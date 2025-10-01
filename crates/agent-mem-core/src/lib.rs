@@ -7,8 +7,12 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+/// Agent state management and lifecycle
+pub mod agent_state;
 /// Specialized memory agents for different cognitive memory types
 pub mod agents;
+/// Background agent processing system
+pub mod background_agent;
 pub mod client;
 pub mod collaboration;
 pub mod compression;
@@ -31,6 +35,8 @@ pub mod lifecycle;
 pub mod manager;
 /// Specialized memory managers for different memory types
 pub mod managers;
+/// Message queue system for agent communication
+pub mod message_queue;
 pub mod operations;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
@@ -47,8 +53,11 @@ pub mod types;
 pub mod vector_ecosystem;
 
 // Re-export core types
+pub use agent_state::{AgentState, AgentStateMachine};
+pub use background_agent::BackgroundAgentManager;
 pub use engine::{MemoryEngine, MemoryEngineConfig};
 pub use hierarchy::{HierarchyManager, MemoryLevel};
+pub use message_queue::{AgentMessage as QueueMessage, MessageAccumulator, MessageQueue};
 pub use managers::{
     ActivityState, ChangeType, ContextCorrelation, ContextState, ContextualMemoryConfig,
     ContextualMemoryManager, ContextualMemoryStats, CoreMemoryBlock, CoreMemoryBlockType,

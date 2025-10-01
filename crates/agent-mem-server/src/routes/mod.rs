@@ -90,6 +90,15 @@ pub async fn create_router(
             "/api/v1/agents/:id/messages",
             post(agents::send_message_to_agent),
         )
+        // Agent state management routes
+        .route(
+            "/api/v1/agents/:agent_id/state",
+            get(agents::get_agent_state),
+        )
+        .route(
+            "/api/v1/agents/:agent_id/state",
+            put(agents::update_agent_state),
+        )
         // Message management routes
         .route("/api/v1/messages", post(messages::create_message))
         .route("/api/v1/messages/:id", get(messages::get_message))
@@ -156,6 +165,8 @@ pub async fn create_router(
         agents::delete_agent,
         agents::list_agents,
         agents::send_message_to_agent,
+        agents::get_agent_state,
+        agents::update_agent_state,
         messages::create_message,
         messages::get_message,
         messages::list_messages,
@@ -195,6 +206,8 @@ pub async fn create_router(
             agents::AgentResponse,
             agents::SendMessageRequest,
             agents::SendMessageResponse,
+            agents::AgentStateResponse,
+            agents::UpdateAgentStateRequest,
             messages::CreateMessageRequest,
             messages::MessageResponse,
             tools::RegisterToolRequest,

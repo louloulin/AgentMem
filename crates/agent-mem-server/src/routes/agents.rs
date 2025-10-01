@@ -84,6 +84,9 @@ pub struct AgentResponse {
     pub embedding_config: Option<JsonValue>,
     pub tool_rules: Option<JsonValue>,
     pub metadata: Option<JsonValue>,
+    pub state: Option<String>,
+    pub last_active_at: Option<String>,
+    pub error_message: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -101,6 +104,9 @@ impl From<Agent> for AgentResponse {
             embedding_config: agent.embedding_config,
             tool_rules: agent.tool_rules,
             metadata: agent.metadata_,
+            state: agent.state,
+            last_active_at: agent.last_active_at.map(|dt| dt.to_rfc3339()),
+            error_message: agent.error_message,
             created_at: agent.created_at.to_rfc3339(),
             updated_at: agent.updated_at.to_rfc3339(),
         }
@@ -568,4 +574,143 @@ pub async fn send_message_to_agent(
     };
 
     Ok(Json(ApiResponse::success(response)))
+}
+
+/// Get agent state
+///
+/// Returns the current state of an agent.
+#[utoipa::path(
+    get,
+    path = "/api/v1/agents/{agent_id}/state",
+    params(
+        ("agent_id" = String, Path, description = "Agent ID")
+    ),
+    responses(
+        (status = 200, description = "Agent state retrieved successfully", body = AgentStateResponse),
+        (status = 404, description = "Agent not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = []),
+        ("api_key" = [])
+    )
+)]
+pub async fn get_agent_state(
+    State(pool): State<PgPool>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(agent_id): Path<String>,
+) -> ServerResult<Json<ApiResponse<AgentStateResponse>>> {
+    let agent_repo = AgentRepository::new(pool.clone());
+
+    // Get agent
+    let agent = agent_repo
+        .read(&agent_id)
+        .await
+        .map_err(|e| ServerError::internal_error(format!("Failed to get agent: {e}")))?
+        .ok_or_else(|| ServerError::not_found("Agent not found"))?;
+
+    // Check authorization
+    if agent.organization_id != auth_user.org_id {
+        return Err(ServerError::forbidden("Access denied"));
+    }
+
+    let response = AgentStateResponse {
+        agent_id: agent.id,
+        state: agent.state.unwrap_or_else(|| "idle".to_string()),
+        last_active_at: agent.last_active_at.map(|dt| dt.to_rfc3339()),
+        error_message: agent.error_message,
+    };
+
+    Ok(Json(ApiResponse::success(response)))
+}
+
+/// Update agent state
+///
+/// Updates the state of an agent.
+#[utoipa::path(
+    put,
+    path = "/api/v1/agents/{agent_id}/state",
+    params(
+        ("agent_id" = String, Path, description = "Agent ID")
+    ),
+    request_body = UpdateAgentStateRequest,
+    responses(
+        (status = 200, description = "Agent state updated successfully", body = AgentStateResponse),
+        (status = 404, description = "Agent not found"),
+        (status = 400, description = "Invalid state transition"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = []),
+        ("api_key" = [])
+    )
+)]
+pub async fn update_agent_state(
+    State(pool): State<PgPool>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(agent_id): Path<String>,
+    Json(req): Json<UpdateAgentStateRequest>,
+) -> ServerResult<Json<ApiResponse<AgentStateResponse>>> {
+    let agent_repo = AgentRepository::new(pool.clone());
+
+    // Get agent
+    let mut agent = agent_repo
+        .read(&agent_id)
+        .await
+        .map_err(|e| ServerError::internal_error(format!("Failed to get agent: {e}")))?
+        .ok_or_else(|| ServerError::not_found("Agent not found"))?;
+
+    // Check authorization
+    if agent.organization_id != auth_user.org_id {
+        return Err(ServerError::forbidden("Access denied"));
+    }
+
+    // Validate state
+    let valid_states = vec!["idle", "thinking", "executing", "waiting", "error"];
+    if !valid_states.contains(&req.state.as_str()) {
+        return Err(ServerError::bad_request(format!(
+            "Invalid state: {}. Valid states are: {}",
+            req.state,
+            valid_states.join(", ")
+        )));
+    }
+
+    // Update agent state
+    agent.state = Some(req.state.clone());
+    agent.last_active_at = Some(Utc::now());
+    agent.error_message = req.error_message.clone();
+    agent.updated_at = Utc::now();
+
+    // Save agent
+    agent_repo
+        .update(&agent)
+        .await
+        .map_err(|e| ServerError::internal_error(format!("Failed to update agent: {e}")))?;
+
+    let response = AgentStateResponse {
+        agent_id: agent.id,
+        state: agent.state.unwrap_or_else(|| "idle".to_string()),
+        last_active_at: agent.last_active_at.map(|dt| dt.to_rfc3339()),
+        error_message: agent.error_message,
+    };
+
+    Ok(Json(ApiResponse::success(response)))
+}
+
+/// Agent state response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AgentStateResponse {
+    pub agent_id: String,
+    pub state: String,
+    pub last_active_at: Option<String>,
+    pub error_message: Option<String>,
+}
+
+/// Request to update agent state
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateAgentStateRequest {
+    /// New state (idle, thinking, executing, waiting, error)
+    pub state: String,
+    /// Error message (only for error state)
+    pub error_message: Option<String>,
 }

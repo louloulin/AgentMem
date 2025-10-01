@@ -63,6 +63,9 @@ pub struct Agent {
     pub tool_rules: Option<JsonValue>,
     #[sqlx(json)]
     pub mcp_tools: Option<Vec<String>>, // MCP server names
+    pub state: Option<String>,          // Agent state: idle, thinking, executing, waiting, error
+    pub last_active_at: Option<DateTime<Utc>>, // Last activity timestamp
+    pub error_message: Option<String>,  // Error message if state is error
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub is_deleted: bool,
@@ -235,6 +238,9 @@ impl Agent {
             embedding_config: None,
             tool_rules: None,
             mcp_tools: None,
+            state: Some("idle".to_string()),
+            last_active_at: None,
+            error_message: None,
             created_at: now,
             updated_at: now,
             is_deleted: false,
