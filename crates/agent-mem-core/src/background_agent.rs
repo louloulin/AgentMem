@@ -195,9 +195,11 @@ impl BackgroundAgentManager {
 impl Drop for BackgroundAgentManager {
     fn drop(&mut self) {
         // Abort all tasks
-        let tasks = self.tasks.blocking_write();
-        for (_, handle) in tasks.iter() {
-            handle.abort();
+        // Use try_write to avoid blocking in async context
+        if let Ok(tasks) = self.tasks.try_write() {
+            for (_, handle) in tasks.iter() {
+                handle.abort();
+            }
         }
     }
 }
