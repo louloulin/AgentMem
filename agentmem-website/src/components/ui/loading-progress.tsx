@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 /**
- * 页面加载进度条组件
+ * 页面加载进度条组件（内部实现）
  */
-export function PageLoadingProgress() {
+function PageLoadingProgressInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const pathname = usePathname();
@@ -42,11 +42,9 @@ export function PageLoadingProgress() {
     };
 
     // 监听路由变化
-    let interval: NodeJS.Timeout;
-    
     // 页面开始加载
-    interval = handleStart();
-    
+    const interval = handleStart();
+
     // 页面加载完成
     const timer = setTimeout(() => {
       clearInterval(interval);
@@ -65,11 +63,22 @@ export function PageLoadingProgress() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-slate-800/50">
-      <div 
+      <div
         className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300 ease-out"
         style={{ width: `${progress}%` }}
       />
     </div>
+  );
+}
+
+/**
+ * 页面加载进度条组件（带 Suspense 包装）
+ */
+export function PageLoadingProgress() {
+  return (
+    <Suspense fallback={null}>
+      <PageLoadingProgressInner />
+    </Suspense>
   );
 }
 

@@ -55,7 +55,7 @@ export interface Memory {
   agent_id: string;
   memory_type: string;
   content: string;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
   importance: number;
   created_at: string;
   updated_at: string;
@@ -65,7 +65,7 @@ export interface CreateMemoryRequest {
   agent_id: string;
   memory_type: string;
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   importance?: number;
 }
 
@@ -104,9 +104,9 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {

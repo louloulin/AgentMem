@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

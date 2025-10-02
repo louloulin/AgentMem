@@ -8,6 +8,9 @@ import { FadeIn, SlideIn } from "@/components/ui/animations";
 import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, Book, Zap } from "lucide-react";
 import Link from "next/link";
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
+
 interface FAQItem {
   id: string;
   question: string;

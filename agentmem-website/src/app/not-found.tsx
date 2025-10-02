@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Home } from "lucide-react";
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
+
 // 分离使用useSearchParams的组件
 function NotFoundContent() {
   return (
