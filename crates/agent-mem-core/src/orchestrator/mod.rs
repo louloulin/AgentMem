@@ -21,6 +21,9 @@ pub mod memory_integration;
 pub mod tool_integration;
 pub mod memory_extraction;
 
+use memory_integration::MemoryIntegrator;
+use memory_extraction::MemoryExtractor;
+
 /// 对话请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequest {
@@ -104,6 +107,8 @@ pub struct AgentOrchestrator {
     message_repo: Arc<MessageRepository>,
     llm_client: Arc<LLMClient>,
     tool_executor: Arc<ToolExecutor>,
+    memory_integrator: MemoryIntegrator,
+    memory_extractor: MemoryExtractor,
 }
 
 impl AgentOrchestrator {
@@ -115,12 +120,23 @@ impl AgentOrchestrator {
         llm_client: Arc<LLMClient>,
         tool_executor: Arc<ToolExecutor>,
     ) -> Self {
+        // 创建记忆集成器
+        let memory_integrator = MemoryIntegrator::with_default_config(memory_engine.clone());
+
+        // 创建记忆提取器
+        let memory_extractor = MemoryExtractor::with_default_config(
+            llm_client.clone(),
+            memory_engine.clone(),
+        );
+
         Self {
             config,
             memory_engine,
             message_repo,
             llm_client,
             tool_executor,
+            memory_integrator,
+            memory_extractor,
         }
     }
 
@@ -208,9 +224,17 @@ impl AgentOrchestrator {
 
     /// 检索相关记忆
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
-        // 使用 MemoryEngine 检索记忆
-        // TODO: 实现完整的记忆检索逻辑
-        Ok(Vec::new())
+        // 使用 MemoryIntegrator 检索记忆
+        let max_count = self.config.max_memories_per_request;
+        let memories = self.memory_integrator
+            .retrieve_relevant_memories(&request.message, &request.agent_id, max_count)
+            .await?;
+
+        // 过滤和排序
+        let memories = self.memory_integrator.filter_by_relevance(memories);
+        let memories = self.memory_integrator.sort_memories(memories);
+
+        Ok(memories)
     }
 
     /// 构建包含记忆的消息列表
@@ -223,8 +247,8 @@ impl AgentOrchestrator {
 
         // 添加系统消息（包含记忆）
         if !memories.is_empty() {
-            let memory_context = self.format_memories_for_prompt(memories);
-            messages.push(Message::system(&format!("Relevant memories:\n{}", memory_context)));
+            let memory_context = self.memory_integrator.inject_memories_to_prompt(memories);
+            messages.push(Message::system(&memory_context));
         }
 
         // 添加用户消息
@@ -233,24 +257,21 @@ impl AgentOrchestrator {
         Ok(messages)
     }
 
-    /// 格式化记忆为 prompt
-    fn format_memories_for_prompt(&self, memories: &[Memory]) -> String {
-        memories
-            .iter()
-            .map(|m| format!("- {}", m.content))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     /// 提取和更新记忆
     async fn extract_and_update_memories(
         &self,
         request: &ChatRequest,
         messages: &[Message],
     ) -> Result<usize> {
-        // TODO: 使用 LLM 从对话中提取记忆
-        // TODO: 使用 MemoryEngine 存储记忆
-        Ok(0)
+        // 使用 MemoryExtractor 提取记忆
+        let memories = self.memory_extractor
+            .extract_from_conversation(messages, &request.agent_id, &request.user_id)
+            .await?;
+
+        // 保存记忆
+        let count = self.memory_extractor.save_memories(memories).await?;
+
+        Ok(count)
     }
 }
 
