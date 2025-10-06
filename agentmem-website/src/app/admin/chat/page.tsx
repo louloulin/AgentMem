@@ -34,6 +34,13 @@ export default function ChatPage() {
     loadAgents();
   }, []);
 
+  // Load chat history when agent changes
+  useEffect(() => {
+    if (selectedAgentId) {
+      loadChatHistory();
+    }
+  }, [selectedAgentId]);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,6 +58,23 @@ export default function ChatPage() {
     }
   };
 
+  const loadChatHistory = async () => {
+    if (!selectedAgentId) return;
+
+    try {
+      const history = await apiClient.getChatHistory(selectedAgentId);
+      const loadedMessages: Message[] = history.map((msg) => ({
+        id: msg.id,
+        role: msg.role === 'user' ? 'user' : 'agent',
+        content: msg.content || '',
+        timestamp: new Date(msg.created_at),
+      }));
+      setMessages(loadedMessages);
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !selectedAgentId || loading) return;
@@ -63,23 +87,36 @@ export default function ChatPage() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const messageContent = input;
     setInput('');
     setLoading(true);
 
     try {
-      // Simulate agent response (replace with actual API call)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call real Chat API
+      const response = await apiClient.sendChatMessage(selectedAgentId, {
+        message: messageContent,
+      });
 
       const agentMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: response.message_id,
         role: 'agent',
-        content: `I received your message: "${input}". This is a simulated response. In production, this would call the agent's processing endpoint.`,
+        content: response.content,
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, agentMessage]);
     } catch (err) {
       console.error('Failed to send message:', err);
+
+      // Show error message to user
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'agent',
+        content: `Error: ${err instanceof Error ? err.message : 'Failed to send message'}. Please try again.`,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }

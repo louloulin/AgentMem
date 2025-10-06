@@ -48,6 +48,38 @@ export interface AgentStateResponse {
 }
 
 /**
+ * Chat types
+ */
+export interface ChatMessageRequest {
+  message: string;
+  user_id?: string;
+  stream?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ToolCallInfo {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  result?: string;
+}
+
+export interface ChatMessageResponse {
+  message_id: string;
+  content: string;
+  memories_updated: boolean;
+  memories_count: number;
+  tool_calls?: ToolCallInfo[];
+  processing_time_ms: number;
+}
+
+export interface ChatHistoryMessage {
+  id: string;
+  role: string;
+  content: string | null;
+  created_at: string;
+}
+
+/**
  * Memory types
  */
 export interface Memory {
@@ -205,6 +237,35 @@ class ApiClient {
         method: 'PUT',
         body: JSON.stringify(data),
       }
+    );
+    return response.data;
+  }
+
+  // ==================== Chat APIs ====================
+
+  /**
+   * Send chat message to agent
+   */
+  async sendChatMessage(
+    agentId: string,
+    data: ChatMessageRequest
+  ): Promise<ChatMessageResponse> {
+    const response = await this.request<ApiResponse<ChatMessageResponse>>(
+      `/api/v1/agents/${agentId}/chat`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Get chat history for agent
+   */
+  async getChatHistory(agentId: string): Promise<ChatHistoryMessage[]> {
+    const response = await this.request<ApiResponse<ChatHistoryMessage[]>>(
+      `/api/v1/agents/${agentId}/chat/history`
     );
     return response.data;
   }
