@@ -91,9 +91,7 @@ impl MemoryIntegrator {
             prompt.push_str(&format!("{}. ", i + 1));
 
             // 添加记忆类型标签
-            if let Some(memory_type) = &memory.memory_type {
-                prompt.push_str(&format!("[{}] ", self.format_memory_type(memory_type)));
-            }
+            prompt.push_str(&format!("[{}] ", self.format_memory_type(&memory.memory_type)));
 
             // 添加记忆内容
             prompt.push_str(&memory.content);
