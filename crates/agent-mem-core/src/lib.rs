@@ -38,6 +38,8 @@ pub mod managers;
 /// Message queue system for agent communication
 pub mod message_queue;
 pub mod operations;
+/// Agent orchestrator for conversation loop and memory integration
+pub mod orchestrator;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
 pub mod search;
@@ -91,6 +93,11 @@ pub use retrieval::{
 pub use integration::{
     ComponentHealth, HealthStatus, SystemConfig, SystemIntegrationManager, SystemState,
     SystemStatus,
+};
+
+// Re-export orchestrator modules
+pub use orchestrator::{
+    AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig, ToolCallInfo,
 };
 
 // Re-export from traits
