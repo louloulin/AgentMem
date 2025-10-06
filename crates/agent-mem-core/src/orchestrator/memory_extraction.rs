@@ -4,8 +4,9 @@
 
 use crate::{Memory, engine::MemoryEngine};
 use agent_mem_llm::LLMClient;
-use agent_mem_traits::{Result, Message, MemoryType};
+use agent_mem_traits::{Result, Message, MemoryType, Session};
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -165,13 +166,28 @@ impl MemoryExtractor {
                             .and_then(|v| v.as_f64())
                             .unwrap_or(0.5) as f32;
 
-                        let memory = Memory::new(
-                            agent_id.to_string(),
-                            Some(user_id.to_string()),
-                            memory_type.unwrap_or(MemoryType::Episodic),
-                            content.to_string(),
+                        let now = Utc::now();
+                        let memory = Memory {
+                            id: Uuid::new_v4().to_string(),
+                            content: content.to_string(),
+                            hash: None,
+                            metadata: HashMap::new(),
+                            score: Some(importance),
+                            created_at: now,
+                            updated_at: Some(now),
+                            session: Session::new(),
+                            memory_type: memory_type.unwrap_or(MemoryType::Episodic),
+                            entities: Vec::new(),
+                            relations: Vec::new(),
+                            agent_id: agent_id.to_string(),
+                            user_id: Some(user_id.to_string()),
                             importance,
-                        );
+                            embedding: None,
+                            last_accessed_at: now,
+                            access_count: 0,
+                            expires_at: None,
+                            version: 1,
+                        };
                         memories.push(memory);
                     }
                 }
@@ -204,10 +220,10 @@ impl MemoryExtractor {
             "procedural" => Some(MemoryType::Procedural),
             "working" => Some(MemoryType::Working),
             "core" => Some(MemoryType::Core),
-            "declarative" => Some(MemoryType::Declarative),
-            "implicit" => Some(MemoryType::Implicit),
-            "explicit" => Some(MemoryType::Explicit),
-            "autobiographical" => Some(MemoryType::Autobiographical),
+            "resource" => Some(MemoryType::Resource),
+            "knowledge" => Some(MemoryType::Knowledge),
+            "contextual" => Some(MemoryType::Contextual),
+            "factual" => Some(MemoryType::Factual),
             _ => None,
         }
     }
@@ -215,17 +231,32 @@ impl MemoryExtractor {
     /// 提取简单记忆（降级方案）
     fn extract_simple_memories(&self, text: &str, agent_id: &str, user_id: &str) -> Vec<Memory> {
         // 简单的基于行的提取
+        let now = Utc::now();
         text.lines()
             .filter(|line| !line.trim().is_empty() && line.len() > 10)
             .take(5) // 最多提取 5 条
             .map(|line| {
-                Memory::new(
-                    agent_id.to_string(),
-                    Some(user_id.to_string()),
-                    MemoryType::Episodic,
-                    line.trim().to_string(),
-                    0.5,
-                )
+                Memory {
+                    id: Uuid::new_v4().to_string(),
+                    content: line.trim().to_string(),
+                    hash: None,
+                    metadata: HashMap::new(),
+                    score: Some(0.5),
+                    created_at: now,
+                    updated_at: Some(now),
+                    session: Session::new(),
+                    memory_type: MemoryType::Episodic,
+                    entities: Vec::new(),
+                    relations: Vec::new(),
+                    agent_id: agent_id.to_string(),
+                    user_id: Some(user_id.to_string()),
+                    importance: 0.5,
+                    embedding: None,
+                    last_accessed_at: now,
+                    access_count: 0,
+                    expires_at: None,
+                    version: 1,
+                }
             })
             .collect()
     }

@@ -225,7 +225,7 @@ impl AgentOrchestrator {
     /// 检索相关记忆
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
         // 使用 MemoryIntegrator 检索记忆
-        let max_count = self.config.max_memories_per_request;
+        let max_count = self.config.max_memories;
         let memories = self.memory_integrator
             .retrieve_relevant_memories(&request.message, &request.agent_id, max_count)
             .await?;

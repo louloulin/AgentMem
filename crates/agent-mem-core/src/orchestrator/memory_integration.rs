@@ -100,17 +100,13 @@ impl MemoryIntegrator {
 
             // 添加时间戳（如果启用）
             if self.config.include_timestamp {
-                if let Some(timestamp) = memory.timestamp {
-                    let time_str = timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-                    prompt.push_str(&format!(" ({})", time_str));
-                }
+                let time_str = memory.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+                prompt.push_str(&format!(" ({})", time_str));
             }
 
             // 添加重要性分数（如果有）
-            if let Some(score) = memory.score {
-                if score > 0.7 {
-                    prompt.push_str(" [Important]");
-                }
+            if memory.importance > 0.7 {
+                prompt.push_str(" [Important]");
             }
 
             prompt.push_str("\n");
@@ -128,10 +124,10 @@ impl MemoryIntegrator {
             MemoryType::Procedural => "Procedural",
             MemoryType::Working => "Working",
             MemoryType::Core => "Core",
-            MemoryType::Declarative => "Declarative",
-            MemoryType::Implicit => "Implicit",
-            MemoryType::Explicit => "Explicit",
-            MemoryType::Autobiographical => "Autobiographical",
+            MemoryType::Resource => "Resource",
+            MemoryType::Knowledge => "Knowledge",
+            MemoryType::Contextual => "Contextual",
+            MemoryType::Factual => "Factual",
         }
     }
 
@@ -139,9 +135,7 @@ impl MemoryIntegrator {
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
             memories.sort_by(|a, b| {
-                let score_a = a.score.unwrap_or(0.0);
-                let score_b = b.score.unwrap_or(0.0);
-                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal)
             });
         }
         memories
@@ -152,7 +146,7 @@ impl MemoryIntegrator {
         memories
             .into_iter()
             .filter(|m| {
-                m.score.unwrap_or(0.0) >= self.config.relevance_threshold
+                m.importance >= self.config.relevance_threshold
             })
             .collect()
     }
