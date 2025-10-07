@@ -6,7 +6,7 @@ use crate::error::{ServerError, ServerResult};
 use crate::models::ApiResponse;
 use agent_mem_tools::mcp::{McpServer, ServerInfo};
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -15,11 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use utoipa::ToSchema;
-
-/// MCP 服务端状态
-pub struct McpServerState {
-    pub server: Arc<McpServer>,
-}
 
 /// 工具调用请求
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -67,11 +62,11 @@ pub enum ContentItem {
     )
 )]
 pub async fn get_server_info(
-    State(state): State<Arc<McpServerState>>,
+    Extension(mcp_server): Extension<Arc<McpServer>>,
 ) -> ServerResult<Json<ApiResponse<ServerInfo>>> {
     info!("Getting MCP server info");
 
-    let info = state.server.get_server_info();
+    let info = mcp_server.get_server_info();
 
     Ok(Json(ApiResponse::success(info)))
 }
@@ -89,11 +84,11 @@ pub async fn get_server_info(
     )
 )]
 pub async fn list_tools(
-    State(state): State<Arc<McpServerState>>,
+    Extension(mcp_server): Extension<Arc<McpServer>>,
 ) -> ServerResult<Json<ApiResponse<serde_json::Value>>> {
     info!("Listing MCP tools");
 
-    let response = state.server.list_tools().await
+    let response = mcp_server.list_tools().await
         .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
 
     Ok(Json(ApiResponse::success(serde_json::json!({
@@ -116,14 +111,14 @@ pub async fn list_tools(
     )
 )]
 pub async fn call_tool(
-    State(state): State<Arc<McpServerState>>,
+    Extension(mcp_server): Extension<Arc<McpServer>>,
     Json(request): Json<ToolCallRequest>,
 ) -> ServerResult<Json<ApiResponse<ToolCallResponse>>> {
     info!("Calling MCP tool: {}", request.name);
 
     // 验证 API 密钥（如果需要）
     if let Some(api_key) = &request.api_key {
-        if !state.server.verify_api_key(api_key) {
+        if !mcp_server.verify_api_key(api_key) {
             return Err(ServerError::Unauthorized("Invalid API key".to_string()));
         }
     }
@@ -136,7 +131,7 @@ pub async fn call_tool(
         arguments: request.arguments,
     };
 
-    let mcp_response = state.server.call_tool(mcp_request).await
+    let mcp_response = mcp_server.call_tool(mcp_request).await
         .map_err(|e| ServerError::Internal(format!("Tool execution failed: {}", e)))?;
 
     // 转换响应
@@ -181,12 +176,12 @@ pub async fn call_tool(
     )
 )]
 pub async fn get_tool(
-    State(state): State<Arc<McpServerState>>,
+    Extension(mcp_server): Extension<Arc<McpServer>>,
     Path(tool_name): Path<String>,
 ) -> ServerResult<Json<ApiResponse<serde_json::Value>>> {
     info!("Getting MCP tool: {}", tool_name);
 
-    let response = state.server.list_tools().await
+    let response = mcp_server.list_tools().await
         .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
 
     let tool = response.tools
@@ -210,11 +205,11 @@ pub async fn get_tool(
     )
 )]
 pub async fn health_check(
-    State(state): State<Arc<McpServerState>>,
+    Extension(mcp_server): Extension<Arc<McpServer>>,
 ) -> ServerResult<Json<ApiResponse<serde_json::Value>>> {
     debug!("MCP health check");
 
-    let info = state.server.get_server_info();
+    let info = mcp_server.get_server_info();
 
     Ok(Json(ApiResponse::success(serde_json::json!({
         "status": "healthy",
@@ -237,11 +232,7 @@ mod tests {
         let mcp_server = Arc::new(McpServer::new(config, tool_executor));
         mcp_server.initialize().await.unwrap();
 
-        let state = Arc::new(McpServerState {
-            server: mcp_server,
-        });
-
-        let response = get_server_info(State(state)).await.unwrap();
+        let response = get_server_info(Extension(mcp_server)).await.unwrap();
         assert_eq!(response.0.data.name, "AgentMem MCP Server");
     }
 
@@ -252,11 +243,7 @@ mod tests {
         let mcp_server = Arc::new(McpServer::new(config, tool_executor));
         mcp_server.initialize().await.unwrap();
 
-        let state = Arc::new(McpServerState {
-            server: mcp_server,
-        });
-
-        let response = list_tools(State(state)).await.unwrap();
+        let response = list_tools(Extension(mcp_server)).await.unwrap();
         assert!(response.0.success);
     }
 
@@ -267,11 +254,7 @@ mod tests {
         let mcp_server = Arc::new(McpServer::new(config, tool_executor));
         mcp_server.initialize().await.unwrap();
 
-        let state = Arc::new(McpServerState {
-            server: mcp_server,
-        });
-
-        let response = health_check(State(state)).await.unwrap();
+        let response = health_check(Extension(mcp_server)).await.unwrap();
         assert!(response.0.success);
         assert_eq!(
             response.0.data["status"].as_str().unwrap(),

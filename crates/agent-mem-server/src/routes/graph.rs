@@ -149,7 +149,7 @@ pub async fn get_graph_data(
         let entities = kg_manager
             .get_entities_by_type(&auth_user.user_id, entity_type)
             .await
-            .map_err(|e| ServerError::InternalError(e.to_string()))?;
+            .map_err(|e| ServerError::Internal(e.to_string()))?;
 
         for entity in entities {
             if entity.confidence >= params.min_confidence {
@@ -170,7 +170,7 @@ pub async fn get_graph_data(
         let associations = assoc_manager
             .get_associations(&node.id, &auth_user.user_id)
             .await
-            .map_err(|e| ServerError::InternalError(e.to_string()))?;
+            .map_err(|e| ServerError::Internal(e.to_string()))?;
 
         for assoc in associations {
             all_edges.push(GraphEdge {
@@ -225,7 +225,7 @@ pub async fn create_association(
 
     let association_id = assoc_manager
         .create_association(
-            &auth_user.organization_id,
+            &auth_user.org_id,
             &auth_user.user_id,
             &auth_user.user_id, // agent_id
             &req.from_memory_id,
@@ -236,7 +236,7 @@ pub async fn create_association(
             req.metadata.clone(),
         )
         .await
-        .map_err(|e| ServerError::InternalError(e.to_string()))?;
+        .map_err(|e| ServerError::Internal(e.to_string()))?;
 
     let response = AssociationResponse {
         id: association_id,
@@ -282,7 +282,7 @@ pub async fn get_memory_associations(
     let associations = assoc_manager
         .get_associations(&memory_id, &auth_user.user_id)
         .await
-        .map_err(|e| ServerError::InternalError(e.to_string()))?;
+        .map_err(|e| ServerError::Internal(e.to_string()))?;
 
     let response: Vec<AssociationResponse> = associations
         .into_iter()
@@ -326,7 +326,7 @@ pub async fn get_graph_stats(
     let stats = assoc_manager
         .get_stats(&auth_user.user_id)
         .await
-        .map_err(|e| ServerError::InternalError(e.to_string()))?;
+        .map_err(|e| ServerError::Internal(e.to_string()))?;
 
     let response = serde_json::json!({
         "total_associations": stats.total_associations,

@@ -14,7 +14,7 @@ use std::time::Instant;
 
 /// Middleware to collect request metrics
 pub async fn metrics_middleware(
-    Extension(metrics): Extension<Arc<MetricsRegistry>>,
+    Extension(metrics_registry): Extension<Arc<MetricsRegistry>>,
     req: Request,
     next: Next,
 ) -> Response {
@@ -29,23 +29,23 @@ pub async fn metrics_middleware(
     let duration = start.elapsed().as_secs_f64();
     let status = response.status().as_u16();
 
-    // Increment request counter
-    let status_str = status.to_string();
-    metrics
-        .increment_requests(&method, &path, &status_str)
-        .await;
+    // Get the metrics collector
+    let collector = metrics_registry.collector();
+
+    // Record request
+    collector.record_request(&method, &path, status).await;
 
     // Record request duration
-    metrics.record_request_duration(&method, &path, duration).await;
+    collector.record_request_duration(&method, &path, duration).await;
 
-    // Increment error counter if status >= 400
+    // Record error if status >= 400
     if status >= 400 {
         let error_type = if status >= 500 {
             "server_error"
         } else {
             "client_error"
         };
-        metrics.increment_errors(error_type).await;
+        collector.record_error(error_type).await;
     }
 
     response
