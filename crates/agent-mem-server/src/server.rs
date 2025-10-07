@@ -7,6 +7,7 @@ use crate::{
     routes::create_router,
     telemetry::setup_telemetry,
 };
+use agent_mem_observability::metrics::MetricsRegistry;
 use axum::Router;
 use sqlx::PgPool;
 use std::net::SocketAddr;
@@ -18,6 +19,7 @@ use tracing::info;
 pub struct MemoryServer {
     config: ServerConfig,
     memory_manager: Arc<MemoryManager>,
+    metrics_registry: Arc<MetricsRegistry>,
     db_pool: PgPool,
     router: Router,
 }
@@ -39,14 +41,24 @@ impl MemoryServer {
         // Create memory manager
         let memory_manager = Arc::new(MemoryManager::new());
 
+        // Create metrics registry
+        let metrics_registry = Arc::new(MetricsRegistry::new());
+        info!("Metrics registry initialized");
+
         // Create router with all routes and middleware
-        let router = create_router(memory_manager.clone(), db_pool.clone()).await?;
+        let router = create_router(
+            memory_manager.clone(),
+            metrics_registry.clone(),
+            db_pool.clone(),
+        )
+        .await?;
 
         info!("Memory server initialized successfully");
 
         Ok(Self {
             config,
             memory_manager,
+            metrics_registry,
             db_pool,
             router,
         })

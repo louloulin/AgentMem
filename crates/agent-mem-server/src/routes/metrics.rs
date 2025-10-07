@@ -2,7 +2,10 @@
 
 use crate::routes::memory::MemoryManager;
 use crate::{error::ServerResult, models::MetricsResponse};
-use axum::{extract::Extension, response::Json};
+use axum::{
+    extract::Extension,
+    response::{IntoResponse, Json, Response},
+};
 use chrono::Utc;
 use std::sync::Arc;
 use utoipa;
@@ -74,6 +77,41 @@ pub async fn get_metrics(
     Ok(Json(response))
 }
 
+/// Get Prometheus metrics
+///
+/// Returns metrics in Prometheus text format for scraping
+#[utoipa::path(
+    get,
+    path = "/metrics/prometheus",
+    tag = "health",
+    responses(
+        (status = 200, description = "Prometheus metrics", content_type = "text/plain"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_prometheus_metrics(
+    Extension(metrics_registry): Extension<Arc<agent_mem_observability::metrics::MetricsRegistry>>,
+) -> impl IntoResponse {
+    use prometheus::Encoder;
+
+    let encoder = prometheus::TextEncoder::new();
+    let metric_families = metrics_registry.registry().gather();
+
+    let mut buffer = Vec::new();
+    if let Err(e) = encoder.encode(&metric_families, &mut buffer) {
+        return Response::builder()
+            .status(500)
+            .body(format!("Failed to encode metrics: {}", e).into())
+            .unwrap();
+    }
+
+    Response::builder()
+        .status(200)
+        .header("Content-Type", encoder.format_type())
+        .body(buffer.into())
+        .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +125,12 @@ mod tests {
 
         let response = result.unwrap().0;
         assert!(response.metrics.contains_key("total_memories"));
+    }
+
+    #[tokio::test]
+    async fn test_get_prometheus_metrics() {
+        let metrics_registry = Arc::new(agent_mem_observability::metrics::MetricsRegistry::new());
+        let response = get_prometheus_metrics(Extension(metrics_registry)).await;
+        assert_eq!(response.status(), 200);
     }
 }

@@ -9,6 +9,7 @@
 
 pub mod audit;
 pub mod auth;
+pub mod metrics;
 pub mod quota;
 
 use axum::{extract::Request, middleware::Next, response::Response};
@@ -21,6 +22,9 @@ pub use auth::{
 
 // Re-export audit middleware
 pub use audit::{audit_logging_middleware, log_security_event, SecurityEvent};
+
+// Re-export metrics middleware
+pub use metrics::metrics_middleware;
 
 // Re-export quota middleware
 pub use quota::{quota_middleware, QuotaLimits, QuotaManager, UsageStats};

@@ -16,6 +16,7 @@ agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-tools = { path = "../agent-mem-tools" }
 agent-mem-llm = { path = "../agent-mem-llm" }
+agent-mem-observability = { path = "../agent-mem-observability" }
 
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }

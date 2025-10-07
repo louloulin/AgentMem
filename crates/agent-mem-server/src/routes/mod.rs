@@ -13,10 +13,11 @@ pub mod tools;
 pub mod users;
 
 use crate::error::ServerResult;
-use crate::middleware::{audit_logging_middleware, quota_middleware};
+use crate::middleware::{audit_logging_middleware, metrics_middleware, quota_middleware};
 use crate::routes::memory::MemoryManager;
 use crate::sse::SseManager;
 use crate::websocket::WebSocketManager;
+use agent_mem_observability::metrics::MetricsRegistry;
 use axum::{
     middleware as axum_middleware,
     routing::{delete, get, post, put},
@@ -31,6 +32,7 @@ use utoipa_swagger_ui::SwaggerUi;
 /// Create the main router with all routes
 pub async fn create_router(
     memory_manager: Arc<MemoryManager>,
+    metrics_registry: Arc<MetricsRegistry>,
     db_pool: PgPool,
 ) -> ServerResult<Router> {
     // Create WebSocket and SSE managers
@@ -142,15 +144,18 @@ pub async fn create_router(
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/metrics", get(metrics::get_metrics))
+        .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
         // OpenAPI documentation
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // Add shared state via with_state
         .with_state(db_pool)
         // Add shared state via Extension
         .layer(Extension(memory_manager))
+        .layer(Extension(metrics_registry))
         .layer(Extension(ws_manager))
         .layer(Extension(sse_manager))
         // Add middleware (order matters: last added = first executed)
+        .layer(axum_middleware::from_fn(metrics_middleware))
         .layer(axum_middleware::from_fn(audit_logging_middleware))
         .layer(axum_middleware::from_fn(quota_middleware))
         .layer(TraceLayer::new_for_http())
@@ -209,6 +214,7 @@ pub async fn create_router(
         graph::get_graph_stats,
         health::health_check,
         metrics::get_metrics,
+        metrics::get_prometheus_metrics,
     ),
     components(
         schemas(
