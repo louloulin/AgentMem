@@ -144,18 +144,29 @@ pub struct VectorStoreStats {
 mod tests {
     use super::*;
     use agent_mem_storage::backends::MemoryVectorStore;
+    use agent_mem_traits::VectorStoreConfig;
     use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_vector_search_engine() {
-        let vector_store = Arc::new(MemoryVectorStore::new());
+        let config = VectorStoreConfig {
+            provider: "memory".to_string(),
+            path: "".to_string(),
+            table_name: "test".to_string(),
+            dimension: Some(128),
+            api_key: None,
+            url: None,
+            index_name: None,
+            collection_name: None,
+        };
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
         let engine = VectorSearchEngine::new(vector_store.clone(), 128);
 
         // 添加测试向量
         let mut metadata = HashMap::new();
         metadata.insert(
             "content".to_string(),
-            serde_json::Value::String("test content".to_string()),
+            "test content".to_string(),
         );
 
         let vectors = vec![VectorData {
@@ -179,12 +190,13 @@ mod tests {
         let (results, elapsed) = engine.search(query_vector, &query).await.unwrap();
 
         assert!(!results.is_empty());
-        assert!(elapsed > 0);
+        assert!(elapsed >= 0); // 允许 0，因为内存操作可能非常快
     }
 
     #[tokio::test]
     async fn test_vector_dimension_validation() {
-        let vector_store = Arc::new(MemoryVectorStore::new());
+        let config = VectorStoreConfig::default();
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
         let engine = VectorSearchEngine::new(vector_store, 128);
 
         let query = SearchQuery::default();
@@ -196,14 +208,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_vectors() {
-        let vector_store = Arc::new(MemoryVectorStore::new());
+        let config = VectorStoreConfig {
+            dimension: Some(128),
+            ..Default::default()
+        };
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
         let engine = VectorSearchEngine::new(vector_store, 128);
 
         // 添加向量
         let mut metadata = HashMap::new();
         metadata.insert(
             "content".to_string(),
-            serde_json::Value::String("test".to_string()),
+            "test".to_string(),
         );
 
         let vectors = vec![VectorData {

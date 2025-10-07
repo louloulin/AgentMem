@@ -24,6 +24,10 @@ pub fn memory_type_to_string(memory_type: &MemoryType) -> String {
         MemoryType::Semantic => "semantic".to_string(),
         MemoryType::Procedural => "procedural".to_string(),
         MemoryType::Working => "working".to_string(),
+        MemoryType::Core => "core".to_string(),
+        MemoryType::Resource => "resource".to_string(),
+        MemoryType::Knowledge => "knowledge".to_string(),
+        MemoryType::Contextual => "contextual".to_string(),
     }
 }
 

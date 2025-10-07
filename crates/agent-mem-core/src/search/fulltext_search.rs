@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_build_search_query() {
         // 注意：这个测试需要实际的数据库连接，这里只测试 SQL 构建逻辑
-        let query = SearchQuery {
+        let _query = SearchQuery {
             query: "test query".to_string(),
             limit: 10,
             threshold: Some(0.7),
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_build_filter_clause() {
-        let filters = SearchFilters {
+        let _filters = SearchFilters {
             user_id: Some("user-123".to_string()),
             organization_id: Some("org-456".to_string()),
             agent_id: None,
