@@ -1,0 +1,15 @@
+//! MCP (Model Context Protocol) 支持
+//!
+//! 提供 MCP 协议的客户端和服务端实现，用于与外部 MCP 服务器通信
+//! 以及将 AgentMem 工具暴露为 MCP 服务。
+
+pub mod types;
+pub mod client;
+pub mod manager;
+pub mod error;
+
+pub use types::{McpServerConfig, McpServerType, McpTool};
+pub use client::McpClient;
+pub use manager::McpClientManager;
+pub use error::{McpError, McpResult};
+

@@ -129,12 +129,16 @@ pub mod error;
 /// Built-in tools
 pub mod builtin;
 
+/// MCP (Model Context Protocol) support
+pub mod mcp;
+
 // Re-export main types
 pub use error::{ToolError, ToolResult};
 pub use execution_sandbox::{
     LocalSandboxConfig, SandboxRunResult, SandboxStatus, SandboxType, ToolExecutionSandbox,
 };
 pub use executor::{ExecutionContext, Tool, ToolExecutor};
+pub use mcp::{McpClient, McpClientManager, McpError, McpResult, McpServerConfig, McpTool};
 pub use permissions::{Permission, PermissionManager};
 pub use sandbox::{CommandOutput, SandboxConfig, SandboxManager, SandboxStats};
 pub use schema::{ParameterSchema, PropertySchema, ToolSchema};
