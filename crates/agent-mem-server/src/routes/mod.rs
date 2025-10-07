@@ -97,6 +97,10 @@ pub async fn create_router(
             post(chat::send_chat_message),
         )
         .route(
+            "/api/v1/agents/:agent_id/chat/stream",
+            post(chat::send_chat_message_stream),
+        )
+        .route(
             "/api/v1/agents/:agent_id/chat/history",
             get(chat::get_chat_history),
         )
@@ -178,6 +182,7 @@ pub async fn create_router(
         agents::get_agent_state,
         agents::update_agent_state,
         chat::send_chat_message,
+        chat::send_chat_message_stream,
         chat::get_chat_history,
         messages::create_message,
         messages::get_message,
