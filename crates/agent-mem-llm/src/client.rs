@@ -1,7 +1,10 @@
 //! LLM客户端实现
 
 use crate::{prompts::PromptManager, LLMFactory};
-use agent_mem_traits::{LLMConfig, LLMProvider, Message, ModelInfo, Result};
+use agent_mem_traits::{
+    llm::{FunctionCallResponse, FunctionDefinition},
+    LLMConfig, LLMProvider, Message, ModelInfo, Result,
+};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -81,6 +84,15 @@ impl LLMClient {
     pub async fn generate(&self, messages: &[Message]) -> Result<String> {
         self.generate_with_retry(messages, self.config.max_retries)
             .await
+    }
+
+    /// 带函数调用的生成响应
+    pub async fn generate_with_functions(
+        &self,
+        messages: &[Message],
+        functions: &[FunctionDefinition],
+    ) -> Result<FunctionCallResponse> {
+        self.provider.generate_with_functions(messages, functions).await
     }
 
     /// 带重试的生成文本响应

@@ -7,9 +7,8 @@
 //! 4. 格式化工具结果
 //! 5. 将结果返回给 LLM
 
-use crate::CoreResult;
 use agent_mem_tools::{ExecutionContext, ToolExecutor};
-use agent_mem_traits::llm::FunctionCall;
+use agent_mem_traits::{llm::FunctionCall, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -80,7 +79,7 @@ impl ToolIntegrator {
         &self,
         function_calls: &[FunctionCall],
         user_id: &str,
-    ) -> CoreResult<Vec<ToolCallResult>> {
+    ) -> Result<Vec<ToolCallResult>> {
         if function_calls.is_empty() {
             return Ok(Vec::new());
         }

@@ -10,7 +10,10 @@ use crate::{
 };
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::{ToolExecutor, ExecutionContext};
-use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
+use agent_mem_traits::{
+    llm::{FunctionDefinition, FunctionCall},
+    AgentMemError, Message, MessageRole, Result,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -76,15 +79,18 @@ pub struct ToolCallInfo {
 pub struct OrchestratorConfig {
     /// 最大工具调用轮数
     pub max_tool_rounds: usize,
-    
+
     /// 最大记忆检索数量
     pub max_memories: usize,
-    
+
     /// 是否自动提取记忆
     pub auto_extract_memories: bool,
-    
+
     /// 记忆提取阈值
     pub memory_extraction_threshold: f32,
+
+    /// 是否启用工具调用
+    pub enable_tool_calling: bool,
 }
 
 impl Default for OrchestratorConfig {
@@ -94,6 +100,7 @@ impl Default for OrchestratorConfig {
             max_memories: 10,
             auto_extract_memories: true,
             memory_extraction_threshold: 0.5,
+            enable_tool_calling: false, // 默认关闭，需要显式启用
         }
     }
 }
@@ -206,6 +213,130 @@ impl AgentOrchestrator {
         Ok(ChatResponse {
             message_id: assistant_message_id,
             content: response,
+            memories_updated: memories_count > 0,
+            memories_count,
+            tool_calls: if tool_calls_info.is_empty() {
+                None
+            } else {
+                Some(tool_calls_info)
+            },
+        })
+    }
+
+    /// 执行带工具调用的对话循环
+    ///
+    /// 这个方法支持完整的工具调用流程：
+    /// 1. 创建用户消息
+    /// 2. 检索相关记忆
+    /// 3. 构建 prompt（注入记忆）
+    /// 4. 调用 LLM（带工具定义）
+    /// 5. 如果有工具调用，执行工具并继续循环
+    /// 6. 保存 assistant 消息
+    /// 7. 提取和更新记忆
+    /// 8. 返回响应
+    pub async fn step_with_tools(
+        &self,
+        request: ChatRequest,
+        available_tools: &[FunctionDefinition],
+    ) -> Result<ChatResponse> {
+        info!(
+            "Starting conversation step with tools for agent_id={}, user_id={}",
+            request.agent_id, request.user_id
+        );
+
+        // 1. 创建用户消息
+        let user_message_id = self.create_user_message(&request).await?;
+        debug!("Created user message: {}", user_message_id);
+
+        // 2. 检索相关记忆
+        let memories = self.retrieve_memories(&request).await?;
+        info!("Retrieved {} memories", memories.len());
+
+        // 3. 构建 prompt（注入记忆）
+        let mut messages = self.build_messages_with_memories(&request, &memories).await?;
+        debug!("Built {} messages with memories", messages.len());
+
+        let mut tool_calls_info = Vec::new();
+        let mut final_response = String::new();
+        let mut round = 0;
+
+        // 工具调用循环
+        loop {
+            round += 1;
+            if round > self.config.max_tool_rounds {
+                warn!("Reached max tool rounds ({}), stopping", self.config.max_tool_rounds);
+                break;
+            }
+
+            // 4. 调用 LLM（带工具定义）
+            let llm_response = self
+                .llm_client
+                .generate_with_functions(&messages, available_tools)
+                .await?;
+
+            // 检查是否有文本响应
+            if let Some(text) = &llm_response.text {
+                final_response = text.clone();
+                debug!("Got LLM text response: {} chars", text.len());
+            }
+
+            // 检查是否有工具调用
+            if llm_response.function_calls.is_empty() {
+                debug!("No tool calls, ending loop");
+                break;
+            }
+
+            info!("Got {} tool calls", llm_response.function_calls.len());
+
+            // 5. 执行工具调用
+            let tool_results = self
+                .tool_integrator
+                .execute_tool_calls(&llm_response.function_calls, &request.user_id)
+                .await?;
+
+            // 记录工具调用信息
+            for result in &tool_results {
+                tool_calls_info.push(ToolCallInfo {
+                    tool_name: result.tool_name.clone(),
+                    arguments: serde_json::from_str(&result.arguments)
+                        .unwrap_or(serde_json::json!({})),
+                    result: Some(result.result.clone()),
+                });
+            }
+
+            // 将工具结果添加到消息历史
+            let tool_results_text = self.tool_integrator.format_tool_results(&tool_results);
+            messages.push(Message {
+                role: agent_mem_traits::MessageRole::Assistant,
+                content: tool_results_text,
+                timestamp: Some(chrono::Utc::now()),
+            });
+
+            // 如果所有工具都失败了，停止循环
+            if tool_results.iter().all(|r| !r.success) {
+                warn!("All tools failed, stopping loop");
+                break;
+            }
+        }
+
+        // 6. 保存 assistant 消息
+        let assistant_message_id = self
+            .create_assistant_message(&request.agent_id, &final_response)
+            .await?;
+        debug!("Created assistant message: {}", assistant_message_id);
+
+        // 7. 提取和更新记忆
+        let memories_count = if self.config.auto_extract_memories {
+            self.extract_and_update_memories(&request, &messages).await?
+        } else {
+            0
+        };
+        info!("Extracted and updated {} memories", memories_count);
+
+        // 8. 返回响应
+        Ok(ChatResponse {
+            message_id: assistant_message_id,
+            content: final_response,
             memories_updated: memories_count > 0,
             memories_count,
             tool_calls: if tool_calls_info.is_empty() {
