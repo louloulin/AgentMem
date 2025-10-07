@@ -5,12 +5,14 @@
 
 pub mod types;
 pub mod client;
+pub mod server;
 pub mod manager;
 pub mod marketplace;
 pub mod error;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
+pub use server::{McpServer, ServerInfo, ServerCapabilities};
 pub use manager::McpClientManager;
 pub use marketplace::{McpMarketplace, McpServerListing};
 pub use error::{McpError, McpResult};

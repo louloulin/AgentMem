@@ -5,6 +5,7 @@ pub mod chat;
 pub mod docs;
 pub mod graph;
 pub mod health;
+pub mod mcp;
 pub mod memory;
 pub mod messages;
 pub mod metrics;
@@ -128,6 +129,12 @@ pub async fn create_router(
         .route("/api/v1/tools/:id", put(tools::update_tool))
         .route("/api/v1/tools/:id", delete(tools::delete_tool))
         .route("/api/v1/tools/:id/execute", post(tools::execute_tool))
+        // MCP server routes
+        .route("/api/v1/mcp/info", get(mcp::get_server_info))
+        .route("/api/v1/mcp/tools", get(mcp::list_tools))
+        .route("/api/v1/mcp/tools/call", post(mcp::call_tool))
+        .route("/api/v1/mcp/tools/:tool_name", get(mcp::get_tool))
+        .route("/api/v1/mcp/health", get(mcp::health_check))
         // Graph visualization routes
         .route("/api/v1/graph/data", get(graph::get_graph_data))
         .route("/api/v1/graph/associations", post(graph::create_association))
@@ -208,6 +215,11 @@ pub async fn create_router(
         tools::update_tool,
         tools::delete_tool,
         tools::execute_tool,
+        mcp::get_server_info,
+        mcp::list_tools,
+        mcp::call_tool,
+        mcp::get_tool,
+        mcp::health_check,
         graph::get_graph_data,
         graph::create_association,
         graph::get_memory_associations,
@@ -271,6 +283,7 @@ pub async fn create_router(
         (name = "chat", description = "Agent chat operations with AgentOrchestrator"),
         (name = "messages", description = "Message management operations"),
         (name = "tools", description = "Tool management and execution operations"),
+        (name = "mcp", description = "MCP (Model Context Protocol) server operations"),
         (name = "graph", description = "Knowledge graph visualization and querying operations"),
         (name = "health", description = "Health and monitoring"),
     ),
