@@ -13,12 +13,14 @@ pub mod backends;
 pub mod cache;
 pub mod factory;
 pub mod graph;
+pub mod optimizations;
 pub mod performance;
 pub mod utils;
 pub mod vector;
 
 pub use factory::StorageFactory;
 pub use graph::GraphStoreFactory;
+pub use optimizations::{PoolConfig, QueryCache, QueryCacheConfig, QueryOptimizer, create_optimized_pool};
 
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Result, VectorStore, VectorStoreConfig};

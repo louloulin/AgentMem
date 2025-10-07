@@ -58,12 +58,15 @@ futures = { version = "0.3", optional = true }
 # Redis 缓存存储
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
 
+# Database optimization
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres"], optional = true }
+
 [dev-dependencies]
 tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["memory"]
+default = ["memory", "optimizations"]
 
 # 向量存储后端
 azure-ai-search = [] # Azure AI Search 企业级搜索
@@ -89,6 +92,9 @@ rocksdb = ["dep:rocksdb"]
 
 # 内存存储
 memory = ["dep:dashmap"]
+
+# 数据库优化
+optimizations = ["dep:sqlx"]
 
 # 所有后端
 all-backends = [

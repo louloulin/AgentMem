@@ -353,7 +353,7 @@ mod tests {
 
         // 批量设置 TTL
         let result = store
-            .set_ttl_batch(vec!["ttl1".to_string(), "ttl2".to_string()], 3600)
+            .set_batch_ttl(vec!["ttl1".to_string(), "ttl2".to_string()], 3600)
             .await;
         assert!(result.is_ok());
     }
