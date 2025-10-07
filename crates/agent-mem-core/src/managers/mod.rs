@@ -4,6 +4,7 @@
 
 pub mod contextual_memory;
 pub mod core_memory;
+pub mod deduplication;
 pub mod episodic_memory;
 pub mod knowledge_vault;
 pub mod lifecycle_manager;
@@ -41,4 +42,8 @@ pub use procedural_memory::{ProceduralMemoryItem, ProceduralMemoryManager, Proce
 pub use lifecycle_manager::{
     LifecycleEvent, LifecycleEventType, LifecycleManager, LifecycleManagerConfig, MemoryState,
     MemoryStateRecord,
+};
+
+pub use deduplication::{
+    DeduplicationConfig, DeduplicationResult, DuplicateGroup, MemoryDeduplicator, MergeStrategy,
 };
