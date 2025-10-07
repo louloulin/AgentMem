@@ -172,6 +172,83 @@ impl ToolRepository {
 
         Ok(created_tools)
     }
+
+    /// Create a new tool with parameters
+    pub async fn create_tool(
+        &self,
+        organization_id: &str,
+        user_id: &str,
+        name: &str,
+        description: Option<&str>,
+        source_code: Option<&str>,
+        source_type: Option<&str>,
+        json_schema: Option<&serde_json::Value>,
+        tags: Option<&[String]>,
+    ) -> CoreResult<Tool> {
+        let tool = Tool {
+            id: uuid::Uuid::new_v4().to_string(),
+            organization_id: organization_id.to_string(),
+            name: name.to_string(),
+            description: description.map(|s| s.to_string()),
+            json_schema: json_schema.cloned(),
+            source_type: source_type.map(|s| s.to_string()),
+            source_code: source_code.map(|s| s.to_string()),
+            tags: tags.map(|t| t.to_vec()),
+            metadata_: Some(serde_json::json!({})),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            is_deleted: false,
+            created_by_id: Some(user_id.to_string()),
+            last_updated_by_id: Some(user_id.to_string()),
+        };
+
+        Repository::create(self, &tool).await
+    }
+
+    /// Get a tool by ID
+    pub async fn get(&self, id: &str) -> CoreResult<Tool> {
+        self.read(id)
+            .await?
+            .ok_or_else(|| CoreError::NotFound(format!("Tool not found: {}", id)))
+    }
+
+    /// Update a tool with UpdateToolRequest
+    pub async fn update_tool(
+        &self,
+        tool_id: &str,
+        user_id: &str,
+        request: crate::managers::tool_manager::UpdateToolRequest,
+    ) -> CoreResult<Tool> {
+        let mut tool = self.get(tool_id).await?;
+
+        // Update fields
+        if let Some(description) = request.description {
+            tool.description = Some(description);
+        }
+        if let Some(source_code) = request.source_code {
+            tool.source_code = Some(source_code);
+        }
+        if let Some(json_schema) = request.json_schema {
+            tool.json_schema = Some(json_schema);
+        }
+        if let Some(tags) = request.tags {
+            tool.tags = Some(tags);
+        }
+        if let Some(is_enabled) = request.is_enabled {
+            tool.is_deleted = !is_enabled;
+        }
+
+        tool.last_updated_by_id = Some(user_id.to_string());
+        tool.updated_at = Utc::now();
+
+        Repository::update(self, &tool).await
+    }
+
+    /// Delete a tool
+    pub async fn delete_tool(&self, tool_id: &str, _user_id: &str) -> CoreResult<()> {
+        Repository::delete(self, tool_id).await?;
+        Ok(())
+    }
 }
 
 #[async_trait]

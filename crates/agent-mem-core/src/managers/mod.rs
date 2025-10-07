@@ -13,6 +13,7 @@ pub mod lifecycle_manager;
 pub mod procedural_memory;
 pub mod resource_memory;
 pub mod semantic_memory;
+pub mod tool_manager;
 
 pub use core_memory::{
     CoreMemoryBlock, CoreMemoryBlockType, CoreMemoryConfig, CoreMemoryManager, CoreMemoryStats,
@@ -58,4 +59,8 @@ pub use association_manager::{
 pub use knowledge_graph_manager::{
     Entity, EntityType, GraphPath, GraphQueryResult, KnowledgeGraphConfig,
     KnowledgeGraphManager, Relation, RelationType,
+};
+
+pub use tool_manager::{
+    CreateToolRequest, ToolManager, ToolManagerConfig, ToolStats, ToolType, UpdateToolRequest,
 };
