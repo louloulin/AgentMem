@@ -4,6 +4,7 @@
 
 pub mod contextual_memory;
 pub mod core_memory;
+pub mod episodic_memory;
 pub mod knowledge_vault;
 pub mod resource_memory;
 
@@ -27,3 +28,5 @@ pub use contextual_memory::{
     EnvironmentChangeEvent, EnvironmentType, LocationInfo, NetworkInfo, Season, TemporalInfo,
     TimeOfDay, UserState,
 };
+
+pub use episodic_memory::{EpisodicEvent, EpisodicMemoryManager, EpisodicQuery};
