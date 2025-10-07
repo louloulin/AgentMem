@@ -2,6 +2,7 @@
 //!
 //! 专门的记忆管理器，实现不同类型记忆的特化管理
 
+pub mod association_manager;
 pub mod contextual_memory;
 pub mod core_memory;
 pub mod deduplication;
@@ -46,4 +47,9 @@ pub use lifecycle_manager::{
 
 pub use deduplication::{
     DeduplicationConfig, DeduplicationResult, DuplicateGroup, MemoryDeduplicator, MergeStrategy,
+};
+
+pub use association_manager::{
+    AssociationManager, AssociationManagerConfig, AssociationStats, AssociationType,
+    MemoryAssociation, TypeCount,
 };
