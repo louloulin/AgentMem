@@ -138,7 +138,10 @@ pub use execution_sandbox::{
     LocalSandboxConfig, SandboxRunResult, SandboxStatus, SandboxType, ToolExecutionSandbox,
 };
 pub use executor::{ExecutionContext, Tool, ToolExecutor};
-pub use mcp::{McpClient, McpClientManager, McpError, McpResult, McpServerConfig, McpTool};
+pub use mcp::{
+    McpClient, McpClientManager, McpError, McpMarketplace, McpResult, McpServerConfig,
+    McpServerListing, McpTool,
+};
 pub use permissions::{Permission, PermissionManager};
 pub use sandbox::{CommandOutput, SandboxConfig, SandboxManager, SandboxStats};
 pub use schema::{ParameterSchema, PropertySchema, ToolSchema};
