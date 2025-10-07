@@ -6,6 +6,7 @@ pub mod contextual_memory;
 pub mod core_memory;
 pub mod episodic_memory;
 pub mod knowledge_vault;
+pub mod procedural_memory;
 pub mod resource_memory;
 pub mod semantic_memory;
 
@@ -33,3 +34,5 @@ pub use contextual_memory::{
 pub use episodic_memory::{EpisodicEvent, EpisodicMemoryManager, EpisodicQuery};
 
 pub use semantic_memory::{SemanticMemoryItem, SemanticMemoryManager, SemanticQuery};
+
+pub use procedural_memory::{ProceduralMemoryItem, ProceduralMemoryManager, ProceduralQuery};
