@@ -318,3 +318,415 @@ impl From<SemanticMemoryItemRow> for SemanticMemoryItem {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Helper function to create test semantic item
+    fn create_test_item(id: &str, name: &str, tree_path: Vec<String>) -> SemanticMemoryItem {
+        let now = Utc::now();
+        SemanticMemoryItem {
+            id: id.to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: name.to_string(),
+            summary: format!("Summary of {}", name),
+            details: format!("Detailed information about {}", name),
+            source: Some("test-source".to_string()),
+            tree_path,
+            metadata: json!({"category": "test"}),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn test_semantic_item_creation() {
+        let item = create_test_item(
+            "item-1",
+            "Machine Learning",
+            vec!["AI".to_string(), "ML".to_string()],
+        );
+
+        assert_eq!(item.id, "item-1");
+        assert_eq!(item.name, "Machine Learning");
+        assert_eq!(item.tree_path.len(), 2);
+        assert_eq!(item.tree_path[0], "AI");
+        assert_eq!(item.tree_path[1], "ML");
+    }
+
+    #[test]
+    fn test_semantic_item_serialization() {
+        let item = create_test_item(
+            "item-2",
+            "Deep Learning",
+            vec!["AI".to_string(), "ML".to_string(), "DL".to_string()],
+        );
+
+        // Test serialization
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("item-2"));
+        assert!(json.contains("Deep Learning"));
+
+        // Test deserialization
+        let deserialized: SemanticMemoryItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, item.id);
+        assert_eq!(deserialized.name, item.name);
+        assert_eq!(deserialized.tree_path, item.tree_path);
+    }
+
+    #[test]
+    fn test_semantic_query_default() {
+        let query = SemanticQuery {
+            name_query: None,
+            summary_query: None,
+            tree_path_prefix: None,
+            limit: None,
+        };
+
+        assert!(query.name_query.is_none());
+        assert!(query.summary_query.is_none());
+        assert!(query.tree_path_prefix.is_none());
+        assert!(query.limit.is_none());
+    }
+
+    #[test]
+    fn test_semantic_query_with_filters() {
+        let query = SemanticQuery {
+            name_query: Some("machine learning".to_string()),
+            summary_query: Some("AI concepts".to_string()),
+            tree_path_prefix: Some(vec!["AI".to_string(), "ML".to_string()]),
+            limit: Some(20),
+        };
+
+        assert_eq!(query.name_query.unwrap(), "machine learning");
+        assert_eq!(query.summary_query.unwrap(), "AI concepts");
+        assert_eq!(query.tree_path_prefix.unwrap().len(), 2);
+        assert_eq!(query.limit.unwrap(), 20);
+    }
+
+    #[test]
+    fn test_tree_path_hierarchy() {
+        let item1 = create_test_item("item-1", "Concept", vec!["root".to_string()]);
+        let item2 = create_test_item(
+            "item-2",
+            "Subconcept",
+            vec!["root".to_string(), "child".to_string()],
+        );
+        let item3 = create_test_item(
+            "item-3",
+            "Deep Concept",
+            vec![
+                "root".to_string(),
+                "child".to_string(),
+                "grandchild".to_string(),
+            ],
+        );
+
+        assert_eq!(item1.tree_path.len(), 1);
+        assert_eq!(item2.tree_path.len(), 2);
+        assert_eq!(item3.tree_path.len(), 3);
+
+        // Verify hierarchy
+        assert_eq!(item1.tree_path[0], "root");
+        assert_eq!(item2.tree_path[0], "root");
+        assert_eq!(item3.tree_path[0], "root");
+    }
+
+    #[test]
+    fn test_semantic_item_metadata() {
+        let item = create_test_item("item-meta", "Test", vec!["test".to_string()]);
+
+        assert!(item.metadata.is_object());
+        assert_eq!(item.metadata["category"], json!("test"));
+    }
+
+    #[test]
+    fn test_semantic_item_optional_source() {
+        let mut item = create_test_item("item-source", "Test", vec!["test".to_string()]);
+
+        // Test with source
+        assert!(item.source.is_some());
+        assert_eq!(item.source.unwrap(), "test-source");
+
+        // Test without source
+        item.source = None;
+        assert!(item.source.is_none());
+    }
+
+    #[test]
+    fn test_semantic_item_timestamps() {
+        let item = create_test_item("item-time", "Test", vec!["test".to_string()]);
+
+        // Timestamps should be set
+        assert!(item.created_at <= Utc::now());
+        assert!(item.updated_at <= Utc::now());
+
+        // Created and updated should be close
+        let diff = item.updated_at - item.created_at;
+        assert!(diff.num_seconds().abs() < 1);
+    }
+
+    #[test]
+    fn test_empty_tree_path() {
+        let item = create_test_item("item-empty", "Root Concept", vec![]);
+
+        assert_eq!(item.tree_path.len(), 0);
+        assert!(item.tree_path.is_empty());
+    }
+
+    #[test]
+    fn test_complex_tree_path() {
+        let complex_path = vec![
+            "favorites".to_string(),
+            "pets".to_string(),
+            "dogs".to_string(),
+            "breeds".to_string(),
+            "golden_retriever".to_string(),
+        ];
+
+        let item = create_test_item("item-complex", "Golden Retriever", complex_path.clone());
+
+        assert_eq!(item.tree_path.len(), 5);
+        assert_eq!(item.tree_path, complex_path);
+    }
+
+    #[test]
+    fn test_semantic_item_with_empty_strings() {
+        let now = Utc::now();
+        let item = SemanticMemoryItem {
+            id: "".to_string(),
+            organization_id: "".to_string(),
+            user_id: "".to_string(),
+            agent_id: "".to_string(),
+            name: "".to_string(),
+            summary: "".to_string(),
+            details: "".to_string(),
+            source: Some("".to_string()),
+            tree_path: vec![],
+            metadata: json!({}),
+            created_at: now,
+            updated_at: now,
+        };
+
+        // Should handle empty strings without panicking
+        assert_eq!(item.name, "");
+        assert_eq!(item.summary, "");
+        assert_eq!(item.tree_path.len(), 0);
+    }
+
+    #[test]
+    fn test_semantic_item_with_long_content() {
+        let long_string = "x".repeat(50000);
+        let item = create_test_item("item-long", &long_string, vec!["test".to_string()]);
+
+        assert_eq!(item.name.len(), 50000);
+    }
+
+    #[test]
+    fn test_query_with_name_filter() {
+        let query = SemanticQuery {
+            user_id: Some("user-123".to_string()),
+            agent_id: Some("agent-456".to_string()),
+            name_contains: Some("Machine Learning".to_string()),
+            tree_path_prefix: None,
+            limit: Some(20),
+            offset: Some(0),
+        };
+
+        assert_eq!(query.name_contains, Some("Machine Learning".to_string()));
+        assert_eq!(query.limit, Some(20));
+    }
+
+    #[test]
+    fn test_query_with_tree_path_prefix() {
+        let query = SemanticQuery {
+            user_id: Some("user-123".to_string()),
+            agent_id: None,
+            name_contains: None,
+            tree_path_prefix: Some(vec!["technology".to_string(), "ai".to_string()]),
+            limit: Some(100),
+            offset: None,
+        };
+
+        assert!(query.tree_path_prefix.is_some());
+        assert_eq!(query.tree_path_prefix.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_semantic_item_metadata_nested() {
+        let nested_metadata = json!({
+            "category": "technology",
+            "subcategories": ["ai", "ml", "nlp"],
+            "properties": {
+                "difficulty": "advanced",
+                "prerequisites": ["math", "programming"],
+                "estimated_time": 120
+            },
+            "related_concepts": [
+                {"id": "concept-1", "name": "Neural Networks"},
+                {"id": "concept-2", "name": "Deep Learning"}
+            ]
+        });
+
+        let now = Utc::now();
+        let item = SemanticMemoryItem {
+            id: "item-nested".to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: "Machine Learning".to_string(),
+            summary: "Advanced ML concepts".to_string(),
+            details: "Comprehensive guide".to_string(),
+            source: Some("textbook".to_string()),
+            tree_path: vec!["technology".to_string(), "ai".to_string()],
+            metadata: nested_metadata.clone(),
+            created_at: now,
+            updated_at: now,
+        };
+
+        assert_eq!(item.metadata["category"], "technology");
+        assert_eq!(item.metadata["subcategories"].as_array().unwrap().len(), 3);
+        assert_eq!(item.metadata["properties"]["difficulty"], "advanced");
+        assert_eq!(item.metadata["related_concepts"][0]["name"], "Neural Networks");
+    }
+
+    #[test]
+    fn test_tree_path_depth_variations() {
+        // Depth 1
+        let item1 = create_test_item("item-1", "Root", vec!["root".to_string()]);
+        assert_eq!(item1.tree_path.len(), 1);
+
+        // Depth 3
+        let item3 = create_test_item(
+            "item-3",
+            "Leaf",
+            vec!["root".to_string(), "branch".to_string(), "leaf".to_string()],
+        );
+        assert_eq!(item3.tree_path.len(), 3);
+
+        // Depth 10
+        let deep_path: Vec<String> = (0..10).map(|i| format!("level-{}", i)).collect();
+        let item10 = create_test_item("item-10", "Deep", deep_path.clone());
+        assert_eq!(item10.tree_path.len(), 10);
+    }
+
+    #[test]
+    fn test_semantic_item_source_variations() {
+        // With source
+        let item_with_source = create_test_item("item-1", "Concept", vec!["test".to_string()]);
+        assert!(item_with_source.source.is_some());
+
+        // Without source
+        let now = Utc::now();
+        let item_without_source = SemanticMemoryItem {
+            id: "item-2".to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: "Concept".to_string(),
+            summary: "Summary".to_string(),
+            details: "Details".to_string(),
+            source: None,
+            tree_path: vec!["test".to_string()],
+            metadata: json!({}),
+            created_at: now,
+            updated_at: now,
+        };
+        assert!(item_without_source.source.is_none());
+    }
+
+    #[test]
+    fn test_query_limit_variations() {
+        // 小限制
+        let query_small = SemanticQuery {
+            name_query: None,
+            summary_query: None,
+            tree_path_prefix: None,
+            limit: Some(5),
+        };
+
+        // 大限制
+        let query_large = SemanticQuery {
+            name_query: None,
+            summary_query: None,
+            tree_path_prefix: None,
+            limit: Some(100),
+        };
+
+        // 无限制
+        let query_unlimited = SemanticQuery {
+            name_query: None,
+            summary_query: None,
+            tree_path_prefix: None,
+            limit: None,
+        };
+
+        assert_eq!(query_small.limit, Some(5));
+        assert_eq!(query_large.limit, Some(100));
+        assert!(query_unlimited.limit.is_none());
+    }
+
+    #[test]
+    fn test_semantic_item_name_variations() {
+        // 短名称
+        let short_name = create_test_item("item-1", "AI", vec!["tech".to_string()]);
+        assert_eq!(short_name.name.len(), 2);
+
+        // 长名称
+        let long_name = create_test_item(
+            "item-2",
+            "Artificial Intelligence and Machine Learning Systems",
+            vec!["tech".to_string()],
+        );
+        assert!(long_name.name.len() > 20);
+
+        // 特殊字符
+        let special_chars = create_test_item(
+            "item-3",
+            "C++ Programming",
+            vec!["programming".to_string()],
+        );
+        assert!(special_chars.name.contains('+'));
+    }
+
+    #[test]
+    fn test_tree_path_single_vs_multiple() {
+        // 单层路径
+        let single_level = create_test_item(
+            "item-1",
+            "Root Concept",
+            vec!["root".to_string()],
+        );
+        assert_eq!(single_level.tree_path.len(), 1);
+
+        // 多层路径
+        let multi_level = create_test_item(
+            "item-2",
+            "Leaf Concept",
+            vec![
+                "root".to_string(),
+                "branch1".to_string(),
+                "branch2".to_string(),
+                "leaf".to_string(),
+            ],
+        );
+        assert_eq!(multi_level.tree_path.len(), 4);
+    }
+
+    #[test]
+    fn test_semantic_item_summary_vs_details() {
+        let item = create_test_item("item-1", "Machine Learning", vec!["AI".to_string()]);
+
+        // Summary 应该简短
+        assert!(!item.summary.is_empty());
+        assert!(item.summary.starts_with("Summary of"));
+
+        // Details 应该更详细
+        assert!(!item.details.is_empty());
+        assert!(item.details.starts_with("Detailed information"));
+    }
+}
+

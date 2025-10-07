@@ -318,3 +318,388 @@ impl From<ProceduralMemoryItemRow> for ProceduralMemoryItem {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Helper function to create test procedural item
+    fn create_test_item(id: &str, entry_type: &str, steps: Vec<String>) -> ProceduralMemoryItem {
+        let now = Utc::now();
+        ProceduralMemoryItem {
+            id: id.to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            entry_type: entry_type.to_string(),
+            summary: format!("Test {} procedure", entry_type),
+            steps,
+            tree_path: vec!["workflows".to_string(), entry_type.to_string()],
+            metadata: json!({"test": true}),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn test_procedural_item_creation() {
+        let steps = vec![
+            "Step 1: Initialize".to_string(),
+            "Step 2: Process".to_string(),
+            "Step 3: Finalize".to_string(),
+        ];
+        let item = create_test_item("proc-1", "workflow", steps.clone());
+
+        assert_eq!(item.id, "proc-1");
+        assert_eq!(item.entry_type, "workflow");
+        assert_eq!(item.steps.len(), 3);
+        assert_eq!(item.steps, steps);
+    }
+
+    #[test]
+    fn test_procedural_item_serialization() {
+        let steps = vec!["Step 1".to_string(), "Step 2".to_string()];
+        let item = create_test_item("proc-2", "guide", steps);
+
+        // Test serialization
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("proc-2"));
+        assert!(json.contains("guide"));
+
+        // Test deserialization
+        let deserialized: ProceduralMemoryItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, item.id);
+        assert_eq!(deserialized.entry_type, item.entry_type);
+        assert_eq!(deserialized.steps, item.steps);
+    }
+
+    #[test]
+    fn test_procedural_query_default() {
+        let query = ProceduralQuery {
+            entry_type: None,
+            summary_query: None,
+            tree_path_prefix: None,
+            limit: None,
+        };
+
+        assert!(query.entry_type.is_none());
+        assert!(query.summary_query.is_none());
+        assert!(query.tree_path_prefix.is_none());
+        assert!(query.limit.is_none());
+    }
+
+    #[test]
+    fn test_procedural_query_with_filters() {
+        let query = ProceduralQuery {
+            entry_type: Some("workflow".to_string()),
+            summary_query: Some("deployment".to_string()),
+            tree_path_prefix: Some(vec!["workflows".to_string(), "ci".to_string()]),
+            limit: Some(10),
+        };
+
+        assert_eq!(query.entry_type.unwrap(), "workflow");
+        assert_eq!(query.summary_query.unwrap(), "deployment");
+        assert_eq!(query.tree_path_prefix.unwrap().len(), 2);
+        assert_eq!(query.limit.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_empty_steps() {
+        let item = create_test_item("proc-empty", "script", vec![]);
+
+        assert_eq!(item.steps.len(), 0);
+        assert!(item.steps.is_empty());
+    }
+
+    #[test]
+    fn test_single_step() {
+        let steps = vec!["Single step".to_string()];
+        let item = create_test_item("proc-single", "guide", steps.clone());
+
+        assert_eq!(item.steps.len(), 1);
+        assert_eq!(item.steps[0], "Single step");
+    }
+
+    #[test]
+    fn test_many_steps() {
+        let steps: Vec<String> = (1..=20).map(|i| format!("Step {}", i)).collect();
+        let item = create_test_item("proc-many", "workflow", steps.clone());
+
+        assert_eq!(item.steps.len(), 20);
+        assert_eq!(item.steps[0], "Step 1");
+        assert_eq!(item.steps[19], "Step 20");
+    }
+
+    #[test]
+    fn test_entry_types() {
+        let workflow = create_test_item("proc-wf", "workflow", vec!["Step 1".to_string()]);
+        let guide = create_test_item("proc-guide", "guide", vec!["Step 1".to_string()]);
+        let script = create_test_item("proc-script", "script", vec!["Step 1".to_string()]);
+
+        assert_eq!(workflow.entry_type, "workflow");
+        assert_eq!(guide.entry_type, "guide");
+        assert_eq!(script.entry_type, "script");
+    }
+
+    #[test]
+    fn test_tree_path() {
+        let item = create_test_item("proc-path", "workflow", vec!["Step 1".to_string()]);
+
+        assert_eq!(item.tree_path.len(), 2);
+        assert_eq!(item.tree_path[0], "workflows");
+        assert_eq!(item.tree_path[1], "workflow");
+    }
+
+    #[test]
+    fn test_metadata() {
+        let item = create_test_item("proc-meta", "workflow", vec!["Step 1".to_string()]);
+
+        assert!(item.metadata.is_object());
+        assert_eq!(item.metadata["test"], json!(true));
+    }
+
+    #[test]
+    fn test_procedural_item_with_empty_strings() {
+        let now = Utc::now();
+        let item = ProceduralMemoryItem {
+            id: "".to_string(),
+            organization_id: "".to_string(),
+            user_id: "".to_string(),
+            agent_id: "".to_string(),
+            name: "".to_string(),
+            summary: "".to_string(),
+            entry_type: "".to_string(),
+            steps: vec![],
+            tree_path: vec![],
+            metadata: json!({}),
+            created_at: now,
+            updated_at: now,
+        };
+
+        // Should handle empty strings without panicking
+        assert_eq!(item.name, "");
+        assert_eq!(item.steps.len(), 0);
+    }
+
+    #[test]
+    fn test_steps_with_long_content() {
+        let long_step = "x".repeat(10000);
+        let steps = vec![long_step.clone(), long_step.clone()];
+        let item = create_test_item("proc-long", "process", steps.clone());
+
+        assert_eq!(item.steps.len(), 2);
+        assert_eq!(item.steps[0].len(), 10000);
+    }
+
+    #[test]
+    fn test_query_with_entry_type_filter() {
+        let query = ProceduralQuery {
+            user_id: Some("user-123".to_string()),
+            agent_id: Some("agent-456".to_string()),
+            entry_type: Some("workflow".to_string()),
+            name_contains: None,
+            limit: Some(50),
+            offset: Some(0),
+        };
+
+        assert_eq!(query.entry_type, Some("workflow".to_string()));
+        assert_eq!(query.limit, Some(50));
+    }
+
+    #[test]
+    fn test_query_with_name_contains() {
+        let query = ProceduralQuery {
+            user_id: Some("user-123".to_string()),
+            agent_id: None,
+            entry_type: None,
+            name_contains: Some("Deploy".to_string()),
+            limit: Some(100),
+            offset: None,
+        };
+
+        assert_eq!(query.name_contains, Some("Deploy".to_string()));
+    }
+
+    #[test]
+    fn test_procedural_metadata_complex() {
+        let complex_metadata = json!({
+            "version": "1.0.0",
+            "author": "system",
+            "tags": ["automation", "deployment", "production"],
+            "requirements": {
+                "permissions": ["admin", "deploy"],
+                "resources": ["server", "database"]
+            },
+            "execution_stats": {
+                "average_duration": 300,
+                "success_rate": 0.95,
+                "last_run": "2025-10-07T10:00:00Z"
+            }
+        });
+
+        let now = Utc::now();
+        let item = ProceduralMemoryItem {
+            id: "proc-complex".to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: "Deploy Application".to_string(),
+            summary: "Automated deployment process".to_string(),
+            entry_type: "workflow".to_string(),
+            steps: vec![
+                "Build application".to_string(),
+                "Run tests".to_string(),
+                "Deploy to staging".to_string(),
+                "Run smoke tests".to_string(),
+                "Deploy to production".to_string(),
+            ],
+            tree_path: vec!["automation".to_string(), "deployment".to_string()],
+            metadata: complex_metadata.clone(),
+            created_at: now,
+            updated_at: now,
+        };
+
+        assert_eq!(item.metadata["version"], "1.0.0");
+        assert_eq!(item.metadata["tags"].as_array().unwrap().len(), 3);
+        assert_eq!(item.metadata["requirements"]["permissions"][0], "admin");
+        assert_eq!(item.metadata["execution_stats"]["success_rate"], 0.95);
+    }
+
+    #[test]
+    fn test_steps_ordering() {
+        let steps = vec![
+            "First step".to_string(),
+            "Second step".to_string(),
+            "Third step".to_string(),
+            "Fourth step".to_string(),
+            "Fifth step".to_string(),
+        ];
+
+        let item = create_test_item("proc-order", "process", steps.clone());
+
+        // Verify order is preserved
+        for (i, step) in item.steps.iter().enumerate() {
+            assert_eq!(step, &steps[i]);
+        }
+    }
+
+    #[test]
+    fn test_entry_type_variations() {
+        let types = vec!["workflow", "procedure", "algorithm", "recipe", "protocol"];
+
+        for (i, entry_type) in types.iter().enumerate() {
+            let item = create_test_item(
+                &format!("proc-{}", i),
+                entry_type,
+                vec!["Step 1".to_string()],
+            );
+            assert_eq!(item.entry_type, *entry_type);
+        }
+    }
+
+    #[test]
+    fn test_tree_path_variations() {
+        // Single level
+        let item1 = create_test_item(
+            "proc-1",
+            "process",
+            vec!["Step 1".to_string()],
+        );
+        assert_eq!(item1.tree_path.len(), 2);
+
+        // Deep nesting
+        let now = Utc::now();
+        let deep_path: Vec<String> = (0..5).map(|i| format!("level-{}", i)).collect();
+        let item_deep = ProceduralMemoryItem {
+            id: "proc-deep".to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: "Deep Process".to_string(),
+            summary: "Deeply nested process".to_string(),
+            entry_type: "workflow".to_string(),
+            steps: vec!["Step 1".to_string()],
+            tree_path: deep_path.clone(),
+            metadata: json!({}),
+            created_at: now,
+            updated_at: now,
+        };
+        assert_eq!(item_deep.tree_path.len(), 5);
+    }
+
+    #[test]
+    fn test_procedural_item_single_vs_multiple_steps() {
+        // 单步骤
+        let single_step = ProceduralItem {
+            id: "proc-1".to_string(),
+            organization_id: "test-org".to_string(),
+            user_id: "test-user".to_string(),
+            agent_id: "test-agent".to_string(),
+            name: "Simple Task".to_string(),
+            entry_type: "task".to_string(),
+            tree_path: vec!["tasks".to_string()],
+            steps: vec!["Do it".to_string()],
+            metadata: json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // 多步骤
+        let multi_steps = create_test_item(
+            "proc-2",
+            "Complex Workflow",
+            "workflow",
+            vec!["workflows".to_string()],
+        );
+
+        assert_eq!(single_step.steps.len(), 1);
+        assert!(multi_steps.steps.len() > 1);
+    }
+
+    #[test]
+    fn test_procedural_item_name_length() {
+        // 短名称
+        let short_name = create_test_item("proc-1", "Task", "task", vec!["tasks".to_string()]);
+        assert!(short_name.name.len() < 10);
+
+        // 长名称
+        let long_name = create_test_item(
+            "proc-2",
+            "Very Long Procedural Item Name That Describes Complex Process",
+            "procedure",
+            vec!["procedures".to_string()],
+        );
+        assert!(long_name.name.len() > 30);
+    }
+
+    #[test]
+    fn test_query_with_all_filters() {
+        let query = ProceduralQuery {
+            name_query: Some("workflow".to_string()),
+            entry_type: Some("workflow".to_string()),
+            tree_path_prefix: Some(vec!["automation".to_string(), "workflows".to_string()]),
+            limit: Some(50),
+        };
+
+        assert!(query.name_query.is_some());
+        assert!(query.entry_type.is_some());
+        assert!(query.tree_path_prefix.is_some());
+        assert_eq!(query.limit, Some(50));
+    }
+
+    #[test]
+    fn test_query_with_no_filters() {
+        let query = ProceduralQuery {
+            name_query: None,
+            entry_type: None,
+            tree_path_prefix: None,
+            limit: None,
+        };
+
+        assert!(query.name_query.is_none());
+        assert!(query.entry_type.is_none());
+        assert!(query.tree_path_prefix.is_none());
+        assert!(query.limit.is_none());
+    }
+}
+
