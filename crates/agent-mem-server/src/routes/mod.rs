@@ -3,6 +3,7 @@
 pub mod agents;
 pub mod chat;
 pub mod docs;
+pub mod graph;
 pub mod health;
 pub mod memory;
 pub mod messages;
@@ -125,6 +126,14 @@ pub async fn create_router(
         .route("/api/v1/tools/:id", put(tools::update_tool))
         .route("/api/v1/tools/:id", delete(tools::delete_tool))
         .route("/api/v1/tools/:id/execute", post(tools::execute_tool))
+        // Graph visualization routes
+        .route("/api/v1/graph/data", get(graph::get_graph_data))
+        .route("/api/v1/graph/associations", post(graph::create_association))
+        .route(
+            "/api/v1/graph/memories/:memory_id/associations",
+            get(graph::get_memory_associations),
+        )
+        .route("/api/v1/graph/stats", get(graph::get_graph_stats))
         // WebSocket endpoint
         .route("/api/v1/ws", get(crate::websocket::websocket_handler))
         // SSE endpoints
@@ -194,6 +203,10 @@ pub async fn create_router(
         tools::update_tool,
         tools::delete_tool,
         tools::execute_tool,
+        graph::get_graph_data,
+        graph::create_association,
+        graph::get_memory_associations,
+        graph::get_graph_stats,
         health::health_check,
         metrics::get_metrics,
     ),
@@ -235,6 +248,12 @@ pub async fn create_router(
             tools::ToolResponse,
             tools::ExecuteToolRequest,
             tools::ToolExecutionResponse,
+            graph::GraphQueryRequest,
+            graph::GraphNode,
+            graph::GraphEdge,
+            graph::GraphDataResponse,
+            graph::CreateAssociationRequest,
+            graph::AssociationResponse,
         )
     ),
     tags(
@@ -246,6 +265,7 @@ pub async fn create_router(
         (name = "chat", description = "Agent chat operations with AgentOrchestrator"),
         (name = "messages", description = "Message management operations"),
         (name = "tools", description = "Tool management and execution operations"),
+        (name = "graph", description = "Knowledge graph visualization and querying operations"),
         (name = "health", description = "Health and monitoring"),
     ),
     info(
