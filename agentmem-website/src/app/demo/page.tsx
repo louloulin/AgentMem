@@ -14,18 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CodeBlock, InlineCode } from "@/components/ui/code-block";
 import { FadeIn, SlideIn, TypeWriter } from "@/components/ui/animations";
 import { LoadingSpinner, ContentLoading } from "@/components/ui/loading";
-import { 
-  Brain, 
-  Play, 
-  Code, 
-  Zap, 
-  Database, 
-  MessageSquare, 
-  ArrowRight, 
-  Copy, 
-  Check, 
-  Terminal, 
-  Cpu, 
+import {
+  Brain,
+  Play,
+  Code,
+  Zap,
+  Database,
+  MessageSquare,
+  ArrowRight,
+  Copy,
+  Check,
+  Terminal,
+  Cpu,
   Network,
   Settings,
   BarChart3,
@@ -51,48 +51,12 @@ import {
   CheckCircle
 } from "lucide-react";
 import Link from "next/link";
+import { apiClient } from "@/lib/api-client";
 
 /**
  * 演示页面组件 - 展示AgentMem的在线演示和交互式示例
+ * 使用真实 API 进行演示
  */
-// 模拟的 API 响应数据
-const mockResponses = {
-  memory_add: {
-    success: true,
-    memory_id: "mem_1234567890",
-    message: "记忆已成功添加到 AgentMem",
-    metadata: {
-      timestamp: new Date().toISOString(),
-      embedding_model: "deepseek-v2",
-      storage_backend: "qdrant",
-      processing_time: "23ms"
-    }
-  },
-  memory_search: {
-    success: true,
-    results: [
-      {
-        id: "mem_1234567890",
-        content: "用户喜欢在周末进行户外活动，特别是徒步和骑行。",
-        relevance_score: 0.95,
-        metadata: {
-          created_at: "2024-01-15T10:30:00Z",
-          category: "preferences"
-        }
-      },
-      {
-        id: "mem_0987654321",
-        content: "用户对环保话题很感兴趣，经常参与相关讨论。",
-        relevance_score: 0.87,
-        metadata: {
-          created_at: "2024-01-14T15:45:00Z",
-          category: "interests"
-        }
-      }
-    ],
-    processing_time: "15ms"
-  }
-};
 
 export default function DemoPage() {
   const [input, setInput] = useState("");
@@ -237,18 +201,110 @@ export default function DemoPage() {
   };
 
   /**
-   * 模拟 API 调用
+   * 真实 API 调用 - 添加记忆
    */
-  const simulateAPICall = async (type: 'add' | 'search') => {
+  const addMemoryAPI = async () => {
+    if (!input.trim()) return;
+
     setIsLoading(true);
     setOutput("");
-    
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const response = type === 'add' ? mockResponses.memory_add : mockResponses.memory_search;
-    setOutput(JSON.stringify(response, null, 2));
-    setIsLoading(false);
+
+    try {
+      // 首先获取或创建一个 agent
+      const agents = await apiClient.getAgents();
+      let agentId = agents.length > 0 ? agents[0].id : null;
+
+      if (!agentId) {
+        // 创建一个演示 agent
+        const newAgent = await apiClient.createAgent({
+          name: "Demo Agent",
+          description: "Agent for demo purposes"
+        });
+        agentId = newAgent.id;
+      }
+
+      // 添加记忆
+      const memory = await apiClient.createMemory({
+        agent_id: agentId,
+        memory_type: "episodic",
+        content: input,
+        importance: 0.8
+      });
+
+      const response = {
+        success: true,
+        memory_id: memory.id,
+        message: "记忆已成功添加到 AgentMem",
+        metadata: {
+          timestamp: memory.created_at,
+          agent_id: agentId,
+          memory_type: memory.memory_type,
+          importance: memory.importance
+        }
+      };
+
+      setOutput(JSON.stringify(response, null, 2));
+
+      // 更新记忆列表
+      const newMemory: Memory = {
+        id: memory.id,
+        content: memory.content,
+        category: memory.memory_type,
+        importance: memory.importance,
+        created_at: memory.created_at,
+        user_id: agentId
+      };
+      setMemoryList(prev => [newMemory, ...prev]);
+
+    } catch (error) {
+      const errorResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to add memory"
+      };
+      setOutput(JSON.stringify(errorResponse, null, 2));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * 真实 API 调用 - 搜索记忆
+   */
+  const searchMemoryAPI = async () => {
+    if (!input.trim()) return;
+
+    setIsLoading(true);
+    setOutput("");
+
+    try {
+      // 搜索记忆
+      const results = await apiClient.searchMemories(input);
+
+      const response = {
+        success: true,
+        results: results.map(m => ({
+          id: m.id,
+          content: m.content,
+          relevance_score: m.importance,
+          metadata: {
+            created_at: m.created_at,
+            category: m.memory_type
+          }
+        })),
+        processing_time: "real-time"
+      };
+
+      setOutput(JSON.stringify(response, null, 2));
+
+    } catch (error) {
+      const errorResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to search memories"
+      };
+      setOutput(JSON.stringify(errorResponse, null, 2));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /**
@@ -665,7 +721,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                           if (input.trim()) {
                             addMemory(input);
                             setInput('');
-                            simulateAPICall('add');
+                            addMemoryAPI();
                           }
                         }}
                         disabled={isLoading || !input.trim()}
@@ -913,9 +969,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         onChange={(e) => setInput(e.target.value)}
                       />
                     </div>
-                    <Button 
+                    <Button
                       className="w-full bg-purple-600 hover:bg-purple-700"
-                      onClick={() => simulateAPICall('add')}
+                      onClick={() => addMemoryAPI()}
                       disabled={isLoading || !input.trim()}
                     >
                       {isLoading ? (
@@ -990,9 +1046,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         onChange={(e) => setInput(e.target.value)}
                       />
                     </div>
-                    <Button 
+                    <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
-                      onClick={() => simulateAPICall('search')}
+                      onClick={() => searchMemoryAPI()}
                       disabled={isLoading || !input.trim()}
                     >
                       {isLoading ? (
