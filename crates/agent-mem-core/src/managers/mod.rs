@@ -7,6 +7,7 @@ pub mod contextual_memory;
 pub mod core_memory;
 pub mod deduplication;
 pub mod episodic_memory;
+pub mod knowledge_graph_manager;
 pub mod knowledge_vault;
 pub mod lifecycle_manager;
 pub mod procedural_memory;
@@ -52,4 +53,9 @@ pub use deduplication::{
 pub use association_manager::{
     AssociationManager, AssociationManagerConfig, AssociationStats, AssociationType,
     MemoryAssociation, TypeCount,
+};
+
+pub use knowledge_graph_manager::{
+    Entity, EntityType, GraphPath, GraphQueryResult, KnowledgeGraphConfig,
+    KnowledgeGraphManager, Relation, RelationType,
 };
