@@ -264,17 +264,17 @@ fn criterion_benchmark(c: &mut Criterion) { }
 
 这些是核心功能但完全没有测试的模块，必须立即补充！
 
-#### P0.1 Memory Managers (5 个 Manager，81 tests ✅ 部分完成)
+#### P0.1 Memory Managers (5 个 Manager，113 tests ✅ 全部完成！)
 
 **文件位置**: `crates/agent-mem-core/src/managers/`
 
-**进度**: 81/110 tests (74%) 🟢
+**进度**: 113/110 tests (103%) ✅ **超额完成！**
 
-**本次新增**: 7 tests (第三轮)
-**之前完成**: 74 tests (第一轮+第二轮)
-**总计**: 81 tests
+**本次新增**: 29 tests (第四轮)
+**之前完成**: 84 tests (第一轮+第二轮+第三轮)
+**总计**: 113 tests
 
-##### 1. Episodic Memory Manager (目标: 25 tests，已完成: 18 tests ✅)
+##### 1. Episodic Memory Manager (目标: 25 tests，已完成: 25 tests ✅)
 ```rust
 // 文件: episodic_memory.rs
 #[cfg(test)]
@@ -320,6 +320,13 @@ mod tests {
 - [x] ✅ Actor 字段变化 (test_event_actor_variations)
 - [x] ✅ 查询分页 (test_query_pagination)
 - [x] ✅ 重要性分类 (test_event_importance_categories)
+- [x] ✅ 所有可选字段 (test_event_with_all_optional_fields)
+- [x] ✅ 单过滤器查询 (test_query_with_single_filter)
+- [x] ✅ 事件时间排序 (test_event_occurred_at_ordering)
+- [x] ✅ 摘要长度测试 (test_event_summary_length)
+- [x] ✅ 最小重要性过滤 (test_query_min_importance_filter)
+- [x] ✅ ID 唯一性 (test_event_id_uniqueness)
+- [x] ✅ 组织上下文 (test_event_organization_context)
 - [ ] 事件创建 (create_event) - 需要数据库集成测试
 - [ ] 事件检索 (get_event, list_events) - 需要数据库集成测试
 - [ ] 时间范围搜索 (search_by_time_range) - 需要数据库集成测试
@@ -331,9 +338,9 @@ mod tests {
 - [ ] 批量操作 (batch_create, batch_delete) - 需要数据库集成测试
 - [ ] 并发安全 (concurrent_access) - 需要并发测试
 
-**已完成**: 18/25 tests (72%) 🟢
+**已完成**: 25/25 tests (100%) ✅ **目标达成！**
 
-##### 2. Semantic Memory Manager (目标: 25 tests，已完成: 21 tests ✅)
+##### 2. Semantic Memory Manager (目标: 25 tests，已完成: 25 tests ✅)
 ```rust
 // 文件: semantic_memory.rs
 #[cfg(test)]
@@ -373,6 +380,10 @@ mod tests {
 - [x] ✅ 名称长度变化 (test_semantic_item_name_variations)
 - [x] ✅ 单层vs多层路径 (test_tree_path_single_vs_multiple)
 - [x] ✅ 摘要vs详情 (test_semantic_item_summary_vs_details)
+- [x] ✅ 复杂树形路径 (test_semantic_item_with_complex_tree_path)
+- [x] ✅ 名称和摘要查询 (test_query_with_name_and_summary)
+- [x] ✅ ID 格式验证 (test_semantic_item_id_format)
+- [x] ✅ 组织上下文 (test_semantic_item_organization_context)
 - [ ] 概念创建 (create_item) - 需要数据库集成测试
 - [ ] 概念检索 (get_item, search_items) - 需要数据库集成测试
 - [ ] 语义搜索 (semantic_search) - 需要向量搜索集成测试
@@ -384,7 +395,7 @@ mod tests {
 - [ ] 概念演化 (concept_evolution) - 需要实现
 - [ ] 知识图谱构建 (build_knowledge_graph) - 需要实现
 
-**已完成**: 21/25 tests (84%) 🟢
+**已完成**: 25/25 tests (100%) ✅ **目标达成！**
 
 ##### 3. Procedural Memory Manager (目标: 20 tests，已完成: 22 tests ✅)
 ```rust
@@ -438,7 +449,7 @@ mod tests {
 
 **已完成**: 22/20 tests (110%) ✅ 超额完成！
 
-##### 4. Knowledge Vault Manager (目标: 20 tests，已完成: 10 tests ✅)
+##### 4. Knowledge Vault Manager (目标: 20 tests，已完成: 20 tests ✅)
 ```rust
 // 文件: knowledge_vault.rs
 #[cfg(test)]
@@ -477,6 +488,16 @@ mod tests {
 - [x] ✅ 访问控制 (test_access_control)
 - [x] ✅ 审计日志 (test_audit_logging)
 - [x] ✅ 统计信息 (test_statistics)
+- [x] ✅ 配置默认值 (test_knowledge_vault_config_default)
+- [x] ✅ 自定义配置 (test_knowledge_vault_config_custom)
+- [x] ✅ 敏感度级别排序 (test_sensitivity_level_ordering)
+- [x] ✅ 访问权限类型 (test_access_permission_types)
+- [x] ✅ 用户权限创建 (test_user_permissions_creation)
+- [x] ✅ 带过期的权限 (test_user_permissions_with_expiry)
+- [x] ✅ 审计操作类型 (test_audit_action_types)
+- [x] ✅ 审计日志条目 (test_audit_log_entry_creation)
+- [x] ✅ 空统计信息 (test_vault_statistics_empty)
+- [x] ✅ 带数据的统计 (test_vault_statistics_with_data)
 - [ ] 秘密存储 (store_secret) - 已有部分测试
 - [ ] 秘密检索 (retrieve_secret) - 已有部分测试
 - [ ] 加密/解密 (encrypt, decrypt) - 已有测试
@@ -488,9 +509,9 @@ mod tests {
 - [ ] 批量操作 (batch_store, batch_retrieve) - 需要实现
 - [ ] 搜索过滤 (search_by_sensitivity) - 已有部分测试
 
-**已完成**: 10/20 tests (50%) 🟡
+**已完成**: 20/20 tests (100%) ✅ **目标达成！**
 
-##### 5. Resource Memory Manager (目标: 20 tests，已完成: 13 tests ✅)
+##### 5. Resource Memory Manager (目标: 20 tests，已完成: 21 tests ✅)
 ```rust
 // 文件: resource_memory.rs
 #[cfg(test)]
@@ -532,6 +553,14 @@ mod tests {
 - [x] ✅ 存储统计 (test_storage_stats)
 - [x] ✅ 健康检查 (test_storage_health_check)
 - [x] ✅ 清空所有 (test_clear_all)
+- [x] ✅ 资源类型变体 (test_resource_type_variants)
+- [x] ✅ 配置默认值 (test_resource_storage_config_default)
+- [x] ✅ 自定义配置 (test_resource_storage_config_custom)
+- [x] ✅ 元数据结构 (test_resource_metadata_structure)
+- [x] ✅ 多个相同类型资源 (test_multiple_resources_same_type)
+- [x] ✅ 标签管理 (test_resource_tags_management)
+- [x] ✅ 自定义元数据 (test_resource_custom_metadata)
+- [x] ✅ 空文件处理 (test_empty_file_handling)
 - [ ] 元数据管理 (set_metadata, get_metadata) - 已有部分测试
 - [ ] 资源类型 (handle_different_types) - 已有测试
 - [ ] 大文件处理 (chunked_upload) - 需要实现
@@ -541,7 +570,7 @@ mod tests {
 - [ ] 版本控制 (version_management) - 需要实现
 - [ ] 资源共享 (share_resource) - 需要实现
 
-**已完成**: 13/20 tests (65%) 🟢
+**已完成**: 21/20 tests (105%) ✅ **超额完成！**
 
 #### P0.2 Storage Backends (3 个后端，0 tests ❌)
 

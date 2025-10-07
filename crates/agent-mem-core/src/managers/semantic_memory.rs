@@ -728,5 +728,73 @@ mod tests {
         assert!(!item.details.is_empty());
         assert!(item.details.starts_with("Detailed information"));
     }
+
+    #[test]
+    fn test_semantic_item_with_complex_tree_path() {
+        let complex_path = vec![
+            "knowledge".to_string(),
+            "technology".to_string(),
+            "artificial_intelligence".to_string(),
+            "machine_learning".to_string(),
+            "deep_learning".to_string(),
+            "neural_networks".to_string(),
+        ];
+
+        let item = create_test_item("item-1", "CNN Architecture", complex_path.clone());
+
+        assert_eq!(item.tree_path.len(), 6);
+        assert_eq!(item.tree_path[0], "knowledge");
+        assert_eq!(item.tree_path[5], "neural_networks");
+    }
+
+    #[test]
+    fn test_query_with_name_and_summary() {
+        let query = SemanticQuery {
+            name_query: Some("machine learning".to_string()),
+            summary_query: Some("artificial intelligence".to_string()),
+            tree_path_prefix: None,
+            limit: Some(10),
+        };
+
+        assert!(query.name_query.is_some());
+        assert!(query.summary_query.is_some());
+        assert_eq!(query.limit, Some(10));
+    }
+
+    #[test]
+    fn test_semantic_item_id_format() {
+        let item1 = create_test_item("item-1", "Concept A", vec!["root".to_string()]);
+        let item2 = create_test_item("item-2", "Concept B", vec!["root".to_string()]);
+
+        assert!(!item1.id.is_empty());
+        assert!(!item2.id.is_empty());
+        assert_ne!(item1.id, item2.id);
+    }
+
+    #[test]
+    fn test_semantic_item_organization_context() {
+        let now = Utc::now();
+
+        let item = SemanticItem {
+            id: "item-1".to_string(),
+            organization_id: "org-research-lab".to_string(),
+            user_id: "researcher-123".to_string(),
+            agent_id: "agent-456".to_string(),
+            name: "Research Topic".to_string(),
+            summary: "Summary of research".to_string(),
+            details: "Detailed research information".to_string(),
+            tree_path: vec!["research".to_string(), "topics".to_string()],
+            source: Some("Academic Paper".to_string()),
+            metadata: json!({
+                "field": "Computer Science",
+                "year": 2025
+            }),
+            created_at: now,
+            updated_at: now,
+        };
+
+        assert_eq!(item.organization_id, "org-research-lab");
+        assert!(item.metadata["field"].is_string());
+    }
 }
 

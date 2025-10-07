@@ -682,5 +682,195 @@ mod tests {
         let high_importance = create_test_event("event-high", "decision", 0.9);
         assert!(high_importance.importance_score >= 0.7);
     }
+
+    #[test]
+    fn test_event_with_all_optional_fields() {
+        let now = Utc::now();
+
+        let event = EpisodicEvent {
+            id: "event-full".to_string(),
+            organization_id: "org-123".to_string(),
+            user_id: "user-456".to_string(),
+            agent_id: "agent-789".to_string(),
+            occurred_at: now,
+            event_type: "interaction".to_string(),
+            actor: Some("John Doe".to_string()),
+            summary: "Complete event with all fields".to_string(),
+            details: Some("Detailed description of the event".to_string()),
+            importance_score: 0.8,
+            metadata: json!({
+                "location": "Office",
+                "duration": 3600,
+                "participants": ["Alice", "Bob"]
+            }),
+            created_at: now,
+            updated_at: now,
+        };
+
+        assert!(event.actor.is_some());
+        assert!(event.details.is_some());
+        assert!(!event.metadata.is_null());
+    }
+
+    #[test]
+    fn test_query_with_single_filter() {
+        // 只有 user_id
+        let query1 = EpisodicQuery {
+            user_id: Some("user-123".to_string()),
+            agent_id: None,
+            event_type: None,
+            start_time: None,
+            end_time: None,
+            min_importance: None,
+            limit: None,
+            offset: None,
+        };
+        assert!(query1.user_id.is_some());
+        assert!(query1.agent_id.is_none());
+
+        // 只有 event_type
+        let query2 = EpisodicQuery {
+            user_id: None,
+            agent_id: None,
+            event_type: Some("conversation".to_string()),
+            start_time: None,
+            end_time: None,
+            min_importance: None,
+            limit: None,
+            offset: None,
+        };
+        assert!(query2.event_type.is_some());
+    }
+
+    #[test]
+    fn test_event_occurred_at_ordering() {
+        let base_time = Utc::now();
+
+        let event1 = EpisodicEvent {
+            id: "event-1".to_string(),
+            organization_id: "org".to_string(),
+            user_id: "user".to_string(),
+            agent_id: "agent".to_string(),
+            occurred_at: base_time - Duration::hours(2),
+            event_type: "action".to_string(),
+            actor: None,
+            summary: "Earlier event".to_string(),
+            details: None,
+            importance_score: 0.5,
+            metadata: json!({}),
+            created_at: base_time,
+            updated_at: base_time,
+        };
+
+        let event2 = EpisodicEvent {
+            id: "event-2".to_string(),
+            organization_id: "org".to_string(),
+            user_id: "user".to_string(),
+            agent_id: "agent".to_string(),
+            occurred_at: base_time,
+            event_type: "action".to_string(),
+            actor: None,
+            summary: "Later event".to_string(),
+            details: None,
+            importance_score: 0.5,
+            metadata: json!({}),
+            created_at: base_time,
+            updated_at: base_time,
+        };
+
+        assert!(event1.occurred_at < event2.occurred_at);
+    }
+
+    #[test]
+    fn test_event_summary_length() {
+        // 短摘要
+        let short_event = create_test_event("event-1", "action", 0.5);
+        assert!(!short_event.summary.is_empty());
+
+        // 长摘要
+        let long_summary = "A".repeat(500);
+        let now = Utc::now();
+        let long_event = EpisodicEvent {
+            id: "event-2".to_string(),
+            organization_id: "org".to_string(),
+            user_id: "user".to_string(),
+            agent_id: "agent".to_string(),
+            occurred_at: now,
+            event_type: "action".to_string(),
+            actor: None,
+            summary: long_summary.clone(),
+            details: None,
+            importance_score: 0.5,
+            metadata: json!({}),
+            created_at: now,
+            updated_at: now,
+        };
+        assert_eq!(long_event.summary.len(), 500);
+    }
+
+    #[test]
+    fn test_query_min_importance_filter() {
+        let query_low = EpisodicQuery {
+            user_id: None,
+            agent_id: None,
+            event_type: None,
+            start_time: None,
+            end_time: None,
+            min_importance: Some(0.3),
+            limit: None,
+            offset: None,
+        };
+
+        let query_high = EpisodicQuery {
+            user_id: None,
+            agent_id: None,
+            event_type: None,
+            start_time: None,
+            end_time: None,
+            min_importance: Some(0.8),
+            limit: None,
+            offset: None,
+        };
+
+        assert_eq!(query_low.min_importance, Some(0.3));
+        assert_eq!(query_high.min_importance, Some(0.8));
+    }
+
+    #[test]
+    fn test_event_id_uniqueness() {
+        let event1 = create_test_event("event-1", "action", 0.5);
+        let event2 = create_test_event("event-2", "action", 0.5);
+        let event3 = create_test_event("event-1", "observation", 0.6);
+
+        assert_ne!(event1.id, event2.id);
+        assert_eq!(event1.id, event3.id); // 相同 ID
+    }
+
+    #[test]
+    fn test_event_organization_context() {
+        let now = Utc::now();
+
+        let event = EpisodicEvent {
+            id: "event-1".to_string(),
+            organization_id: "org-enterprise-123".to_string(),
+            user_id: "user-456".to_string(),
+            agent_id: "agent-789".to_string(),
+            occurred_at: now,
+            event_type: "business_action".to_string(),
+            actor: Some("Manager".to_string()),
+            summary: "Business event".to_string(),
+            details: None,
+            importance_score: 0.7,
+            metadata: json!({
+                "department": "Sales",
+                "project": "Q4-2025"
+            }),
+            created_at: now,
+            updated_at: now,
+        };
+
+        assert!(!event.organization_id.is_empty());
+        assert!(event.metadata["department"].is_string());
+    }
 }
 

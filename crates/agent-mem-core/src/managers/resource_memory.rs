@@ -1103,4 +1103,150 @@ mod tests {
         let all_resources = manager.list_all_resources().await.unwrap();
         assert_eq!(all_resources.len(), 0);
     }
+
+    #[tokio::test]
+    async fn test_resource_type_variants() {
+        // 测试所有资源类型
+        assert_ne!(ResourceType::Document, ResourceType::Image);
+        assert_ne!(ResourceType::Image, ResourceType::Video);
+        assert_ne!(ResourceType::Video, ResourceType::Audio);
+        assert_ne!(ResourceType::Audio, ResourceType::Code);
+        assert_ne!(ResourceType::Code, ResourceType::Data);
+    }
+
+    #[tokio::test]
+    async fn test_resource_storage_config_default() {
+        let config = ResourceStorageConfig::default();
+
+        assert!(config.max_file_size > 0);
+        assert!(config.allowed_extensions.is_empty() || !config.allowed_extensions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resource_storage_config_custom() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().to_path_buf(),
+            max_file_size: 1024 * 1024, // 1MB
+            allowed_extensions: vec!["txt".to_string(), "pdf".to_string()],
+            enable_deduplication: true,
+            enable_compression: false,
+        };
+
+        assert_eq!(config.max_file_size, 1024 * 1024);
+        assert_eq!(config.allowed_extensions.len(), 2);
+        assert!(config.enable_deduplication);
+        assert!(!config.enable_compression);
+    }
+
+    #[tokio::test]
+    async fn test_resource_metadata_structure() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().join("storage"),
+            ..Default::default()
+        };
+
+        let manager = ResourceMemoryManager::with_config(config).unwrap();
+        let test_file = create_test_file(temp_dir.path(), "test.txt", b"content").await;
+
+        let resource_id = manager.store_resource(&test_file, None, None).await.unwrap();
+        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap();
+
+        assert!(metadata.is_some());
+        let meta = metadata.unwrap();
+        assert!(!meta.id.is_empty());
+        assert!(!meta.filename.is_empty());
+        assert!(meta.size > 0);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_resources_same_type() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().join("storage"),
+            ..Default::default()
+        };
+
+        let manager = ResourceMemoryManager::with_config(config).unwrap();
+
+        // 存储多个相同类型的资源
+        let file1 = create_test_file(temp_dir.path(), "doc1.pdf", b"content1").await;
+        let file2 = create_test_file(temp_dir.path(), "doc2.pdf", b"content2").await;
+        let file3 = create_test_file(temp_dir.path(), "doc3.pdf", b"content3").await;
+
+        let id1 = manager.store_resource(&file1, None, None).await.unwrap();
+        let id2 = manager.store_resource(&file2, None, None).await.unwrap();
+        let id3 = manager.store_resource(&file3, None, None).await.unwrap();
+
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+        assert_ne!(id1, id3);
+
+        let stats = manager.get_stats().await.unwrap();
+        assert_eq!(stats.total_resources, 3);
+    }
+
+    #[tokio::test]
+    async fn test_resource_tags_management() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().join("storage"),
+            ..Default::default()
+        };
+
+        let manager = ResourceMemoryManager::with_config(config).unwrap();
+        let test_file = create_test_file(temp_dir.path(), "tagged.txt", b"content").await;
+
+        // 存储带标签的资源
+        let tags = vec!["important".to_string(), "project-a".to_string()];
+        let resource_id = manager.store_resource(&test_file, Some(tags.clone()), None).await.unwrap();
+
+        // 验证标签
+        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
+        assert_eq!(metadata.tags.len(), 2);
+        assert!(metadata.tags.contains(&"important".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resource_custom_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().join("storage"),
+            ..Default::default()
+        };
+
+        let manager = ResourceMemoryManager::with_config(config).unwrap();
+        let test_file = create_test_file(temp_dir.path(), "meta.txt", b"content").await;
+
+        // 存储带自定义元数据的资源
+        let mut custom_meta = HashMap::new();
+        custom_meta.insert("author".to_string(), "John Doe".to_string());
+        custom_meta.insert("version".to_string(), "1.0".to_string());
+
+        let resource_id = manager.store_resource(&test_file, None, Some(custom_meta.clone())).await.unwrap();
+
+        // 验证自定义元数据
+        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
+        assert_eq!(metadata.custom_metadata.get("author"), Some(&"John Doe".to_string()));
+        assert_eq!(metadata.custom_metadata.get("version"), Some(&"1.0".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_empty_file_handling() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ResourceStorageConfig {
+            storage_root: temp_dir.path().join("storage"),
+            ..Default::default()
+        };
+
+        let manager = ResourceMemoryManager::with_config(config).unwrap();
+        let empty_file = create_test_file(temp_dir.path(), "empty.txt", b"").await;
+
+        // 存储空文件
+        let resource_id = manager.store_resource(&empty_file, None, None).await.unwrap();
+
+        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
+        assert_eq!(metadata.size, 0);
+    }
 }

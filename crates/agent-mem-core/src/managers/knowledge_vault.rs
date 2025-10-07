@@ -1395,4 +1395,162 @@ mod tests {
         );
         assert_eq!(stats.entries_by_creator.get("test_user"), Some(&2));
     }
+
+    #[test]
+    fn test_knowledge_vault_config_default() {
+        let config = KnowledgeVaultConfig::default();
+
+        assert_eq!(config.max_entries, 10000);
+        assert!(config.access_control_enabled);
+        assert!(config.audit_logging_enabled);
+        assert!(config.auto_classification_enabled);
+        assert!(!config.encryption_key.is_empty());
+    }
+
+    #[test]
+    fn test_knowledge_vault_config_custom() {
+        let config = KnowledgeVaultConfig {
+            max_entries: 5000,
+            encryption_key: "custom_key".to_string(),
+            access_control_enabled: false,
+            audit_logging_enabled: false,
+            auto_classification_enabled: false,
+        };
+
+        assert_eq!(config.max_entries, 5000);
+        assert!(!config.access_control_enabled);
+        assert!(!config.audit_logging_enabled);
+    }
+
+    #[test]
+    fn test_sensitivity_level_ordering() {
+        assert!(SensitivityLevel::Public.level_value() < SensitivityLevel::Internal.level_value());
+        assert!(SensitivityLevel::Internal.level_value() < SensitivityLevel::Confidential.level_value());
+        assert!(SensitivityLevel::Confidential.level_value() < SensitivityLevel::TopSecret.level_value());
+    }
+
+    #[test]
+    fn test_access_permission_types() {
+        let read = AccessPermission::Read;
+        let write = AccessPermission::Write;
+        let admin = AccessPermission::Admin;
+
+        assert_ne!(read, write);
+        assert_ne!(write, admin);
+        assert_ne!(read, admin);
+    }
+
+    #[test]
+    fn test_user_permissions_creation() {
+        let perms = UserPermissions {
+            user_id: "user-123".to_string(),
+            role: "developer".to_string(),
+            max_sensitivity_level: SensitivityLevel::Confidential,
+            permissions: vec![AccessPermission::Read, AccessPermission::Write],
+            created_at: Utc::now(),
+            expires_at: None,
+            active: true,
+        };
+
+        assert_eq!(perms.user_id, "user-123");
+        assert_eq!(perms.permissions.len(), 2);
+        assert!(perms.active);
+        assert!(perms.expires_at.is_none());
+    }
+
+    #[test]
+    fn test_user_permissions_with_expiry() {
+        let now = Utc::now();
+        let future = now + chrono::Duration::days(30);
+
+        let perms = UserPermissions {
+            user_id: "temp-user".to_string(),
+            role: "contractor".to_string(),
+            max_sensitivity_level: SensitivityLevel::Internal,
+            permissions: vec![AccessPermission::Read],
+            created_at: now,
+            expires_at: Some(future),
+            active: true,
+        };
+
+        assert!(perms.expires_at.is_some());
+        assert!(perms.expires_at.unwrap() > now);
+    }
+
+    #[test]
+    fn test_audit_action_types() {
+        let create = AuditAction::Create;
+        let read = AuditAction::Read;
+        let update = AuditAction::Update;
+        let delete = AuditAction::Delete;
+        let permission_change = AuditAction::PermissionChange;
+
+        assert_ne!(create, read);
+        assert_ne!(read, update);
+        assert_ne!(update, delete);
+        assert_ne!(delete, permission_change);
+    }
+
+    #[test]
+    fn test_audit_log_entry_creation() {
+        let now = Utc::now();
+
+        let log = AuditLogEntry {
+            id: "log-1".to_string(),
+            user_id: "user-123".to_string(),
+            action: AuditAction::Read,
+            resource_id: Some("entry-456".to_string()),
+            timestamp: now,
+            details: Some("User accessed confidential document".to_string()),
+            ip_address: Some("192.168.1.1".to_string()),
+            success: true,
+        };
+
+        assert_eq!(log.user_id, "user-123");
+        assert!(log.success);
+        assert!(log.resource_id.is_some());
+        assert!(log.details.is_some());
+    }
+
+    #[test]
+    fn test_vault_statistics_empty() {
+        let stats = VaultStatistics {
+            total_entries: 0,
+            total_users: 0,
+            active_users: 0,
+            entries_by_sensitivity: HashMap::new(),
+            entries_by_creator: HashMap::new(),
+            total_audit_logs: 0,
+            last_access: None,
+        };
+
+        assert_eq!(stats.total_entries, 0);
+        assert_eq!(stats.total_users, 0);
+        assert!(stats.last_access.is_none());
+    }
+
+    #[test]
+    fn test_vault_statistics_with_data() {
+        let mut entries_by_sensitivity = HashMap::new();
+        entries_by_sensitivity.insert(SensitivityLevel::Public, 5);
+        entries_by_sensitivity.insert(SensitivityLevel::Internal, 3);
+
+        let mut entries_by_creator = HashMap::new();
+        entries_by_creator.insert("user1".to_string(), 4);
+        entries_by_creator.insert("user2".to_string(), 4);
+
+        let stats = VaultStatistics {
+            total_entries: 8,
+            total_users: 2,
+            active_users: 2,
+            entries_by_sensitivity,
+            entries_by_creator,
+            total_audit_logs: 15,
+            last_access: Some(Utc::now()),
+        };
+
+        assert_eq!(stats.total_entries, 8);
+        assert_eq!(stats.total_users, 2);
+        assert!(stats.last_access.is_some());
+    }
 }
