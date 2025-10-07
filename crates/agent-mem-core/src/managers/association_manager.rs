@@ -180,7 +180,7 @@ impl AssociationManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         info!(
             "Created association {} from {} to {} (type: {}, strength: {})",
@@ -213,7 +213,7 @@ impl AssociationManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results)
     }
@@ -246,7 +246,7 @@ impl AssociationManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results)
     }
@@ -269,7 +269,7 @@ impl AssociationManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         debug!("Updated association {} strength to {}", association_id, new_strength);
 
@@ -287,7 +287,7 @@ impl AssociationManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         info!("Deleted association {}", association_id);
 
@@ -307,7 +307,7 @@ impl AssociationManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         // 按类型统计
         let by_type = sqlx::query!(
@@ -321,7 +321,7 @@ impl AssociationManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         // 平均强度
         let avg_strength = sqlx::query!(
@@ -334,7 +334,7 @@ impl AssociationManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         // 最强关联
         let strongest = sqlx::query_as!(
@@ -353,7 +353,7 @@ impl AssociationManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(AssociationStats {
             total_associations: total.count.unwrap_or(0),

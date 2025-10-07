@@ -12,7 +12,7 @@ categories.workspace = true
 description = "Core memory management for AgentMem memory platform"
 
 [dependencies]
-agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem-traits = { path = "../agent-mem-traits", features = ["sqlx"] }
 agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-llm = { path = "../agent-mem-llm" }

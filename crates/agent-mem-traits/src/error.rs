@@ -105,6 +105,14 @@ pub enum AgentMemError {
 /// Result type alias for AgentMem operations
 pub type Result<T> = std::result::Result<T, AgentMemError>;
 
+// Implement From<sqlx::Error> for AgentMemError
+#[cfg(feature = "sqlx")]
+impl From<sqlx::Error> for AgentMemError {
+    fn from(err: sqlx::Error) -> Self {
+        Self::StorageError(err.to_string())
+    }
+}
+
 impl AgentMemError {
     pub fn memory_error(msg: impl Into<String>) -> Self {
         Self::MemoryError(msg.into())

@@ -196,7 +196,7 @@ impl LifecycleManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         debug!(
             "Recorded lifecycle event: {} for memory {}",
@@ -215,7 +215,7 @@ impl LifecycleManager {
         memory_id: &str,
         new_state: MemoryState,
     ) -> Result<()> {
-        let new_state_str = new_state.as_str();
+        let new_state_str = new_state.as_str().to_string();
 
         // 获取旧状态
         let old_state = self.get_state(memory_id, user_id).await?;
@@ -235,26 +235,28 @@ impl LifecycleManager {
             organization_id,
             user_id,
             agent_id,
-            new_state_str,
+            new_state_str.as_str(),
             Utc::now(),
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         // 记录事件
+        let event_type = match &new_state {
+            MemoryState::Created => LifecycleEventType::Created,
+            MemoryState::Active => LifecycleEventType::Accessed,
+            MemoryState::Archived => LifecycleEventType::Archived,
+            MemoryState::Deprecated => LifecycleEventType::Deprecated,
+            MemoryState::Deleted => LifecycleEventType::Deleted,
+        };
+
         self.record_event(
             organization_id,
             user_id,
             agent_id,
             memory_id,
-            match new_state {
-                MemoryState::Created => LifecycleEventType::Created,
-                MemoryState::Active => LifecycleEventType::Accessed,
-                MemoryState::Archived => LifecycleEventType::Archived,
-                MemoryState::Deprecated => LifecycleEventType::Deprecated,
-                MemoryState::Deleted => LifecycleEventType::Deleted,
-            },
+            event_type,
             old_state.map(|s| MemoryState::from_str(&s.current_state).ok()).flatten(),
             Some(new_state),
             serde_json::json!({}),
@@ -288,7 +290,7 @@ impl LifecycleManager {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(result)
     }
@@ -309,7 +311,7 @@ impl LifecycleManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(())
     }
@@ -336,7 +338,7 @@ impl LifecycleManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         // 记录事件
         self.record_event(
@@ -374,7 +376,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results.into_iter().map(|r| r.memory_id).collect())
     }
@@ -402,7 +404,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results.into_iter().map(|r| r.memory_id).collect())
     }
@@ -430,7 +432,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results.into_iter().map(|r| r.memory_id).collect())
     }
@@ -460,7 +462,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(results)
     }
@@ -478,7 +480,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         let event_counts = sqlx::query!(
             r#"
@@ -492,7 +494,7 @@ impl LifecycleManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         Ok(serde_json::json!({
             "state_counts": state_counts.into_iter().map(|r| {
@@ -523,7 +525,7 @@ impl LifecycleManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(AgentMemError::storage_error)?;
+        .map_err(|e| AgentMemError::from(e))?;
 
         info!("Cleaned up {} old lifecycle events", result.rows_affected());
 
