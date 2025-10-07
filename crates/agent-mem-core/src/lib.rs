@@ -13,6 +13,8 @@ pub mod agent_state;
 pub mod agents;
 /// Background agent processing system
 pub mod background_agent;
+/// Multi-level caching system with warming strategies
+pub mod cache;
 pub mod client;
 pub mod collaboration;
 pub mod compression;
@@ -98,6 +100,14 @@ pub use integration::{
 // Re-export orchestrator modules
 pub use orchestrator::{
     AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig, ToolCallInfo,
+};
+
+// Re-export cache modules
+pub use cache::{
+    Cache, CacheConfig, CacheKey, CacheLevel, CacheMetadata, CacheStats, CacheValue,
+    CacheWarmer, CacheWarmingConfig, DataLoader, EvictionPolicy, InvalidationStrategy,
+    MemoryCache, MemoryCacheConfig, MemoryCacheStats, MultiLevelCache, MultiLevelCacheConfig,
+    WarmingStats, WarmingStrategy,
 };
 
 // Re-export from traits
