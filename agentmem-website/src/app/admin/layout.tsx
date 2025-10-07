@@ -7,7 +7,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Bot, Brain, Users, Settings, Home, MessageSquare } from 'lucide-react';
+import { Bot, Brain, Users, Settings, Home, MessageSquare, Network } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -43,6 +43,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </NavLink>
               <NavLink href="/admin/memories" icon={<Brain className="w-5 h-5" />}>
                 Memories
+              </NavLink>
+              <NavLink href="/admin/graph" icon={<Network className="w-5 h-5" />}>
+                Knowledge Graph
               </NavLink>
               <NavLink href="/admin/users" icon={<Users className="w-5 h-5" />}>
                 Users
