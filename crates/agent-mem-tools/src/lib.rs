@@ -117,6 +117,9 @@ pub mod schema;
 /// Sandboxed execution environment
 pub mod sandbox;
 
+/// Tool execution sandbox (advanced)
+pub mod execution_sandbox;
+
 /// Permission management
 pub mod permissions;
 
@@ -128,9 +131,12 @@ pub mod builtin;
 
 // Re-export main types
 pub use error::{ToolError, ToolResult};
+pub use execution_sandbox::{
+    LocalSandboxConfig, SandboxRunResult, SandboxStatus, SandboxType, ToolExecutionSandbox,
+};
 pub use executor::{ExecutionContext, Tool, ToolExecutor};
 pub use permissions::{Permission, PermissionManager};
-pub use sandbox::SandboxManager;
+pub use sandbox::{CommandOutput, SandboxConfig, SandboxManager, SandboxStats};
 pub use schema::{ParameterSchema, PropertySchema, ToolSchema};
 
 /// Tool execution statistics

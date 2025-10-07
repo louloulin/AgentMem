@@ -2,14 +2,22 @@
 //!
 //! This module provides safe tool execution with timeout and resource limits,
 //! inspired by MIRIX's tool_execution_sandbox.py.
+//!
+//! 参考 MIRIX 实现:
+//! - mirix/services/tool_execution_sandbox.py
+//! - 本地沙箱执行
+//! - 虚拟环境隔离
+//! - 资源限制和监控
 
 use crate::error::{ToolError, ToolResult};
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::time::Duration;
+use tokio::process::Command;
 use tokio::time::timeout;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Sandbox configuration
 #[derive(Debug, Clone)]
