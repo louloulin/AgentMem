@@ -7,6 +7,7 @@ pub mod core_memory;
 pub mod episodic_memory;
 pub mod knowledge_vault;
 pub mod resource_memory;
+pub mod semantic_memory;
 
 pub use core_memory::{
     CoreMemoryBlock, CoreMemoryBlockType, CoreMemoryConfig, CoreMemoryManager, CoreMemoryStats,
@@ -30,3 +31,5 @@ pub use contextual_memory::{
 };
 
 pub use episodic_memory::{EpisodicEvent, EpisodicMemoryManager, EpisodicQuery};
+
+pub use semantic_memory::{SemanticMemoryItem, SemanticMemoryManager, SemanticQuery};
