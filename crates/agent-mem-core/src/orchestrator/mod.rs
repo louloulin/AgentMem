@@ -23,6 +23,7 @@ pub mod memory_extraction;
 
 use memory_integration::MemoryIntegrator;
 use memory_extraction::MemoryExtractor;
+use tool_integration::{ToolIntegrator, ToolIntegratorConfig};
 
 /// 对话请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +110,7 @@ pub struct AgentOrchestrator {
     tool_executor: Arc<ToolExecutor>,
     memory_integrator: MemoryIntegrator,
     memory_extractor: MemoryExtractor,
+    tool_integrator: ToolIntegrator,
 }
 
 impl AgentOrchestrator {
@@ -129,6 +131,14 @@ impl AgentOrchestrator {
             memory_engine.clone(),
         );
 
+        // 创建工具集成器
+        let tool_config = ToolIntegratorConfig {
+            max_tool_rounds: config.max_tool_rounds,
+            tool_timeout_seconds: 30,
+            allow_parallel_execution: false,
+        };
+        let tool_integrator = ToolIntegrator::new(tool_config, tool_executor.clone());
+
         Self {
             config,
             memory_engine,
@@ -137,6 +147,7 @@ impl AgentOrchestrator {
             tool_executor,
             memory_integrator,
             memory_extractor,
+            tool_integrator,
         }
     }
 
