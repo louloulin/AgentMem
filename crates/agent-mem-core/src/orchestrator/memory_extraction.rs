@@ -264,11 +264,28 @@ impl MemoryExtractor {
     /// 保存提取的记忆
     pub async fn save_memories(&self, memories: Vec<Memory>) -> Result<usize> {
         let count = memories.len();
-        for memory in memories {
-            // TODO: 使用 MemoryEngine 保存记忆
-            // self.memory_engine.add_memory(memory).await?;
-            debug!("Would save memory: {}", memory.content);
+
+        if count == 0 {
+            debug!("No memories to save");
+            return Ok(0);
         }
+
+        info!("Saving {} extracted memories", count);
+
+        for memory in memories {
+            // 使用 MemoryEngine 保存记忆
+            match self.memory_engine.add_memory(memory.clone()).await {
+                Ok(_) => {
+                    debug!("Successfully saved memory: {}", memory.content);
+                }
+                Err(e) => {
+                    warn!("Failed to save memory '{}': {}", memory.content, e);
+                    // 继续保存其他记忆，不中断整个流程
+                }
+            }
+        }
+
+        info!("Successfully saved {} memories", count);
         Ok(count)
     }
 }
