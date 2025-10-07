@@ -7,9 +7,36 @@ use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     Memory, MemoryType,
 };
+use agent_mem_traits::Session;
 use chrono::Utc;
 use std::sync::Arc;
+use std::collections::HashMap;
 use uuid::Uuid;
+
+// 辅助函数：创建测试用的 Memory
+fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
+    Memory {
+        id: Uuid::new_v4().to_string(),
+        content: content.to_string(),
+        hash: None,
+        metadata: HashMap::new(),
+        score,
+        created_at: Utc::now(),
+        updated_at: Some(Utc::now()),
+        session: Session::new(),
+        memory_type,
+        entities: vec![],
+        relations: vec![],
+        agent_id: "test-agent".to_string(),
+        user_id: Some("test-user".to_string()),
+        importance: 0.5,
+        embedding: None,
+        last_accessed_at: Utc::now(),
+        access_count: 0,
+        expires_at: None,
+        version: 1,
+    }
+}
 
 #[tokio::test]
 async fn test_memory_integrator_format_memories() {
@@ -41,7 +68,7 @@ async fn test_memory_integrator_format_memories() {
     ];
 
     // 3. 格式化记忆
-    let formatted = integrator.format_memories_for_prompt(&memories);
+    let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证格式化结果
     assert!(formatted.contains("Semantic"), "Should contain memory type");
@@ -167,7 +194,7 @@ async fn test_memory_integrator_empty_memories() {
     let memories: Vec<Memory> = vec![];
 
     // 3. 格式化空记忆
-    let formatted = integrator.format_memories_for_prompt(&memories);
+    let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证结果
     assert!(formatted.is_empty() || formatted.contains("No memories"), "Should handle empty memories");
