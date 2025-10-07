@@ -46,8 +46,17 @@ redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 tempfile.workspace = true
 tokio-test = "0.4"
 agent-mem-storage = { path = "../agent-mem-storage", features = ["memory"] }
+criterion.workspace = true
 
 [features]
 default = []
 persistence = []
 vector-search = []
+
+[[bench]]
+name = "memory_operations"
+harness = false
+
+[[bench]]
+name = "graph_reasoning"
+harness = false

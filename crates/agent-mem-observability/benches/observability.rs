@@ -59,7 +59,9 @@ fn bench_performance_tracking(c: &mut Criterion) {
     c.bench_function("performance_start_operation", |b| {
         let analyzer = PerformanceAnalyzer::new();
         b.iter(|| {
-            let _tracker = analyzer.start_operation(black_box("test_op"));
+            tokio::runtime::Runtime::new().unwrap().block_on(async {
+                let _tracker = analyzer.start_operation(black_box("test_op"));
+            });
         });
     });
 }
