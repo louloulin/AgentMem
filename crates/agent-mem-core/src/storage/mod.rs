@@ -9,6 +9,7 @@ pub mod api_key_repository;
 pub mod batch;
 #[cfg(feature = "postgres")]
 pub mod block_repository;
+#[cfg(all(feature = "postgres", feature = "redis-cache"))]
 pub mod hybrid_manager;
 #[cfg(feature = "postgres")]
 pub mod memory_repository;
@@ -26,6 +27,7 @@ pub mod models;
 pub mod pool_manager;
 #[cfg(feature = "postgres")]
 pub mod postgres;
+#[cfg(feature = "postgres")]
 pub mod query_analyzer;
 #[cfg(feature = "redis-cache")]
 pub mod redis;
@@ -127,14 +129,17 @@ pub trait CacheBackend: Send + Sync {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {
     /// PostgreSQL configuration
+    #[cfg(feature = "postgres")]
     pub postgres: PostgresConfig,
     /// Redis configuration
+    #[cfg(feature = "redis-cache")]
     pub redis: RedisConfig,
     /// Cache configuration
     pub cache: CacheConfig,
 }
 
 /// PostgreSQL configuration
+#[cfg(feature = "postgres")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostgresConfig {
     /// Database URL
@@ -150,6 +155,7 @@ pub struct PostgresConfig {
 }
 
 /// Redis configuration
+#[cfg(feature = "redis-cache")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedisConfig {
     /// Redis URL
@@ -244,13 +250,16 @@ pub struct HealthStatus {
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "postgres")]
             postgres: PostgresConfig::default(),
+            #[cfg(feature = "redis-cache")]
             redis: RedisConfig::default(),
             cache: CacheConfig::default(),
         }
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Default for PostgresConfig {
     fn default() -> Self {
         Self {
@@ -263,6 +272,7 @@ impl Default for PostgresConfig {
     }
 }
 
+#[cfg(feature = "redis-cache")]
 impl Default for RedisConfig {
     fn default() -> Self {
         Self {
@@ -287,6 +297,7 @@ impl Default for CacheConfig {
 }
 
 /// Hybrid storage manager that combines PostgreSQL and Redis
+#[cfg(all(feature = "postgres", feature = "redis-cache"))]
 pub struct HybridStorageManager {
     /// PostgreSQL backend for persistent storage
     postgres: Box<dyn StorageBackend>,
@@ -296,6 +307,7 @@ pub struct HybridStorageManager {
     config: StorageConfig,
 }
 
+#[cfg(all(feature = "postgres", feature = "redis-cache"))]
 impl HybridStorageManager {
     /// Create new hybrid storage manager
     pub fn new(

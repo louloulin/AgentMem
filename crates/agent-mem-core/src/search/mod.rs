@@ -7,12 +7,16 @@
 //! - 搜索结果重排序
 //! - 搜索性能优化
 
+#[cfg(feature = "postgres")]
 pub mod fulltext_search;
+#[cfg(feature = "postgres")]
 pub mod hybrid;
 pub mod ranker;
 pub mod vector_search;
 
+#[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;
+#[cfg(feature = "postgres")]
 pub use hybrid::{HybridSearchConfig, HybridSearchEngine, HybridSearchResult};
 pub use ranker::{RRFRanker, SearchResultRanker};
 pub use vector_search::VectorSearchEngine;

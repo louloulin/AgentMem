@@ -43,6 +43,7 @@ pub mod simple_memory;
 pub mod message_queue;
 pub mod operations;
 /// Agent orchestrator for conversation loop and memory integration
+#[cfg(feature = "postgres")]
 pub mod orchestrator;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
@@ -100,6 +101,7 @@ pub use integration::{
 };
 
 // Re-export orchestrator modules
+#[cfg(feature = "postgres")]
 pub use orchestrator::{
     AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig, ToolCallInfo,
 };

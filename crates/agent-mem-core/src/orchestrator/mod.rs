@@ -5,9 +5,11 @@
 
 use crate::{
     engine::MemoryEngine,
-    storage::message_repository::MessageRepository,
     Memory,
 };
+
+#[cfg(feature = "postgres")]
+use crate::storage::message_repository::MessageRepository;
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::{ToolExecutor, ExecutionContext};
 use agent_mem_traits::{
