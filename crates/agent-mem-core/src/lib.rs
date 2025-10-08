@@ -37,6 +37,8 @@ pub mod lifecycle;
 pub mod manager;
 /// Specialized memory managers for different memory types
 pub mod managers;
+/// Simplified Memory API (Mem0-style)
+pub mod simple_memory;
 /// Message queue system for agent communication
 pub mod message_queue;
 pub mod operations;
@@ -114,6 +116,9 @@ pub use cache::{
 pub use agent_mem_traits::{
     AgentMemError, MemoryItem as Memory, MemoryType, Result as MemoryResult, Session,
 };
+
+// Re-export simple memory API
+pub use simple_memory::SimpleMemory;
 
 /// Core error types
 #[derive(Debug, Clone, thiserror::Error)]

@@ -50,6 +50,7 @@ members = [
     "examples/graph-memory-demo",
     "examples/test-intelligent-integration",
     "examples/test-cache",
+    "examples/simple-memory-demo",
     "examples/local-embedding-demo",
     "examples/storage-backend-demo",
     "examples/litellm-demo",
