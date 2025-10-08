@@ -51,6 +51,8 @@ members = [
     "examples/test-intelligent-integration",
     "examples/test-cache",
     "examples/simple-memory-demo",
+    "examples/simple-api-test",
+    "examples/real-agentmem-test",
     "examples/local-embedding-demo",
     "examples/storage-backend-demo",
     "examples/litellm-demo",

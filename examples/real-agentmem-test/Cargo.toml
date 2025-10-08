@@ -1,0 +1,31 @@
+[package]
+name = "real-agentmem-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 直接使用 agent-mem-traits 和 agent-mem-config，不依赖 agent-mem-core
+agent-mem-traits = { path = "../../crates/agent-mem-traits", default-features = false }
+agent-mem-config = { path = "../../crates/agent-mem-config" }
+agent-mem-utils = { path = "../../crates/agent-mem-utils" }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Time
+chrono = "0.4"
+
