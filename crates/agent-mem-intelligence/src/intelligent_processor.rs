@@ -168,7 +168,7 @@ impl IntelligentMemoryProcessor {
         let start_time = std::time::Instant::now();
 
         // 1. 提取事实
-        let mut extracted_facts = self.fact_extractor.extract_facts(messages).await?;
+        let mut extracted_facts = self.fact_extractor.extract_facts_internal(messages).await?;
 
         // 2. 验证事实（如果启用）
         if self.config.enable_fact_validation {

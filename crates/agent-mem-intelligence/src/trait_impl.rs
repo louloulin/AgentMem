@@ -17,19 +17,19 @@ use crate::{
 #[async_trait]
 impl FactExtractorTrait for FactExtractor {
     async fn extract_facts(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
-        // 调用现有的 extract_structured_facts 方法
-        let facts = self.extract_structured_facts(messages).await?;
-        
+        // 调用 FactExtractor 的内部实现
+        let internal_facts = self.extract_facts_internal(messages).await?;
+
         // 转换为 trait 定义的 ExtractedFact 格式
-        let converted_facts: Vec<ExtractedFact> = facts.into_iter()
+        let converted_facts: Vec<ExtractedFact> = internal_facts.into_iter()
             .map(|fact| ExtractedFact {
                 content: fact.content,
                 confidence: fact.confidence,
-                category: format!("{:?}", fact.category),
+                category: fact.category,
                 metadata: fact.metadata,
             })
             .collect();
-        
+
         Ok(converted_facts)
     }
 }

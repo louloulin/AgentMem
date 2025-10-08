@@ -53,7 +53,7 @@ members = [
     "examples/simple-memory-demo",
     "examples/simple-api-test",
     "examples/real-agentmem-test",
-    "examples/local-embedding-demo",
+    # "examples/local-embedding-demo",  # 暂时禁用：依赖 candle-core 有编译问题
     "examples/storage-backend-demo",
     "examples/litellm-demo",
     "examples/embedding-demo",

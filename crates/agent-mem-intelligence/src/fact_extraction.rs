@@ -162,8 +162,8 @@ impl FactExtractor {
         Self { llm }
     }
 
-    /// 从消息中提取事实（增强版本）
-    pub async fn extract_facts(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
+    /// 从消息中提取事实（增强版本）- 内部实现
+    pub async fn extract_facts_internal(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
         if messages.is_empty() {
             return Ok(vec![]);
         }

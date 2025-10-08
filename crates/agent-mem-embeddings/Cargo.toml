@@ -52,7 +52,7 @@ tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["openai", "local"]
+default = ["openai"]
 
 # 嵌入提供商
 openai = []

@@ -19,7 +19,8 @@ pub mod similarity;
 pub mod decision_engine;
 pub mod fact_extraction;
 pub mod intelligent_processor;
-pub mod trait_impl;
+// TODO: 修复类型不匹配问题后再启用
+// pub mod trait_impl;
 pub mod cache;
 
 // Mem5 增强模块
