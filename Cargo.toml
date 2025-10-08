@@ -79,6 +79,7 @@ members = [
     "examples/multi-tenant-demo",
     "examples/cloud-native-demo",
     "examples/performance-benchmark",
+    "examples/intelligent-memory-demo",
     "crates/agent-mem-tools",
     "crates/agent-mem-observability",
     # "examples/basic-usage",

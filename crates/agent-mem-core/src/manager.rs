@@ -116,9 +116,17 @@ impl MemoryManager {
         };
 
         let deduplicator = if config.intelligence.enable_deduplication {
-            Some(Arc::new(MemoryDeduplicator::new(
-                config.intelligence.deduplication.similarity_threshold,
-            )))
+            use crate::managers::deduplication::DeduplicationConfig as DedupConfig;
+
+            let dedup_config = DedupConfig {
+                similarity_threshold: config.intelligence.deduplication.similarity_threshold,
+                time_window_seconds: config.intelligence.deduplication.time_window_seconds.unwrap_or(3600),
+                batch_size: 100,
+                enable_intelligent_merge: true,
+                preserve_history: true,
+            };
+
+            Some(Arc::new(MemoryDeduplicator::new(dedup_config)))
         } else {
             None
         };
@@ -577,17 +585,15 @@ impl MemoryManager {
     /// 从内容中提取事实
     async fn extract_facts_from_content(&self, content: &str) -> Result<Vec<ExtractedFact>> {
         let fact_extractor = self.fact_extractor.as_ref()
-            .ok_or_else(|| AgentMemError::ConfigurationError(
+            .ok_or_else(|| AgentMemError::ConfigError(
                 "Fact extractor not initialized".to_string()
             ))?;
 
         // 创建消息
         let message = agent_mem_traits::Message {
-            id: uuid::Uuid::new_v4().to_string(),
             role: agent_mem_traits::MessageRole::User,
             content: content.to_string(),
-            timestamp: chrono::Utc::now(),
-            metadata: HashMap::new(),
+            timestamp: Some(chrono::Utc::now()),
         };
 
         // 提取结构化事实
@@ -672,7 +678,7 @@ impl MemoryManager {
         similar_memories: &[ExistingMemory],
     ) -> Result<MemoryAction> {
         let decision_engine = self.decision_engine.as_ref()
-            .ok_or_else(|| AgentMemError::ConfigurationError(
+            .ok_or_else(|| AgentMemError::ConfigError(
                 "Decision engine not initialized".to_string()
             ))?;
 
@@ -745,9 +751,9 @@ impl MemoryManager {
                 info!("Executing UPDATE action for memory {}: {}", memory_id, change_reason);
 
                 // 获取现有记忆
-                if let Some(mut memory) = self.get_memory(&memory_id).await? {
+                if let Some(memory) = self.get_memory(&memory_id).await? {
                     // 根据合并策略更新内容
-                    memory.content = match merge_strategy {
+                    let updated_content = match merge_strategy {
                         agent_mem_intelligence::decision_engine::MergeStrategy::Replace => {
                             new_content
                         },
@@ -765,7 +771,7 @@ impl MemoryManager {
                     };
 
                     // 更新记忆
-                    self.update_memory(memory).await?;
+                    self.update_memory(&memory_id, Some(updated_content), None, None).await?;
                     Ok(Some(memory_id))
                 } else {
                     warn!("Memory {} not found for update, skipping", memory_id);
@@ -784,9 +790,8 @@ impl MemoryManager {
                     secondary_memory_ids.len(), primary_memory_id);
 
                 // 更新主记忆
-                if let Some(mut memory) = self.get_memory(&primary_memory_id).await? {
-                    memory.content = merged_content;
-                    self.update_memory(memory).await?;
+                if self.get_memory(&primary_memory_id).await?.is_some() {
+                    self.update_memory(&primary_memory_id, Some(merged_content), None, None).await?;
                 }
 
                 // 删除次要记忆
