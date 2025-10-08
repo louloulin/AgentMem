@@ -662,14 +662,65 @@ pub struct VectorStoreConfig {
 impl Default for VectorStoreConfig {
     fn default() -> Self {
         Self {
-            provider: "lancedb".to_string(),
-            path: "./data/vectors".to_string(),
+            provider: "memory".to_string(),  // Changed from "lancedb" to "memory" for zero-config embedded mode
+            path: "".to_string(),             // Empty path for in-memory storage
             table_name: "memories".to_string(),
             dimension: Some(1536),
             api_key: None,
             index_name: None,
             url: None,
             collection_name: None,
+        }
+    }
+}
+
+impl VectorStoreConfig {
+    /// Create in-memory vector store configuration (zero-config, embedded mode)
+    pub fn memory() -> Self {
+        Self::default()
+    }
+
+    /// Create LibSQL vector store configuration (local persistence)
+    pub fn libsql(path: &str) -> Self {
+        Self {
+            provider: "libsql".to_string(),
+            path: path.to_string(),
+            table_name: "memories".to_string(),
+            dimension: Some(1536),
+            ..Default::default()
+        }
+    }
+
+    /// Create LanceDB vector store configuration
+    pub fn lancedb(path: &str) -> Self {
+        Self {
+            provider: "lancedb".to_string(),
+            path: path.to_string(),
+            table_name: "memories".to_string(),
+            dimension: Some(1536),
+            ..Default::default()
+        }
+    }
+
+    /// Create Pinecone vector store configuration
+    pub fn pinecone(api_key: &str, index_name: &str) -> Self {
+        Self {
+            provider: "pinecone".to_string(),
+            api_key: Some(api_key.to_string()),
+            index_name: Some(index_name.to_string()),
+            dimension: Some(1536),
+            ..Default::default()
+        }
+    }
+
+    /// Create Qdrant vector store configuration
+    pub fn qdrant(url: &str, collection_name: &str) -> Self {
+        Self {
+            provider: "qdrant".to_string(),
+            url: Some(url.to_string()),
+            collection_name: Some(collection_name.to_string()),
+            dimension: Some(1536),
+            ..Default::default()
         }
     }
 }

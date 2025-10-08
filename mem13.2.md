@@ -168,9 +168,92 @@ SQLX_OFFLINE=true cargo build --package agent-mem-core --features postgres
 
 ---
 
-### Phase 3: 调整默认配置 ⏳ **待开始**
+### Phase 3: 调整默认配置 ✅ **已完成**
 
-**状态**: ⏳ 待开始
+**完成时间**: 2025-10-08
+**实际耗时**: 约 0.5 小时
+**状态**: ✅ 成功
+
+**完成的工作**:
+
+1. ✅ **修改 VectorStoreConfig 默认值** (agent-mem-traits/src/types.rs):
+   - 将默认 provider 从 "lancedb" 改为 "memory"
+   - 将默认 path 从 "./data/vectors" 改为 ""（空字符串）
+   - 添加注释说明零配置嵌入式模式
+
+2. ✅ **添加便捷工厂方法** (agent-mem-traits/src/types.rs):
+   - `VectorStoreConfig::memory()` - 内存存储（零配置）
+   - `VectorStoreConfig::libsql(path)` - LibSQL 本地持久化
+   - `VectorStoreConfig::lancedb(path)` - LanceDB 向量存储
+   - `VectorStoreConfig::pinecone(api_key, index_name)` - Pinecone 云存储
+   - `VectorStoreConfig::qdrant(url, collection_name)` - Qdrant 向量数据库
+
+**关键设计决策**:
+
+**问题**: 默认配置使用 "lancedb" 需要外部依赖，不适合零配置嵌入式部署
+
+**解决方案**:
+- 将默认 provider 改为 "memory"（内存存储）
+- 提供便捷的工厂方法，让用户轻松切换存储后端
+- 保持向后兼容，用户可以通过工厂方法使用 LanceDB
+
+**新的使用方式**:
+
+```rust
+// 零配置模式（默认）
+let config = VectorStoreConfig::default();  // 使用内存存储
+
+// 或者显式使用内存存储
+let config = VectorStoreConfig::memory();
+
+// 本地持久化
+let config = VectorStoreConfig::libsql("./data/memories.db");
+
+// LanceDB（原默认）
+let config = VectorStoreConfig::lancedb("./data/vectors");
+
+// Pinecone 云存储
+let config = VectorStoreConfig::pinecone("your-api-key", "your-index");
+
+// Qdrant 向量数据库
+let config = VectorStoreConfig::qdrant("http://localhost:6333", "memories");
+```
+
+**编译测试结果**:
+```bash
+# 测试 1: agent-mem-traits 编译
+cargo build --package agent-mem-traits
+✅ 成功 - Finished in 4.69s
+
+# 测试 2: agent-mem-core 无特性编译
+cargo build --package agent-mem-core --no-default-features
+✅ 成功 - Finished in 4.79s
+```
+
+**修改文件统计**:
+- 修改文件数: 1 个
+  - `agent-mem-traits/src/types.rs`: 约 65 行新增
+- 新增工厂方法: 5 个
+- 修改默认值: 2 处
+
+**遇到的问题和解决方案**:
+
+1. **问题**: 需要确保向后兼容
+   - **解决**: 保留所有现有功能，只修改默认值
+   - **验证**: 用户可以通过 `VectorStoreConfig::lancedb()` 继续使用 LanceDB
+
+2. **问题**: 需要提供便捷的切换方式
+   - **解决**: 添加工厂方法，一行代码切换存储后端
+   - **优势**: 代码更简洁，意图更明确
+
+**优势**:
+- ✅ **零配置嵌入式部署**: 默认使用内存存储，无需任何配置
+- ✅ **便捷的工厂方法**: 一行代码切换存储后端
+- ✅ **向后兼容**: 用户可以继续使用 LanceDB 或其他存储
+- ✅ **代码更简洁**: 工厂方法比手动构造配置更清晰
+- ✅ **降低入门门槛**: 新用户可以零配置快速开始
+
+**下一步**: 所有 Phase 已完成！准备最终验证和文档更新
 
 ---
 
