@@ -4,6 +4,7 @@
 //! This crate defines the fundamental interfaces that all components must implement.
 
 pub mod batch;
+pub mod cache;
 pub mod embedder;
 pub mod error;
 pub mod intelligence;
@@ -21,6 +22,7 @@ pub use batch::{
 };
 pub use embedder::Embedder;
 pub use error::{AgentMemError, Result};
+pub use cache::{CacheStats, IntelligenceCache};
 pub use intelligence::{
     DecisionEngine, ExtractedFact, FactExtractor, IntelligentMemoryProcessor,
     IntelligentProcessingResult, MemoryActionType, MemoryDecision,

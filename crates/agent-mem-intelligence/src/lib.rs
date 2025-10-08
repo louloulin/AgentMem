@@ -20,6 +20,7 @@ pub mod decision_engine;
 pub mod fact_extraction;
 pub mod intelligent_processor;
 pub mod trait_impl;
+pub mod cache;
 
 // Mem5 增强模块
 pub mod conflict_resolution;
@@ -32,6 +33,7 @@ pub mod multimodal;
 pub use agent_mem_traits::{AgentMemError, Result};
 
 // 导出主要功能模块
+pub use cache::LRUIntelligenceCache;
 pub use clustering::MemoryClusterer;
 pub use importance::ImportanceEvaluator;
 pub use processing::{MemoryProcessor, ProcessingConfig, ProcessingStats};
