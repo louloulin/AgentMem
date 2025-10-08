@@ -10,7 +10,9 @@ use std::sync::Arc;
 use crate::storage::traits::*;
 
 #[cfg(feature = "libsql")]
-use crate::storage::libsql::{create_libsql_pool, run_migrations, LibSqlUserRepository};
+use crate::storage::libsql::{
+    create_libsql_pool, run_migrations, LibSqlOrganizationRepository, LibSqlUserRepository,
+};
 
 #[cfg(feature = "postgres")]
 use crate::storage::user_repository::UserRepository as PgUserRepository;
@@ -24,11 +26,13 @@ pub struct Repositories {
     /// User repository
     pub users: Arc<dyn UserRepositoryTrait>,
 
+    /// Organization repository
+    pub organizations: Arc<dyn OrganizationRepositoryTrait>,
+
     // TODO: Add other repositories as they are implemented
     // pub agents: Arc<dyn AgentRepositoryTrait>,
     // pub messages: Arc<dyn MessageRepositoryTrait>,
     // pub tools: Arc<dyn ToolRepositoryTrait>,
-    // pub organizations: Arc<dyn OrganizationRepositoryTrait>,
     // pub api_keys: Arc<dyn ApiKeyRepositoryTrait>,
     // pub memories: Arc<dyn MemoryRepositoryTrait>,
     // pub blocks: Arc<dyn BlockRepositoryTrait>,
@@ -101,6 +105,7 @@ impl RepositoryFactory {
         // Create repository instances
         Ok(Repositories {
             users: Arc::new(LibSqlUserRepository::new(conn.clone())),
+            organizations: Arc::new(LibSqlOrganizationRepository::new(conn.clone())),
             // TODO: Add other repositories as they are implemented
         })
     }
