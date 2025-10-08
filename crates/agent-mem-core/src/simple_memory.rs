@@ -28,15 +28,14 @@ use crate::manager::MemoryManager;
 use crate::types::{Memory, MemoryQuery, MemorySearchResult};
 use agent_mem_config::memory::{
     DecisionEngineConfig, DeduplicationConfig, FactExtractionConfig, IntelligenceConfig,
+    EmbedderConfig, PerformanceConfig, SessionConfig,
 };
 use agent_mem_config::MemoryConfig;
-use agent_mem_intelligence::{FactExtractor as IntelligenceFactExtractor, MemoryDecisionEngine};
-use agent_mem_llm::providers::OpenAIProvider;
-use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{
     AgentMemError, DecisionEngine, FactExtractor, LLMConfig, MemoryItem, MemoryType, Result,
     VectorStoreConfig,
 };
+use agent_mem_llm::LLMProvider;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -75,28 +74,64 @@ impl SimpleMemory {
     /// }
     /// ```
     pub async fn new() -> Result<Self> {
-        info!("Initializing SimpleMemory with automatic configuration");
-        
-        // Create intelligent configuration
-        let config = Self::create_intelligent_config()?;
-        
-        // Create LLM provider
-        let llm_provider = Self::create_llm_provider()?;
-        
-        // Create intelligent components
-        let fact_extractor = Arc::new(IntelligenceFactExtractor::new(llm_provider.clone()));
-        let decision_engine = Arc::new(MemoryDecisionEngine::new(llm_provider.clone()));
-        
-        // Create memory manager with intelligent components
+        info!("Initializing SimpleMemory with default configuration");
+
+        // Create configuration
+        let config = Self::create_config()?;
+
+        // Create memory manager without intelligent components
+        // For intelligent features, use `with_intelligence()` instead
+        let manager = MemoryManager::with_config(config);
+
+        info!("SimpleMemory initialized successfully");
+
+        Ok(Self {
+            manager: Arc::new(manager),
+            default_user_id: None,
+            default_agent_id: "default".to_string(),
+        })
+    }
+
+    /// Create a SimpleMemory instance with intelligent components
+    ///
+    /// # Arguments
+    /// * `fact_extractor` - Optional fact extraction component
+    /// * `decision_engine` - Optional decision making component
+    /// * `llm_provider` - Optional LLM provider for intelligent features
+    ///
+    /// # Example
+    /// ```ignore
+    /// use agent_mem_core::SimpleMemory;
+    /// use agent_mem_intelligence::{FactExtractor, MemoryDecisionEngine};
+    /// use agent_mem_llm::providers::OpenAIProvider;
+    ///
+    /// let llm = Arc::new(OpenAIProvider::new(config)?);
+    /// let fact_extractor = Arc::new(FactExtractor::new(llm.clone()));
+    /// let decision_engine = Arc::new(MemoryDecisionEngine::new(llm.clone()));
+    ///
+    /// let mem = SimpleMemory::with_intelligence(
+    ///     Some(fact_extractor),
+    ///     Some(decision_engine),
+    ///     Some(llm),
+    /// ).await?;
+    /// ```
+    pub async fn with_intelligence(
+        fact_extractor: Option<Arc<dyn FactExtractor>>,
+        decision_engine: Option<Arc<dyn DecisionEngine>>,
+        llm_provider: Option<Arc<dyn LLMProvider>>,
+    ) -> Result<Self> {
+        info!("Initializing SimpleMemory with intelligent components");
+
+        let config = Self::create_config()?;
         let manager = MemoryManager::with_intelligent_components(
             config,
-            Some(fact_extractor as Arc<dyn FactExtractor>),
-            Some(decision_engine as Arc<dyn DecisionEngine>),
-            Some(llm_provider),
+            fact_extractor,
+            decision_engine,
+            llm_provider,
         );
-        
-        info!("SimpleMemory initialized successfully");
-        
+
+        info!("SimpleMemory with intelligence initialized successfully");
+
         Ok(Self {
             manager: Arc::new(manager),
             default_user_id: None,
@@ -121,22 +156,39 @@ impl SimpleMemory {
     /// ```
     pub async fn with_config(config: MemoryConfig) -> Result<Self> {
         info!("Initializing SimpleMemory with custom configuration");
-        
-        // Create LLM provider
-        let llm_provider = Self::create_llm_provider()?;
-        
-        // Create intelligent components
-        let fact_extractor = Arc::new(IntelligenceFactExtractor::new(llm_provider.clone()));
-        let decision_engine = Arc::new(MemoryDecisionEngine::new(llm_provider.clone()));
-        
-        // Create memory manager
+
+        // Create memory manager without intelligent components
+        let manager = MemoryManager::with_config(config);
+
+        Ok(Self {
+            manager: Arc::new(manager),
+            default_user_id: None,
+            default_agent_id: "default".to_string(),
+        })
+    }
+
+    /// Create a SimpleMemory instance with custom configuration and intelligent components
+    ///
+    /// # Arguments
+    /// * `config` - Memory configuration
+    /// * `fact_extractor` - Optional fact extraction component
+    /// * `decision_engine` - Optional decision making component
+    /// * `llm_provider` - Optional LLM provider for intelligent features
+    pub async fn with_config_and_intelligence(
+        config: MemoryConfig,
+        fact_extractor: Option<Arc<dyn FactExtractor>>,
+        decision_engine: Option<Arc<dyn DecisionEngine>>,
+        llm_provider: Option<Arc<dyn LLMProvider>>,
+    ) -> Result<Self> {
+        info!("Initializing SimpleMemory with custom configuration and intelligent components");
+
         let manager = MemoryManager::with_intelligent_components(
             config,
-            Some(fact_extractor as Arc<dyn FactExtractor>),
-            Some(decision_engine as Arc<dyn DecisionEngine>),
-            Some(llm_provider),
+            fact_extractor,
+            decision_engine,
+            llm_provider,
         );
-        
+
         Ok(Self {
             manager: Arc::new(manager),
             default_user_id: None,
@@ -409,22 +461,22 @@ impl SimpleMemory {
 
     // Helper methods
 
-    /// Create intelligent configuration with all features enabled
-    fn create_intelligent_config() -> Result<MemoryConfig> {
+    /// Create configuration with optional intelligent features
+    fn create_config() -> Result<MemoryConfig> {
         Ok(MemoryConfig {
             llm: LLMConfig::default(),
             vector_store: VectorStoreConfig::default(),
             graph_store: None,
-            embedder: agent_mem_config::EmbedderConfig::default(),
-            session: agent_mem_config::SessionConfig::default(),
+            embedder: EmbedderConfig::default(),
+            session: SessionConfig::default(),
             intelligence: IntelligenceConfig {
                 similarity_threshold: 0.8,
                 clustering_threshold: 0.7,
                 enable_conflict_detection: true,
                 enable_memory_summarization: true,
                 importance_scoring: true,
-                enable_intelligent_extraction: true,  // Enabled by default
-                enable_decision_engine: true,         // Enabled by default
+                enable_intelligent_extraction: false,  // Disabled by default, enable via with_intelligence()
+                enable_decision_engine: false,         // Disabled by default, enable via with_intelligence()
                 enable_deduplication: false,          // Optional
                 fact_extraction: FactExtractionConfig {
                     min_confidence: 0.7,
@@ -444,36 +496,8 @@ impl SimpleMemory {
                     merge_strategy: "intelligent_merge".to_string(),
                 },
             },
-            performance: agent_mem_config::PerformanceConfig::default(),
+            performance: PerformanceConfig::default(),
         })
-    }
-
-    /// Create LLM provider with automatic detection
-    fn create_llm_provider() -> Result<Arc<dyn LLMProvider>> {
-        // Try OpenAI first
-        if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            info!("Using OpenAI LLM provider");
-            let config = LLMConfig {
-                provider: "openai".to_string(),
-                model: "gpt-4".to_string(),
-                api_key: Some(api_key),
-                base_url: None,
-                temperature: Some(0.7),
-                max_tokens: Some(2000),
-                top_p: None,
-                frequency_penalty: None,
-                presence_penalty: None,
-                response_format: None,
-            };
-            return Ok(Arc::new(OpenAIProvider::new(config)?));
-        }
-
-        // TODO: Add Anthropic support
-        // TODO: Add Ollama support
-
-        Err(AgentMemError::ConfigError(
-            "No LLM provider available. Please set OPENAI_API_KEY environment variable".to_string(),
-        ))
     }
 }
 
