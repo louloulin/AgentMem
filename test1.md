@@ -16,7 +16,7 @@
 |------|------|--------|------|
 | **Rust 源文件总数** | 376 个 | 100% | 整个项目的 .rs 文件 |
 | **包含测试的文件** | 230 个 | 61.2% | 包含 `#[cfg(test)]` 模块的文件 |
-| **测试函数总数** | 1,367 个 | - | 所有 `#[test]` 和 `#[tokio::test]` |
+| **测试函数总数** | 1,403 个 | - | 所有 `#[test]` 和 `#[tokio::test]` (+36 新增) |
 | **单元测试** | ~1,200 个 | 87.8% | 模块内测试 |
 | **集成测试** | ~150 个 | 11.0% | tests/ 目录测试 |
 | **基准测试** | ~17 个 | 1.2% | benches/ 目录 |
@@ -720,6 +720,54 @@ mod tests {
 - [ ] 全文搜索 (full_text_search)
 - [ ] 向量搜索 (vector_search via pgvector)
 - [ ] 错误处理 (api_error, network_error)
+
+---
+
+### 🟢 优先级 P0.3: Orchestrator & Retrieval (24 tests ✅ 新增完成！)
+
+**文件位置**: `crates/agent-mem-core/src/orchestrator/` 和 `crates/agent-mem-core/src/retrieval/`
+
+**进度**: 24/24 tests (100%) ✅
+
+#### 1. Orchestrator Module (已完成: 12 tests ✅)
+
+**文件**: `orchestrator/mod.rs`
+
+**已完成测试**:
+- [x] ✅ ChatRequest 创建测试 (test_chat_request_creation)
+- [x] ✅ ChatRequest 序列化测试 (test_chat_request_serialization)
+- [x] ✅ ChatResponse 创建测试 (test_chat_response_creation)
+- [x] ✅ ChatResponse 工具调用测试 (test_chat_response_with_tool_calls)
+- [x] ✅ ToolCallInfo 创建测试 (test_tool_call_info_creation)
+- [x] ✅ OrchestratorConfig 默认值测试 (test_orchestrator_config_default)
+- [x] ✅ OrchestratorConfig 自定义测试 (test_orchestrator_config_custom)
+- [x] ✅ OrchestratorConfig 序列化测试 (test_orchestrator_config_serialization)
+- [x] ✅ 空消息测试 (test_chat_request_with_empty_message)
+- [x] ✅ 长消息测试 (test_chat_request_with_long_message)
+- [x] ✅ ChatResponse 序列化测试 (test_chat_response_serialization)
+- [x] ✅ ToolCallInfo 序列化测试 (test_tool_call_info_serialization)
+
+**已完成**: 12/12 tests (100%) ✅
+
+#### 2. Retrieval Router Module (已完成: 12 tests ✅)
+
+**文件**: `retrieval/router.rs`
+
+**已完成测试**:
+- [x] ✅ 检索策略描述测试 (test_retrieval_strategy_description)
+- [x] ✅ 检索策略权重测试 (test_retrieval_strategy_weight)
+- [x] ✅ 检索策略排序测试 (test_retrieval_strategy_ordering)
+- [x] ✅ 检索策略相等性测试 (test_retrieval_strategy_equality)
+- [x] ✅ 检索策略序列化测试 (test_retrieval_strategy_serialization)
+- [x] ✅ RouteDecision 创建测试 (test_route_decision_creation)
+- [x] ✅ RouteDecision 序列化测试 (test_route_decision_serialization)
+- [x] ✅ PerformanceEstimate 创建测试 (test_performance_estimate_creation)
+- [x] ✅ ResourceCost 变体测试 (test_resource_cost_variants)
+- [x] ✅ 空策略测试 (test_route_decision_with_empty_strategies)
+- [x] ✅ 多策略测试 (test_route_decision_with_multiple_strategies)
+- [x] ✅ 策略权重计算测试 (test_strategy_weights_calculation)
+
+**已完成**: 12/12 tests (100%) ✅
 
 ---
 

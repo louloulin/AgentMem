@@ -421,6 +421,187 @@ impl AgentOrchestrator {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_chat_request_creation() {
+        let request = ChatRequest {
+            message: "Hello, how are you?".to_string(),
+            agent_id: "agent-123".to_string(),
+            user_id: "user-456".to_string(),
+            stream: false,
+            max_memories: 10,
+        };
+
+        assert_eq!(request.message, "Hello, how are you?");
+        assert_eq!(request.agent_id, "agent-123");
+        assert_eq!(request.user_id, "user-456");
+        assert!(!request.stream);
+        assert_eq!(request.max_memories, 10);
+    }
+
+    #[test]
+    fn test_chat_request_serialization() {
+        let request = ChatRequest {
+            message: "Test message".to_string(),
+            agent_id: "agent-1".to_string(),
+            user_id: "user-1".to_string(),
+            stream: true,
+            max_memories: 5,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        let deserialized: ChatRequest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(request.message, deserialized.message);
+        assert_eq!(request.stream, deserialized.stream);
+    }
+
+    #[test]
+    fn test_chat_response_creation() {
+        let response = ChatResponse {
+            message_id: "msg-123".to_string(),
+            content: "I'm doing well, thank you!".to_string(),
+            memories_updated: true,
+            memories_count: 3,
+            tool_calls: None,
+        };
+
+        assert_eq!(response.message_id, "msg-123");
+        assert!(response.memories_updated);
+        assert_eq!(response.memories_count, 3);
+        assert!(response.tool_calls.is_none());
+    }
+
+    #[test]
+    fn test_chat_response_with_tool_calls() {
+        let tool_call = ToolCallInfo {
+            tool_name: "search".to_string(),
+            arguments: serde_json::json!({"query": "weather"}),
+            result: Some("Sunny, 25°C".to_string()),
+        };
+
+        let response = ChatResponse {
+            message_id: "msg-456".to_string(),
+            content: "The weather is sunny".to_string(),
+            memories_updated: false,
+            memories_count: 0,
+            tool_calls: Some(vec![tool_call]),
+        };
+
+        assert!(response.tool_calls.is_some());
+        assert_eq!(response.tool_calls.as_ref().unwrap().len(), 1);
+        assert_eq!(response.tool_calls.as_ref().unwrap()[0].tool_name, "search");
+    }
+
+    #[test]
+    fn test_tool_call_info_creation() {
+        let tool_call = ToolCallInfo {
+            tool_name: "calculator".to_string(),
+            arguments: serde_json::json!({"operation": "add", "a": 5, "b": 3}),
+            result: Some("8".to_string()),
+        };
+
+        assert_eq!(tool_call.tool_name, "calculator");
+        assert!(tool_call.result.is_some());
+        assert_eq!(tool_call.arguments["operation"], "add");
+    }
+
+    #[test]
+    fn test_orchestrator_config_default() {
+        let config = OrchestratorConfig::default();
+
+        assert_eq!(config.max_tool_rounds, 5);
+        assert_eq!(config.max_memories, 10);
+        assert!(config.auto_extract_memories);
+        assert_eq!(config.memory_extraction_threshold, 0.5);
+        assert!(!config.enable_tool_calling);
+    }
+
+    #[test]
+    fn test_orchestrator_config_custom() {
+        let config = OrchestratorConfig {
+            max_tool_rounds: 3,
+            max_memories: 20,
+            auto_extract_memories: false,
+            memory_extraction_threshold: 0.7,
+            enable_tool_calling: true,
+        };
+
+        assert_eq!(config.max_tool_rounds, 3);
+        assert_eq!(config.max_memories, 20);
+        assert!(!config.auto_extract_memories);
+        assert_eq!(config.memory_extraction_threshold, 0.7);
+        assert!(config.enable_tool_calling);
+    }
+
+    #[test]
+    fn test_orchestrator_config_serialization() {
+        let config = OrchestratorConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: OrchestratorConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(config.max_tool_rounds, deserialized.max_tool_rounds);
+        assert_eq!(config.max_memories, deserialized.max_memories);
+    }
+
+    #[test]
+    fn test_chat_request_with_empty_message() {
+        let request = ChatRequest {
+            message: "".to_string(),
+            agent_id: "agent-1".to_string(),
+            user_id: "user-1".to_string(),
+            stream: false,
+            max_memories: 5,
+        };
+
+        assert!(request.message.is_empty());
+    }
+
+    #[test]
+    fn test_chat_request_with_long_message() {
+        let long_message = "A".repeat(10000);
+        let request = ChatRequest {
+            message: long_message.clone(),
+            agent_id: "agent-1".to_string(),
+            user_id: "user-1".to_string(),
+            stream: false,
+            max_memories: 5,
+        };
+
+        assert_eq!(request.message.len(), 10000);
+    }
+
+    #[test]
+    fn test_chat_response_serialization() {
+        let response = ChatResponse {
+            message_id: "msg-1".to_string(),
+            content: "Response content".to_string(),
+            memories_updated: true,
+            memories_count: 2,
+            tool_calls: None,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: ChatResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(response.message_id, deserialized.message_id);
+        assert_eq!(response.memories_updated, deserialized.memories_updated);
+    }
+
+    #[test]
+    fn test_tool_call_info_serialization() {
+        let tool_call = ToolCallInfo {
+            tool_name: "test_tool".to_string(),
+            arguments: serde_json::json!({"param": "value"}),
+            result: Some("success".to_string()),
+        };
+
+        let json = serde_json::to_string(&tool_call).unwrap();
+        let deserialized: ToolCallInfo = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tool_call.tool_name, deserialized.tool_name);
+        assert_eq!(tool_call.result, deserialized.result);
+    }
+
     #[tokio::test]
     async fn test_orchestrator_creation() {
         // TODO: 添加完整的集成测试

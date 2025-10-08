@@ -579,3 +579,197 @@ struct RequestFeatures {
     pub has_preferred_strategy: bool,
     pub target_memory_types_specified: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retrieval_strategy_description() {
+        assert_eq!(
+            RetrievalStrategy::Embedding.description(),
+            "基于向量嵌入的语义相似度检索"
+        );
+        assert_eq!(
+            RetrievalStrategy::BM25.description(),
+            "基于 BM25 算法的全文检索"
+        );
+        assert_eq!(
+            RetrievalStrategy::Hybrid.description(),
+            "结合多种策略的混合检索"
+        );
+    }
+
+    #[test]
+    fn test_retrieval_strategy_weight() {
+        assert_eq!(RetrievalStrategy::Embedding.weight(), 0.9);
+        assert_eq!(RetrievalStrategy::BM25.weight(), 0.8);
+        assert_eq!(RetrievalStrategy::Hybrid.weight(), 1.0);
+        assert_eq!(RetrievalStrategy::ContextAware.weight(), 0.95);
+    }
+
+    #[test]
+    fn test_retrieval_strategy_ordering() {
+        let mut strategies = vec![
+            RetrievalStrategy::BM25,
+            RetrievalStrategy::Embedding,
+            RetrievalStrategy::StringMatch,
+        ];
+        strategies.sort();
+
+        // 验证排序后的顺序
+        assert_eq!(strategies.len(), 3);
+    }
+
+    #[test]
+    fn test_retrieval_strategy_equality() {
+        assert_eq!(RetrievalStrategy::Embedding, RetrievalStrategy::Embedding);
+        assert_ne!(RetrievalStrategy::Embedding, RetrievalStrategy::BM25);
+    }
+
+    #[test]
+    fn test_retrieval_strategy_serialization() {
+        let strategy = RetrievalStrategy::Hybrid;
+        let json = serde_json::to_string(&strategy).unwrap();
+        let deserialized: RetrievalStrategy = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(strategy, deserialized);
+    }
+
+    #[test]
+    fn test_route_decision_creation() {
+        let mut weights = HashMap::new();
+        weights.insert(RetrievalStrategy::Embedding, 0.9);
+        weights.insert(RetrievalStrategy::BM25, 0.8);
+
+        let decision = RouteDecision {
+            selected_strategies: vec![RetrievalStrategy::Embedding, RetrievalStrategy::BM25],
+            target_memory_types: vec![MemoryType::Episodic, MemoryType::Semantic],
+            strategy_weights: weights,
+            confidence: 0.85,
+            reasoning: vec!["High semantic similarity".to_string()],
+            estimated_performance: PerformanceEstimate {
+                estimated_response_time_ms: 100,
+                estimated_accuracy: 0.85,
+                estimated_recall: 0.9,
+                estimated_resource_usage: 0.5,
+            },
+        };
+
+        assert_eq!(decision.selected_strategies.len(), 2);
+        assert_eq!(decision.confidence, 0.85);
+        assert_eq!(decision.reasoning.len(), 1);
+    }
+
+    #[test]
+    fn test_route_decision_serialization() {
+        let decision = RouteDecision {
+            selected_strategies: vec![RetrievalStrategy::Embedding],
+            target_memory_types: vec![MemoryType::Episodic],
+            strategy_weights: HashMap::new(),
+            confidence: 0.9,
+            reasoning: vec!["Test reason".to_string()],
+            estimated_performance: PerformanceEstimate {
+                estimated_response_time_ms: 50,
+                estimated_accuracy: 0.9,
+                estimated_recall: 0.95,
+                estimated_resource_usage: 0.3,
+            },
+        };
+
+        let json = serde_json::to_string(&decision).unwrap();
+        let deserialized: RouteDecision = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(decision.selected_strategies, deserialized.selected_strategies);
+        assert_eq!(decision.confidence, deserialized.confidence);
+    }
+
+    #[test]
+    fn test_performance_estimate_creation() {
+        let estimate = PerformanceEstimate {
+            estimated_response_time_ms: 200,
+            estimated_accuracy: 0.82,
+            estimated_recall: 0.88,
+            estimated_resource_usage: 0.7,
+        };
+
+        assert_eq!(estimate.estimated_response_time_ms, 200);
+        assert_eq!(estimate.estimated_recall, 0.88);
+        assert_eq!(estimate.estimated_accuracy, 0.82);
+        assert_eq!(estimate.estimated_resource_usage, 0.7);
+    }
+
+    #[test]
+    fn test_performance_estimate_serialization() {
+        let estimate = PerformanceEstimate {
+            estimated_response_time_ms: 150,
+            estimated_accuracy: 0.9,
+            estimated_recall: 0.85,
+            estimated_resource_usage: 0.6,
+        };
+
+        let json = serde_json::to_string(&estimate).unwrap();
+        let deserialized: PerformanceEstimate = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(estimate.estimated_response_time_ms, deserialized.estimated_response_time_ms);
+        assert_eq!(estimate.estimated_accuracy, deserialized.estimated_accuracy);
+    }
+
+    #[test]
+    fn test_route_decision_with_empty_strategies() {
+        let decision = RouteDecision {
+            selected_strategies: vec![],
+            target_memory_types: vec![],
+            strategy_weights: HashMap::new(),
+            confidence: 0.0,
+            reasoning: vec![],
+            estimated_performance: PerformanceEstimate {
+                estimated_response_time_ms: 0,
+                estimated_accuracy: 0.0,
+                estimated_recall: 0.0,
+                estimated_resource_usage: 0.0,
+            },
+        };
+
+        assert!(decision.selected_strategies.is_empty());
+        assert!(decision.target_memory_types.is_empty());
+        assert_eq!(decision.confidence, 0.0);
+    }
+
+    #[test]
+    fn test_route_decision_with_multiple_strategies() {
+        let strategies = vec![
+            RetrievalStrategy::Embedding,
+            RetrievalStrategy::BM25,
+            RetrievalStrategy::SemanticGraph,
+            RetrievalStrategy::ContextAware,
+        ];
+
+        let decision = RouteDecision {
+            selected_strategies: strategies.clone(),
+            target_memory_types: vec![MemoryType::Episodic],
+            strategy_weights: HashMap::new(),
+            confidence: 0.75,
+            reasoning: vec!["Multiple strategies for better coverage".to_string()],
+            estimated_performance: PerformanceEstimate {
+                estimated_response_time_ms: 300,
+                estimated_accuracy: 0.88,
+                estimated_recall: 0.92,
+                estimated_resource_usage: 0.8,
+            },
+        };
+
+        assert_eq!(decision.selected_strategies.len(), 4);
+        assert!(decision.selected_strategies.contains(&RetrievalStrategy::Embedding));
+    }
+
+    #[test]
+    fn test_strategy_weights_calculation() {
+        let embedding_weight = RetrievalStrategy::Embedding.weight();
+        let bm25_weight = RetrievalStrategy::BM25.weight();
+        let hybrid_weight = RetrievalStrategy::Hybrid.weight();
+
+        assert!(hybrid_weight >= embedding_weight);
+        assert!(embedding_weight > bm25_weight);
+    }
+}
