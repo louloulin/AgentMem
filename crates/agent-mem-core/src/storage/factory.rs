@@ -11,7 +11,8 @@ use crate::storage::traits::*;
 
 #[cfg(feature = "libsql")]
 use crate::storage::libsql::{
-    create_libsql_pool, run_migrations, LibSqlOrganizationRepository, LibSqlUserRepository,
+    create_libsql_pool, run_migrations, LibSqlAgentRepository, LibSqlOrganizationRepository,
+    LibSqlUserRepository,
 };
 
 #[cfg(feature = "postgres")]
@@ -29,8 +30,10 @@ pub struct Repositories {
     /// Organization repository
     pub organizations: Arc<dyn OrganizationRepositoryTrait>,
 
+    /// Agent repository
+    pub agents: Arc<dyn AgentRepositoryTrait>,
+
     // TODO: Add other repositories as they are implemented
-    // pub agents: Arc<dyn AgentRepositoryTrait>,
     // pub messages: Arc<dyn MessageRepositoryTrait>,
     // pub tools: Arc<dyn ToolRepositoryTrait>,
     // pub api_keys: Arc<dyn ApiKeyRepositoryTrait>,
@@ -106,6 +109,7 @@ impl RepositoryFactory {
         Ok(Repositories {
             users: Arc::new(LibSqlUserRepository::new(conn.clone())),
             organizations: Arc::new(LibSqlOrganizationRepository::new(conn.clone())),
+            agents: Arc::new(LibSqlAgentRepository::new(conn.clone())),
             // TODO: Add other repositories as they are implemented
         })
     }
