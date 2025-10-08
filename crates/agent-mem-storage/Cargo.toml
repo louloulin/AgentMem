@@ -31,6 +31,9 @@ tracing.workspace = true
 # HTTP客户端（用于多个提供商）
 reqwest = { version = "0.11", features = ["json"] }
 
+# 嵌入式数据库
+libsql = { version = "0.6", optional = true }
+
 # 向量存储依赖
 lancedb = { version = "0.4", optional = true }
 arrow = { version = "52", optional = true }
@@ -66,7 +69,11 @@ tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["memory", "optimizations"]
+default = ["embedded"]
+
+# 嵌入式存储（零配置）
+embedded = ["libsql", "lancedb"]
+libsql = ["dep:libsql"]
 
 # 向量存储后端
 azure-ai-search = [] # Azure AI Search 企业级搜索

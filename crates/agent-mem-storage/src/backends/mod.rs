@@ -1,5 +1,9 @@
 //! 存储后端实现模块
 
+// 嵌入式存储
+pub mod libsql_store;
+pub mod lancedb_store;
+
 pub mod azure_ai_search;
 #[cfg(test)]
 mod azure_ai_search_test;
@@ -23,6 +27,10 @@ pub mod supabase;
 #[cfg(test)]
 mod supabase_test;
 pub mod weaviate;
+
+// 嵌入式存储导出
+pub use libsql_store::LibSQLStore;
+pub use lancedb_store::LanceDBStore as LanceDBVectorStore;
 
 pub use azure_ai_search::AzureAISearchStore;
 pub use chroma::ChromaStore;
