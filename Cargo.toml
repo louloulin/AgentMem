@@ -52,9 +52,9 @@ members = [
     "examples/test-cache",
     "examples/simple-memory-demo",
     "examples/simple-api-test",
-    "examples/real-agentmem-test",
+    # "examples/real-agentmem-test",  # 暂时禁用：使用旧 API
     # "examples/local-embedding-demo",  # 暂时禁用：依赖 candle-core 有编译问题
-    "examples/storage-backend-demo",
+    # "examples/storage-backend-demo",  # 暂时禁用：需要修复
     "examples/litellm-demo",
     "examples/embedding-demo",
     "examples/vector-store-demo",

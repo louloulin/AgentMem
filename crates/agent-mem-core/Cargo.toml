@@ -41,6 +41,7 @@ regex = "1.10"
 # Database dependencies
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"], optional = true }
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
+libsql = { version = "0.6", optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -49,11 +50,12 @@ agent-mem-storage = { path = "../agent-mem-storage", features = ["memory"] }
 criterion.workspace = true
 
 [features]
-default = []
+default = ["libsql"]
 persistence = ["postgres", "redis-cache"]
 vector-search = []
 postgres = ["sqlx", "agent-mem-traits/sqlx"]
 redis-cache = ["redis"]
+libsql = ["dep:libsql"]
 
 [[bench]]
 name = "memory_operations"

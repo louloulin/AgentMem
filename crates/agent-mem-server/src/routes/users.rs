@@ -1,4 +1,5 @@
 //! User management API routes
+#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for user management:
 //! - User registration

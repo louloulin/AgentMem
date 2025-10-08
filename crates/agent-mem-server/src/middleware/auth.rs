@@ -2,6 +2,8 @@
 //!
 //! This module provides middleware for JWT and API Key authentication.
 
+#![cfg(feature = "postgres")]
+
 use crate::auth::AuthService;
 use crate::error::{ServerError, ServerResult};
 use agent_mem_core::storage::api_key_repository::ApiKeyRepository;

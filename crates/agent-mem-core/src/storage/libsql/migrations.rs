@@ -1,0 +1,409 @@
+//! LibSQL database migrations
+//!
+//! Creates and manages database schema for LibSQL backend
+
+use agent_mem_traits::{AgentMemError, Result};
+use libsql::Connection;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+/// Run all database migrations
+pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
+    let conn_guard = conn.lock().await;
+
+    // Create migrations tracking table
+    create_migrations_table(&conn_guard).await?;
+
+    // Run migrations in order
+    run_migration(&conn_guard, 1, "create_organizations", create_organizations_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 2, "create_users", create_users_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 3, "create_agents", create_agents_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 4, "create_messages", create_messages_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 5, "create_blocks", create_blocks_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 6, "create_tools", create_tools_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 7, "create_memories", create_memories_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 8, "create_api_keys", create_api_keys_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 9, "create_junction_tables", create_junction_tables(&conn_guard)).await?;
+    run_migration(&conn_guard, 10, "create_indexes", create_indexes(&conn_guard)).await?;
+
+    Ok(())
+}
+
+/// Create migrations tracking table
+async fn create_migrations_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS _migrations (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at INTEGER NOT NULL
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create migrations table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Run a single migration if not already applied
+async fn run_migration(
+    conn: &Connection,
+    version: i64,
+    name: &str,
+    migration_fn: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    // Check if migration already applied
+    let mut rows = conn
+        .query("SELECT id FROM _migrations WHERE id = ?", libsql::params![version])
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to check migration status: {}", e)))?;
+
+    if rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))?.is_some() {
+        return Ok(()); // Already applied
+    }
+
+    // Run migration
+    migration_fn.await?;
+
+    // Record migration
+    conn.execute(
+        "INSERT INTO _migrations (id, name, applied_at) VALUES (?, ?, ?)",
+        libsql::params![version, name, chrono::Utc::now().timestamp()],
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to record migration: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create organizations table
+async fn create_organizations_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE organizations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create organizations table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create users table
+async fn create_users_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE users (
+            id TEXT PRIMARY KEY,
+            organization_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            timezone TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_by_id TEXT,
+            last_updated_by_id TEXT,
+            FOREIGN KEY (organization_id) REFERENCES organizations(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create users table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create agents table
+async fn create_agents_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE agents (
+            id TEXT PRIMARY KEY,
+            organization_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            system TEXT,
+            llm_config TEXT,
+            embedding_config TEXT,
+            message_ids TEXT,
+            memory_ids TEXT,
+            tool_ids TEXT,
+            metadata_ TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_by_id TEXT,
+            last_updated_by_id TEXT,
+            FOREIGN KEY (organization_id) REFERENCES organizations(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create agents table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create messages table
+async fn create_messages_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE messages (
+            id TEXT PRIMARY KEY,
+            role TEXT NOT NULL,
+            text TEXT,
+            user_id TEXT,
+            agent_id TEXT,
+            model TEXT,
+            name TEXT,
+            created_at INTEGER NOT NULL,
+            tool_calls TEXT,
+            tool_call_id TEXT,
+            metadata_ TEXT,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (agent_id) REFERENCES agents(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create messages table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create blocks table (Core Memory)
+async fn create_blocks_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE blocks (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            value TEXT NOT NULL,
+            limit_ INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            metadata_ TEXT
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create tools table
+async fn create_tools_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE tools (
+            id TEXT PRIMARY KEY,
+            organization_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            tags TEXT,
+            source_type TEXT,
+            source_code TEXT,
+            json_schema TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            metadata_ TEXT,
+            FOREIGN KEY (organization_id) REFERENCES organizations(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create memories table
+async fn create_memories_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE memories (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            agent_id TEXT,
+            content TEXT NOT NULL,
+            embedding TEXT,
+            metadata_ TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (agent_id) REFERENCES agents(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memories table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create API keys table
+async fn create_api_keys_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE api_keys (
+            id TEXT PRIMARY KEY,
+            key_hash TEXT NOT NULL UNIQUE,
+            user_id TEXT NOT NULL,
+            name TEXT,
+            scopes TEXT,
+            expires_at INTEGER,
+            created_at INTEGER NOT NULL,
+            last_used_at INTEGER,
+            is_revoked INTEGER NOT NULL DEFAULT 0,
+            metadata_ TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create api_keys table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create junction tables for many-to-many relationships
+async fn create_junction_tables(conn: &Connection) -> Result<()> {
+    // blocks_agents junction table
+    conn.execute(
+        "CREATE TABLE blocks_agents (
+            block_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (block_id, agent_id),
+            FOREIGN KEY (block_id) REFERENCES blocks(id),
+            FOREIGN KEY (agent_id) REFERENCES agents(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks_agents table: {}", e)))?;
+
+    // tools_agents junction table
+    conn.execute(
+        "CREATE TABLE tools_agents (
+            tool_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (tool_id, agent_id),
+            FOREIGN KEY (tool_id) REFERENCES tools(id),
+            FOREIGN KEY (agent_id) REFERENCES agents(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools_agents table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create indexes for performance
+async fn create_indexes(conn: &Connection) -> Result<()> {
+    let indexes = vec![
+        // Organization indexes
+        "CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name)",
+        "CREATE INDEX IF NOT EXISTS idx_organizations_deleted ON organizations(is_deleted)",
+        
+        // User indexes
+        "CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(organization_id)",
+        "CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)",
+        "CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(is_deleted)",
+        
+        // Agent indexes
+        "CREATE INDEX IF NOT EXISTS idx_agents_org_id ON agents(organization_id)",
+        "CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_agents_deleted ON agents(is_deleted)",
+        
+        // Message indexes
+        "CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON messages(agent_id)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_deleted ON messages(is_deleted)",
+        
+        // Tool indexes
+        "CREATE INDEX IF NOT EXISTS idx_tools_org_id ON tools(organization_id)",
+        "CREATE INDEX IF NOT EXISTS idx_tools_name ON tools(name)",
+        "CREATE INDEX IF NOT EXISTS idx_tools_deleted ON tools(is_deleted)",
+        
+        // Memory indexes
+        "CREATE INDEX IF NOT EXISTS idx_memories_agent_id ON memories(agent_id)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_deleted ON memories(is_deleted)",
+        
+        // API Key indexes
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_revoked ON api_keys(is_revoked)",
+        
+        // Block indexes
+        "CREATE INDEX IF NOT EXISTS idx_blocks_label ON blocks(label)",
+        "CREATE INDEX IF NOT EXISTS idx_blocks_deleted ON blocks(is_deleted)",
+    ];
+
+    for index_sql in indexes {
+        conn.execute(index_sql, ())
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::libsql::connection::create_libsql_pool;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_run_migrations() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+
+        let result = run_migrations(conn.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify migrations table exists
+        let conn_guard = conn.lock().await;
+        let mut rows = conn_guard
+            .query("SELECT COUNT(*) FROM _migrations", ())
+            .await
+            .unwrap();
+
+        let row = rows.next().await.unwrap().unwrap();
+        let count: i64 = row.get(0).unwrap();
+        assert_eq!(count, 10); // 10 migrations
+    }
+
+    #[tokio::test]
+    async fn test_migrations_idempotent() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+
+        // Run migrations twice
+        run_migrations(conn.clone()).await.unwrap();
+        let result = run_migrations(conn.clone()).await;
+        assert!(result.is_ok());
+
+        // Should still have 10 migrations
+        let conn_guard = conn.lock().await;
+        let mut rows = conn_guard
+            .query("SELECT COUNT(*) FROM _migrations", ())
+            .await
+            .unwrap();
+
+        let row = rows.next().await.unwrap().unwrap();
+        let count: i64 = row.get(0).unwrap();
+        assert_eq!(count, 10);
+    }
+}
+

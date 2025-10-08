@@ -10,6 +10,8 @@
 //! - RBAC authorization
 //! - OpenAPI documentation
 
+#![cfg(feature = "postgres")]
+
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;

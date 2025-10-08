@@ -13,11 +13,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+#[cfg(feature = "postgres")]
 use sqlx::FromRow;
 use uuid::Uuid;
 
 /// Organization model - the highest level of the object tree
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Organization {
     pub id: String,
     pub name: String,
@@ -27,7 +29,8 @@ pub struct Organization {
 }
 
 /// User model - represents a user within an organization
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct User {
     pub id: String,
     pub organization_id: String,
@@ -42,7 +45,8 @@ pub struct User {
 }
 
 /// Agent model - represents an AI agent
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Agent {
     pub id: String,
     pub organization_id: String,
@@ -51,17 +55,17 @@ pub struct Agent {
     pub description: Option<String>,
     pub system: Option<String>, // System prompt
     pub topic: Option<String>,  // Current topic
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub message_ids: Option<Vec<String>>, // In-context message IDs
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub metadata_: Option<JsonValue>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub llm_config: Option<JsonValue>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub embedding_config: Option<JsonValue>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub tool_rules: Option<JsonValue>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub mcp_tools: Option<Vec<String>>, // MCP server names
     pub state: Option<String>,          // Agent state: idle, thinking, executing, waiting, error
     pub last_active_at: Option<DateTime<Utc>>, // Last activity timestamp
@@ -74,7 +78,8 @@ pub struct Agent {
 }
 
 /// Message model - represents a message in a conversation
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Message {
     pub id: String,
     pub organization_id: String,
@@ -82,16 +87,16 @@ pub struct Message {
     pub agent_id: String,
     pub role: String, // "user", "assistant", "system", "tool"
     pub text: Option<String>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub content: Option<JsonValue>, // Message content parts
     pub model: Option<String>,
     pub name: Option<String>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub tool_calls: Option<JsonValue>,
     pub tool_call_id: Option<String>,
     pub step_id: Option<String>,
     pub otid: Option<String>, // Offline threading ID
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub tool_returns: Option<JsonValue>,
     pub group_id: Option<String>,
     pub sender_id: Option<String>,
@@ -103,7 +108,8 @@ pub struct Message {
 }
 
 /// Block model - represents a section of core memory
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Block {
     pub id: String,
     pub organization_id: String,
@@ -114,7 +120,7 @@ pub struct Block {
     pub is_template: bool,
     pub value: String,
     pub limit: i64, // Character limit
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub metadata_: Option<JsonValue>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -124,19 +130,20 @@ pub struct Block {
 }
 
 /// Tool model - represents a tool that can be used by agents
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Tool {
     pub id: String,
     pub organization_id: String,
     pub name: String,
     pub description: Option<String>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub json_schema: Option<JsonValue>,
     pub source_type: Option<String>,
     pub source_code: Option<String>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub tags: Option<Vec<String>>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub metadata_: Option<JsonValue>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -146,7 +153,8 @@ pub struct Tool {
 }
 
 /// Memory model - enhanced version with agent and user relationships
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct Memory {
     pub id: String,
     pub organization_id: String,
@@ -154,7 +162,7 @@ pub struct Memory {
     pub agent_id: String,
     pub content: String,
     pub hash: Option<String>,
-    #[sqlx(json)]
+    #[cfg_attr(feature = "postgres", sqlx(json))]
     pub metadata: JsonValue,
     pub score: Option<f32>,
     pub memory_type: String,
@@ -170,8 +178,25 @@ pub struct Memory {
     pub last_updated_by_id: Option<String>,
 }
 
+/// API Key model - represents an API key for authentication
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
+pub struct ApiKey {
+    pub id: String,
+    pub key_hash: String, // Store hash, not the actual key
+    pub name: String,
+    pub user_id: String,
+    pub organization_id: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub is_deleted: bool,
+}
+
 /// Junction table for blocks and agents (many-to-many)
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct BlocksAgents {
     pub block_id: String,
     pub block_label: String,
@@ -179,7 +204,8 @@ pub struct BlocksAgents {
 }
 
 /// Junction table for tools and agents (many-to-many)
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "postgres", derive(FromRow))]
 pub struct ToolsAgents {
     pub tool_id: String,
     pub agent_id: String,
@@ -310,6 +336,30 @@ impl Block {
             is_deleted: false,
             created_by_id: None,
             last_updated_by_id: None,
+        }
+    }
+}
+
+impl ApiKey {
+    pub fn new(
+        organization_id: String,
+        user_id: String,
+        name: String,
+        key_hash: String,
+        expires_at: Option<DateTime<Utc>>,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: generate_id("apikey"),
+            key_hash,
+            name,
+            user_id,
+            organization_id,
+            expires_at,
+            last_used_at: None,
+            created_at: now,
+            updated_at: now,
+            is_deleted: false,
         }
     }
 }

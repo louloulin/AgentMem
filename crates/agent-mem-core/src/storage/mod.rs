@@ -1,6 +1,17 @@
 // Storage module for AgentMem
 // Provides different storage backends for persistent memory storage
 
+// Repository traits (always available)
+pub mod traits;
+
+// Models (always available for LibSQL and PostgreSQL)
+pub mod models;
+
+// LibSQL backend (default, embedded mode)
+#[cfg(feature = "libsql")]
+pub mod libsql;
+
+// PostgreSQL repositories (optional, enterprise mode)
 #[cfg(feature = "postgres")]
 pub mod agent_repository;
 #[cfg(feature = "postgres")]
@@ -21,8 +32,6 @@ pub mod migration;
 pub mod migration_manager;
 #[cfg(feature = "postgres")]
 pub mod migrations;
-#[cfg(feature = "postgres")]
-pub mod models;
 #[cfg(feature = "postgres")]
 pub mod pool_manager;
 #[cfg(feature = "postgres")]

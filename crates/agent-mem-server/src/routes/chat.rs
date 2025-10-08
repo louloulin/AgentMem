@@ -1,4 +1,5 @@
 //! Chat API routes
+#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for agent chat functionality.
 //! It integrates the AgentOrchestrator to provide complete conversation loops
