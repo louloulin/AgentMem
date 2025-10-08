@@ -152,6 +152,29 @@ pub struct Tool {
     pub last_updated_by_id: Option<String>,
 }
 
+impl Tool {
+    /// Create a new tool
+    pub fn new(organization_id: String, name: String) -> Self {
+        let now = Utc::now();
+        Self {
+            id: generate_id("tool"),
+            organization_id,
+            name,
+            description: None,
+            json_schema: None,
+            source_type: None,
+            source_code: None,
+            tags: None,
+            metadata_: None,
+            created_at: now,
+            updated_at: now,
+            is_deleted: false,
+            created_by_id: None,
+            last_updated_by_id: None,
+        }
+    }
+}
+
 /// Memory model - enhanced version with agent and user relationships
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "postgres", derive(FromRow))]
