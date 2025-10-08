@@ -7,6 +7,9 @@ pub mod traits;
 // Models (always available for LibSQL and PostgreSQL)
 pub mod models;
 
+// Repository factory (always available)
+pub mod factory;
+
 // LibSQL backend (default, embedded mode)
 #[cfg(feature = "libsql")]
 pub mod libsql;

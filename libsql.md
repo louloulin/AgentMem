@@ -297,14 +297,16 @@ impl Default for DatabaseConfig {
 **实际**: 1 天 ✅
 **测试**: 7/7 passed
 
-#### Task 1.3: 创建 Repository Factory ⏳ **待实现**
-- [ ] 定义 `Repositories` 结构体
-- [ ] 实现 `RepositoryFactory::create_repositories()`
-- [ ] 实现 LibSQL 连接创建
-- [ ] 实现 PostgreSQL 连接创建
+#### Task 1.3: 创建 Repository Factory ✅ **已完成**
+- [x] 定义 `Repositories` 结构体
+- [x] 实现 `RepositoryFactory::create_repositories()`
+- [x] 实现 LibSQL 连接创建
+- [x] 实现 PostgreSQL 连接创建
+- [x] 添加 6 个集成测试
 
-**文件**: `crates/agent-mem-core/src/storage/factory.rs`
-**预计**: 2 天
+**文件**: `crates/agent-mem-core/src/storage/factory.rs` (277 行)
+**实际**: 1 天 ✅
+**测试**: 6/6 passed
 
 #### Task 1.4: LibSQL 连接管理 ✅ **已完成**
 - [x] 实现 LibSQL 连接池
@@ -494,20 +496,21 @@ impl UserRepositoryTrait for PgUserRepository {
 
 ## 📈 进度跟踪
 
-### 总体进度: 22% ✅
+### 总体进度: 30% ✅
 
 | Phase | 任务数 | 已完成 | 进行中 | 未开始 | 进度 |
 |-------|--------|--------|--------|--------|------|
-| Phase 1: 基础设施 | 4 | 3 | 1 | 0 | 75% |
+| Phase 1: 基础设施 | 4 | 4 | 0 | 0 | 100% ✅ |
 | Phase 2: LibSQL 实现 | 9 | 1 | 0 | 8 | 11% |
 | Phase 3: PostgreSQL 重构 | 9 | 0 | 0 | 9 | 0% |
 | Phase 4: Server 改造 | 2 | 0 | 0 | 2 | 0% |
 | Phase 5: 测试文档 | 3 | 0 | 0 | 3 | 0% |
-| **总计** | **27** | **4** | **1** | **22** | **22%** |
+| **总计** | **27** | **5** | **0** | **22** | **30%** |
 
 ### 最近完成 (2025-10-08)
 - ✅ Task 1.1: 完善 Repository Traits (8/8 traits)
 - ✅ Task 1.2: 创建配置系统 (320 行, 7 tests passed)
+- ✅ Task 1.3: 创建 Repository Factory (277 行, 6 tests passed) **NEW**
 - ✅ Task 1.4: LibSQL 连接管理 (260 行, 7 tests passed)
 - ✅ Task 2.1: LibSQL Schema 设计 (380 行, 3 integration tests passed)
 
