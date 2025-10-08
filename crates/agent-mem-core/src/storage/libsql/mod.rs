@@ -4,6 +4,7 @@
 
 pub mod agent_repository;
 pub mod connection;
+pub mod message_repository;
 pub mod migrations;
 pub mod organization_repository;
 pub mod user_repository;
@@ -11,6 +12,7 @@ pub mod user_repository;
 // Re-export commonly used types
 pub use agent_repository::LibSqlAgentRepository;
 pub use connection::{create_libsql_pool, DatabaseStats, LibSqlConnectionManager};
+pub use message_repository::LibSqlMessageRepository;
 pub use migrations::run_migrations;
 pub use organization_repository::LibSqlOrganizationRepository;
 pub use user_repository::LibSqlUserRepository;
