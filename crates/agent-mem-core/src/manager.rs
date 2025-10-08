@@ -8,14 +8,10 @@ use crate::{
     types::{Memory, MemoryQuery, MemorySearchResult, MemoryStats, MemoryType},
 };
 use agent_mem_config::MemoryConfig;
-use agent_mem_intelligence::{
-    decision_engine::MemoryDecisionEngine,
-    fact_extraction::FactExtractor,
-    MemoryAction, ExistingMemory, ExtractedFact,
-};
 use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{
-    AgentMemError, HistoryEntry, MemoryEvent, MemoryItem, MemoryProvider, Message, Result, Session,
+    AgentMemError, DecisionEngine, ExtractedFact, FactExtractor, HistoryEntry, MemoryActionType,
+    MemoryDecision, MemoryEvent, MemoryItem, MemoryProvider, Message, Result, Session,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,9 +31,9 @@ pub struct MemoryManager {
 
     // 智能组件 (可选)
     /// 事实提取器 (用于从内容中提取结构化事实)
-    fact_extractor: Option<Arc<FactExtractor>>,
+    fact_extractor: Option<Arc<dyn FactExtractor>>,
     /// 决策引擎 (用于智能决定记忆操作)
-    decision_engine: Option<Arc<MemoryDecisionEngine>>,
+    decision_engine: Option<Arc<dyn DecisionEngine>>,
     /// 去重器 (用于检测和合并重复记忆)
     deduplicator: Option<Arc<MemoryDeduplicator>>,
     /// LLM 提供商 (用于智能功能)
@@ -92,29 +88,19 @@ impl MemoryManager {
         }
     }
 
-    /// Create a new memory manager with LLM provider for intelligent features
-    pub fn with_llm_provider(
+    /// Create a new memory manager with intelligent components
+    pub fn with_intelligent_components(
         config: MemoryConfig,
-        llm_provider: Arc<dyn LLMProvider>,
+        fact_extractor: Option<Arc<dyn FactExtractor>>,
+        decision_engine: Option<Arc<dyn DecisionEngine>>,
+        llm_provider: Option<Arc<dyn LLMProvider>>,
     ) -> Self {
         let operations: Box<dyn MemoryOperations + Send + Sync> =
             Box::new(InMemoryOperations::new());
         let lifecycle = MemoryLifecycle::with_default_config();
         let history = MemoryHistory::with_default_config();
 
-        // 初始化智能组件
-        let fact_extractor = if config.intelligence.enable_intelligent_extraction {
-            Some(Arc::new(FactExtractor::new(llm_provider.clone())))
-        } else {
-            None
-        };
-
-        let decision_engine = if config.intelligence.enable_decision_engine {
-            Some(Arc::new(MemoryDecisionEngine::new(llm_provider.clone())))
-        } else {
-            None
-        };
-
+        // 初始化去重器 (如果启用)
         let deduplicator = if config.intelligence.enable_deduplication {
             use crate::managers::deduplication::DeduplicationConfig as DedupConfig;
 
@@ -139,7 +125,7 @@ impl MemoryManager {
             fact_extractor,
             decision_engine,
             deduplicator,
-            llm_provider: Some(llm_provider),
+            llm_provider,
         }
     }
 
@@ -597,7 +583,7 @@ impl MemoryManager {
         };
 
         // 提取结构化事实
-        match fact_extractor.extract_structured_facts(&[message]).await {
+        match fact_extractor.extract_facts(&[message]).await {
             Ok(facts) => {
                 // 过滤低置信度事实
                 let min_confidence = self.config.intelligence.fact_extraction.min_confidence;
@@ -605,8 +591,8 @@ impl MemoryManager {
                     .filter(|f| f.confidence >= min_confidence)
                     .collect();
 
-                debug!("Extracted {} facts (filtered from {} with min confidence {})",
-                    filtered_facts.len(), facts.len(), min_confidence);
+                debug!("Extracted {} facts (filtered from total with min confidence {})",
+                    filtered_facts.len(), min_confidence);
                 Ok(filtered_facts)
             },
             Err(e) => {
@@ -615,10 +601,7 @@ impl MemoryManager {
                 Ok(vec![ExtractedFact {
                     content: content.to_string(),
                     confidence: 0.5,
-                    category: agent_mem_intelligence::FactCategory::Knowledge,
-                    entities: vec![],
-                    temporal_info: None,
-                    source_message_id: None,
+                    category: "knowledge".to_string(),
                     metadata: HashMap::new(),
                 }])
             }
@@ -631,7 +614,7 @@ impl MemoryManager {
         fact: &ExtractedFact,
         agent_id: &str,
         user_id: &Option<String>,
-    ) -> Result<Vec<ExistingMemory>> {
+    ) -> Result<Vec<MemoryItem>> {
         let max_similar = self.config.intelligence.decision_engine.max_similar_memories;
 
         // 构建查询
@@ -649,21 +632,47 @@ impl MemoryManager {
         // 搜索相似记忆
         let results = self.search_memories(query).await?;
 
-        // 转换为 ExistingMemory 格式
-        let existing_memories: Vec<ExistingMemory> = results.into_iter()
-            .map(|result| ExistingMemory {
-                id: result.memory.id.clone(),
-                content: result.memory.content.clone(),
-                importance: result.memory.importance,
-                created_at: chrono::DateTime::from_timestamp(result.memory.created_at, 0)
-                    .unwrap_or_else(|| chrono::Utc::now())
-                    .to_rfc3339(),
-                updated_at: Some(
-                    chrono::DateTime::from_timestamp(result.memory.last_accessed_at, 0)
-                        .unwrap_or_else(|| chrono::Utc::now())
-                        .to_rfc3339()
-                ),
-                metadata: result.memory.metadata.clone(),
+        // 转换为 MemoryItem 格式
+        let existing_memories: Vec<MemoryItem> = results.into_iter()
+            .map(|result| {
+                let memory = &result.memory;
+                // 转换 metadata: HashMap<String, String> -> HashMap<String, serde_json::Value>
+                let metadata: HashMap<String, serde_json::Value> = memory.metadata.iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .collect();
+
+                MemoryItem {
+                    id: memory.id.clone(),
+                    content: memory.content.clone(),
+                    hash: None,
+                    metadata,
+                    score: Some(result.score),
+                    created_at: chrono::DateTime::from_timestamp(memory.created_at, 0)
+                        .unwrap_or_else(|| chrono::Utc::now()),
+                    updated_at: Some(chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
+                        .unwrap_or_else(|| chrono::Utc::now())),
+                    session: Session {
+                        id: memory.agent_id.clone(),
+                        user_id: memory.user_id.clone(),
+                        agent_id: Some(memory.agent_id.clone()),
+                        run_id: None,
+                        actor_id: None,
+                        created_at: chrono::Utc::now(),
+                        metadata: HashMap::new(),
+                    },
+                    memory_type: agent_mem_traits::MemoryType::Episodic, // 默认类型
+                    entities: vec![],
+                    relations: vec![],
+                    agent_id: memory.agent_id.clone(),
+                    user_id: memory.user_id.clone(),
+                    importance: memory.importance,
+                    embedding: None,
+                    last_accessed_at: chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
+                        .unwrap_or_else(|| chrono::Utc::now()),
+                    access_count: 0,
+                    expires_at: None,
+                    version: 1,
+                }
             })
             .collect();
 
@@ -675,15 +684,15 @@ impl MemoryManager {
     async fn make_decision_for_fact(
         &self,
         fact: &ExtractedFact,
-        similar_memories: &[ExistingMemory],
-    ) -> Result<MemoryAction> {
+        similar_memories: &[MemoryItem],
+    ) -> Result<MemoryActionType> {
         let decision_engine = self.decision_engine.as_ref()
             .ok_or_else(|| AgentMemError::ConfigError(
                 "Decision engine not initialized".to_string()
             ))?;
 
         // 调用决策引擎
-        match decision_engine.decide(&fact.content, similar_memories).await {
+        match decision_engine.decide(fact, similar_memories).await {
             Ok(decision) => {
                 info!("Decision made: {:?} with confidence {}",
                     decision.action, decision.confidence);
@@ -693,7 +702,7 @@ impl MemoryManager {
                 if decision.confidence < min_confidence {
                     warn!("Decision confidence {} below threshold {}, defaulting to Add",
                         decision.confidence, min_confidence);
-                    return Ok(MemoryAction::Add {
+                    return Ok(MemoryActionType::Add {
                         content: fact.content.clone(),
                         importance: fact.confidence,
                         metadata: fact.metadata.clone(),
@@ -705,7 +714,7 @@ impl MemoryManager {
             Err(e) => {
                 warn!("Decision engine failed: {}, defaulting to Add", e);
                 // 降级: 默认添加
-                Ok(MemoryAction::Add {
+                Ok(MemoryActionType::Add {
                     content: fact.content.clone(),
                     importance: fact.confidence,
                     metadata: fact.metadata.clone(),
@@ -717,7 +726,7 @@ impl MemoryManager {
     /// 执行记忆操作
     async fn execute_memory_action(
         &self,
-        action: MemoryAction,
+        action: MemoryActionType,
         agent_id: &str,
         user_id: &Option<String>,
         memory_type: &Option<MemoryType>,
@@ -725,7 +734,7 @@ impl MemoryManager {
         metadata: &Option<HashMap<String, String>>,
     ) -> Result<Option<String>> {
         match action {
-            MemoryAction::Add { content, importance: fact_importance, metadata: fact_metadata } => {
+            MemoryActionType::Add { content, importance: fact_importance, metadata: fact_metadata } => {
                 info!("Executing ADD action");
 
                 // 合并元数据
@@ -747,27 +756,17 @@ impl MemoryManager {
                 Ok(Some(memory_id))
             },
 
-            MemoryAction::Update { memory_id, new_content, merge_strategy, change_reason } => {
-                info!("Executing UPDATE action for memory {}: {}", memory_id, change_reason);
+            MemoryActionType::Update { memory_id, new_content, merge_strategy } => {
+                info!("Executing UPDATE action for memory {} with strategy {}", memory_id, merge_strategy);
 
                 // 获取现有记忆
                 if let Some(memory) = self.get_memory(&memory_id).await? {
                     // 根据合并策略更新内容
-                    let updated_content = match merge_strategy {
-                        agent_mem_intelligence::decision_engine::MergeStrategy::Replace => {
-                            new_content
-                        },
-                        agent_mem_intelligence::decision_engine::MergeStrategy::Append => {
-                            format!("{}\n\n{}", memory.content, new_content)
-                        },
-                        agent_mem_intelligence::decision_engine::MergeStrategy::Merge => {
-                            // 简单合并: 保留两者
-                            format!("{}\n{}", memory.content, new_content)
-                        },
-                        agent_mem_intelligence::decision_engine::MergeStrategy::Prioritize => {
-                            // 优先新内容
-                            new_content
-                        },
+                    let updated_content = match merge_strategy.as_str() {
+                        "replace" => new_content,
+                        "append" => format!("{}\n\n{}", memory.content, new_content),
+                        "merge" => format!("{}\n{}", memory.content, new_content),
+                        _ => new_content, // 默认替换
                     };
 
                     // 更新记忆
@@ -779,13 +778,13 @@ impl MemoryManager {
                 }
             },
 
-            MemoryAction::Delete { memory_id, deletion_reason } => {
-                info!("Executing DELETE action for memory {}: {:?}", memory_id, deletion_reason);
+            MemoryActionType::Delete { memory_id, reason } => {
+                info!("Executing DELETE action for memory {}: {}", memory_id, reason);
                 self.delete_memory(&memory_id).await?;
                 Ok(None)
             },
 
-            MemoryAction::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
+            MemoryActionType::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
                 info!("Executing MERGE action: merging {} memories into {}",
                     secondary_memory_ids.len(), primary_memory_id);
 
@@ -802,7 +801,7 @@ impl MemoryManager {
                 Ok(Some(primary_memory_id))
             },
 
-            MemoryAction::NoAction { reason } => {
+            MemoryActionType::NoAction { reason } => {
                 debug!("No action taken: {}", reason);
                 Ok(None)
             },

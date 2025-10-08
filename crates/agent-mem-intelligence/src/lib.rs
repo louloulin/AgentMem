@@ -19,6 +19,7 @@ pub mod similarity;
 pub mod decision_engine;
 pub mod fact_extraction;
 pub mod intelligent_processor;
+pub mod trait_impl;
 
 // Mem5 增强模块
 pub mod conflict_resolution;

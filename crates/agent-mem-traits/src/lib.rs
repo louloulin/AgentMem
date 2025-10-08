@@ -6,6 +6,7 @@
 pub mod batch;
 pub mod embedder;
 pub mod error;
+pub mod intelligence;
 pub mod llm;
 pub mod memory;
 pub mod session;
@@ -20,6 +21,10 @@ pub use batch::{
 };
 pub use embedder::Embedder;
 pub use error::{AgentMemError, Result};
+pub use intelligence::{
+    DecisionEngine, ExtractedFact, FactExtractor, IntelligentMemoryProcessor,
+    IntelligentProcessingResult, MemoryActionType, MemoryDecision,
+};
 pub use llm::{LLMProvider, ModelInfo};
 pub use memory::MemoryProvider;
 pub use session::SessionManager;
