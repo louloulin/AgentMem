@@ -34,9 +34,9 @@ reqwest = { version = "0.11", features = ["json"] }
 # 嵌入式数据库
 libsql = { version = "0.6", optional = true }
 
-# 向量存储依赖
-lancedb = { version = "0.4", optional = true }
-arrow = { version = "52", optional = true }
+# 向量存储依赖 (最新版本，已修复 chrono 冲突)
+lancedb = { version = "0.22", optional = true }
+arrow = { version = "56", optional = true }
 
 # FAISS 向量搜索 (可选，需要系统级安装)
 # faiss = { version = "0.12", optional = true }  # 需要系统级 FAISS 安装
@@ -72,7 +72,8 @@ tokio-test = "0.4"
 default = ["embedded"]
 
 # 嵌入式存储（零配置）
-embedded = ["libsql", "lancedb"]
+# 使用最新版本: lancedb 0.22.1 + arrow 56.2.0 + chrono 0.4.41
+embedded = ["libsql", "lancedb", "memory"]
 libsql = ["dep:libsql"]
 
 # 向量存储后端

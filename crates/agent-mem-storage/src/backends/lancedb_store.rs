@@ -3,7 +3,7 @@
 //! Provides embedded vector search capabilities for AgentMem.
 //! LanceDB is a serverless, low-latency vector database built on Lance format.
 
-use agent_mem_traits::{Error, Result, VectorData, VectorSearchResult, VectorStore};
+use agent_mem_traits::{AgentMemError, Result, VectorData, VectorSearchResult, VectorStore};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::Path;
@@ -43,7 +43,7 @@ impl LanceDBStore {
         // Expand home directory
         let expanded_path = if path.starts_with("~/") {
             let home = std::env::var("HOME").map_err(|e| {
-                Error::Storage(format!("Failed to get HOME directory: {}", e))
+                AgentMemError::StorageError(format!("Failed to get HOME directory: {}", e))
             })?;
             path.replace("~", &home)
         } else {
@@ -53,7 +53,7 @@ impl LanceDBStore {
         // Create parent directory if needed
         if let Some(parent) = Path::new(&expanded_path).parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                Error::Storage(format!("Failed to create directory: {}", e))
+                AgentMemError::StorageError(format!("Failed to create directory: {}", e))
             })?;
         }
 
@@ -61,7 +61,7 @@ impl LanceDBStore {
         let conn = connect(&expanded_path)
             .execute()
             .await
-            .map_err(|e| Error::Storage(format!("Failed to connect to LanceDB: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to connect to LanceDB: {}", e)))?;
 
         info!("LanceDB store initialized successfully");
 
@@ -79,7 +79,7 @@ impl LanceDBStore {
             .table_names()
             .execute()
             .await
-            .map_err(|e| Error::Storage(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
 
         if table_names.contains(&self.table_name) {
             // Open existing table
@@ -87,11 +87,11 @@ impl LanceDBStore {
                 .open_table(&self.table_name)
                 .execute()
                 .await
-                .map_err(|e| Error::Storage(format!("Failed to open table: {}", e)))
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {}", e)))
         } else {
             // Create new table with empty data
             // We'll add data later
-            Err(Error::Storage(format!(
+            Err(AgentMemError::StorageError(format!(
                 "Table '{}' does not exist. Use add_vectors to create it.",
                 self.table_name
             )))
@@ -105,7 +105,7 @@ impl LanceDBStore {
             .table_names()
             .execute()
             .await
-            .map_err(|e| Error::Storage(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
 
         if !table_names.contains(&self.table_name) {
             debug!("Creating new table: {}", self.table_name);
@@ -225,8 +225,8 @@ impl VectorStore for LanceDBStore {
     async fn health_check(&self) -> Result<agent_mem_traits::HealthStatus> {
         // Check if we can list tables
         match self.conn.table_names().execute().await {
-            Ok(_) => Ok(agent_mem_traits::HealthStatus::Healthy),
-            Err(e) => Ok(agent_mem_traits::HealthStatus::Unhealthy(format!(
+            Ok(_) => Ok(agent_mem_traits::HealthStatus::healthy()),
+            Err(e) => Ok(agent_mem_traits::HealthStatus::unhealthy(&format!(
                 "LanceDB health check failed: {}",
                 e
             ))),
@@ -275,7 +275,7 @@ pub struct LanceDBStore;
 #[cfg(not(feature = "lancedb"))]
 impl LanceDBStore {
     pub async fn new(_path: &str, _table_name: &str) -> Result<Self> {
-        Err(Error::Storage(
+        Err(AgentMemError::StorageError(
             "LanceDB feature is not enabled. Enable with --features lancedb".to_string(),
         ))
     }

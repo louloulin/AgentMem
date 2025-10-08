@@ -2,6 +2,7 @@
 
 // 嵌入式存储
 pub mod libsql_store;
+#[cfg(feature = "lancedb")]
 pub mod lancedb_store;
 
 pub mod azure_ai_search;
@@ -30,6 +31,7 @@ pub mod weaviate;
 
 // 嵌入式存储导出
 pub use libsql_store::LibSQLStore;
+#[cfg(feature = "lancedb")]
 pub use lancedb_store::LanceDBStore as LanceDBVectorStore;
 
 pub use azure_ai_search::AzureAISearchStore;

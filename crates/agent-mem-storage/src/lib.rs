@@ -20,7 +20,9 @@ pub mod vector;
 
 pub use factory::StorageFactory;
 pub use graph::GraphStoreFactory;
-pub use optimizations::{PoolConfig, QueryCache, QueryCacheConfig, QueryOptimizer, create_optimized_pool};
+pub use optimizations::{QueryCache, QueryCacheConfig};
+#[cfg(feature = "optimizations")]
+pub use optimizations::{PoolConfig, QueryOptimizer, create_optimized_pool};
 
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Result, VectorStore, VectorStoreConfig};

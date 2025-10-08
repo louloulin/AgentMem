@@ -1,6 +1,8 @@
 //! 存储工厂模式实现
 
 use crate::backends::{ChromaStore, MemoryVectorStore};
+#[cfg(feature = "lancedb")]
+use crate::backends::LanceDBVectorStore as LanceDBStore;
 use agent_mem_traits::{AgentMemError, Result, VectorStore, VectorStoreConfig};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -609,7 +611,7 @@ impl StorageFactory {
             "lancedb" => {
                 #[cfg(feature = "lancedb")]
                 {
-                    let store = LanceDBStore::new(config.clone()).await?;
+                    let store = LanceDBStore::new(&config.path, &config.table_name).await?;
                     VectorStoreEnum::LanceDB(store)
                 }
                 #[cfg(not(feature = "lancedb"))]

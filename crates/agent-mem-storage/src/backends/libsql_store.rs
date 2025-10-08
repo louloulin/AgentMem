@@ -3,8 +3,7 @@
 //! Provides a zero-configuration, embedded SQL database for AgentMem.
 //! LibSQL is a fork of SQLite with additional features like embedded replicas.
 
-use agent_mem_traits::{Error, Result};
-use async_trait::async_trait;
+use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,7 +60,7 @@ impl LibSQLStore {
         // Expand home directory
         let expanded_path = if path.starts_with("~/") {
             let home = std::env::var("HOME").map_err(|e| {
-                Error::Storage(format!("Failed to get HOME directory: {}", e))
+                AgentMemError::StorageError(format!("Failed to get HOME directory: {}", e))
             })?;
             path.replace("~", &home)
         } else {
@@ -72,7 +71,7 @@ impl LibSQLStore {
         if expanded_path != ":memory:" {
             if let Some(parent) = Path::new(&expanded_path).parent() {
                 std::fs::create_dir_all(parent).map_err(|e| {
-                    Error::Storage(format!("Failed to create directory: {}", e))
+                    AgentMemError::StorageError(format!("Failed to create directory: {}", e))
                 })?;
             }
         }
@@ -81,11 +80,11 @@ impl LibSQLStore {
         let db = Builder::new_local(&expanded_path)
             .build()
             .await
-            .map_err(|e| Error::Storage(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to open database: {}", e)))?;
 
         let conn = db
             .connect()
-            .map_err(|e| Error::Storage(format!("Failed to connect to database: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to connect to database: {}", e)))?;
 
         let mut store = Self { db, conn };
 
@@ -117,7 +116,7 @@ impl LibSQLStore {
                 (),
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to create memories table: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create memories table: {}", e)))?;
 
         // Create indices
         self.conn
@@ -126,7 +125,7 @@ impl LibSQLStore {
                 (),
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
 
         self.conn
             .execute(
@@ -134,7 +133,7 @@ impl LibSQLStore {
                 (),
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
 
         self.conn
             .execute(
@@ -142,7 +141,7 @@ impl LibSQLStore {
                 (),
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
 
         self.conn
             .execute(
@@ -150,7 +149,7 @@ impl LibSQLStore {
                 (),
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
 
         debug!("Database schema initialized");
         Ok(())
@@ -161,26 +160,26 @@ impl LibSQLStore {
         debug!("Inserting memory: {}", record.id);
 
         let metadata_json = serde_json::to_string(&record.metadata)
-            .map_err(|e| Error::Serialization(format!("Failed to serialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {}", e)))?;
 
         self.conn
             .execute(
                 "INSERT INTO memories (id, agent_id, user_id, content, memory_type, importance, created_at, updated_at, metadata)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 libsql::params![
-                    &record.id,
-                    &record.agent_id,
-                    &record.user_id,
-                    &record.content,
-                    &record.memory_type,
+                    record.id.clone(),
+                    record.agent_id.clone(),
+                    record.user_id.clone(),
+                    record.content.clone(),
+                    record.memory_type.clone(),
                     record.importance,
                     record.created_at.timestamp(),
                     record.updated_at.timestamp(),
-                    &metadata_json,
+                    metadata_json.clone(),
                 ],
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to insert memory: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to insert memory: {}", e)))?;
 
         debug!("Memory inserted successfully");
         Ok(())
@@ -198,9 +197,9 @@ impl LibSQLStore {
                 libsql::params![id],
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to query memory: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memory: {}", e)))?;
 
-        if let Some(row) = rows.next().await.map_err(|e| Error::Storage(format!("Failed to fetch row: {}", e)))? {
+        if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
             let record = self.row_to_record(row)?;
             Ok(Some(record))
         } else {
@@ -243,10 +242,10 @@ impl LibSQLStore {
             .conn
             .query(&sql, libsql::params_from_iter(params))
             .await
-            .map_err(|e| Error::Storage(format!("Failed to search memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {}", e)))?;
 
         let mut records = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| Error::Storage(format!("Failed to fetch row: {}", e)))? {
+        while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
             records.push(self.row_to_record(row)?);
         }
 
@@ -259,21 +258,21 @@ impl LibSQLStore {
         debug!("Updating memory: {}", record.id);
 
         let metadata_json = serde_json::to_string(&record.metadata)
-            .map_err(|e| Error::Serialization(format!("Failed to serialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {}", e)))?;
 
         self.conn
             .execute(
                 "UPDATE memories SET content = ?, importance = ?, updated_at = ?, metadata = ? WHERE id = ?",
                 libsql::params![
-                    &record.content,
+                    record.content.clone(),
                     record.importance,
                     record.updated_at.timestamp(),
-                    &metadata_json,
-                    &record.id,
+                    metadata_json.clone(),
+                    record.id.clone(),
                 ],
             )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to update memory: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to update memory: {}", e)))?;
 
         debug!("Memory updated successfully");
         Ok(())
@@ -287,7 +286,7 @@ impl LibSQLStore {
             .conn
             .execute("DELETE FROM memories WHERE id = ?", libsql::params![id])
             .await
-            .map_err(|e| Error::Storage(format!("Failed to delete memory: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memory: {}", e)))?;
 
         let deleted = result > 0;
         debug!("Memory deleted: {}", deleted);
@@ -300,10 +299,10 @@ impl LibSQLStore {
             .conn
             .query("SELECT COUNT(*) as count FROM memories", ())
             .await
-            .map_err(|e| Error::Storage(format!("Failed to count memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to count memories: {}", e)))?;
 
-        if let Some(row) = rows.next().await.map_err(|e| Error::Storage(format!("Failed to fetch row: {}", e)))? {
-            let count: i64 = row.get(0).map_err(|e| Error::Storage(format!("Failed to get count: {}", e)))?;
+        if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            let count: i64 = row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {}", e)))?;
             Ok(count as usize)
         } else {
             Ok(0)
@@ -316,24 +315,24 @@ impl LibSQLStore {
         self.conn
             .execute("DELETE FROM memories", ())
             .await
-            .map_err(|e| Error::Storage(format!("Failed to clear memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to clear memories: {}", e)))?;
         Ok(())
     }
 
     /// Convert a row to a MemoryRecord
     fn row_to_record(&self, row: libsql::Row) -> Result<MemoryRecord> {
-        let id: String = row.get(0).map_err(|e| Error::Storage(format!("Failed to get id: {}", e)))?;
-        let agent_id: String = row.get(1).map_err(|e| Error::Storage(format!("Failed to get agent_id: {}", e)))?;
-        let user_id: Option<String> = row.get(2).map_err(|e| Error::Storage(format!("Failed to get user_id: {}", e)))?;
-        let content: String = row.get(3).map_err(|e| Error::Storage(format!("Failed to get content: {}", e)))?;
-        let memory_type: String = row.get(4).map_err(|e| Error::Storage(format!("Failed to get memory_type: {}", e)))?;
-        let importance: f64 = row.get(5).map_err(|e| Error::Storage(format!("Failed to get importance: {}", e)))?;
-        let created_at: i64 = row.get(6).map_err(|e| Error::Storage(format!("Failed to get created_at: {}", e)))?;
-        let updated_at: i64 = row.get(7).map_err(|e| Error::Storage(format!("Failed to get updated_at: {}", e)))?;
-        let metadata_json: String = row.get(8).map_err(|e| Error::Storage(format!("Failed to get metadata: {}", e)))?;
+        let id: String = row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?;
+        let agent_id: String = row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {}", e)))?;
+        let user_id: Option<String> = row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {}", e)))?;
+        let content: String = row.get(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {}", e)))?;
+        let memory_type: String = row.get(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get memory_type: {}", e)))?;
+        let importance: f64 = row.get(5).map_err(|e| AgentMemError::StorageError(format!("Failed to get importance: {}", e)))?;
+        let created_at: i64 = row.get(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?;
+        let updated_at: i64 = row.get(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?;
+        let metadata_json: String = row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {}", e)))?;
 
         let metadata: HashMap<String, String> = serde_json::from_str(&metadata_json)
-            .map_err(|e| Error::Serialization(format!("Failed to deserialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to deserialize metadata: {}", e)))?;
 
         Ok(MemoryRecord {
             id,
@@ -343,9 +342,9 @@ impl LibSQLStore {
             memory_type,
             importance: importance as f32,
             created_at: DateTime::from_timestamp(created_at, 0)
-                .ok_or_else(|| Error::Storage("Invalid created_at timestamp".to_string()))?,
+                .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
             updated_at: DateTime::from_timestamp(updated_at, 0)
-                .ok_or_else(|| Error::Storage("Invalid updated_at timestamp".to_string()))?,
+                .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
             metadata,
         })
     }
