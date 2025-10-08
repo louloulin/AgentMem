@@ -340,17 +340,18 @@ impl Default for DatabaseConfig {
 #### Task 2.2: 实现 8 个 LibSQL Repositories
 每个 repository 约 200-300 行代码
 
-1. [ ] `LibSqlUserRepository` (1 天)
-2. [ ] `LibSqlOrganizationRepository` (1 天)
-3. [ ] `LibSqlAgentRepository` (1 天)
+1. [x] `LibSqlUserRepository` (1 天) ✅ **已完成**
+2. [x] `LibSqlOrganizationRepository` (1 天) ✅ **已完成**
+3. [x] `LibSqlAgentRepository` (1 天) ✅ **已完成**
 4. [ ] `LibSqlMessageRepository` (1 天)
 5. [ ] `LibSqlToolRepository` (1 天)
 6. [ ] `LibSqlApiKeyRepository` (1 天)
 7. [ ] `LibSqlMemoryRepository` (1 天)
 8. [ ] `LibSqlBlockRepository` (1 天)
 
-**文件**: `crates/agent-mem-core/src/storage/libsql/*.rs`  
+**文件**: `crates/agent-mem-core/src/storage/libsql/*.rs`
 **预计**: 8 天
+**实际**: 3/8 完成 (37.5%)
 
 ---
 
@@ -496,26 +497,29 @@ impl UserRepositoryTrait for PgUserRepository {
 
 ## 📈 进度跟踪
 
-### 总体进度: 30% ✅
+### 总体进度: 33% ✅
 
 | Phase | 任务数 | 已完成 | 进行中 | 未开始 | 进度 |
 |-------|--------|--------|--------|--------|------|
 | Phase 1: 基础设施 | 4 | 4 | 0 | 0 | 100% ✅ |
-| Phase 2: LibSQL 实现 | 9 | 1 | 0 | 8 | 11% |
+| Phase 2: LibSQL 实现 | 9 | 4 | 0 | 5 | 44% |
 | Phase 3: PostgreSQL 重构 | 9 | 0 | 0 | 9 | 0% |
 | Phase 4: Server 改造 | 2 | 0 | 0 | 2 | 0% |
 | Phase 5: 测试文档 | 3 | 0 | 0 | 3 | 0% |
-| **总计** | **27** | **5** | **0** | **22** | **30%** |
+| **总计** | **27** | **8** | **0** | **19** | **33%** |
 
 ### 最近完成 (2025-10-08)
 - ✅ Task 1.1: 完善 Repository Traits (8/8 traits)
 - ✅ Task 1.2: 创建配置系统 (320 行, 7 tests passed)
-- ✅ Task 1.3: 创建 Repository Factory (277 行, 6 tests passed) **NEW**
+- ✅ Task 1.3: 创建 Repository Factory (277 行, 6 tests passed)
 - ✅ Task 1.4: LibSQL 连接管理 (260 行, 7 tests passed)
 - ✅ Task 2.1: LibSQL Schema 设计 (380 行, 3 integration tests passed)
+- ✅ Task 2.2.1: LibSqlUserRepository (250 行) **NEW**
+- ✅ Task 2.2.2: LibSqlOrganizationRepository (280 行, 7 tests passed) **NEW**
+- ✅ Task 2.2.3: LibSqlAgentRepository (300+ 行, 8 tests passed) **NEW**
 
 ### 下一步
-- ⏳ Task 1.3: 创建 Repository Factory (预计 2 天)
+- ⏳ Task 2.2.4: 实现 LibSqlMessageRepository (预计 1 天)
 
 ### 已完成 ✅
 - [x] Task 1.1: 完善 Repository Traits (部分)
