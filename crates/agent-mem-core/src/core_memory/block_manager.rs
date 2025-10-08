@@ -7,12 +7,16 @@
 //! - 自动重写触发
 
 use crate::core_memory::{BlockMetadata, BlockStats, BlockType};
+#[cfg(feature = "postgres")]
 use crate::storage::block_repository::BlockRepository;
+#[cfg(feature = "postgres")]
 use crate::storage::models::Block;
+#[cfg(feature = "postgres")]
 use crate::storage::repository::Repository;
 use agent_mem_traits::{AgentMemError, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "postgres")]
 use sqlx::PgPool;
 use std::sync::Arc;
 

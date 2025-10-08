@@ -7,12 +7,16 @@
 //! - Core Memory 编译器
 
 pub mod auto_rewriter;
+#[cfg(feature = "postgres")]
 pub mod block_manager;
+#[cfg(feature = "postgres")]
 pub mod compiler;
 pub mod template_engine;
 
 pub use auto_rewriter::{AutoRewriter, AutoRewriterConfig, RewriteStrategy};
+#[cfg(feature = "postgres")]
 pub use block_manager::{BlockManager, BlockManagerConfig};
+#[cfg(feature = "postgres")]
 pub use compiler::{CompilerConfig, CoreMemoryCompiler};
 pub use template_engine::{TemplateContext, TemplateEngine};
 

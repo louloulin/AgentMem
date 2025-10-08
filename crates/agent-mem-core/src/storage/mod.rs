@@ -1,24 +1,41 @@
 // Storage module for AgentMem
 // Provides different storage backends for persistent memory storage
 
+#[cfg(feature = "postgres")]
 pub mod agent_repository;
+#[cfg(feature = "postgres")]
 pub mod api_key_repository;
+#[cfg(feature = "postgres")]
 pub mod batch;
+#[cfg(feature = "postgres")]
 pub mod block_repository;
 pub mod hybrid_manager;
+#[cfg(feature = "postgres")]
 pub mod memory_repository;
+#[cfg(feature = "postgres")]
 pub mod message_repository;
+#[cfg(feature = "postgres")]
 pub mod migration;
+#[cfg(feature = "postgres")]
 pub mod migration_manager;
+#[cfg(feature = "postgres")]
 pub mod migrations;
+#[cfg(feature = "postgres")]
 pub mod models;
+#[cfg(feature = "postgres")]
 pub mod pool_manager;
+#[cfg(feature = "postgres")]
 pub mod postgres;
 pub mod query_analyzer;
+#[cfg(feature = "redis-cache")]
 pub mod redis;
+#[cfg(feature = "postgres")]
 pub mod repository;
+#[cfg(feature = "postgres")]
 pub mod tool_repository;
+#[cfg(feature = "postgres")]
 pub mod transaction;
+#[cfg(feature = "postgres")]
 pub mod user_repository;
 
 use async_trait::async_trait;

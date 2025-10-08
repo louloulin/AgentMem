@@ -13,6 +13,7 @@ pub mod lifecycle_manager;
 pub mod procedural_memory;
 pub mod resource_memory;
 pub mod semantic_memory;
+#[cfg(feature = "postgres")]
 pub mod tool_manager;
 
 pub use core_memory::{
@@ -61,6 +62,7 @@ pub use knowledge_graph_manager::{
     KnowledgeGraphManager, Relation, RelationType,
 };
 
+#[cfg(feature = "postgres")]
 pub use tool_manager::{
     CreateToolRequest, ToolManager, ToolManagerConfig, ToolStats, ToolType, UpdateToolRequest,
 };

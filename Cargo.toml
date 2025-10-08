@@ -20,7 +20,7 @@ members = [
     # "crates/agent-mem-intelligence",
 
     # 多语言绑定
-    # "bindings/agent-mem-python",
+    "crates/agent-mem-python",
     # "bindings/agent-mem-node",
     # "bindings/agent-mem-c",
 

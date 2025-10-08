@@ -12,7 +12,7 @@ categories.workspace = true
 description = "Core memory management for AgentMem memory platform"
 
 [dependencies]
-agent-mem-traits = { path = "../agent-mem-traits", features = ["sqlx"] }
+agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-llm = { path = "../agent-mem-llm" }
@@ -39,8 +39,8 @@ rand = "0.8"
 regex = "1.10"
 
 # Database dependencies
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }
-redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"], optional = true }
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -50,8 +50,10 @@ criterion.workspace = true
 
 [features]
 default = []
-persistence = []
+persistence = ["postgres", "redis-cache"]
 vector-search = []
+postgres = ["sqlx", "agent-mem-traits/sqlx"]
+redis-cache = ["redis"]
 
 [[bench]]
 name = "memory_operations"
