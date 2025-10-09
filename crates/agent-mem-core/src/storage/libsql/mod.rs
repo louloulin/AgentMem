@@ -5,6 +5,7 @@
 pub mod agent_repository;
 pub mod api_key_repository;
 pub mod connection;
+pub mod memory_repository;
 pub mod message_repository;
 pub mod migrations;
 pub mod organization_repository;
@@ -15,6 +16,7 @@ pub mod user_repository;
 pub use agent_repository::LibSqlAgentRepository;
 pub use api_key_repository::LibSqlApiKeyRepository;
 pub use connection::{create_libsql_pool, DatabaseStats, LibSqlConnectionManager};
+pub use memory_repository::LibSqlMemoryRepository;
 pub use message_repository::LibSqlMessageRepository;
 pub use migrations::run_migrations;
 pub use organization_repository::LibSqlOrganizationRepository;

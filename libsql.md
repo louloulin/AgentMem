@@ -345,13 +345,13 @@ impl Default for DatabaseConfig {
 3. [x] `LibSqlAgentRepository` (1 天) ✅ **已完成**
 4. [x] `LibSqlMessageRepository` (1 天) ✅ **已完成**
 5. [x] `LibSqlToolRepository` (1 天) ✅ **已完成**
-6. [ ] `LibSqlApiKeyRepository` (1 天)
-7. [ ] `LibSqlMemoryRepository` (1 天)
+6. [x] `LibSqlApiKeyRepository` (1 天) ✅ **已完成**
+7. [x] `LibSqlMemoryRepository` (1 天) ✅ **已完成**
 8. [ ] `LibSqlBlockRepository` (1 天)
 
 **文件**: `crates/agent-mem-core/src/storage/libsql/*.rs`
 **预计**: 8 天
-**实际**: 5/8 完成 (62.5%)
+**实际**: 7/8 完成 (87.5%)
 
 ---
 
@@ -497,16 +497,16 @@ impl UserRepositoryTrait for PgUserRepository {
 
 ## 📈 进度跟踪
 
-### 总体进度: 44% ✅
+### 总体进度: 48% ✅
 
 | Phase | 任务数 | 已完成 | 进行中 | 未开始 | 进度 |
 |-------|--------|--------|--------|--------|------|
 | Phase 1: 基础设施 | 4 | 4 | 0 | 0 | 100% ✅ |
-| Phase 2: LibSQL 实现 | 9 | 7 | 0 | 2 | 77% |
+| Phase 2: LibSQL 实现 | 9 | 8 | 0 | 1 | 88% |
 | Phase 3: PostgreSQL 重构 | 9 | 0 | 0 | 9 | 0% |
 | Phase 4: Server 改造 | 2 | 0 | 0 | 2 | 0% |
 | Phase 5: 测试文档 | 3 | 0 | 0 | 3 | 0% |
-| **总计** | **27** | **11** | **0** | **16** | **44%** |
+| **总计** | **27** | **12** | **0** | **15** | **48%** |
 
 ### 最近完成 (2025-10-09)
 - ✅ Task 1.1: 完善 Repository Traits (8/8 traits)
@@ -519,10 +519,11 @@ impl UserRepositoryTrait for PgUserRepository {
 - ✅ Task 2.2.3: LibSqlAgentRepository (300+ 行, 8 tests passed)
 - ✅ Task 2.2.4: LibSqlMessageRepository (300+ 行, 8 tests passed)
 - ✅ Task 2.2.5: LibSqlToolRepository (300+ 行, 8 tests passed)
-- ✅ Task 2.2.6: LibSqlApiKeyRepository (300+ 行, 8 tests passed) **NEW**
+- ✅ Task 2.2.6: LibSqlApiKeyRepository (300+ 行, 8 tests passed)
+- ✅ Task 2.2.7: LibSqlMemoryRepository (539 行, 9 tests passed) **NEW**
 
 ### 下一步
-- ⏳ Task 2.2.7: 实现 LibSqlMemoryRepository (预计 1 天)
+- ⏳ Task 2.2.8: 实现 LibSqlBlockRepository (预计 1 天)
 
 ### 已完成 ✅
 - [x] Task 1.1: 完善 Repository Traits (部分)
