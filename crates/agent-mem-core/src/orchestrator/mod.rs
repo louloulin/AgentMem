@@ -6,10 +6,9 @@
 use crate::{
     engine::MemoryEngine,
     Memory,
+    storage::traits::MessageRepositoryTrait,
 };
 
-#[cfg(feature = "postgres")]
-use crate::storage::message_repository::MessageRepository;
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::{ToolExecutor, ExecutionContext};
 use agent_mem_traits::{
@@ -114,7 +113,7 @@ impl Default for OrchestratorConfig {
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
     memory_engine: Arc<MemoryEngine>,
-    message_repo: Arc<MessageRepository>,
+    message_repo: Arc<dyn MessageRepositoryTrait>,
     llm_client: Arc<LLMClient>,
     tool_executor: Arc<ToolExecutor>,
     memory_integrator: MemoryIntegrator,
@@ -127,7 +126,7 @@ impl AgentOrchestrator {
     pub fn new(
         config: OrchestratorConfig,
         memory_engine: Arc<MemoryEngine>,
-        message_repo: Arc<MessageRepository>,
+        message_repo: Arc<dyn MessageRepositoryTrait>,
         llm_client: Arc<LLMClient>,
         tool_executor: Arc<ToolExecutor>,
     ) -> Self {

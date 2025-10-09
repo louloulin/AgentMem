@@ -308,7 +308,7 @@ pub async fn list_organization_members(
 
     // Fetch members from database
     let users = user_repo
-        .list_by_organization(&org_id)
+        .find_by_organization_id(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?;
 
@@ -318,7 +318,7 @@ pub async fn list_organization_members(
             user_id: user.id,
             email: user.email,
             name: user.name,
-            roles: user.roles,
+            roles: user.roles.unwrap_or_else(|| vec!["user".to_string()]),
             joined_at: user.created_at.timestamp(),
         })
         .collect();
@@ -358,14 +358,10 @@ pub async fn delete_organization(
     let org_repo = repositories.organizations.clone();
 
     // Delete organization from database (soft delete)
-    let deleted = org_repo
+    org_repo
         .delete(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Failed to delete organization: {e}")))?;
-
-    if !deleted {
-        return Err(ServerError::NotFound("Organization not found".to_string()));
-    }
 
     Ok(StatusCode::NO_CONTENT)
 }

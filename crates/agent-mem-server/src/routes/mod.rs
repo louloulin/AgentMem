@@ -4,6 +4,8 @@
 pub mod agents;
 pub mod chat;
 pub mod docs;
+// Graph routes require PostgreSQL-specific managers (temporarily disabled for LibSQL)
+#[cfg(feature = "postgres")]
 pub mod graph;
 pub mod health;
 pub mod mcp;
@@ -142,15 +144,22 @@ pub async fn create_router(
         .route("/api/v1/mcp/tools", get(mcp::list_tools))
         .route("/api/v1/mcp/tools/call", post(mcp::call_tool))
         .route("/api/v1/mcp/tools/:tool_name", get(mcp::get_tool))
-        .route("/api/v1/mcp/health", get(mcp::health_check))
-        // Graph visualization routes
-        .route("/api/v1/graph/data", get(graph::get_graph_data))
-        .route("/api/v1/graph/associations", post(graph::create_association))
-        .route(
-            "/api/v1/graph/memories/:memory_id/associations",
-            get(graph::get_memory_associations),
-        )
-        .route("/api/v1/graph/stats", get(graph::get_graph_stats))
+        .route("/api/v1/mcp/health", get(mcp::health_check));
+
+    // Graph visualization routes (PostgreSQL only)
+    #[cfg(feature = "postgres")]
+    let app = {
+        app
+            .route("/api/v1/graph/data", get(graph::get_graph_data))
+            .route("/api/v1/graph/associations", post(graph::create_association))
+            .route(
+                "/api/v1/graph/memories/:memory_id/associations",
+                get(graph::get_memory_associations),
+            )
+            .route("/api/v1/graph/stats", get(graph::get_graph_stats))
+    };
+
+    let app = app
         // WebSocket endpoint
         .route("/api/v1/ws", get(crate::websocket::websocket_handler))
         // SSE endpoints
@@ -226,10 +235,7 @@ pub async fn create_router(
         mcp::call_tool,
         mcp::get_tool,
         mcp::health_check,
-        graph::get_graph_data,
-        graph::create_association,
-        graph::get_memory_associations,
-        graph::get_graph_stats,
+        // Note: graph routes are only available with postgres feature
         health::health_check,
         metrics::get_metrics,
         metrics::get_prometheus_metrics,
@@ -272,12 +278,7 @@ pub async fn create_router(
             tools::ToolResponse,
             tools::ExecuteToolRequest,
             tools::ToolExecutionResponse,
-            graph::GraphQueryRequest,
-            graph::GraphNode,
-            graph::GraphEdge,
-            graph::GraphDataResponse,
-            graph::CreateAssociationRequest,
-            graph::AssociationResponse,
+            // Note: graph schemas are only available with postgres feature
         )
     ),
     tags(

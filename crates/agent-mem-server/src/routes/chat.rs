@@ -146,14 +146,12 @@ pub async fn send_chat_message(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Json<ApiResponse<ChatMessageResponse>>> {
-    use agent_mem_core::storage::{agent_repository::AgentRepository, repository::Repository};
-
     let start_time = std::time::Instant::now();
 
     // Validate agent exists and belongs to user's organization
-    let agent_repo = AgentRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
     let agent = agent_repo
-        .read(&agent_id)
+        .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -251,14 +249,13 @@ pub async fn send_chat_message_stream(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    use agent_mem_core::storage::{agent_repository::AgentRepository, repository::Repository};
     use agent_mem_llm::LLMClient;
     use agent_mem_traits::{Message, MessageRole};
 
     // Validate agent exists and belongs to user's organization
-    let agent_repo = AgentRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
     let agent = agent_repo
-        .read(&agent_id)
+        .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -395,12 +392,10 @@ pub async fn get_chat_history(
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<Vec<JsonValue>>>> {
-    use agent_mem_core::storage::{agent_repository::AgentRepository, repository::Repository};
-
     // Validate agent exists and belongs to user's organization
-    let agent_repo = AgentRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
     let agent = agent_repo
-        .read(&agent_id)
+        .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -411,9 +406,9 @@ pub async fn get_chat_history(
     }
 
     // Get recent messages
-    let message_repo = MessageRepository::new(pool.clone());
+    let message_repo = repositories.messages.clone();
     let messages = message_repo
-        .get_recent_messages(&agent_id, 50)
+        .find_by_agent_id(&agent_id, 50)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to get messages: {e}")))?;
 

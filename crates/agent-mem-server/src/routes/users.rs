@@ -10,6 +10,7 @@ use crate::auth::{AuthService, PasswordService};
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::{log_security_event, AuthUser, SecurityEvent};
 use agent_mem_core::storage::factory::Repositories;
+use agent_mem_core::storage::models::User;
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
@@ -31,6 +32,7 @@ pub struct RegisterRequest {
     #[validate(length(min = 2))]
     pub name: String,
     pub organization_id: String,
+    pub timezone: Option<String>,
 }
 
 /// User login request
@@ -39,6 +41,7 @@ pub struct LoginRequest {
     #[validate(email)]
     pub email: String,
     pub password: String,
+    pub organization_id: String,
 }
 
 /// User login response
@@ -116,16 +119,18 @@ pub async fn register_user(
     // Hash password
     let password_hash = PasswordService::hash_password(&request.password)?;
 
+    // Create user object
+    let new_user = User::new(
+        request.organization_id.clone(),
+        request.name.clone(),
+        request.email.clone(),
+        password_hash,
+        request.timezone.clone().unwrap_or_else(|| "UTC".to_string()),
+    );
+
     // Save user to database
     let user = user_repo
-        .create(
-            &request.organization_id,
-            &request.email,
-            &password_hash,
-            &request.name,
-            vec!["user".to_string()],
-            None,
-        )
+        .create(&new_user)
         .await
         .map_err(|e| ServerError::Internal(format!("Failed to create user: {e}")))?;
 
@@ -140,7 +145,7 @@ pub async fn register_user(
         email: user.email,
         name: user.name,
         organization_id: user.organization_id,
-        roles: user.roles,
+        roles: user.roles.unwrap_or_else(|| vec!["user".to_string()]),
         created_at: user.created_at.timestamp(),
     };
 
@@ -172,7 +177,7 @@ pub async fn login_user(
 
     // Fetch user from database
     let user = user_repo
-        .find_by_email(&request.email)
+        .find_by_email(&request.email, &request.organization_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
         .ok_or_else(|| {
@@ -202,7 +207,7 @@ pub async fn login_user(
     let token = auth_service.generate_token(
         &user.id,
         user.organization_id.clone(),
-        user.roles.clone(),
+        user.roles.clone().unwrap_or_else(|| vec!["user".to_string()]),
         None,
     )?;
 
@@ -219,7 +224,7 @@ pub async fn login_user(
             email: user.email,
             name: user.name,
             organization_id: user.organization_id,
-            roles: user.roles,
+            roles: user.roles.unwrap_or_else(|| vec!["user".to_string()]),
             created_at: user.created_at.timestamp(),
         },
     };
@@ -259,7 +264,7 @@ pub async fn get_current_user(
         email: user.email,
         name: user.name,
         organization_id: user.organization_id,
-        roles: user.roles,
+        roles: user.roles.unwrap_or_else(|| vec!["user".to_string()]),
         created_at: user.created_at.timestamp(),
     };
 
@@ -294,16 +299,26 @@ pub async fn update_current_user(
     // Get user repository from repositories container
     let user_repo = repositories.users.clone();
 
+    // Fetch current user
+    let mut user = user_repo
+        .find_by_id(&auth_user.user_id)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerError::NotFound("User not found".to_string()))?;
+
+    // Update fields if provided
+    if let Some(name) = request.name {
+        user.name = name;
+    }
+    if let Some(email) = request.email {
+        user.email = email;
+    }
+    user.updated_at = chrono::Utc::now();
+    user.last_updated_by_id = Some(auth_user.user_id.clone());
+
     // Update user in database
     let user = user_repo
-        .update(
-            &auth_user.user_id,
-            request.name.as_deref(),
-            request.email.as_deref(),
-            None, // Don't update roles here
-            None, // Don't update status here
-            Some(&auth_user.user_id),
-        )
+        .update(&user)
         .await
         .map_err(|e| ServerError::Internal(format!("Failed to update user: {e}")))?;
 
@@ -312,7 +327,7 @@ pub async fn update_current_user(
         email: user.email,
         name: user.name,
         organization_id: user.organization_id,
-        roles: user.roles,
+        roles: user.roles.unwrap_or_else(|| vec!["user".to_string()]),
         created_at: user.created_at.timestamp(),
     };
 
@@ -367,11 +382,7 @@ pub async fn change_password(
 
     // Update password in database
     user_repo
-        .update_password(
-            &auth_user.user_id,
-            &new_password_hash,
-            Some(&auth_user.user_id),
-        )
+        .update_password(&auth_user.user_id, &new_password_hash)
         .await
         .map_err(|e| ServerError::Internal(format!("Failed to update password: {e}")))?;
 
@@ -431,7 +442,7 @@ pub async fn get_user_by_id(
         email: user_model.email,
         name: user_model.name,
         organization_id: user_model.organization_id,
-        roles: user_model.roles,
+        roles: user_model.roles.unwrap_or_else(|| vec!["user".to_string()]),
         created_at: user_model.created_at.timestamp(),
     };
 

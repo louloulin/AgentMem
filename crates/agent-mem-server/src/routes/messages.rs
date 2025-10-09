@@ -241,36 +241,28 @@ pub async fn list_messages(
     let repo = repositories.messages.clone();
 
     // Validate pagination parameters
-    let limit = query.limit.map(|l| l.min(100)).or(Some(50));
-    let offset = query.offset.map(|o| o.max(0)).or(Some(0));
+    let limit = query.limit.map(|l| l.min(100)).unwrap_or(50);
 
     let messages = if let Some(agent_id) = query.agent_id {
-        repo.find_by_agent_id(&agent_id, limit, offset)
+        repo.find_by_agent_id(&agent_id, limit)
+            .await
+            .map_err(|e| ServerError::internal_error(format!("Failed to list messages: {e}")))?
+    } else if let Some(user_id) = query.user_id {
+        // List messages by user ID
+        repo.find_by_user_id(&user_id, limit)
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to list messages: {e}")))?
     } else {
-        // For user_id or organization-wide listing, use list() and filter
-        let all_messages = repo
-            .find_by_id(limit, offset)
-            .await
-            .map_err(|e| ServerError::internal_error(format!("Failed to list messages: {e}")))?;
-        all_messages
-            .into_iter()
-            .filter(|m| {
-                m.organization_id == auth_user.org_id
-                    && (query.user_id.is_none() || Some(&m.user_id) == query.user_id.as_ref())
-            })
-            .collect()
+        // For organization-wide listing, we need to filter by organization
+        // Since we don't have a find_by_organization_id method, return empty for now
+        // TODO: Add find_by_organization_id to MessageRepositoryTrait
+        vec![]
     };
 
-    // Filter by organization for tenant isolation
-    let filtered_messages: Vec<Message> = messages
+    // Filter by organization for security and convert to response
+    let responses: Vec<MessageResponse> = messages
         .into_iter()
         .filter(|m| m.organization_id == auth_user.org_id)
-        .collect();
-
-    let responses: Vec<MessageResponse> = filtered_messages
-        .into_iter()
         .map(MessageResponse::from)
         .collect();
 
