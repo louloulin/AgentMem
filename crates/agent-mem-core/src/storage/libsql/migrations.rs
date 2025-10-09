@@ -101,6 +101,9 @@ async fn create_users_table(conn: &Connection) -> Result<()> {
             id TEXT PRIMARY KEY,
             organization_id TEXT NOT NULL,
             name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            roles TEXT,
             status TEXT NOT NULL,
             timezone TEXT NOT NULL,
             created_at INTEGER NOT NULL,
@@ -108,7 +111,8 @@ async fn create_users_table(conn: &Connection) -> Result<()> {
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_by_id TEXT,
             last_updated_by_id TEXT,
-            FOREIGN KEY (organization_id) REFERENCES organizations(id)
+            FOREIGN KEY (organization_id) REFERENCES organizations(id),
+            UNIQUE(organization_id, email)
         )",
         (),
     )
