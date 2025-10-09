@@ -85,3 +85,8 @@ libsql = ["agent-mem-core/libsql"]
 [dev-dependencies]
 tokio-test = "0.4"
 tower-test = "0.4"
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "database_performance"
+harness = false
