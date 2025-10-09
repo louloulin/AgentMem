@@ -1,0 +1,497 @@
+//! LibSQL Block Repository
+//!
+//! Provides LibSQL implementation of BlockRepositoryTrait
+
+use agent_mem_traits::{AgentMemError, Result};
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use libsql::Connection;
+use serde_json::Value as JsonValue;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+use crate::storage::models::Block;
+use crate::storage::traits::BlockRepositoryTrait;
+
+/// LibSQL implementation of Block repository
+pub struct LibSqlBlockRepository {
+    conn: Arc<Mutex<Connection>>,
+}
+
+impl LibSqlBlockRepository {
+    /// Create a new LibSQL block repository
+    pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
+        Self { conn }
+    }
+
+    /// Helper function to convert row to Block
+    fn row_to_block(row: &libsql::Row) -> Result<Block> {
+        // Field order: id, organization_id, user_id, template_name, description, is_template,
+        //              label, value, limit, metadata_, created_at, updated_at, is_deleted,
+        //              created_by_id, last_updated_by_id
+
+        let metadata_str: Option<String> = row.get(9).ok();
+        let metadata_: Option<JsonValue> = metadata_str
+            .and_then(|s| serde_json::from_str(&s).ok());
+
+        let created_at_ts: i64 = row.get(10).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get created_at: {}", e))
+        })?;
+        let created_at = DateTime::from_timestamp(created_at_ts, 0)
+            .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?;
+
+        let updated_at_ts: i64 = row.get(11).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get updated_at: {}", e))
+        })?;
+        let updated_at = DateTime::from_timestamp(updated_at_ts, 0)
+            .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?;
+
+        let is_deleted_int: i64 = row.get(12).unwrap_or(0);
+        let is_template_int: i64 = row.get(5).unwrap_or(0);
+
+        Ok(Block {
+            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
+            organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {}", e)))?,
+            user_id: row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {}", e)))?,
+            template_name: row.get(3).ok(),
+            description: row.get(4).ok(),
+            is_template: is_template_int != 0,
+            label: row.get(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {}", e)))?,
+            value: row.get(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get value: {}", e)))?,
+            limit: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get limit: {}", e)))?,
+            metadata_,
+            created_at,
+            updated_at,
+            is_deleted: is_deleted_int != 0,
+            created_by_id: row.get(13).ok(),
+            last_updated_by_id: row.get(14).ok(),
+        })
+    }
+}
+
+#[async_trait]
+impl BlockRepositoryTrait for LibSqlBlockRepository {
+    async fn create(&self, block: &Block) -> Result<Block> {
+        let conn = self.conn.lock().await;
+
+        let metadata_json = block.metadata_.as_ref()
+            .map(|m| serde_json::to_string(m).unwrap_or_else(|_| "null".to_string()))
+            .unwrap_or_else(|| "null".to_string());
+
+        conn.execute(
+            "INSERT INTO blocks (
+                id, organization_id, user_id, template_name, description, is_template,
+                label, value, limit, metadata_, created_at, updated_at, is_deleted,
+                created_by_id, last_updated_by_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            libsql::params![
+                block.id.clone(),
+                block.organization_id.clone(),
+                block.user_id.clone(),
+                block.template_name.clone(),
+                block.description.clone(),
+                if block.is_template { 1 } else { 0 },
+                block.label.clone(),
+                block.value.clone(),
+                block.limit,
+                metadata_json,
+                block.created_at.timestamp(),
+                block.updated_at.timestamp(),
+                if block.is_deleted { 1 } else { 0 },
+                block.created_by_id.clone(),
+                block.last_updated_by_id.clone(),
+            ],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create block: {}", e)))?;
+
+        Ok(block.clone())
+    }
+
+    async fn find_by_id(&self, id: &str) -> Result<Option<Block>> {
+        let conn = self.conn.lock().await;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, organization_id, user_id, template_name, description, is_template,
+                        label, value, limit, metadata_, created_at, updated_at, is_deleted,
+                        created_by_id, last_updated_by_id
+                 FROM blocks WHERE id = ? AND is_deleted = 0"
+            )
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+
+        let mut rows = stmt
+            .query(libsql::params![id])
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {}", e)))?;
+
+        if let Some(row) = rows.next().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+        })? {
+            Ok(Some(Self::row_to_block(&row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn find_by_agent_id(&self, agent_id: &str) -> Result<Vec<Block>> {
+        let conn = self.conn.lock().await;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT b.id, b.organization_id, b.user_id, b.template_name, b.description,
+                        b.is_template, b.label, b.value, b.limit, b.metadata_, b.created_at,
+                        b.updated_at, b.is_deleted, b.created_by_id, b.last_updated_by_id
+                 FROM blocks b
+                 INNER JOIN blocks_agents ba ON b.id = ba.block_id
+                 WHERE ba.agent_id = ? AND b.is_deleted = 0
+                 ORDER BY b.created_at DESC"
+            )
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+
+        let mut rows = stmt
+            .query(libsql::params![agent_id])
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query blocks: {}", e)))?;
+
+        let mut blocks = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+        })? {
+            blocks.push(Self::row_to_block(&row)?);
+        }
+
+        Ok(blocks)
+    }
+
+    async fn update(&self, block: &Block) -> Result<Block> {
+        let conn = self.conn.lock().await;
+
+        let metadata_json = block.metadata_.as_ref()
+            .map(|m| serde_json::to_string(m).unwrap_or_else(|_| "null".to_string()))
+            .unwrap_or_else(|| "null".to_string());
+
+        conn.execute(
+            "UPDATE blocks SET 
+                organization_id = ?, user_id = ?, template_name = ?, description = ?,
+                is_template = ?, label = ?, value = ?, limit = ?, metadata_ = ?,
+                updated_at = ?, last_updated_by_id = ?
+             WHERE id = ? AND is_deleted = 0",
+            libsql::params![
+                block.organization_id.clone(),
+                block.user_id.clone(),
+                block.template_name.clone(),
+                block.description.clone(),
+                if block.is_template { 1 } else { 0 },
+                block.label.clone(),
+                block.value.clone(),
+                block.limit,
+                metadata_json,
+                block.updated_at.timestamp(),
+                block.last_updated_by_id.clone(),
+                block.id.clone(),
+            ],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update block: {}", e)))?;
+
+        Ok(block.clone())
+    }
+
+    async fn delete(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+
+        conn.execute(
+            "UPDATE blocks SET is_deleted = 1, updated_at = ? WHERE id = ?",
+            libsql::params![Utc::now().timestamp(), id],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete block: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn link_to_agent(&self, block_id: &str, agent_id: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+
+        // Get block label for the junction table
+        let mut stmt = conn
+            .prepare("SELECT label FROM blocks WHERE id = ? AND is_deleted = 0")
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+
+        let mut rows = stmt
+            .query(libsql::params![block_id])
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {}", e)))?;
+
+        let block_label: String = if let Some(row) = rows.next().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+        })? {
+            row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {}", e)))?
+        } else {
+            return Err(AgentMemError::NotFound(format!("Block {} not found", block_id)));
+        };
+
+        // Insert into junction table
+        conn.execute(
+            "INSERT OR IGNORE INTO blocks_agents (block_id, block_label, agent_id) VALUES (?, ?, ?)",
+            libsql::params![block_id, block_label, agent_id],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to link block to agent: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn unlink_from_agent(&self, block_id: &str, agent_id: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+
+        conn.execute(
+            "DELETE FROM blocks_agents WHERE block_id = ? AND agent_id = ?",
+            libsql::params![block_id, agent_id],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to unlink block from agent: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Block>> {
+        let conn = self.conn.lock().await;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, organization_id, user_id, template_name, description, is_template,
+                        label, value, limit, metadata_, created_at, updated_at, is_deleted,
+                        created_by_id, last_updated_by_id
+                 FROM blocks WHERE is_deleted = 0 
+                 ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            )
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+
+        let mut rows = stmt
+            .query(libsql::params![limit, offset])
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list blocks: {}", e)))?;
+
+        let mut blocks = Vec::new();
+        while let Some(row) = rows.next().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+        })? {
+            blocks.push(Self::row_to_block(&row)?);
+        }
+
+        Ok(blocks)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use serde_json::json;
+
+    async fn setup_test_db() -> Arc<Mutex<Connection>> {
+        let conn = libsql::Connection::open_in_memory()
+            .await
+            .expect("Failed to create in-memory database");
+
+        // Create blocks table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS blocks (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                template_name TEXT,
+                description TEXT,
+                is_template INTEGER NOT NULL DEFAULT 0,
+                label TEXT NOT NULL,
+                value TEXT NOT NULL,
+                limit INTEGER NOT NULL,
+                metadata_ TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+                created_by_id TEXT,
+                last_updated_by_id TEXT
+            )",
+            (),
+        )
+        .await
+        .expect("Failed to create blocks table");
+
+        // Create blocks_agents junction table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS blocks_agents (
+                block_id TEXT NOT NULL,
+                block_label TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                PRIMARY KEY (block_id, agent_id)
+            )",
+            (),
+        )
+        .await
+        .expect("Failed to create blocks_agents table");
+
+        Arc::new(Mutex::new(conn))
+    }
+
+    fn create_test_block(id: &str) -> Block {
+        Block {
+            id: id.to_string(),
+            organization_id: "org1".to_string(),
+            user_id: "user1".to_string(),
+            template_name: Some("test_template".to_string()),
+            description: Some("Test block description".to_string()),
+            is_template: false,
+            label: "human".to_string(),
+            value: "Test block value".to_string(),
+            limit: 1000,
+            metadata_: Some(json!({"key": "value"})),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            is_deleted: false,
+            created_by_id: Some("user1".to_string()),
+            last_updated_by_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_block() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block1");
+        let result = repo.create(&block).await;
+
+        assert!(result.is_ok());
+        let created = result.unwrap();
+        assert_eq!(created.id, "block1");
+        assert_eq!(created.label, "human");
+    }
+
+    #[tokio::test]
+    async fn test_find_by_id() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block2");
+        repo.create(&block).await.unwrap();
+
+        let result = repo.find_by_id("block2").await;
+        assert!(result.is_ok());
+        let found = result.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "block2");
+    }
+
+    #[tokio::test]
+    async fn test_find_by_agent_id() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block3");
+        repo.create(&block).await.unwrap();
+        repo.link_to_agent("block3", "agent1").await.unwrap();
+
+        let result = repo.find_by_agent_id("agent1").await;
+        assert!(result.is_ok());
+        let blocks = result.unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].id, "block3");
+    }
+
+    #[tokio::test]
+    async fn test_update() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let mut block = create_test_block("block4");
+        repo.create(&block).await.unwrap();
+
+        block.value = "Updated value".to_string();
+        block.limit = 2000;
+        let result = repo.update(&block).await;
+
+        assert!(result.is_ok());
+        let updated = repo.find_by_id("block4").await.unwrap().unwrap();
+        assert_eq!(updated.value, "Updated value");
+        assert_eq!(updated.limit, 2000);
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block5");
+        repo.create(&block).await.unwrap();
+
+        let result = repo.delete("block5").await;
+        assert!(result.is_ok());
+
+        let found = repo.find_by_id("block5").await.unwrap();
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_link_to_agent() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block6");
+        repo.create(&block).await.unwrap();
+
+        let result = repo.link_to_agent("block6", "agent1").await;
+        assert!(result.is_ok());
+
+        let blocks = repo.find_by_agent_id("agent1").await.unwrap();
+        assert_eq!(blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_unlink_from_agent() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block = create_test_block("block7");
+        repo.create(&block).await.unwrap();
+        repo.link_to_agent("block7", "agent1").await.unwrap();
+
+        let result = repo.unlink_from_agent("block7", "agent1").await;
+        assert!(result.is_ok());
+
+        let blocks = repo.find_by_agent_id("agent1").await.unwrap();
+        assert_eq!(blocks.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let block1 = create_test_block("block8");
+        let block2 = create_test_block("block9");
+        repo.create(&block1).await.unwrap();
+        repo.create(&block2).await.unwrap();
+
+        let result = repo.list(10, 0).await;
+        assert!(result.is_ok());
+        let blocks = result.unwrap();
+        assert_eq!(blocks.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_link_nonexistent_block() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlBlockRepository::new(conn);
+
+        let result = repo.link_to_agent("nonexistent", "agent1").await;
+        assert!(result.is_err());
+    }
+}
+
