@@ -7,9 +7,12 @@ use crate::{
     routes::create_router,
     telemetry::setup_telemetry,
 };
+use agent_mem_core::storage::{
+    config::{DatabaseBackend, DatabaseConfig},
+    factory::{Repositories, RepositoryFactory},
+};
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::Router;
-use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -20,7 +23,7 @@ pub struct MemoryServer {
     config: ServerConfig,
     memory_manager: Arc<MemoryManager>,
     metrics_registry: Arc<MetricsRegistry>,
-    db_pool: PgPool,
+    repositories: Repositories,
     router: Router,
 }
 
@@ -30,13 +33,25 @@ impl MemoryServer {
         // Setup telemetry
         setup_telemetry(&config)?;
 
-        // Create database connection pool
-        info!("Connecting to database: {}", config.database_url);
-        let db_pool = PgPool::connect(&config.database_url).await.map_err(|e| {
-            ServerError::ServerError(format!("Failed to connect to database: {e}"))
-        })?;
+        // Create database configuration from server config
+        let db_config = DatabaseConfig {
+            backend: if config.database_url.starts_with("libsql://") || config.database_url.ends_with(".db") {
+                DatabaseBackend::LibSql
+            } else {
+                DatabaseBackend::Postgres
+            },
+            connection_string: config.database_url.clone(),
+            auto_migrate: true,
+        };
 
-        info!("Database connection established");
+        info!("Initializing database backend: {:?}", db_config.backend);
+
+        // Create repositories using factory
+        let repositories = RepositoryFactory::create_repositories(&db_config)
+            .await
+            .map_err(|e| ServerError::ServerError(format!("Failed to create repositories: {e}")))?;
+
+        info!("Database repositories initialized");
 
         // Create memory manager
         let memory_manager = Arc::new(MemoryManager::new());
@@ -49,7 +64,7 @@ impl MemoryServer {
         let router = create_router(
             memory_manager.clone(),
             metrics_registry.clone(),
-            db_pool.clone(),
+            repositories.clone(),
         )
         .await?;
 
@@ -59,7 +74,7 @@ impl MemoryServer {
             config,
             memory_manager,
             metrics_registry,
-            db_pool,
+            repositories,
             router,
         })
     }

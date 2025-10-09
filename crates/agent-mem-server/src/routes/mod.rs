@@ -1,16 +1,24 @@
 //! HTTP routes for the AgentMem API
 
+#[cfg(feature = "postgres")]
 pub mod agents;
+#[cfg(feature = "postgres")]
 pub mod chat;
 pub mod docs;
+#[cfg(feature = "postgres")]
 pub mod graph;
 pub mod health;
+#[cfg(feature = "postgres")]
 pub mod mcp;
 pub mod memory;
+#[cfg(feature = "postgres")]
 pub mod messages;
 pub mod metrics;
+#[cfg(feature = "postgres")]
 pub mod organizations;
+#[cfg(feature = "postgres")]
 pub mod tools;
+#[cfg(feature = "postgres")]
 pub mod users;
 
 use crate::error::ServerResult;
@@ -18,13 +26,13 @@ use crate::middleware::{audit_logging_middleware, metrics_middleware, quota_midd
 use crate::routes::memory::MemoryManager;
 use crate::sse::SseManager;
 use crate::websocket::WebSocketManager;
+use agent_mem_core::storage::factory::Repositories;
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::{
     middleware as axum_middleware,
     routing::{delete, get, post, put},
     Extension, Router,
 };
-use sqlx::PgPool;
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use utoipa::OpenApi;
@@ -34,13 +42,13 @@ use utoipa_swagger_ui::SwaggerUi;
 pub async fn create_router(
     memory_manager: Arc<MemoryManager>,
     metrics_registry: Arc<MetricsRegistry>,
-    db_pool: PgPool,
+    repositories: Repositories,
 ) -> ServerResult<Router> {
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
     let sse_manager = Arc::new(SseManager::new());
 
-    let app = Router::new()
+    let mut app = Router::new()
         // Memory management routes
         .route("/api/v1/memories", post(memory::add_memory))
         .route("/api/v1/memories/:id", get(memory::get_memory))
@@ -57,13 +65,22 @@ pub async fn create_router(
             "/api/v1/memories/batch/delete",
             post(memory::batch_delete_memories),
         )
-        // User management routes
-        .route("/api/v1/users/register", post(users::register_user))
-        .route("/api/v1/users/login", post(users::login_user))
-        .route("/api/v1/users/me", get(users::get_current_user))
-        .route("/api/v1/users/me", put(users::update_current_user))
-        .route("/api/v1/users/me/password", post(users::change_password))
-        .route("/api/v1/users/:user_id", get(users::get_user_by_id))
+        // Health and monitoring
+        .route("/health", get(health::health_check))
+        .route("/metrics", get(metrics::get_metrics))
+        .route("/metrics/prometheus", get(metrics::get_prometheus_metrics));
+
+    // Add postgres-only routes
+    #[cfg(feature = "postgres")]
+    {
+        app = app
+            // User management routes
+            .route("/api/v1/users/register", post(users::register_user))
+            .route("/api/v1/users/login", post(users::login_user))
+            .route("/api/v1/users/me", get(users::get_current_user))
+            .route("/api/v1/users/me", put(users::update_current_user))
+            .route("/api/v1/users/me/password", post(users::change_password))
+            .route("/api/v1/users/:user_id", get(users::get_user_by_id))
         // Organization management routes
         .route(
             "/api/v1/organizations",
@@ -154,9 +171,8 @@ pub async fn create_router(
         .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
         // OpenAPI documentation
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Add shared state via with_state
-        .with_state(db_pool)
         // Add shared state via Extension
+        .layer(Extension(Arc::new(repositories)))
         .layer(Extension(memory_manager))
         .layer(Extension(metrics_registry))
         .layer(Extension(ws_manager))

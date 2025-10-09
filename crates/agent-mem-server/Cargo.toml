@@ -77,6 +77,11 @@ clap = { version = "4.0", features = ["derive"] }
 argon2 = "0.5.3"
 sha2.workspace = true
 
+[features]
+default = ["libsql"]
+postgres = ["agent-mem-core/postgres"]
+libsql = ["agent-mem-core/libsql"]
+
 [dev-dependencies]
 tokio-test = "0.4"
 tower-test = "0.4"
