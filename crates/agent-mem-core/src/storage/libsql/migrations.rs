@@ -269,15 +269,16 @@ async fn create_api_keys_table(conn: &Connection) -> Result<()> {
         "CREATE TABLE api_keys (
             id TEXT PRIMARY KEY,
             key_hash TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
             user_id TEXT NOT NULL,
-            name TEXT,
-            scopes TEXT,
+            organization_id TEXT NOT NULL,
             expires_at INTEGER,
-            created_at INTEGER NOT NULL,
             last_used_at INTEGER,
-            is_revoked INTEGER NOT NULL DEFAULT 0,
-            metadata_ TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (organization_id) REFERENCES organizations(id)
         )",
         (),
     )
@@ -359,7 +360,7 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
         // API Key indexes
         "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
-        "CREATE INDEX IF NOT EXISTS idx_api_keys_revoked ON api_keys(is_revoked)",
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_deleted ON api_keys(is_deleted)",
         
         // Block indexes
         "CREATE INDEX IF NOT EXISTS idx_blocks_label ON blocks(label)",

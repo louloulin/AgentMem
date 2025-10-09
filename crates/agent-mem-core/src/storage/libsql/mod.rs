@@ -3,6 +3,7 @@
 //! Provides embedded database support using LibSQL (SQLite fork)
 
 pub mod agent_repository;
+pub mod api_key_repository;
 pub mod connection;
 pub mod message_repository;
 pub mod migrations;
@@ -12,6 +13,7 @@ pub mod user_repository;
 
 // Re-export commonly used types
 pub use agent_repository::LibSqlAgentRepository;
+pub use api_key_repository::LibSqlApiKeyRepository;
 pub use connection::{create_libsql_pool, DatabaseStats, LibSqlConnectionManager};
 pub use message_repository::LibSqlMessageRepository;
 pub use migrations::run_migrations;
