@@ -9,9 +9,10 @@
 use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use std::sync::Arc;
 use tracing::{debug, info};
+
+use crate::storage::traits::{AssociationRepositoryTrait, MemoryAssociation as RepoMemoryAssociation};
 
 /// 关联类型
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -117,19 +118,19 @@ impl Default for AssociationManagerConfig {
 
 /// 记忆关联管理器
 pub struct AssociationManager {
-    pool: Arc<PgPool>,
+    repository: Arc<dyn AssociationRepositoryTrait>,
     config: AssociationManagerConfig,
 }
 
 impl AssociationManager {
     /// 创建新的关联管理器
-    pub fn new(pool: Arc<PgPool>, config: AssociationManagerConfig) -> Self {
-        Self { pool, config }
+    pub fn new(repository: Arc<dyn AssociationRepositoryTrait>, config: AssociationManagerConfig) -> Self {
+        Self { repository, config }
     }
 
     /// 使用默认配置创建
-    pub fn with_default_config(pool: Arc<PgPool>) -> Self {
-        Self::new(pool, AssociationManagerConfig::default())
+    pub fn with_default_config(repository: Arc<dyn AssociationRepositoryTrait>) -> Self {
+        Self::new(repository, AssociationManagerConfig::default())
     }
 
     /// 创建关联
@@ -153,34 +154,26 @@ impl AssociationManager {
             )));
         }
 
-        let association_id = uuid::Uuid::new_v4().to_string();
-        let association_type_str = association_type.as_str();
+        let association_id = format!("assoc-{}", uuid::Uuid::new_v4());
+        let association_type_str = association_type.as_str().to_string();
+        let now = Utc::now();
 
-        sqlx::query!(
-            r#"
-            INSERT INTO memory_associations (
-                id, organization_id, user_id, agent_id,
-                from_memory_id, to_memory_id, association_type,
-                strength, confidence, metadata, created_at, updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            "#,
-            association_id,
-            organization_id,
-            user_id,
-            agent_id,
-            from_memory_id,
-            to_memory_id,
-            association_type_str,
+        let association = RepoMemoryAssociation {
+            id: association_id.clone(),
+            organization_id: organization_id.to_string(),
+            user_id: user_id.to_string(),
+            agent_id: agent_id.to_string(),
+            from_memory_id: from_memory_id.to_string(),
+            to_memory_id: to_memory_id.to_string(),
+            association_type: association_type_str.clone(),
             strength,
             confidence,
             metadata,
-            Utc::now(),
-            Utc::now(),
-        )
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+            created_at: now,
+            updated_at: now,
+        };
+
+        self.repository.create(&association).await?;
 
         info!(
             "Created association {} from {} to {} (type: {}, strength: {})",
@@ -196,24 +189,22 @@ impl AssociationManager {
         memory_id: &str,
         user_id: &str,
     ) -> Result<Vec<MemoryAssociation>> {
-        let results = sqlx::query_as!(
-            MemoryAssociation,
-            r#"
-            SELECT 
-                id, organization_id, user_id, agent_id,
-                from_memory_id, to_memory_id, association_type,
-                strength, confidence, metadata, created_at, updated_at
-            FROM memory_associations
-            WHERE (from_memory_id = $1 OR to_memory_id = $1)
-            AND user_id = $2
-            ORDER BY strength DESC
-            "#,
-            memory_id,
-            user_id,
-        )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let repo_associations = self.repository.find_by_memory_id(memory_id, user_id).await?;
+
+        let results = repo_associations.into_iter().map(|a| MemoryAssociation {
+            id: a.id,
+            organization_id: a.organization_id,
+            user_id: a.user_id,
+            agent_id: a.agent_id,
+            from_memory_id: a.from_memory_id,
+            to_memory_id: a.to_memory_id,
+            association_type: a.association_type,
+            strength: a.strength,
+            confidence: a.confidence,
+            metadata: a.metadata,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+        }).collect();
 
         Ok(results)
     }
@@ -226,27 +217,22 @@ impl AssociationManager {
         association_type: AssociationType,
     ) -> Result<Vec<MemoryAssociation>> {
         let type_str = association_type.as_str();
+        let repo_associations = self.repository.find_by_type(memory_id, user_id, type_str).await?;
 
-        let results = sqlx::query_as!(
-            MemoryAssociation,
-            r#"
-            SELECT 
-                id, organization_id, user_id, agent_id,
-                from_memory_id, to_memory_id, association_type,
-                strength, confidence, metadata, created_at, updated_at
-            FROM memory_associations
-            WHERE (from_memory_id = $1 OR to_memory_id = $1)
-            AND user_id = $2
-            AND association_type = $3
-            ORDER BY strength DESC
-            "#,
-            memory_id,
-            user_id,
-            type_str,
-        )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let results = repo_associations.into_iter().map(|a| MemoryAssociation {
+            id: a.id,
+            organization_id: a.organization_id,
+            user_id: a.user_id,
+            agent_id: a.agent_id,
+            from_memory_id: a.from_memory_id,
+            to_memory_id: a.to_memory_id,
+            association_type: a.association_type,
+            strength: a.strength,
+            confidence: a.confidence,
+            metadata: a.metadata,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+        }).collect();
 
         Ok(results)
     }
@@ -257,115 +243,58 @@ impl AssociationManager {
         association_id: &str,
         new_strength: f32,
     ) -> Result<()> {
-        sqlx::query!(
-            r#"
-            UPDATE memory_associations
-            SET strength = $1, updated_at = $2
-            WHERE id = $3
-            "#,
-            new_strength,
-            Utc::now(),
-            association_id,
-        )
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
-
+        self.repository.update_strength(association_id, new_strength).await?;
         debug!("Updated association {} strength to {}", association_id, new_strength);
-
         Ok(())
     }
 
     /// 删除关联
     pub async fn delete_association(&self, association_id: &str) -> Result<()> {
-        sqlx::query!(
-            r#"
-            DELETE FROM memory_associations
-            WHERE id = $1
-            "#,
-            association_id,
-        )
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
-
+        self.repository.delete(association_id).await?;
         info!("Deleted association {}", association_id);
-
         Ok(())
     }
 
     /// 获取关联统计
     pub async fn get_stats(&self, user_id: &str) -> Result<AssociationStats> {
         // 总数
-        let total = sqlx::query!(
-            r#"
-            SELECT COUNT(*) as count
-            FROM memory_associations
-            WHERE user_id = $1
-            "#,
-            user_id,
-        )
-        .fetch_one(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let total = self.repository.count_by_user(user_id).await?;
 
         // 按类型统计
-        let by_type = sqlx::query!(
-            r#"
-            SELECT association_type, COUNT(*) as count
-            FROM memory_associations
-            WHERE user_id = $1
-            GROUP BY association_type
-            "#,
-            user_id,
-        )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let by_type_data = self.repository.count_by_type(user_id).await?;
+        let by_type = by_type_data
+            .into_iter()
+            .map(|(association_type, count)| TypeCount {
+                association_type,
+                count,
+            })
+            .collect();
 
         // 平均强度
-        let avg_strength = sqlx::query!(
-            r#"
-            SELECT AVG(strength) as avg_strength
-            FROM memory_associations
-            WHERE user_id = $1
-            "#,
-            user_id,
-        )
-        .fetch_one(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let avg_strength = self.repository.avg_strength(user_id).await?;
 
         // 最强关联
-        let strongest = sqlx::query_as!(
-            MemoryAssociation,
-            r#"
-            SELECT 
-                id, organization_id, user_id, agent_id,
-                from_memory_id, to_memory_id, association_type,
-                strength, confidence, metadata, created_at, updated_at
-            FROM memory_associations
-            WHERE user_id = $1
-            ORDER BY strength DESC
-            LIMIT 10
-            "#,
-            user_id,
-        )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| AgentMemError::from(e))?;
+        let repo_strongest = self.repository.find_strongest(user_id, 10).await?;
+        let strongest_associations = repo_strongest.into_iter().map(|a| MemoryAssociation {
+            id: a.id,
+            organization_id: a.organization_id,
+            user_id: a.user_id,
+            agent_id: a.agent_id,
+            from_memory_id: a.from_memory_id,
+            to_memory_id: a.to_memory_id,
+            association_type: a.association_type,
+            strength: a.strength,
+            confidence: a.confidence,
+            metadata: a.metadata,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+        }).collect();
 
         Ok(AssociationStats {
-            total_associations: total.count.unwrap_or(0),
-            by_type: by_type
-                .into_iter()
-                .map(|r| TypeCount {
-                    association_type: r.association_type,
-                    count: r.count.unwrap_or(0),
-                })
-                .collect(),
-            avg_strength: avg_strength.avg_strength.unwrap_or(0.0) as f32,
-            strongest_associations: strongest,
+            total_associations: total,
+            by_type,
+            avg_strength,
+            strongest_associations,
         })
     }
 }

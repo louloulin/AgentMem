@@ -24,7 +24,8 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
     run_migration(&conn_guard, 7, "create_memories", create_memories_table(&conn_guard)).await?;
     run_migration(&conn_guard, 8, "create_api_keys", create_api_keys_table(&conn_guard)).await?;
     run_migration(&conn_guard, 9, "create_junction_tables", create_junction_tables(&conn_guard)).await?;
-    run_migration(&conn_guard, 10, "create_indexes", create_indexes(&conn_guard)).await?;
+    run_migration(&conn_guard, 10, "create_memory_associations", create_memory_associations_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 11, "create_indexes", create_indexes(&conn_guard)).await?;
 
     Ok(())
 }
@@ -334,6 +335,36 @@ async fn create_junction_tables(conn: &Connection) -> Result<()> {
     )
     .await
     .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools_agents table: {}", e)))?;
+
+    Ok(())
+}
+
+/// Create memory associations table
+async fn create_memory_associations_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE memory_associations (
+            id TEXT PRIMARY KEY,
+            organization_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            from_memory_id TEXT NOT NULL,
+            to_memory_id TEXT NOT NULL,
+            association_type TEXT NOT NULL,
+            strength REAL NOT NULL,
+            confidence REAL NOT NULL,
+            metadata TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (organization_id) REFERENCES organizations(id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (agent_id) REFERENCES agents(id),
+            FOREIGN KEY (from_memory_id) REFERENCES memories(id),
+            FOREIGN KEY (to_memory_id) REFERENCES memories(id)
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory_associations table: {}", e)))?;
 
     Ok(())
 }

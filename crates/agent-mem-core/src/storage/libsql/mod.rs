@@ -4,6 +4,7 @@
 
 pub mod agent_repository;
 pub mod api_key_repository;
+pub mod association_repository;
 pub mod block_repository;
 pub mod connection;
 pub mod memory_repository;
@@ -16,6 +17,7 @@ pub mod user_repository;
 // Re-export commonly used types
 pub use agent_repository::LibSqlAgentRepository;
 pub use api_key_repository::LibSqlApiKeyRepository;
+pub use association_repository::LibSqlAssociationRepository;
 pub use block_repository::LibSqlBlockRepository;
 pub use connection::{create_libsql_pool, DatabaseStats, LibSqlConnectionManager};
 pub use memory_repository::LibSqlMemoryRepository;

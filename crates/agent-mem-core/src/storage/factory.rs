@@ -12,8 +12,9 @@ use crate::storage::traits::*;
 #[cfg(feature = "libsql")]
 use crate::storage::libsql::{
     create_libsql_pool, run_migrations, LibSqlAgentRepository, LibSqlApiKeyRepository,
-    LibSqlBlockRepository, LibSqlMemoryRepository, LibSqlMessageRepository,
-    LibSqlOrganizationRepository, LibSqlToolRepository, LibSqlUserRepository,
+    LibSqlAssociationRepository, LibSqlBlockRepository, LibSqlMemoryRepository,
+    LibSqlMessageRepository, LibSqlOrganizationRepository, LibSqlToolRepository,
+    LibSqlUserRepository,
 };
 
 // Note: PostgreSQL repository implementations are being refactored.
@@ -48,6 +49,9 @@ pub struct Repositories {
 
     /// Block repository
     pub blocks: Arc<dyn BlockRepositoryTrait>,
+
+    /// Association repository
+    pub associations: Arc<dyn AssociationRepositoryTrait>,
 }
 
 /// Factory for creating repository instances
@@ -124,6 +128,7 @@ impl RepositoryFactory {
             api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
             memories: Arc::new(LibSqlMemoryRepository::new(conn.clone())),
             blocks: Arc::new(LibSqlBlockRepository::new(conn.clone())),
+            associations: Arc::new(LibSqlAssociationRepository::new(conn.clone())),
         })
     }
 
