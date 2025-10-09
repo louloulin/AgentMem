@@ -15,16 +15,17 @@
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
-use agent_mem_core::{
-    orchestrator::{AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig},
-    engine::{MemoryEngine, MemoryEngineConfig},
-    storage::message_repository::MessageRepository,
-};
+use agent_mem_core::storage::factory::Repositories;
+// Note: orchestrator module needs to be refactored to use Repository Traits
+// use agent_mem_core::{
+//     orchestrator::{AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig},
+//     engine::{MemoryEngine, MemoryEngineConfig},
+// };
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, Path},
     http::StatusCode,
     response::sse::{Event, Sse},
     Json,
@@ -32,7 +33,6 @@ use axum::{
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
-use sqlx::PgPool;
 use std::sync::Arc;
 use std::convert::Infallible;
 use utoipa::ToSchema;
@@ -141,7 +141,7 @@ impl From<agent_mem_core::orchestrator::ToolCallInfo> for ToolCallInfo {
     tag = "chat"
 )]
 pub async fn send_chat_message(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
@@ -246,7 +246,7 @@ pub async fn send_chat_message(
     tag = "chat"
 )]
 pub async fn send_chat_message_stream(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
@@ -391,7 +391,7 @@ pub async fn send_chat_message_stream(
     tag = "chat"
 )]
 pub async fn get_chat_history(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<Vec<JsonValue>>>> {

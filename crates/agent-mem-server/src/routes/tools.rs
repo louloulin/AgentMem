@@ -13,21 +13,20 @@ use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use agent_mem_core::storage::{
+    factory::Repositories,
     models::{generate_id, Tool},
-    repository::Repository,
-    tool_repository::ToolRepository,
 };
 use agent_mem_tools::sandbox::SandboxManager;
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, Path, Query},
     http::StatusCode,
     Json,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sqlx::PgPool;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use utoipa::ToSchema;
 
@@ -151,11 +150,11 @@ pub struct ListToolsQuery {
     )
 )]
 pub async fn register_tool(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<RegisterToolRequest>,
 ) -> ServerResult<(StatusCode, Json<ApiResponse<ToolResponse>>)> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     // Validate request
     if req.name.trim().is_empty() {
@@ -219,11 +218,11 @@ pub async fn register_tool(
     )
 )]
 pub async fn get_tool(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<ToolResponse>>> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     let tool = repo
         .read(&id)
@@ -262,11 +261,11 @@ pub async fn get_tool(
     )
 )]
 pub async fn list_tools(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<ListToolsQuery>,
 ) -> ServerResult<Json<ApiResponse<Vec<ToolResponse>>>> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     // Validate pagination parameters
     let limit = query.limit.unwrap_or(50).min(100);
@@ -311,12 +310,12 @@ pub async fn list_tools(
     )
 )]
 pub async fn update_tool(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
     Json(req): Json<UpdateToolRequest>,
 ) -> ServerResult<Json<ApiResponse<ToolResponse>>> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     let mut tool = repo
         .read(&id)
@@ -394,11 +393,11 @@ pub async fn update_tool(
     )
 )]
 pub async fn delete_tool(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<StatusCode> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     // First check if tool exists and belongs to user's organization
     let tool = repo
@@ -444,12 +443,12 @@ pub async fn delete_tool(
     )
 )]
 pub async fn execute_tool(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
     Json(req): Json<ExecuteToolRequest>,
 ) -> ServerResult<Json<ApiResponse<ToolExecutionResponse>>> {
-    let repo = ToolRepository::new(pool);
+    let repo = repositories.tools.clone();
 
     // Validate tool exists and belongs to user's organization
     let tool = repo

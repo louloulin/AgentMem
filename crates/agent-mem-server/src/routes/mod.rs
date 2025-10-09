@@ -1,27 +1,17 @@
 //! HTTP routes for the AgentMem API
 
-// Core routes (work with both LibSQL and PostgreSQL)
-pub mod docs;
-pub mod health;
-pub mod memory;
-pub mod metrics;
-
-// Advanced routes (require PostgreSQL, need refactoring for LibSQL)
-#[cfg(feature = "postgres")]
+// All routes now use Repository Traits and work with both LibSQL and PostgreSQL
 pub mod agents;
-#[cfg(feature = "postgres")]
 pub mod chat;
-#[cfg(feature = "postgres")]
+pub mod docs;
 pub mod graph;
-#[cfg(feature = "postgres")]
+pub mod health;
 pub mod mcp;
-#[cfg(feature = "postgres")]
+pub mod memory;
 pub mod messages;
-#[cfg(feature = "postgres")]
+pub mod metrics;
 pub mod organizations;
-#[cfg(feature = "postgres")]
 pub mod tools;
-#[cfg(feature = "postgres")]
 pub mod users;
 
 use crate::error::ServerResult;
@@ -73,10 +63,8 @@ pub async fn create_router(
         .route("/metrics", get(metrics::get_metrics))
         .route("/metrics/prometheus", get(metrics::get_prometheus_metrics));
 
-    // Add postgres-only routes
-    #[cfg(feature = "postgres")]
-    {
-        app = app
+    // Add all routes (now database-agnostic via Repository Traits)
+    app = app
             // User management routes
             .route("/api/v1/users/register", post(users::register_user))
             .route("/api/v1/users/login", post(users::login_user))
@@ -163,12 +151,11 @@ pub async fn create_router(
             get(graph::get_memory_associations),
         )
         .route("/api/v1/graph/stats", get(graph::get_graph_stats))
-            // WebSocket endpoint
-            .route("/api/v1/ws", get(crate::websocket::websocket_handler))
-            // SSE endpoints
-            .route("/api/v1/sse", get(crate::sse::sse_handler))
-            .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response));
-    }
+        // WebSocket endpoint
+        .route("/api/v1/ws", get(crate::websocket::websocket_handler))
+        // SSE endpoints
+        .route("/api/v1/sse", get(crate::sse::sse_handler))
+        .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response));
 
     // Add OpenAPI documentation and middleware (always included)
     let app = app
@@ -190,45 +177,7 @@ pub async fn create_router(
     Ok(app)
 }
 
-/// OpenAPI documentation structure (LibSQL version - basic routes only)
-#[cfg(not(feature = "postgres"))]
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        memory::add_memory,
-        memory::get_memory,
-        memory::update_memory,
-        memory::delete_memory,
-        memory::search_memories,
-        memory::get_memory_history,
-        memory::batch_add_memories,
-        memory::batch_delete_memories,
-        health::health_check,
-        metrics::get_metrics,
-        metrics::get_prometheus_metrics,
-    ),
-    components(
-        schemas(
-            crate::models::MemoryRequest,
-            crate::models::MemoryResponse,
-            crate::models::SearchRequest,
-            crate::models::SearchResponse,
-            crate::models::BatchRequest,
-            crate::models::BatchResponse,
-            crate::models::HealthResponse,
-            crate::models::MetricsResponse,
-        )
-    ),
-    tags(
-        (name = "memory", description = "Memory management endpoints"),
-        (name = "health", description = "Health check and monitoring"),
-        (name = "metrics", description = "Metrics and observability"),
-    )
-)]
-struct ApiDoc;
-
-/// OpenAPI documentation structure (PostgreSQL version - all routes)
-#[cfg(feature = "postgres")]
+/// OpenAPI documentation structure (all routes - database-agnostic)
 #[derive(OpenApi)]
 #[openapi(
     paths(

@@ -14,20 +14,16 @@
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
-use agent_mem_core::storage::{
-    agent_repository::AgentRepository,
-    models::{generate_id, Agent},
-    repository::Repository,
-};
+use agent_mem_core::storage::{factory::Repositories, models::{generate_id, Agent}};
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, Path, Query},
     http::StatusCode,
     Json,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sqlx::PgPool;
+use std::sync::Arc;
 use utoipa::ToSchema;
 
 /// Request to create a new agent
@@ -171,11 +167,11 @@ pub struct SendMessageResponse {
     )
 )]
 pub async fn create_agent(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<CreateAgentRequest>,
 ) -> ServerResult<(StatusCode, Json<ApiResponse<AgentResponse>>)> {
-    let repo = AgentRepository::new(pool);
+    let repo = repositories.agents.clone();
 
     // Validate request
     if let Some(ref name) = req.name {
@@ -235,11 +231,11 @@ pub async fn create_agent(
     )
 )]
 pub async fn get_agent(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<AgentResponse>>> {
-    let repo = AgentRepository::new(pool);
+    let repo = repositories.agents.clone();
 
     let agent = repo
         .read(&id)
@@ -279,12 +275,12 @@ pub async fn get_agent(
     )
 )]
 pub async fn update_agent(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
     Json(req): Json<UpdateAgentRequest>,
 ) -> ServerResult<Json<ApiResponse<AgentResponse>>> {
-    let repo = AgentRepository::new(pool);
+    let repo = repositories.agents.clone();
 
     let mut agent = repo
         .read(&id)
@@ -365,11 +361,11 @@ pub async fn update_agent(
     )
 )]
 pub async fn delete_agent(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<StatusCode> {
-    let repo = AgentRepository::new(pool);
+    let repo = repositories.agents.clone();
 
     // First check if agent exists and belongs to user's organization
     let agent = repo
@@ -412,11 +408,11 @@ pub async fn delete_agent(
     )
 )]
 pub async fn list_agents(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<ListAgentsQuery>,
 ) -> ServerResult<Json<ApiResponse<Vec<AgentResponse>>>> {
-    let repo = AgentRepository::new(pool);
+    let repo = repositories.agents.clone();
 
     // Validate pagination parameters
     let limit = query.limit.unwrap_or(50).min(100); // Max 100 items per page
@@ -457,7 +453,7 @@ pub async fn list_agents(
     )
 )]
 pub async fn send_message_to_agent(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
     Json(req): Json<SendMessageRequest>,
@@ -597,7 +593,7 @@ pub async fn send_message_to_agent(
     )
 )]
 pub async fn get_agent_state(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<AgentStateResponse>>> {
@@ -647,7 +643,7 @@ pub async fn get_agent_state(
     )
 )]
 pub async fn update_agent_state(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
     Json(req): Json<UpdateAgentStateRequest>,

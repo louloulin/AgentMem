@@ -13,19 +13,18 @@ use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use agent_mem_core::storage::{
-    message_repository::MessageRepository,
+    factory::Repositories,
     models::{generate_id, Message},
-    repository::Repository,
 };
 use axum::{
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, Path, Query},
     http::StatusCode,
     Json,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sqlx::PgPool;
+use std::sync::Arc;
 use utoipa::ToSchema;
 
 /// Request to create a new message
@@ -113,11 +112,11 @@ pub struct ListMessagesQuery {
     )
 )]
 pub async fn create_message(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(req): Json<CreateMessageRequest>,
 ) -> ServerResult<(StatusCode, Json<ApiResponse<MessageResponse>>)> {
-    let repo = MessageRepository::new(pool);
+    let repo = repositories.messages.clone();
 
     // Validate request
     if req.role.is_empty() {
@@ -191,11 +190,11 @@ pub async fn create_message(
     )
 )]
 pub async fn get_message(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<MessageResponse>>> {
-    let repo = MessageRepository::new(pool);
+    let repo = repositories.messages.clone();
 
     let message = repo
         .read(&id)
@@ -235,11 +234,11 @@ pub async fn get_message(
     )
 )]
 pub async fn list_messages(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Query(query): Query<ListMessagesQuery>,
 ) -> ServerResult<Json<ApiResponse<Vec<MessageResponse>>>> {
-    let repo = MessageRepository::new(pool);
+    let repo = repositories.messages.clone();
 
     // Validate pagination parameters
     let limit = query.limit.map(|l| l.min(100)).or(Some(50));
@@ -301,11 +300,11 @@ pub async fn list_messages(
     )
 )]
 pub async fn delete_message(
-    State(pool): State<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> ServerResult<StatusCode> {
-    let repo = MessageRepository::new(pool);
+    let repo = repositories.messages.clone();
 
     // First check if message exists and belongs to user's organization
     let message = repo
