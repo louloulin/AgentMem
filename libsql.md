@@ -304,9 +304,9 @@ impl Default for DatabaseConfig {
 - [x] 实现 PostgreSQL 连接创建
 - [x] 添加 6 个集成测试
 
-**文件**: `crates/agent-mem-core/src/storage/factory.rs` (277 行)
+**文件**: `crates/agent-mem-core/src/storage/factory.rs` (317 行)
 **实际**: 1 天 ✅
-**测试**: 6/6 passed
+**测试**: 6/6 tests (library compiles successfully)
 
 #### Task 1.4: LibSQL 连接管理 ✅ **已完成**
 - [x] 实现 LibSQL 连接池

@@ -16,8 +16,8 @@ use crate::storage::libsql::{
     LibSqlUserRepository,
 };
 
-#[cfg(feature = "postgres")]
-use crate::storage::user_repository::UserRepository as PgUserRepository;
+// Note: PostgreSQL repository implementations are being refactored.
+// The factory will return a clear error until Pg repositories implement the traits.
 
 /// Container for all repository trait objects
 ///
@@ -78,7 +78,7 @@ impl RepositoryFactory {
     /// # async fn example() -> agent_mem_traits::Result<()> {
     /// let config = DatabaseConfig::from_env();
     /// let repos = RepositoryFactory::create_repositories(&config).await?;
-    /// 
+    ///
     /// // Use repositories
     /// let users = repos.users.list(10, 0).await?;
     /// # Ok(())
@@ -152,17 +152,17 @@ impl RepositoryFactory {
 
         // Run migrations if auto_migrate is enabled
         if config.auto_migrate {
-            sqlx::migrate!("./migrations")
-                .run(&pool)
+            // Use our internal Rust-based migrations module
+            crate::storage::migrations::run_migrations(&pool)
                 .await
                 .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {}", e)))?;
         }
 
-        // Create repository instances
-        Ok(Repositories {
-            users: Arc::new(PgUserRepository::new(pool.clone())),
-            // TODO: Add other repositories as they are implemented
-        })
+        // PostgreSQL repositories are under refactor and not yet implementing traits.
+        // Return a clear error to callers for now.
+        Err(AgentMemError::ConfigError(
+            "PostgreSQL repositories are not yet implemented for the new trait-based factory.".to_string(),
+        ))
     }
 
     /// Create PostgreSQL-backed repositories (fallback when feature is disabled)
@@ -201,7 +201,7 @@ mod tests {
         assert!(repos.is_ok(), "Failed to create LibSQL repositories: {:?}", repos.err());
 
         let repos = repos.unwrap();
-        
+
         // Test that we can use the user repository
         let users = repos.users.list(10, 0).await;
         assert!(users.is_ok(), "Failed to list users: {:?}", users.err());
@@ -293,5 +293,24 @@ mod tests {
         let err_msg = result.err().unwrap().to_string();
         assert!(err_msg.contains("PostgreSQL support is not enabled"));
     }
+
+    #[tokio::test]
+    #[cfg(feature = "postgres")]
+    async fn test_postgres_factory_returns_error_until_implemented() {
+        let config = DatabaseConfig {
+            backend: DatabaseBackend::Postgres,
+            url: "postgresql://localhost/agentmem".to_string(),
+            pool: PoolConfig::default(),
+            auto_migrate: false,
+            log_queries: false,
+            slow_query_threshold_ms: 1000,
+        };
+
+        let result = RepositoryFactory::create_repositories(&config).await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("PostgreSQL repositories are not yet implemented"));
+    }
+
 }
 
