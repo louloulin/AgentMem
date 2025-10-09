@@ -214,3 +214,54 @@ pub trait BlockRepositoryTrait: Send + Sync {
     /// List all blocks
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Block>>;
 }
+
+/// Memory Association model
+#[derive(Debug, Clone)]
+pub struct MemoryAssociation {
+    pub id: String,
+    pub organization_id: String,
+    pub user_id: String,
+    pub agent_id: String,
+    pub from_memory_id: String,
+    pub to_memory_id: String,
+    pub association_type: String,
+    pub strength: f32,
+    pub confidence: f32,
+    pub metadata: serde_json::Value,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Association repository trait
+#[async_trait]
+pub trait AssociationRepositoryTrait: Send + Sync {
+    /// Create a new association
+    async fn create(&self, association: &MemoryAssociation) -> Result<MemoryAssociation>;
+
+    /// Find association by ID
+    async fn find_by_id(&self, id: &str) -> Result<Option<MemoryAssociation>>;
+
+    /// Get all associations for a memory
+    async fn find_by_memory_id(&self, memory_id: &str, user_id: &str) -> Result<Vec<MemoryAssociation>>;
+
+    /// Get associations by type
+    async fn find_by_type(&self, memory_id: &str, user_id: &str, association_type: &str) -> Result<Vec<MemoryAssociation>>;
+
+    /// Update association strength
+    async fn update_strength(&self, id: &str, strength: f32) -> Result<()>;
+
+    /// Delete association
+    async fn delete(&self, id: &str) -> Result<()>;
+
+    /// Get association count
+    async fn count_by_user(&self, user_id: &str) -> Result<i64>;
+
+    /// Get association count by type
+    async fn count_by_type(&self, user_id: &str) -> Result<Vec<(String, i64)>>;
+
+    /// Get average strength
+    async fn avg_strength(&self, user_id: &str) -> Result<f32>;
+
+    /// Get strongest associations
+    async fn find_strongest(&self, user_id: &str, limit: i64) -> Result<Vec<MemoryAssociation>>;
+}
