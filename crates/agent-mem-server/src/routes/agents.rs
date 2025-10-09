@@ -238,7 +238,7 @@ pub async fn get_agent(
     let repo = repositories.agents.clone();
 
     let agent = repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -283,7 +283,7 @@ pub async fn update_agent(
     let repo = repositories.agents.clone();
 
     let mut agent = repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -369,7 +369,7 @@ pub async fn delete_agent(
 
     // First check if agent exists and belongs to user's organization
     let agent = repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -419,7 +419,7 @@ pub async fn list_agents(
     let offset = query.offset.unwrap_or(0).max(0); // Ensure non-negative
 
     let agents = repo
-        .list_by_organization(&auth_user.org_id, Some(limit), Some(offset))
+        .find_by_organization_id(&auth_user.org_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to list agents: {e}")))?;
 
@@ -458,15 +458,14 @@ pub async fn send_message_to_agent(
     Path(id): Path<String>,
     Json(req): Json<SendMessageRequest>,
 ) -> ServerResult<Json<ApiResponse<SendMessageResponse>>> {
-    use agent_mem_core::storage::message_repository::MessageRepository;
     use agent_mem_core::storage::models::Message;
 
-    let agent_repo = AgentRepository::new(pool.clone());
-    let message_repo = MessageRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
+    let message_repo = repositories.messages.clone();
 
     // Validate agent exists and belongs to user's organization
     let agent = agent_repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -597,11 +596,11 @@ pub async fn get_agent_state(
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
 ) -> ServerResult<Json<ApiResponse<AgentStateResponse>>> {
-    let agent_repo = AgentRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
 
     // Get agent
     let agent = agent_repo
-        .read(&agent_id)
+        .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to get agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
@@ -648,11 +647,11 @@ pub async fn update_agent_state(
     Path(agent_id): Path<String>,
     Json(req): Json<UpdateAgentStateRequest>,
 ) -> ServerResult<Json<ApiResponse<AgentStateResponse>>> {
-    let agent_repo = AgentRepository::new(pool.clone());
+    let agent_repo = repositories.agents.clone();
 
     // Get agent
     let mut agent = agent_repo
-        .read(&agent_id)
+        .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to get agent: {e}")))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;

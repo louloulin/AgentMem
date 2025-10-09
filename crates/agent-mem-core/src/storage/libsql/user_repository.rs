@@ -25,13 +25,21 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     async fn create(&self, user: &User) -> Result<User> {
         let conn = self.conn.lock().await;
 
+        // Serialize roles to JSON
+        let roles_json = user.roles.as_ref()
+            .map(|r| serde_json::to_string(r).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|| "[]".to_string());
+
         conn.execute(
-            "INSERT INTO users (id, organization_id, name, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO users (id, organization_id, name, email, password_hash, roles, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             libsql::params![
                 user.id.clone(),
                 user.organization_id.clone(),
                 user.name.clone(),
+                user.email.clone(),
+                user.password_hash.clone(),
+                roles_json,
                 user.status.clone(),
                 user.timezone.clone(),
                 user.created_at.timestamp(),
@@ -49,10 +57,10 @@ impl UserRepositoryTrait for LibSqlUserRepository {
 
     async fn find_by_id(&self, id: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().await;
-        
+
         let mut rows = conn
             .query(
-                "SELECT id, organization_id, name, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id 
+                "SELECT id, organization_id, name, email, password_hash, roles, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
                  FROM users WHERE id = ? AND is_deleted = 0",
                 libsql::params![id],
             )
@@ -60,35 +68,104 @@ impl UserRepositoryTrait for LibSqlUserRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query user: {}", e)))?;
 
         if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
-            let created_at_ts: i64 = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let updated_at_ts: i64 = row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let is_deleted_int: i64 = row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let updated_at_ts: i64 = row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let is_deleted_int: i64 = row.get(10).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+
+            // Deserialize roles from JSON
+            let roles_str: String = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let roles: Option<Vec<String>> = serde_json::from_str(&roles_str).ok();
 
             Ok(Some(User {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 name: row.get(2).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                status: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                timezone: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                email: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                password_hash: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                roles,
+                status: row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                timezone: row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 is_deleted: is_deleted_int != 0,
-                created_by_id: row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                last_updated_by_id: row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                created_by_id: row.get(11).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                last_updated_by_id: row.get(12).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
             }))
         } else {
             Ok(None)
         }
     }
 
-    async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<User>> {
+    async fn find_by_email(&self, email: &str, org_id: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().await;
-        
+
         let mut rows = conn
             .query(
-                "SELECT id, organization_id, name, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id 
+                "SELECT id, organization_id, name, email, password_hash, roles, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
+                 FROM users WHERE email = ? AND organization_id = ? AND is_deleted = 0",
+                libsql::params![email, org_id],
+            )
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query user by email: {}", e)))?;
+
+        if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
+            let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let updated_at_ts: i64 = row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let is_deleted_int: i64 = row.get(10).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+
+            // Deserialize roles from JSON
+            let roles_str: String = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let roles: Option<Vec<String>> = serde_json::from_str(&roles_str).ok();
+
+            Ok(Some(User {
+                id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                name: row.get(2).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                email: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                password_hash: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                roles,
+                status: row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                timezone: row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
+                    .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
+                updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
+                    .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
+                is_deleted: is_deleted_int != 0,
+                created_by_id: row.get(11).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                last_updated_by_id: row.get(12).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn email_exists(&self, email: &str, org_id: &str) -> Result<bool> {
+        let conn = self.conn.lock().await;
+
+        let mut rows = conn
+            .query(
+                "SELECT COUNT(*) FROM users WHERE email = ? AND organization_id = ? AND is_deleted = 0",
+                libsql::params![email, org_id],
+            )
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to check email existence: {}", e)))?;
+
+        if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
+            let count: i64 = row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            Ok(count > 0)
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<User>> {
+        let conn = self.conn.lock().await;
+
+        let mut rows = conn
+            .query(
+                "SELECT id, organization_id, name, email, password_hash, roles, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
                  FROM users WHERE organization_id = ? AND is_deleted = 0",
                 libsql::params![org_id],
             )
@@ -97,23 +174,30 @@ impl UserRepositoryTrait for LibSqlUserRepository {
 
         let mut users = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
-            let created_at_ts: i64 = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let updated_at_ts: i64 = row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let is_deleted_int: i64 = row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let updated_at_ts: i64 = row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let is_deleted_int: i64 = row.get(10).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+
+            // Deserialize roles from JSON
+            let roles_str: String = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let roles: Option<Vec<String>> = serde_json::from_str(&roles_str).ok();
 
             users.push(User {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 name: row.get(2).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                status: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                timezone: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                email: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                password_hash: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                roles,
+                status: row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                timezone: row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 is_deleted: is_deleted_int != 0,
-                created_by_id: row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                last_updated_by_id: row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                created_by_id: row.get(11).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                last_updated_by_id: row.get(12).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
             });
         }
 
@@ -142,6 +226,19 @@ impl UserRepositoryTrait for LibSqlUserRepository {
         Ok(user.clone())
     }
 
+    async fn update_password(&self, user_id: &str, password_hash: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+
+        conn.execute(
+            "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND is_deleted = 0",
+            libsql::params![password_hash, chrono::Utc::now().timestamp(), user_id],
+        )
+        .await
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update password: {}", e)))?;
+
+        Ok(())
+    }
+
     async fn delete(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().await;
         
@@ -157,10 +254,10 @@ impl UserRepositoryTrait for LibSqlUserRepository {
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
         let conn = self.conn.lock().await;
-        
+
         let mut rows = conn
             .query(
-                "SELECT id, organization_id, name, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id 
+                "SELECT id, organization_id, name, email, password_hash, roles, status, timezone, created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
                  FROM users WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 libsql::params![limit, offset],
             )
@@ -169,23 +266,30 @@ impl UserRepositoryTrait for LibSqlUserRepository {
 
         let mut users = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
-            let created_at_ts: i64 = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let updated_at_ts: i64 = row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
-            let is_deleted_int: i64 = row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let updated_at_ts: i64 = row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let is_deleted_int: i64 = row.get(10).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+
+            // Deserialize roles from JSON
+            let roles_str: String = row.get(5).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
+            let roles: Option<Vec<String>> = serde_json::from_str(&roles_str).ok();
 
             users.push(User {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 name: row.get(2).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                status: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                timezone: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                email: row.get(3).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                password_hash: row.get(4).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                roles,
+                status: row.get(6).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                timezone: row.get(7).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
                     .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?,
                 is_deleted: is_deleted_int != 0,
-                created_by_id: row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
-                last_updated_by_id: row.get(9).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                created_by_id: row.get(11).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
+                last_updated_by_id: row.get(12).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
             });
         }
 

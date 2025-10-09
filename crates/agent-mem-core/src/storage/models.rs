@@ -35,6 +35,9 @@ pub struct User {
     pub id: String,
     pub organization_id: String,
     pub name: String,
+    pub email: String,
+    pub password_hash: String,
+    pub roles: Option<Vec<String>>, // JSON array of roles
     pub status: String, // "active" or "inactive"
     pub timezone: String,
     pub created_at: DateTime<Utc>,
@@ -253,12 +256,15 @@ impl Organization {
 }
 
 impl User {
-    pub fn new(organization_id: String, name: String, timezone: String) -> Self {
+    pub fn new(organization_id: String, name: String, email: String, password_hash: String, timezone: String) -> Self {
         let now = Utc::now();
         Self {
             id: generate_id("user"),
             organization_id,
             name,
+            email,
+            password_hash,
+            roles: Some(vec!["user".to_string()]), // Default role
             status: "active".to_string(),
             timezone,
             created_at: now,

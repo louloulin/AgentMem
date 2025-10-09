@@ -172,7 +172,7 @@ pub async fn get_organization(
 
     // Fetch organization from database
     let org = org_repo
-        .read(&org_id)
+        .find_by_id(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
         .ok_or_else(|| ServerError::NotFound("Organization not found".to_string()))?;
@@ -237,7 +237,7 @@ pub async fn update_organization(
 
     // Fetch existing organization
     let mut org = org_repo
-        .read(&org_id)
+        .find_by_id(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
         .ok_or_else(|| ServerError::NotFound("Organization not found".to_string()))?;

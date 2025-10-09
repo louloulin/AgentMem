@@ -15,11 +15,20 @@ pub trait UserRepositoryTrait: Send + Sync {
     /// Find user by ID
     async fn find_by_id(&self, id: &str) -> Result<Option<User>>;
 
+    /// Find user by email and organization
+    async fn find_by_email(&self, email: &str, org_id: &str) -> Result<Option<User>>;
+
+    /// Check if email exists in organization
+    async fn email_exists(&self, email: &str, org_id: &str) -> Result<bool>;
+
     /// Find user by organization ID
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<User>>;
 
     /// Update user
     async fn update(&self, user: &User) -> Result<User>;
+
+    /// Update user password
+    async fn update_password(&self, user_id: &str, password_hash: &str) -> Result<()>;
 
     /// Delete user (soft delete)
     async fn delete(&self, id: &str) -> Result<()>;
@@ -86,6 +95,9 @@ pub trait ToolRepositoryTrait: Send + Sync {
 
     /// Find tools by organization ID
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<Tool>>;
+
+    /// Find tools by tags
+    async fn find_by_tags(&self, org_id: &str, tags: &[String]) -> Result<Vec<Tool>>;
 
     /// Update tool
     async fn update(&self, tool: &Tool) -> Result<Tool>;

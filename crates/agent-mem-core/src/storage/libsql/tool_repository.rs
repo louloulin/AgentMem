@@ -131,9 +131,9 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<Tool>> {
         let conn = self.conn.lock().await;
 
-        let query = "SELECT 
-            id, organization_id, name, description, json_schema, 
-            source_type, source_code, tags, metadata_, 
+        let query = "SELECT
+            id, organization_id, name, description, json_schema,
+            source_type, source_code, tags, metadata_,
             created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
         FROM tools WHERE organization_id = ? AND is_deleted = 0 ORDER BY created_at DESC";
 
@@ -166,6 +166,78 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 source_type: row.get(5).unwrap(),
                 source_code: row.get(6).unwrap(),
                 tags: Self::deserialize_tags(row.get(7).unwrap()),
+                metadata_: Self::deserialize_json(row.get(8).unwrap()),
+                created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
+                    .unwrap_or_else(|| Utc::now()),
+                updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
+                    .unwrap_or_else(|| Utc::now()),
+                is_deleted: is_deleted_int != 0,
+                created_by_id: row.get(12).unwrap(),
+                last_updated_by_id: row.get(13).unwrap(),
+            };
+
+            tools.push(tool);
+        }
+
+        Ok(tools)
+    }
+
+    async fn find_by_tags(&self, org_id: &str, tags: &[String]) -> Result<Vec<Tool>> {
+        if tags.is_empty() {
+            return self.find_by_organization_id(org_id).await;
+        }
+
+        let conn = self.conn.lock().await;
+
+        // Build query to find tools that have any of the specified tags
+        // Tags are stored as JSON array, so we need to check if any tag matches
+        let query = "SELECT
+            id, organization_id, name, description, json_schema,
+            source_type, source_code, tags, metadata_,
+            created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
+        FROM tools WHERE organization_id = ? AND is_deleted = 0 ORDER BY created_at DESC";
+
+        let mut stmt = conn
+            .prepare(query)
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {}", e)))?;
+
+        let mut rows = stmt
+            .query([org_id])
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?;
+
+        let mut tools = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+        {
+            let created_at_ts: i64 = row.get(9).unwrap();
+            let updated_at_ts: i64 = row.get(10).unwrap();
+            let is_deleted_int: i64 = row.get(11).unwrap();
+            let tool_tags = Self::deserialize_tags(row.get(7).unwrap());
+
+            // Check if tool has any of the requested tags
+            if let Some(ref tag_list) = tool_tags {
+                let has_matching_tag = tags.iter().any(|tag| tag_list.contains(tag));
+                if !has_matching_tag {
+                    continue;
+                }
+            } else {
+                // No tags, skip this tool
+                continue;
+            }
+
+            let tool = Tool {
+                id: row.get(0).unwrap(),
+                organization_id: row.get(1).unwrap(),
+                name: row.get(2).unwrap(),
+                description: row.get(3).unwrap(),
+                json_schema: Self::deserialize_json(row.get(4).unwrap()),
+                source_type: row.get(5).unwrap(),
+                source_code: row.get(6).unwrap(),
+                tags: tool_tags,
                 metadata_: Self::deserialize_json(row.get(8).unwrap()),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
                     .unwrap_or_else(|| Utc::now()),

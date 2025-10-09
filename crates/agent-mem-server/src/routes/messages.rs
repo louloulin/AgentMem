@@ -197,7 +197,7 @@ pub async fn get_message(
     let repo = repositories.messages.clone();
 
     let message = repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read message: {e}")))?
         .ok_or_else(|| ServerError::not_found("Message not found"))?;
@@ -245,13 +245,13 @@ pub async fn list_messages(
     let offset = query.offset.map(|o| o.max(0)).or(Some(0));
 
     let messages = if let Some(agent_id) = query.agent_id {
-        repo.list_by_agent(&agent_id, limit, offset)
+        repo.find_by_agent_id(&agent_id, limit, offset)
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to list messages: {e}")))?
     } else {
         // For user_id or organization-wide listing, use list() and filter
         let all_messages = repo
-            .list(limit, offset)
+            .find_by_id(limit, offset)
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to list messages: {e}")))?;
         all_messages
@@ -308,7 +308,7 @@ pub async fn delete_message(
 
     // First check if message exists and belongs to user's organization
     let message = repo
-        .read(&id)
+        .find_by_id(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read message: {e}")))?
         .ok_or_else(|| ServerError::not_found("Message not found"))?;
