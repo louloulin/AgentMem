@@ -9,10 +9,7 @@
 
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::AuthUser;
-use agent_mem_core::storage::{
-    models::Organization,
-    repository::{OrganizationRepository, Repository},
-};
+use agent_mem_core::storage::{factory::Repositories, models::Organization};
 use axum::{
     extract::{Extension, Path, Query},
     http::StatusCode,
@@ -20,7 +17,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use std::sync::Arc;
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
@@ -94,7 +91,7 @@ pub struct ListOrganizationsQuery {
     )
 )]
 pub async fn create_organization(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(request): Json<CreateOrganizationRequest>,
 ) -> ServerResult<impl IntoResponse> {
@@ -103,8 +100,8 @@ pub async fn create_organization(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create organization repository
-    let org_repo = OrganizationRepository::new(db_pool);
+    // Get organization repository from repositories container
+    let org_repo = repositories.organizations.clone();
 
     // Create organization in database
     let org_id = uuid::Uuid::new_v4().to_string();
@@ -159,7 +156,7 @@ pub async fn create_organization(
     )
 )]
 pub async fn get_organization(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(org_id): Path<String>,
 ) -> ServerResult<impl IntoResponse> {
@@ -170,8 +167,8 @@ pub async fn get_organization(
         ));
     }
 
-    // Create organization repository
-    let org_repo = OrganizationRepository::new(db_pool);
+    // Get organization repository from repositories container
+    let org_repo = repositories.organizations.clone();
 
     // Fetch organization from database
     let org = org_repo
@@ -218,7 +215,7 @@ pub async fn get_organization(
     )
 )]
 pub async fn update_organization(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(org_id): Path<String>,
     Json(request): Json<UpdateOrganizationRequest>,
@@ -235,8 +232,8 @@ pub async fn update_organization(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create organization repository
-    let org_repo = OrganizationRepository::new(db_pool);
+    // Get organization repository from repositories container
+    let org_repo = repositories.organizations.clone();
 
     // Fetch existing organization
     let mut org = org_repo
@@ -294,7 +291,7 @@ pub async fn update_organization(
     )
 )]
 pub async fn list_organization_members(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(org_id): Path<String>,
     Query(_query): Query<ListOrganizationsQuery>,
@@ -306,8 +303,8 @@ pub async fn list_organization_members(
         ));
     }
 
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Fetch members from database
     let users = user_repo
@@ -348,7 +345,7 @@ pub async fn list_organization_members(
     )
 )]
 pub async fn delete_organization(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(org_id): Path<String>,
 ) -> ServerResult<impl IntoResponse> {
@@ -357,8 +354,8 @@ pub async fn delete_organization(
         return Err(ServerError::Forbidden("Admin role required".to_string()));
     }
 
-    // Create organization repository
-    let org_repo = OrganizationRepository::new(db_pool);
+    // Get organization repository from repositories container
+    let org_repo = repositories.organizations.clone();
 
     // Delete organization from database (soft delete)
     let deleted = org_repo

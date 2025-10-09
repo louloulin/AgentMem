@@ -9,6 +9,7 @@
 use crate::auth::{AuthService, PasswordService};
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::{log_security_event, AuthUser, SecurityEvent};
+use agent_mem_core::storage::factory::Repositories;
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
@@ -16,7 +17,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use std::sync::Arc;
 use utoipa::ToSchema;
 use validator::Validate;
 
@@ -88,7 +89,7 @@ pub struct ChangePasswordRequest {
     tag = "users"
 )]
 pub async fn register_user(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Json(request): Json<RegisterRequest>,
 ) -> ServerResult<impl IntoResponse> {
     // Validate request
@@ -96,8 +97,8 @@ pub async fn register_user(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Check if user already exists
     let exists = user_repo
@@ -158,7 +159,7 @@ pub async fn register_user(
     tag = "users"
 )]
 pub async fn login_user(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Json(request): Json<LoginRequest>,
 ) -> ServerResult<impl IntoResponse> {
     // Validate request
@@ -166,8 +167,8 @@ pub async fn login_user(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Fetch user from database
     let user = user_repo
@@ -240,11 +241,11 @@ pub async fn login_user(
     )
 )]
 pub async fn get_current_user(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
 ) -> ServerResult<impl IntoResponse> {
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Fetch user from database
     let user = user_repo
@@ -281,7 +282,7 @@ pub async fn get_current_user(
     )
 )]
 pub async fn update_current_user(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(request): Json<UpdateUserRequest>,
 ) -> ServerResult<impl IntoResponse> {
@@ -290,8 +291,8 @@ pub async fn update_current_user(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Update user in database
     let user = user_repo
@@ -334,7 +335,7 @@ pub async fn update_current_user(
     )
 )]
 pub async fn change_password(
-    Extension(db_pool): Extension<PgPool>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> ServerResult<impl IntoResponse> {
@@ -343,8 +344,8 @@ pub async fn change_password(
         .validate()
         .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
 
-    // Create user repository
-    let user_repo = agent_mem_core::storage::user_repository::UserRepository::new(db_pool);
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
 
     // Fetch user to verify current password
     let user = user_repo
@@ -406,6 +407,7 @@ pub async fn change_password(
     )
 )]
 pub async fn get_user_by_id(
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(user_id): Path<String>,
 ) -> ServerResult<impl IntoResponse> {
@@ -414,15 +416,23 @@ pub async fn get_user_by_id(
         return Err(ServerError::Forbidden("Admin role required".to_string()));
     }
 
-    // TODO: Fetch user from database
-    // For now, return mock data
+    // Get user repository from repositories container
+    let user_repo = repositories.users.clone();
+
+    // Fetch user from database
+    let user_model = user_repo
+        .find_by_id(&user_id)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerError::NotFound(format!("User with id {} not found", user_id)))?;
+
     let user = UserResponse {
-        id: user_id,
-        email: "user@example.com".to_string(),
-        name: "Test User".to_string(),
-        organization_id: auth_user.org_id.clone(),
-        roles: vec!["user".to_string()],
-        created_at: chrono::Utc::now().timestamp(),
+        id: user_model.id,
+        email: user_model.email,
+        name: user_model.name,
+        organization_id: user_model.organization_id,
+        roles: user_model.roles,
+        created_at: user_model.created_at.timestamp(),
     };
 
     Ok(Json(user))
