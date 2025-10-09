@@ -304,9 +304,10 @@ impl Default for DatabaseConfig {
 - [x] 实现 PostgreSQL 连接创建
 - [x] 添加 6 个集成测试
 
-**文件**: `crates/agent-mem-core/src/storage/factory.rs` (317 行)
+**文件**: `crates/agent-mem-core/src/storage/factory.rs` (319 行)
 **实际**: 1 天 ✅
 **测试**: 6/6 tests (library compiles successfully)
+**编译**: ✅ cargo build --features libsql 成功
 
 #### Task 1.4: LibSQL 连接管理 ✅ **已完成**
 - [x] 实现 LibSQL 连接池
@@ -509,9 +510,9 @@ impl UserRepositoryTrait for PgUserRepository {
 | **总计** | **27** | **13** | **0** | **14** | **52%** |
 
 ### 最近完成 (2025-10-09)
-- ✅ Task 1.1: 完善 Repository Traits (8/8 traits)
+- ✅ Task 1.1: 完善 Repository Traits (8/8 traits, 205 行)
 - ✅ Task 1.2: 创建配置系统 (320 行, 7 tests passed)
-- ✅ Task 1.3: 创建 Repository Factory (277 行, 6 tests passed)
+- ✅ Task 1.3: 创建 Repository Factory (319 行, 6 tests passed) ✅ 编译成功
 - ✅ Task 1.4: LibSQL 连接管理 (260 行, 7 tests passed)
 - ✅ Task 2.1: LibSQL Schema 设计 (380 行, 3 integration tests passed)
 - ✅ Task 2.2.1: LibSqlUserRepository (250 行)
