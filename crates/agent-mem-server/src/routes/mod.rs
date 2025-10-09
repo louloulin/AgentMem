@@ -1,19 +1,22 @@
 //! HTTP routes for the AgentMem API
 
+// Core routes (work with both LibSQL and PostgreSQL)
+pub mod docs;
+pub mod health;
+pub mod memory;
+pub mod metrics;
+
+// Advanced routes (require PostgreSQL, need refactoring for LibSQL)
 #[cfg(feature = "postgres")]
 pub mod agents;
 #[cfg(feature = "postgres")]
 pub mod chat;
-pub mod docs;
 #[cfg(feature = "postgres")]
 pub mod graph;
-pub mod health;
 #[cfg(feature = "postgres")]
 pub mod mcp;
-pub mod memory;
 #[cfg(feature = "postgres")]
 pub mod messages;
-pub mod metrics;
 #[cfg(feature = "postgres")]
 pub mod organizations;
 #[cfg(feature = "postgres")]
@@ -160,15 +163,15 @@ pub async fn create_router(
             get(graph::get_memory_associations),
         )
         .route("/api/v1/graph/stats", get(graph::get_graph_stats))
-        // WebSocket endpoint
-        .route("/api/v1/ws", get(crate::websocket::websocket_handler))
-        // SSE endpoints
-        .route("/api/v1/sse", get(crate::sse::sse_handler))
-        .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response))
-        // Health and monitoring
-        .route("/health", get(health::health_check))
-        .route("/metrics", get(metrics::get_metrics))
-        .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
+            // WebSocket endpoint
+            .route("/api/v1/ws", get(crate::websocket::websocket_handler))
+            // SSE endpoints
+            .route("/api/v1/sse", get(crate::sse::sse_handler))
+            .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response));
+    }
+
+    // Add OpenAPI documentation and middleware (always included)
+    let app = app
         // OpenAPI documentation
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // Add shared state via Extension
@@ -187,7 +190,45 @@ pub async fn create_router(
     Ok(app)
 }
 
-/// OpenAPI documentation structure
+/// OpenAPI documentation structure (LibSQL version - basic routes only)
+#[cfg(not(feature = "postgres"))]
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        memory::add_memory,
+        memory::get_memory,
+        memory::update_memory,
+        memory::delete_memory,
+        memory::search_memories,
+        memory::get_memory_history,
+        memory::batch_add_memories,
+        memory::batch_delete_memories,
+        health::health_check,
+        metrics::get_metrics,
+        metrics::get_prometheus_metrics,
+    ),
+    components(
+        schemas(
+            crate::models::MemoryRequest,
+            crate::models::MemoryResponse,
+            crate::models::SearchRequest,
+            crate::models::SearchResponse,
+            crate::models::BatchRequest,
+            crate::models::BatchResponse,
+            crate::models::HealthResponse,
+            crate::models::MetricsResponse,
+        )
+    ),
+    tags(
+        (name = "memory", description = "Memory management endpoints"),
+        (name = "health", description = "Health check and monitoring"),
+        (name = "metrics", description = "Metrics and observability"),
+    )
+)]
+struct ApiDoc;
+
+/// OpenAPI documentation structure (PostgreSQL version - all routes)
+#[cfg(feature = "postgres")]
 #[derive(OpenApi)]
 #[openapi(
     paths(

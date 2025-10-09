@@ -7,10 +7,8 @@ use crate::{
     routes::create_router,
     telemetry::setup_telemetry,
 };
-use agent_mem_core::storage::{
-    config::{DatabaseBackend, DatabaseConfig},
-    factory::{Repositories, RepositoryFactory},
-};
+use agent_mem_config::{DatabaseBackend, DatabaseConfig};
+use agent_mem_core::storage::factory::{Repositories, RepositoryFactory};
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::Router;
 use std::net::SocketAddr;
@@ -40,8 +38,11 @@ impl MemoryServer {
             } else {
                 DatabaseBackend::Postgres
             },
-            connection_string: config.database_url.clone(),
+            url: config.database_url.clone(),
+            pool: Default::default(),
             auto_migrate: true,
+            log_queries: false,
+            slow_query_threshold_ms: 1000,
         };
 
         info!("Initializing database backend: {:?}", db_config.backend);

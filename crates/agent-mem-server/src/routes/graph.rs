@@ -1,5 +1,4 @@
 //! Graph API routes
-#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for knowledge graph visualization and querying.
 //!

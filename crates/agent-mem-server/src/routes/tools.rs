@@ -1,5 +1,4 @@
 //! Tool API routes
-#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for tool management and execution.
 //!

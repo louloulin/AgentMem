@@ -2,11 +2,9 @@
 //!
 //! This module provides middleware for JWT and API Key authentication.
 
-#![cfg(feature = "postgres")]
-
 use crate::auth::AuthService;
 use crate::error::{ServerError, ServerResult};
-use agent_mem_core::storage::api_key_repository::ApiKeyRepository;
+use agent_mem_core::storage::traits::ApiKeyRepositoryTrait;
 use axum::{extract::Request, http::header, middleware::Next, response::Response};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -77,7 +75,7 @@ pub async fn api_key_auth_middleware(
     // Get ApiKeyRepository from extensions (added by router)
     let api_key_repo = request
         .extensions()
-        .get::<Arc<ApiKeyRepository>>()
+        .get::<Arc<dyn ApiKeyRepositoryTrait>>()
         .ok_or_else(|| ServerError::Internal("ApiKeyRepository not found".to_string()))?;
 
     // Hash the API key for lookup
@@ -85,7 +83,7 @@ pub async fn api_key_auth_middleware(
 
     // Validate API key against database
     let api_key_model = api_key_repo
-        .validate(&key_hash)
+        .find_by_key(&key_hash)
         .await
         .map_err(|e| ServerError::Internal(format!("API key validation failed: {e}")))?
         .ok_or_else(|| ServerError::Unauthorized("Invalid or expired API key".to_string()))?;

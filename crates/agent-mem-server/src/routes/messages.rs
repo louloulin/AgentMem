@@ -1,5 +1,4 @@
 //! Message API routes
-#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for message management.
 //!

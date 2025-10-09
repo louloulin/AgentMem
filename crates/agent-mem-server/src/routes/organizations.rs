@@ -1,5 +1,4 @@
 //! Organization management API routes
-#![cfg(feature = "postgres")]
 //!
 //! This module provides REST API endpoints for organization management:
 //! - Create organization
