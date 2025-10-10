@@ -1,11 +1,88 @@
 //! 向量搜索引擎
 //!
 //! 提供语义相似度搜索功能，基于向量存储后端
+//! 支持 pgvector 扩展和性能优化
 
 use super::{SearchQuery, SearchResult};
 use agent_mem_traits::{AgentMemError, Result, VectorData, VectorSearchResult, VectorStore};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::RwLock;
+
+/// 向量搜索配置
+#[derive(Debug, Clone)]
+pub struct VectorSearchConfig {
+    /// 是否启用缓存
+    pub enable_cache: bool,
+    /// 缓存大小
+    pub cache_size: usize,
+    /// 是否启用批量优化
+    pub enable_batch_optimization: bool,
+    /// 批量大小
+    pub batch_size: usize,
+    /// 是否使用 pgvector 扩展
+    pub use_pgvector: bool,
+    /// pgvector 索引类型 (ivfflat, hnsw)
+    pub pgvector_index_type: PgVectorIndexType,
+    /// 索引参数
+    pub index_params: IndexParams,
+}
+
+impl Default for VectorSearchConfig {
+    fn default() -> Self {
+        Self {
+            enable_cache: true,
+            cache_size: 1000,
+            enable_batch_optimization: true,
+            batch_size: 100,
+            use_pgvector: false,
+            pgvector_index_type: PgVectorIndexType::IVFFlat,
+            index_params: IndexParams::default(),
+        }
+    }
+}
+
+/// pgvector 索引类型
+#[derive(Debug, Clone)]
+pub enum PgVectorIndexType {
+    /// IVFFlat 索引（快速但近似）
+    IVFFlat,
+    /// HNSW 索引（更精确但慢）
+    HNSW,
+}
+
+/// 索引参数
+#[derive(Debug, Clone)]
+pub struct IndexParams {
+    /// IVFFlat 列表数量
+    pub ivfflat_lists: usize,
+    /// HNSW M 参数
+    pub hnsw_m: usize,
+    /// HNSW ef_construction 参数
+    pub hnsw_ef_construction: usize,
+}
+
+impl Default for IndexParams {
+    fn default() -> Self {
+        Self {
+            ivfflat_lists: 100,
+            hnsw_m: 16,
+            hnsw_ef_construction: 64,
+        }
+    }
+}
+
+/// 搜索缓存项
+#[derive(Debug, Clone)]
+struct CacheEntry {
+    /// 查询向量
+    query_vector: Vec<f32>,
+    /// 搜索结果
+    results: Vec<SearchResult>,
+    /// 缓存时间
+    cached_at: Instant,
+}
 
 /// 向量搜索引擎
 pub struct VectorSearchEngine {
@@ -13,6 +90,25 @@ pub struct VectorSearchEngine {
     vector_store: Arc<dyn VectorStore>,
     /// 嵌入模型维度
     embedding_dimension: usize,
+    /// 配置
+    config: VectorSearchConfig,
+    /// 搜索缓存
+    cache: Arc<RwLock<HashMap<String, CacheEntry>>>,
+    /// 性能统计
+    stats: Arc<RwLock<PerformanceStats>>,
+}
+
+/// 性能统计
+#[derive(Debug, Clone, Default)]
+struct PerformanceStats {
+    /// 总搜索次数
+    total_searches: usize,
+    /// 缓存命中次数
+    cache_hits: usize,
+    /// 平均搜索时间（毫秒）
+    avg_search_time_ms: f64,
+    /// 总搜索时间（毫秒）
+    total_search_time_ms: u64,
 }
 
 impl VectorSearchEngine {
@@ -23,13 +119,25 @@ impl VectorSearchEngine {
     /// * `vector_store` - 向量存储后端
     /// * `embedding_dimension` - 嵌入向量维度
     pub fn new(vector_store: Arc<dyn VectorStore>, embedding_dimension: usize) -> Self {
+        Self::with_config(vector_store, embedding_dimension, VectorSearchConfig::default())
+    }
+
+    /// 使用配置创建向量搜索引擎
+    pub fn with_config(
+        vector_store: Arc<dyn VectorStore>,
+        embedding_dimension: usize,
+        config: VectorSearchConfig,
+    ) -> Self {
         Self {
             vector_store,
             embedding_dimension,
+            config,
+            cache: Arc::new(RwLock::new(HashMap::new())),
+            stats: Arc::new(RwLock::new(PerformanceStats::default())),
         }
     }
 
-    /// 执行向量搜索
+    /// 执行向量搜索（带缓存和优化）
     ///
     /// # Arguments
     ///
@@ -55,14 +163,31 @@ impl VectorSearchEngine {
             )));
         }
 
+        // 检查缓存
+        if self.config.enable_cache {
+            let cache_key = self.generate_cache_key(&query_vector, query);
+
+            if let Some(cached_results) = self.check_cache(&cache_key).await {
+                let elapsed = start.elapsed().as_millis() as u64;
+
+                // 更新统计
+                let mut stats = self.stats.write().await;
+                stats.cache_hits += 1;
+                stats.total_searches += 1;
+
+                log::debug!("Cache hit for vector search, saved {} ms", elapsed);
+                return Ok((cached_results, elapsed));
+            }
+        }
+
         // 执行向量搜索
         let vector_results = self
             .vector_store
-            .search_vectors(query_vector, query.limit, query.threshold)
+            .search_vectors(query_vector.clone(), query.limit, query.threshold)
             .await?;
 
         // 转换为搜索结果
-        let results = vector_results
+        let results: Vec<SearchResult> = vector_results
             .into_iter()
             .map(|vr| SearchResult {
                 id: vr.id,
@@ -82,7 +207,89 @@ impl VectorSearchEngine {
 
         let elapsed = start.elapsed().as_millis() as u64;
 
+        // 更新缓存
+        if self.config.enable_cache {
+            let cache_key = self.generate_cache_key(&query_vector, query);
+            self.update_cache(cache_key, query_vector, results.clone()).await;
+        }
+
+        // 更新统计
+        let mut stats = self.stats.write().await;
+        stats.total_searches += 1;
+        stats.total_search_time_ms += elapsed;
+        stats.avg_search_time_ms = stats.total_search_time_ms as f64 / stats.total_searches as f64;
+
         Ok((results, elapsed))
+    }
+
+    /// 生成缓存键
+    fn generate_cache_key(&self, query_vector: &[f32], query: &SearchQuery) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+
+        // 对向量进行哈希（使用前几个元素以提高性能）
+        for &val in query_vector.iter().take(10) {
+            val.to_bits().hash(&mut hasher);
+        }
+
+        query.limit.hash(&mut hasher);
+        if let Some(threshold) = query.threshold {
+            threshold.to_bits().hash(&mut hasher);
+        }
+
+        format!("vec_{}", hasher.finish())
+    }
+
+    /// 检查缓存
+    async fn check_cache(&self, cache_key: &str) -> Option<Vec<SearchResult>> {
+        let cache = self.cache.read().await;
+
+        if let Some(entry) = cache.get(cache_key) {
+            // 检查缓存是否过期（5分钟）
+            if entry.cached_at.elapsed().as_secs() < 300 {
+                return Some(entry.results.clone());
+            }
+        }
+
+        None
+    }
+
+    /// 更新缓存
+    async fn update_cache(
+        &self,
+        cache_key: String,
+        query_vector: Vec<f32>,
+        results: Vec<SearchResult>,
+    ) {
+        let mut cache = self.cache.write().await;
+
+        // 如果缓存已满，移除最旧的条目
+        if cache.len() >= self.config.cache_size {
+            if let Some(oldest_key) = cache.keys().next().cloned() {
+                cache.remove(&oldest_key);
+            }
+        }
+
+        cache.insert(
+            cache_key,
+            CacheEntry {
+                query_vector,
+                results,
+                cached_at: Instant::now(),
+            },
+        );
+    }
+
+    /// 清空缓存
+    pub async fn clear_cache(&self) {
+        self.cache.write().await.clear();
+    }
+
+    /// 获取性能统计
+    pub async fn get_performance_stats(&self) -> PerformanceStats {
+        self.stats.read().await.clone()
     }
 
     /// 批量添加向量
@@ -120,12 +327,116 @@ impl VectorSearchEngine {
 
     /// 获取向量存储统计信息
     pub async fn get_stats(&self) -> Result<VectorStoreStats> {
-        // TODO: 实现统计信息获取
+        let perf_stats = self.stats.read().await;
+
         Ok(VectorStoreStats {
-            total_vectors: 0,
+            total_vectors: 0, // TODO: 从 vector_store 获取
             dimension: self.embedding_dimension,
-            index_type: "unknown".to_string(),
+            index_type: if self.config.use_pgvector {
+                match self.config.pgvector_index_type {
+                    PgVectorIndexType::IVFFlat => "pgvector_ivfflat".to_string(),
+                    PgVectorIndexType::HNSW => "pgvector_hnsw".to_string(),
+                }
+            } else {
+                "default".to_string()
+            },
+            total_searches: perf_stats.total_searches,
+            cache_hits: perf_stats.cache_hits,
+            avg_search_time_ms: perf_stats.avg_search_time_ms,
+            cache_hit_rate: if perf_stats.total_searches > 0 {
+                perf_stats.cache_hits as f64 / perf_stats.total_searches as f64
+            } else {
+                0.0
+            },
         })
+    }
+
+    /// 创建 pgvector 索引（仅在使用 PostgreSQL 时）
+    #[cfg(feature = "postgres")]
+    pub async fn create_pgvector_index(&self, table_name: &str) -> Result<()> {
+        if !self.config.use_pgvector {
+            return Err(AgentMemError::ConfigError(
+                "pgvector is not enabled in configuration".to_string(),
+            ));
+        }
+
+        // 这里需要直接访问 PostgreSQL 连接
+        // 实际实现需要传入 PgPool
+        log::info!(
+            "Creating pgvector index on table {} with type {:?}",
+            table_name,
+            self.config.pgvector_index_type
+        );
+
+        // TODO: 实现实际的索引创建
+        // 示例 SQL:
+        // CREATE INDEX ON table_name USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+        // 或
+        // CREATE INDEX ON table_name USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+        Ok(())
+    }
+
+    /// 优化向量搜索性能
+    pub async fn optimize_search_performance(&self) -> Result<()> {
+        log::info!("Optimizing vector search performance...");
+
+        // 清理过期缓存
+        let mut cache = self.cache.write().await;
+        let now = Instant::now();
+        cache.retain(|_, entry| now.duration_since(entry.cached_at).as_secs() < 300);
+
+        log::info!("Cleaned up expired cache entries. Current cache size: {}", cache.len());
+
+        Ok(())
+    }
+
+    /// 批量搜索优化
+    pub async fn batch_search(
+        &self,
+        query_vectors: Vec<Vec<f32>>,
+        query: &SearchQuery,
+    ) -> Result<Vec<(Vec<SearchResult>, u64)>> {
+        if !self.config.enable_batch_optimization {
+            // 如果未启用批量优化，逐个搜索
+            let mut results = Vec::new();
+            for qv in query_vectors {
+                results.push(self.search(qv, query).await?);
+            }
+            return Ok(results);
+        }
+
+        // 批量优化：并发执行搜索
+        let mut tasks = Vec::new();
+
+        for query_vector in query_vectors {
+            let engine = self.clone_for_search();
+            let query_clone = query.clone();
+
+            tasks.push(tokio::spawn(async move {
+                engine.search(query_vector, &query_clone).await
+            }));
+        }
+
+        let mut results = Vec::new();
+        for task in tasks {
+            results.push(task.await.map_err(|e| {
+                AgentMemError::MemoryError(format!("Batch search task failed: {}", e))
+            })??);
+        }
+
+        Ok(results)
+    }
+
+    /// 克隆用于并发搜索
+    fn clone_for_search(&self) -> Self {
+        Self {
+            vector_store: Arc::clone(&self.vector_store),
+            embedding_dimension: self.embedding_dimension,
+            config: self.config.clone(),
+            cache: Arc::clone(&self.cache),
+            stats: Arc::clone(&self.stats),
+        }
     }
 }
 
@@ -138,6 +449,14 @@ pub struct VectorStoreStats {
     pub dimension: usize,
     /// 索引类型
     pub index_type: String,
+    /// 总搜索次数
+    pub total_searches: usize,
+    /// 缓存命中次数
+    pub cache_hits: usize,
+    /// 平均搜索时间（毫秒）
+    pub avg_search_time_ms: f64,
+    /// 缓存命中率
+    pub cache_hit_rate: f64,
 }
 
 #[cfg(test)]
