@@ -102,8 +102,15 @@ impl PostgresStorage {
             id: row
                 .try_get("id")
                 .map_err(|e| CoreError::Database(format!("Failed to get id: {}", e)))?,
-            agent_id: "default".to_string(), // TODO: Store agent_id in DB
-            user_id: None,                   // TODO: Store user_id in DB
+
+            // ✅ Read agent_id from database, fallback to "default"
+            agent_id: row
+                .try_get("agent_id")
+                .unwrap_or_else(|_| "default".to_string()),
+
+            // ✅ Read user_id from database (optional field)
+            user_id: row.try_get("user_id").ok(),
+
             memory_type,
             content: row
                 .try_get("content")
@@ -111,7 +118,14 @@ impl PostgresStorage {
             importance: row
                 .try_get("importance")
                 .map_err(|e| CoreError::Database(format!("Failed to get importance: {}", e)))?,
-            embedding: None, // TODO: Store embedding in DB
+
+            // ✅ Read embedding from database (JSON format)
+            embedding: row
+                .try_get::<Option<String>, _>("embedding")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok()),
+
             created_at: created_at.timestamp(),
             last_accessed_at: last_accessed
                 .map(|dt| dt.timestamp())
@@ -120,9 +134,18 @@ impl PostgresStorage {
                 .try_get::<i64, _>("access_count")
                 .map(|v| v as u32)
                 .unwrap_or(0),
-            expires_at: None, // TODO: Store expires_at in DB
+
+            // ✅ Read expires_at from database, convert to timestamp
+            expires_at: row
+                .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at")
+                .ok()
+                .flatten()
+                .map(|dt| dt.timestamp()),
+
             metadata: metadata_map,
-            version: 1, // TODO: Store version in DB
+
+            // ✅ Read version from database, fallback to 1
+            version: row.try_get("version").unwrap_or(1),
         };
 
         use crate::hierarchy::{HierarchyMetadata, MemoryInheritance, MemoryPermissions};
