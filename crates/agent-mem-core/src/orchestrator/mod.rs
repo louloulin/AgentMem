@@ -52,6 +52,82 @@ pub struct ChatRequest {
     pub max_memories: usize,
 }
 
+impl ChatRequest {
+    /// 验证请求参数
+    pub fn validate(&self) -> Result<()> {
+        // 验证消息不为空
+        if self.message.trim().is_empty() {
+            return Err(AgentMemError::ValidationError(
+                "Message cannot be empty".to_string(),
+            ));
+        }
+
+        // 验证消息长度（最大 100KB）
+        if self.message.len() > 100_000 {
+            return Err(AgentMemError::ValidationError(
+                format!("Message too long: {} bytes (max 100KB)", self.message.len()),
+            ));
+        }
+
+        // 验证 agent_id 不为空
+        if self.agent_id.trim().is_empty() {
+            return Err(AgentMemError::ValidationError(
+                "Agent ID cannot be empty".to_string(),
+            ));
+        }
+
+        // 验证 agent_id 长度（最大 255 字符）
+        if self.agent_id.len() > 255 {
+            return Err(AgentMemError::ValidationError(
+                format!("Agent ID too long: {} characters (max 255)", self.agent_id.len()),
+            ));
+        }
+
+        // 验证 user_id 不为空
+        if self.user_id.trim().is_empty() {
+            return Err(AgentMemError::ValidationError(
+                "User ID cannot be empty".to_string(),
+            ));
+        }
+
+        // 验证 user_id 长度（最大 255 字符）
+        if self.user_id.len() > 255 {
+            return Err(AgentMemError::ValidationError(
+                format!("User ID too long: {} characters (max 255)", self.user_id.len()),
+            ));
+        }
+
+        // 验证 organization_id 不为空
+        if self.organization_id.trim().is_empty() {
+            return Err(AgentMemError::ValidationError(
+                "Organization ID cannot be empty".to_string(),
+            ));
+        }
+
+        // 验证 organization_id 长度（最大 255 字符）
+        if self.organization_id.len() > 255 {
+            return Err(AgentMemError::ValidationError(
+                format!("Organization ID too long: {} characters (max 255)", self.organization_id.len()),
+            ));
+        }
+
+        // 验证 max_memories 范围（1-1000）
+        if self.max_memories == 0 {
+            return Err(AgentMemError::ValidationError(
+                "max_memories must be at least 1".to_string(),
+            ));
+        }
+
+        if self.max_memories > 1000 {
+            return Err(AgentMemError::ValidationError(
+                format!("max_memories too large: {} (max 1000)", self.max_memories),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 /// 默认组织 ID
 fn default_organization_id() -> String {
     "default".to_string()
@@ -180,6 +256,9 @@ impl AgentOrchestrator {
     /// 7. 提取和更新记忆
     /// 8. 返回响应
     pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
+        // ✅ 验证请求参数
+        request.validate()?;
+
         info!("Starting conversation step for agent_id={}, user_id={}",
               request.agent_id, request.user_id);
 
@@ -250,6 +329,9 @@ impl AgentOrchestrator {
         request: ChatRequest,
         available_tools: &[FunctionDefinition],
     ) -> Result<ChatResponse> {
+        // ✅ 验证请求参数
+        request.validate()?;
+
         info!(
             "Starting conversation step with tools for agent_id={}, user_id={}",
             request.agent_id, request.user_id
