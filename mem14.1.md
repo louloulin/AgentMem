@@ -211,12 +211,17 @@
   - ✅ 更新所有测试用例
   - ✅ 支持向后兼容（使用 serde default）
 
-#### P1-4: 更新数据库 schema 添加缺失字段 (1-2 小时)
+#### P1-4: ~~更新数据库 schema 添加缺失字段~~ ✅ **已完成**
 - 优先级: P1
-- 工作量: 1-2 小时
-- 影响: 支持向量搜索、记忆过期等
-- 状态: 未开始
-- 缺失字段: embedding, expires_at, version, agent_id, user_id
+- 工作量: 0.5 小时
+- 影响: 支持向量搜索、记忆过期、乐观锁
+- 状态: ✅ 完成 (2025-01-10)
+- 修改内容:
+  - ✅ 为 5 个记忆表添加 embedding, expires_at, version 字段
+  - ✅ 创建 4 个新索引（expires_at 部分索引）
+  - ✅ 创建 SQL 迁移脚本 (20250110_add_missing_fields.sql)
+  - ✅ 实现向后兼容（ALTER TABLE IF NOT EXISTS）
+  - ✅ 所有测试通过 (21/21)
 
 #### P1-5: 实现 RetrievalOrchestrator (3-4 小时)
 - 优先级: P1

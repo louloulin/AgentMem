@@ -35,6 +35,9 @@ async fn create_episodic_events_table(pool: &PgPool) -> CoreResult<()> {
             details TEXT,
             importance_score REAL NOT NULL DEFAULT 0.0,
             metadata JSONB NOT NULL DEFAULT '{}',
+            embedding TEXT,
+            expires_at TIMESTAMPTZ,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -43,6 +46,19 @@ async fn create_episodic_events_table(pool: &PgPool) -> CoreResult<()> {
     .execute(pool)
     .await
     .map_err(|e| CoreError::Database(format!("Failed to create episodic_events table: {}", e)))?;
+
+    // Add columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS embedding TEXT")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }
@@ -62,6 +78,9 @@ async fn create_semantic_memory_table(pool: &PgPool) -> CoreResult<()> {
             source VARCHAR(255),
             tree_path TEXT[] NOT NULL DEFAULT '{}',
             metadata JSONB NOT NULL DEFAULT '{}',
+            embedding TEXT,
+            expires_at TIMESTAMPTZ,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -70,6 +89,19 @@ async fn create_semantic_memory_table(pool: &PgPool) -> CoreResult<()> {
     .execute(pool)
     .await
     .map_err(|e| CoreError::Database(format!("Failed to create semantic_memory table: {}", e)))?;
+
+    // Add columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS embedding TEXT")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }
@@ -89,6 +121,9 @@ async fn create_procedural_memory_table(pool: &PgPool) -> CoreResult<()> {
             success_rate REAL NOT NULL DEFAULT 0.0,
             execution_count INTEGER NOT NULL DEFAULT 0,
             metadata JSONB NOT NULL DEFAULT '{}',
+            embedding TEXT,
+            expires_at TIMESTAMPTZ,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -97,6 +132,19 @@ async fn create_procedural_memory_table(pool: &PgPool) -> CoreResult<()> {
     .execute(pool)
     .await
     .map_err(|e| CoreError::Database(format!("Failed to create procedural_memory table: {}", e)))?;
+
+    // Add columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS embedding TEXT")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }
@@ -114,6 +162,9 @@ async fn create_core_memory_table(pool: &PgPool) -> CoreResult<()> {
             category VARCHAR(100) NOT NULL,
             is_mutable BOOLEAN NOT NULL DEFAULT TRUE,
             metadata JSONB NOT NULL DEFAULT '{}',
+            embedding TEXT,
+            expires_at TIMESTAMPTZ,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE(user_id, agent_id, key)
@@ -123,6 +174,19 @@ async fn create_core_memory_table(pool: &PgPool) -> CoreResult<()> {
     .execute(pool)
     .await
     .map_err(|e| CoreError::Database(format!("Failed to create core_memory table: {}", e)))?;
+
+    // Add columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE core_memory ADD COLUMN IF NOT EXISTS embedding TEXT")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE core_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE core_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }
@@ -140,6 +204,8 @@ async fn create_working_memory_table(pool: &PgPool) -> CoreResult<()> {
             priority INTEGER NOT NULL DEFAULT 0,
             expires_at TIMESTAMPTZ,
             metadata JSONB NOT NULL DEFAULT '{}',
+            embedding TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
         "#,
@@ -147,6 +213,15 @@ async fn create_working_memory_table(pool: &PgPool) -> CoreResult<()> {
     .execute(pool)
     .await
     .map_err(|e| CoreError::Database(format!("Failed to create working_memory table: {}", e)))?;
+
+    // Add columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE working_memory ADD COLUMN IF NOT EXISTS embedding TEXT")
+        .execute(pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE working_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
+        .execute(pool)
+        .await;
 
     Ok(())
 }
@@ -229,6 +304,27 @@ async fn create_memory_indexes(pool: &PgPool) -> CoreResult<()> {
         .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_working_priority ON working_memory(priority DESC)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+
+    // Indexes for new fields (expires_at)
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_episodic_expires ON episodic_events(expires_at) WHERE expires_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_semantic_expires ON semantic_memory(expires_at) WHERE expires_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_procedural_expires ON procedural_memory(expires_at) WHERE expires_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_core_expires ON core_memory(expires_at) WHERE expires_at IS NOT NULL")
         .execute(pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
