@@ -69,36 +69,297 @@ impl ProceduralAgent {
     }
 
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {
-        let procedure = parameters.get("procedure").ok_or_else(|| {
-            AgentError::InvalidParameters("Missing 'procedure' parameter".to_string())
-        })?;
+        // Use actual procedural memory store if available
+        if let Some(store) = &self.procedural_store {
+            use agent_mem_traits::ProceduralMemoryItem;
+            use chrono::Utc;
 
+            // Extract parameters
+            let user_id = parameters
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+                })?;
+
+            let skill_name = parameters
+                .get("skill_name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'skill_name' parameter".to_string())
+                })?;
+
+            let description = parameters
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            let steps: Vec<String> = parameters
+                .get("steps")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let now = Utc::now();
+            let item = ProceduralMemoryItem {
+                id: uuid::Uuid::new_v4().to_string(),
+                organization_id: "default".to_string(),
+                user_id: user_id.to_string(),
+                agent_id: self.agent_id().to_string(),
+                skill_name: skill_name.to_string(),
+                description: description.to_string(),
+                steps,
+                success_rate: 0.0,
+                execution_count: 0,
+                metadata: parameters
+                    .get("metadata")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({})),
+                created_at: now,
+                updated_at: now,
+            };
+
+            let created_item = store
+                .create_item(item)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create procedure: {}", e)))?;
+
+            let response = serde_json::json!({
+                "success": true,
+                "procedure_id": created_item.id,
+                "skill_name": created_item.skill_name,
+                "message": "Procedural memory inserted successfully"
+            });
+
+            log::info!("Procedural agent: Inserted procedure '{}' with ID {}", created_item.skill_name, created_item.id);
+            return Ok(response);
+        }
+
+        // Fallback to mock response if store not available
         let response = serde_json::json!({
             "success": true,
             "procedure_id": uuid::Uuid::new_v4().to_string(),
-            "message": "Procedural memory inserted successfully"
+            "message": "Procedural memory inserted successfully (mock)"
         });
 
-        log::info!("Procedural agent: Inserted procedure");
+        log::warn!("Procedural agent: Using mock response (store not available)");
         Ok(response)
     }
 
     async fn handle_search(&self, parameters: Value) -> AgentResult<Value> {
-        let query = parameters
-            .get("query")
+        let user_id = parameters
+            .get("user_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                AgentError::InvalidParameters("Missing 'query' parameter".to_string())
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
             })?;
 
+        // Use actual procedural memory store if available
+        if let Some(store) = &self.procedural_store {
+            use agent_mem_traits::ProceduralQuery;
+
+            // Build query from parameters
+            let query = ProceduralQuery {
+                skill_name_pattern: parameters
+                    .get("skill_name_pattern")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                min_success_rate: parameters
+                    .get("min_success_rate")
+                    .and_then(|v| v.as_f64())
+                    .map(|f| f as f32),
+                limit: parameters
+                    .get("limit")
+                    .and_then(|v| v.as_i64()),
+            };
+
+            let items = store
+                .query_items(user_id, query)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query procedures: {}", e)))?;
+
+            let results: Vec<_> = items
+                .iter()
+                .map(|item| {
+                    serde_json::json!({
+                        "id": item.id,
+                        "skill_name": item.skill_name,
+                        "description": item.description,
+                        "steps": item.steps,
+                        "success_rate": item.success_rate,
+                        "execution_count": item.execution_count,
+                        "created_at": item.created_at.to_rfc3339(),
+                        "updated_at": item.updated_at.to_rfc3339()
+                    })
+                })
+                .collect();
+
+            let response = serde_json::json!({
+                "success": true,
+                "results": results,
+                "total_count": items.len()
+            });
+
+            log::info!("Procedural agent: Found {} procedures for user {}", items.len(), user_id);
+            return Ok(response);
+        }
+
+        // Fallback to mock response if store not available
         let response = serde_json::json!({
             "success": true,
             "results": [],
             "total_count": 0,
-            "query": query
+            "message": "Mock response (store not available)"
         });
 
-        log::info!("Procedural agent: Searched for '{}'", query);
+        log::warn!("Procedural agent: Using mock response (store not available)");
+        Ok(response)
+    }
+
+    async fn handle_update(&self, parameters: Value) -> AgentResult<Value> {
+        let user_id = parameters
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+            })?;
+
+        let item_id = parameters
+            .get("item_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'item_id' parameter".to_string())
+            })?;
+
+        // Use actual procedural memory store if available
+        if let Some(store) = &self.procedural_store {
+            // Get existing item
+            let existing_item = store
+                .get_item(item_id, user_id)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get procedure: {}", e)))?
+                .ok_or_else(|| AgentError::InternalError(format!("Procedure with ID '{}' not found", item_id)))?;
+
+            // Update fields
+            use agent_mem_traits::ProceduralMemoryItem;
+            use chrono::Utc;
+
+            let updated_item = ProceduralMemoryItem {
+                id: existing_item.id.clone(),
+                organization_id: existing_item.organization_id.clone(),
+                user_id: existing_item.user_id.clone(),
+                agent_id: existing_item.agent_id.clone(),
+                skill_name: parameters
+                    .get("skill_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&existing_item.skill_name)
+                    .to_string(),
+                description: parameters
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&existing_item.description)
+                    .to_string(),
+                steps: parameters
+                    .get("steps")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or(existing_item.steps.clone()),
+                success_rate: existing_item.success_rate,
+                execution_count: existing_item.execution_count,
+                metadata: parameters
+                    .get("metadata")
+                    .cloned()
+                    .unwrap_or(existing_item.metadata.clone()),
+                created_at: existing_item.created_at,
+                updated_at: Utc::now(),
+            };
+
+            let updated = store
+                .update_item(updated_item)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update procedure: {}", e)))?;
+
+            if updated {
+                let response = serde_json::json!({
+                    "success": true,
+                    "item_id": item_id,
+                    "message": "Procedural memory updated successfully"
+                });
+                log::info!("Procedural agent: Updated procedure '{}'", item_id);
+                return Ok(response);
+            } else {
+                return Err(AgentError::InternalError(format!(
+                    "Failed to update procedure '{}'",
+                    item_id
+                )));
+            }
+        }
+
+        // Fallback to mock response if store not available
+        let response = serde_json::json!({
+            "success": true,
+            "item_id": item_id,
+            "message": "Procedural memory updated successfully (mock)"
+        });
+
+        log::warn!("Procedural agent: Using mock response (store not available)");
+        Ok(response)
+    }
+
+    async fn handle_delete(&self, parameters: Value) -> AgentResult<Value> {
+        let user_id = parameters
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+            })?;
+
+        let item_id = parameters
+            .get("item_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'item_id' parameter".to_string())
+            })?;
+
+        // Use actual procedural memory store if available
+        if let Some(store) = &self.procedural_store {
+            let deleted = store
+                .delete_item(item_id, user_id)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete procedure: {}", e)))?;
+
+            if deleted {
+                let response = serde_json::json!({
+                    "success": true,
+                    "item_id": item_id,
+                    "message": "Procedural memory deleted successfully"
+                });
+                log::info!("Procedural agent: Deleted procedure '{}'", item_id);
+                return Ok(response);
+            } else {
+                return Err(AgentError::InternalError(format!(
+                    "Procedure with ID '{}' not found",
+                    item_id
+                )));
+            }
+        }
+
+        // Fallback to mock response if store not available
+        let response = serde_json::json!({
+            "success": true,
+            "item_id": item_id,
+            "message": "Procedural memory deleted successfully (mock)"
+        });
+
+        log::warn!("Procedural agent: Using mock response (store not available)");
         Ok(response)
     }
 }
@@ -146,6 +407,8 @@ impl MemoryAgent for ProceduralAgent {
         let result = match task.operation.as_str() {
             "insert" => self.handle_insert(task.parameters).await,
             "search" => self.handle_search(task.parameters).await,
+            "update" => self.handle_update(task.parameters).await,
+            "delete" => self.handle_delete(task.parameters).await,
             _ => Err(AgentError::InvalidParameters(format!(
                 "Unknown operation: {}",
                 task.operation

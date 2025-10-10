@@ -69,36 +69,177 @@ impl WorkingAgent {
     }
 
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {
-        let content = parameters.get("content").ok_or_else(|| {
-            AgentError::InvalidParameters("Missing 'content' parameter".to_string())
-        })?;
+        // Use actual working memory store if available
+        if let Some(store) = &self.working_store {
+            use agent_mem_traits::WorkingMemoryItem;
+            use chrono::Utc;
 
+            // Extract parameters
+            let user_id = parameters
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+                })?;
+
+            let session_id = parameters
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'session_id' parameter".to_string())
+                })?;
+
+            let content = parameters
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'content' parameter".to_string())
+                })?;
+
+            let priority = parameters
+                .get("priority")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0) as i32;
+
+            let expires_at = parameters
+                .get("expires_at")
+                .and_then(|v| v.as_str())
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc));
+
+            let item = WorkingMemoryItem {
+                id: uuid::Uuid::new_v4().to_string(),
+                user_id: user_id.to_string(),
+                agent_id: self.agent_id().to_string(),
+                session_id: session_id.to_string(),
+                content: content.to_string(),
+                priority,
+                expires_at,
+                metadata: parameters
+                    .get("metadata")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({})),
+                created_at: Utc::now(),
+            };
+
+            let created_item = store
+                .add_item(item)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to add working memory: {}", e)))?;
+
+            let response = serde_json::json!({
+                "success": true,
+                "working_memory_id": created_item.id,
+                "session_id": created_item.session_id,
+                "message": "Working memory inserted successfully"
+            });
+
+            log::info!("Working agent: Inserted working memory with ID {}", created_item.id);
+            return Ok(response);
+        }
+
+        // Fallback to mock response if store not available
         let response = serde_json::json!({
             "success": true,
             "working_memory_id": uuid::Uuid::new_v4().to_string(),
-            "message": "Working memory inserted successfully"
+            "message": "Working memory inserted successfully (mock)"
         });
 
-        log::info!("Working agent: Inserted working memory");
+        log::warn!("Working agent: Using mock response (store not available)");
         Ok(response)
     }
 
     async fn handle_search(&self, parameters: Value) -> AgentResult<Value> {
-        let query = parameters
-            .get("query")
+        let session_id = parameters
+            .get("session_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                AgentError::InvalidParameters("Missing 'query' parameter".to_string())
+                AgentError::InvalidParameters("Missing 'session_id' parameter".to_string())
             })?;
 
+        // Use actual working memory store if available
+        if let Some(store) = &self.working_store {
+            let items = store
+                .get_session_items(session_id)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get session items: {}", e)))?;
+
+            let results: Vec<_> = items
+                .iter()
+                .map(|item| {
+                    serde_json::json!({
+                        "id": item.id,
+                        "content": item.content,
+                        "priority": item.priority,
+                        "expires_at": item.expires_at.map(|dt| dt.to_rfc3339()),
+                        "created_at": item.created_at.to_rfc3339()
+                    })
+                })
+                .collect();
+
+            let response = serde_json::json!({
+                "success": true,
+                "results": results,
+                "total_count": items.len(),
+                "session_id": session_id
+            });
+
+            log::info!("Working agent: Found {} items for session {}", items.len(), session_id);
+            return Ok(response);
+        }
+
+        // Fallback to mock response if store not available
         let response = serde_json::json!({
             "success": true,
             "results": [],
             "total_count": 0,
-            "query": query
+            "session_id": session_id,
+            "message": "Mock response (store not available)"
         });
 
-        log::info!("Working agent: Searched for '{}'", query);
+        log::warn!("Working agent: Using mock response (store not available)");
+        Ok(response)
+    }
+
+    async fn handle_delete(&self, parameters: Value) -> AgentResult<Value> {
+        let item_id = parameters
+            .get("item_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'item_id' parameter".to_string())
+            })?;
+
+        // Use actual working memory store if available
+        if let Some(store) = &self.working_store {
+            let deleted = store
+                .remove_item(item_id)
+                .await
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete item: {}", e)))?;
+
+            if deleted {
+                let response = serde_json::json!({
+                    "success": true,
+                    "item_id": item_id,
+                    "message": "Working memory item deleted successfully"
+                });
+                log::info!("Working agent: Deleted item '{}'", item_id);
+                return Ok(response);
+            } else {
+                return Err(AgentError::InternalError(format!(
+                    "Working memory item with ID '{}' not found",
+                    item_id
+                )));
+            }
+        }
+
+        // Fallback to mock response if store not available
+        let response = serde_json::json!({
+            "success": true,
+            "item_id": item_id,
+            "message": "Working memory item deleted successfully (mock)"
+        });
+
+        log::warn!("Working agent: Using mock response (store not available)");
         Ok(response)
     }
 }
@@ -146,6 +287,7 @@ impl MemoryAgent for WorkingAgent {
         let result = match task.operation.as_str() {
             "insert" => self.handle_insert(task.parameters).await,
             "search" => self.handle_search(task.parameters).await,
+            "delete" => self.handle_delete(task.parameters).await,
             _ => Err(AgentError::InvalidParameters(format!(
                 "Unknown operation: {}",
                 task.operation
