@@ -199,12 +199,17 @@
   - ✅ handle_graph_traversal() - 基于 tree_path 的图遍历
 - 测试: 6/6 通过 (新增 4 个测试)
 
-#### P1-3: 修复 organization_id 硬编码 (1 小时)
+#### P1-3: ~~修复 organization_id 硬编码~~ ✅ **已完成**
 - 优先级: P1
-- 工作量: 1 小时
+- 工作量: 0.5 小时
 - 影响: 支持多租户场景
-- 状态: 未开始
-- 位置: `orchestrator/mod.rs:358, 401`
+- 状态: ✅ 完成 (2025-01-10)
+- 修改内容:
+  - ✅ ChatRequest 添加 organization_id 字段
+  - ✅ 修复 create_user_message 硬编码
+  - ✅ 修复 create_assistant_message 硬编码
+  - ✅ 更新所有测试用例
+  - ✅ 支持向后兼容（使用 serde default）
 
 #### P1-4: 更新数据库 schema 添加缺失字段 (1-2 小时)
 - 优先级: P1
