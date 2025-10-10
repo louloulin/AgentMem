@@ -350,9 +350,41 @@ impl AgentOrchestrator {
 
     /// 创建用户消息
     async fn create_user_message(&self, request: &ChatRequest) -> Result<String> {
-        // TODO: 调用 MessageRepository 创建消息
-        // 这里需要等待 MessageRepository 的完整实现
-        Ok(Uuid::new_v4().to_string())
+        use crate::storage::models::Message as DbMessage;
+
+        // 创建用户消息
+        let now = chrono::Utc::now();
+        let message = DbMessage {
+            id: Uuid::new_v4().to_string(),
+            organization_id: "default".to_string(), // TODO: 从 request 获取
+            user_id: request.user_id.clone(),
+            agent_id: request.agent_id.clone(),
+            role: "user".to_string(),
+            text: Some(request.message.clone()),
+            content: None,
+            model: None,
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+            step_id: None,
+            otid: None,
+            tool_returns: None,
+            group_id: None,
+            sender_id: None,
+            created_at: now,
+            updated_at: now,
+            is_deleted: false,
+            created_by_id: None,
+            last_updated_by_id: None,
+        };
+
+        // 保存到数据库
+        let created_message = self.message_repo
+            .create(&message)
+            .await?;
+
+        debug!("Created user message: {}", created_message.id);
+        Ok(created_message.id)
     }
 
     /// 创建 assistant 消息
@@ -361,8 +393,41 @@ impl AgentOrchestrator {
         agent_id: &str,
         content: &str,
     ) -> Result<String> {
-        // TODO: 调用 MessageRepository 创建消息
-        Ok(Uuid::new_v4().to_string())
+        use crate::storage::models::Message as DbMessage;
+
+        // 创建 assistant 消息
+        let now = chrono::Utc::now();
+        let message = DbMessage {
+            id: Uuid::new_v4().to_string(),
+            organization_id: "default".to_string(), // TODO: 从配置获取
+            user_id: "system".to_string(), // TODO: 从 context 获取
+            agent_id: agent_id.to_string(),
+            role: "assistant".to_string(),
+            text: Some(content.to_string()),
+            content: None,
+            model: None,
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+            step_id: None,
+            otid: None,
+            tool_returns: None,
+            group_id: None,
+            sender_id: None,
+            created_at: now,
+            updated_at: now,
+            is_deleted: false,
+            created_by_id: None,
+            last_updated_by_id: None,
+        };
+
+        // 保存到数据库
+        let created_message = self.message_repo
+            .create(&message)
+            .await?;
+
+        debug!("Created assistant message: {}", created_message.id);
+        Ok(created_message.id)
     }
 
     /// 检索相关记忆

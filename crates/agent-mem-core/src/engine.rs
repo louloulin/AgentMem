@@ -162,14 +162,128 @@ impl MemoryEngine {
     /// Search memories with intelligent ranking
     pub async fn search_memories(
         &self,
-        _query: &str,
-        _scope: Option<MemoryScope>,
-        _limit: Option<usize>,
+        query: &str,
+        scope: Option<MemoryScope>,
+        limit: Option<usize>,
     ) -> crate::CoreResult<Vec<Memory>> {
-        // TODO: Implement intelligent search
-        // For now, return empty results
-        warn!("Search not yet implemented");
-        Ok(Vec::new())
+        info!("Searching memories: query='{}', scope={:?}, limit={:?}", query, scope, limit);
+
+        // Get all memories from hierarchy based on scope
+        let mut all_memories = Vec::new();
+
+        // Collect memories from all levels
+        for level in [
+            MemoryLevel::Strategic,
+            MemoryLevel::Tactical,
+            MemoryLevel::Operational,
+            MemoryLevel::Contextual,
+        ] {
+            let level_memories = self.hierarchy_manager.get_memories_at_level(level).await?;
+            all_memories.extend(level_memories.into_iter().map(|hm| hm.memory));
+        }
+
+        debug!("Found {} total memories before filtering", all_memories.len());
+
+        // Apply scope filtering if specified
+        let filtered_memories = if let Some(scope) = scope {
+            all_memories
+                .into_iter()
+                .filter(|memory| self.matches_scope(memory, &scope))
+                .collect()
+        } else {
+            all_memories
+        };
+
+        debug!("Found {} memories after scope filtering", filtered_memories.len());
+
+        // Perform text-based search and ranking
+        let mut scored_memories: Vec<(Memory, f64)> = filtered_memories
+            .into_iter()
+            .filter_map(|memory| {
+                let score = self.calculate_relevance_score(&memory, query);
+                if score > 0.0 {
+                    Some((memory, score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by score (descending) and importance
+        scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
+            let combined_a = score_a + (mem_a.score.unwrap_or(0.0) as f64 * 0.3);
+            let combined_b = score_b + (mem_b.score.unwrap_or(0.0) as f64 * 0.3);
+            combined_b
+                .partial_cmp(&combined_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Apply limit
+        let result_limit = limit.unwrap_or(10);
+        let results: Vec<Memory> = scored_memories
+            .into_iter()
+            .take(result_limit)
+            .map(|(memory, _)| memory)
+            .collect();
+
+        info!("Returning {} search results", results.len());
+        Ok(results)
+    }
+
+    /// Check if a memory matches the given scope
+    fn matches_scope(&self, memory: &Memory, scope: &MemoryScope) -> bool {
+        match scope {
+            MemoryScope::Global => true,
+            MemoryScope::Agent(agent_id) => &memory.agent_id == agent_id,
+            MemoryScope::User {
+                agent_id,
+                user_id,
+            } => {
+                &memory.agent_id == agent_id
+                    && memory.user_id.as_ref().map(|uid| uid == user_id).unwrap_or(false)
+            }
+            MemoryScope::Session {
+                agent_id,
+                user_id,
+                session_id,
+            } => {
+                &memory.agent_id == agent_id
+                    && memory.user_id.as_ref().map(|uid| uid == user_id).unwrap_or(false)
+                    && memory
+                        .metadata
+                        .get("session_id")
+                        .map(|sid| sid == session_id)
+                        .unwrap_or(false)
+            }
+        }
+    }
+
+    /// Calculate relevance score for a memory based on query
+    fn calculate_relevance_score(&self, memory: &Memory, query: &str) -> f64 {
+        let query_lower = query.to_lowercase();
+        let content_lower = memory.content.to_lowercase();
+
+        // Exact match gets highest score
+        if content_lower.contains(&query_lower) {
+            return 1.0;
+        }
+
+        // Calculate word overlap score
+        let query_words: Vec<&str> = query_lower.split_whitespace().collect();
+        let content_words: Vec<&str> = content_lower.split_whitespace().collect();
+
+        if query_words.is_empty() || content_words.is_empty() {
+            return 0.0;
+        }
+
+        let mut matches = 0;
+        for query_word in &query_words {
+            if content_words.iter().any(|cw| cw.contains(query_word)) {
+                matches += 1;
+            }
+        }
+
+        (matches as f64) / (query_words.len() as f64)
     }
 
     /// Process memories for conflicts and optimization

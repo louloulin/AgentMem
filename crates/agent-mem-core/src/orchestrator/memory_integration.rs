@@ -63,16 +63,28 @@ impl MemoryIntegrator {
     ) -> Result<Vec<Memory>> {
         debug!("Retrieving memories for agent_id={}, query={}", agent_id, query);
 
-        // TODO: 使用 MemoryEngine 的搜索功能
-        // 目前返回空列表，后续实现完整的检索逻辑
-        // 需要：
-        // 1. 向量化查询
-        // 2. 向量搜索
-        // 3. 按相关性和重要性排序
-        // 4. 过滤低相关性记忆
+        // 使用 MemoryEngine 的搜索功能
+        use crate::hierarchy::MemoryScope;
 
-        info!("Retrieved 0 memories (placeholder)");
-        Ok(Vec::new())
+        // 创建 Agent 级别的 scope
+        let scope = Some(MemoryScope::Agent(agent_id.to_string()));
+
+        // 调用 MemoryEngine 进行搜索
+        let memories = self.memory_engine
+            .search_memories(query, scope, Some(max_count))
+            .await
+            .map_err(|e| agent_mem_traits::AgentMemError::storage_error(e.to_string()))?;
+
+        // 过滤低相关性记忆（基于 importance score）
+        let filtered_memories: Vec<Memory> = memories
+            .into_iter()
+            .filter(|m| {
+                m.score.unwrap_or(0.0) >= self.config.relevance_threshold
+            })
+            .collect();
+
+        info!("Retrieved {} relevant memories (filtered from search results)", filtered_memories.len());
+        Ok(filtered_memories)
     }
 
     /// 将记忆注入到 prompt

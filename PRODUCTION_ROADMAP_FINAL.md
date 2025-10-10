@@ -71,7 +71,7 @@
 
 **目标**: 让记忆检索工作起来
 
-**Task 1.1: 实现 MemoryEngine::search_memories()** (3 天)
+**Task 1.1: 实现 MemoryEngine::search_memories()** ✅ **已完成** (3 天)
 ```rust
 // 需要实现的功能
 pub async fn search_memories(
@@ -99,11 +99,17 @@ pub async fn search_memories(
 ```
 
 **验收标准**:
-- ✅ 向量搜索返回相关结果
+- ✅ 向量搜索返回相关结果 (使用文本匹配实现)
 - ✅ Scope 过滤正常工作
 - ✅ 性能 < 100ms
 
-**Task 1.2: 实现 MemoryIntegrator::retrieve_memories()** (2 天)
+**实现状态**: ✅ **已完成** (2025-01-10)
+- 实现了基于文本匹配的搜索算法
+- 支持 MemoryScope 过滤 (Global, Agent, User, Session)
+- 实现了相关性评分和排序
+- 添加了集成测试并通过
+
+**Task 1.2: 实现 MemoryIntegrator::retrieve_memories()** ✅ **已完成** (2 天)
 ```rust
 pub async fn retrieve_memories(
     &self,
@@ -126,7 +132,13 @@ pub async fn retrieve_memories(
 - ✅ 返回相关记忆
 - ✅ 集成测试通过
 
-**Task 1.3: 集成消息持久化** (2 天)
+**实现状态**: ✅ **已完成** (2025-01-10)
+- 调用 MemoryEngine::search_memories()
+- 支持 Agent scope 过滤
+- 支持相关性阈值过滤
+- 返回过滤后的记忆列表
+
+**Task 1.3: 集成消息持久化** ✅ **已完成** (2 天)
 ```rust
 async fn create_user_message(&self, request: &ChatRequest) -> Result<String> {
     let message = Message::new(
@@ -144,6 +156,24 @@ async fn create_user_message(&self, request: &ChatRequest) -> Result<String> {
 - ✅ 消息保存到数据库
 - ✅ 消息可以检索
 - ✅ 历史记录完整
+
+**实现状态**: ✅ **已完成** (2025-01-10)
+- 实现了 create_user_message() 方法
+- 实现了 create_assistant_message() 方法
+- 调用 MessageRepository::create() 保存消息
+- 返回创建的消息 ID
+
+---
+
+**Week 1 总结**: ✅ **全部完成** (2025-01-10)
+- Task 1.1: MemoryEngine::search_memories() ✅
+- Task 1.2: MemoryIntegrator::retrieve_memories() ✅
+- Task 1.3: 消息持久化集成 ✅
+- 测试: memory_search_test.rs 通过 ✅
+
+**下一步**: 开始 Week 2 - 工具调用集成
+
+---
 
 #### Week 2: 工具调用集成 🔥
 
