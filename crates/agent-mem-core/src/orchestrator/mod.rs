@@ -207,6 +207,7 @@ impl AgentOrchestrator {
         let assistant_message_id = self.create_assistant_message(
             &request.organization_id,
             &request.agent_id,
+            &request.user_id,
             &final_response,
         ).await?;
         debug!("Created assistant message: {}", assistant_message_id);
@@ -331,7 +332,7 @@ impl AgentOrchestrator {
 
         // 6. 保存 assistant 消息
         let assistant_message_id = self
-            .create_assistant_message(&request.organization_id, &request.agent_id, &final_response)
+            .create_assistant_message(&request.organization_id, &request.agent_id, &request.user_id, &final_response)
             .await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
@@ -401,6 +402,7 @@ impl AgentOrchestrator {
         &self,
         organization_id: &str,
         agent_id: &str,
+        user_id: &str,
         content: &str,
     ) -> Result<String> {
         use crate::storage::models::Message as DbMessage;
@@ -410,7 +412,7 @@ impl AgentOrchestrator {
         let message = DbMessage {
             id: Uuid::new_v4().to_string(),
             organization_id: organization_id.to_string(),
-            user_id: "system".to_string(), // TODO: 从 context 获取
+            user_id: user_id.to_string(), // ✅ 修复: 从参数获取而非硬编码
             agent_id: agent_id.to_string(),
             role: "assistant".to_string(),
             text: Some(content.to_string()),

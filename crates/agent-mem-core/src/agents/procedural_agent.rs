@@ -82,6 +82,12 @@ impl ProceduralAgent {
                     AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
                 })?;
 
+            // ✅ 修复: 从参数获取 organization_id 而非硬编码
+            let organization_id = parameters
+                .get("organization_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default");
+
             let skill_name = parameters
                 .get("skill_name")
                 .and_then(|v| v.as_str())
@@ -107,7 +113,7 @@ impl ProceduralAgent {
             let now = Utc::now();
             let item = ProceduralMemoryItem {
                 id: uuid::Uuid::new_v4().to_string(),
-                organization_id: "default".to_string(),
+                organization_id: organization_id.to_string(),
                 user_id: user_id.to_string(),
                 agent_id: self.agent_id().to_string(),
                 skill_name: skill_name.to_string(),
