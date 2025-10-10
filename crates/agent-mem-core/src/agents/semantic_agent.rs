@@ -18,15 +18,26 @@ use crate::coordination::{
 };
 use crate::types::MemoryType;
 
+// Use trait-based storage instead of concrete implementation
+use agent_mem_traits::{SemanticMemoryItem, SemanticMemoryStore, SemanticQuery};
+
 /// Semantic Memory Agent
 ///
 /// Specializes in handling semantic memories - factual knowledge and concepts.
 /// This agent manages conceptual relationships, knowledge graphs, and semantic search.
+///
+/// Uses trait-based storage (SemanticMemoryStore) to support multiple backends:
+/// - PostgreSQL
+/// - LibSQL
+/// - MongoDB
+/// - etc.
 pub struct SemanticAgent {
     /// Base agent functionality
     base: BaseAgent,
     /// Agent context
     context: Arc<RwLock<AgentContext>>,
+    /// Semantic memory store (trait-based, supports multiple backends)
+    semantic_store: Option<Arc<dyn SemanticMemoryStore>>,
     /// Initialization status
     initialized: bool,
 }
@@ -46,6 +57,7 @@ impl SemanticAgent {
         Self {
             base,
             context,
+            semantic_store: None,
             initialized: false,
         }
     }
@@ -58,61 +70,136 @@ impl SemanticAgent {
         Self {
             base,
             context,
+            semantic_store: None,
             initialized: false,
         }
     }
 
+    /// Create with semantic memory store (trait-based, supports any backend)
+    pub fn with_store(agent_id: String, store: Arc<dyn SemanticMemoryStore>) -> Self {
+        let config = AgentConfig::new(
+            agent_id,
+            vec![MemoryType::Semantic],
+            10, // max concurrent tasks
+        );
+
+        let base = BaseAgent::new(config);
+        let context = base.context();
+
+        Self {
+            base,
+            context,
+            semantic_store: Some(store),
+            initialized: false,
+        }
+    }
+
+    /// Set semantic memory store (trait-based, supports any backend)
+    pub fn set_store(&mut self, store: Arc<dyn SemanticMemoryStore>) {
+        self.semantic_store = Some(store);
+    }
+
     /// Handle semantic knowledge insertion
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {
-        let concept = parameters.get("concept").ok_or_else(|| {
-            AgentError::InvalidParameters("Missing 'concept' parameter".to_string())
-        })?;
+        
+        {
+            // Use actual semantic memory manager if available
+            if let Some(manager) = &self.semantic_store {
+                // Parse item data
+                let item: SemanticMemoryItem = serde_json::from_value(parameters.clone())
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {}", e)))?;
 
-        let knowledge = parameters.get("knowledge").ok_or_else(|| {
-            AgentError::InvalidParameters("Missing 'knowledge' parameter".to_string())
-        })?;
+                // Create item using manager
+                let created_item = manager.create_item(item).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create item: {}", e)))?;
 
-        // TODO: Integrate with actual semantic memory manager
+                let response = serde_json::json!({
+                    "success": true,
+                    "item_id": created_item.id,
+                    "name": created_item.name,
+                    "message": "Semantic knowledge inserted successfully"
+                });
+
+                log::info!("Semantic agent: Inserted knowledge item {}", created_item.id);
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
+        let concept = parameters.get("concept").unwrap_or(&Value::Null);
+        let knowledge = parameters.get("knowledge").unwrap_or(&Value::Null);
+
         let response = serde_json::json!({
             "success": true,
             "concept_id": uuid::Uuid::new_v4().to_string(),
             "concept": concept,
             "knowledge": knowledge,
-            "message": "Semantic knowledge inserted successfully"
+            "message": "Semantic knowledge inserted successfully (mock)"
         });
 
-        log::info!("Semantic agent: Inserted knowledge for concept");
+        log::warn!("Semantic agent: Using mock response (manager not available)");
         Ok(response)
     }
 
     /// Handle semantic knowledge search
     async fn handle_search(&self, parameters: Value) -> AgentResult<Value> {
-        let query = parameters
-            .get("query")
+        let user_id = parameters
+            .get("user_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                AgentError::InvalidParameters("Missing 'query' parameter".to_string())
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
             })?;
 
+        
+        {
+            // Use actual semantic memory manager if available
+            if let Some(manager) = &self.semantic_store {
+                // Build query from parameters
+                let query = SemanticQuery {
+                    name_query: parameters.get("name_query")
+                        .and_then(|v| v.as_str())
+                        .map(|s| format!("%{}%", s)),
+                    summary_query: parameters.get("summary_query")
+                        .and_then(|v| v.as_str())
+                        .map(|s| format!("%{}%", s)),
+                    tree_path_prefix: parameters.get("tree_path_prefix")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                    limit: parameters.get("limit")
+                        .and_then(|v| v.as_i64()),
+                };
+
+                // Query items using manager
+                let items = manager.query_items(user_id, query).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query items: {}", e)))?;
+
+                let response = serde_json::json!({
+                    "success": true,
+                    "results": items,
+                    "total_count": items.len()
+                });
+
+                log::info!("Semantic agent: Found {} items for user {}", items.len(), user_id);
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
+        let query = parameters.get("query").and_then(|v| v.as_str()).unwrap_or("");
         let semantic_similarity = parameters
             .get("semantic_similarity")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        // TODO: Integrate with actual semantic search
         let response = serde_json::json!({
             "success": true,
             "results": [],
             "total_count": 0,
             "query": query,
-            "semantic_similarity": semantic_similarity
+            "semantic_similarity": semantic_similarity,
+            "message": "Mock response (manager not available)"
         });
 
-        log::info!(
-            "Semantic agent: Searched for '{}' with semantic similarity: {}",
-            query,
-            semantic_similarity
-        );
+        log::warn!("Semantic agent: Using mock response (manager not available)");
         Ok(response)
     }
 

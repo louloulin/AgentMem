@@ -36,6 +36,8 @@ pub mod migration_manager;
 #[cfg(feature = "postgres")]
 pub mod migrations;
 #[cfg(feature = "postgres")]
+pub mod memory_tables_migration;
+#[cfg(feature = "postgres")]
 pub mod pool_manager;
 #[cfg(feature = "postgres")]
 pub mod postgres;

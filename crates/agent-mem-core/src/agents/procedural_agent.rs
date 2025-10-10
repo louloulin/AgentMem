@@ -15,15 +15,29 @@ use crate::coordination::{
     AgentMessage, CoordinationError, CoordinationResult, TaskRequest, TaskResponse,
 };
 use crate::types::MemoryType;
+use agent_mem_traits::ProceduralMemoryStore;
 
 /// Procedural Memory Agent
+///
+/// Specializes in handling procedural memories - skills, workflows, and executable procedures.
+/// Uses trait-based storage (ProceduralMemoryStore) to support multiple backends:
+/// - PostgreSQL
+/// - LibSQL
+/// - MongoDB
+/// - etc.
 pub struct ProceduralAgent {
+    /// Base agent functionality
     base: BaseAgent,
+    /// Agent context
     context: Arc<RwLock<AgentContext>>,
+    /// Procedural memory store (trait-based, supports multiple backends)
+    procedural_store: Option<Arc<dyn ProceduralMemoryStore>>,
+    /// Initialization status
     initialized: bool,
 }
 
 impl ProceduralAgent {
+    /// Create a new procedural memory agent
     pub fn new(agent_id: String) -> Self {
         let config = AgentConfig::new(agent_id, vec![MemoryType::Procedural], 10);
         let base = BaseAgent::new(config);
@@ -31,8 +45,27 @@ impl ProceduralAgent {
         Self {
             base,
             context,
+            procedural_store: None,
             initialized: false,
         }
+    }
+
+    /// Create with procedural memory store (trait-based, supports any backend)
+    pub fn with_store(agent_id: String, store: Arc<dyn ProceduralMemoryStore>) -> Self {
+        let config = AgentConfig::new(agent_id, vec![MemoryType::Procedural], 10);
+        let base = BaseAgent::new(config);
+        let context = base.context();
+        Self {
+            base,
+            context,
+            procedural_store: Some(store),
+            initialized: false,
+        }
+    }
+
+    /// Set procedural memory store (trait-based, supports any backend)
+    pub fn set_store(&mut self, store: Arc<dyn ProceduralMemoryStore>) {
+        self.procedural_store = Some(store);
     }
 
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {

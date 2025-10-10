@@ -10,6 +10,7 @@ pub mod error;
 pub mod intelligence;
 pub mod llm;
 pub mod memory;
+pub mod memory_store;
 pub mod session;
 pub mod storage;
 pub mod types;
@@ -29,6 +30,11 @@ pub use intelligence::{
 };
 pub use llm::{LLMProvider, ModelInfo};
 pub use memory::MemoryProvider;
+pub use memory_store::{
+    CoreMemoryItem, CoreMemoryStore, EpisodicEvent, EpisodicMemoryStore, EpisodicQuery,
+    ProceduralMemoryItem, ProceduralMemoryStore, ProceduralQuery, SemanticMemoryItem,
+    SemanticMemoryStore, SemanticQuery, WorkingMemoryItem, WorkingMemoryStore,
+};
 pub use session::SessionManager;
 pub use storage::{
     EmbeddingVectorStore, GraphResult, GraphStore, HistoryStore, KeyValueStore, LegacyVectorStore,

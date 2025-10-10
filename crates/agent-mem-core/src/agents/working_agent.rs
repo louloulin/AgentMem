@@ -15,15 +15,29 @@ use crate::coordination::{
     AgentMessage, CoordinationError, CoordinationResult, TaskRequest, TaskResponse,
 };
 use crate::types::MemoryType;
+use agent_mem_traits::WorkingMemoryStore;
 
 /// Working Memory Agent
+///
+/// Specializes in handling working memories - temporary, active memory contexts.
+/// Uses trait-based storage (WorkingMemoryStore) to support multiple backends:
+/// - PostgreSQL
+/// - LibSQL
+/// - MongoDB
+/// - etc.
 pub struct WorkingAgent {
+    /// Base agent functionality
     base: BaseAgent,
+    /// Agent context
     context: Arc<RwLock<AgentContext>>,
+    /// Working memory store (trait-based, supports multiple backends)
+    working_store: Option<Arc<dyn WorkingMemoryStore>>,
+    /// Initialization status
     initialized: bool,
 }
 
 impl WorkingAgent {
+    /// Create a new working memory agent
     pub fn new(agent_id: String) -> Self {
         let config = AgentConfig::new(agent_id, vec![MemoryType::Working], 15);
         let base = BaseAgent::new(config);
@@ -31,8 +45,27 @@ impl WorkingAgent {
         Self {
             base,
             context,
+            working_store: None,
             initialized: false,
         }
+    }
+
+    /// Create with working memory store (trait-based, supports any backend)
+    pub fn with_store(agent_id: String, store: Arc<dyn WorkingMemoryStore>) -> Self {
+        let config = AgentConfig::new(agent_id, vec![MemoryType::Working], 15);
+        let base = BaseAgent::new(config);
+        let context = base.context();
+        Self {
+            base,
+            context,
+            working_store: Some(store),
+            initialized: false,
+        }
+    }
+
+    /// Set working memory store (trait-based, supports any backend)
+    pub fn set_store(&mut self, store: Arc<dyn WorkingMemoryStore>) {
+        self.working_store = Some(store);
     }
 
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {

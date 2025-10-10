@@ -1,5 +1,22 @@
 //! 存储后端实现模块
 
+// Memory store implementations (trait-based)
+#[cfg(feature = "postgres")]
+pub mod postgres_episodic;
+#[cfg(feature = "postgres")]
+pub mod postgres_semantic;
+#[cfg(feature = "postgres")]
+pub mod postgres_procedural;
+#[cfg(feature = "postgres")]
+pub mod postgres_core;
+#[cfg(feature = "postgres")]
+pub mod postgres_working;
+pub mod libsql_episodic;
+pub mod libsql_semantic;
+pub mod libsql_procedural;
+pub mod libsql_core;
+pub mod libsql_working;
+
 // 嵌入式存储
 pub mod libsql_store;
 #[cfg(feature = "lancedb")]
@@ -28,6 +45,23 @@ pub mod supabase;
 #[cfg(test)]
 mod supabase_test;
 pub mod weaviate;
+
+// Memory store exports (trait-based)
+#[cfg(feature = "postgres")]
+pub use postgres_episodic::PostgresEpisodicStore;
+#[cfg(feature = "postgres")]
+pub use postgres_semantic::PostgresSemanticStore;
+#[cfg(feature = "postgres")]
+pub use postgres_procedural::PostgresProceduralStore;
+#[cfg(feature = "postgres")]
+pub use postgres_core::PostgresCoreStore;
+#[cfg(feature = "postgres")]
+pub use postgres_working::PostgresWorkingStore;
+pub use libsql_episodic::LibSqlEpisodicStore;
+pub use libsql_semantic::LibSqlSemanticStore;
+pub use libsql_procedural::LibSqlProceduralStore;
+pub use libsql_core::LibSqlCoreStore;
+pub use libsql_working::LibSqlWorkingStore;
 
 // 嵌入式存储导出
 pub use libsql_store::LibSQLStore;

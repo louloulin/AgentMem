@@ -18,16 +18,27 @@ use crate::coordination::{
 };
 use crate::types::MemoryType;
 
+// Use trait-based storage instead of concrete implementation
+use agent_mem_traits::{EpisodicEvent, EpisodicMemoryStore, EpisodicQuery};
+
 /// Episodic Memory Agent
 ///
 /// Specializes in handling episodic memories - time-based events and experiences.
 /// This agent is inspired by MIRIX's episodic memory management but optimized
 /// for Rust's performance characteristics.
+///
+/// Uses trait-based storage (EpisodicMemoryStore) to support multiple backends:
+/// - PostgreSQL
+/// - LibSQL
+/// - MongoDB
+/// - etc.
 pub struct EpisodicAgent {
     /// Base agent functionality
     base: BaseAgent,
     /// Agent context
     context: Arc<RwLock<AgentContext>>,
+    /// Episodic memory store (trait-based, supports multiple backends)
+    episodic_store: Option<Arc<dyn EpisodicMemoryStore>>,
     /// Initialization status
     initialized: bool,
 }
@@ -47,6 +58,7 @@ impl EpisodicAgent {
         Self {
             base,
             context,
+            episodic_store: None,
             initialized: false,
         }
     }
@@ -59,8 +71,33 @@ impl EpisodicAgent {
         Self {
             base,
             context,
+            episodic_store: None,
             initialized: false,
         }
+    }
+
+    /// Create with episodic memory store (trait-based, supports any backend)
+    pub fn with_store(agent_id: String, store: Arc<dyn EpisodicMemoryStore>) -> Self {
+        let config = AgentConfig::new(
+            agent_id,
+            vec![MemoryType::Episodic],
+            10, // max concurrent tasks
+        );
+
+        let base = BaseAgent::new(config);
+        let context = base.context();
+
+        Self {
+            base,
+            context,
+            episodic_store: Some(store),
+            initialized: false,
+        }
+    }
+
+    /// Set episodic memory store (trait-based, supports any backend)
+    pub fn set_store(&mut self, store: Arc<dyn EpisodicMemoryStore>) {
+        self.episodic_store = Some(store);
     }
 
     /// Handle episodic memory insertion
@@ -70,66 +107,182 @@ impl EpisodicAgent {
             AgentError::InvalidParameters("Missing 'event' parameter".to_string())
         })?;
 
-        // TODO: Integrate with actual episodic memory manager
-        // For now, return a mock response
+        
+        {
+            // Use actual episodic memory manager if available
+            if let Some(manager) = &self.episodic_store {
+                // Parse event data
+                let event: EpisodicEvent = serde_json::from_value(event_data.clone())
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid event data: {}", e)))?;
+
+                // Create event using manager
+                let created_event = manager.create_event(event).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create event: {}", e)))?;
+
+                let response = serde_json::json!({
+                    "success": true,
+                    "event_id": created_event.id,
+                    "message": "Episodic memory inserted successfully"
+                });
+
+                log::info!("Episodic agent: Inserted event {}", created_event.id);
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
         let response = serde_json::json!({
             "success": true,
             "event_id": uuid::Uuid::new_v4().to_string(),
-            "message": "Episodic memory inserted successfully"
+            "message": "Episodic memory inserted successfully (mock)"
         });
 
-        log::info!("Episodic agent: Inserted event");
+        log::warn!("Episodic agent: Using mock response (manager not available)");
         Ok(response)
     }
 
     /// Handle episodic memory search
     async fn handle_search(&self, parameters: Value) -> AgentResult<Value> {
-        let query = parameters
-            .get("query")
+        let user_id = parameters
+            .get("user_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                AgentError::InvalidParameters("Missing 'query' parameter".to_string())
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
             })?;
 
-        // TODO: Integrate with actual episodic memory search
-        // For now, return a mock response
+        
+        {
+            // Use actual episodic memory manager if available
+            if let Some(manager) = &self.episodic_store {
+                // Build query from parameters
+                let query = EpisodicQuery {
+                    start_time: parameters.get("start_time")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc)),
+                    end_time: parameters.get("end_time")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc)),
+                    event_type: parameters.get("event_type")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    min_importance: parameters.get("min_importance")
+                        .and_then(|v| v.as_f64())
+                        .map(|f| f as f32),
+                    limit: parameters.get("limit")
+                        .and_then(|v| v.as_i64()),
+                };
+
+                // Query events using manager
+                let events = manager.query_events(user_id, query).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {}", e)))?;
+
+                let response = serde_json::json!({
+                    "success": true,
+                    "results": events,
+                    "total_count": events.len()
+                });
+
+                log::info!("Episodic agent: Found {} events for user {}", events.len(), user_id);
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
         let response = serde_json::json!({
             "success": true,
             "results": [],
             "total_count": 0,
-            "query": query
+            "message": "Mock response (manager not available)"
         });
 
-        log::info!("Episodic agent: Searched for '{}'", query);
+        log::warn!("Episodic agent: Using mock response (manager not available)");
         Ok(response)
     }
 
     /// Handle episodic memory retrieval by time range
     async fn handle_time_range_query(&self, parameters: Value) -> AgentResult<Value> {
-        let start_time = parameters.get("start_time").and_then(|v| v.as_str());
-        let end_time = parameters.get("end_time").and_then(|v| v.as_str());
+        let start_time_str = parameters.get("start_time").and_then(|v| v.as_str());
+        let end_time_str = parameters.get("end_time").and_then(|v| v.as_str());
 
-        if start_time.is_none() || end_time.is_none() {
+        if start_time_str.is_none() || end_time_str.is_none() {
             return Err(AgentError::InvalidParameters(
                 "Missing 'start_time' or 'end_time' parameter".to_string(),
             ));
         }
 
-        // TODO: Integrate with actual episodic memory time range query
+        let user_id = parameters
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+            })?;
+
+        
+        {
+            // Use actual episodic memory manager if available
+            if let Some(manager) = &self.episodic_store {
+                // Parse time strings
+                let start_time = chrono::DateTime::parse_from_rfc3339(start_time_str.unwrap())
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid start_time format: {}", e)))?
+                    .with_timezone(&chrono::Utc);
+
+                let end_time = chrono::DateTime::parse_from_rfc3339(end_time_str.unwrap())
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid end_time format: {}", e)))?
+                    .with_timezone(&chrono::Utc);
+
+                // Build query
+                let query = EpisodicQuery {
+                    start_time: Some(start_time),
+                    end_time: Some(end_time),
+                    event_type: parameters.get("event_type")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    min_importance: parameters.get("min_importance")
+                        .and_then(|v| v.as_f64())
+                        .map(|f| f as f32),
+                    limit: parameters.get("limit")
+                        .and_then(|v| v.as_i64()),
+                };
+
+                // Query events using manager
+                let events = manager.query_events(user_id, query).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {}", e)))?;
+
+                let response = serde_json::json!({
+                    "success": true,
+                    "events": events,
+                    "total_count": events.len(),
+                    "time_range": {
+                        "start": start_time_str,
+                        "end": end_time_str
+                    }
+                });
+
+                log::info!(
+                    "Episodic agent: Found {} events in time range {} to {}",
+                    events.len(),
+                    start_time_str.unwrap(),
+                    end_time_str.unwrap()
+                );
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
         let response = serde_json::json!({
             "success": true,
             "events": [],
+            "total_count": 0,
             "time_range": {
-                "start": start_time,
-                "end": end_time
-            }
+                "start": start_time_str,
+                "end": end_time_str
+            },
+            "message": "Mock response (manager not available)"
         });
 
-        log::info!(
-            "Episodic agent: Queried time range {} to {}",
-            start_time.unwrap(),
-            end_time.unwrap()
-        );
+        log::warn!("Episodic agent: Using mock response (manager not available)");
         Ok(response)
     }
 
@@ -142,14 +295,51 @@ impl EpisodicAgent {
                 AgentError::InvalidParameters("Missing 'event_id' parameter".to_string())
             })?;
 
-        // TODO: Integrate with actual episodic memory update
+        let user_id = parameters
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+            })?;
+
+        
+        {
+            // Use actual episodic memory manager if available
+            if let Some(manager) = &self.episodic_store {
+                // Check if updating importance score
+                if let Some(importance) = parameters.get("importance_score").and_then(|v| v.as_f64()) {
+                    let updated = manager.update_importance(event_id, user_id, importance as f32).await
+                        .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update importance: {}", e)))?;
+
+                    let response = serde_json::json!({
+                        "success": updated,
+                        "event_id": event_id,
+                        "message": if updated { "Importance updated successfully" } else { "Event not found" }
+                    });
+
+                    log::info!("Episodic agent: Updated importance for event {}", event_id);
+                    return Ok(response);
+                }
+
+                // For other updates, would need update_event method in manager
+                let response = serde_json::json!({
+                    "success": false,
+                    "event_id": event_id,
+                    "message": "Only importance_score updates are currently supported"
+                });
+
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
         let response = serde_json::json!({
             "success": true,
             "event_id": event_id,
-            "message": "Episodic memory updated successfully"
+            "message": "Episodic memory updated successfully (mock)"
         });
 
-        log::info!("Episodic agent: Updated event {}", event_id);
+        log::warn!("Episodic agent: Using mock response (manager not available)");
         Ok(response)
     }
 
@@ -162,14 +352,39 @@ impl EpisodicAgent {
                 AgentError::InvalidParameters("Missing 'event_id' parameter".to_string())
             })?;
 
-        // TODO: Integrate with actual episodic memory deletion
+        let user_id = parameters
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+            })?;
+
+        
+        {
+            // Use actual episodic memory manager if available
+            if let Some(manager) = &self.episodic_store {
+                let deleted = manager.delete_event(event_id, user_id).await
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete event: {}", e)))?;
+
+                let response = serde_json::json!({
+                    "success": deleted,
+                    "event_id": event_id,
+                    "message": if deleted { "Event deleted successfully" } else { "Event not found" }
+                });
+
+                log::info!("Episodic agent: Deleted event {}", event_id);
+                return Ok(response);
+            }
+        }
+
+        // Fallback to mock response if manager not available
         let response = serde_json::json!({
             "success": true,
             "event_id": event_id,
-            "message": "Episodic memory deleted successfully"
+            "message": "Episodic memory deleted successfully (mock)"
         });
 
-        log::info!("Episodic agent: Deleted event {}", event_id);
+        log::warn!("Episodic agent: Using mock response (manager not available)");
         Ok(response)
     }
 }

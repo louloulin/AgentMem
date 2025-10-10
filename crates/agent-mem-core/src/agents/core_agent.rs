@@ -16,16 +16,24 @@ use crate::coordination::{
     AgentMessage, CoordinationError, CoordinationResult, TaskRequest, TaskResponse,
 };
 use crate::types::MemoryType;
+use agent_mem_traits::CoreMemoryStore;
 
 /// Core Memory Agent
 ///
 /// Specializes in handling core memories - persistent memory blocks that define
 /// the agent's identity, persona, and fundamental context.
+/// Uses trait-based storage (CoreMemoryStore) to support multiple backends:
+/// - PostgreSQL
+/// - LibSQL
+/// - MongoDB
+/// - etc.
 pub struct CoreAgent {
     /// Base agent functionality
     base: BaseAgent,
     /// Agent context
     context: Arc<RwLock<AgentContext>>,
+    /// Core memory store (trait-based, supports multiple backends)
+    core_store: Option<Arc<dyn CoreMemoryStore>>,
     /// Initialization status
     initialized: bool,
 }
@@ -45,8 +53,33 @@ impl CoreAgent {
         Self {
             base,
             context,
+            core_store: None,
             initialized: false,
         }
+    }
+
+    /// Create with core memory store (trait-based, supports any backend)
+    pub fn with_store(agent_id: String, store: Arc<dyn CoreMemoryStore>) -> Self {
+        let config = AgentConfig::new(
+            agent_id,
+            vec![MemoryType::Core],
+            5,
+        );
+
+        let base = BaseAgent::new(config);
+        let context = base.context();
+
+        Self {
+            base,
+            context,
+            core_store: Some(store),
+            initialized: false,
+        }
+    }
+
+    /// Set core memory store (trait-based, supports any backend)
+    pub fn set_store(&mut self, store: Arc<dyn CoreMemoryStore>) {
+        self.core_store = Some(store);
     }
 
     /// Create with custom configuration
@@ -57,6 +90,7 @@ impl CoreAgent {
         Self {
             base,
             context,
+            core_store: None,
             initialized: false,
         }
     }

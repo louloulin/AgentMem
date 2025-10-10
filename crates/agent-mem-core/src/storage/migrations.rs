@@ -6,6 +6,7 @@
 use sqlx::PgPool;
 
 use crate::{CoreError, CoreResult};
+use super::memory_tables_migration;
 
 /// Run all database migrations
 pub async fn run_migrations(pool: &PgPool) -> CoreResult<()> {
@@ -19,6 +20,9 @@ pub async fn run_migrations(pool: &PgPool) -> CoreResult<()> {
     create_memories_table(pool).await?;
     create_junction_tables(pool).await?;
     create_indexes(pool).await?;
+
+    // Run memory-specific table migrations
+    memory_tables_migration::run_memory_migrations(pool).await?;
 
     Ok(())
 }
