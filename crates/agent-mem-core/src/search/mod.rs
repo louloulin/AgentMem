@@ -3,10 +3,14 @@
 //! 提供向量搜索 + 全文搜索的混合搜索系统，包括：
 //! - 向量语义搜索
 //! - 全文关键词搜索
+//! - BM25 算法搜索
+//! - 模糊匹配搜索
 //! - RRF (Reciprocal Rank Fusion) 融合算法
 //! - 搜索结果重排序
 //! - 搜索性能优化
 
+pub mod bm25;
+pub mod fuzzy;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
 #[cfg(feature = "postgres")]
@@ -14,6 +18,8 @@ pub mod hybrid;
 pub mod ranker;
 pub mod vector_search;
 
+pub use bm25::{BM25Params, BM25SearchEngine};
+pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
 #[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;
 #[cfg(feature = "postgres")]
