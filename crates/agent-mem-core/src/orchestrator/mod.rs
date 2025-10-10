@@ -34,18 +34,27 @@ use tool_integration::{ToolIntegrator, ToolIntegratorConfig};
 pub struct ChatRequest {
     /// 用户消息
     pub message: String,
-    
+
     /// Agent ID
     pub agent_id: String,
-    
+
     /// 用户 ID
     pub user_id: String,
-    
+
+    /// 组织 ID (可选，默认为 "default")
+    #[serde(default = "default_organization_id")]
+    pub organization_id: String,
+
     /// 是否流式响应
     pub stream: bool,
-    
+
     /// 最大记忆检索数量
     pub max_memories: usize,
+}
+
+/// 默认组织 ID
+fn default_organization_id() -> String {
+    "default".to_string()
 }
 
 /// 对话响应
@@ -196,6 +205,7 @@ impl AgentOrchestrator {
 
         // 5. 保存 assistant 消息
         let assistant_message_id = self.create_assistant_message(
+            &request.organization_id,
             &request.agent_id,
             &final_response,
         ).await?;
@@ -321,7 +331,7 @@ impl AgentOrchestrator {
 
         // 6. 保存 assistant 消息
         let assistant_message_id = self
-            .create_assistant_message(&request.agent_id, &final_response)
+            .create_assistant_message(&request.organization_id, &request.agent_id, &final_response)
             .await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
@@ -355,7 +365,7 @@ impl AgentOrchestrator {
         let now = chrono::Utc::now();
         let message = DbMessage {
             id: Uuid::new_v4().to_string(),
-            organization_id: "default".to_string(), // TODO: 从 request 获取
+            organization_id: request.organization_id.clone(),
             user_id: request.user_id.clone(),
             agent_id: request.agent_id.clone(),
             role: "user".to_string(),
@@ -389,6 +399,7 @@ impl AgentOrchestrator {
     /// 创建 assistant 消息
     async fn create_assistant_message(
         &self,
+        organization_id: &str,
         agent_id: &str,
         content: &str,
     ) -> Result<String> {
@@ -398,7 +409,7 @@ impl AgentOrchestrator {
         let now = chrono::Utc::now();
         let message = DbMessage {
             id: Uuid::new_v4().to_string(),
-            organization_id: "default".to_string(), // TODO: 从配置获取
+            organization_id: organization_id.to_string(),
             user_id: "system".to_string(), // TODO: 从 context 获取
             agent_id: agent_id.to_string(),
             role: "assistant".to_string(),
@@ -584,6 +595,7 @@ mod tests {
             message: "Hello, how are you?".to_string(),
             agent_id: "agent-123".to_string(),
             user_id: "user-456".to_string(),
+            organization_id: "org-789".to_string(),
             stream: false,
             max_memories: 10,
         };
@@ -591,6 +603,7 @@ mod tests {
         assert_eq!(request.message, "Hello, how are you?");
         assert_eq!(request.agent_id, "agent-123");
         assert_eq!(request.user_id, "user-456");
+        assert_eq!(request.organization_id, "org-789");
         assert!(!request.stream);
         assert_eq!(request.max_memories, 10);
     }
@@ -601,6 +614,7 @@ mod tests {
             message: "Test message".to_string(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            organization_id: "default".to_string(),
             stream: true,
             max_memories: 5,
         };
@@ -706,6 +720,7 @@ mod tests {
             message: "".to_string(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            organization_id: "default".to_string(),
             stream: false,
             max_memories: 5,
         };
@@ -720,6 +735,7 @@ mod tests {
             message: long_message.clone(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            organization_id: "default".to_string(),
             stream: false,
             max_memories: 5,
         };
