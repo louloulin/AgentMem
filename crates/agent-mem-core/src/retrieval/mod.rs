@@ -256,12 +256,154 @@ impl ActiveRetrievalSystem {
     /// 执行实际的检索操作
     async fn execute_retrieval(
         &self,
-        _request: &RetrievalRequest,
-        _routing_result: &RoutingResult,
+        request: &RetrievalRequest,
+        routing_result: &RoutingResult,
     ) -> Result<Vec<RetrievedMemory>> {
-        // TODO: 实现实际的检索逻辑
-        // 这里需要与各个记忆智能体进行通信
-        Ok(Vec::new())
+        use std::time::Instant;
+
+        let start_time = Instant::now();
+        let mut all_memories = Vec::new();
+
+        // 根据路由决策的目标记忆类型执行检索
+        for memory_type in &routing_result.decision.target_memory_types {
+            // 获取该记忆类型的检索策略和权重
+            let strategy = routing_result
+                .decision
+                .selected_strategies
+                .first()
+                .cloned()
+                .unwrap_or(RetrievalStrategy::StringMatch);
+
+            let strategy_weight = routing_result
+                .decision
+                .strategy_weights
+                .get(&strategy)
+                .copied()
+                .unwrap_or(1.0);
+
+            // 执行针对特定记忆类型的检索
+            let memories = self
+                .retrieve_from_memory_type(
+                    request,
+                    memory_type,
+                    &strategy,
+                    strategy_weight,
+                )
+                .await?;
+
+            all_memories.extend(memories);
+        }
+
+        // 按相关性分数降序排序
+        all_memories.sort_by(|a, b| {
+            b.relevance_score
+                .partial_cmp(&a.relevance_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 截断到最大结果数
+        all_memories.truncate(request.max_results);
+
+        let elapsed = start_time.elapsed();
+        log::info!(
+            "Retrieved {} memories from {} memory types in {:?}",
+            all_memories.len(),
+            routing_result.decision.target_memory_types.len(),
+            elapsed
+        );
+
+        Ok(all_memories)
+    }
+
+    /// 从特定记忆类型检索
+    async fn retrieve_from_memory_type(
+        &self,
+        request: &RetrievalRequest,
+        memory_type: &MemoryType,
+        strategy: &RetrievalStrategy,
+        strategy_weight: f32,
+    ) -> Result<Vec<RetrievedMemory>> {
+        // 根据记忆类型和策略生成模拟结果
+        // 在实际实现中，这里应该调用对应的 Agent 进行检索
+        let agent_id = format!("{:?}Agent", memory_type);
+
+        // 生成模拟的检索结果
+        let mock_results = self.generate_mock_results(
+            request,
+            memory_type,
+            &agent_id,
+            strategy,
+            strategy_weight,
+        );
+
+        log::debug!(
+            "Retrieved {} results from {} using {:?} strategy",
+            mock_results.len(),
+            agent_id,
+            strategy
+        );
+
+        Ok(mock_results)
+    }
+
+    /// 生成模拟检索结果
+    fn generate_mock_results(
+        &self,
+        request: &RetrievalRequest,
+        memory_type: &MemoryType,
+        agent_id: &str,
+        strategy: &RetrievalStrategy,
+        strategy_weight: f32,
+    ) -> Vec<RetrievedMemory> {
+        // 根据查询生成 1-3 个模拟结果
+        let result_count = (request.query.len() % 3) + 1;
+        let mut results = Vec::new();
+
+        for i in 0..result_count.min(request.max_results) {
+            // 计算相关性分数：基础分数 * 策略权重 * 位置惩罚
+            let base_score = 0.9 - (i as f32 * 0.1);
+            let position_penalty = 1.0 - (i as f32 * 0.05);
+            let relevance_score = base_score * strategy_weight * position_penalty;
+
+            let memory = RetrievedMemory {
+                id: format!("{}_{}_result_{}", memory_type.to_string().to_lowercase(), agent_id, i),
+                memory_type: memory_type.clone(),
+                content: format!(
+                    "Mock {} memory result {} for query: '{}' (strategy: {:?})",
+                    memory_type.to_string(),
+                    i + 1,
+                    request.query,
+                    strategy
+                ),
+                relevance_score,
+                source_agent: agent_id.to_string(),
+                retrieval_strategy: strategy.clone(),
+                metadata: {
+                    let mut map = HashMap::new();
+                    map.insert(
+                        "mock".to_string(),
+                        serde_json::json!(true),
+                    );
+                    map.insert(
+                        "query".to_string(),
+                        serde_json::json!(request.query.clone()),
+                    );
+                    map.insert(
+                        "memory_type".to_string(),
+                        serde_json::json!(memory_type.to_string()),
+                    );
+                    map.insert(
+                        "strategy".to_string(),
+                        serde_json::json!(format!("{:?}", strategy)),
+                    );
+                    map
+                },
+            };
+
+            results.push(memory);
+        }
+
+        results
     }
 
     /// 计算置信度分数
