@@ -38,7 +38,8 @@
 - **实时监控**: 完整的性能指标和健康检查
 
 ### 🔌 **灵活集成**
-- **多存储后端**: PostgreSQL、Redis、Pinecone、Qdrant 等
+- **多数据库后端**: LibSQL (默认, 嵌入式) 和 PostgreSQL (企业级)
+- **多存储后端**: Redis、Pinecone、Qdrant 等向量数据库
 - **LLM 集成**: OpenAI、Anthropic、DeepSeek、Ollama 等
 - **RESTful API**: 完整的 HTTP API 接口
 - **Mem0 兼容**: 100% API 兼容，支持无缝迁移
@@ -58,15 +59,72 @@
 git clone https://gitcode.com/louloulin/agentmem.git
 cd agentmem
 
-# 构建所有 crate
+# 构建所有 crate (默认使用 LibSQL)
 cargo build --release
 
 # 运行测试
 cargo test --workspace
 
-# 运行智能推理引擎演示
-cargo run --bin intelligent-reasoning-demo
+# 运行服务器 (零配置启动，自动使用 LibSQL)
+cargo run --bin agent-mem-server
 ```
+
+### **数据库配置**
+
+AgentMem 支持两种数据库后端：
+
+#### **选项 1: LibSQL (默认，推荐用于开发)**
+
+零配置启动，自动创建本地数据库文件：
+
+```bash
+# 直接运行，无需任何配置
+cargo run --bin agent-mem-server
+
+# 数据库文件会自动创建在 ./data/agentmem.db
+```
+
+#### **选项 2: PostgreSQL (推荐用于生产)**
+
+通过环境变量配置：
+
+```bash
+# 设置环境变量
+export DATABASE_BACKEND=postgres
+export DATABASE_URL=postgresql://user:password@localhost:5432/agentmem
+
+# 运行服务器
+cargo run --bin agent-mem-server --features postgres
+```
+
+或使用配置文件：
+
+```toml
+# config.toml
+[database]
+backend = "postgres"
+url = "postgresql://user:password@localhost:5432/agentmem"
+auto_migrate = true
+```
+
+```bash
+# 使用配置文件启动
+cargo run --bin agent-mem-server -- --config config.toml
+```
+
+#### **选项 3: 混合使用**
+
+开发环境使用 LibSQL，生产环境使用 PostgreSQL：
+
+```bash
+# 开发环境 (默认)
+cargo run
+
+# 生产环境
+DATABASE_BACKEND=postgres DATABASE_URL=postgresql://... cargo run --features postgres
+```
+
+更多配置选项请参考 [config.example.toml](config.example.toml) 和 [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)。
 
 ### **基础使用 - Mem0 兼容 API**
 
