@@ -314,7 +314,13 @@ mod tests {
         let repo = LibSqlUserRepository::new(conn);
 
         // Create
-        let user = User::new("org-123".to_string(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(
+            "org-123".to_string(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string()
+        );
         let created = repo.create(&user).await.unwrap();
         assert_eq!(created.name, "Test User");
 

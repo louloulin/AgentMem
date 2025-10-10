@@ -623,17 +623,6 @@ impl UserRepositoryTrait for PgUserRepository {
    - 编写部署脚本
    - 添加监控和告警
 
-### 已完成 ✅
-- [x] Task 1.1: 完善 Repository Traits (部分)
-  - [x] UserRepositoryTrait
-  - [x] AgentRepositoryTrait
-  - [x] MessageRepositoryTrait
-  - [x] ToolRepositoryTrait
-  - [x] OrganizationRepositoryTrait
-
-### 进行中 ⏳
-- [/] Task 2.2.1: LibSqlUserRepository (50% 完成)
-
 ---
 
 ## 🎯 验收标准
