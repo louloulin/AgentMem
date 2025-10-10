@@ -186,19 +186,18 @@ impl AgentOrchestrator {
         let messages = self.build_messages_with_memories(&request, &memories).await?;
         debug!("Built {} messages with memories", messages.len());
 
-        // 4. 调用 LLM
-        let response = self.llm_client.generate(&messages).await?;
-        debug!("Got LLM response: {} chars", response.len());
+        // 4. 调用 LLM（可能需要多轮工具调用）
+        let (final_response, tool_calls_info) = self.execute_with_tools(
+            &messages,
+            &request.user_id,
+        ).await?;
+        debug!("Got final response: {} chars, {} tool calls",
+            final_response.len(), tool_calls_info.len());
 
-        // 5. 处理工具调用（如果有）
-        // TODO: 实现工具调用逻辑
-        // 目前先跳过，后续实现
-        let tool_calls_info = Vec::new();
-
-        // 6. 保存 assistant 消息
+        // 5. 保存 assistant 消息
         let assistant_message_id = self.create_assistant_message(
             &request.agent_id,
-            &response,
+            &final_response,
         ).await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
@@ -213,7 +212,7 @@ impl AgentOrchestrator {
         // 8. 返回响应
         Ok(ChatResponse {
             message_id: assistant_message_id,
-            content: response,
+            content: final_response,
             memories_updated: memories_count > 0,
             memories_count,
             tool_calls: if tool_calls_info.is_empty() {
@@ -463,6 +462,98 @@ impl AgentOrchestrator {
         messages.push(Message::user(&request.message));
 
         Ok(messages)
+    }
+
+    /// 执行带工具调用的 LLM 对话
+    ///
+    /// 参考 MIRIX 的实现，支持多轮工具调用
+    async fn execute_with_tools(
+        &self,
+        messages: &[Message],
+        user_id: &str,
+    ) -> Result<(String, Vec<ToolCallInfo>)> {
+        let mut current_messages = messages.to_vec();
+        let mut all_tool_calls = Vec::new();
+        let mut round = 0;
+        let max_rounds = 5; // 最大工具调用轮数
+
+        loop {
+            round += 1;
+            if round > max_rounds {
+                warn!("Reached maximum tool call rounds ({})", max_rounds);
+                break;
+            }
+
+            debug!("Tool call round {}/{}", round, max_rounds);
+
+            // 获取可用工具
+            let available_tools = self.get_available_tools().await;
+
+            // 调用 LLM（支持工具调用）
+            let llm_response = self.llm_client
+                .generate_with_functions(&current_messages, &available_tools)
+                .await?;
+
+            // 检查是否有工具调用
+            if llm_response.function_calls.is_empty() {
+                // 没有工具调用，返回文本响应
+                let text = llm_response.text.unwrap_or_default();
+                info!("LLM response without tool calls, {} total tool calls made", all_tool_calls.len());
+                return Ok((text, all_tool_calls));
+            }
+
+            // 执行工具调用
+            info!("Executing {} tool call(s) in round {}", llm_response.function_calls.len(), round);
+            let tool_results = self.tool_integrator
+                .execute_tool_calls(&llm_response.function_calls, user_id)
+                .await?;
+
+            // 记录工具调用信息
+            for result in &tool_results {
+                all_tool_calls.push(ToolCallInfo {
+                    tool_name: result.tool_name.clone(),
+                    arguments: serde_json::from_str(&result.arguments).unwrap_or(serde_json::json!({})),
+                    result: if result.success {
+                        Some(result.result.clone())
+                    } else {
+                        result.error.clone()
+                    },
+                });
+            }
+
+            // 将工具结果添加到消息历史
+            if let Some(assistant_text) = llm_response.text {
+                current_messages.push(Message::assistant(&assistant_text));
+            }
+
+            // 添加工具结果消息
+            for result in &tool_results {
+                let tool_message = if result.success {
+                    format!("Tool '{}' result: {}", result.tool_name, result.result)
+                } else {
+                    format!("Tool '{}' error: {}", result.tool_name, result.error.as_ref().unwrap_or(&"Unknown error".to_string()))
+                };
+                current_messages.push(Message::system(&tool_message));
+            }
+
+            // 继续下一轮（让 LLM 处理工具结果）
+        }
+
+        // 如果达到最大轮数，返回最后的消息
+        let final_text = "Maximum tool call rounds reached. Please try again.".to_string();
+        Ok((final_text, all_tool_calls))
+    }
+
+    /// 获取可用的工具定义
+    async fn get_available_tools(&self) -> Vec<FunctionDefinition> {
+        // 从 ToolIntegrator 获取工具定义
+        match self.tool_integrator.get_tool_definitions().await {
+            Ok(tools) => tools,
+            Err(e) => {
+                warn!("Failed to get tool definitions: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     /// 提取和更新记忆

@@ -167,6 +167,48 @@ impl ToolIntegrator {
         Ok(results)
     }
 
+    /// 获取工具定义列表
+    ///
+    /// 从 ToolExecutor 获取所有已注册工具的定义，转换为 LLM 可用的格式
+    pub async fn get_tool_definitions(&self) -> Result<Vec<agent_mem_traits::llm::FunctionDefinition>> {
+        use agent_mem_traits::llm::FunctionDefinition;
+
+        // 获取所有工具名称
+        let tool_names = self.tool_executor.list_tools().await;
+
+        let mut definitions = Vec::new();
+
+        for tool_name in tool_names {
+            // 获取工具 schema
+            if let Some(schema) = self.tool_executor.get_schema(&tool_name).await {
+                // 构建 properties
+                let mut properties = serde_json::Map::new();
+                for (key, prop) in &schema.parameters.properties {
+                    properties.insert(key.clone(), serde_json::json!({
+                        "type": prop.prop_type,
+                        "description": prop.description,
+                    }));
+                }
+
+                // 转换为 FunctionDefinition
+                let definition = FunctionDefinition {
+                    name: tool_name.clone(),
+                    description: schema.description.clone(),
+                    parameters: serde_json::json!({
+                        "type": "object",
+                        "properties": properties,
+                        "required": schema.parameters.required,
+                    }),
+                };
+
+                definitions.push(definition);
+            }
+        }
+
+        debug!("Loaded {} tool definitions", definitions.len());
+        Ok(definitions)
+    }
+
     /// 格式化工具结果为 LLM 消息
     ///
     /// 将工具执行结果格式化为可以发送给 LLM 的消息格式

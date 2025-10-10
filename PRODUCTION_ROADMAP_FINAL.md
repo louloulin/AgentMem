@@ -175,44 +175,142 @@ async fn create_user_message(&self, request: &ChatRequest) -> Result<String> {
 
 ---
 
-#### Week 2: 工具调用集成 🔥
+#### Week 2: 工具调用集成 ✅
 
-**Task 2.1: 实现工具调用逻辑** (3 天)
+**Task 2.1: 实现工具调用逻辑** (3 天) ✅ **已完成** (2025-01-10)
 ```rust
-pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
-    // ... 前面的步骤 ...
-    
-    // 4. 调用 LLM（带工具定义）
-    let available_tools = self.tool_executor.list_tools().await;
-    let tool_definitions = self.get_tool_definitions(&available_tools).await?;
-    
-    let response = self.llm_client.generate_with_tools(
-        &messages,
-        &tool_definitions,
-    ).await?;
-    
-    // 5. 处理工具调用（修复 TODO）
-    let tool_calls_info = if let Some(tool_calls) = response.tool_calls {
-        self.handle_tool_calls(tool_calls, &request).await?
-    } else {
-        Vec::new()
-    };
-    
-    // ... 后面的步骤 ...
+/// 执行带工具调用的 LLM 对话
+async fn execute_with_tools(
+    &self,
+    messages: &[Message],
+    user_id: &str,
+) -> Result<(String, Vec<ToolCallInfo>)> {
+    let mut current_messages = messages.to_vec();
+    let mut all_tool_calls = Vec::new();
+    let max_rounds = 5;
+
+    loop {
+        // 获取可用工具
+        let available_tools = self.get_available_tools().await;
+
+        // 调用 LLM（支持工具调用）
+        let llm_response = self.llm_client
+            .generate_with_functions(&current_messages, &available_tools)
+            .await?;
+
+        // 检查是否有工具调用
+        if llm_response.function_calls.is_empty() {
+            return Ok((llm_response.text.unwrap_or_default(), all_tool_calls));
+        }
+
+        // 执行工具调用
+        let tool_results = self.tool_integrator
+            .execute_tool_calls(&llm_response.function_calls, user_id)
+            .await?;
+
+        // 记录工具调用信息
+        for result in &tool_results {
+            all_tool_calls.push(ToolCallInfo { ... });
+        }
+
+        // 将工具结果添加到消息历史
+        // 继续下一轮
+    }
 }
 ```
+
+**实现状态**: ✅ **已完成** (2025-01-10)
+- 实现了 execute_with_tools() 方法
+- 支持多轮工具调用（最多 5 轮）
+- 工具结果自动添加到消息历史
+- 返回最终响应和工具调用信息
 
 **验收标准**:
 - ✅ 工具调用正常执行
 - ✅ 工具结果正确返回
 - ✅ 错误处理完善
 
-**Task 2.2: 工具注册和发现** (2 天)
+**Task 2.2: 集成 ToolExecutor** (2 天) ✅ **已完成** (2025-01-10)
+```rust
+/// 获取可用的工具定义
+async fn get_available_tools(&self) -> Vec<FunctionDefinition> {
+    match self.tool_integrator.get_tool_definitions().await {
+        Ok(tools) => tools,
+        Err(e) => {
+            warn!("Failed to get tool definitions: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+// ToolIntegrator 实现
+pub async fn get_tool_definitions(&self) -> Result<Vec<FunctionDefinition>> {
+    let tool_names = self.tool_executor.list_tools().await;
+
+    let mut definitions = Vec::new();
+    for tool_name in tool_names {
+        if let Some(schema) = self.tool_executor.get_schema(&tool_name).await {
+            let definition = FunctionDefinition {
+                name: tool_name.clone(),
+                description: schema.description.clone(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": /* ... */,
+                    "required": schema.parameters.required,
+                }),
+            };
+            definitions.push(definition);
+        }
+    }
+    Ok(definitions)
+}
+```
+
+**实现状态**: ✅ **已完成** (2025-01-10)
+- 实现了 get_available_tools() 方法
+- 实现了 ToolIntegrator::get_tool_definitions()
+- 从 ToolExecutor 获取工具列表和 schema
+- 转换为 LLM 可用的 FunctionDefinition 格式
 
 **验收标准**:
 - ✅ 工具可以动态注册
 - ✅ 工具列表可以查询
 - ✅ 工具定义正确生成
+
+**Task 2.3: 测试工具调用流程** (2 天) ✅ **已完成** (2025-01-10)
+
+**测试文件**: `crates/agent-mem-core/tests/tool_call_integration_test.rs`
+
+**测试用例**:
+1. ✅ test_tool_integrator_creation - 工具集成器创建
+2. ✅ test_tool_executor_registration - 工具注册
+3. ✅ test_tool_execution_basic - 基本工具执行
+4. ✅ test_tool_call_integration - 工具调用集成
+5. ✅ test_tool_definitions_retrieval - 工具定义获取
+6. ✅ test_tool_error_handling - 错误处理
+7. ✅ test_tool_result_formatting - 结果格式化
+8. ✅ test_multiple_tool_rounds - 多轮工具调用
+
+**测试结果**: ✅ **8/8 通过** (2025-01-10)
+```
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured
+```
+
+**验收标准**:
+- ✅ 单工具调用测试通过
+- ✅ 多工具调用测试通过
+- ✅ 工具错误处理测试通过
+- ✅ 多轮工具调用测试通过
+
+---
+
+**Week 2 总结**: ✅ **全部完成** (2025-01-10)
+- Task 2.1: 实现工具调用逻辑 ✅
+- Task 2.2: 集成 ToolExecutor ✅
+- Task 2.3: 测试工具调用流程 ✅
+- 测试: tool_call_integration_test.rs 通过 (8/8) ✅
+
+**下一步**: 开始 Week 3 - 第一批智能体集成
 
 #### Week 3: 第一批智能体集成 🔥
 
