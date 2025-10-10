@@ -263,6 +263,308 @@ async fn test_semantic_agent_search_with_real_store() {
     assert_eq!(results[0]["name"], "Rust Programming");
 }
 
-// Note: update test is not included because SemanticAgent's handle_update()
-// has not yet been integrated with real storage (still has TODO comment)
+/// Test SemanticAgent update with real storage
+#[tokio::test]
+async fn test_semantic_agent_update_with_real_store() {
+    let store = Arc::new(MockSemanticStore::new());
+    let mut agent = SemanticAgent::with_store("semantic-agent-1".to_string(), store.clone());
+    agent.initialize().await.unwrap();
 
+    // First, insert an item
+    let item_id = "item-update-1";
+    let now = Utc::now();
+    let params_insert = json!({
+        "id": item_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "Original Name",
+        "summary": "Original summary",
+        "details": "Original details",
+        "source": "test",
+        "tree_path": ["root", "category"],
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": now.to_rfc3339()
+    });
+
+    let task_insert = TaskRequest {
+        task_id: "task-insert".to_string(),
+        memory_type: MemoryType::Semantic,
+        operation: "insert".to_string(),
+        parameters: params_insert,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    agent.execute_task(task_insert).await.unwrap();
+
+    // Now update the item
+    let updated_at = Utc::now();
+    let params_update = json!({
+        "id": item_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "Updated Name",
+        "summary": "Updated summary",
+        "details": "Updated details",
+        "source": "test",
+        "tree_path": ["root", "category"],
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": updated_at.to_rfc3339()
+    });
+
+    let task_update = TaskRequest {
+        task_id: "task-update".to_string(),
+        memory_type: MemoryType::Semantic,
+        operation: "update".to_string(),
+        parameters: params_update,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    let response = agent.execute_task(task_update).await.unwrap();
+    if !response.success {
+        eprintln!("Update failed: {:?}", response);
+    }
+    assert!(response.success);
+
+    let result = response.data.unwrap();
+    assert_eq!(result["success"], true);
+    assert_eq!(result["item_id"], item_id);
+
+    // Verify the item was actually updated in the store
+    let stored_item = store.get_item(item_id, "user123").await.unwrap().unwrap();
+    assert_eq!(stored_item.name, "Updated Name");
+    assert_eq!(stored_item.summary, "Updated summary");
+}
+
+/// Test SemanticAgent delete with real storage
+#[tokio::test]
+async fn test_semantic_agent_delete_with_real_store() {
+    let store = Arc::new(MockSemanticStore::new());
+    let mut agent = SemanticAgent::with_store("semantic-agent-1".to_string(), store.clone());
+    agent.initialize().await.unwrap();
+
+    // First, insert an item
+    let item_id = "item-delete-1";
+    let params_insert = json!({
+        "id": item_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "To Be Deleted",
+        "summary": "This item will be deleted",
+        "details": null,
+        "source": "test",
+        "tree_path": ["root"],
+        "metadata": {}
+    });
+
+    let task_insert = TaskRequest {
+        task_id: "task-insert".to_string(),
+        
+        memory_type: MemoryType::Semantic,
+        operation: "insert".to_string(),
+        parameters: params_insert,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    agent.execute_task(task_insert).await.unwrap();
+
+    // Verify item exists
+    assert!(store.get_item(item_id, "user123").await.unwrap().is_some());
+
+    // Now delete the item
+    let params_delete = json!({
+        "id": item_id,
+        "user_id": "user123"
+    });
+
+    let task_delete = TaskRequest {
+        task_id: "task-delete".to_string(),
+        
+        memory_type: MemoryType::Semantic,
+        operation: "delete".to_string(),
+        parameters: params_delete,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    let response = agent.execute_task(task_delete).await.unwrap();
+    assert!(response.success);
+
+    let result = response.data.unwrap();
+    assert_eq!(result["success"], true);
+    assert_eq!(result["item_id"], item_id);
+
+    // Verify the item was actually deleted from the store
+    assert!(store.get_item(item_id, "user123").await.unwrap().is_none());
+}
+
+/// Test SemanticAgent query_relationships with real storage
+#[tokio::test]
+async fn test_semantic_agent_query_relationships_with_real_store() {
+    let store = Arc::new(MockSemanticStore::new());
+    let mut agent = SemanticAgent::with_store("semantic-agent-1".to_string(), store.clone());
+    agent.initialize().await.unwrap();
+
+    // Insert a main concept
+    let main_id = "concept-main";
+    let params_main = json!({
+        "id": main_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "Main Concept",
+        "summary": "The main concept",
+        "details": null,
+        "source": "test",
+        "tree_path": ["root", "category", "subcategory"],
+        "metadata": {}
+    });
+
+    let task_main = TaskRequest {
+        task_id: "task-main".to_string(),
+        
+        memory_type: MemoryType::Semantic,
+        operation: "insert".to_string(),
+        parameters: params_main,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    agent.execute_task(task_main).await.unwrap();
+
+    // Insert related concepts with same tree_path
+    let related_id = "concept-related";
+    let params_related = json!({
+        "id": related_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "Related Concept",
+        "summary": "A related concept",
+        "details": null,
+        "source": "test",
+        "tree_path": ["root", "category", "subcategory"],
+        "metadata": {}
+    });
+
+    let task_related = TaskRequest {
+        task_id: "task-related".to_string(),
+        
+        memory_type: MemoryType::Semantic,
+        operation: "insert".to_string(),
+        parameters: params_related,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    agent.execute_task(task_related).await.unwrap();
+
+    // Query relationships
+    let params_query = json!({
+        "concept_id": main_id,
+        "user_id": "user123"
+    });
+
+    let task_query = TaskRequest {
+        task_id: "task-query-rel".to_string(),
+
+        memory_type: MemoryType::Semantic,
+        operation: "relationship_query".to_string(),
+        parameters: params_query,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    let response = agent.execute_task(task_query).await.unwrap();
+    assert!(response.success);
+
+    let result = response.data.unwrap();
+    assert_eq!(result["success"], true);
+    assert_eq!(result["concept_id"], main_id);
+
+    // Should find the related concept
+    let relationships = result["relationships"].as_array().unwrap();
+    assert_eq!(relationships.len(), 1);
+    assert_eq!(relationships[0]["id"], related_id);
+}
+
+/// Test SemanticAgent graph_traversal with real storage
+#[tokio::test]
+async fn test_semantic_agent_graph_traversal_with_real_store() {
+    let store = Arc::new(MockSemanticStore::new());
+    let mut agent = SemanticAgent::with_store("semantic-agent-1".to_string(), store.clone());
+    agent.initialize().await.unwrap();
+
+    // Insert a start concept
+    let start_id = "concept-start";
+    let params_start = json!({
+        "id": start_id,
+        "organization_id": "org1",
+        "user_id": "user123",
+        "agent_id": "agent1",
+        "name": "Start Concept",
+        "summary": "The starting point",
+        "details": null,
+        "source": "test",
+        "tree_path": ["root", "level1", "level2"],
+        "metadata": {}
+    });
+
+    let task_start = TaskRequest {
+        task_id: "task-start".to_string(),
+        
+        memory_type: MemoryType::Semantic,
+        operation: "insert".to_string(),
+        parameters: params_start,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    agent.execute_task(task_start).await.unwrap();
+
+    // Traverse the graph
+    let params_traverse = json!({
+        "start_concept": start_id,
+        "user_id": "user123",
+        "max_depth": 2
+    });
+
+    let task_traverse = TaskRequest {
+        task_id: "task-traverse".to_string(),
+
+        memory_type: MemoryType::Semantic,
+        operation: "graph_traversal".to_string(),
+        parameters: params_traverse,
+        priority: 1,
+        timeout: None,
+        retry_count: 0,
+    };
+
+    let response = agent.execute_task(task_traverse).await.unwrap();
+    assert!(response.success);
+
+    let result = response.data.unwrap();
+    assert_eq!(result["success"], true);
+    assert_eq!(result["start_concept"], start_id);
+    assert_eq!(result["max_depth"], 2);
+
+    // Should have traversal path
+    let traversal_path = result["traversal_path"].as_array().unwrap();
+    assert!(traversal_path.len() > 0);
+    assert_eq!(traversal_path[0]["id"], start_id);
+}

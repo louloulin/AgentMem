@@ -204,7 +204,71 @@ impl SemanticAgent {
     }
 
     /// Handle concept relationship queries
+    ///
+    /// Note: This is a simplified implementation using tree_path for relationships.
+    /// For full graph relationship support, a graph database backend would be needed.
     async fn handle_relationship_query(&self, parameters: Value) -> AgentResult<Value> {
+        // Use semantic_store if available
+        if let Some(store) = &self.semantic_store {
+            let concept_id = parameters
+                .get("concept_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'concept_id' parameter".to_string())
+                })?;
+
+            let user_id = parameters
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+                })?;
+
+            // Get the concept item
+            let item = store.get_item(concept_id, user_id).await
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get item: {}", e)))?;
+
+            if let Some(item) = item {
+                // Use tree_path to find related items (simplified relationship model)
+                let related_items = store.search_by_tree_path(user_id, item.tree_path.clone()).await
+                    .map_err(|e| AgentError::MemoryManagerError(format!("Failed to search by tree path: {}", e)))?;
+
+                // Filter out the concept itself
+                let relationships: Vec<_> = related_items
+                    .into_iter()
+                    .filter(|r| r.id != concept_id)
+                    .map(|r| serde_json::json!({
+                        "id": r.id,
+                        "name": r.name,
+                        "summary": r.summary,
+                        "tree_path": r.tree_path,
+                        "relationship_type": "tree_sibling" // Simplified relationship type
+                    }))
+                    .collect();
+
+                log::info!(
+                    "Semantic agent: Found {} relationships for concept {} using real storage",
+                    relationships.len(),
+                    concept_id
+                );
+
+                return Ok(serde_json::json!({
+                    "success": true,
+                    "concept_id": concept_id,
+                    "relationships": relationships,
+                    "relationship_type": "tree_based"
+                }));
+            } else {
+                log::warn!("Semantic agent: Concept {} not found", concept_id);
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "concept_id": concept_id,
+                    "message": "Concept not found"
+                }));
+            }
+        }
+
+        // Fallback to mock response if store not available
         let concept_id = parameters
             .get("concept_id")
             .and_then(|v| v.as_str())
@@ -217,24 +281,107 @@ impl SemanticAgent {
             .and_then(|v| v.as_str())
             .unwrap_or("all");
 
-        // TODO: Integrate with actual relationship query
         let response = serde_json::json!({
             "success": true,
             "concept_id": concept_id,
             "relationships": [],
-            "relationship_type": relationship_type
+            "relationship_type": relationship_type,
+            "note": "Mock response - store not available"
         });
 
-        log::info!(
-            "Semantic agent: Queried relationships for concept {} (type: {})",
-            concept_id,
-            relationship_type
-        );
+        log::warn!("Semantic agent: Using mock response for relationship query (store not available)");
         Ok(response)
     }
 
     /// Handle knowledge graph traversal
+    ///
+    /// Note: This is a simplified implementation using tree_path for traversal.
+    /// For full graph traversal support, a graph database backend would be needed.
     async fn handle_graph_traversal(&self, parameters: Value) -> AgentResult<Value> {
+        // Use semantic_store if available
+        if let Some(store) = &self.semantic_store {
+            let start_concept = parameters
+                .get("start_concept")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'start_concept' parameter".to_string())
+                })?;
+
+            let user_id = parameters
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+                })?;
+
+            let max_depth = parameters
+                .get("max_depth")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(3) as usize;
+
+            // Get the starting concept
+            let start_item = store.get_item(start_concept, user_id).await
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get start concept: {}", e)))?;
+
+            if let Some(start_item) = start_item {
+                // Simplified traversal: explore tree path hierarchy
+                let mut traversal_path = vec![serde_json::json!({
+                    "id": start_item.id,
+                    "name": start_item.name,
+                    "depth": 0
+                })];
+
+                let mut related_concepts = Vec::new();
+
+                // Traverse up to max_depth levels
+                for depth in 1..=max_depth {
+                    // Get items at current tree path level
+                    let mut current_path = start_item.tree_path.clone();
+                    if current_path.len() >= depth {
+                        current_path.truncate(current_path.len() - depth + 1);
+
+                        let items = store.search_by_tree_path(user_id, current_path).await
+                            .map_err(|e| AgentError::MemoryManagerError(format!("Failed to traverse: {}", e)))?;
+
+                        for item in items {
+                            if item.id != start_concept {
+                                related_concepts.push(serde_json::json!({
+                                    "id": item.id,
+                                    "name": item.name,
+                                    "summary": item.summary,
+                                    "depth": depth,
+                                    "tree_path": item.tree_path
+                                }));
+                            }
+                        }
+                    }
+                }
+
+                log::info!(
+                    "Semantic agent: Graph traversal from '{}' found {} related concepts using real storage",
+                    start_concept,
+                    related_concepts.len()
+                );
+
+                return Ok(serde_json::json!({
+                    "success": true,
+                    "start_concept": start_concept,
+                    "max_depth": max_depth,
+                    "traversal_path": traversal_path,
+                    "related_concepts": related_concepts,
+                    "traversal_type": "tree_based"
+                }));
+            } else {
+                log::warn!("Semantic agent: Start concept {} not found", start_concept);
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "start_concept": start_concept,
+                    "message": "Start concept not found"
+                }));
+            }
+        }
+
+        // Fallback to mock response if store not available
         let start_concept = parameters
             .get("start_concept")
             .and_then(|v| v.as_str())
@@ -247,25 +394,49 @@ impl SemanticAgent {
             .and_then(|v| v.as_u64())
             .unwrap_or(3);
 
-        // TODO: Integrate with actual graph traversal
         let response = serde_json::json!({
             "success": true,
             "start_concept": start_concept,
             "max_depth": max_depth,
             "traversal_path": [],
-            "related_concepts": []
+            "related_concepts": [],
+            "note": "Mock response - store not available"
         });
 
-        log::info!(
-            "Semantic agent: Graph traversal from '{}' with max depth {}",
-            start_concept,
-            max_depth
-        );
+        log::warn!("Semantic agent: Using mock response for graph traversal (store not available)");
         Ok(response)
     }
 
     /// Handle semantic knowledge update
     async fn handle_update(&self, parameters: Value) -> AgentResult<Value> {
+        // Use semantic_store if available
+        if let Some(store) = &self.semantic_store {
+            // Parse the updated item from parameters
+            let item: SemanticMemoryItem = serde_json::from_value(parameters.clone())
+                .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {}", e)))?;
+
+            // Update the item in the store
+            let updated = store.update_item(item.clone()).await
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to update item: {}", e)))?;
+
+            if updated {
+                log::info!("Semantic agent: Updated item {} in real storage", item.id);
+                return Ok(serde_json::json!({
+                    "success": true,
+                    "item_id": item.id,
+                    "message": "Semantic knowledge updated successfully"
+                }));
+            } else {
+                log::warn!("Semantic agent: Item {} not found for update", item.id);
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "item_id": item.id,
+                    "message": "Item not found"
+                }));
+            }
+        }
+
+        // Fallback to mock response if store not available
         let concept_id = parameters
             .get("concept_id")
             .and_then(|v| v.as_str())
@@ -273,19 +444,58 @@ impl SemanticAgent {
                 AgentError::InvalidParameters("Missing 'concept_id' parameter".to_string())
             })?;
 
-        // TODO: Integrate with actual semantic memory update
         let response = serde_json::json!({
             "success": true,
             "concept_id": concept_id,
-            "message": "Semantic knowledge updated successfully"
+            "message": "Semantic knowledge updated successfully (mock)"
         });
 
-        log::info!("Semantic agent: Updated concept {}", concept_id);
+        log::warn!("Semantic agent: Using mock response for update (store not available)");
         Ok(response)
     }
 
     /// Handle semantic knowledge deletion
     async fn handle_delete(&self, parameters: Value) -> AgentResult<Value> {
+        // Use semantic_store if available
+        if let Some(store) = &self.semantic_store {
+            let item_id = parameters
+                .get("id")
+                .or_else(|| parameters.get("item_id"))
+                .or_else(|| parameters.get("concept_id"))
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'id' or 'item_id' parameter".to_string())
+                })?;
+
+            let user_id = parameters
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
+                })?;
+
+            // Delete the item from the store
+            let deleted = store.delete_item(item_id, user_id).await
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to delete item: {}", e)))?;
+
+            if deleted {
+                log::info!("Semantic agent: Deleted item {} from real storage", item_id);
+                return Ok(serde_json::json!({
+                    "success": true,
+                    "item_id": item_id,
+                    "message": "Semantic knowledge deleted successfully"
+                }));
+            } else {
+                log::warn!("Semantic agent: Item {} not found for deletion", item_id);
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "item_id": item_id,
+                    "message": "Item not found"
+                }));
+            }
+        }
+
+        // Fallback to mock response if store not available
         let concept_id = parameters
             .get("concept_id")
             .and_then(|v| v.as_str())
@@ -293,14 +503,13 @@ impl SemanticAgent {
                 AgentError::InvalidParameters("Missing 'concept_id' parameter".to_string())
             })?;
 
-        // TODO: Integrate with actual semantic memory deletion
         let response = serde_json::json!({
             "success": true,
             "concept_id": concept_id,
-            "message": "Semantic knowledge deleted successfully"
+            "message": "Semantic knowledge deleted successfully (mock)"
         });
 
-        log::info!("Semantic agent: Deleted concept {}", concept_id);
+        log::warn!("Semantic agent: Using mock response for delete (store not available)");
         Ok(response)
     }
 }
