@@ -352,6 +352,7 @@ async fn test_semantic_agent_delete_with_real_store() {
 
     // First, insert an item
     let item_id = "item-delete-1";
+    let now = Utc::now();
     let params_insert = json!({
         "id": item_id,
         "organization_id": "org1",
@@ -362,7 +363,9 @@ async fn test_semantic_agent_delete_with_real_store() {
         "details": null,
         "source": "test",
         "tree_path": ["root"],
-        "metadata": {}
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": now.to_rfc3339()
     });
 
     let task_insert = TaskRequest {
@@ -418,6 +421,7 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
 
     // Insert a main concept
     let main_id = "concept-main";
+    let now = Utc::now();
     let params_main = json!({
         "id": main_id,
         "organization_id": "org1",
@@ -428,7 +432,9 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
         "details": null,
         "source": "test",
         "tree_path": ["root", "category", "subcategory"],
-        "metadata": {}
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": now.to_rfc3339()
     });
 
     let task_main = TaskRequest {
@@ -456,7 +462,9 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
         "details": null,
         "source": "test",
         "tree_path": ["root", "category", "subcategory"],
-        "metadata": {}
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": now.to_rfc3339()
     });
 
     let task_related = TaskRequest {
@@ -511,6 +519,7 @@ async fn test_semantic_agent_graph_traversal_with_real_store() {
 
     // Insert a start concept
     let start_id = "concept-start";
+    let now = Utc::now();
     let params_start = json!({
         "id": start_id,
         "organization_id": "org1",
@@ -521,7 +530,9 @@ async fn test_semantic_agent_graph_traversal_with_real_store() {
         "details": null,
         "source": "test",
         "tree_path": ["root", "level1", "level2"],
-        "metadata": {}
+        "metadata": {},
+        "created_at": now.to_rfc3339(),
+        "updated_at": now.to_rfc3339()
     });
 
     let task_start = TaskRequest {
