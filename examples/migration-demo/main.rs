@@ -2,7 +2,7 @@
 //!
 //! 演示如何使用 AgentMem 的数据迁移工具在不同存储后端之间迁移数据
 
-use agent_mem_storage::StorageFactory;
+use agent_mem_storage::VectorStoreFactory;
 use agent_mem_traits::{VectorData, VectorStoreConfig};
 use agent_mem_utils::{DataMigrator, MigrationConfig, MigrationStatus, MigrationTools};
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dimension: Some(128),
         ..Default::default()
     };
-    let source = StorageFactory::create_vector_store(&source_config).await?;
+    let source = VectorStoreFactory::create_vector_store(&source_config).await?;
 
     // 添加一些测试数据到源存储
     info!("向源存储添加测试数据...");
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dimension: Some(128),
         ..Default::default()
     };
-    let target = StorageFactory::create_vector_store(&target_config).await?;
+    let target = VectorStoreFactory::create_vector_store(&target_config).await?;
 
     // 验证存储兼容性
     info!("验证存储兼容性...");

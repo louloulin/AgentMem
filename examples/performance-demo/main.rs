@@ -5,7 +5,7 @@
 use agent_mem_storage::{
     cache::{CacheConfig, CachedVectorStore},
     performance::{MonitoredVectorStore, PerformanceMonitor},
-    StorageFactory,
+    VectorStoreFactory,
 };
 use agent_mem_traits::{VectorData, VectorStoreConfig};
 use std::collections::HashMap;
@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dimension: Some(128),
         ..Default::default()
     };
-    let base_store = StorageFactory::create_vector_store(&base_config).await?;
+    let base_store = VectorStoreFactory::create_vector_store(&base_config).await?;
 
     // 创建性能监控器
     let monitor = Arc::new(PerformanceMonitor::new(

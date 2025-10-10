@@ -99,7 +99,7 @@ use agent_mem_intelligence::{
 use agent_mem_llm::{prompts::PromptManager, LLMClient, LLMFactory};
 use agent_mem_storage::{
     vector::{SimilarityCalculator, SimilarityMetric, VectorUtils},
-    StorageFactory,
+    VectorStoreFactory,
 };
 use agent_mem_traits::{LLMConfig, MemoryProvider, Message, Session, VectorStoreConfig};
 use agent_mem_utils::{clean_text, extract_json, hash_content, Timer};
@@ -317,7 +317,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 演示存储工厂模式
     println!(
         "   Supported storage providers: {:?}",
-        StorageFactory::supported_providers()
+        VectorStoreFactory::supported_providers()
     );
 
     // 创建内存向量存储（3维向量用于演示）
@@ -326,7 +326,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dimension: Some(3),
         ..Default::default()
     };
-    let memory_store = StorageFactory::create_vector_store(&config).await?;
+    let memory_store = VectorStoreFactory::create_vector_store(&config).await?;
     println!("   Created memory vector store");
 
     // 演示新的存储提供商配置（不会实际连接）

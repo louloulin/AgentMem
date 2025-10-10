@@ -9,7 +9,7 @@ use agent_mem_embeddings::factory::EmbeddingFactory;
 use agent_mem_embeddings::EmbeddingConfig;
 use agent_mem_llm::factory::LLMFactory;
 use agent_mem_performance::{PerformanceConfig, PerformanceMonitor};
-use agent_mem_storage::factory::StorageFactory;
+use agent_mem_storage::VectorStoreFactory;
 use agent_mem_traits::{LLMConfig, Message, MessageRole, VectorStoreConfig};
 use std::collections::HashMap;
 use tracing::{error, info, warn};
@@ -150,7 +150,7 @@ async fn demo_real_storage_backends() -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    match StorageFactory::create_vector_store(&memory_config).await {
+    match VectorStoreFactory::create_vector_store(&memory_config).await {
         Ok(store) => {
             info!("✅ 内存存储后端创建成功");
 
