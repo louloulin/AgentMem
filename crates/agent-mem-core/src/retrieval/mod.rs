@@ -4,9 +4,11 @@
 //! - TopicExtractor: 基于 LLM 的主题提取
 //! - RetrievalRouter: 智能路由和多策略检索
 //! - ContextSynthesizer: 多源记忆融合和上下文合成
+//! - AgentRegistry: Agent 注册表，支持真实 Agent 调用
 //!
 //! 参考 MIRIX 的设计模式，但针对 Rust 的特性进行了优化
 
+pub mod agent_registry;
 pub mod router;
 pub mod synthesizer;
 pub mod topic_extractor;
@@ -15,6 +17,7 @@ pub mod topic_extractor;
 mod tests;
 
 // Re-export main types
+pub use agent_registry::AgentRegistry;
 pub use router::{
     RetrievalRouter, RetrievalRouterConfig, RetrievalStrategy, RouteDecision, RoutingResult,
 };
@@ -131,10 +134,14 @@ pub struct ActiveRetrievalSystem {
     router: Arc<RetrievalRouter>,
     /// 上下文合成器
     synthesizer: Arc<ContextSynthesizer>,
+    /// Agent 注册表
+    agent_registry: Arc<RwLock<AgentRegistry>>,
     /// 系统配置
     config: ActiveRetrievalConfig,
     /// 检索缓存
     cache: Arc<RwLock<HashMap<String, (RetrievalResponse, std::time::Instant)>>>,
+    /// 是否使用真实 Agent（false 则使用 Mock）
+    use_real_agents: bool,
 }
 
 impl ActiveRetrievalSystem {
@@ -148,9 +155,26 @@ impl ActiveRetrievalSystem {
             topic_extractor,
             router,
             synthesizer,
+            agent_registry: Arc::new(RwLock::new(AgentRegistry::new())),
             config,
             cache: Arc::new(RwLock::new(HashMap::new())),
+            use_real_agents: false, // 默认使用 Mock
         })
+    }
+
+    /// 启用真实 Agent 调用
+    pub fn enable_real_agents(&mut self) {
+        self.use_real_agents = true;
+    }
+
+    /// 禁用真实 Agent 调用（使用 Mock）
+    pub fn disable_real_agents(&mut self) {
+        self.use_real_agents = false;
+    }
+
+    /// 获取 Agent 注册表的引用
+    pub fn agent_registry(&self) -> Arc<RwLock<AgentRegistry>> {
+        Arc::clone(&self.agent_registry)
     }
 
     /// 执行主动检索
@@ -323,11 +347,63 @@ impl ActiveRetrievalSystem {
         strategy: &RetrievalStrategy,
         strategy_weight: f32,
     ) -> Result<Vec<RetrievedMemory>> {
-        // 根据记忆类型和策略生成模拟结果
-        // 在实际实现中，这里应该调用对应的 Agent 进行检索
         let agent_id = format!("{:?}Agent", memory_type);
 
-        // 生成模拟的检索结果
+        // 如果启用了真实 Agent，尝试调用真实 Agent
+        if self.use_real_agents {
+            let registry = self.agent_registry.read().await;
+
+            if registry.has_agent(memory_type).await {
+                log::debug!(
+                    "Using real agent for {} with {:?} strategy",
+                    agent_id,
+                    strategy
+                );
+
+                // 构建任务请求
+                let task = crate::coordination::TaskRequest {
+                    task_id: uuid::Uuid::new_v4().to_string(),
+                    memory_type: memory_type.clone(),
+                    operation: "search".to_string(),
+                    parameters: serde_json::json!({
+                        "query": request.query,
+                        "max_results": request.max_results,
+                        "strategy": format!("{:?}", strategy),
+                    }),
+                    priority: 5, // Normal priority
+                    timeout: Some(std::time::Duration::from_secs(5)),
+                    retry_count: 0,
+                };
+
+                // 调用真实 Agent
+                match registry.execute_task(memory_type, task).await {
+                    Ok(response) => {
+                        // 将 Agent 响应转换为 RetrievedMemory
+                        return self.convert_agent_response_to_memories(
+                            response,
+                            memory_type,
+                            &agent_id,
+                            strategy_weight,
+                        );
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to execute task on real agent {}: {}. Falling back to mock.",
+                            agent_id,
+                            e
+                        );
+                        // 失败时回退到 Mock
+                    }
+                }
+            } else {
+                log::debug!(
+                    "No real agent registered for {:?}, using mock",
+                    memory_type
+                );
+            }
+        }
+
+        // 使用 Mock 结果（默认或回退）
         let mock_results = self.generate_mock_results(
             request,
             memory_type,
@@ -337,13 +413,84 @@ impl ActiveRetrievalSystem {
         );
 
         log::debug!(
-            "Retrieved {} results from {} using {:?} strategy",
+            "Retrieved {} mock results from {} using {:?} strategy",
             mock_results.len(),
             agent_id,
             strategy
         );
 
         Ok(mock_results)
+    }
+
+    /// 将 Agent 响应转换为检索记忆
+    fn convert_agent_response_to_memories(
+        &self,
+        response: crate::coordination::TaskResponse,
+        memory_type: &MemoryType,
+        agent_id: &str,
+        strategy_weight: f32,
+    ) -> Result<Vec<RetrievedMemory>> {
+        // 检查响应是否成功
+        if !response.success {
+            log::warn!(
+                "Agent {} returned unsuccessful response: {:?}",
+                agent_id,
+                response.error
+            );
+            return Ok(Vec::new());
+        }
+
+        // 从响应中提取记忆数据
+        let memories_data = response
+            .data
+            .as_ref()
+            .and_then(|d| d.get("memories"))
+            .and_then(|v| v.as_array());
+
+        if let Some(memories) = memories_data {
+            let retrieved_memories: Vec<RetrievedMemory> = memories
+                .iter()
+                .filter_map(|mem| {
+                    let content = mem.get("content")?.as_str()?.to_string();
+                    let score = mem.get("score")?.as_f64().unwrap_or(0.5) as f32;
+
+                    Some(RetrievedMemory {
+                        id: mem.get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        memory_type: memory_type.clone(),
+                        content,
+                        relevance_score: score * strategy_weight,
+                        source_agent: agent_id.to_string(),
+                        retrieval_strategy: RetrievalStrategy::StringMatch, // 默认策略
+                        metadata: mem
+                            .get("metadata")
+                            .and_then(|v| v.as_object())
+                            .map(|obj| {
+                                obj.iter()
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                    })
+                })
+                .collect();
+
+            log::info!(
+                "Converted {} memories from real agent {}",
+                retrieved_memories.len(),
+                agent_id
+            );
+
+            Ok(retrieved_memories)
+        } else {
+            log::warn!(
+                "No memories found in agent response from {}",
+                agent_id
+            );
+            Ok(Vec::new())
+        }
     }
 
     /// 生成模拟检索结果
