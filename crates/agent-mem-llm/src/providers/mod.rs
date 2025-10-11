@@ -25,6 +25,7 @@ pub mod perplexity;
 pub mod together;
 #[cfg(test)]
 mod together_test;
+pub mod zhipu;
 
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureProvider;
@@ -41,3 +42,4 @@ pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
 pub use perplexity::PerplexityProvider;
 pub use together::TogetherProvider;
+pub use zhipu::ZhipuProvider;

@@ -170,18 +170,19 @@ pub async fn create_router(
     let app = app
         // OpenAPI documentation
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Add shared state via Extension
-        .layer(Extension(Arc::new(repositories)))
-        .layer(Extension(memory_manager))
-        .layer(Extension(metrics_registry))
-        .layer(Extension(ws_manager))
-        .layer(Extension(sse_manager))
         // Add middleware (order matters: last added = first executed)
-        .layer(axum_middleware::from_fn(metrics_middleware))
-        .layer(axum_middleware::from_fn(audit_logging_middleware))
-        .layer(axum_middleware::from_fn(quota_middleware))
+        // These middleware layers execute BEFORE the Extension layers below
+        .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive());
+        .layer(axum_middleware::from_fn(quota_middleware))
+        .layer(axum_middleware::from_fn(audit_logging_middleware))
+        .layer(axum_middleware::from_fn(metrics_middleware))
+        // Add shared state via Extension (must be after middleware that uses them)
+        .layer(Extension(sse_manager))
+        .layer(Extension(ws_manager))
+        .layer(Extension(metrics_registry))
+        .layer(Extension(memory_manager))
+        .layer(Extension(Arc::new(repositories)));
 
     Ok(app)
 }

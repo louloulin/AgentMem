@@ -1,0 +1,53 @@
+# AgentMem 配置文件 - Zhipu AI 测试配置
+
+[database]
+backend = "libsql"
+url = "./data/agentmem.db"
+auto_migrate = true
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 0
+request_timeout = 30
+
+[logging]
+level = "info"
+format = "pretty"
+output = "stdout"
+
+[auth]
+jwt_secret = "test-secret-key-for-development-only"
+jwt_expiration = 86400
+api_key_expiration = 0
+
+[cors]
+enabled = true
+allowed_origins = ["*"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+allowed_headers = ["Content-Type", "Authorization", "X-API-Key"]
+allow_credentials = true
+
+[llm]
+default_provider = "zhipu"
+
+[llm.zhipu]
+api_key = "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
+model = "glm-4-plus"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+max_tokens = 4096
+temperature = 0.7
+
+[llm.openai]
+api_key = "sk-test"
+model = "gpt-4"
+base_url = "https://api.openai.com/v1"
+max_tokens = 4096
+temperature = 0.7
+
+[monitoring]
+enable_metrics = true
+metrics_path = "/metrics"
+enable_health_check = true
+health_check_path = "/health"
+
