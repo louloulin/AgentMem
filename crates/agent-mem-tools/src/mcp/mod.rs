@@ -11,6 +11,7 @@ pub mod marketplace;
 pub mod error;
 pub mod resources;
 pub mod prompts;
+pub mod transport;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
@@ -30,4 +31,6 @@ pub use prompts::{
     McpListPromptsResponse, McpGetPromptRequest, McpGetPromptResponse,
     PromptManager,
 };
-
+pub use transport::{
+    Transport, HttpTransport, SseTransport,
+};

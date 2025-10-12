@@ -49,6 +49,7 @@ members = [
     "examples/onnx-embedding-demo",
     "examples/mcp-resources-demo",
     "examples/mcp-prompts-demo",
+    "examples/mcp-transport-demo",
 
     # 示例
     "examples/demo",
