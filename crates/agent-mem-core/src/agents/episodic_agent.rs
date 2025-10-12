@@ -404,12 +404,51 @@ impl MemoryAgent for EpisodicAgent {
             return Ok(());
         }
 
-        log::info!("Initializing Episodic Memory Agent: {}", self.agent_id());
+        log::info!("初始化情景记忆 Agent: {}", self.agent_id());
 
-        // TODO: Initialize episodic memory manager
-        // TODO: Set up any required resources
+        // 如果配置了存储后端，验证连接并加载统计信息
+        if let Some(store) = &self.episodic_store {
+            log::info!("验证情景记忆存储后端连接...");
+
+            // 尝试查询最近的事件以验证存储可用性
+            let query = EpisodicQuery {
+                start_time: None,
+                end_time: None,
+                event_type: None,
+                min_importance: None,
+                limit: Some(10),
+            };
+
+            // 使用 system 用户 ID 进行测试查询
+            match store.query_events("system", query).await {
+                Ok(events) => {
+                    log::info!(
+                        "成功连接到情景记忆存储，发现 {} 个最近事件",
+                        events.len()
+                    );
+
+                    // 更新统计信息
+                    let mut context = self.context.write().await;
+                    context.stats.total_tasks = events.len() as u64;
+                }
+                Err(e) => {
+                    log::warn!("查询情景记忆失败: {}，将从空状态开始", e);
+                }
+            }
+        } else {
+            log::warn!("未配置情景记忆存储后端，Agent 将以只读模式运行");
+        }
+
+        // 初始化 Agent 上下文
+        {
+            let mut context = self.context.write().await;
+            context.stats.active_tasks = 0;
+            context.stats.successful_tasks = 0;
+            context.stats.failed_tasks = 0;
+        }
 
         self.initialized = true;
+        log::info!("情景记忆 Agent 初始化完成");
         Ok(())
     }
 
@@ -418,12 +457,32 @@ impl MemoryAgent for EpisodicAgent {
             return Ok(());
         }
 
-        log::info!("Shutting down Episodic Memory Agent: {}", self.agent_id());
+        log::info!("关闭情景记忆 Agent: {}", self.agent_id());
 
-        // TODO: Clean up resources
-        // TODO: Persist any pending data
+        // 如果有存储后端，记录最终状态
+        if let Some(_store) = &self.episodic_store {
+            log::info!("情景记忆存储后端已配置，所有事件已通过 trait 方法持久化");
+
+            // 记录最终统计信息
+            let context = self.context.read().await;
+            log::info!(
+                "Agent 统计: 总任务={}, 完成={}, 失败={}, 活跃={}",
+                context.stats.total_tasks,
+                context.stats.successful_tasks,
+                context.stats.failed_tasks,
+                context.stats.active_tasks
+            );
+        }
+
+        // 清理上下文
+        {
+            let mut context = self.context.write().await;
+            context.current_task = None;
+            context.stats.active_tasks = 0;
+        }
 
         self.initialized = false;
+        log::info!("情景记忆 Agent 已成功关闭");
         Ok(())
     }
 

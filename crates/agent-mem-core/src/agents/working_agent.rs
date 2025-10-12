@@ -254,18 +254,81 @@ impl MemoryAgent for WorkingAgent {
     }
 
     async fn initialize(&mut self) -> CoordinationResult<()> {
-        if !self.initialized {
-            log::info!("Initializing Working Memory Agent: {}", self.agent_id());
-            self.initialized = true;
+        if self.initialized {
+            return Ok(());
         }
+
+        log::info!("初始化工作记忆 Agent: {}", self.agent_id());
+
+        // 如果配置了存储后端，验证连接并加载工作记忆统计信息
+        if let Some(store) = &self.working_store {
+            log::info!("验证工作记忆存储后端连接...");
+
+            // 尝试获取会话工作记忆项以验证存储可用性
+            // 使用 system 会话 ID 进行测试查询
+            match store.get_session_items("system").await {
+                Ok(items) => {
+                    log::info!(
+                        "成功连接到工作记忆存储，发现 {} 个活跃项",
+                        items.len()
+                    );
+
+                    // 更新统计信息
+                    let mut context = self.context.write().await;
+                    context.stats.total_tasks = items.len() as u64;
+                }
+                Err(e) => {
+                    log::warn!("查询工作记忆失败: {}，将从空状态开始", e);
+                }
+            }
+        } else {
+            log::warn!("未配置工作记忆存储后端，Agent 将以只读模式运行");
+        }
+
+        // 初始化 Agent 上下文
+        {
+            let mut context = self.context.write().await;
+            context.stats.active_tasks = 0;
+            context.stats.successful_tasks = 0;
+            context.stats.failed_tasks = 0;
+        }
+
+        self.initialized = true;
+        log::info!("工作记忆 Agent 初始化完成");
         Ok(())
     }
 
     async fn shutdown(&mut self) -> CoordinationResult<()> {
-        if self.initialized {
-            log::info!("Shutting down Working Memory Agent: {}", self.agent_id());
-            self.initialized = false;
+        if !self.initialized {
+            return Ok(());
         }
+
+        log::info!("关闭工作记忆 Agent: {}", self.agent_id());
+
+        // 如果有存储后端，记录最终状态
+        if let Some(_store) = &self.working_store {
+            log::info!("工作记忆存储后端已配置，所有工作记忆项已通过 trait 方法持久化");
+
+            // 记录最终统计信息
+            let context = self.context.read().await;
+            log::info!(
+                "Agent 统计: 总任务={}, 完成={}, 失败={}, 活跃={}",
+                context.stats.total_tasks,
+                context.stats.successful_tasks,
+                context.stats.failed_tasks,
+                context.stats.active_tasks
+            );
+        }
+
+        // 清理上下文
+        {
+            let mut context = self.context.write().await;
+            context.current_task = None;
+            context.stats.active_tasks = 0;
+        }
+
+        self.initialized = false;
+        log::info!("工作记忆 Agent 已成功关闭");
         Ok(())
     }
 

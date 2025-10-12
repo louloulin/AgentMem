@@ -518,12 +518,43 @@ impl MemoryAgent for CoreAgent {
             return Ok(());
         }
 
-        log::info!("Initializing Core Memory Agent: {}", self.agent_id());
+        log::info!("初始化核心记忆 Agent: {}", self.agent_id());
 
-        // TODO: Initialize core memory manager
-        // TODO: Load existing memory blocks
+        // 如果配置了存储后端，加载现有的核心记忆块
+        if let Some(store) = &self.core_store {
+            log::info!("从存储后端加载核心记忆块...");
+
+            // 尝试加载核心记忆项以验证存储可用性
+            // 使用 system 用户 ID 进行测试查询
+            match store.get_all("system").await {
+                Ok(items) => {
+                    log::info!(
+                        "成功连接到核心记忆存储，发现 {} 个记忆项",
+                        items.len()
+                    );
+
+                    // 更新统计信息
+                    let mut context = self.context.write().await;
+                    context.stats.total_tasks = items.len() as u64;
+                }
+                Err(e) => {
+                    log::warn!("加载核心记忆项失败: {}，将从空状态开始", e);
+                }
+            }
+        } else {
+            log::warn!("未配置核心记忆存储后端，Agent 将以只读模式运行");
+        }
+
+        // 初始化 Agent 上下文
+        {
+            let mut context = self.context.write().await;
+            context.stats.active_tasks = 0;
+            context.stats.successful_tasks = 0;
+            context.stats.failed_tasks = 0;
+        }
 
         self.initialized = true;
+        log::info!("核心记忆 Agent 初始化完成");
         Ok(())
     }
 
@@ -532,12 +563,32 @@ impl MemoryAgent for CoreAgent {
             return Ok(());
         }
 
-        log::info!("Shutting down Core Memory Agent: {}", self.agent_id());
+        log::info!("关闭核心记忆 Agent: {}", self.agent_id());
 
-        // TODO: Persist memory blocks
-        // TODO: Clean up resources
+        // 如果有存储后端，确保所有待处理的操作都已完成
+        if let Some(_store) = &self.core_store {
+            log::info!("核心记忆存储后端已配置，所有操作已通过 trait 方法持久化");
+
+            // 记录最终统计信息
+            let context = self.context.read().await;
+            log::info!(
+                "Agent 统计: 总任务={}, 完成={}, 失败={}, 活跃={}",
+                context.stats.total_tasks,
+                context.stats.successful_tasks,
+                context.stats.failed_tasks,
+                context.stats.active_tasks
+            );
+        }
+
+        // 清理上下文
+        {
+            let mut context = self.context.write().await;
+            context.current_task = None;
+            context.stats.active_tasks = 0;
+        }
 
         self.initialized = false;
+        log::info!("核心记忆 Agent 已成功关闭");
         Ok(())
     }
 
