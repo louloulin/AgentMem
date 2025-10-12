@@ -1,5 +1,12 @@
 //! 记忆推理和关联分析模块
 
+pub mod advanced;
+
+pub use advanced::{
+    AdvancedReasoner, AnalogyResult, CounterfactualResult, MultiHopCausalResult,
+    CausalStep, CausalRelationType, AnalogicalDomain, AnalogicalMapping, MappingType,
+};
+
 use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -55,6 +55,7 @@ members = [
     "examples/mcp-sampling-demo",
     "examples/mcp-logging-demo",
     "examples/multimodal-ai-demo",
+    "examples/advanced-reasoning-demo",
 
     # 示例
     "examples/demo",
