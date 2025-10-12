@@ -119,12 +119,16 @@ impl PostgresStorage {
                 .try_get("importance")
                 .map_err(|e| CoreError::Database(format!("Failed to get importance: {}", e)))?,
 
-            // ✅ Read embedding from database (JSON format)
+            // ✅ Read embedding from database (JSONB format)
             embedding: row
-                .try_get::<Option<String>, _>("embedding")
+                .try_get::<Option<serde_json::Value>, _>("embedding")
                 .ok()
                 .flatten()
-                .and_then(|s| serde_json::from_str(&s).ok()),
+                .and_then(|v| {
+                    serde_json::from_value::<Vec<f32>>(v)
+                        .ok()
+                        .map(|values| crate::types::Vector { values })
+                }),
 
             created_at: created_at.timestamp(),
             last_accessed_at: last_accessed
@@ -176,12 +180,23 @@ impl StorageBackend for PostgresStorage {
             CoreError::SerializationError(format!("Failed to serialize metadata: {}", e))
         })?;
 
+        // 序列化 embedding 为 JSON（如果存在）
+        let embedding_json = memory.memory.embedding.as_ref().map(|emb| {
+            serde_json::to_value(&emb.values).ok()
+        }).flatten();
+
+        // 转换 expires_at 为 DateTime
+        let expires_at = memory.memory.expires_at.map(|ts| {
+            chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(|| chrono::Utc::now())
+        });
+
         sqlx::query(
             r#"
             INSERT INTO memories (
-                id, content, hash, metadata, score, memory_type, scope, level,
-                importance, access_count, last_accessed, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                id, organization_id, user_id, agent_id, content, hash, metadata, score,
+                memory_type, scope, level, importance, access_count, last_accessed,
+                embedding, expires_at, version, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             ON CONFLICT (id) DO UPDATE SET
                 content = EXCLUDED.content,
                 hash = EXCLUDED.hash,
@@ -193,10 +208,16 @@ impl StorageBackend for PostgresStorage {
                 importance = EXCLUDED.importance,
                 access_count = EXCLUDED.access_count,
                 last_accessed = EXCLUDED.last_accessed,
+                embedding = EXCLUDED.embedding,
+                expires_at = EXCLUDED.expires_at,
+                version = EXCLUDED.version,
                 updated_at = NOW()
             "#,
         )
         .bind(&memory.memory.id)
+        .bind("default_org") // TODO: 从上下文获取 organization_id
+        .bind(&memory.memory.user_id.as_ref().unwrap_or(&"default_user".to_string()))
+        .bind(&memory.memory.agent_id)
         .bind(&memory.memory.content)
         .bind(None::<String>) // hash - not available in Memory struct
         .bind(&metadata_json)
@@ -207,6 +228,9 @@ impl StorageBackend for PostgresStorage {
         .bind(&memory.memory.importance)
         .bind(memory.memory.access_count as i64)
         .bind(&memory.memory.last_accessed_at)
+        .bind(&embedding_json)
+        .bind(&expires_at)
+        .bind(memory.memory.version as i32)
         .bind(&memory.memory.created_at)
         .bind(&memory.memory.last_accessed_at) // updated_at mapped from last_accessed_at
         .execute(&self.pool)
@@ -246,6 +270,16 @@ impl StorageBackend for PostgresStorage {
             CoreError::SerializationError(format!("Failed to serialize metadata: {}", e))
         })?;
 
+        // 序列化 embedding 为 JSON（如果存在）
+        let embedding_json = memory.memory.embedding.as_ref().map(|emb| {
+            serde_json::to_value(&emb.values).ok()
+        }).flatten();
+
+        // 转换 expires_at 为 DateTime
+        let expires_at = memory.memory.expires_at.map(|ts| {
+            chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(|| chrono::Utc::now())
+        });
+
         let result = sqlx::query(
             r#"
             UPDATE memories SET
@@ -257,6 +291,9 @@ impl StorageBackend for PostgresStorage {
                 scope = $7,
                 level = $8,
                 importance = $9,
+                embedding = $10,
+                expires_at = $11,
+                version = $12,
                 updated_at = NOW()
             WHERE id = $1
             "#,
@@ -270,6 +307,9 @@ impl StorageBackend for PostgresStorage {
         .bind(memory.scope.as_str())
         .bind(memory.level.as_str())
         .bind(&memory.memory.importance)
+        .bind(&embedding_json)
+        .bind(&expires_at)
+        .bind(memory.memory.version as i32)
         .execute(&self.pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to update memory: {}", e)))?;

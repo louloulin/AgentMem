@@ -24,6 +24,9 @@ pub async fn run_migrations(pool: &PgPool) -> CoreResult<()> {
     // Run memory-specific table migrations
     memory_tables_migration::run_memory_migrations(pool).await?;
 
+    // Run migration to add missing fields (embedding, expires_at, version)
+    migrate_add_missing_fields(pool).await?;
+
     Ok(())
 }
 
@@ -223,6 +226,9 @@ async fn create_memories_table(pool: &PgPool) -> CoreResult<()> {
             importance REAL NOT NULL DEFAULT 0.0,
             access_count BIGINT NOT NULL DEFAULT 0,
             last_accessed TIMESTAMPTZ,
+            embedding JSONB,
+            expires_at TIMESTAMPTZ,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -349,6 +355,95 @@ async fn create_indexes(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create FTS index: {}", e)))?;
+
+    // Index for expires_at (用于过期记忆查询)
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memories_expires_at ON memories(expires_at) WHERE expires_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create expires_at index: {}", e)))?;
+
+    // Index for version (用于乐观锁定)
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memories_version ON memories(version)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create version index: {}", e)))?;
+
+    Ok(())
+}
+
+/// 迁移：添加缺失的字段到 memories 表
+///
+/// 此迁移添加以下字段：
+/// - embedding: JSONB - 向量嵌入（用于语义搜索）
+/// - expires_at: TIMESTAMPTZ - 过期时间（用于工作记忆）
+/// - version: INTEGER - 版本号（用于乐观锁定）
+///
+/// 注意：此迁移是幂等的，可以安全地多次运行
+pub async fn migrate_add_missing_fields(pool: &PgPool) -> CoreResult<()> {
+    // 添加 embedding 字段（如果不存在）
+    sqlx::query(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'memories' AND column_name = 'embedding'
+            ) THEN
+                ALTER TABLE memories ADD COLUMN embedding JSONB;
+            END IF;
+        END $$;
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to add embedding column: {}", e)))?;
+
+    // 添加 expires_at 字段（如果不存在）
+    sqlx::query(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'memories' AND column_name = 'expires_at'
+            ) THEN
+                ALTER TABLE memories ADD COLUMN expires_at TIMESTAMPTZ;
+            END IF;
+        END $$;
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to add expires_at column: {}", e)))?;
+
+    // 添加 version 字段（如果不存在）
+    sqlx::query(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'memories' AND column_name = 'version'
+            ) THEN
+                ALTER TABLE memories ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+            END IF;
+        END $$;
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to add version column: {}", e)))?;
+
+    // 创建索引（如果不存在）
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memories_expires_at ON memories(expires_at) WHERE expires_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create expires_at index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memories_version ON memories(version)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create version index: {}", e)))?;
 
     Ok(())
 }
