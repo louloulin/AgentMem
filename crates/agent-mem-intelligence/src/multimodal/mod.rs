@@ -11,12 +11,32 @@ pub mod video;
 pub mod real_audio;
 pub mod real_image;
 
+// AI 模型集成模块（需要 multimodal feature）
+#[cfg(feature = "multimodal")]
+pub mod ai_models;
+#[cfg(feature = "multimodal")]
+pub mod openai_vision;
+#[cfg(feature = "multimodal")]
+pub mod openai_whisper;
+#[cfg(feature = "multimodal")]
+pub mod video_analyzer;
+
 // 跨模态关联模块
 pub mod cross_modal;
 pub mod unified_retrieval;
 
 // 性能优化模块
 pub mod optimization;
+
+// 重新导出 AI 模型相关类型（需要 multimodal feature）
+#[cfg(feature = "multimodal")]
+pub use ai_models::*;
+#[cfg(feature = "multimodal")]
+pub use openai_vision::OpenAIVisionClient;
+#[cfg(feature = "multimodal")]
+pub use openai_whisper::OpenAIWhisperClient;
+#[cfg(feature = "multimodal")]
+pub use video_analyzer::{VideoAnalyzer, VideoAnalyzerConfig, VideoAnalysisRequest, VideoAnalysisResponse};
 
 use agent_mem_traits::{AgentMemError, Result};
 use async_trait::async_trait;

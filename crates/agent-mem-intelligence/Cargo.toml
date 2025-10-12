@@ -81,9 +81,14 @@ multimodal = [
     "dep:image",
     "dep:imageproc",
     "dep:rusttype",
-    "dep:tesseract",
     "dep:hound",
     "dep:symphonia",
+]
+
+# 多模态处理功能（完整版，包含 OCR 和视频）
+multimodal-full = [
+    "multimodal",
+    "dep:tesseract",
     "dep:ffmpeg-next"
 ]
 
