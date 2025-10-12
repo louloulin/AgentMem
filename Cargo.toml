@@ -59,6 +59,7 @@ members = [
     "examples/multimodal-ai-demo",
     "examples/advanced-reasoning-demo",
     "examples/single-binary-demo",
+    "examples/observability-demo",
 
     # 示例
     "examples/demo",

@@ -1,0 +1,174 @@
+# AlertManager 配置文件 - AgentMem 告警管理
+
+global:
+  # SMTP 配置（用于邮件告警）
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'agentmem-alerts@example.com'
+  smtp_auth_username: 'agentmem-alerts@example.com'
+  smtp_auth_password: 'your-password-here'
+  smtp_require_tls: true
+  
+  # Slack 配置（用于 Slack 告警）
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+  
+  # 全局标签
+  resolve_timeout: 5m
+
+# 路由配置
+route:
+  # 默认接收器
+  receiver: 'default'
+  
+  # 分组配置
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  
+  # 子路由
+  routes:
+    # 严重告警 - 立即发送
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+    
+    # 警告告警 - 分组发送
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 1h
+    
+    # 数据库告警
+    - match:
+        component: database
+      receiver: 'database-team'
+      group_wait: 10s
+      repeat_interval: 30m
+    
+    # 缓存告警
+    - match:
+        component: cache
+      receiver: 'cache-team'
+      group_wait: 10s
+      repeat_interval: 30m
+    
+    # 性能告警
+    - match_re:
+        component: (vector_search|graph_query|batch)
+      receiver: 'performance-team'
+      group_wait: 10s
+      repeat_interval: 30m
+
+# 抑制规则
+inhibit_rules:
+  # 如果服务已经宕机，抑制其他所有告警
+  - source_match:
+      severity: 'critical'
+      alertname: 'ServiceDown'
+    target_match_re:
+      severity: 'warning|info'
+    equal: ['instance']
+  
+  # 如果有严重告警，抑制相同组件的警告告警
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['component', 'instance']
+
+# 接收器配置
+receivers:
+  # 默认接收器 - 控制台输出
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+  
+  # 严重告警 - 多渠道通知
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@example.com'
+        headers:
+          Subject: '[CRITICAL] AgentMem Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>严重告警</h2>
+          <p><strong>告警名称:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>严重程度:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>组件:</strong> {{ .CommonLabels.component }}</p>
+          <p><strong>描述:</strong> {{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>
+          <p><strong>时间:</strong> {{ .CommonAnnotations.timestamp }}</p>
+    
+    slack_configs:
+      - channel: '#agentmem-critical'
+        title: '🚨 严重告警: {{ .GroupLabels.alertname }}'
+        text: |
+          *严重程度:* {{ .CommonLabels.severity }}
+          *组件:* {{ .CommonLabels.component }}
+          *描述:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        send_resolved: true
+    
+    webhook_configs:
+      - url: 'http://localhost:5001/critical'
+        send_resolved: true
+  
+  # 警告告警 - Slack 通知
+  - name: 'warning-alerts'
+    slack_configs:
+      - channel: '#agentmem-warnings'
+        title: '⚠️ 警告: {{ .GroupLabels.alertname }}'
+        text: |
+          *严重程度:* {{ .CommonLabels.severity }}
+          *组件:* {{ .CommonLabels.component }}
+          *描述:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        send_resolved: true
+  
+  # 数据库团队
+  - name: 'database-team'
+    email_configs:
+      - to: 'database-team@example.com'
+        headers:
+          Subject: '[Database] AgentMem Alert: {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - channel: '#database-alerts'
+        title: '💾 数据库告警: {{ .GroupLabels.alertname }}'
+        text: |
+          *描述:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        send_resolved: true
+  
+  # 缓存团队
+  - name: 'cache-team'
+    email_configs:
+      - to: 'cache-team@example.com'
+        headers:
+          Subject: '[Cache] AgentMem Alert: {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - channel: '#cache-alerts'
+        title: '🗄️ 缓存告警: {{ .GroupLabels.alertname }}'
+        text: |
+          *描述:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        send_resolved: true
+  
+  # 性能团队
+  - name: 'performance-team'
+    email_configs:
+      - to: 'performance-team@example.com'
+        headers:
+          Subject: '[Performance] AgentMem Alert: {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - channel: '#performance-alerts'
+        title: '⚡ 性能告警: {{ .GroupLabels.alertname }}'
+        text: |
+          *描述:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        send_resolved: true
+
+# 模板配置
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+

@@ -1,0 +1,165 @@
+# Prometheus 告警规则 - AgentMem 监控
+
+groups:
+  # 服务可用性告警
+  - name: service_availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="agentmem"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: agentmem
+        annotations:
+          summary: "AgentMem 服务不可用"
+          description: "AgentMem 服务 {{ $labels.instance }} 已经停止运行超过 1 分钟"
+      
+      - alert: HighErrorRate
+        expr: rate(agentmem_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "错误率过高"
+          description: "AgentMem 错误率为 {{ $value }} 错误/秒，超过阈值 10 错误/秒"
+  
+  # 性能告警
+  - name: performance
+    interval: 30s
+    rules:
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(agentmem_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "请求延迟过高"
+          description: "P95 请求延迟为 {{ $value }}s，超过阈值 1.0s"
+      
+      - alert: HighToolExecutionLatency
+        expr: histogram_quantile(0.95, rate(agentmem_tool_execution_duration_seconds_bucket[5m])) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "工具执行延迟过高"
+          description: "P95 工具执行延迟为 {{ $value }}s，超过阈值 5.0s"
+      
+      - alert: HighMemoryUsage
+        expr: agentmem_memory_usage_bytes > 1073741824  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "内存使用过高"
+          description: "内存使用为 {{ $value | humanize }}B，超过阈值 1GB"
+  
+  # 资源告警
+  - name: resources
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="agentmem"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "CPU 使用率过高"
+          description: "CPU 使用率为 {{ $value | humanizePercentage }}，超过阈值 80%"
+      
+      - alert: TooManyActiveConnections
+        expr: agentmem_active_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: agentmem
+        annotations:
+          summary: "活跃连接数过多"
+          description: "活跃连接数为 {{ $value }}，超过阈值 1000"
+  
+  # 缓存告警
+  - name: cache
+    interval: 30s
+    rules:
+      - alert: LowCacheHitRate
+        expr: rate(agentmem_cache_hits_total[5m]) / (rate(agentmem_cache_hits_total[5m]) + rate(agentmem_cache_misses_total[5m])) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "缓存命中率过低"
+          description: "缓存命中率为 {{ $value | humanizePercentage }}，低于阈值 50%"
+  
+  # 数据库告警
+  - name: database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionPoolExhausted
+        expr: agentmem_db_connections_active / agentmem_db_connections_max > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "数据库连接池即将耗尽"
+          description: "数据库连接池使用率为 {{ $value | humanizePercentage }}，超过阈值 90%"
+      
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(agentmem_db_query_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "数据库查询过慢"
+          description: "P95 数据库查询延迟为 {{ $value }}s，超过阈值 1.0s"
+  
+  # 向量搜索告警
+  - name: vector_search
+    interval: 30s
+    rules:
+      - alert: HighVectorSearchLatency
+        expr: histogram_quantile(0.95, rate(agentmem_vector_search_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: vector_search
+        annotations:
+          summary: "向量搜索延迟过高"
+          description: "P95 向量搜索延迟为 {{ $value }}s，超过阈值 0.5s"
+  
+  # 图查询告警
+  - name: graph_query
+    interval: 30s
+    rules:
+      - alert: HighGraphQueryLatency
+        expr: histogram_quantile(0.95, rate(agentmem_graph_query_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: graph_query
+        annotations:
+          summary: "图查询延迟过高"
+          description: "P95 图查询延迟为 {{ $value }}s，超过阈值 1.0s"
+  
+  # 批量操作告警
+  - name: batch_operations
+    interval: 30s
+    rules:
+      - alert: HighBatchFailureRate
+        expr: rate(agentmem_batch_failures_total[5m]) / rate(agentmem_batch_operations_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: batch
+        annotations:
+          summary: "批量操作失败率过高"
+          description: "批量操作失败率为 {{ $value | humanizePercentage }}，超过阈值 10%"
+

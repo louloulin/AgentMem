@@ -1,0 +1,17 @@
+# Grafana 仪表板配置
+
+apiVersion: 1
+
+providers:
+  # AgentMem 仪表板
+  - name: 'AgentMem Dashboards'
+    orgId: 1
+    folder: 'AgentMem'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
+
