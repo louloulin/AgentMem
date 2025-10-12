@@ -46,6 +46,9 @@ eventsource-client = "0.12"
 futures = "0.3"
 pin-project = "1.1"
 
+# Async stream
+async-stream = "0.3"
+
 # AgentMem dependencies
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-traits = { path = "../agent-mem-traits" }
