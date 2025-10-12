@@ -1,0 +1,12 @@
+[package]
+name = "system-metrics-demo"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+agent-mem-observability = { path = "../../crates/agent-mem-observability" }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+

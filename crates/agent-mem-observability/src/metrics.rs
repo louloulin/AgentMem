@@ -6,6 +6,7 @@ use crate::error::{ObservabilityError, ObservabilityResult};
 use prometheus::{CounterVec, Gauge, HistogramOpts, HistogramVec, Opts, Registry};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use std::time::Duration;
 
 /// Metrics registry
 pub struct MetricsRegistry {
@@ -22,6 +23,10 @@ struct MetricsCollectors {
     // Gauges
     active_connections: Gauge,
     memory_usage_bytes: Gauge,
+    cpu_usage_percent: Gauge,
+    system_memory_total_bytes: Gauge,
+    system_memory_used_bytes: Gauge,
+    system_memory_available_bytes: Gauge,
 
     // Histograms
     request_duration_seconds: HistogramVec,
@@ -56,6 +61,30 @@ impl MetricsRegistry {
             memory_usage_bytes: Gauge::new("agentmem_memory_usage_bytes", "Memory usage in bytes")
                 .unwrap(),
 
+            cpu_usage_percent: Gauge::new(
+                "agentmem_cpu_usage_percent",
+                "CPU usage percentage (0-100)",
+            )
+            .unwrap(),
+
+            system_memory_total_bytes: Gauge::new(
+                "agentmem_system_memory_total_bytes",
+                "Total system memory in bytes",
+            )
+            .unwrap(),
+
+            system_memory_used_bytes: Gauge::new(
+                "agentmem_system_memory_used_bytes",
+                "Used system memory in bytes",
+            )
+            .unwrap(),
+
+            system_memory_available_bytes: Gauge::new(
+                "agentmem_system_memory_available_bytes",
+                "Available system memory in bytes",
+            )
+            .unwrap(),
+
             request_duration_seconds: HistogramVec::new(
                 HistogramOpts::new(
                     "agentmem_request_duration_seconds",
@@ -89,6 +118,18 @@ impl MetricsRegistry {
             .unwrap();
         registry
             .register(Box::new(collectors.memory_usage_bytes.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(collectors.cpu_usage_percent.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(collectors.system_memory_total_bytes.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(collectors.system_memory_used_bytes.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(collectors.system_memory_available_bytes.clone()))
             .unwrap();
         registry
             .register(Box::new(collectors.request_duration_seconds.clone()))
@@ -186,6 +227,20 @@ impl MetricsCollector {
             .with_label_values(&[tool_name])
             .observe(duration_secs);
     }
+
+    /// Set CPU usage percentage (0-100)
+    pub async fn set_cpu_usage(&self, percent: f64) {
+        let collectors = self.collectors.read().await;
+        collectors.cpu_usage_percent.set(percent);
+    }
+
+    /// Set system memory metrics
+    pub async fn set_system_memory(&self, total_bytes: u64, used_bytes: u64, available_bytes: u64) {
+        let collectors = self.collectors.read().await;
+        collectors.system_memory_total_bytes.set(total_bytes as f64);
+        collectors.system_memory_used_bytes.set(used_bytes as f64);
+        collectors.system_memory_available_bytes.set(available_bytes as f64);
+    }
 }
 
 /// Start metrics server
@@ -218,6 +273,72 @@ pub async fn start_metrics_server(registry: Arc<Registry>, port: u16) -> Observa
     .map_err(|e| ObservabilityError::MetricsInitFailed(e.to_string()))?;
 
     Ok(())
+}
+
+/// System metrics monitor
+///
+/// 系统指标监控器，定期收集 CPU 和内存使用率
+pub struct SystemMetricsMonitor {
+    collector: MetricsCollector,
+    interval: Duration,
+}
+
+impl SystemMetricsMonitor {
+    /// Create a new system metrics monitor
+    ///
+    /// 创建新的系统指标监控器
+    ///
+    /// # Arguments
+    ///
+    /// * `collector` - Metrics collector
+    /// * `interval` - Collection interval (default: 5 seconds)
+    pub fn new(collector: MetricsCollector, interval: Duration) -> Self {
+        Self { collector, interval }
+    }
+
+    /// Start monitoring system metrics
+    ///
+    /// 启动系统指标监控
+    ///
+    /// This will spawn a background task that periodically collects CPU and memory metrics.
+    /// 这将启动一个后台任务，定期收集 CPU 和内存指标。
+    pub fn start(self) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut sys = sysinfo::System::new_all();
+            let mut interval = tokio::time::interval(self.interval);
+
+            loop {
+                interval.tick().await;
+
+                // Refresh system information
+                // 刷新系统信息
+                sys.refresh_all();
+
+                // Collect CPU usage
+                // 收集 CPU 使用率
+                let cpu_usage = sys.global_cpu_usage() as f64;
+                self.collector.set_cpu_usage(cpu_usage).await;
+
+                // Collect memory usage
+                // 收集内存使用率
+                let total_memory = sys.total_memory();
+                let used_memory = sys.used_memory();
+                let available_memory = sys.available_memory();
+
+                self.collector
+                    .set_system_memory(total_memory, used_memory, available_memory)
+                    .await;
+
+                tracing::debug!(
+                    "System metrics: CPU={:.2}%, Memory={}/{} MB ({:.2}%)",
+                    cpu_usage,
+                    used_memory / 1024 / 1024,
+                    total_memory / 1024 / 1024,
+                    (used_memory as f64 / total_memory as f64) * 100.0
+                );
+            }
+        })
+    }
 }
 
 #[cfg(test)]
@@ -260,5 +381,48 @@ mod tests {
         let metrics = registry.gather();
         assert!(metrics.contains("POST"));
         assert!(metrics.contains("/api/create"));
+    }
+
+    #[tokio::test]
+    async fn test_system_metrics() {
+        let registry = MetricsRegistry::new();
+        let collector = registry.collector();
+
+        // Set CPU usage
+        collector.set_cpu_usage(45.5).await;
+
+        // Set memory metrics
+        collector
+            .set_system_memory(16_000_000_000, 8_000_000_000, 8_000_000_000)
+            .await;
+
+        let metrics = registry.gather();
+        assert!(metrics.contains("agentmem_cpu_usage_percent"));
+        assert!(metrics.contains("agentmem_system_memory_total_bytes"));
+        assert!(metrics.contains("agentmem_system_memory_used_bytes"));
+        assert!(metrics.contains("agentmem_system_memory_available_bytes"));
+    }
+
+    #[tokio::test]
+    async fn test_system_metrics_monitor() {
+        let registry = MetricsRegistry::new();
+        let collector = registry.collector();
+
+        // Create monitor with short interval for testing
+        let monitor = SystemMetricsMonitor::new(collector.clone(), Duration::from_millis(100));
+
+        // Start monitoring
+        let handle = monitor.start();
+
+        // Wait for a few collection cycles
+        tokio::time::sleep(Duration::from_millis(350)).await;
+
+        // Stop monitoring
+        handle.abort();
+
+        // Check that metrics were collected
+        let metrics = registry.gather();
+        assert!(metrics.contains("agentmem_cpu_usage_percent"));
+        assert!(metrics.contains("agentmem_system_memory_total_bytes"));
     }
 }

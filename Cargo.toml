@@ -45,6 +45,7 @@ members = [
     "examples/agent-lifecycle-demo",
     "examples/database-schema-demo",
     "examples/entity-relation-extraction-demo",
+    "examples/system-metrics-demo",
 
     # 示例
     "examples/demo",
