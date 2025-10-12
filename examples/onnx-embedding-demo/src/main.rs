@@ -2,7 +2,7 @@
 //!
 //! 本示例演示如何使用 ONNX Runtime 进行嵌入模型推理。
 //!
-//! 注意：当前实现使用确定性嵌入作为占位符，等待 ort 2.0 API 稳定后实现完整的 ONNX 推理。
+//! 注意：本示例使用模拟的 ONNX 模型文件。要使用真实模型，请下载真实的 ONNX 模型和 tokenizer。
 
 use agent_mem_embeddings::config::EmbeddingConfig;
 use agent_mem_embeddings::providers::LocalEmbedder;
@@ -123,20 +123,22 @@ async fn main() -> Result<()> {
     info!("");
 
     // 重要说明
-    info!("⚠️  重要说明:");
-    info!("   当前 ONNX 实现使用确定性嵌入作为占位符");
-    info!("   完整的 ONNX 推理实现需要等待 ort 2.0 API 稳定");
+    info!("✅ 功能完整:");
+    info!("   真实的 ONNX 推理已实现！");
     info!("   ");
     info!("   已实现的功能:");
-    info!("   ✅ ONNX 模型加载框架");
+    info!("   ✅ ONNX 模型加载");
     info!("   ✅ Tokenizer 集成");
+    info!("   ✅ 真实的 ONNX 推理");
+    info!("   ✅ 张量转换和处理");
+    info!("   ✅ 池化策略（CLS token）");
     info!("   ✅ 批量处理接口");
+    info!("   ✅ L2 归一化");
     info!("   ✅ 错误处理");
     info!("   ");
-    info!("   待实现的功能:");
-    info!("   ⏳ 真实的 ONNX 推理（等待 ort 2.0 API 稳定）");
-    info!("   ⏳ 张量转换和处理");
-    info!("   ⏳ 池化策略（CLS token / 平均池化）");
+    info!("   ⚠️  注意:");
+    info!("   本示例使用模拟的 ONNX 模型文件");
+    info!("   要使用真实模型，请下载真实的 ONNX 模型和 tokenizer");
     info!("");
 
     info!("{}", "=".repeat(60));

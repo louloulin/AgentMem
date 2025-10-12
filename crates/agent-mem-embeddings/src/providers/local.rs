@@ -26,6 +26,7 @@ use tokenizers::Tokenizer;
 #[cfg(feature = "onnx")]
 use ort::{
     session::{builder::GraphOptimizationLevel, Session},
+    value::Tensor,
 };
 
 /// 本地模型类型
@@ -117,7 +118,7 @@ pub struct LocalEmbedder {
     device: Option<Device>,
 
     #[cfg(feature = "onnx")]
-    onnx_session: Option<Arc<Session>>,
+    onnx_session: Option<Arc<Mutex<Session>>>,
     #[cfg(feature = "onnx")]
     onnx_tokenizer: Option<Arc<Tokenizer>>,
 }
@@ -290,7 +291,7 @@ impl LocalEmbedder {
                 AgentMemError::embedding_error(format!("Failed to load ONNX model from {:?}: {}", model_path, e))
             })?;
 
-        self.onnx_session = Some(Arc::new(session));
+        self.onnx_session = Some(Arc::new(Mutex::new(session)));
         self.onnx_tokenizer = Some(Arc::new(tokenizer));
 
         info!("ONNX model loaded successfully from {:?}", model_path);
@@ -484,25 +485,99 @@ impl LocalEmbedder {
 
     #[cfg(feature = "onnx")]
     async fn generate_onnx_embedding(&self, text: &str) -> Result<Vec<f32>> {
-        if let (Some(_session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
-            // 分词（验证模型已加载）
-            let _encoding = tokenizer.encode(text, true).map_err(|e| {
+        if let (Some(session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
+            // 1. 分词
+            let encoding = tokenizer.encode(text, true).map_err(|e| {
                 AgentMemError::embedding_error(format!("Tokenization failed: {}", e))
             })?;
 
-            // TODO: 实现真实的 ONNX 推理
-            // 当前使用确定性嵌入作为占位符
-            // 等待 ort 2.0 API 稳定后实现完整的 ONNX 推理
-            //
-            // 完整实现需要：
-            // 1. 将 token IDs 和 attention mask 转换为 ONNX Runtime 输入张量
-            // 2. 运行 session.run() 进行推理
-            // 3. 从输出张量中提取嵌入向量
-            // 4. 进行池化（CLS token 或平均池化）
-            // 5. L2 归一化
+            let input_ids = encoding.get_ids();
+            let attention_mask = encoding.get_attention_mask();
+            let seq_len = input_ids.len();
 
-            warn!("ONNX inference using deterministic embedding placeholder - full implementation pending");
-            Ok(self.generate_deterministic_embedding(text))
+            debug!("Tokenized text into {} tokens", seq_len);
+
+            // 2. 创建输入张量
+            // 将 u32 转换为 i64（ONNX Runtime 期望的类型）
+            let input_ids_i64: Vec<i64> = input_ids.iter().map(|&x| x as i64).collect();
+            let attention_mask_i64: Vec<i64> = attention_mask.iter().map(|&x| x as i64).collect();
+
+            // 创建形状为 [1, seq_len] 的张量
+            let input_ids_tensor = Tensor::from_array((vec![1_usize, seq_len], input_ids_i64))
+                .map_err(|e| {
+                    AgentMemError::embedding_error(format!(
+                        "Failed to create input_ids tensor: {}",
+                        e
+                    ))
+                })?;
+
+            let attention_mask_tensor =
+                Tensor::from_array((vec![1_usize, seq_len], attention_mask_i64)).map_err(|e| {
+                    AgentMemError::embedding_error(format!(
+                        "Failed to create attention_mask tensor: {}",
+                        e
+                    ))
+                })?;
+
+            // 3. 运行 ONNX 推理
+            let mut session_guard = session.lock().await;
+            let outputs = session_guard
+                .run(ort::inputs![input_ids_tensor, attention_mask_tensor])
+                .map_err(|e| {
+                    AgentMemError::embedding_error(format!("ONNX inference failed: {}", e))
+                })?;
+
+            // 4. 提取输出张量
+            // 输出通常是 [batch_size, seq_len, hidden_size] 或 [batch_size, hidden_size]
+            // 使用第一个输出（通常是 "last_hidden_state" 或类似的名称）
+            let output_value = outputs
+                .iter()
+                .next()
+                .ok_or_else(|| {
+                    AgentMemError::embedding_error("No output tensor found".to_string())
+                })?
+                .1;
+
+            let (shape, data) = output_value
+                .try_extract_tensor::<f32>()
+                .map_err(|e| {
+                    AgentMemError::embedding_error(format!(
+                        "Failed to extract output tensor: {}",
+                        e
+                    ))
+                })?;
+            debug!("Output tensor shape: {:?}", shape);
+
+            // 5. 池化策略：使用 [CLS] token（第一个 token 的嵌入）
+            let embedding_vec: Vec<f32> = if shape.len() == 3 {
+                // 形状: [batch_size, seq_len, hidden_size]
+                let hidden_size = shape[2] as usize;
+                // 提取第一个 token 的嵌入 [0, 0, :]
+                data[0..hidden_size].to_vec()
+            } else if shape.len() == 2 {
+                // 形状: [batch_size, hidden_size]（已经池化过）
+                let hidden_size = shape[1] as usize;
+                data[0..hidden_size].to_vec()
+            } else {
+                return Err(AgentMemError::embedding_error(format!(
+                    "Unexpected output tensor shape: {:?}",
+                    shape
+                )));
+            };
+
+            // 6. L2 归一化
+            let norm = embedding_vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let normalized: Vec<f32> = if norm > 0.0 {
+                embedding_vec.iter().map(|x| x / norm).collect()
+            } else {
+                embedding_vec
+            };
+
+            debug!(
+                "Generated ONNX embedding with {} dimensions",
+                normalized.len()
+            );
+            Ok(normalized)
         } else {
             warn!("ONNX model not loaded, using deterministic embedding");
             Ok(self.generate_deterministic_embedding(text))
@@ -512,9 +587,11 @@ impl LocalEmbedder {
     /// 批量生成 ONNX 嵌入（优化版本）
     #[cfg(feature = "onnx")]
     async fn generate_onnx_batch_embedding(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
-        if let (Some(_session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
-            // 批量分词（验证模型已加载）
-            let _encodings: Vec<_> = texts
+        if let (Some(session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
+            let batch_size = texts.len();
+
+            // 1. 批量分词
+            let encodings: Vec<_> = texts
                 .iter()
                 .map(|text| {
                     tokenizer.encode(text.as_str(), true).map_err(|e| {
@@ -523,22 +600,136 @@ impl LocalEmbedder {
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            // TODO: 实现真实的批量 ONNX 推理
-            // 当前使用确定性嵌入作为占位符
-            // 等待 ort 2.0 API 稳定后实现完整的批量 ONNX 推理
-            //
-            // 完整实现需要：
-            // 1. 找到最大序列长度并进行 padding
-            // 2. 创建批量输入张量（input_ids 和 attention_mask）
-            // 3. 运行批量推理
-            // 4. 提取每个样本的嵌入向量
-            // 5. L2 归一化
-
-            warn!("Batch ONNX inference using deterministic embedding placeholder - full implementation pending");
-            Ok(texts
+            // 2. 找到最大序列长度
+            let max_len = encodings
                 .iter()
-                .map(|text| self.generate_deterministic_embedding(text))
-                .collect())
+                .map(|enc| enc.get_ids().len())
+                .max()
+                .unwrap_or(0);
+
+            debug!(
+                "Batch tokenization: {} texts, max_len: {}",
+                batch_size, max_len
+            );
+
+            // 3. 创建批量输入张量（padding 到相同长度）
+            let mut input_ids_batch = Vec::with_capacity(batch_size * max_len);
+            let mut attention_mask_batch = Vec::with_capacity(batch_size * max_len);
+
+            for encoding in &encodings {
+                let ids = encoding.get_ids();
+                let mask = encoding.get_attention_mask();
+
+                // 添加 token IDs 和 padding
+                input_ids_batch.extend(ids.iter().map(|&x| x as i64));
+                input_ids_batch.extend(vec![0i64; max_len - ids.len()]);
+
+                // 添加 attention mask 和 padding
+                attention_mask_batch.extend(mask.iter().map(|&x| x as i64));
+                attention_mask_batch.extend(vec![0i64; max_len - mask.len()]);
+            }
+
+            // 创建形状为 [batch_size, max_len] 的张量
+            let input_ids_tensor =
+                Tensor::from_array((vec![batch_size, max_len], input_ids_batch)).map_err(|e| {
+                    AgentMemError::embedding_error(format!(
+                        "Failed to create batch input_ids tensor: {}",
+                        e
+                    ))
+                })?;
+
+            let attention_mask_tensor =
+                Tensor::from_array((vec![batch_size, max_len], attention_mask_batch)).map_err(
+                    |e| {
+                        AgentMemError::embedding_error(format!(
+                            "Failed to create batch attention_mask tensor: {}",
+                            e
+                        ))
+                    },
+                )?;
+
+            // 4. 运行批量 ONNX 推理
+            let mut session_guard = session.lock().await;
+            let outputs = session_guard
+                .run(ort::inputs![input_ids_tensor, attention_mask_tensor])
+                .map_err(|e| {
+                    AgentMemError::embedding_error(format!("Batch ONNX inference failed: {}", e))
+                })?;
+
+            // 5. 提取输出张量
+            let output_value = outputs
+                .iter()
+                .next()
+                .ok_or_else(|| {
+                    AgentMemError::embedding_error("No output tensor found".to_string())
+                })?
+                .1;
+
+            let (shape, data) = output_value
+                .try_extract_tensor::<f32>()
+                .map_err(|e| {
+                    AgentMemError::embedding_error(format!(
+                        "Failed to extract batch output tensor: {}",
+                        e
+                    ))
+                })?;
+            debug!("Batch output tensor shape: {:?}", shape);
+
+            // 6. 提取每个样本的嵌入向量
+            let mut embeddings = Vec::with_capacity(batch_size);
+
+            if shape.len() == 3 {
+                // 形状: [batch_size, seq_len, hidden_size]
+                let hidden_size = shape[2] as usize;
+                let seq_len = shape[1] as usize;
+
+                for i in 0..batch_size {
+                    // 提取第 i 个样本的 [CLS] token（第一个 token）
+                    let start_idx = i * seq_len * hidden_size;
+                    let embedding_vec: Vec<f32> = data[start_idx..start_idx + hidden_size].to_vec();
+
+                    // L2 归一化
+                    let norm = embedding_vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    let normalized: Vec<f32> = if norm > 0.0 {
+                        embedding_vec.iter().map(|x| x / norm).collect()
+                    } else {
+                        embedding_vec
+                    };
+
+                    embeddings.push(normalized);
+                }
+            } else if shape.len() == 2 {
+                // 形状: [batch_size, hidden_size]（已经池化过）
+                let hidden_size = shape[1] as usize;
+
+                for i in 0..batch_size {
+                    let start_idx = i * hidden_size;
+                    let embedding_vec: Vec<f32> = data[start_idx..start_idx + hidden_size].to_vec();
+
+                    // L2 归一化
+                    let norm = embedding_vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    let normalized: Vec<f32> = if norm > 0.0 {
+                        embedding_vec.iter().map(|x| x / norm).collect()
+                    } else {
+                        embedding_vec
+                    };
+
+                    embeddings.push(normalized);
+                }
+            } else {
+                return Err(AgentMemError::embedding_error(format!(
+                    "Unexpected batch output tensor shape: {:?}",
+                    shape
+                )));
+            }
+
+            debug!(
+                "Generated {} ONNX embeddings in batch with {} dimensions each",
+                batch_size,
+                embeddings[0].len()
+            );
+
+            Ok(embeddings)
         } else {
             warn!("ONNX model not loaded, using deterministic embeddings for batch");
             Ok(texts
