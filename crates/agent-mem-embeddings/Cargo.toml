@@ -58,7 +58,7 @@ default = ["openai"]
 openai = []
 huggingface = ["dep:hf-hub"]
 local = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
-onnx = ["dep:ort", "dep:ndarray"]
+onnx = ["dep:ort", "dep:ndarray", "dep:tokenizers"]
 anthropic = []
 cohere = []
 

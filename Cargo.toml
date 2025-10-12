@@ -46,6 +46,7 @@ members = [
     "examples/database-schema-demo",
     "examples/entity-relation-extraction-demo",
     "examples/system-metrics-demo",
+    "examples/onnx-embedding-demo",
 
     # 示例
     "examples/demo",

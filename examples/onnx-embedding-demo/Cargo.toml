@@ -1,0 +1,18 @@
+[package]
+name = "onnx-embedding-demo"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings", features = ["onnx"] }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+tempfile = "3.0"
+
+[[bin]]
+name = "onnx-embedding-demo"
+path = "src/main.rs"
+
