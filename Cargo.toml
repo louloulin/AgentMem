@@ -25,6 +25,7 @@ members = [
     "crates/agent-mem-performance",
     "crates/agent-mem-distributed",
     "crates/agent-mem-compat",
+    "crates/agent-mem-deployment",
     # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
     # "crates/agent-mem-intelligence",
@@ -56,6 +57,7 @@ members = [
     "examples/mcp-logging-demo",
     "examples/multimodal-ai-demo",
     "examples/advanced-reasoning-demo",
+    "examples/single-binary-demo",
 
     # 示例
     "examples/demo",

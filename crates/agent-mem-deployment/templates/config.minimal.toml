@@ -1,0 +1,34 @@
+# AgentMem 最小化配置
+
+data_root = "./data"
+
+[database]
+backend = "libsql"
+url = "./data/agentmem.db"
+enable_wal = true
+auto_create_dir = true
+in_memory = false
+
+[vector_store]
+path = "./data/vectors"
+dimension = 384
+distance = "Cosine"
+enable_persistence = true
+auto_create_dir = true
+in_memory = false
+collection_name = "agentmem_vectors"
+
+[logging]
+level = "info"
+format = "pretty"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[features]
+enable_mcp = true
+enable_multimodal = false
+enable_reasoning = false
+enable_graph = false
+
