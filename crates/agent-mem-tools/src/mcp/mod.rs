@@ -13,6 +13,7 @@ pub mod resources;
 pub mod prompts;
 pub mod transport;
 pub mod discovery;
+pub mod auth;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
@@ -37,4 +38,8 @@ pub use transport::{
 };
 pub use discovery::{
     ToolDiscovery, ToolMetadata, ToolType, ToolLoader, HttpToolLoader,
+};
+pub use auth::{
+    AuthManager, AuthContext, AuthMethod, Permission, Role, Credentials,
+    AuditLogger, AuditEvent, AuditEventType, JwtConfig, OAuth2Config,
 };

@@ -54,6 +54,12 @@ pub enum McpError {
     /// 未连接
     NotConnected,
 
+    /// 认证失败
+    AuthenticationFailed(String),
+
+    /// 权限拒绝
+    PermissionDenied(String),
+
     /// 内部错误
     Internal(String),
 
@@ -100,6 +106,12 @@ impl fmt::Display for McpError {
             }
             McpError::NotConnected => {
                 write!(f, "MCP not connected")
+            }
+            McpError::AuthenticationFailed(msg) => {
+                write!(f, "MCP authentication failed: {}", msg)
+            }
+            McpError::PermissionDenied(msg) => {
+                write!(f, "MCP permission denied: {}", msg)
             }
             McpError::Internal(msg) => {
                 write!(f, "MCP internal error: {}", msg)
