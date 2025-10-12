@@ -1,0 +1,102 @@
+{{/*
+AgentMem ConfigMap 定义
+存储应用配置和非敏感数据
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agentmem.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentmem.labels" . | nindent 4 }}
+data:
+  # 日志配置
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  RUST_LOG: {{ .Values.config.rustLog | quote }}
+  
+  # 服务器配置
+  SERVER_PORT: {{ .Values.service.targetPort | quote }}
+  SERVER_HOST: "0.0.0.0"
+  
+  # 数据库配置
+  DB_POOL_SIZE: {{ .Values.config.database.poolSize | default "10" | quote }}
+  DB_MAX_CONNECTIONS: {{ .Values.config.database.maxConnections | default "100" | quote }}
+  DB_CONNECTION_TIMEOUT: {{ .Values.config.database.connectionTimeout | default "30" | quote }}
+  
+  # Redis 配置
+  REDIS_POOL_SIZE: {{ .Values.config.redis.poolSize | default "10" | quote }}
+  REDIS_MAX_CONNECTIONS: {{ .Values.config.redis.maxConnections | default "50" | quote }}
+  REDIS_CONNECTION_TIMEOUT: {{ .Values.config.redis.connectionTimeout | default "5" | quote }}
+  
+  # 向量搜索配置
+  VECTOR_DIMENSION: {{ .Values.config.vector.dimension | default "384" | quote }}
+  VECTOR_SIMILARITY_THRESHOLD: {{ .Values.config.vector.similarityThreshold | default "0.7" | quote }}
+  
+  # 记忆配置
+  MEMORY_MAX_SIZE: {{ .Values.config.memory.maxSize | default "10000" | quote }}
+  MEMORY_TTL_SECONDS: {{ .Values.config.memory.ttlSeconds | default "86400" | quote }}
+  MEMORY_CLEANUP_INTERVAL: {{ .Values.config.memory.cleanupInterval | default "3600" | quote }}
+  
+  # 监控配置
+  METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}
+  METRICS_PORT: {{ .Values.metrics.port | default "9090" | quote }}
+  METRICS_PATH: {{ .Values.metrics.path | default "/metrics" | quote }}
+  
+  # 追踪配置
+  TRACING_ENABLED: {{ .Values.tracing.enabled | quote }}
+  {{- if .Values.tracing.enabled }}
+  TRACING_ENDPOINT: {{ .Values.tracing.endpoint | quote }}
+  TRACING_SERVICE_NAME: {{ .Values.tracing.serviceName | default "agentmem" | quote }}
+  {{- end }}
+  
+  # 特性开关
+  FEATURE_ENTITY_EXTRACTION: {{ .Values.features.entityExtraction | default "true" | quote }}
+  FEATURE_RELATION_EXTRACTION: {{ .Values.features.relationExtraction | default "true" | quote }}
+  FEATURE_VECTOR_SEARCH: {{ .Values.features.vectorSearch | default "true" | quote }}
+  FEATURE_GRAPH_MEMORY: {{ .Values.features.graphMemory | default "true" | quote }}
+  
+  # 性能配置
+  WORKER_THREADS: {{ .Values.config.performance.workerThreads | default "4" | quote }}
+  MAX_BLOCKING_THREADS: {{ .Values.config.performance.maxBlockingThreads | default "512" | quote }}
+  THREAD_STACK_SIZE: {{ .Values.config.performance.threadStackSize | default "2097152" | quote }}
+  
+  # 安全配置
+  CORS_ENABLED: {{ .Values.config.security.cors.enabled | default "true" | quote }}
+  {{- if .Values.config.security.cors.enabled }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.config.security.cors.allowedOrigins | default "*" | quote }}
+  CORS_ALLOWED_METHODS: {{ .Values.config.security.cors.allowedMethods | default "GET,POST,PUT,DELETE,OPTIONS" | quote }}
+  CORS_ALLOWED_HEADERS: {{ .Values.config.security.cors.allowedHeaders | default "Content-Type,Authorization" | quote }}
+  {{- end }}
+  
+  # 速率限制配置
+  RATE_LIMIT_ENABLED: {{ .Values.config.rateLimit.enabled | default "true" | quote }}
+  {{- if .Values.config.rateLimit.enabled }}
+  RATE_LIMIT_REQUESTS_PER_SECOND: {{ .Values.config.rateLimit.requestsPerSecond | default "100" | quote }}
+  RATE_LIMIT_BURST_SIZE: {{ .Values.config.rateLimit.burstSize | default "200" | quote }}
+  {{- end }}
+  
+  {{- if .Values.config.extraConfig }}
+  # 额外配置
+  {{- range $key, $value := .Values.config.extraConfig }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+---
+{{/*
+AgentMem 应用配置文件 ConfigMap
+存储 YAML/TOML 格式的配置文件
+*/}}
+{{- if .Values.config.configFile }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agentmem.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentmem.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    {{- toYaml .Values.config.configFile | nindent 4 }}
+{{- end }}
+

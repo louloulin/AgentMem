@@ -1,0 +1,304 @@
+# AgentMem Helm Chart 生产环境配置
+# 高可用、高性能、高安全性配置
+
+# ================================
+# 全局配置
+# ================================
+global:
+  imageRegistry: "registry.example.com"
+  imagePullSecrets:
+    - name: registry-credentials
+  storageClass: "fast-ssd"
+
+# ================================
+# AgentMem 应用配置
+# ================================
+image:
+  registry: registry.example.com
+  repository: agentmem/server
+  tag: "6.0.0"
+  pullPolicy: IfNotPresent
+  pullSecrets:
+    - name: registry-credentials
+
+# 副本数配置（生产环境高可用）
+replicaCount: 5
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  labels:
+    environment: production
+  headless:
+    enabled: true
+    publishNotReadyAddresses: false
+
+# Ingress 配置（生产环境）
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  hosts:
+    - host: api.agentmem.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: agentmem-tls-prod
+      hosts:
+        - api.agentmem.com
+
+# 资源限制（生产环境）
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+
+# 自动扩缩容（生产环境）
+autoscaling:
+  enabled: true
+  minReplicas: 5
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+
+# Pod 配置
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# 节点选择器（生产环境专用节点）
+nodeSelector:
+  workload: production
+  node.kubernetes.io/instance-type: c5.2xlarge
+
+# 容忍度
+tolerations:
+  - key: "production"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# 亲和性（强制反亲和）
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values:
+          - agentmem
+      topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+          - c5.2xlarge
+          - c5.4xlarge
+
+# 健康检查（生产环境严格配置）
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: 8080
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 30
+
+# Pod 中断预算（生产环境）
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 3
+  unhealthyPodEvictionPolicy: IfHealthyBudget
+
+# 应用配置
+config:
+  logLevel: "info"
+  rustLog: "agentmem=info,tower_http=info"
+  
+  # 数据库配置
+  database:
+    poolSize: 20
+    maxConnections: 200
+    connectionTimeout: 30
+  
+  # Redis 配置
+  redis:
+    poolSize: 20
+    maxConnections: 100
+    connectionTimeout: 5
+  
+  # 向量搜索配置
+  vector:
+    dimension: 384
+    similarityThreshold: 0.75
+  
+  # 记忆配置
+  memory:
+    maxSize: 100000
+    ttlSeconds: 604800  # 7 天
+    cleanupInterval: 3600
+  
+  # 性能配置
+  performance:
+    workerThreads: 8
+    maxBlockingThreads: 512
+    threadStackSize: 2097152
+  
+  # 安全配置
+  security:
+    cors:
+      enabled: true
+      allowedOrigins: "https://app.agentmem.com"
+      allowedMethods: "GET,POST,PUT,DELETE,OPTIONS"
+      allowedHeaders: "Content-Type,Authorization"
+  
+  # 速率限制配置
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 1000
+    burstSize: 2000
+
+# 监控配置
+metrics:
+  enabled: true
+  port: 9090
+  path: /metrics
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      prometheus: kube-prometheus
+
+# 追踪配置
+tracing:
+  enabled: true
+  endpoint: "http://jaeger-collector:14268/api/traces"
+  serviceName: "agentmem-production"
+
+# 特性开关
+features:
+  entityExtraction: true
+  relationExtraction: true
+  vectorSearch: true
+  graphMemory: true
+
+# PostgreSQL 配置（使用外部 RDS）
+postgresql:
+  enabled: false
+
+externalDatabase:
+  host: "agentmem-prod.xxxxx.us-east-1.rds.amazonaws.com"
+  port: 5432
+  database: "agentmem"
+  username: "agentmem"
+  password: ""  # 从 Secret 读取
+
+# Redis 配置（使用外部 ElastiCache）
+redis:
+  enabled: false
+
+externalRedis:
+  host: "agentmem-prod.xxxxx.cache.amazonaws.com"
+  port: 6379
+  password: ""  # 从 Secret 读取
+
+# Elasticsearch 配置（使用外部 ES）
+elasticsearch:
+  enabled: false
+
+externalElasticsearch:
+  host: "agentmem-prod.es.amazonaws.com"
+  port: 9200
+
+# TLS 配置
+tls:
+  enabled: true
+  cert: ""  # 从 Secret 读取
+  key: ""   # 从 Secret 读取
+  ca: ""    # 从 Secret 读取
+
