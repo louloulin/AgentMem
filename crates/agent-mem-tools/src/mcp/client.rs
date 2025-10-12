@@ -7,27 +7,37 @@ use super::types::{
     McpContent, McpListToolsResponse, McpServerConfig, McpServerType, McpTool,
     McpToolCallRequest, McpToolCallResponse,
 };
+use super::transport::{Transport, HttpTransport, SseTransport};
+use super::discovery::ToolDiscovery;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
+use tracing::{debug, info};
 
 /// MCP 客户端
 pub struct McpClient {
     /// 服务器配置
     config: McpServerConfig,
-    
+
     /// 是否已初始化
     initialized: Arc<RwLock<bool>>,
-    
+
     /// 子进程（用于 Stdio 类型）
     #[allow(dead_code)]
     process: Arc<RwLock<Option<Child>>>,
-    
+
     /// 工具缓存
     tools_cache: Arc<RwLock<Option<Vec<McpTool>>>>,
+
+    /// 工具发现器
+    discovery: Arc<ToolDiscovery>,
+
+    /// HTTP 传输（用于 HTTP 类型）
+    http_transport: Arc<RwLock<Option<HttpTransport>>>,
+
+    /// SSE 传输（用于 SSE 类型）
+    sse_transport: Arc<RwLock<Option<SseTransport>>>,
 }
 
 impl McpClient {
@@ -38,7 +48,15 @@ impl McpClient {
             initialized: Arc::new(RwLock::new(false)),
             process: Arc::new(RwLock::new(None)),
             tools_cache: Arc::new(RwLock::new(None)),
+            discovery: Arc::new(ToolDiscovery::new()),
+            http_transport: Arc::new(RwLock::new(None)),
+            sse_transport: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// 获取工具发现器
+    pub fn discovery(&self) -> Arc<ToolDiscovery> {
+        self.discovery.clone()
     }
     
     /// 连接到 MCP 服务器
@@ -84,23 +102,40 @@ impl McpClient {
     
     /// 连接到 SSE 类型的服务器
     async fn connect_sse(&self) -> McpResult<()> {
-        let _url = self.config.url.as_ref()
+        let url = self.config.url.as_ref()
             .ok_or_else(|| McpError::ConfigError("Missing URL for SSE server".to_string()))?;
-        
-        // TODO: 实现 SSE 连接逻辑
-        // 这里需要使用 reqwest 或其他 HTTP 客户端库
-        
+
+        info!("Connecting to SSE server: {}", url);
+
+        // 创建 SSE 传输
+        let mut transport = SseTransport::new(url.clone());
+
+        // 连接到服务器
+        transport.connect().await?;
+
+        // 保存传输
+        *self.sse_transport.write().await = Some(transport);
+
         *self.initialized.write().await = true;
         Ok(())
     }
     
     /// 连接到 HTTP 类型的服务器
     async fn connect_http(&self) -> McpResult<()> {
-        let _url = self.config.url.as_ref()
+        let url = self.config.url.as_ref()
             .ok_or_else(|| McpError::ConfigError("Missing URL for HTTP server".to_string()))?;
-        
-        // TODO: 实现 HTTP 连接逻辑
-        
+
+        info!("Connecting to HTTP server: {}", url);
+
+        // 创建 HTTP 传输
+        let mut transport = HttpTransport::new(url.clone(), self.config.headers.clone());
+
+        // 连接到服务器
+        transport.connect().await?;
+
+        // 保存传输
+        *self.http_transport.write().await = Some(transport);
+
         *self.initialized.write().await = true;
         Ok(())
     }
@@ -133,26 +168,50 @@ impl McpClient {
         Ok(tools)
     }
     
-    /// 发现工具（模拟实现）
+    /// 发现工具（真实实现）
     async fn discover_tools(&self) -> McpResult<Vec<McpTool>> {
-        // TODO: 实现真实的工具发现逻辑
-        // 这里返回一个示例工具列表
-        Ok(vec![
-            McpTool {
-                name: format!("{}_example_tool", self.config.server_name),
-                description: "An example MCP tool".to_string(),
-                input_schema: serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "input": {
-                            "type": "string",
-                            "description": "Input parameter"
-                        }
-                    },
-                    "required": ["input"]
-                }),
+        info!("Discovering tools from server: {}", self.config.server_name);
+
+        match self.config.server_type {
+            McpServerType::Http => {
+                // 使用工具发现器通过 HTTP 发现工具
+                if let Some(url) = &self.config.url {
+                    self.discovery.discover_tools(url).await
+                } else {
+                    Err(McpError::ConfigError("Missing URL for HTTP server".to_string()))
+                }
             }
-        ])
+            McpServerType::Sse => {
+                // SSE 服务器也使用 HTTP 端点发现工具
+                if let Some(url) = &self.config.url {
+                    // 移除 /events 后缀，使用基础 URL
+                    let base_url = url.trim_end_matches("/events");
+                    self.discovery.discover_tools(base_url).await
+                } else {
+                    Err(McpError::ConfigError("Missing URL for SSE server".to_string()))
+                }
+            }
+            McpServerType::Stdio => {
+                // Stdio 服务器返回模拟工具列表
+                debug!("Using mock tools for Stdio server");
+                Ok(vec![
+                    McpTool {
+                        name: format!("{}_example_tool", self.config.server_name),
+                        description: "An example MCP tool".to_string(),
+                        input_schema: serde_json::json!({
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "string",
+                                    "description": "Input parameter"
+                                }
+                            },
+                            "required": ["input"]
+                        }),
+                    }
+                ])
+            }
+        }
     }
     
     /// 执行工具
@@ -173,21 +232,49 @@ impl McpClient {
         self.call_tool(request).await
     }
     
-    /// 调用工具（模拟实现）
+    /// 调用工具（真实实现）
     async fn call_tool(&self, request: McpToolCallRequest) -> McpResult<McpToolCallResponse> {
-        // TODO: 实现真实的工具调用逻辑
-        // 这里返回一个模拟响应
-        
-        Ok(McpToolCallResponse {
-            content: vec![McpContent::Text {
-                text: format!(
-                    "Mock response from tool '{}' with args: {}",
-                    request.name,
-                    request.arguments
-                ),
-            }],
-            is_error: false,
-        })
+        info!("Calling tool: {} with args: {}", request.name, request.arguments);
+
+        match self.config.server_type {
+            McpServerType::Http => {
+                // 使用 HTTP 传输调用工具
+                let transport_guard = self.http_transport.read().await;
+                if let Some(transport) = transport_guard.as_ref() {
+                    let response = transport.send_request(
+                        "tools/call",
+                        serde_json::json!({
+                            "name": request.name,
+                            "arguments": request.arguments,
+                        })
+                    ).await?;
+
+                    // 解析响应
+                    serde_json::from_value(response)
+                        .map_err(|e| McpError::SerializationError(format!("Failed to parse tool response: {}", e)))
+                } else {
+                    Err(McpError::NotConnected)
+                }
+            }
+            McpServerType::Sse => {
+                // SSE 不支持双向通信，返回错误
+                Err(McpError::TransportError("SSE does not support tool calls".to_string()))
+            }
+            McpServerType::Stdio => {
+                // Stdio 返回模拟响应
+                debug!("Using mock response for Stdio tool call");
+                Ok(McpToolCallResponse {
+                    content: vec![McpContent::Text {
+                        text: format!(
+                            "Mock response from tool '{}' with args: {}",
+                            request.name,
+                            request.arguments
+                        ),
+                    }],
+                    is_error: false,
+                })
+            }
+        }
     }
     
     /// 断开连接

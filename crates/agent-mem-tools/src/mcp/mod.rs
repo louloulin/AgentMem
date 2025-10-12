@@ -12,6 +12,7 @@ pub mod error;
 pub mod resources;
 pub mod prompts;
 pub mod transport;
+pub mod discovery;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
@@ -33,4 +34,7 @@ pub use prompts::{
 };
 pub use transport::{
     Transport, HttpTransport, SseTransport,
+};
+pub use discovery::{
+    ToolDiscovery, ToolMetadata, ToolType, ToolLoader, HttpToolLoader,
 };
