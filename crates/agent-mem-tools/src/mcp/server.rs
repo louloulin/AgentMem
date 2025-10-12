@@ -4,6 +4,11 @@
 
 use super::error::{McpError, McpResult};
 use super::types::{McpContent, McpListToolsResponse, McpTool, McpToolCallRequest, McpToolCallResponse};
+use super::resources::{
+    ResourceManager, McpListResourcesResponse,
+    McpReadResourceRequest, McpReadResourceResponse, McpSubscribeResourceRequest,
+    McpSubscribeResourceResponse, ResourceChangeType,
+};
 use crate::executor::{Tool, ToolExecutor};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -46,13 +51,16 @@ impl Default for McpServerConfig {
 pub struct McpServer {
     /// 配置
     config: McpServerConfig,
-    
+
     /// 工具执行器
     tool_executor: Arc<ToolExecutor>,
-    
+
     /// 已注册的工具
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
-    
+
+    /// 资源管理器
+    resource_manager: Arc<ResourceManager>,
+
     /// 是否已初始化
     initialized: Arc<RwLock<bool>>,
 }
@@ -64,13 +72,29 @@ impl McpServer {
             config,
             tool_executor,
             tools: Arc::new(RwLock::new(HashMap::new())),
+            resource_manager: Arc::new(ResourceManager::new(300)), // 5 分钟缓存
             initialized: Arc::new(RwLock::new(false)),
         }
     }
-    
+
     /// 使用默认配置创建
     pub fn with_default_config(tool_executor: Arc<ToolExecutor>) -> Self {
         Self::new(McpServerConfig::default(), tool_executor)
+    }
+
+    /// 使用自定义资源管理器创建
+    pub fn with_resource_manager(
+        config: McpServerConfig,
+        tool_executor: Arc<ToolExecutor>,
+        resource_manager: Arc<ResourceManager>,
+    ) -> Self {
+        Self {
+            config,
+            tool_executor,
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            resource_manager,
+            initialized: Arc::new(RwLock::new(false)),
+        }
     }
     
     /// 初始化服务器
@@ -208,10 +232,65 @@ impl McpServer {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ServerCapabilities {
                 tools: true,
-                resources: false,
+                resources: true,  // 现在支持 Resources
                 prompts: false,
             },
         }
+    }
+
+    /// 列出所有资源
+    pub async fn list_resources(&self) -> McpResult<McpListResourcesResponse> {
+        self.check_initialized().await?;
+
+        info!("Listing MCP resources");
+        let resources = self.resource_manager.list_resources().await?;
+
+        Ok(McpListResourcesResponse { resources })
+    }
+
+    /// 读取资源内容
+    pub async fn read_resource(&self, request: McpReadResourceRequest) -> McpResult<McpReadResourceResponse> {
+        self.check_initialized().await?;
+
+        info!("Reading MCP resource: {}", request.uri);
+        let content = self.resource_manager.read_resource(&request.uri).await?;
+
+        Ok(McpReadResourceResponse {
+            contents: vec![content],
+        })
+    }
+
+    /// 订阅资源变更
+    pub async fn subscribe_resource(&self, request: McpSubscribeResourceRequest) -> McpResult<McpSubscribeResourceResponse> {
+        self.check_initialized().await?;
+
+        info!("Subscribing to MCP resource: {}", request.uri);
+        let subscription = self.resource_manager.subscribe_resource(&request.uri).await?;
+
+        Ok(McpSubscribeResourceResponse {
+            subscription_id: subscription.id,
+        })
+    }
+
+    /// 取消订阅资源
+    pub async fn unsubscribe_resource(&self, subscription_id: &str) -> McpResult<()> {
+        self.check_initialized().await?;
+
+        info!("Unsubscribing from MCP resource: {}", subscription_id);
+        self.resource_manager.unsubscribe_resource(subscription_id).await
+    }
+
+    /// 通知资源变更
+    pub async fn notify_resource_change(&self, uri: &str, change_type: ResourceChangeType) -> McpResult<()> {
+        self.check_initialized().await?;
+
+        info!("Notifying resource change: {} ({:?})", uri, change_type);
+        self.resource_manager.notify_resource_change(uri, change_type).await
+    }
+
+    /// 获取资源管理器
+    pub fn resource_manager(&self) -> &Arc<ResourceManager> {
+        &self.resource_manager
     }
     
     /// 检查是否已初始化
@@ -264,19 +343,31 @@ mod tests {
         }
 
         fn schema(&self) -> ToolSchema {
+            use crate::schema::{ParameterSchema, PropertySchema};
+            use std::collections::HashMap;
+
+            let mut properties = HashMap::new();
+            properties.insert(
+                "input".to_string(),
+                PropertySchema {
+                    prop_type: "string".to_string(),
+                    description: "Input parameter".to_string(),
+                    enum_values: None,
+                    default: None,
+                    minimum: None,
+                    maximum: None,
+                    items: None,
+                },
+            );
+
             ToolSchema {
                 name: "mock_tool".to_string(),
                 description: "A mock tool for testing".to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "input": {
-                            "type": "string",
-                            "description": "Input parameter"
-                        }
-                    },
-                    "required": ["input"]
-                }),
+                parameters: ParameterSchema {
+                    param_type: "object".to_string(),
+                    properties,
+                    required: vec!["input".to_string()],
+                },
             }
         }
 

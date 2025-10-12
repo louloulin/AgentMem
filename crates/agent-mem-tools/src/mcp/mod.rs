@@ -9,6 +9,7 @@ pub mod server;
 pub mod manager;
 pub mod marketplace;
 pub mod error;
+pub mod resources;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
@@ -16,4 +17,11 @@ pub use server::{McpServer, ServerInfo, ServerCapabilities};
 pub use manager::McpClientManager;
 pub use marketplace::{McpMarketplace, McpServerListing};
 pub use error::{McpError, McpResult};
+pub use resources::{
+    McpResource, ResourceContent, ResourceTemplate, TemplateParameter,
+    McpListResourcesResponse, McpReadResourceRequest, McpReadResourceResponse,
+    McpSubscribeResourceRequest, McpSubscribeResourceResponse,
+    ResourceChangeEvent, ResourceChangeType, ResourceSubscription,
+    ResourceManager, CacheStats,
+};
 

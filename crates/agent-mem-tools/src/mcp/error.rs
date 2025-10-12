@@ -36,6 +36,27 @@ pub enum McpError {
     /// 不支持的服务器类型
     UnsupportedServerType(String),
     
+    /// 资源未找到
+    ResourceNotFound(String),
+
+    /// 订阅未找到
+    SubscriptionNotFound(String),
+
+    /// 工具未找到
+    ToolNotFound(String),
+
+    /// 工具加载错误
+    ToolLoadError(String),
+
+    /// 传输错误
+    TransportError(String),
+
+    /// 未连接
+    NotConnected,
+
+    /// 内部错误
+    Internal(String),
+
     /// 其他错误
     Other(String),
 }
@@ -61,6 +82,27 @@ impl fmt::Display for McpError {
             McpError::SerializationError(msg) => write!(f, "MCP serialization error: {}", msg),
             McpError::UnsupportedServerType(server_type) => {
                 write!(f, "Unsupported MCP server type: {}", server_type)
+            }
+            McpError::ResourceNotFound(uri) => {
+                write!(f, "MCP resource not found: {}", uri)
+            }
+            McpError::SubscriptionNotFound(id) => {
+                write!(f, "MCP subscription not found: {}", id)
+            }
+            McpError::ToolNotFound(name) => {
+                write!(f, "MCP tool not found: {}", name)
+            }
+            McpError::ToolLoadError(name) => {
+                write!(f, "MCP tool load error: {}", name)
+            }
+            McpError::TransportError(msg) => {
+                write!(f, "MCP transport error: {}", msg)
+            }
+            McpError::NotConnected => {
+                write!(f, "MCP not connected")
+            }
+            McpError::Internal(msg) => {
+                write!(f, "MCP internal error: {}", msg)
             }
             McpError::Other(msg) => write!(f, "MCP error: {}", msg),
         }

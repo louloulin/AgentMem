@@ -47,6 +47,7 @@ members = [
     "examples/entity-relation-extraction-demo",
     "examples/system-metrics-demo",
     "examples/onnx-embedding-demo",
+    "examples/mcp-resources-demo",
 
     # 示例
     "examples/demo",
