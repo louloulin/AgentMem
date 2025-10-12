@@ -35,6 +35,9 @@ chrono = { workspace = true }
 # Collections
 dashmap = { workspace = true }
 
+# Template engine
+handlebars = "5.1"
+
 [dev-dependencies]
 tokio-test = "0.4"
 criterion = { workspace = true }

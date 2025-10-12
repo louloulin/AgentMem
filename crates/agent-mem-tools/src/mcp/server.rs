@@ -9,6 +9,9 @@ use super::resources::{
     McpReadResourceRequest, McpReadResourceResponse, McpSubscribeResourceRequest,
     McpSubscribeResourceResponse, ResourceChangeType,
 };
+use super::prompts::{
+    PromptManager, McpListPromptsResponse, McpGetPromptRequest, McpGetPromptResponse,
+};
 use crate::executor::{Tool, ToolExecutor};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,6 +64,9 @@ pub struct McpServer {
     /// 资源管理器
     resource_manager: Arc<ResourceManager>,
 
+    /// 提示词管理器
+    prompt_manager: Arc<PromptManager>,
+
     /// 是否已初始化
     initialized: Arc<RwLock<bool>>,
 }
@@ -73,6 +79,7 @@ impl McpServer {
             tool_executor,
             tools: Arc::new(RwLock::new(HashMap::new())),
             resource_manager: Arc::new(ResourceManager::new(300)), // 5 分钟缓存
+            prompt_manager: Arc::new(PromptManager::new()),
             initialized: Arc::new(RwLock::new(false)),
         }
     }
@@ -93,6 +100,23 @@ impl McpServer {
             tool_executor,
             tools: Arc::new(RwLock::new(HashMap::new())),
             resource_manager,
+            prompt_manager: Arc::new(PromptManager::new()),
+            initialized: Arc::new(RwLock::new(false)),
+        }
+    }
+
+    /// 使用自定义提示词管理器创建
+    pub fn with_prompt_manager(
+        config: McpServerConfig,
+        tool_executor: Arc<ToolExecutor>,
+        prompt_manager: Arc<PromptManager>,
+    ) -> Self {
+        Self {
+            config,
+            tool_executor,
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            resource_manager: Arc::new(ResourceManager::new(300)),
+            prompt_manager,
             initialized: Arc::new(RwLock::new(false)),
         }
     }
@@ -232,8 +256,8 @@ impl McpServer {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ServerCapabilities {
                 tools: true,
-                resources: true,  // 现在支持 Resources
-                prompts: false,
+                resources: true,  // 支持 Resources
+                prompts: true,    // 支持 Prompts
             },
         }
     }
@@ -292,7 +316,32 @@ impl McpServer {
     pub fn resource_manager(&self) -> &Arc<ResourceManager> {
         &self.resource_manager
     }
-    
+
+    /// 列出所有提示词
+    pub async fn list_prompts(&self) -> McpResult<McpListPromptsResponse> {
+        self.check_initialized().await?;
+
+        info!("Listing MCP prompts");
+        let prompts = self.prompt_manager.list_prompts().await?;
+
+        Ok(McpListPromptsResponse { prompts })
+    }
+
+    /// 获取提示词
+    pub async fn get_prompt(&self, request: McpGetPromptRequest) -> McpResult<McpGetPromptResponse> {
+        self.check_initialized().await?;
+
+        info!("Getting MCP prompt: {}", request.name);
+        let response = self.prompt_manager.get_prompt(&request.name, request.arguments).await?;
+
+        Ok(response)
+    }
+
+    /// 获取提示词管理器
+    pub fn prompt_manager(&self) -> &Arc<PromptManager> {
+        &self.prompt_manager
+    }
+
     /// 检查是否已初始化
     async fn check_initialized(&self) -> McpResult<()> {
         let initialized = self.initialized.read().await;
