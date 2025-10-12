@@ -42,6 +42,7 @@ members = [
     # 示例
     "examples/migration-demo",
     "examples/performance-demo",
+    "examples/agent-lifecycle-demo",
 
     # 示例
     "examples/demo",

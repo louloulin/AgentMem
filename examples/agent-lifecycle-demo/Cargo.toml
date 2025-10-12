@@ -1,0 +1,13 @@
+[package]
+name = "agent-lifecycle-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.47", features = ["full"] }
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
