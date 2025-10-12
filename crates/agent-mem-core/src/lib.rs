@@ -25,6 +25,8 @@ pub mod coordination;
 /// Core Memory system with Block management, template engine, and auto-rewriter
 pub mod core_memory;
 pub mod engine;
+/// Entity and relation extraction for knowledge graph construction
+pub mod extraction;
 /// Graph-based memory management and reasoning capabilities
 pub mod graph_memory;
 /// Graph optimization with compression and query optimization
@@ -62,6 +64,10 @@ pub mod vector_ecosystem;
 pub use agent_state::{AgentState, AgentStateMachine};
 pub use background_agent::BackgroundAgentManager;
 pub use engine::{MemoryEngine, MemoryEngineConfig};
+pub use extraction::{
+    Entity, EntityExtractor, EntityType, ExtractionResult, Relation, RelationExtractor,
+    RelationType, RuleBasedExtractor, RuleBasedRelationExtractor,
+};
 pub use hierarchy::{HierarchyManager, MemoryLevel};
 pub use message_queue::{AgentMessage as QueueMessage, MessageAccumulator, MessageQueue};
 pub use managers::{
