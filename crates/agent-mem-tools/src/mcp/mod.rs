@@ -14,6 +14,7 @@ pub mod prompts;
 pub mod transport;
 pub mod discovery;
 pub mod auth;
+pub mod sampling;
 
 pub use types::{McpServerConfig, McpServerType, McpTool};
 pub use client::McpClient;
@@ -42,4 +43,8 @@ pub use discovery::{
 pub use auth::{
     AuthManager, AuthContext, AuthMethod, Permission, Role, Credentials,
     AuditLogger, AuditEvent, AuditEventType, JwtConfig, OAuth2Config,
+};
+pub use sampling::{
+    SamplingManager, SamplingMessage, SamplingRole, SamplingParams,
+    CreateMessageRequest, CreateMessageResponse, StopReason, TokenUsage, StreamChunk,
 };
