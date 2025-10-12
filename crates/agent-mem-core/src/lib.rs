@@ -46,6 +46,8 @@ pub mod message_queue;
 pub mod operations;
 /// Agent orchestrator for conversation loop and memory integration
 pub mod orchestrator;
+/// Performance optimization system with caching, batching, and benchmarking
+pub mod performance;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
 pub mod search;
