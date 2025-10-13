@@ -442,6 +442,21 @@ impl AgentMemClient {
         Self::new(AgentMemClientConfig::default())
     }
 
+    /// Convert CoreError to AgentMemError
+    fn convert_error(err: crate::CoreError) -> AgentMemError {
+        match err {
+            crate::CoreError::Storage(msg) => AgentMemError::storage_error(&msg),
+            crate::CoreError::Database(msg) => AgentMemError::storage_error(&msg),
+            crate::CoreError::NotFound(msg) => AgentMemError::not_found(&msg),
+            crate::CoreError::ValidationError(msg) => AgentMemError::validation_error(&msg),
+            crate::CoreError::InvalidInput(msg) => AgentMemError::validation_error(&msg),
+            crate::CoreError::SerializationError(msg) => {
+                AgentMemError::internal_error(&format!("Serialization error: {}", msg))
+            }
+            _ => AgentMemError::internal_error(&err.to_string()),
+        }
+    }
+
     /// Add memory - Mem0 compatible API
     pub async fn add(
         &self,
@@ -490,25 +505,64 @@ impl AgentMemClient {
             ));
         }
 
-        // Build search filters
-        let mut search_filters = filters.unwrap_or_default();
+        // Acquire semaphore permit
+        let _permit = self.semaphore.acquire().await.map_err(|e| {
+            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+        })?;
 
-        // Add ID filters if provided
-        if let Some(uid) = user_id {
-            search_filters.insert("user_id".to_string(), serde_json::Value::String(uid));
-        }
-        if let Some(aid) = agent_id {
-            search_filters.insert("agent_id".to_string(), serde_json::Value::String(aid));
-        }
-        if let Some(rid) = run_id {
-            search_filters.insert("run_id".to_string(), serde_json::Value::String(rid));
-        }
+        // Search using engine
+        let memories = self
+            .engine
+            .search_memories(&query, None, Some(limit))
+            .await
+            .map_err(Self::convert_error)?;
 
-        // TODO: Implement actual search with the engine
-        // For now, return empty results
+        // Convert to search results and apply filters
+        let mut results: Vec<MemorySearchResult> = memories
+            .into_iter()
+            .filter(|memory| {
+                // Apply user_id filter
+                if let Some(ref uid) = user_id {
+                    if memory.session.user_id.as_ref() != Some(uid) {
+                        return false;
+                    }
+                }
+                // Apply agent_id filter
+                if let Some(ref aid) = agent_id {
+                    if memory.session.agent_id.as_ref() != Some(aid) {
+                        return false;
+                    }
+                }
+                // Apply run_id filter (from session)
+                if let Some(ref rid) = run_id {
+                    if memory.session.run_id.as_ref() != Some(rid) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(|memory| MemorySearchResult {
+                id: memory.id.clone(),
+                content: memory.content.clone(),
+                score: memory.score.unwrap_or(0.0),
+                memory_type: match memory.memory_type {
+                    agent_mem_traits::MemoryType::Episodic => MemoryType::Episodic,
+                    agent_mem_traits::MemoryType::Semantic => MemoryType::Semantic,
+                    agent_mem_traits::MemoryType::Procedural => MemoryType::Procedural,
+                    agent_mem_traits::MemoryType::Working => MemoryType::Working,
+                    _ => MemoryType::Episodic,
+                },
+                metadata: memory.metadata,
+                created_at: memory.created_at,
+                updated_at: memory.updated_at.unwrap_or(memory.created_at),
+            })
+            .collect();
+
+        let total = results.len();
+
         Ok(SearchResult {
-            results: vec![],
-            total: 0,
+            results,
+            total,
             query,
         })
     }
@@ -519,9 +573,33 @@ impl AgentMemClient {
             return Err(AgentMemError::validation_error("Memory ID cannot be empty"));
         }
 
-        // TODO: Implement get_memory functionality
-        // For now, return None (not found)
-        Ok(None)
+        // Acquire semaphore permit
+        let _permit = self.semaphore.acquire().await.map_err(|e| {
+            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+        })?;
+
+        // Get from engine
+        let memory_opt = self
+            .engine
+            .get_memory(&memory_id)
+            .await
+            .map_err(Self::convert_error)?;
+
+        Ok(memory_opt.map(|memory| MemorySearchResult {
+            id: memory.id.clone(),
+            content: memory.content.clone(),
+            score: memory.score.unwrap_or(0.0),
+            memory_type: match memory.memory_type {
+                agent_mem_traits::MemoryType::Episodic => MemoryType::Episodic,
+                agent_mem_traits::MemoryType::Semantic => MemoryType::Semantic,
+                agent_mem_traits::MemoryType::Procedural => MemoryType::Procedural,
+                agent_mem_traits::MemoryType::Working => MemoryType::Working,
+                _ => MemoryType::Episodic,
+            },
+            metadata: memory.metadata,
+            created_at: memory.created_at,
+            updated_at: memory.updated_at.unwrap_or(memory.created_at),
+        }))
     }
 
     /// Update memory
@@ -530,10 +608,43 @@ impl AgentMemClient {
             return Err(AgentMemError::validation_error("Memory ID cannot be empty"));
         }
 
-        // TODO: Implement update functionality
-        // For now, return success
+        // Acquire semaphore permit
+        let _permit = self.semaphore.acquire().await.map_err(|e| {
+            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+        })?;
+
+        // Get existing memory
+        let mut memory = self
+            .engine
+            .get_memory(&request.memory_id)
+            .await
+            .map_err(Self::convert_error)?
+            .ok_or_else(|| {
+                AgentMemError::not_found(&format!("Memory {} not found", request.memory_id))
+            })?;
+
+        // Update content if provided
+        if let Some(content) = request.content {
+            memory.content = content;
+        }
+
+        // Update metadata if provided
+        if let Some(metadata) = request.metadata {
+            memory.metadata = metadata;
+        }
+
+        // Update timestamp
+        memory.updated_at = Some(chrono::Utc::now());
+
+        // Update in engine
+        let updated_memory = self
+            .engine
+            .update_memory(memory)
+            .await
+            .map_err(Self::convert_error)?;
+
         Ok(UpdateResult {
-            id: request.memory_id,
+            id: updated_memory.id,
             success: true,
             message: Some("Memory updated successfully".to_string()),
             updated_at: Utc::now(),
@@ -546,9 +657,19 @@ impl AgentMemClient {
             return Err(AgentMemError::validation_error("Memory ID cannot be empty"));
         }
 
-        // TODO: Implement delete_memory in MemoryEngine
-        // For now, return success
-        Ok(true)
+        // Acquire semaphore permit
+        let _permit = self.semaphore.acquire().await.map_err(|e| {
+            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+        })?;
+
+        // Delete from engine
+        let deleted = self
+            .engine
+            .remove_memory(&memory_id)
+            .await
+            .map_err(Self::convert_error)?;
+
+        Ok(deleted)
     }
 
     /// Get all memories for a user
@@ -557,24 +678,62 @@ impl AgentMemClient {
         user_id: Option<String>,
         agent_id: Option<String>,
         run_id: Option<String>,
-        _limit: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<Vec<MemorySearchResult>> {
-        // Build filters
-        let mut filters = HashMap::new();
+        // Acquire semaphore permit
+        let _permit = self.semaphore.acquire().await.map_err(|e| {
+            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+        })?;
 
-        if let Some(uid) = user_id {
-            filters.insert("user_id".to_string(), serde_json::Value::String(uid));
-        }
-        if let Some(aid) = agent_id {
-            filters.insert("agent_id".to_string(), serde_json::Value::String(aid));
-        }
-        if let Some(rid) = run_id {
-            filters.insert("run_id".to_string(), serde_json::Value::String(rid));
-        }
+        // Get all memories from engine (using empty query to get all)
+        let memories = self
+            .engine
+            .search_memories("", None, limit)
+            .await
+            .map_err(Self::convert_error)?;
 
-        // TODO: Implement actual get_all with the engine
-        // For now, return empty results
-        Ok(vec![])
+        // Apply filters
+        let results: Vec<MemorySearchResult> = memories
+            .into_iter()
+            .filter(|memory| {
+                // Apply user_id filter
+                if let Some(ref uid) = user_id {
+                    if memory.session.user_id.as_ref() != Some(uid) {
+                        return false;
+                    }
+                }
+                // Apply agent_id filter
+                if let Some(ref aid) = agent_id {
+                    if memory.session.agent_id.as_ref() != Some(aid) {
+                        return false;
+                    }
+                }
+                // Apply run_id filter (from session)
+                if let Some(ref rid) = run_id {
+                    if memory.session.run_id.as_ref() != Some(rid) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(|memory| MemorySearchResult {
+                id: memory.id.clone(),
+                content: memory.content.clone(),
+                score: memory.score.unwrap_or(0.0),
+                memory_type: match memory.memory_type {
+                    agent_mem_traits::MemoryType::Episodic => MemoryType::Episodic,
+                    agent_mem_traits::MemoryType::Semantic => MemoryType::Semantic,
+                    agent_mem_traits::MemoryType::Procedural => MemoryType::Procedural,
+                    agent_mem_traits::MemoryType::Working => MemoryType::Working,
+                    _ => MemoryType::Episodic,
+                },
+                metadata: memory.metadata,
+                created_at: memory.created_at,
+                updated_at: memory.updated_at.unwrap_or(memory.created_at),
+            })
+            .collect();
+
+        Ok(results)
     }
 
     /// Reset all memories (dangerous operation)
@@ -725,20 +884,67 @@ impl AgentMemClient {
             AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
         })?;
 
-        // Convert messages to memory
+        // Convert messages to memory content
         let messages = request.messages.to_message_list();
-        let _content = messages
+        let content = messages
             .iter()
             .map(|m| format!("{}: {}", m.role, m.content))
             .collect::<Vec<_>>()
             .join("\n");
 
-        // TODO: Implement actual memory creation with engine
-        // For now, return success with generated ID
-        let memory_id = Uuid::new_v4().to_string();
+        // Create memory object using the Memory::new constructor
+        let agent_id = request.agent_id.unwrap_or_else(|| "default".to_string());
+        let user_id = request.user_id;
+        let memory_type = match request.memory_type {
+            Some(MemoryType::Episodic) => agent_mem_traits::MemoryType::Episodic,
+            Some(MemoryType::Semantic) => agent_mem_traits::MemoryType::Semantic,
+            Some(MemoryType::Procedural) => agent_mem_traits::MemoryType::Procedural,
+            Some(MemoryType::Working) => agent_mem_traits::MemoryType::Working,
+            None => agent_mem_traits::MemoryType::Episodic, // Default to episodic
+        };
+
+        let now = Utc::now();
+
+        // Create MemoryItem (which is aliased as crate::Memory)
+        let memory_item = agent_mem_traits::MemoryItem {
+            id: Uuid::new_v4().to_string(),
+            content,
+            hash: None,
+            metadata: request.metadata.unwrap_or_default(),
+            score: Some(0.5), // Default importance
+            created_at: now,
+            updated_at: Some(now),
+            session: agent_mem_traits::Session {
+                id: Uuid::new_v4().to_string(),
+                user_id: user_id.clone(),
+                agent_id: Some(agent_id.clone()),
+                run_id: None,
+                actor_id: None,
+                created_at: now,
+                metadata: HashMap::new(),
+            },
+            memory_type,
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id,
+            user_id,
+            importance: 0.5,
+            embedding: None,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            version: 1,
+        };
+
+        // Add to engine
+        let id = self
+            .engine
+            .add_memory(memory_item)
+            .await
+            .map_err(Self::convert_error)?;
 
         Ok(AddResult {
-            id: memory_id,
+            id,
             success: true,
             message: Some("Memory added successfully".to_string()),
             created_at: Utc::now(),

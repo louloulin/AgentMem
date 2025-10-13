@@ -61,6 +61,8 @@ pub mod tenant;
 pub mod types;
 /// Vector storage ecosystem with capability detection and auto-selection
 pub mod vector_ecosystem;
+/// Environment-based configuration
+pub mod config_env;
 
 // Re-export core types
 pub use agent_state::{AgentState, AgentStateMachine};

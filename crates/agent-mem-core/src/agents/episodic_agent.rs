@@ -45,6 +45,9 @@ pub struct EpisodicAgent {
 
 impl EpisodicAgent {
     /// Create a new episodic memory agent
+    ///
+    /// **Note**: This creates an agent without a store configured.
+    /// For production use, prefer `from_env()` or `with_store()`.
     pub fn new(agent_id: String) -> Self {
         let config = AgentConfig::new(
             agent_id,
@@ -61,6 +64,17 @@ impl EpisodicAgent {
             episodic_store: None,
             initialized: false,
         }
+    }
+
+    /// Create a new episodic memory agent with store from environment configuration
+    ///
+    /// This method automatically initializes the store based on environment variables.
+    /// See `config_env` module for supported environment variables.
+    pub async fn from_env(agent_id: String) -> agent_mem_traits::Result<Self> {
+        use crate::config_env::create_stores_from_env;
+
+        let stores = create_stores_from_env().await?;
+        Ok(Self::with_store(agent_id, stores.episodic))
     }
 
     /// Create with custom configuration

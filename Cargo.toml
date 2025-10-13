@@ -41,6 +41,9 @@ members = [
     # "tools/agent-mem-bench",
 
     # 示例
+    "examples/agent-from-env-demo",
+    "examples/production-memory-demo",
+    "examples/env-config-demo",
     "examples/migration-demo",
     "examples/performance-demo",
     "examples/performance-optimization-demo",

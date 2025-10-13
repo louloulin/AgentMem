@@ -42,14 +42,61 @@ pub struct MemoryManager {
 
 impl MemoryManager {
     /// Create a new memory manager with default configuration
+    ///
+    /// **Note**: This uses in-memory storage which is not persistent.
+    /// For production use with persistent storage, use `with_operations()` or use
+    /// the Agent-based API (CoreAgent, EpisodicAgent, etc.) which supports persistent storage.
     pub fn new() -> Self {
         Self::with_config(MemoryConfig::default())
     }
 
     /// Create a new memory manager with custom configuration
+    ///
+    /// **Note**: This uses in-memory storage which is not persistent.
+    /// For production use with persistent storage, use `with_operations()` or use
+    /// the Agent-based API (CoreAgent, EpisodicAgent, etc.) which supports persistent storage.
     pub fn with_config(config: MemoryConfig) -> Self {
         let operations: Box<dyn MemoryOperations + Send + Sync> =
             Box::new(InMemoryOperations::new());
+        let lifecycle = MemoryLifecycle::with_default_config();
+        let history = MemoryHistory::with_default_config();
+
+        Self {
+            operations: Arc::new(RwLock::new(operations)),
+            lifecycle: Arc::new(RwLock::new(lifecycle)),
+            history: Arc::new(RwLock::new(history)),
+            config,
+            fact_extractor: None,
+            decision_engine: None,
+            deduplicator: None,
+            llm_provider: None,
+        }
+    }
+
+    /// Create a new memory manager with custom operations backend
+    ///
+    /// This allows you to provide your own MemoryOperations implementation,
+    /// such as one backed by a persistent database.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use agent_mem_core::manager::MemoryManager;
+    /// use agent_mem_config::MemoryConfig;
+    ///
+    /// // Create your custom operations implementation
+    /// let operations = MyPersistentOperations::new(db_connection);
+    ///
+    /// // Create manager with custom operations
+    /// let manager = MemoryManager::with_operations(
+    ///     MemoryConfig::default(),
+    ///     Box::new(operations),
+    /// );
+    /// ```
+    pub fn with_operations(
+        config: MemoryConfig,
+        operations: Box<dyn MemoryOperations + Send + Sync>,
+    ) -> Self {
         let lifecycle = MemoryLifecycle::with_default_config();
         let history = MemoryHistory::with_default_config();
 

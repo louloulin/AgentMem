@@ -44,6 +44,24 @@ use tracing::{debug, info};
 ///
 /// This struct provides a simple, user-friendly API for memory management,
 /// automatically handling configuration and intelligent features.
+///
+/// **Important**: SimpleMemory uses in-memory storage by default, which means
+/// data is lost when the process exits. For production use with persistent storage,
+/// use the Agent-based API instead:
+///
+/// ```rust,no_run
+/// use agent_mem_core::agents::CoreAgent;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // Production: Uses persistent storage (LibSQL by default)
+///     let agent = CoreAgent::from_env("agent1".to_string()).await?;
+///
+///     // Development: Uses in-memory storage
+///     let mem = agent_mem_core::SimpleMemory::new().await?;
+///     Ok(())
+/// }
+/// ```
 pub struct SimpleMemory {
     /// Internal memory manager
     manager: Arc<MemoryManager>,
@@ -56,11 +74,18 @@ pub struct SimpleMemory {
 impl SimpleMemory {
     /// Create a new SimpleMemory with automatic configuration
     ///
+    /// **Note**: This uses in-memory storage which is not persistent.
+    /// Data will be lost when the process exits.
+    ///
+    /// For production use with persistent storage, use the Agent-based API:
+    /// - `CoreAgent::from_env()` - Persistent core memory
+    /// - `EpisodicAgent::from_env()` - Persistent episodic memory
+    /// - `SemanticAgent::from_env()` - Persistent semantic memory
+    ///
     /// This method automatically:
-    /// - Detects and initializes an LLM provider (OpenAI, Anthropic, or Ollama)
-    /// - Creates fact extractor and decision engine
+    /// - Creates an in-memory storage backend
     /// - Enables intelligent features by default
-    /// - Uses in-memory storage (suitable for development)
+    /// - Suitable for development and testing
     ///
     /// # Example
     ///
@@ -69,12 +94,18 @@ impl SimpleMemory {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Development/Testing: In-memory storage
     ///     let mem = SimpleMemory::new().await?;
+    ///
+    ///     // Add memory (will be lost on exit)
+    ///     let id = mem.add("I love pizza").await?;
+    ///
     ///     Ok(())
     /// }
     /// ```
     pub async fn new() -> Result<Self> {
-        info!("Initializing SimpleMemory with default configuration");
+        info!("Initializing SimpleMemory with in-memory storage (development mode)");
+        info!("For production use with persistent storage, use Agent::from_env() instead");
 
         // Create configuration
         let config = Self::create_config()?;

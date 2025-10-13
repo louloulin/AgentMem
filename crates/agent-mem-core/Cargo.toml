@@ -17,6 +17,7 @@ agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-tools = { path = "../agent-mem-tools" }
+agent-mem-storage = { path = "../agent-mem-storage" }
 
 # Core dependencies
 serde.workspace = true

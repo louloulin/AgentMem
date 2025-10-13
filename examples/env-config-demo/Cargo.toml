@@ -1,0 +1,11 @@
+[package]
+name = "env-config-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+tokio = { version = "1.42", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
