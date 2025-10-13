@@ -562,6 +562,11 @@ impl RealLLMFactory {
                 Self::validate_provider(&provider).await?;
                 Ok(Arc::new(provider))
             }
+            "deepseek" => {
+                let provider = DeepSeekProvider::from_config(config.clone())?;
+                Self::validate_provider(&provider).await?;
+                Ok(Arc::new(provider))
+            }
             // LiteLLM 需要特殊配置，暂时跳过
             // "litellm" => { ... },
             _ => Err(AgentMemError::config_error(&format!(

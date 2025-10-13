@@ -45,6 +45,8 @@ members = [
     "examples/production-memory-demo",
     "examples/env-config-demo",
     "examples/importance-scoring-demo",
+    "examples/vector-search-demo",
+    "examples/llm-memory-analysis-demo",
     "examples/migration-demo",
     "examples/performance-demo",
     "examples/performance-optimization-demo",

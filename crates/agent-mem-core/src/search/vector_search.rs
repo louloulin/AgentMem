@@ -329,8 +329,11 @@ impl VectorSearchEngine {
     pub async fn get_stats(&self) -> Result<VectorStoreStats> {
         let perf_stats = self.stats.read().await;
 
+        // 从 vector_store 获取实际的向量数量
+        let total_vectors = self.vector_store.count_vectors().await.unwrap_or(0);
+
         Ok(VectorStoreStats {
-            total_vectors: 0, // TODO: 从 vector_store 获取
+            total_vectors,
             dimension: self.embedding_dimension,
             index_type: if self.config.use_pgvector {
                 match self.config.pgvector_index_type {
@@ -352,27 +355,77 @@ impl VectorSearchEngine {
     }
 
     /// 创建 pgvector 索引（仅在使用 PostgreSQL 时）
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - PostgreSQL 连接池
+    /// * `table_name` - 表名
+    /// * `column_name` - 向量列名（默认为 "embedding"）
+    ///
+    /// # Returns
+    ///
+    /// 返回索引创建结果
     #[cfg(feature = "postgres")]
-    pub async fn create_pgvector_index(&self, table_name: &str) -> Result<()> {
+    pub async fn create_pgvector_index(
+        &self,
+        pool: &sqlx::PgPool,
+        table_name: &str,
+        column_name: Option<&str>,
+    ) -> Result<()> {
         if !self.config.use_pgvector {
             return Err(AgentMemError::ConfigError(
                 "pgvector is not enabled in configuration".to_string(),
             ));
         }
 
-        // 这里需要直接访问 PostgreSQL 连接
-        // 实际实现需要传入 PgPool
+        let column = column_name.unwrap_or("embedding");
+        let index_name = format!("{}_{}_idx", table_name, column);
+
         log::info!(
-            "Creating pgvector index on table {} with type {:?}",
+            "Creating pgvector index '{}' on table '{}.{}' with type {:?}",
+            index_name,
             table_name,
+            column,
             self.config.pgvector_index_type
         );
 
-        // TODO: 实现实际的索引创建
-        // 示例 SQL:
-        // CREATE INDEX ON table_name USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-        // 或
-        // CREATE INDEX ON table_name USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+        // 根据索引类型创建不同的索引
+        let sql = match self.config.pgvector_index_type {
+            PgVectorIndexType::IVFFlat => {
+                // IVFFlat 索引：快速但近似
+                // lists 参数：聚类数量，通常设置为 sqrt(total_rows)
+                format!(
+                    "CREATE INDEX IF NOT EXISTS {} ON {} USING ivfflat ({} vector_cosine_ops) WITH (lists = {})",
+                    index_name,
+                    table_name,
+                    column,
+                    self.config.index_params.ivfflat_lists
+                )
+            }
+            PgVectorIndexType::HNSW => {
+                // HNSW 索引：更精确但构建慢
+                // m: 每个节点的最大连接数（通常 16-64）
+                // ef_construction: 构建时的搜索深度（通常 64-200）
+                format!(
+                    "CREATE INDEX IF NOT EXISTS {} ON {} USING hnsw ({} vector_cosine_ops) WITH (m = {}, ef_construction = {})",
+                    index_name,
+                    table_name,
+                    column,
+                    self.config.index_params.hnsw_m,
+                    self.config.index_params.hnsw_ef_construction
+                )
+            }
+        };
+
+        // 执行索引创建
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to create pgvector index: {}", e))
+            })?;
+
+        log::info!("Successfully created pgvector index '{}'", index_name);
 
         Ok(())
     }
