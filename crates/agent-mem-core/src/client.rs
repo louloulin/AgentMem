@@ -392,6 +392,19 @@ impl Default for PerformanceConfig {
     }
 }
 
+/// User structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    /// User ID
+    pub id: String,
+    /// User name
+    pub name: String,
+    /// Created timestamp
+    pub created_at: DateTime<Utc>,
+    /// Updated timestamp
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Mem0 compatible client configuration
 #[derive(Debug, Clone)]
 pub struct AgentMemClientConfig {
@@ -949,6 +962,49 @@ impl AgentMemClient {
             message: Some("Memory added successfully".to_string()),
             created_at: Utc::now(),
         })
+    }
+
+    // ==================== 用户管理 API ====================
+
+    /// 创建新用户
+    pub async fn create_user(&self, user_name: String) -> Result<User> {
+        // 验证用户名
+        if user_name.trim().is_empty() {
+            return Err(AgentMemError::validation_error("User name cannot be empty"));
+        }
+
+        // 检查用户是否已存在
+        if let Some(existing_user) = self.get_user_by_name(user_name.clone()).await? {
+            // 返回已存在的用户
+            return Ok(existing_user);
+        }
+
+        // 创建新用户
+        let user = User {
+            id: Uuid::new_v4().to_string(),
+            name: user_name,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        // TODO: 将用户保存到数据库
+        // 目前先返回内存中的用户对象
+
+        Ok(user)
+    }
+
+    /// 列出所有用户
+    pub async fn list_users(&self) -> Result<Vec<User>> {
+        // TODO: 从数据库查询所有用户
+        // 目前返回空列表
+        Ok(Vec::new())
+    }
+
+    /// 按名称查询用户
+    pub async fn get_user_by_name(&self, user_name: String) -> Result<Option<User>> {
+        // TODO: 从数据库查询用户
+        // 目前返回 None
+        Ok(None)
     }
 }
 

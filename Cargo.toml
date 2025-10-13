@@ -49,6 +49,7 @@ members = [
     "examples/llm-memory-analysis-demo",
     "examples/error-handling-demo",
     "examples/langgraph-integration-demo",
+    "examples/user-management-demo",
     "examples/migration-demo",
     "examples/performance-demo",
     "examples/performance-optimization-demo",
