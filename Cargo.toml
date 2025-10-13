@@ -47,6 +47,8 @@ members = [
     "examples/importance-scoring-demo",
     "examples/vector-search-demo",
     "examples/llm-memory-analysis-demo",
+    "examples/error-handling-demo",
+    "examples/langgraph-integration-demo",
     "examples/migration-demo",
     "examples/performance-demo",
     "examples/performance-optimization-demo",

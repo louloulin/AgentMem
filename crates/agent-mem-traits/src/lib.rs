@@ -22,7 +22,7 @@ pub use batch::{
     TelemetryProvider,
 };
 pub use embedder::Embedder;
-pub use error::{AgentMemError, Result};
+pub use error::{AgentMemError, ErrorContext, ErrorSeverity, Result};
 pub use cache::{CacheStats, IntelligenceCache};
 pub use intelligence::{
     DecisionEngine, ExtractedFact, FactExtractor, IntelligentMemoryProcessor,
