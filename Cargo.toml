@@ -44,6 +44,7 @@ members = [
     "examples/agent-from-env-demo",
     "examples/production-memory-demo",
     "examples/env-config-demo",
+    "examples/importance-scoring-demo",
     "examples/migration-demo",
     "examples/performance-demo",
     "examples/performance-optimization-demo",

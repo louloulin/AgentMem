@@ -121,21 +121,30 @@ impl ImportanceScorer for DefaultImportanceScorer {
         let now = chrono::Utc::now();
 
         // Calculate recency score (more recent = higher score)
+        // Uses exponential decay: score = e^(-decay_rate * hours)
         let age_hours = (now - memory.created_at).num_hours() as f64;
-        let recency_score = (1.0 / (1.0 + age_hours / 24.0)).max(0.0).min(1.0);
+        let decay_rate = 0.01; // Slower decay for longer-term relevance
+        let recency_score = (-decay_rate * age_hours).exp().max(0.0).min(1.0);
 
-        // Calculate frequency score based on metadata (placeholder)
-        let frequency_score = 0.5; // TODO: Implement based on access patterns
+        // Calculate frequency score based on access patterns
+        // Uses logarithmic scale to normalize access frequency
+        let days_since_creation = (now - memory.created_at).num_days().max(1) as f64;
+        let access_frequency = memory.access_count as f64 / days_since_creation;
+        let frequency_score = (1.0 + access_frequency).ln() / (1.0 + 100.0_f64).ln();
+        let frequency_score = frequency_score.max(0.0).min(1.0);
 
-        // Calculate relevance score (placeholder - would use semantic analysis)
-        let relevance_score = memory.score.unwrap_or(0.5) as f64; // Use existing score as base
+        // Calculate relevance score based on existing importance and score
+        // Combines the memory's base importance with its semantic score
+        let base_importance = memory.importance as f64;
+        let semantic_score = memory.score.unwrap_or(0.5) as f64;
+        let relevance_score = (base_importance * 0.6 + semantic_score * 0.4).max(0.0).min(1.0);
 
-        // Calculate interaction score based on metadata
-        let interaction_score = if memory.metadata.contains_key("user_interaction") {
-            0.8
-        } else {
-            0.3
-        };
+        // Calculate interaction score based on access count and recency
+        // Recent accesses are weighted more heavily
+        let hours_since_access = (now - memory.last_accessed_at).num_hours() as f64;
+        let access_recency = (-0.02 * hours_since_access).exp();
+        let access_count_normalized = (memory.access_count as f64 / (memory.access_count as f64 + 10.0)).max(0.0).min(1.0);
+        let interaction_score = (access_recency * 0.5 + access_count_normalized * 0.5).max(0.0).min(1.0);
 
         // Calculate final weighted score
         let weights = &self.config.importance_weights;
@@ -158,10 +167,21 @@ impl ImportanceScorer for DefaultImportanceScorer {
     async fn update_importance(
         &self,
         _memory_id: &str,
-        _access_type: AccessType,
+        access_type: AccessType,
     ) -> crate::CoreResult<f64> {
-        // TODO: Implement importance updates based on access patterns
-        Ok(0.5)
+        // Calculate importance boost based on access type
+        // Different access types have different impacts on importance
+        let importance_boost = match access_type {
+            AccessType::Read => 0.01,        // Small boost for reads
+            AccessType::Update => 0.03,      // Small-moderate boost for updates
+            AccessType::Reference => 0.02,   // Small boost for references
+            AccessType::Decision => 0.08,    // Large boost for decision-making
+        };
+
+        // Return the calculated boost
+        // Note: The actual importance update should be applied by the caller
+        // by adding this boost to the current importance and clamping to [0.0, 1.0]
+        Ok(importance_boost)
     }
 }
 
