@@ -24,6 +24,14 @@ pub enum MemoryType {
     Procedural,
     /// Working memories - temporary information
     Working,
+    /// Core memories - persistent identity and preferences
+    Core,
+    /// Resource memories - multimedia content and documents
+    Resource,
+    /// Knowledge memories - structured knowledge graphs
+    Knowledge,
+    /// Contextual memories - environment-aware information
+    Contextual,
 }
 
 impl ToString for MemoryType {
@@ -33,6 +41,10 @@ impl ToString for MemoryType {
             MemoryType::Semantic => "semantic".to_string(),
             MemoryType::Procedural => "procedural".to_string(),
             MemoryType::Working => "working".to_string(),
+            MemoryType::Core => "core".to_string(),
+            MemoryType::Resource => "resource".to_string(),
+            MemoryType::Knowledge => "knowledge".to_string(),
+            MemoryType::Contextual => "contextual".to_string(),
         }
     }
 }
@@ -405,6 +417,63 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Memory visualization structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryVisualization {
+    /// User ID
+    pub user_id: String,
+    /// User name
+    pub user_name: String,
+    /// Memory summary statistics
+    pub summary: MemorySummary,
+    /// Memories grouped by type
+    pub memories: MemoriesByType,
+}
+
+/// Memory summary statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemorySummary {
+    /// Total number of memories
+    pub total_count: usize,
+    /// Number of episodic memories
+    pub episodic_count: usize,
+    /// Number of semantic memories
+    pub semantic_count: usize,
+    /// Number of procedural memories
+    pub procedural_count: usize,
+    /// Number of core memories
+    pub core_count: usize,
+    /// Number of resource memories
+    pub resource_count: usize,
+    /// Number of knowledge memories
+    pub knowledge_count: usize,
+    /// Number of working memories
+    pub working_count: usize,
+    /// Number of contextual memories
+    pub contextual_count: usize,
+}
+
+/// Memories grouped by type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoriesByType {
+    /// Episodic memories
+    pub episodic: Vec<MemorySearchResult>,
+    /// Semantic memories
+    pub semantic: Vec<MemorySearchResult>,
+    /// Procedural memories
+    pub procedural: Vec<MemorySearchResult>,
+    /// Core memories
+    pub core: Vec<MemorySearchResult>,
+    /// Resource memories
+    pub resource: Vec<MemorySearchResult>,
+    /// Knowledge memories
+    pub knowledge: Vec<MemorySearchResult>,
+    /// Working memories
+    pub working: Vec<MemorySearchResult>,
+    /// Contextual memories
+    pub contextual: Vec<MemorySearchResult>,
+}
+
 /// Mem0 compatible client configuration
 #[derive(Debug, Clone)]
 pub struct AgentMemClientConfig {
@@ -565,6 +634,10 @@ impl AgentMemClient {
                     agent_mem_traits::MemoryType::Semantic => MemoryType::Semantic,
                     agent_mem_traits::MemoryType::Procedural => MemoryType::Procedural,
                     agent_mem_traits::MemoryType::Working => MemoryType::Working,
+                    agent_mem_traits::MemoryType::Core => MemoryType::Core,
+                    agent_mem_traits::MemoryType::Resource => MemoryType::Resource,
+                    agent_mem_traits::MemoryType::Knowledge => MemoryType::Knowledge,
+                    agent_mem_traits::MemoryType::Contextual => MemoryType::Contextual,
                     _ => MemoryType::Episodic,
                 },
                 metadata: memory.metadata,
@@ -740,6 +813,10 @@ impl AgentMemClient {
                     agent_mem_traits::MemoryType::Semantic => MemoryType::Semantic,
                     agent_mem_traits::MemoryType::Procedural => MemoryType::Procedural,
                     agent_mem_traits::MemoryType::Working => MemoryType::Working,
+                    agent_mem_traits::MemoryType::Core => MemoryType::Core,
+                    agent_mem_traits::MemoryType::Resource => MemoryType::Resource,
+                    agent_mem_traits::MemoryType::Knowledge => MemoryType::Knowledge,
+                    agent_mem_traits::MemoryType::Contextual => MemoryType::Contextual,
                     _ => MemoryType::Episodic,
                 },
                 metadata: memory.metadata,
@@ -915,6 +992,10 @@ impl AgentMemClient {
             Some(MemoryType::Semantic) => agent_mem_traits::MemoryType::Semantic,
             Some(MemoryType::Procedural) => agent_mem_traits::MemoryType::Procedural,
             Some(MemoryType::Working) => agent_mem_traits::MemoryType::Working,
+            Some(MemoryType::Core) => agent_mem_traits::MemoryType::Core,
+            Some(MemoryType::Resource) => agent_mem_traits::MemoryType::Resource,
+            Some(MemoryType::Knowledge) => agent_mem_traits::MemoryType::Knowledge,
+            Some(MemoryType::Contextual) => agent_mem_traits::MemoryType::Contextual,
             None => agent_mem_traits::MemoryType::Episodic, // Default to episodic
         };
 
@@ -1010,6 +1091,156 @@ impl AgentMemClient {
     pub async fn get_user_by_name(&self, user_name: String) -> Result<Option<User>> {
         let storage = self.user_storage.read().await;
         Ok(storage.get(&user_name).cloned())
+    }
+
+    /// 按 ID 查询用户
+    pub async fn get_user_by_id(&self, user_id: String) -> Result<Option<User>> {
+        let storage = self.user_storage.read().await;
+        Ok(storage.values().find(|u| u.id == user_id).cloned())
+    }
+
+    // ==================== 辅助方法 ====================
+
+    /// 简化的添加记忆方法（用于测试和简单场景）
+    ///
+    /// 这是一个便捷方法，简化了 `add` 方法的调用
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - 记忆内容
+    /// * `user_id` - 用户 ID（可选）
+    /// * `run_id` - 运行 ID（可选）
+    /// * `memory_type` - 记忆类型（可选，默认为 Episodic）
+    ///
+    /// # Returns
+    ///
+    /// 返回添加结果
+    pub async fn add_simple(
+        &self,
+        content: String,
+        user_id: Option<String>,
+        run_id: Option<String>,
+        memory_type: Option<MemoryType>,
+    ) -> Result<AddResult> {
+        self.add(
+            Messages::Single(content),
+            user_id,
+            None, // agent_id
+            run_id,
+            None, // metadata
+            false, // infer
+            memory_type,
+            None, // prompt
+        ).await
+    }
+
+    // ==================== 记忆可视化 API ====================
+
+    /// 可视化用户的所有记忆
+    ///
+    /// 按记忆类型分组显示所有记忆，并提供统计摘要
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - 用户 ID（可选）
+    ///
+    /// # Returns
+    ///
+    /// 返回 `MemoryVisualization` 结构，包含：
+    /// - 用户信息
+    /// - 记忆统计摘要
+    /// - 按类型分组的记忆列表
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use agent_mem_core::client::AgentMemClient;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = AgentMemClient::default();
+    ///
+    ///     // 可视化特定用户的记忆
+    ///     let viz = client.visualize_memories(Some("alice".to_string())).await?;
+    ///     println!("Total memories: {}", viz.summary.total_count);
+    ///     println!("Episodic: {}", viz.summary.episodic_count);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn visualize_memories(&self, user_id: Option<String>) -> Result<MemoryVisualization> {
+        // 1. 获取用户信息
+        let user_name = if let Some(ref uid) = user_id {
+            // 尝试通过 ID 查找用户
+            if let Some(user) = self.get_user_by_id(uid.clone()).await? {
+                user.name
+            } else {
+                // 如果通过 ID 找不到，尝试通过名称查找
+                self.get_user_by_name(uid.clone())
+                    .await?
+                    .map(|u| u.name)
+                    .unwrap_or_else(|| "Unknown".to_string())
+            }
+        } else {
+            "Default".to_string()
+        };
+
+        // 2. 获取所有记忆
+        let all_memories = self.get_all(user_id.clone(), None, None, None).await?;
+
+        // 3. 按类型分组
+        let mut episodic = Vec::new();
+        let mut semantic = Vec::new();
+        let mut procedural = Vec::new();
+        let mut core = Vec::new();
+        let mut resource = Vec::new();
+        let mut knowledge = Vec::new();
+        let mut working = Vec::new();
+        let mut contextual = Vec::new();
+
+        for mem in all_memories {
+            match mem.memory_type {
+                MemoryType::Episodic => episodic.push(mem),
+                MemoryType::Semantic => semantic.push(mem),
+                MemoryType::Procedural => procedural.push(mem),
+                MemoryType::Core => core.push(mem),
+                MemoryType::Resource => resource.push(mem),
+                MemoryType::Knowledge => knowledge.push(mem),
+                MemoryType::Working => working.push(mem),
+                MemoryType::Contextual => contextual.push(mem),
+            }
+        }
+
+        // 4. 构建摘要
+        let summary = MemorySummary {
+            total_count: episodic.len() + semantic.len() + procedural.len() +
+                        core.len() + resource.len() + knowledge.len() +
+                        working.len() + contextual.len(),
+            episodic_count: episodic.len(),
+            semantic_count: semantic.len(),
+            procedural_count: procedural.len(),
+            core_count: core.len(),
+            resource_count: resource.len(),
+            knowledge_count: knowledge.len(),
+            working_count: working.len(),
+            contextual_count: contextual.len(),
+        };
+
+        Ok(MemoryVisualization {
+            user_id: user_id.unwrap_or_else(|| "default".to_string()),
+            user_name,
+            summary,
+            memories: MemoriesByType {
+                episodic,
+                semantic,
+                procedural,
+                core,
+                resource,
+                knowledge,
+                working,
+                contextual,
+            },
+        })
     }
 }
 
