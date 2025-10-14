@@ -4,7 +4,9 @@
 //! enabling seamless migration from Mem0 to AgentMem.
 
 use crate::{MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::{
+    AgentMemError, LLMConfig, Message as LLMMessage, MessageRole as LLMMessageRole, Result,
+};
 use chrono::{DateTime, Utc};
 use futures::future;
 use serde::{Deserialize, Serialize};
@@ -481,6 +483,8 @@ pub struct AgentMemClientConfig {
     pub engine: MemoryEngineConfig,
     /// Performance configuration
     pub performance: PerformanceConfig,
+    /// LLM configuration (optional)
+    pub llm: Option<LLMConfig>,
     /// Enable telemetry
     pub enable_telemetry: bool,
     /// Enable error recovery
@@ -492,6 +496,7 @@ impl Default for AgentMemClientConfig {
         Self {
             engine: MemoryEngineConfig::default(),
             performance: PerformanceConfig::default(),
+            llm: None, // LLM is optional by default
             enable_telemetry: true,
             enable_error_recovery: true,
         }
@@ -505,6 +510,7 @@ pub struct AgentMemClient {
     config: AgentMemClientConfig,
     semaphore: Arc<Semaphore>,
     user_storage: Arc<RwLock<HashMap<String, User>>>, // 简化的内存存储
+    llm_client: Option<Arc<agent_mem_llm::LLMClient>>,  // LLM 客户端（可选）
 }
 
 impl AgentMemClient {
@@ -513,11 +519,23 @@ impl AgentMemClient {
         let engine = Arc::new(MemoryEngine::new(config.engine.clone()));
         let semaphore = Arc::new(Semaphore::new(config.performance.max_concurrent_operations));
 
+        // 初始化 LLM 客户端（如果配置了）
+        let llm_client = config.llm.as_ref().and_then(|llm_config| {
+            match agent_mem_llm::LLMClient::new(llm_config) {
+                Ok(client) => Some(Arc::new(client)),
+                Err(e) => {
+                    eprintln!("Warning: Failed to initialize LLM client: {}", e);
+                    None
+                }
+            }
+        });
+
         Self {
             engine,
             config,
             semaphore,
             user_storage: Arc::new(RwLock::new(HashMap::new())),
+            llm_client,
         }
     }
 
@@ -1292,6 +1310,134 @@ impl AgentMemClient {
         }
 
         Ok(count)
+    }
+
+    /// Chat with the AI assistant using memory context
+    ///
+    /// This method provides a complete chat experience by:
+    /// 1. Extracting relevant memories for context
+    /// 2. Constructing a system message with memory context
+    /// 3. Calling the LLM to generate a response
+    /// 4. Optionally saving the conversation to memory
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The user's message
+    /// * `user_id` - Optional user ID for personalized context
+    /// * `save_to_memory` - Whether to save the conversation to memory
+    ///
+    /// # Returns
+    ///
+    /// Returns the AI assistant's response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - LLM is not configured
+    /// - LLM API call fails
+    /// - Memory operations fail (if save_to_memory is true)
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use agent_mem_core::client::AgentMemClient;
+    /// # use agent_mem_traits::{LLMConfig, Result};
+    /// # async fn example() -> Result<()> {
+    /// use agent_mem_core::client::{AgentMemClientConfig, Messages};
+    ///
+    /// let mut config = AgentMemClientConfig::default();
+    /// config.llm = Some(LLMConfig {
+    ///     provider: "openai".to_string(),
+    ///     model: "gpt-3.5-turbo".to_string(),
+    ///     api_key: Some("your-api-key".to_string()),
+    ///     ..Default::default()
+    /// });
+    ///
+    /// let client = AgentMemClient::new(config);
+    ///
+    /// // Add some background information
+    /// client.add(
+    ///     Messages::Single("I am a software engineer".to_string()),
+    ///     Some("alice".to_string()),
+    ///     None, None, None, false, None, None,
+    /// ).await?;
+    ///
+    /// // Chat with memory context
+    /// let response = client.chat(
+    ///     "What is my profession?".to_string(),
+    ///     Some("alice".to_string()),
+    ///     true, // Save conversation to memory
+    /// ).await?;
+    ///
+    /// println!("Assistant: {}", response);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn chat(
+        &self,
+        message: String,
+        user_id: Option<String>,
+        save_to_memory: bool,
+    ) -> Result<String> {
+        // 检查 LLM 是否配置
+        let llm_client = self.llm_client.as_ref().ok_or_else(|| {
+            AgentMemError::config_error(
+                "LLM not configured. Please provide LLM configuration in AgentMemClientConfig.",
+            )
+        })?;
+
+        // 1. 构建系统消息（包含记忆上下文）
+        let system_message = self
+            .construct_system_message(message.clone(), user_id.clone(), None)
+            .await?;
+
+        // 2. 构建 LLM 消息
+        let llm_messages = vec![
+            LLMMessage {
+                role: LLMMessageRole::System,
+                content: system_message,
+                timestamp: Some(chrono::Utc::now()),
+            },
+            LLMMessage {
+                role: LLMMessageRole::User,
+                content: message.clone(),
+                timestamp: Some(chrono::Utc::now()),
+            },
+        ];
+
+        // 3. 调用 LLM 生成回复
+        let response = llm_client.generate(&llm_messages).await?;
+
+        // 4. 可选：保存对话到记忆
+        if save_to_memory {
+            // 保存用户消息
+            self.add(
+                Messages::Single(message),
+                user_id.clone(),
+                None,
+                None,
+                None,
+                false,
+                Some(MemoryType::Episodic),
+                None,
+            )
+            .await?;
+
+            // 保存助手回复
+            self.add(
+                Messages::Single(format!("Assistant: {}", response)),
+                user_id,
+                None,
+                None,
+                None,
+                false,
+                Some(MemoryType::Episodic),
+                None,
+            )
+            .await?;
+        }
+
+        Ok(response)
     }
 
     // ==================== 辅助方法 ====================

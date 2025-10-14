@@ -1,0 +1,17 @@
+[package]
+name = "chat-demo"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.35", features = ["full"] }
+anyhow = "1.0"
