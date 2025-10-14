@@ -212,6 +212,10 @@ pub enum AgentError {
     /// Internal error
     #[error("Internal agent error: {0}")]
     InternalError(String),
+
+    /// Configuration error
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
 }
 
 /// Result type for agent operations

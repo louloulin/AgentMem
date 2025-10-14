@@ -311,11 +311,21 @@ mod tests {
         let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
+        // Create organization first (required for foreign key)
+        let org_id = generate_id("org");
+        {
+            let conn_guard = conn.lock().await;
+            conn_guard.execute(
+                "INSERT INTO organizations (id, name, created_at, updated_at, is_deleted) VALUES (?, ?, ?, ?, ?)",
+                libsql::params![org_id.clone(), "Test Org", chrono::Utc::now().timestamp(), chrono::Utc::now().timestamp(), 0],
+            ).await.unwrap();
+        }
+
         let repo = LibSqlUserRepository::new(conn);
 
         // Create
         let user = User::new(
-            "org-123".to_string(),
+            org_id.clone(),
             "Test User".to_string(),
             "test@example.com".to_string(),
             "hashed_password".to_string(),

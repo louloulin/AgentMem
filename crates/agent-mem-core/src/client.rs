@@ -1099,6 +1099,201 @@ impl AgentMemClient {
         Ok(storage.values().find(|u| u.id == user_id).cloned())
     }
 
+    // ==================== 系统提示和对话功能 ====================
+
+    /// 提取记忆用于系统提示
+    ///
+    /// 搜索与给定消息相关的记忆，并格式化为系统提示文本
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - 用户消息
+    /// * `user_id` - 用户 ID（可选）
+    /// * `limit` - 返回的记忆数量限制（默认为 5）
+    ///
+    /// # Returns
+    ///
+    /// 返回格式化的系统提示文本
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem_core::AgentMemClient;
+    /// # async fn example() -> agent_mem_traits::Result<()> {
+    /// let client = AgentMemClient::default();
+    /// let prompt = client.extract_memory_for_system_prompt(
+    ///     "What do you know about me?".to_string(),
+    ///     Some("alice".to_string()),
+    ///     Some(5),
+    /// ).await?;
+    /// println!("System prompt: {}", prompt);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn extract_memory_for_system_prompt(
+        &self,
+        message: String,
+        user_id: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<String> {
+        // 1. 搜索相关记忆
+        let search_results = self
+            .search(
+                message.clone(),
+                user_id.clone(),
+                None,
+                None,
+                limit.unwrap_or(5),
+                None,
+                None,
+            )
+            .await?;
+
+        // 2. 格式化为提示文本
+        if search_results.results.is_empty() {
+            return Ok("No relevant memories found.".to_string());
+        }
+
+        let mut prompt = String::from("Relevant memories:\n\n");
+
+        for (i, result) in search_results.results.iter().enumerate() {
+            prompt.push_str(&format!(
+                "{}. [{}] {} (score: {:.2})\n",
+                i + 1,
+                result.memory_type.to_string(),
+                result.content,
+                result.score
+            ));
+        }
+
+        Ok(prompt)
+    }
+
+    /// 构建系统消息
+    ///
+    /// 提取相关记忆并构建完整的系统消息，包含记忆上下文和用户消息
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - 用户消息
+    /// * `user_id` - 用户 ID（可选）
+    /// * `system_prefix` - 系统消息前缀（可选，默认为标准提示）
+    ///
+    /// # Returns
+    ///
+    /// 返回完整的系统消息
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem_core::AgentMemClient;
+    /// # async fn example() -> agent_mem_traits::Result<()> {
+    /// let client = AgentMemClient::default();
+    /// let system_message = client.construct_system_message(
+    ///     "Tell me about my preferences".to_string(),
+    ///     Some("alice".to_string()),
+    ///     None,
+    /// ).await?;
+    /// println!("System message: {}", system_message);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn construct_system_message(
+        &self,
+        message: String,
+        user_id: Option<String>,
+        system_prefix: Option<String>,
+    ) -> Result<String> {
+        // 1. 提取记忆上下文
+        let memory_context = self
+            .extract_memory_for_system_prompt(message.clone(), user_id, Some(5))
+            .await?;
+
+        // 2. 构建完整消息
+        let prefix = system_prefix.unwrap_or_else(|| {
+            "You are a helpful AI assistant with access to the following memories:".to_string()
+        });
+
+        Ok(format!(
+            "{}\n\n{}\n\nUser: {}",
+            prefix, memory_context, message
+        ))
+    }
+
+    // ==================== 清空功能 ====================
+
+    /// 清空所有记忆
+    ///
+    /// 删除指定用户的所有记忆。如果未指定用户，则删除所有记忆。
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - 用户 ID（可选）
+    ///
+    /// # Returns
+    ///
+    /// 返回删除的记忆数量
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem_core::client::AgentMemClient;
+    /// # async fn example() -> agent_mem_traits::Result<()> {
+    /// let client = AgentMemClient::default();
+    /// let count = client.clear(Some("alice".to_string())).await?;
+    /// println!("Deleted {} memories", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear(&self, user_id: Option<String>) -> Result<usize> {
+        let memories = self.get_all(user_id, None, None, None).await?;
+        let count = memories.len();
+
+        for memory in memories {
+            self.delete(memory.id).await?;
+        }
+
+        Ok(count)
+    }
+
+    /// 清空对话历史
+    ///
+    /// 只删除情景记忆（对话历史），保留其他类型的记忆
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - 用户 ID
+    ///
+    /// # Returns
+    ///
+    /// 返回删除的对话记录数量
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem_core::client::AgentMemClient;
+    /// # async fn example() -> agent_mem_traits::Result<()> {
+    /// let client = AgentMemClient::default();
+    /// let count = client.clear_conversation_history("alice".to_string()).await?;
+    /// println!("Deleted {} conversation records", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_conversation_history(&self, user_id: String) -> Result<usize> {
+        let memories = self.get_all(Some(user_id), None, None, None).await?;
+
+        // 只删除情景记忆（对话历史）
+        let mut count = 0;
+        for memory in memories {
+            if memory.memory_type == MemoryType::Episodic {
+                self.delete(memory.id).await?;
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
     // ==================== 辅助方法 ====================
 
     /// 简化的添加记忆方法（用于测试和简单场景）
@@ -1390,14 +1585,43 @@ mod tests {
     async fn test_batch_update_memories() {
         let client = AgentMemClient::default();
 
+        // First, create some memories to update
+        let add_requests = vec![
+            AddRequest {
+                messages: Messages::Single("Original content 1".to_string()),
+                user_id: Some("user123".to_string()),
+                agent_id: Some("agent456".to_string()),
+                run_id: None,
+                metadata: None,
+                infer: true,
+                memory_type: Some(MemoryType::Episodic),
+                prompt: None,
+            },
+            AddRequest {
+                messages: Messages::Single("Original content 2".to_string()),
+                user_id: Some("user123".to_string()),
+                agent_id: Some("agent456".to_string()),
+                run_id: None,
+                metadata: None,
+                infer: true,
+                memory_type: Some(MemoryType::Episodic),
+                prompt: None,
+            },
+        ];
+
+        let add_results = client.add_batch(add_requests).await.unwrap();
+        let mem1_id = add_results[0].id.clone();
+        let mem2_id = add_results[1].id.clone();
+
+        // Now update them
         let requests = vec![
             UpdateRequest {
-                memory_id: "mem1".to_string(),
+                memory_id: mem1_id,
                 content: Some("Updated content 1".to_string()),
                 metadata: None,
             },
             UpdateRequest {
-                memory_id: "mem2".to_string(),
+                memory_id: mem2_id,
                 content: Some("Updated content 2".to_string()),
                 metadata: None,
             },
@@ -1416,8 +1640,48 @@ mod tests {
     async fn test_batch_delete_memories() {
         let client = AgentMemClient::default();
 
-        let memory_ids = vec!["mem1".to_string(), "mem2".to_string(), "mem3".to_string()];
+        // First, create some memories to delete
+        let add_requests = vec![
+            AddRequest {
+                messages: Messages::Single("Memory to delete 1".to_string()),
+                user_id: Some("user123".to_string()),
+                agent_id: Some("agent456".to_string()),
+                run_id: None,
+                metadata: None,
+                infer: true,
+                memory_type: Some(MemoryType::Episodic),
+                prompt: None,
+            },
+            AddRequest {
+                messages: Messages::Single("Memory to delete 2".to_string()),
+                user_id: Some("user123".to_string()),
+                agent_id: Some("agent456".to_string()),
+                run_id: None,
+                metadata: None,
+                infer: true,
+                memory_type: Some(MemoryType::Episodic),
+                prompt: None,
+            },
+            AddRequest {
+                messages: Messages::Single("Memory to delete 3".to_string()),
+                user_id: Some("user123".to_string()),
+                agent_id: Some("agent456".to_string()),
+                run_id: None,
+                metadata: None,
+                infer: true,
+                memory_type: Some(MemoryType::Episodic),
+                prompt: None,
+            },
+        ];
 
+        let add_results = client.add_batch(add_requests).await.unwrap();
+        let memory_ids = vec![
+            add_results[0].id.clone(),
+            add_results[1].id.clone(),
+            add_results[2].id.clone(),
+        ];
+
+        // Now delete them
         let results = client.delete_batch(memory_ids).await;
         assert!(results.is_ok());
 

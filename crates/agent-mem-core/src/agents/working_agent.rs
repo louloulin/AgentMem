@@ -138,15 +138,11 @@ impl WorkingAgent {
             return Ok(response);
         }
 
-        // Fallback to mock response if store not available
-        let response = serde_json::json!({
-            "success": true,
-            "working_memory_id": uuid::Uuid::new_v4().to_string(),
-            "message": "Working memory inserted successfully (mock)"
-        });
-
-        log::warn!("Working agent: Using mock response (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Working agent: No store configured, cannot insert item");
+        Err(AgentError::ConfigurationError(
+            "Working memory store not configured. Use WorkingAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     async fn handle_search(&self, parameters: Value) -> AgentResult<Value> {
@@ -188,17 +184,11 @@ impl WorkingAgent {
             return Ok(response);
         }
 
-        // Fallback to mock response if store not available
-        let response = serde_json::json!({
-            "success": true,
-            "results": [],
-            "total_count": 0,
-            "session_id": session_id,
-            "message": "Mock response (store not available)"
-        });
-
-        log::warn!("Working agent: Using mock response (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Working agent: No store configured, cannot search items");
+        Err(AgentError::ConfigurationError(
+            "Working memory store not configured. Use WorkingAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     async fn handle_delete(&self, parameters: Value) -> AgentResult<Value> {
@@ -232,15 +222,11 @@ impl WorkingAgent {
             }
         }
 
-        // Fallback to mock response if store not available
-        let response = serde_json::json!({
-            "success": true,
-            "item_id": item_id,
-            "message": "Working memory item deleted successfully (mock)"
-        });
-
-        log::warn!("Working agent: Using mock response (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Working agent: No store configured, cannot delete item");
+        Err(AgentError::ConfigurationError(
+            "Working memory store not configured. Use WorkingAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 }
 

@@ -171,7 +171,7 @@ pub struct AuditLogEntry {
 }
 
 /// 审计操作类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AuditAction {
     /// 创建知识条目
     CreateKnowledge,
@@ -1479,10 +1479,10 @@ mod tests {
 
     #[test]
     fn test_audit_action_types() {
-        let create = AuditAction::Create;
-        let read = AuditAction::Read;
-        let update = AuditAction::Update;
-        let delete = AuditAction::Delete;
+        let create = AuditAction::CreateKnowledge;
+        let read = AuditAction::ReadKnowledge;
+        let update = AuditAction::UpdateKnowledge;
+        let delete = AuditAction::DeleteKnowledge;
         let permission_change = AuditAction::PermissionChange;
 
         assert_ne!(create, read);
@@ -1495,38 +1495,45 @@ mod tests {
     fn test_audit_log_entry_creation() {
         let now = Utc::now();
 
+        let mut metadata = HashMap::new();
+        metadata.insert("details".to_string(), "User accessed confidential document".to_string());
+
         let log = AuditLogEntry {
             id: "log-1".to_string(),
             user_id: "user-123".to_string(),
-            action: AuditAction::Read,
-            resource_id: Some("entry-456".to_string()),
+            action: AuditAction::ReadKnowledge,
+            knowledge_id: Some("entry-456".to_string()),
             timestamp: now,
-            details: Some("User accessed confidential document".to_string()),
-            ip_address: Some("192.168.1.1".to_string()),
+            client_ip: Some("192.168.1.1".to_string()),
+            user_agent: None,
             success: true,
+            error_message: None,
+            metadata,
         };
 
         assert_eq!(log.user_id, "user-123");
         assert!(log.success);
-        assert!(log.resource_id.is_some());
-        assert!(log.details.is_some());
+        assert!(log.knowledge_id.is_some());
+        assert!(log.metadata.contains_key("details"));
     }
 
     #[test]
     fn test_vault_statistics_empty() {
-        let stats = VaultStatistics {
+        let stats = KnowledgeVaultStats {
             total_entries: 0,
             total_users: 0,
             active_users: 0,
             entries_by_sensitivity: HashMap::new(),
             entries_by_creator: HashMap::new(),
-            total_audit_logs: 0,
-            last_access: None,
+            total_accesses: 0,
+            audit_log_entries: 0,
+            average_access_count: 0.0,
+            last_updated: Utc::now(),
         };
 
         assert_eq!(stats.total_entries, 0);
         assert_eq!(stats.total_users, 0);
-        assert!(stats.last_access.is_none());
+        assert_eq!(stats.total_accesses, 0);
     }
 
     #[test]
@@ -1539,18 +1546,20 @@ mod tests {
         entries_by_creator.insert("user1".to_string(), 4);
         entries_by_creator.insert("user2".to_string(), 4);
 
-        let stats = VaultStatistics {
+        let stats = KnowledgeVaultStats {
             total_entries: 8,
             total_users: 2,
             active_users: 2,
             entries_by_sensitivity,
             entries_by_creator,
-            total_audit_logs: 15,
-            last_access: Some(Utc::now()),
+            total_accesses: 100,
+            audit_log_entries: 15,
+            average_access_count: 12.5,
+            last_updated: Utc::now(),
         };
 
         assert_eq!(stats.total_entries, 8);
         assert_eq!(stats.total_users, 2);
-        assert!(stats.last_access.is_some());
+        assert_eq!(stats.total_accesses, 100);
     }
 }

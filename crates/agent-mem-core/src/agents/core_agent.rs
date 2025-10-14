@@ -189,18 +189,11 @@ impl CoreAgent {
             log::info!("Core agent: Created memory block '{}' with ID {}", label, created_item.id);
             Ok(response)
         } else {
-            // Fallback to mock response if no store is configured
-            let response = serde_json::json!({
-                "success": true,
-                "block_id": uuid::Uuid::new_v4().to_string(),
-                "label": label,
-                "content": content,
-                "block_type": block_type,
-                "message": "Core memory block created successfully (mock)"
-            });
-
-            log::warn!("Core agent: No store configured, using mock response");
-            Ok(response)
+            // No store configured - return error instead of mock
+            log::error!("Core agent: No store configured, cannot create memory block");
+            Err(AgentError::ConfigurationError(
+                "Core memory store not configured. Use CoreAgent::from_env() or set_store() to configure storage.".to_string()
+            ))
         }
     }
 
@@ -259,21 +252,11 @@ impl CoreAgent {
                 ));
             }
         } else {
-            // Fallback to mock response if no store is configured
-            let response = serde_json::json!({
-                "success": true,
-                "block": {
-                    "id": block_id.unwrap_or("unknown"),
-                    "label": label.unwrap_or("unknown"),
-                    "content": "Sample core memory content (mock)",
-                    "block_type": "general",
-                    "created_at": chrono::Utc::now().to_rfc3339(),
-                    "updated_at": chrono::Utc::now().to_rfc3339()
-                }
-            });
-
-            log::warn!("Core agent: No store configured, using mock response");
-            Ok(response)
+            // No store configured - return error instead of mock
+            log::error!("Core agent: No store configured, cannot retrieve memory block");
+            Err(AgentError::ConfigurationError(
+                "Core memory store not configured. Use CoreAgent::from_env() or set_store() to configure storage.".to_string()
+            ))
         }
     }
 
@@ -458,18 +441,11 @@ impl CoreAgent {
             );
             Ok(response)
         } else {
-            // Fallback to mock response if no store is configured
-            let response = serde_json::json!({
-                "success": true,
-                "results": [],
-                "total_count": 0,
-                "query": query,
-                "block_type": block_type,
-                "message": "No store configured (mock)"
-            });
-
-            log::warn!("Core agent: No store configured, using mock response");
-            Ok(response)
+            // No store configured - return error instead of mock
+            log::error!("Core agent: No store configured, cannot search memory blocks");
+            Err(AgentError::ConfigurationError(
+                "Core memory store not configured. Use CoreAgent::from_env() or set_store() to configure storage.".to_string()
+            ))
         }
     }
 
@@ -517,16 +493,11 @@ impl CoreAgent {
             );
             Ok(response)
         } else {
-            // Fallback to mock response if no store is configured
-            let response = serde_json::json!({
-                "success": true,
-                "compiled_memory": "Compiled core memory context (mock)",
-                "block_count": 0,
-                "total_characters": 0
-            });
-
-            log::warn!("Core agent: No store configured, using mock response");
-            Ok(response)
+            // No store configured - return error instead of mock
+            log::error!("Core agent: No store configured, cannot compile memory blocks");
+            Err(AgentError::ConfigurationError(
+                "Core memory store not configured. Use CoreAgent::from_env() or set_store() to configure storage.".to_string()
+            ))
         }
     }
 }

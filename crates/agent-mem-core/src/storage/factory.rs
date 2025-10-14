@@ -236,7 +236,13 @@ mod tests {
 
         // Verify migrations ran by checking we can create a user
         use crate::storage::models::User;
-        let user = User::new("org-123".to_string(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(
+            "org-123".to_string(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "password_hash".to_string(),
+            "UTC".to_string()
+        );
         let result = repos.users.create(&user).await;
         assert!(result.is_ok(), "Failed to create user after migration: {:?}", result.err());
     }
@@ -262,7 +268,13 @@ mod tests {
 
         // Without migrations, creating a user should fail
         use crate::storage::models::User;
-        let user = User::new("org-123".to_string(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(
+            "org-123".to_string(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "password_hash".to_string(),
+            "UTC".to_string()
+        );
         let result = repos.users.create(&user).await;
         assert!(result.is_err(), "Expected error without migrations, but got success");
     }

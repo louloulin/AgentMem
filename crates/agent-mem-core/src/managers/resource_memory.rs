@@ -1110,8 +1110,8 @@ mod tests {
         assert_ne!(ResourceType::Document, ResourceType::Image);
         assert_ne!(ResourceType::Image, ResourceType::Video);
         assert_ne!(ResourceType::Video, ResourceType::Audio);
-        assert_ne!(ResourceType::Audio, ResourceType::Code);
-        assert_ne!(ResourceType::Code, ResourceType::Data);
+        assert_ne!(ResourceType::Audio, ResourceType::Other);
+        assert_ne!(ResourceType::Other, ResourceType::Document);
     }
 
     #[tokio::test]
@@ -1119,7 +1119,7 @@ mod tests {
         let config = ResourceStorageConfig::default();
 
         assert!(config.max_file_size > 0);
-        assert!(config.allowed_extensions.is_empty() || !config.allowed_extensions.is_empty());
+        assert!(config.enable_compression || !config.enable_compression); // Always true, just testing field access
     }
 
     #[tokio::test]
@@ -1128,15 +1128,19 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().to_path_buf(),
             max_file_size: 1024 * 1024, // 1MB
-            allowed_extensions: vec!["txt".to_string(), "pdf".to_string()],
-            enable_deduplication: true,
             enable_compression: false,
+            compression_threshold: 512 * 1024, // 512KB
+            enable_deduplication: true,
+            enable_versioning: true,
+            max_versions: 5,
         };
 
         assert_eq!(config.max_file_size, 1024 * 1024);
-        assert_eq!(config.allowed_extensions.len(), 2);
+        assert_eq!(config.compression_threshold, 512 * 1024);
         assert!(config.enable_deduplication);
         assert!(!config.enable_compression);
+        assert!(config.enable_versioning);
+        assert_eq!(config.max_versions, 5);
     }
 
     #[tokio::test]
@@ -1156,8 +1160,8 @@ mod tests {
         assert!(metadata.is_some());
         let meta = metadata.unwrap();
         assert!(!meta.id.is_empty());
-        assert!(!meta.filename.is_empty());
-        assert!(meta.size > 0);
+        assert!(!meta.original_filename.is_empty());
+        assert!(meta.file_size > 0);
     }
 
     #[tokio::test]
@@ -1247,6 +1251,6 @@ mod tests {
         let resource_id = manager.store_resource(&empty_file, None, None).await.unwrap();
 
         let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
-        assert_eq!(metadata.size, 0);
+        assert_eq!(metadata.file_size, 0);
     }
 }

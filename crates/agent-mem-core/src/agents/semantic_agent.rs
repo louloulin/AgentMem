@@ -139,20 +139,11 @@ impl SemanticAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let concept = parameters.get("concept").unwrap_or(&Value::Null);
-        let knowledge = parameters.get("knowledge").unwrap_or(&Value::Null);
-
-        let response = serde_json::json!({
-            "success": true,
-            "concept_id": uuid::Uuid::new_v4().to_string(),
-            "concept": concept,
-            "knowledge": knowledge,
-            "message": "Semantic knowledge inserted successfully (mock)"
-        });
-
-        log::warn!("Semantic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot insert knowledge");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle semantic knowledge search
@@ -197,24 +188,11 @@ impl SemanticAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let query = parameters.get("query").and_then(|v| v.as_str()).unwrap_or("");
-        let semantic_similarity = parameters
-            .get("semantic_similarity")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
-
-        let response = serde_json::json!({
-            "success": true,
-            "results": [],
-            "total_count": 0,
-            "query": query,
-            "semantic_similarity": semantic_similarity,
-            "message": "Mock response (manager not available)"
-        });
-
-        log::warn!("Semantic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot search knowledge");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle concept relationship queries
@@ -295,16 +273,11 @@ impl SemanticAgent {
             .and_then(|v| v.as_str())
             .unwrap_or("all");
 
-        let response = serde_json::json!({
-            "success": true,
-            "concept_id": concept_id,
-            "relationships": [],
-            "relationship_type": relationship_type,
-            "note": "Mock response - store not available"
-        });
-
-        log::warn!("Semantic agent: Using mock response for relationship query (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot query relationships");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle knowledge graph traversal
@@ -408,17 +381,11 @@ impl SemanticAgent {
             .and_then(|v| v.as_u64())
             .unwrap_or(3);
 
-        let response = serde_json::json!({
-            "success": true,
-            "start_concept": start_concept,
-            "max_depth": max_depth,
-            "traversal_path": [],
-            "related_concepts": [],
-            "note": "Mock response - store not available"
-        });
-
-        log::warn!("Semantic agent: Using mock response for graph traversal (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot traverse graph");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle semantic knowledge update
@@ -458,14 +425,11 @@ impl SemanticAgent {
                 AgentError::InvalidParameters("Missing 'concept_id' parameter".to_string())
             })?;
 
-        let response = serde_json::json!({
-            "success": true,
-            "concept_id": concept_id,
-            "message": "Semantic knowledge updated successfully (mock)"
-        });
-
-        log::warn!("Semantic agent: Using mock response for update (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot update knowledge");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle semantic knowledge deletion
@@ -509,22 +473,11 @@ impl SemanticAgent {
             }
         }
 
-        // Fallback to mock response if store not available
-        let concept_id = parameters
-            .get("concept_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                AgentError::InvalidParameters("Missing 'concept_id' parameter".to_string())
-            })?;
-
-        let response = serde_json::json!({
-            "success": true,
-            "concept_id": concept_id,
-            "message": "Semantic knowledge deleted successfully (mock)"
-        });
-
-        log::warn!("Semantic agent: Using mock response for delete (store not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Semantic agent: No store configured, cannot delete knowledge");
+        Err(AgentError::ConfigurationError(
+            "Semantic memory store not configured. Use SemanticAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 }
 

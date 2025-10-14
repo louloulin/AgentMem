@@ -26,30 +26,35 @@ impl LibSqlMemoryRepository {
 
     /// Helper function to convert row to Memory
     fn row_to_memory(row: &libsql::Row) -> Result<Memory> {
-        let metadata_str: Option<String> = row.get(7).ok();
+        // Column order from SELECT:
+        // 0: id, 1: organization_id, 2: user_id, 3: agent_id, 4: content, 5: hash, 6: metadata,
+        // 7: score, 8: memory_type, 9: scope, 10: level, 11: importance, 12: access_count, 13: last_accessed,
+        // 14: created_at, 15: updated_at, 16: is_deleted, 17: created_by_id, 18: last_updated_by_id
+
+        let metadata_str: Option<String> = row.get(6).ok();
         let metadata: JsonValue = metadata_str
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or(JsonValue::Null);
 
-        let last_accessed_ts: Option<i64> = row.get(14).ok();
+        let last_accessed_ts: Option<i64> = row.get(13).ok();
         let last_accessed = last_accessed_ts.and_then(|ts| DateTime::from_timestamp(ts, 0));
 
-        let created_at_ts: i64 = row.get(15).map_err(|e| {
+        let created_at_ts: i64 = row.get(14).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to get created_at: {}", e))
         })?;
         let created_at = DateTime::from_timestamp(created_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?;
 
-        let updated_at_ts: i64 = row.get(16).map_err(|e| {
+        let updated_at_ts: i64 = row.get(15).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to get updated_at: {}", e))
         })?;
         let updated_at = DateTime::from_timestamp(updated_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?;
 
-        let is_deleted_int: i64 = row.get(17).unwrap_or(0);
+        let is_deleted_int: i64 = row.get(16).unwrap_or(0);
 
-        let score_f64: Option<f64> = row.get(8).ok();
-        let importance_f64: f64 = row.get(12).map_err(|e| {
+        let score_f64: Option<f64> = row.get(7).ok();
+        let importance_f64: f64 = row.get(11).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to get importance: {}", e))
         })?;
 
@@ -62,17 +67,17 @@ impl LibSqlMemoryRepository {
             hash: row.get(5).ok(),
             metadata,
             score: score_f64.map(|v| v as f32),
-            memory_type: row.get(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get memory_type: {}", e)))?,
-            scope: row.get(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get scope: {}", e)))?,
-            level: row.get(11).map_err(|e| AgentMemError::StorageError(format!("Failed to get level: {}", e)))?,
+            memory_type: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get memory_type: {}", e)))?,
+            scope: row.get(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get scope: {}", e)))?,
+            level: row.get(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get level: {}", e)))?,
             importance: importance_f64 as f32,
-            access_count: row.get(13).map_err(|e| AgentMemError::StorageError(format!("Failed to get access_count: {}", e)))?,
+            access_count: row.get(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get access_count: {}", e)))?,
             last_accessed,
             created_at,
             updated_at,
             is_deleted: is_deleted_int != 0,
-            created_by_id: row.get(18).ok(),
-            last_updated_by_id: row.get(19).ok(),
+            created_by_id: row.get(17).ok(),
+            last_updated_by_id: row.get(18).ok(),
         })
     }
 }
@@ -336,9 +341,9 @@ mod tests {
     use serde_json::json;
 
     async fn setup_test_db() -> Arc<Mutex<Connection>> {
-        let conn = libsql::Connection::open_in_memory()
-            .await
+        let db = libsql::Database::open(":memory:")
             .expect("Failed to create in-memory database");
+        let conn = db.connect().expect("Failed to connect to database");
 
         // Create memories table
         conn.execute(

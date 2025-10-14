@@ -203,16 +203,11 @@ impl EpisodicAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let response = serde_json::json!({
-            "success": true,
-            "results": [],
-            "total_count": 0,
-            "message": "Mock response (manager not available)"
-        });
-
-        log::warn!("Episodic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Episodic agent: No store configured, cannot query events");
+        Err(AgentError::ConfigurationError(
+            "Episodic memory store not configured. Use EpisodicAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle episodic memory retrieval by time range
@@ -284,20 +279,11 @@ impl EpisodicAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let response = serde_json::json!({
-            "success": true,
-            "events": [],
-            "total_count": 0,
-            "time_range": {
-                "start": start_time_str,
-                "end": end_time_str
-            },
-            "message": "Mock response (manager not available)"
-        });
-
-        log::warn!("Episodic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Episodic agent: No store configured, cannot query events by time range");
+        Err(AgentError::ConfigurationError(
+            "Episodic memory store not configured. Use EpisodicAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle episodic memory update
@@ -346,15 +332,11 @@ impl EpisodicAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let response = serde_json::json!({
-            "success": true,
-            "event_id": event_id,
-            "message": "Episodic memory updated successfully (mock)"
-        });
-
-        log::warn!("Episodic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Episodic agent: No store configured, cannot update event");
+        Err(AgentError::ConfigurationError(
+            "Episodic memory store not configured. Use EpisodicAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 
     /// Handle episodic memory deletion
@@ -391,15 +373,11 @@ impl EpisodicAgent {
             }
         }
 
-        // Fallback to mock response if manager not available
-        let response = serde_json::json!({
-            "success": true,
-            "event_id": event_id,
-            "message": "Episodic memory deleted successfully (mock)"
-        });
-
-        log::warn!("Episodic agent: Using mock response (manager not available)");
-        Ok(response)
+        // No store configured - return error instead of mock
+        log::error!("Episodic agent: No store configured, cannot delete event");
+        Err(AgentError::ConfigurationError(
+            "Episodic memory store not configured. Use EpisodicAgent::from_env() or set_store() to configure storage.".to_string()
+        ))
     }
 }
 

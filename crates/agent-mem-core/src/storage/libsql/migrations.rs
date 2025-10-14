@@ -200,13 +200,22 @@ async fn create_blocks_table(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE blocks (
             id TEXT PRIMARY KEY,
+            organization_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            template_name TEXT,
+            description TEXT,
+            is_template INTEGER NOT NULL DEFAULT 0,
             label TEXT NOT NULL,
             value TEXT NOT NULL,
-            limit_ INTEGER NOT NULL,
+            \"limit\" INTEGER NOT NULL,
+            metadata_ TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             is_deleted INTEGER NOT NULL DEFAULT 0,
-            metadata_ TEXT
+            created_by_id TEXT,
+            last_updated_by_id TEXT,
+            FOREIGN KEY (organization_id) REFERENCES organizations(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )",
         (),
     )
@@ -449,7 +458,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 10); // 10 migrations
+        assert_eq!(count, 11); // 11 migrations
     }
 
     #[tokio::test]
@@ -463,7 +472,7 @@ mod tests {
         let result = run_migrations(conn.clone()).await;
         assert!(result.is_ok());
 
-        // Should still have 10 migrations
+        // Should still have 11 migrations
         let conn_guard = conn.lock().await;
         let mut rows = conn_guard
             .query("SELECT COUNT(*) FROM _migrations", ())
@@ -472,7 +481,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 10);
+        assert_eq!(count, 11);
     }
 }
 

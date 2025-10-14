@@ -123,7 +123,7 @@ members = [
     "examples/performance-benchmark",
     # "examples/intelligent-memory-demo",  # Temporarily excluded - MemoryManager import error, API changes
     "crates/agent-mem-tools",
-    "crates/agent-mem-observability",
+    "crates/agent-mem-observability", "examples/system-prompt-demo",
     # "examples/basic-usage",
     # "examples/advanced-features",
     # "examples/migration-from-agentmen",

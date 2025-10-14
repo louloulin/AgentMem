@@ -62,8 +62,13 @@ impl LibSqlConnectionManager {
         let conn = self.get_connection().await?;
         let conn_guard = conn.lock().await;
 
-        conn_guard
-            .execute("SELECT 1", ())
+        let mut rows = conn_guard
+            .query("SELECT 1", ())
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {}", e)))?;
+
+        // Consume the result to verify the query worked
+        rows.next()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {}", e)))?;
 
@@ -201,6 +206,9 @@ mod tests {
 
         let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
         let result = manager.health_check().await;
+        if let Err(e) = &result {
+            eprintln!("Health check failed: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
