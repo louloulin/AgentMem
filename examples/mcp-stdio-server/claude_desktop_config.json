@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "agentmem": {
+      "command": "/Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen/target/release/agentmem-mcp-server",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+

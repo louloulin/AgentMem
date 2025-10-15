@@ -48,6 +48,7 @@ members = [
     "examples/vector-search-demo",
     "examples/llm-memory-analysis-demo",
     "examples/error-handling-demo",
+    "examples/mcp-stdio-server",
     "examples/langgraph-integration-demo",
     "examples/user-management-demo",
     "examples/migration-demo",

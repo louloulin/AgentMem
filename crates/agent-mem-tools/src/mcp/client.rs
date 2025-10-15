@@ -4,16 +4,16 @@
 
 use super::error::{McpError, McpResult};
 use super::types::{
-    McpContent, McpListToolsResponse, McpServerConfig, McpServerType, McpTool,
+    McpListToolsResponse, McpServerConfig, McpServerType, McpTool,
     McpToolCallRequest, McpToolCallResponse,
 };
-use super::transport::{Transport, HttpTransport, SseTransport};
+use super::transport::{Transport, HttpTransport, SseTransport, StdioTransport};
 use super::discovery::ToolDiscovery;
 use serde_json::Value;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::info;
 
 /// MCP 客户端
 pub struct McpClient {
@@ -38,6 +38,9 @@ pub struct McpClient {
 
     /// SSE 传输（用于 SSE 类型）
     sse_transport: Arc<RwLock<Option<SseTransport>>>,
+
+    /// Stdio 传输（用于 Stdio 类型）
+    stdio_transport: Arc<RwLock<Option<StdioTransport>>>,
 }
 
 impl McpClient {
@@ -51,6 +54,7 @@ impl McpClient {
             discovery: Arc::new(ToolDiscovery::new()),
             http_transport: Arc::new(RwLock::new(None)),
             sse_transport: Arc::new(RwLock::new(None)),
+            stdio_transport: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -70,33 +74,18 @@ impl McpClient {
     
     /// 连接到 Stdio 类型的服务器
     async fn connect_stdio(&self) -> McpResult<()> {
-        let command = self.config.command.as_ref()
-            .ok_or_else(|| McpError::ConfigError("Missing command for stdio server".to_string()))?;
-        
-        let args = self.config.args.as_ref()
-            .map(|a| a.as_slice())
-            .unwrap_or(&[]);
-        
-        // 启动子进程
-        let mut cmd = Command::new(command);
-        cmd.args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        
-        // 设置环境变量
-        if let Some(env) = &self.config.env {
-            for (key, value) in env {
-                cmd.env(key, value);
-            }
-        }
-        
-        let child = cmd.spawn()
-            .map_err(|e| McpError::ConnectionError(format!("Failed to spawn process: {}", e)))?;
-        
-        *self.process.write().await = Some(child);
+        info!("连接到 Stdio 服务器");
+
+        // 创建 Stdio 传输
+        let mut transport = StdioTransport::new();
+
+        // 连接到服务器（执行 initialize 握手）
+        transport.connect().await?;
+
+        // 保存传输
+        *self.stdio_transport.write().await = Some(transport);
+
         *self.initialized.write().await = true;
-        
         Ok(())
     }
     
@@ -192,24 +181,22 @@ impl McpClient {
                 }
             }
             McpServerType::Stdio => {
-                // Stdio 服务器返回模拟工具列表
-                debug!("Using mock tools for Stdio server");
-                Ok(vec![
-                    McpTool {
-                        name: format!("{}_example_tool", self.config.server_name),
-                        description: "An example MCP tool".to_string(),
-                        input_schema: serde_json::json!({
-                            "type": "object",
-                            "properties": {
-                                "input": {
-                                    "type": "string",
-                                    "description": "Input parameter"
-                                }
-                            },
-                            "required": ["input"]
-                        }),
-                    }
-                ])
+                // 使用 Stdio 传输调用 tools/list
+                let transport_guard = self.stdio_transport.read().await;
+                if let Some(transport) = transport_guard.as_ref() {
+                    let response = transport.send_request(
+                        "tools/list",
+                        serde_json::json!({})
+                    ).await?;
+
+                    // 解析响应
+                    let tools_response: McpListToolsResponse = serde_json::from_value(response)
+                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tools list: {}", e)))?;
+
+                    Ok(tools_response.tools)
+                } else {
+                    Err(McpError::NotConnected)
+                }
             }
         }
     }
@@ -261,18 +248,23 @@ impl McpClient {
                 Err(McpError::TransportError("SSE does not support tool calls".to_string()))
             }
             McpServerType::Stdio => {
-                // Stdio 返回模拟响应
-                debug!("Using mock response for Stdio tool call");
-                Ok(McpToolCallResponse {
-                    content: vec![McpContent::Text {
-                        text: format!(
-                            "Mock response from tool '{}' with args: {}",
-                            request.name,
-                            request.arguments
-                        ),
-                    }],
-                    is_error: false,
-                })
+                // 使用 Stdio 传输调用工具
+                let transport_guard = self.stdio_transport.read().await;
+                if let Some(transport) = transport_guard.as_ref() {
+                    let response = transport.send_request(
+                        "tools/call",
+                        serde_json::json!({
+                            "name": request.name,
+                            "arguments": request.arguments,
+                        })
+                    ).await?;
+
+                    // 解析响应
+                    serde_json::from_value(response)
+                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tool response: {}", e)))
+                } else {
+                    Err(McpError::NotConnected)
+                }
             }
         }
     }

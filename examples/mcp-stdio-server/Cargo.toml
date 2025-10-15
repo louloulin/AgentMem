@@ -1,0 +1,20 @@
+[package]
+name = "mcp-stdio-server"
+version = "2.0.0"
+edition = "2021"
+
+[[bin]]
+name = "agentmem-mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-tools = { path = "../../crates/agent-mem-tools" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+
+tokio = { version = "1.47", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+

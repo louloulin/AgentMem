@@ -30,9 +30,18 @@ pub enum McpError {
     /// 配置错误
     ConfigError(String),
     
-    /// 序列化/反序列化错误
+    /// 序列化错误
     SerializationError(String),
-    
+
+    /// 反序列化错误
+    DeserializationError(String),
+
+    /// 协议错误
+    ProtocolError(String),
+
+    /// 服务器错误
+    ServerError(String),
+
     /// 不支持的服务器类型
     UnsupportedServerType(String),
     
@@ -86,6 +95,9 @@ impl fmt::Display for McpError {
             }
             McpError::ConfigError(msg) => write!(f, "MCP configuration error: {}", msg),
             McpError::SerializationError(msg) => write!(f, "MCP serialization error: {}", msg),
+            McpError::DeserializationError(msg) => write!(f, "MCP deserialization error: {}", msg),
+            McpError::ProtocolError(msg) => write!(f, "MCP protocol error: {}", msg),
+            McpError::ServerError(msg) => write!(f, "MCP server error: {}", msg),
             McpError::UnsupportedServerType(server_type) => {
                 write!(f, "Unsupported MCP server type: {}", server_type)
             }
