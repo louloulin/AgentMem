@@ -15,12 +15,9 @@
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
+use crate::orchestrator_factory::create_orchestrator;
 use agent_mem_core::storage::factory::Repositories;
-// Note: orchestrator module needs to be refactored to use Repository Traits
-// use agent_mem_core::{
-//     orchestrator::{AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig},
-//     engine::{MemoryEngine, MemoryEngineConfig},
-// };
+use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
@@ -35,6 +32,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 use std::sync::Arc;
 use std::convert::Infallible;
+use std::time::Instant;
+use tracing::{debug, info};
 use utoipa::ToSchema;
 
 /// Request to send a chat message
@@ -166,44 +165,48 @@ pub async fn send_chat_message(
         return Err(ServerError::bad_request("Message content cannot be empty"));
     }
 
-    // TODO: Create AgentOrchestrator with real LLM and MemoryEngine
-    // For now, return a placeholder response indicating the orchestrator is ready
-    
-    // This is where we would create the orchestrator:
-    // 1. Parse LLM config from agent.llm_config
-    // 2. Create LLMClient
-    // 3. Create MemoryEngine
-    // 4. Create MessageRepository
-    // 5. Create ToolExecutor
-    // 6. Create AgentOrchestrator
-    // 7. Call orchestrator.step()
-    
+    // ✅ 创建 AgentOrchestrator
+    info!("Creating AgentOrchestrator for agent: {}", agent_id);
+    let orchestrator = create_orchestrator(&agent, &repositories).await?;
+
+    // ✅ 构建 OrchestratorChatRequest
     let user_id = req.user_id.unwrap_or_else(|| auth_user.user_id.clone());
-    
-    // Placeholder response
-    let response_content = format!(
-        "AgentOrchestrator is ready! Your message: '{}'\n\n\
-        To enable full functionality:\n\
-        1. Configure LLM provider (OpenAI, Anthropic, etc.)\n\
-        2. Set up vector store (Qdrant, Pinecone, etc.)\n\
-        3. Initialize MemoryEngine\n\
-        4. The orchestrator will then:\n\
-        - Retrieve relevant memories\n\
-        - Inject them into the prompt\n\
-        - Call the LLM\n\
-        - Extract and store new memories\n\
-        - Return the response",
-        req.message
+    let orchestrator_request = OrchestratorChatRequest {
+        message: req.message.clone(),
+        agent_id: agent_id.clone(),
+        user_id: user_id.clone(),
+        organization_id: auth_user.org_id.clone(),
+        stream: req.stream,
+        max_memories: 10,
+    };
+
+    debug!("Calling orchestrator.step() with request: {:?}", orchestrator_request);
+
+    // ✅ 调用 orchestrator.step()
+    let orchestrator_response = orchestrator
+        .step(orchestrator_request)
+        .await
+        .map_err(|e| {
+            ServerError::internal_error(format!("Orchestrator failed: {}", e))
+        })?;
+
+    info!(
+        "Orchestrator completed: message_id={}, memories_count={}",
+        orchestrator_response.message_id,
+        orchestrator_response.memories_count
     );
 
+    // ✅ 转换响应
     let processing_time_ms = start_time.elapsed().as_millis() as u64;
 
     let response = ChatMessageResponse {
-        message_id: format!("msg-{}", uuid::Uuid::new_v4()),
-        content: response_content,
-        memories_updated: false,
-        memories_count: 0,
-        tool_calls: None,
+        message_id: orchestrator_response.message_id,
+        content: orchestrator_response.content,
+        memories_updated: orchestrator_response.memories_updated,
+        memories_count: orchestrator_response.memories_count,
+        tool_calls: orchestrator_response.tool_calls.map(|calls| {
+            calls.into_iter().map(|c| c.into()).collect()
+        }),
         processing_time_ms,
     };
 

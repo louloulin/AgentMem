@@ -9,6 +9,7 @@ pub mod config;
 pub mod error;
 pub mod middleware;
 pub mod models;
+pub mod orchestrator_factory;
 pub mod routes;
 pub mod server;
 pub mod sse;

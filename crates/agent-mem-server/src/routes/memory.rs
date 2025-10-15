@@ -443,11 +443,33 @@ pub async fn get_memory_history(
 ) -> ServerResult<Json<serde_json::Value>> {
     info!("Getting history for memory ID: {}", id);
 
-    // TODO: Implement memory history functionality
+    // ✅ 验证 memory 存在
+    let memory = memory_manager
+        .get_memory(&id)
+        .await
+        .map_err(|e| ServerError::internal_error(format!("Failed to get memory: {}", e)))?
+        .ok_or_else(|| ServerError::not_found("Memory not found"))?;
+
+    // ✅ 构建历史记录
+    // 注意：这是一个简化的实现，返回当前版本作为历史记录
+    // 完整的实现需要 memory_history 表和触发器
+    let history = vec![serde_json::json!({
+        "version": 1,
+        "content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
+        "metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+        "created_at": memory.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
+        "updated_at": memory.get("updated_at").and_then(|v| v.as_str()).unwrap_or(""),
+        "change_type": "created",
+        "change_reason": "Initial version",
+    })];
+
+    // ✅ 构建响应
     let response = serde_json::json!({
         "memory_id": id,
-        "history": [],
-        "message": "Memory history feature not yet implemented"
+        "current_version": 1,
+        "total_versions": history.len(),
+        "history": history,
+        "note": "This is a simplified implementation. Full history tracking requires database migration."
     });
 
     Ok(Json(response))

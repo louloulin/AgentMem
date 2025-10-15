@@ -14,7 +14,9 @@
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
+use crate::orchestrator_factory::create_orchestrator;
 use agent_mem_core::storage::{factory::Repositories, models::{generate_id, Agent}};
+use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
 use axum::{
     extract::{Extension, Path, Query},
     http::StatusCode,
@@ -24,6 +26,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
+use tracing::{debug, info};
 use utoipa::ToSchema;
 
 /// Request to create a new agent
@@ -521,45 +524,41 @@ pub async fn send_message_to_agent(
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to save user message: {e}")))?;
 
-    // TODO: Integrate with LLM system to generate response
-    // For now, return a placeholder response
-    let response_text = format!("Received your message: {}", req.message);
+    // ✅ 创建 AgentOrchestrator
+    info!("Creating AgentOrchestrator for agent: {}", id);
+    let orchestrator = create_orchestrator(&agent, &repositories).await?;
 
-    // Create assistant message
-    let assistant_message_id = generate_id("msg");
-    let assistant_message = Message {
-        id: assistant_message_id.clone(),
-        organization_id: auth_user.org_id.clone(),
-        user_id: req.user_id.unwrap_or_else(|| auth_user.user_id.clone()),
+    // ✅ 构建 OrchestratorChatRequest
+    let user_id = req.user_id.clone().unwrap_or_else(|| auth_user.user_id.clone());
+    let orchestrator_request = OrchestratorChatRequest {
+        message: req.message.clone(),
         agent_id: id.clone(),
-        role: "assistant".to_string(),
-        text: Some(response_text.clone()),
-        content: None,
-        model: agent
-            .llm_config
-            .as_ref()
-            .and_then(|c| c.get("model"))
-            .and_then(|m| m.as_str())
-            .map(|s| s.to_string()),
-        name: None,
-        tool_calls: None,
-        tool_call_id: None,
-        step_id: None,
-        otid: None,
-        tool_returns: None,
-        group_id: None,
-        sender_id: None,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        is_deleted: false,
-        created_by_id: None,
-        last_updated_by_id: None,
+        user_id: user_id.clone(),
+        organization_id: auth_user.org_id.clone(),
+        stream: false,
+        max_memories: 10,
     };
 
-    // Save assistant message
-    message_repo.create(&assistant_message).await.map_err(|e| {
-        ServerError::internal_error(format!("Failed to save assistant message: {e}"))
-    })?;
+    debug!("Calling orchestrator.step() with request: {:?}", orchestrator_request);
+
+    // ✅ 调用 orchestrator.step()
+    let orchestrator_response = orchestrator
+        .step(orchestrator_request)
+        .await
+        .map_err(|e| {
+            ServerError::internal_error(format!("Orchestrator failed: {}", e))
+        })?;
+
+    info!(
+        "Orchestrator completed: message_id={}, memories_count={}",
+        orchestrator_response.message_id,
+        orchestrator_response.memories_count
+    );
+
+    // ✅ 使用真实的 LLM 响应
+    // 注意：orchestrator.step() 已经创建并保存了 assistant message
+    let response_text = orchestrator_response.content;
+    let assistant_message_id = orchestrator_response.message_id;
 
     let processing_time_ms = start_time.elapsed().as_millis() as u64;
 

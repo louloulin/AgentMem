@@ -9,6 +9,7 @@
 
 use super::error::{McpError, McpResult};
 use chrono::{DateTime, Duration, Utc};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -110,6 +111,53 @@ impl Role {
                 HashSet::new()
             }
         }
+    }
+}
+
+/// JWT Claims
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JwtClaims {
+    /// Subject (user ID)
+    pub sub: String,
+
+    /// Issued at (timestamp)
+    pub iat: i64,
+
+    /// Expiration time (timestamp)
+    pub exp: i64,
+
+    /// Issuer
+    pub iss: String,
+
+    /// Audience
+    pub aud: String,
+
+    /// User role
+    pub role: Option<String>,
+
+    /// Custom claims
+    #[serde(flatten)]
+    pub custom: HashMap<String, serde_json::Value>,
+}
+
+impl JwtClaims {
+    /// Create new claims
+    pub fn new(user_id: String, issuer: String, audience: String, expiry_seconds: i64) -> Self {
+        let now = Utc::now().timestamp();
+        Self {
+            sub: user_id,
+            iat: now,
+            exp: now + expiry_seconds,
+            iss: issuer,
+            aud: audience,
+            role: None,
+            custom: HashMap::new(),
+        }
+    }
+
+    /// Check if expired
+    pub fn is_expired(&self) -> bool {
+        Utc::now().timestamp() > self.exp
     }
 }
 
@@ -357,40 +405,103 @@ impl AuthManager {
             return Ok(AuthContext::new("anonymous".to_string(), Role::Admin));
         }
 
-        // 这里应该使用 jsonwebtoken crate 来验证 JWT
-        // 为了简化，我们先实现一个基本版本
         debug!("Verifying JWT token");
 
-        // TODO: 实现真实的 JWT 验证
-        // 1. 解码 JWT
-        // 2. 验证签名
-        // 3. 检查过期时间
-        // 4. 提取用户信息
+        // ✅ 1. 创建验证配置
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.set_issuer(&[&self.jwt_config.issuer]);
+        validation.set_audience(&[&self.jwt_config.audience]);
+        validation.validate_exp = true;
 
-        // 临时实现：从令牌中提取用户 ID（假设格式为 "user_id:timestamp:signature"）
-        let parts: Vec<&str> = token.split(':').collect();
-        if parts.len() < 2 {
-            return Err(McpError::AuthenticationFailed("Invalid JWT format".to_string()));
+        // ✅ 2. 解码和验证 JWT
+        let decoding_key = DecodingKey::from_secret(self.jwt_config.secret.as_bytes());
+        let token_data = decode::<JwtClaims>(token, &decoding_key, &validation)
+            .map_err(|e| {
+                warn!("JWT verification failed: {}", e);
+                McpError::AuthenticationFailed(format!("Invalid JWT: {}", e))
+            })?;
+
+        let claims = token_data.claims;
+
+        // ✅ 3. 检查过期时间（双重检查）
+        if claims.is_expired() {
+            return Err(McpError::AuthenticationFailed("JWT expired".to_string()));
         }
 
-        let user_id = parts[0].to_string();
+        // ✅ 4. 提取用户信息
+        let user_id = claims.sub.clone();
 
-        // 获取或创建用户上下文
+        // ✅ 5. 解析角色
+        let role = if let Some(role_str) = claims.role {
+            match role_str.as_str() {
+                "admin" => Role::Admin,
+                "developer" => Role::Developer,
+                "user" => Role::User,
+                "readonly" => Role::ReadOnly,
+                custom => Role::Custom(custom.to_string()),
+            }
+        } else {
+            Role::Developer // 默认角色
+        };
+
+        // ✅ 6. 获取或创建用户上下文
         let contexts = self.contexts.read().await;
         if let Some(context) = contexts.get(&user_id) {
             if context.is_expired() {
                 return Err(McpError::AuthenticationFailed(
-                    "JWT expired".to_string(),
+                    "Authentication expired".to_string(),
                 ));
             }
             Ok(context.clone())
         } else {
             drop(contexts);
-            let mut context = AuthContext::new(user_id.clone(), Role::Developer);
-            context.set_expiry(Duration::seconds(self.jwt_config.expiry_seconds));
+
+            // 创建新的上下文
+            let mut context = AuthContext::new(user_id.clone(), role);
+
+            // 设置过期时间（使用 JWT 的过期时间）
+            let expiry_duration = Duration::seconds(claims.exp - Utc::now().timestamp());
+            context.set_expiry(expiry_duration);
+
+            // 添加自定义元数据
+            for (key, value) in claims.custom {
+                if let Some(s) = value.as_str() {
+                    context.metadata.insert(key, s.to_string());
+                }
+            }
+
             self.contexts.write().await.insert(user_id.clone(), context.clone());
+
+            info!("Created new auth context for user: {}", user_id);
             Ok(context)
         }
+    }
+
+    /// 生成 JWT 令牌
+    pub fn generate_jwt(&self, user_id: String, role: Role) -> McpResult<String> {
+        // 创建 claims
+        let mut claims = JwtClaims::new(
+            user_id,
+            self.jwt_config.issuer.clone(),
+            self.jwt_config.audience.clone(),
+            self.jwt_config.expiry_seconds,
+        );
+
+        // 设置角色
+        claims.role = Some(match role {
+            Role::Admin => "admin".to_string(),
+            Role::Developer => "developer".to_string(),
+            Role::User => "user".to_string(),
+            Role::ReadOnly => "readonly".to_string(),
+            Role::Custom(s) => s,
+        });
+
+        // 编码 JWT
+        let encoding_key = EncodingKey::from_secret(self.jwt_config.secret.as_bytes());
+        let token = encode(&Header::default(), &claims, &encoding_key)
+            .map_err(|e| McpError::AuthenticationFailed(format!("Failed to generate JWT: {}", e)))?;
+
+        Ok(token)
     }
 
     /// 验证 OAuth 2.0 访问令牌
@@ -401,27 +512,100 @@ impl AuthManager {
 
         debug!("Verifying OAuth 2.0 access token");
 
-        // TODO: 实现真实的 OAuth 2.0 验证
-        // 1. 调用 OAuth 2.0 提供商的验证端点
-        // 2. 验证令牌有效性
-        // 3. 提取用户信息
+        // ✅ 1. 调用 OAuth 2.0 提供商的验证端点
+        // 这里使用通用的 token introspection endpoint (RFC 7662)
+        let client = reqwest::Client::new();
 
-        // 临时实现：从令牌中提取用户 ID
-        let user_id = format!("oauth2_{}", access_token.chars().take(8).collect::<String>());
+        let introspection_url = format!("{}/introspect", self.oauth2_config.token_url);
 
+        let response = client
+            .post(&introspection_url)
+            .basic_auth(&self.oauth2_config.client_id, Some(&self.oauth2_config.client_secret))
+            .form(&[("token", access_token)])
+            .send()
+            .await
+            .map_err(|e| {
+                warn!("OAuth2 introspection request failed: {}", e);
+                McpError::AuthenticationFailed(format!("OAuth2 verification failed: {}", e))
+            })?;
+
+        // ✅ 2. 解析响应
+        #[derive(Deserialize)]
+        struct IntrospectionResponse {
+            active: bool,
+            sub: Option<String>,
+            exp: Option<i64>,
+            scope: Option<String>,
+            #[serde(flatten)]
+            extra: HashMap<String, serde_json::Value>,
+        }
+
+        let introspection: IntrospectionResponse = response
+            .json()
+            .await
+            .map_err(|e| {
+                warn!("Failed to parse OAuth2 introspection response: {}", e);
+                McpError::AuthenticationFailed("Invalid OAuth2 response".to_string())
+            })?;
+
+        // ✅ 3. 验证令牌有效性
+        if !introspection.active {
+            return Err(McpError::AuthenticationFailed(
+                "OAuth2 token is not active".to_string(),
+            ));
+        }
+
+        // ✅ 4. 提取用户信息
+        let user_id = introspection.sub
+            .ok_or_else(|| McpError::AuthenticationFailed("OAuth2 token missing subject".to_string()))?;
+
+        // ✅ 5. 检查过期时间
+        if let Some(exp) = introspection.exp {
+            if Utc::now().timestamp() > exp {
+                return Err(McpError::AuthenticationFailed(
+                    "OAuth2 token expired".to_string(),
+                ));
+            }
+        }
+
+        // ✅ 6. 获取或创建用户上下文
         let contexts = self.contexts.read().await;
         if let Some(context) = contexts.get(&user_id) {
             if context.is_expired() {
                 return Err(McpError::AuthenticationFailed(
-                    "OAuth 2.0 token expired".to_string(),
+                    "OAuth2 token expired".to_string(),
                 ));
             }
             Ok(context.clone())
         } else {
             drop(contexts);
+
+            // 创建新的上下文
             let mut context = AuthContext::new(user_id.clone(), Role::User);
-            context.set_expiry(Duration::seconds(3600)); // 1 小时
+
+            // 设置过期时间
+            if let Some(exp) = introspection.exp {
+                let expiry_duration = Duration::seconds(exp - Utc::now().timestamp());
+                context.set_expiry(expiry_duration);
+            } else {
+                context.set_expiry(Duration::seconds(3600)); // 默认 1 小时
+            }
+
+            // 添加 scope 到元数据
+            if let Some(scope) = introspection.scope {
+                context.metadata.insert("scope".to_string(), scope);
+            }
+
+            // 添加其他元数据
+            for (key, value) in introspection.extra {
+                if let Some(s) = value.as_str() {
+                    context.metadata.insert(key, s.to_string());
+                }
+            }
+
             self.contexts.write().await.insert(user_id.clone(), context.clone());
+
+            info!("Created new OAuth2 auth context for user: {}", user_id);
             Ok(context)
         }
     }
