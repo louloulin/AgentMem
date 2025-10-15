@@ -6,6 +6,7 @@ use agent_mem_core::client::{AgentMemClient, AgentMemClientConfig};
 use agent_mem_tools::mcp::server::{McpServer, McpServerConfig};
 use agent_mem_tools::mcp::transport::stdio::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
 use agent_mem_tools::executor::ToolExecutor;
+use agent_mem_tools::register_agentmem_tools;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::{debug, error, info};
@@ -27,6 +28,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 创建工具执行器
     let executor = Arc::new(ToolExecutor::new());
+
+    // 注册 AgentMem 工具
+    register_agentmem_tools(&executor).await?;
+    info!("已注册 {} 个 AgentMem 工具", executor.list_tools().await.len());
 
     // 创建 MCP 服务器配置
     let config = McpServerConfig {
