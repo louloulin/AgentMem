@@ -820,5 +820,125 @@ mod tests {
         // Delete empty list should not error
         store.delete_vectors(vec![]).await.unwrap();
     }
+
+    /// 性能基准测试：向量插入性能
+    /// 目标：> 1000 ops/s
+    #[tokio::test]
+    async fn test_insert_performance() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // 准备 1000 个向量
+        let num_vectors = 1000;
+        let dimension = 128;
+        let mut vectors = Vec::new();
+
+        for i in 0..num_vectors {
+            vectors.push(VectorData {
+                id: format!("vec_{}", i),
+                vector: vec![i as f32 / num_vectors as f32; dimension],
+                metadata: std::collections::HashMap::new(),
+            });
+        }
+
+        // 测试插入性能
+        let start = std::time::Instant::now();
+        store.add_vectors(vectors).await.unwrap();
+        let duration = start.elapsed();
+
+        let ops_per_sec = num_vectors as f64 / duration.as_secs_f64();
+        println!("插入性能: {:.2} ops/s (目标: > 1000 ops/s)", ops_per_sec);
+        println!("插入 {} 个向量耗时: {:?}", num_vectors, duration);
+
+        // 验证性能指标
+        assert!(ops_per_sec > 1000.0, "插入性能未达标: {:.2} ops/s < 1000 ops/s", ops_per_sec);
+    }
+
+    /// 性能基准测试：向量搜索性能 (1K 向量)
+    /// 目标：< 50ms (LanceDB 嵌入式数据库的合理性能目标)
+    #[tokio::test]
+    async fn test_search_performance_1k() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // 准备 1000 个向量
+        let num_vectors = 1000;
+        let dimension = 128;
+        let mut vectors = Vec::new();
+
+        for i in 0..num_vectors {
+            vectors.push(VectorData {
+                id: format!("vec_{}", i),
+                vector: vec![i as f32 / num_vectors as f32; dimension],
+                metadata: std::collections::HashMap::new(),
+            });
+        }
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // 测试搜索性能
+        let query = vec![0.5; dimension];
+        let start = std::time::Instant::now();
+        let results = store.search_vectors(query, 10, None).await.unwrap();
+        let duration = start.elapsed();
+
+        println!("搜索性能 (1K 向量): {:?} (目标: < 50ms)", duration);
+        println!("返回结果数: {}", results.len());
+
+        // 验证性能指标（LanceDB 嵌入式数据库，50ms 是合理目标）
+        assert!(duration.as_millis() < 50, "搜索延迟未达标: {:?} >= 50ms", duration);
+    }
+
+    /// 性能基准测试：向量搜索性能 (10K 向量)
+    /// 目标：< 50ms (文档中是 100K，但为了测试速度，这里用 10K)
+    #[tokio::test]
+    #[ignore] // 默认忽略，因为需要较长时间
+    async fn test_search_performance_10k() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // 准备 10000 个向量
+        let num_vectors = 10000;
+        let dimension = 128;
+
+        // 分批插入以提高性能
+        let batch_size = 1000;
+        for batch_idx in 0..(num_vectors / batch_size) {
+            let mut vectors = Vec::new();
+            for i in 0..batch_size {
+                let idx = batch_idx * batch_size + i;
+                vectors.push(VectorData {
+                    id: format!("vec_{}", idx),
+                    vector: vec![idx as f32 / num_vectors as f32; dimension],
+                    metadata: std::collections::HashMap::new(),
+                });
+            }
+            store.add_vectors(vectors).await.unwrap();
+        }
+
+        // 测试搜索性能
+        let query = vec![0.5; dimension];
+        let start = std::time::Instant::now();
+        let results = store.search_vectors(query, 10, None).await.unwrap();
+        let duration = start.elapsed();
+
+        println!("搜索性能 (10K 向量): {:?} (目标: < 50ms)", duration);
+        println!("返回结果数: {}", results.len());
+
+        // 验证性能指标（10K 向量应该 < 50ms）
+        assert!(duration.as_millis() < 50, "搜索延迟未达标: {:?} >= 50ms", duration);
+    }
 }
 
