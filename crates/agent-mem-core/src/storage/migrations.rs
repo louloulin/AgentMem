@@ -27,6 +27,9 @@ pub async fn run_migrations(pool: &PgPool) -> CoreResult<()> {
     // Run migration to add missing fields (embedding, expires_at, version)
     migrate_add_missing_fields(pool).await?;
 
+    // Run migration to create memory_history table and triggers
+    create_memory_history_table(pool).await?;
+
     Ok(())
 }
 
@@ -444,6 +447,181 @@ pub async fn migrate_add_missing_fields(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create version index: {}", e)))?;
+
+    Ok(())
+}
+
+/// 创建 memory_history 表和触发器
+///
+/// 此迁移创建：
+/// - memory_history 表：存储记忆的历史版本
+/// - 索引：优化查询性能
+/// - 触发器函数：自动追踪记忆变更
+/// - 触发器：在 INSERT/UPDATE/DELETE 时自动记录历史
+async fn create_memory_history_table(pool: &PgPool) -> CoreResult<()> {
+    // 1. 创建 memory_history 表
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS memory_history (
+            id VARCHAR(255) PRIMARY KEY,
+            memory_id VARCHAR(255) NOT NULL,
+            version INTEGER NOT NULL,
+            change_type VARCHAR(50) NOT NULL CHECK (change_type IN ('created', 'updated', 'deleted', 'restored')),
+            change_reason TEXT,
+            content TEXT NOT NULL,
+            metadata JSONB NOT NULL DEFAULT '{}',
+            memory_type VARCHAR(50) NOT NULL,
+            importance REAL NOT NULL DEFAULT 0.0,
+            organization_id VARCHAR(255) NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            agent_id VARCHAR(255) NOT NULL,
+            changed_by_id VARCHAR(255),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT fk_memory_history_memory
+                FOREIGN KEY (memory_id)
+                REFERENCES memories(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_memory_history_organization
+                FOREIGN KEY (organization_id)
+                REFERENCES organizations(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_memory_history_user
+                FOREIGN KEY (user_id)
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_memory_history_agent
+                FOREIGN KEY (agent_id)
+                REFERENCES agents(id)
+                ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create memory_history table: {}", e)))?;
+
+    // 2. 创建索引
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_memory_id ON memory_history(memory_id)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create memory_id index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_memory_version ON memory_history(memory_id, version DESC)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create memory_version index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_change_type ON memory_history(change_type)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create change_type index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_created_at ON memory_history(created_at DESC)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create created_at index: {}", e)))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_tenant ON memory_history(organization_id, user_id, agent_id)")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to create tenant index: {}", e)))?;
+
+    // 3. 创建触发器函数
+    sqlx::query(
+        r#"
+        CREATE OR REPLACE FUNCTION track_memory_changes()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            next_version INTEGER;
+            change_type_val VARCHAR(50);
+        BEGIN
+            IF TG_OP = 'INSERT' THEN
+                change_type_val := 'created';
+                next_version := 1;
+            ELSIF TG_OP = 'UPDATE' THEN
+                change_type_val := 'updated';
+                SELECT COALESCE(MAX(version), 0) + 1 INTO next_version
+                FROM memory_history
+                WHERE memory_id = NEW.id;
+            ELSIF TG_OP = 'DELETE' THEN
+                change_type_val := 'deleted';
+                SELECT COALESCE(MAX(version), 0) + 1 INTO next_version
+                FROM memory_history
+                WHERE memory_id = OLD.id;
+
+                INSERT INTO memory_history (
+                    id, memory_id, version, change_type, change_reason,
+                    content, metadata, memory_type, importance,
+                    organization_id, user_id, agent_id, changed_by_id, created_at
+                ) VALUES (
+                    gen_random_uuid()::TEXT, OLD.id, next_version, change_type_val, 'Memory deleted',
+                    OLD.content, OLD.metadata, OLD.memory_type, OLD.importance,
+                    OLD.organization_id, OLD.user_id, OLD.agent_id, OLD.last_updated_by_id, NOW()
+                );
+
+                RETURN OLD;
+            END IF;
+
+            INSERT INTO memory_history (
+                id, memory_id, version, change_type, change_reason,
+                content, metadata, memory_type, importance,
+                organization_id, user_id, agent_id, changed_by_id, created_at
+            ) VALUES (
+                gen_random_uuid()::TEXT, NEW.id, next_version, change_type_val,
+                CASE
+                    WHEN TG_OP = 'INSERT' THEN 'Initial version'
+                    WHEN TG_OP = 'UPDATE' THEN 'Memory updated'
+                    ELSE NULL
+                END,
+                NEW.content, NEW.metadata, NEW.memory_type, NEW.importance,
+                NEW.organization_id, NEW.user_id, NEW.agent_id, NEW.last_updated_by_id, NOW()
+            );
+
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create trigger function: {}", e)))?;
+
+    // 4. 创建触发器
+    sqlx::query("DROP TRIGGER IF EXISTS trigger_memory_insert ON memories")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to drop old insert trigger: {}", e)))?;
+
+    sqlx::query("DROP TRIGGER IF EXISTS trigger_memory_update ON memories")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to drop old update trigger: {}", e)))?;
+
+    sqlx::query("DROP TRIGGER IF EXISTS trigger_memory_delete ON memories")
+        .execute(pool)
+        .await
+        .map_err(|e| CoreError::Database(format!("Failed to drop old delete trigger: {}", e)))?;
+
+    sqlx::query(
+        "CREATE TRIGGER trigger_memory_insert AFTER INSERT ON memories FOR EACH ROW EXECUTE FUNCTION track_memory_changes()"
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create insert trigger: {}", e)))?;
+
+    sqlx::query(
+        "CREATE TRIGGER trigger_memory_update AFTER UPDATE ON memories FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION track_memory_changes()"
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create update trigger: {}", e)))?;
+
+    sqlx::query(
+        "CREATE TRIGGER trigger_memory_delete BEFORE DELETE ON memories FOR EACH ROW EXECUTE FUNCTION track_memory_changes()"
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create delete trigger: {}", e)))?;
 
     Ok(())
 }

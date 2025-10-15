@@ -9,6 +9,7 @@ use crate::{
 };
 use agent_mem_core::{
     manager::MemoryManager as CoreMemoryManager,
+    storage::factory::Repositories,
     types::MemoryQuery,
 };
 use agent_mem_traits::MemoryType;
@@ -451,16 +452,18 @@ pub async fn get_memory_history(
         .ok_or_else(|| ServerError::not_found("Memory not found"))?;
 
     // ✅ 构建历史记录
-    // 注意：这是一个简化的实现，返回当前版本作为历史记录
-    // 完整的实现需要 memory_history 表和触发器
+    // 注意：完整的实现需要从 memory_history 表查询
+    // 当前返回当前版本作为历史记录（简化版）
+    // 数据库迁移已创建，但需要通过 Repository trait 访问
     let history = vec![serde_json::json!({
         "version": 1,
-        "content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
-        "metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
-        "created_at": memory.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
-        "updated_at": memory.get("updated_at").and_then(|v| v.as_str()).unwrap_or(""),
         "change_type": "created",
         "change_reason": "Initial version",
+        "content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
+        "metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+        "memory_type": memory.get("memory_type").and_then(|v| v.as_str()).unwrap_or("episodic"),
+        "importance": memory.get("importance").and_then(|v| v.as_f64()).unwrap_or(0.5),
+        "created_at": memory.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
     })];
 
     // ✅ 构建响应
@@ -469,7 +472,9 @@ pub async fn get_memory_history(
         "current_version": 1,
         "total_versions": history.len(),
         "history": history,
-        "note": "This is a simplified implementation. Full history tracking requires database migration."
+        "current_content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
+        "current_metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+        "note": "Memory history table and triggers have been created. Full history tracking will be available once Repository trait is extended with history methods."
     });
 
     Ok(Json(response))
