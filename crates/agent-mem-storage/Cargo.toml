@@ -101,6 +101,9 @@ rocksdb = ["dep:rocksdb"]
 # 内存存储
 memory = ["dep:dashmap"]
 
+# 数据库后端
+postgres = ["dep:sqlx"]
+
 # 数据库优化
 optimizations = ["dep:sqlx"]
 

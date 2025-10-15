@@ -11,6 +11,8 @@ pub mod postgres_procedural;
 pub mod postgres_core;
 #[cfg(feature = "postgres")]
 pub mod postgres_working;
+#[cfg(feature = "postgres")]
+pub mod postgres_vector;
 pub mod libsql_episodic;
 pub mod libsql_semantic;
 pub mod libsql_procedural;
@@ -57,6 +59,8 @@ pub use postgres_procedural::PostgresProceduralStore;
 pub use postgres_core::PostgresCoreStore;
 #[cfg(feature = "postgres")]
 pub use postgres_working::PostgresWorkingStore;
+#[cfg(feature = "postgres")]
+pub use postgres_vector::{PostgresVectorStore, PostgresVectorConfig, VectorDistanceOperator};
 pub use libsql_episodic::LibSqlEpisodicStore;
 pub use libsql_semantic::LibSqlSemanticStore;
 pub use libsql_procedural::LibSqlProceduralStore;
