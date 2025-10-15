@@ -1,0 +1,137 @@
+# AgentMem 嵌入式模式配置
+#
+# 嵌入式模式使用 LibSQL + LanceDB，适合：
+# - 单机部署
+# - 开发环境
+# - 小规模应用
+# - 快速原型开发
+#
+# 特点：
+# - 零配置，开箱即用
+# - 单文件数据库
+# - 本地向量存储
+# - 无需外部依赖
+
+[deployment]
+# 部署模式：embedded（嵌入式）或 server（服务器）
+mode = "embedded"
+
+[embedded]
+# LibSQL 数据库文件路径
+# 默认: ./data/agentmem.db
+database_path = "./data/agentmem.db"
+
+# LanceDB 向量存储目录
+# 默认: ./data/vectors
+vector_path = "./data/vectors"
+
+# 向量维度
+# 默认: 1536 (OpenAI text-embedding-ada-002)
+# 常用值:
+#   - 1536: OpenAI text-embedding-ada-002
+#   - 768: BERT, Sentence-BERT
+#   - 384: MiniLM
+#   - 512: Cohere
+vector_dimension = 1536
+
+# 是否启用 WAL (Write-Ahead Logging)
+# 默认: true
+# WAL 提供更好的并发性能和崩溃恢复
+enable_wal = true
+
+# 缓存大小（KB）
+# 默认: 10240 (10 MB)
+# 建议值:
+#   - 开发环境: 5120 (5 MB)
+#   - 生产环境: 20480 (20 MB)
+#   - 高负载: 51200 (50 MB)
+cache_size_kb = 10240
+
+[logging]
+# 日志级别
+# 可选值: trace, debug, info, warn, error
+# 默认: info
+level = "info"
+
+# 日志格式
+# 可选值: pretty, json, compact
+# 默认: pretty
+# - pretty: 人类可读，适合开发
+# - json: 结构化，适合日志收集
+# - compact: 紧凑格式，节省空间
+format = "pretty"
+
+# 日志输出目标
+# 可选值: stdout, stderr, file
+# 默认: stdout
+output = "stdout"
+
+# 日志文件路径（仅当 output = "file" 时有效）
+# file_path = "./logs/agentmem.log"
+
+# 是否启用日志轮转
+# rotate = true
+
+# 日志文件最大大小（MB）
+# max_size_mb = 100
+
+# 保留的日志文件数量
+# max_backups = 10
+
+[performance]
+# 是否启用性能监控
+# 默认: false
+enable_monitoring = false
+
+# 慢查询阈值（毫秒）
+# 默认: 1000
+# 超过此阈值的查询将被记录
+slow_query_threshold_ms = 1000
+
+# 是否启用查询日志
+# 默认: false
+log_queries = false
+
+[security]
+# 是否启用 API 密钥认证
+# 默认: false
+enable_api_key_auth = false
+
+# API 密钥（如果启用认证）
+# api_key = "your-secret-api-key"
+
+# 是否启用 CORS
+# 默认: false
+enable_cors = false
+
+# CORS 允许的源
+# allowed_origins = ["http://localhost:3000"]
+
+[features]
+# 是否启用自动备份
+# 默认: false
+enable_auto_backup = false
+
+# 备份间隔（小时）
+# 默认: 24
+backup_interval_hours = 24
+
+# 备份保留天数
+# 默认: 7
+backup_retention_days = 7
+
+# 备份目录
+# backup_dir = "./backups"
+
+# 是否启用自动清理
+# 默认: false
+enable_auto_cleanup = false
+
+# 清理间隔（小时）
+# 默认: 24
+cleanup_interval_hours = 24
+
+# 记忆保留天数
+# 默认: 30
+memory_retention_days = 30
+

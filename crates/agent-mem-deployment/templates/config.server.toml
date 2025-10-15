@@ -1,0 +1,282 @@
+# AgentMem 服务器模式配置
+#
+# 服务器模式使用 PostgreSQL + 多种向量服务，适合：
+# - 生产环境
+# - 分布式部署
+# - 高可用性需求
+# - 大规模应用
+#
+# 特点：
+# - 支持 13+ 向量服务
+# - 高可用性
+# - 水平扩展
+# - 企业级功能
+
+[deployment]
+# 部署模式：embedded（嵌入式）或 server（服务器）
+mode = "server"
+
+[server]
+# PostgreSQL 连接 URL
+# 格式: postgresql://user:password@host:port/database
+# 示例:
+#   - 本地: postgresql://postgres:password@localhost:5432/agentmem
+#   - 远程: postgresql://user:pass@db.example.com:5432/agentmem
+#   - SSL: postgresql://user:pass@db.example.com:5432/agentmem?sslmode=require
+database_url = "postgresql://postgres:password@localhost:5432/agentmem"
+
+# 向量维度
+# 默认: 1536 (OpenAI text-embedding-ada-002)
+vector_dimension = 1536
+
+# 向量服务类型
+# 可选值: pgvector, lancedb, pinecone, qdrant, milvus, weaviate,
+#         chroma, elasticsearch, redis, mongodb, supabase, faiss,
+#         azure_ai_search, memory
+# 默认: pgvector
+vector_service = "pgvector"
+
+# 向量索引类型（仅 pgvector）
+# 可选值: ivfflat, hnsw
+# 默认: ivfflat
+# - ivfflat: 更快的构建速度，适合中等规模
+# - hnsw: 更好的查询性能，适合大规模
+index_type = "ivfflat"
+
+[server.pool]
+# 最大连接数
+# 默认: 20
+# 建议值:
+#   - 开发环境: 5-10
+#   - 生产环境: 20-50
+#   - 高负载: 50-100
+max_connections = 20
+
+# 最小连接数
+# 默认: 5
+min_connections = 5
+
+# 连接超时（秒）
+# 默认: 30
+connect_timeout_secs = 30
+
+# 空闲超时（秒）
+# 默认: 600 (10 分钟)
+idle_timeout_secs = 600
+
+# 最大生命周期（秒）
+# 默认: 1800 (30 分钟)
+max_lifetime_secs = 1800
+
+[server.index_params]
+# IVFFlat 索引参数
+# lists: 聚类中心数量
+# 默认: 100
+# 建议值:
+#   - 小规模 (<10K): 50-100
+#   - 中等规模 (10K-100K): 100-500
+#   - 大规模 (>100K): 500-2000
+ivfflat_lists = 100
+
+# HNSW 索引参数
+# m: 每个节点的最大连接数
+# 默认: 16
+# 建议值:
+#   - 快速构建: 8-12
+#   - 平衡: 16-24
+#   - 高精度: 32-48
+hnsw_m = 16
+
+# ef_construction: 构建时的搜索深度
+# 默认: 64
+# 建议值:
+#   - 快速构建: 32-64
+#   - 平衡: 64-128
+#   - 高精度: 128-256
+hnsw_ef_construction = 64
+
+[server.vector_services]
+# Pinecone 配置（如果使用 Pinecone）
+# pinecone_api_key = "your-pinecone-api-key"
+# pinecone_environment = "us-west1-gcp"
+# pinecone_index = "agentmem"
+
+# Qdrant 配置（如果使用 Qdrant）
+# qdrant_url = "http://localhost:6333"
+# qdrant_api_key = "your-qdrant-api-key"
+# qdrant_collection = "memories"
+
+# Milvus 配置（如果使用 Milvus）
+# milvus_url = "localhost:19530"
+# milvus_collection = "memories"
+
+# Weaviate 配置（如果使用 Weaviate）
+# weaviate_url = "http://localhost:8080"
+# weaviate_api_key = "your-weaviate-api-key"
+# weaviate_class = "Memory"
+
+# Chroma 配置（如果使用 Chroma）
+# chroma_url = "http://localhost:8000"
+# chroma_collection = "memories"
+
+# Elasticsearch 配置（如果使用 Elasticsearch）
+# elasticsearch_url = "http://localhost:9200"
+# elasticsearch_index = "memories"
+# elasticsearch_api_key = "your-elasticsearch-api-key"
+
+# Redis 配置（如果使用 Redis）
+# redis_url = "redis://localhost:6379"
+# redis_index = "memories"
+
+# MongoDB 配置（如果使用 MongoDB）
+# mongodb_url = "mongodb://localhost:27017"
+# mongodb_database = "agentmem"
+# mongodb_collection = "memories"
+
+# Supabase 配置（如果使用 Supabase）
+# supabase_url = "https://your-project.supabase.co"
+# supabase_api_key = "your-supabase-api-key"
+
+# Azure AI Search 配置（如果使用 Azure AI Search）
+# azure_search_endpoint = "https://your-service.search.windows.net"
+# azure_search_api_key = "your-azure-search-api-key"
+# azure_search_index = "memories"
+
+[logging]
+# 日志级别
+# 可选值: trace, debug, info, warn, error
+# 默认: info
+level = "info"
+
+# 日志格式
+# 可选值: pretty, json, compact
+# 默认: json (生产环境推荐)
+# - pretty: 人类可读，适合开发
+# - json: 结构化，适合日志收集
+# - compact: 紧凑格式，节省空间
+format = "json"
+
+# 日志输出目标
+# 可选值: stdout, stderr, file
+# 默认: stdout
+output = "stdout"
+
+# 日志文件路径（仅当 output = "file" 时有效）
+# file_path = "/var/log/agentmem/agentmem.log"
+
+# 是否启用日志轮转
+# rotate = true
+
+# 日志文件最大大小（MB）
+# max_size_mb = 100
+
+# 保留的日志文件数量
+# max_backups = 30
+
+[performance]
+# 是否启用性能监控
+# 默认: true
+enable_monitoring = true
+
+# 慢查询阈值（毫秒）
+# 默认: 500
+slow_query_threshold_ms = 500
+
+# 是否启用查询日志
+# 默认: true
+log_queries = true
+
+# 是否启用指标导出
+# 默认: true
+enable_metrics = true
+
+# Prometheus 指标端口
+# 默认: 9090
+metrics_port = 9090
+
+[security]
+# 是否启用 API 密钥认证
+# 默认: true
+enable_api_key_auth = true
+
+# API 密钥（生产环境请使用环境变量）
+# api_key = "${AGENTMEM_API_KEY}"
+
+# 是否启用 CORS
+# 默认: true
+enable_cors = true
+
+# CORS 允许的源
+allowed_origins = ["https://app.example.com", "https://admin.example.com"]
+
+# 是否启用 TLS
+# 默认: false
+enable_tls = false
+
+# TLS 证书路径
+# tls_cert_path = "/etc/agentmem/cert.pem"
+# tls_key_path = "/etc/agentmem/key.pem"
+
+# 是否启用速率限制
+# 默认: true
+enable_rate_limiting = true
+
+# 每分钟最大请求数
+# 默认: 1000
+rate_limit_per_minute = 1000
+
+[features]
+# 是否启用自动备份
+# 默认: true
+enable_auto_backup = true
+
+# 备份间隔（小时）
+# 默认: 6
+backup_interval_hours = 6
+
+# 备份保留天数
+# 默认: 30
+backup_retention_days = 30
+
+# 备份存储类型
+# 可选值: local, s3, gcs, azure
+# 默认: local
+backup_storage = "local"
+
+# 备份目录（local）
+# backup_dir = "/var/backups/agentmem"
+
+# S3 备份配置
+# s3_bucket = "agentmem-backups"
+# s3_region = "us-west-2"
+# s3_access_key = "${AWS_ACCESS_KEY_ID}"
+# s3_secret_key = "${AWS_SECRET_ACCESS_KEY}"
+
+# 是否启用自动清理
+# 默认: true
+enable_auto_cleanup = true
+
+# 清理间隔（小时）
+# 默认: 24
+cleanup_interval_hours = 24
+
+# 记忆保留天数
+# 默认: 90
+memory_retention_days = 90
+
+# 是否启用高可用性
+# 默认: false
+enable_high_availability = false
+
+# 副本数量
+# replica_count = 3
+
+# 是否启用读写分离
+# enable_read_write_split = false
+
+# 读副本 URL
+# read_replica_urls = [
+#     "postgresql://user:pass@replica1.example.com:5432/agentmem",
+#     "postgresql://user:pass@replica2.example.com:5432/agentmem"
+# ]
+

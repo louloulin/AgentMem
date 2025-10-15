@@ -5,8 +5,10 @@
 pub mod embedded;
 pub mod packaging;
 pub mod config_embed;
+pub mod config_loader;
 
 pub use embedded::{EmbeddedDatabase, EmbeddedVectorStore, EmbeddedConfig};
 pub use packaging::{PackageBuilder, PackageConfig, BinaryOptimizer};
 pub use config_embed::{EmbeddedConfigManager, ConfigTemplate};
+pub use config_loader::{ConfigLoader, ConfigFormat, ConfigFile};
 
