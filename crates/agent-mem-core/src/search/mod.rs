@@ -25,7 +25,10 @@ pub use fulltext_search::FullTextSearchEngine;
 #[cfg(feature = "postgres")]
 pub use hybrid::{HybridSearchConfig, HybridSearchEngine, HybridSearchResult};
 pub use ranker::{RRFRanker, SearchResultRanker};
-pub use vector_search::VectorSearchEngine;
+pub use vector_search::{
+    build_hybrid_vector_search_sql, build_vector_search_sql, VectorDistanceOperator,
+    VectorSearchEngine,
+};
 
 use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};

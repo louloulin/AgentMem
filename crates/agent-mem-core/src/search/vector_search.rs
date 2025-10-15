@@ -607,3 +607,376 @@ mod tests {
         assert!(result.is_ok());
     }
 }
+
+/// pgvector 距离操作符
+///
+/// 支持 PostgreSQL pgvector 扩展的三种距离度量方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VectorDistanceOperator {
+    /// 余弦距离: <=>
+    ///
+    /// 范围: [0, 2]
+    /// - 0 表示完全相同
+    /// - 1 表示正交
+    /// - 2 表示完全相反
+    Cosine,
+
+    /// L2 距离 (欧几里得距离): <->
+    ///
+    /// 范围: [0, ∞)
+    /// - 0 表示完全相同
+    /// - 值越大表示越不相似
+    L2,
+
+    /// 内积 (负内积): <#>
+    ///
+    /// 范围: (-∞, 0]
+    /// - 值越接近 0 表示越相似
+    /// - 值越负表示越不相似
+    InnerProduct,
+}
+
+impl VectorDistanceOperator {
+    /// 转换为 SQL 操作符
+    pub fn to_sql(&self) -> &'static str {
+        match self {
+            Self::Cosine => "<=>",
+            Self::L2 => "<->",
+            Self::InnerProduct => "<#>",
+        }
+    }
+
+    /// 将距离转换为相似度分数
+    ///
+    /// 返回值范围: [0, 1]
+    /// - 1.0 表示完全相同
+    /// - 0.0 表示完全不相似
+    pub fn distance_to_similarity(&self, distance: f32) -> f32 {
+        match self {
+            // 余弦距离: [0, 2] -> [1, 0]
+            Self::Cosine => 1.0 - (distance / 2.0),
+            // L2 距离: [0, ∞) -> [1, 0)
+            Self::L2 => 1.0 / (1.0 + distance),
+            // 内积: (-∞, 0] -> [0, 1]
+            Self::InnerProduct => {
+                if distance <= 0.0 {
+                    (-distance).min(1.0)
+                } else {
+                    0.0
+                }
+            }
+        }
+    }
+
+    /// 将相似度分数转换为距离
+    ///
+    /// 这是 `distance_to_similarity` 的反函数
+    pub fn similarity_to_distance(&self, similarity: f32) -> f32 {
+        match self {
+            // 相似度: [1, 0] -> 余弦距离: [0, 2]
+            Self::Cosine => (1.0 - similarity) * 2.0,
+            // 相似度: [1, 0) -> L2 距离: [0, ∞)
+            Self::L2 => {
+                if similarity >= 1.0 {
+                    0.0
+                } else if similarity <= 0.0 {
+                    f32::INFINITY
+                } else {
+                    (1.0 / similarity) - 1.0
+                }
+            }
+            // 相似度: [0, 1] -> 内积: (-∞, 0]
+            Self::InnerProduct => -similarity,
+        }
+    }
+
+    /// 获取操作符名称
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Cosine => "cosine",
+            Self::L2 => "l2",
+            Self::InnerProduct => "inner_product",
+        }
+    }
+}
+
+impl Default for VectorDistanceOperator {
+    fn default() -> Self {
+        Self::Cosine
+    }
+}
+
+/// 构建向量搜索 SQL 查询
+///
+/// # 参数
+///
+/// * `table` - 表名
+/// * `column` - 向量列名
+/// * `operator` - 距离操作符
+/// * `limit` - 返回结果数量限制
+/// * `threshold` - 可选的相似度阈值 (0.0 - 1.0)
+///
+/// # 返回
+///
+/// 返回 SQL 查询字符串，使用占位符 $1, $2, $3 等
+///
+/// # 示例
+///
+/// ```rust
+/// use agent_mem_core::search::vector_search::{build_vector_search_sql, VectorDistanceOperator};
+///
+/// let sql = build_vector_search_sql(
+///     "memories",
+///     "embedding",
+///     VectorDistanceOperator::Cosine,
+///     10,
+///     Some(0.7),
+/// );
+/// ```
+pub fn build_vector_search_sql(
+    table: &str,
+    column: &str,
+    operator: VectorDistanceOperator,
+    limit: usize,
+    threshold: Option<f32>,
+) -> String {
+    let op = operator.to_sql();
+
+    if let Some(threshold) = threshold {
+        // 将相似度阈值转换为距离阈值
+        let distance_threshold = operator.similarity_to_distance(threshold);
+
+        // 根据操作符类型构建不同的 WHERE 子句
+        let where_clause = match operator {
+            VectorDistanceOperator::Cosine | VectorDistanceOperator::L2 => {
+                // 余弦和 L2: 距离越小越相似
+                format!("WHERE ({} {} $1) <= $2", column, op)
+            }
+            VectorDistanceOperator::InnerProduct => {
+                // 内积: 值越大（越接近 0）越相似
+                format!("WHERE ({} {} $1) >= $2", column, op)
+            }
+        };
+
+        format!(
+            "SELECT *, ({} {} $1) as distance
+             FROM {}
+             {}
+             ORDER BY {} {} $1
+             LIMIT $3",
+            column, op, table, where_clause, column, op
+        )
+    } else {
+        format!(
+            "SELECT *, ({} {} $1) as distance
+             FROM {}
+             ORDER BY {} {} $1
+             LIMIT $2",
+            column, op, table, column, op
+        )
+    }
+}
+
+/// 构建多向量混合搜索 SQL 查询
+///
+/// # 参数
+///
+/// * `table` - 表名
+/// * `columns` - 向量列名数组
+/// * `weights` - 对应的权重数组
+/// * `operator` - 距离操作符
+/// * `limit` - 返回结果数量限制
+///
+/// # 返回
+///
+/// 返回 SQL 查询字符串和占位符数量
+///
+/// # 示例
+///
+/// ```rust
+/// use agent_mem_core::search::vector_search::{build_hybrid_vector_search_sql, VectorDistanceOperator};
+///
+/// let (sql, param_count) = build_hybrid_vector_search_sql(
+///     "semantic_memory",
+///     &["summary_embedding", "details_embedding"],
+///     &[0.6, 0.4],
+///     VectorDistanceOperator::Cosine,
+///     10,
+/// );
+/// ```
+pub fn build_hybrid_vector_search_sql(
+    table: &str,
+    columns: &[&str],
+    weights: &[f32],
+    operator: VectorDistanceOperator,
+    limit: usize,
+) -> (String, usize) {
+    assert_eq!(
+        columns.len(),
+        weights.len(),
+        "columns and weights must have the same length"
+    );
+    assert!(!columns.is_empty(), "columns cannot be empty");
+
+    let op = operator.to_sql();
+
+    // 构建加权相似度计算表达式
+    let mut similarity_parts = Vec::new();
+    let mut param_index = 1;
+
+    for (i, (column, weight)) in columns.iter().zip(weights.iter()).enumerate() {
+        // 将距离转换为相似度，然后乘以权重
+        let similarity_expr = match operator {
+            VectorDistanceOperator::Cosine => {
+                // 余弦距离: similarity = 1 - (distance / 2)
+                format!("({} * (1.0 - ({} {} ${}) / 2.0))", weight, column, op, param_index)
+            }
+            VectorDistanceOperator::L2 => {
+                // L2 距离: similarity = 1 / (1 + distance)
+                format!("({} / (1.0 + ({} {} ${})))", weight, column, op, param_index)
+            }
+            VectorDistanceOperator::InnerProduct => {
+                // 内积: similarity = -distance (假设已归一化)
+                format!("({} * (-({} {} ${})))", weight, column, op, param_index)
+            }
+        };
+
+        similarity_parts.push(similarity_expr);
+        param_index += 1;
+    }
+
+    let combined_score = similarity_parts.join(" + ");
+
+    let sql = format!(
+        "SELECT *, ({}) as combined_score
+         FROM {}
+         ORDER BY combined_score DESC
+         LIMIT ${}",
+        combined_score, table, param_index
+    );
+
+    (sql, param_index)
+}
+
+#[cfg(test)]
+mod vector_operator_tests {
+    use super::*;
+
+    #[test]
+    fn test_vector_distance_operator_to_sql() {
+        assert_eq!(VectorDistanceOperator::Cosine.to_sql(), "<=>");
+        assert_eq!(VectorDistanceOperator::L2.to_sql(), "<->");
+        assert_eq!(VectorDistanceOperator::InnerProduct.to_sql(), "<#>");
+    }
+
+    #[test]
+    fn test_distance_to_similarity_cosine() {
+        let op = VectorDistanceOperator::Cosine;
+        assert_eq!(op.distance_to_similarity(0.0), 1.0); // 完全相同
+        assert_eq!(op.distance_to_similarity(1.0), 0.5); // 正交
+        assert_eq!(op.distance_to_similarity(2.0), 0.0); // 完全相反
+    }
+
+    #[test]
+    fn test_distance_to_similarity_l2() {
+        let op = VectorDistanceOperator::L2;
+        assert_eq!(op.distance_to_similarity(0.0), 1.0); // 完全相同
+        assert!(op.distance_to_similarity(1.0) > 0.4 && op.distance_to_similarity(1.0) < 0.6);
+        assert!(op.distance_to_similarity(10.0) < 0.1);
+    }
+
+    #[test]
+    fn test_distance_to_similarity_inner_product() {
+        let op = VectorDistanceOperator::InnerProduct;
+        assert_eq!(op.distance_to_similarity(0.0), 0.0);
+        assert_eq!(op.distance_to_similarity(-0.5), 0.5);
+        assert_eq!(op.distance_to_similarity(-1.0), 1.0);
+    }
+
+    #[test]
+    fn test_similarity_to_distance_roundtrip() {
+        let operators = [
+            VectorDistanceOperator::Cosine,
+            VectorDistanceOperator::L2,
+            VectorDistanceOperator::InnerProduct,
+        ];
+
+        for op in &operators {
+            let similarities = [0.0, 0.25, 0.5, 0.75, 1.0];
+            for &sim in &similarities {
+                let distance = op.similarity_to_distance(sim);
+                let recovered_sim = op.distance_to_similarity(distance);
+                assert!(
+                    (recovered_sim - sim).abs() < 0.01,
+                    "Roundtrip failed for {:?}: {} -> {} -> {}",
+                    op,
+                    sim,
+                    distance,
+                    recovered_sim
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_vector_search_sql_without_threshold() {
+        let sql = build_vector_search_sql(
+            "memories",
+            "embedding",
+            VectorDistanceOperator::Cosine,
+            10,
+            None,
+        );
+
+        assert!(sql.contains("SELECT"));
+        assert!(sql.contains("FROM memories"));
+        assert!(sql.contains("embedding <=> $1"));
+        assert!(sql.contains("ORDER BY"));
+        assert!(sql.contains("LIMIT $2"));
+        assert!(!sql.contains("WHERE"));
+    }
+
+    #[test]
+    fn test_build_vector_search_sql_with_threshold() {
+        let sql = build_vector_search_sql(
+            "memories",
+            "embedding",
+            VectorDistanceOperator::Cosine,
+            10,
+            Some(0.7),
+        );
+
+        assert!(sql.contains("SELECT"));
+        assert!(sql.contains("FROM memories"));
+        assert!(sql.contains("embedding <=> $1"));
+        assert!(sql.contains("WHERE"));
+        assert!(sql.contains("ORDER BY"));
+        assert!(sql.contains("LIMIT $3"));
+    }
+
+    #[test]
+    fn test_build_hybrid_vector_search_sql() {
+        let (sql, param_count) = build_hybrid_vector_search_sql(
+            "semantic_memory",
+            &["summary_embedding", "details_embedding"],
+            &[0.6, 0.4],
+            VectorDistanceOperator::Cosine,
+            10,
+        );
+
+        assert!(sql.contains("SELECT"));
+        assert!(sql.contains("FROM semantic_memory"));
+        assert!(sql.contains("summary_embedding"));
+        assert!(sql.contains("details_embedding"));
+        assert!(sql.contains("combined_score"));
+        assert!(sql.contains("ORDER BY combined_score DESC"));
+        assert_eq!(param_count, 3); // 2 vectors + 1 limit
+    }
+
+    #[test]
+    fn test_operator_name() {
+        assert_eq!(VectorDistanceOperator::Cosine.name(), "cosine");
+        assert_eq!(VectorDistanceOperator::L2.name(), "l2");
+        assert_eq!(VectorDistanceOperator::InnerProduct.name(), "inner_product");
+    }
+}
