@@ -13,6 +13,13 @@ use tracing::{debug, info, warn};
 #[cfg(feature = "lancedb")]
 use lancedb::{connect, Connection, Table};
 
+#[cfg(feature = "lancedb")]
+use arrow::array::{ArrayRef, FixedSizeListArray, Float32Array, RecordBatch, RecordBatchIterator, StringArray};
+#[cfg(feature = "lancedb")]
+use arrow::datatypes::{DataType, Field, Schema};
+#[cfg(feature = "lancedb")]
+use std::sync::Arc as ArrowArc;
+
 /// LanceDB vector store
 #[cfg(feature = "lancedb")]
 pub struct LanceDBStore {
@@ -126,17 +133,114 @@ impl VectorStore for LanceDBStore {
             return Ok(Vec::new());
         }
 
-        // Ensure table exists
+        // Get dimension from first vector
         let dimension = vectors[0].vector.len();
-        self.ensure_table_exists(dimension).await?;
+        let num_vectors = vectors.len();
 
-        // Convert VectorData to LanceDB format
-        // This is a simplified implementation - actual implementation would use Arrow
+        // 1. Create Arrow Schema
+        let schema = ArrowArc::new(Schema::new(vec![
+            Field::new("id", DataType::Utf8, false),
+            Field::new(
+                "vector",
+                DataType::FixedSizeList(
+                    ArrowArc::new(Field::new("item", DataType::Float32, true)),
+                    dimension as i32,
+                ),
+                false,
+            ),
+            Field::new("metadata", DataType::Utf8, true),
+        ]));
+
+        // 2. Convert VectorData to Arrow arrays
+        // ID array
         let ids: Vec<String> = vectors.iter().map(|v| v.id.clone()).collect();
+        let id_array = StringArray::from(ids.clone());
 
-        // TODO: Implement actual LanceDB insertion using Arrow format
-        // For now, return the IDs
-        warn!("LanceDB add_vectors is not fully implemented yet");
+        // Vector array (as FixedSizeList)
+        let vector_values: Vec<f32> = vectors
+            .iter()
+            .flat_map(|v| v.vector.clone())
+            .collect();
+        let vector_value_array = Float32Array::from(vector_values);
+        let vector_array = FixedSizeListArray::new(
+            ArrowArc::new(Field::new("item", DataType::Float32, true)),
+            dimension as i32,
+            ArrowArc::new(vector_value_array) as ArrayRef,
+            None,
+        );
+
+        // Metadata array (serialize HashMap to JSON string)
+        let metadata_values: Vec<Option<String>> = vectors
+            .iter()
+            .map(|v| {
+                if v.metadata.is_empty() {
+                    None
+                } else {
+                    Some(serde_json::to_string(&v.metadata).unwrap_or_default())
+                }
+            })
+            .collect();
+        let metadata_array = StringArray::from(metadata_values);
+
+        // 3. Create RecordBatch
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                ArrowArc::new(id_array) as ArrayRef,
+                ArrowArc::new(vector_array) as ArrayRef,
+                ArrowArc::new(metadata_array) as ArrayRef,
+            ],
+        )
+        .map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to create RecordBatch: {}", e))
+        })?;
+
+        debug!(
+            "Created RecordBatch with {} rows, {} columns",
+            batch.num_rows(),
+            batch.num_columns()
+        );
+
+        // 4. Insert into LanceDB
+        let table_names = self
+            .conn
+            .table_names()
+            .execute()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
+
+        // Create RecordBatchIterator (implements RecordBatchReader)
+        let batches = vec![Ok(batch)];
+        let reader = RecordBatchIterator::new(batches.into_iter(), schema.clone());
+
+        if table_names.contains(&self.table_name) {
+            // Table exists, append data
+            let table = self
+                .conn
+                .open_table(&self.table_name)
+                .execute()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {}", e)))?;
+
+            table
+                .add(reader)
+                .execute()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to add vectors: {}", e)))?;
+
+            info!("Added {} vectors to existing table '{}'", num_vectors, self.table_name);
+        } else {
+            // Create new table with data
+            self.conn
+                .create_table(&self.table_name, reader)
+                .execute()
+                .await
+                .map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to create table: {}", e))
+                })?;
+
+            info!("Created table '{}' with {} vectors", self.table_name, num_vectors);
+        }
 
         Ok(ids)
     }
@@ -205,9 +309,12 @@ impl VectorStore for LanceDBStore {
         // Get table
         match self.get_or_create_table().await {
             Ok(table) => {
-                // TODO: Get actual count from table
-                warn!("LanceDB count_vectors is not fully implemented yet");
-                Ok(0)
+                // Get count from table
+                let count = table
+                    .count_rows(None)
+                    .await
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to count rows: {}", e)))?;
+                Ok(count)
             }
             Err(_) => Ok(0),
         }
@@ -298,7 +405,7 @@ mod tests {
 
         // Test health check
         let health = store.health_check().await.unwrap();
-        assert!(matches!(health, agent_mem_traits::HealthStatus::Healthy));
+        assert_eq!(health.status, "healthy");
     }
 
     #[tokio::test]
@@ -312,6 +419,89 @@ mod tests {
 
         let stats = store.get_stats().await.unwrap();
         assert_eq!(stats.total_vectors, 0);
+    }
+
+    #[tokio::test]
+    async fn test_add_vectors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Create test vectors
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 2.0, 3.0, 4.0],
+                metadata: {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("key1".to_string(), "value1".to_string());
+                    map
+                },
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![5.0, 6.0, 7.0, 8.0],
+                metadata: {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("key2".to_string(), "value2".to_string());
+                    map
+                },
+            },
+        ];
+
+        // Add vectors
+        let ids = store.add_vectors(vectors).await.unwrap();
+        assert_eq!(ids.len(), 2);
+        assert_eq!(ids[0], "vec1");
+        assert_eq!(ids[1], "vec2");
+
+        // Verify stats
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 2);
+    }
+
+    #[tokio::test]
+    async fn test_add_vectors_multiple_batches() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // First batch
+        let vectors1 = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 2.0, 3.0],
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+        let ids1 = store.add_vectors(vectors1).await.unwrap();
+        assert_eq!(ids1.len(), 1);
+
+        // Second batch
+        let vectors2 = vec![
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![4.0, 5.0, 6.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec3".to_string(),
+                vector: vec![7.0, 8.0, 9.0],
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+        let ids2 = store.add_vectors(vectors2).await.unwrap();
+        assert_eq!(ids2.len(), 2);
+
+        // Verify total count
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 3);
     }
 }
 

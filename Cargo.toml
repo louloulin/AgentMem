@@ -216,10 +216,11 @@ ring = "0.17"
 regex = "1.0"
 
 # 现有依赖保持兼容
-arrow = "55.2"
-arrow-array = "55.2"
-arrow-schema = "55.2"
-arrow-buffer = "55.2"
+# 更新到 56.2 以匹配 LanceDB 0.22 的要求
+arrow = "56.2"
+arrow-array = "56.2"
+arrow-schema = "56.2"
+arrow-buffer = "56.2"
 futures = "0.3"
 libc = "0.2"
 rand = "0.8"
