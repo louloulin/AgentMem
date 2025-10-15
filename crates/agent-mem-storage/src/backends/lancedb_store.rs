@@ -12,13 +12,17 @@ use tracing::{debug, info, warn};
 
 #[cfg(feature = "lancedb")]
 use lancedb::{connect, Connection, Table};
+#[cfg(feature = "lancedb")]
+use lancedb::query::{ExecutableQuery, QueryBase};
 
 #[cfg(feature = "lancedb")]
-use arrow::array::{ArrayRef, FixedSizeListArray, Float32Array, RecordBatch, RecordBatchIterator, StringArray};
+use arrow::array::{Array, ArrayRef, FixedSizeListArray, Float32Array, RecordBatch, RecordBatchIterator, StringArray};
 #[cfg(feature = "lancedb")]
 use arrow::datatypes::{DataType, Field, Schema};
 #[cfg(feature = "lancedb")]
 use std::sync::Arc as ArrowArc;
+#[cfg(feature = "lancedb")]
+use futures::TryStreamExt;
 
 /// LanceDB vector store
 #[cfg(feature = "lancedb")]
@@ -251,16 +255,119 @@ impl VectorStore for LanceDBStore {
         limit: usize,
         threshold: Option<f32>,
     ) -> Result<Vec<VectorSearchResult>> {
-        debug!("Searching for {} similar vectors", limit);
+        info!("Searching for {} similar vectors with threshold {:?}", limit, threshold);
 
-        // Get table
+        // 1. 获取表
         let table = self.get_or_create_table().await?;
 
-        // TODO: Implement actual vector search using LanceDB
-        // For now, return empty results
-        warn!("LanceDB search_vectors is not fully implemented yet");
+        // 2. 执行向量搜索
+        // LanceDB 0.22.2 API: table.query().nearest_to(&query_vector)?.limit(limit).execute().await?
+        let batches = table
+            .query()
+            .nearest_to(query_vector.as_slice())
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create nearest_to query: {}", e)))?
+            .limit(limit)
+            .execute()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {}", e)))?;
 
-        Ok(Vec::new())
+        // 3. 解析结果并转换为 VectorSearchResult
+        let mut results = Vec::new();
+
+        for batch in batches {
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // 获取列数据
+            let id_array = batch
+                .column_by_name("id")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'id' column".to_string()))?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'id' column type".to_string()))?;
+
+            let vector_array = batch
+                .column_by_name("vector")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'vector' column".to_string()))?
+                .as_any()
+                .downcast_ref::<FixedSizeListArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'vector' column type".to_string()))?;
+
+            let metadata_array = batch
+                .column_by_name("metadata")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'metadata' column".to_string()))?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'metadata' column type".to_string()))?;
+
+            // 检查是否有距离列（LanceDB 搜索结果可能包含 _distance 列）
+            let distance_array = batch.column_by_name("_distance")
+                .and_then(|col| col.as_any().downcast_ref::<Float32Array>());
+
+            // 处理每一行
+            for i in 0..num_rows {
+                let id = id_array.value(i).to_string();
+
+                // 提取向量
+                let vector_list = vector_array.value(i);
+                let vector_data = vector_list
+                    .as_any()
+                    .downcast_ref::<Float32Array>()
+                    .ok_or_else(|| AgentMemError::StorageError("Invalid vector data type".to_string()))?;
+                let vector: Vec<f32> = vector_data.values().to_vec();
+
+                // 提取 metadata
+                let metadata_str = if metadata_array.is_null(i) {
+                    String::new()
+                } else {
+                    metadata_array.value(i).to_string()
+                };
+                let metadata: HashMap<String, String> = if metadata_str.is_empty() {
+                    HashMap::new()
+                } else {
+                    serde_json::from_str(&metadata_str).unwrap_or_default()
+                };
+
+                // 计算距离和相似度
+                let distance = if let Some(dist_arr) = distance_array {
+                    dist_arr.value(i)
+                } else {
+                    // 如果没有距离列，手动计算欧氏距离
+                    let sum: f32 = query_vector.iter()
+                        .zip(vector.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum();
+                    sum.sqrt()
+                };
+
+                // 将距离转换为相似度（假设使用 L2 距离）
+                // 相似度 = 1 / (1 + distance)
+                let similarity = 1.0 / (1.0 + distance);
+
+                // 应用阈值过滤
+                if let Some(threshold) = threshold {
+                    if similarity < threshold {
+                        continue;
+                    }
+                }
+
+                results.push(VectorSearchResult {
+                    id,
+                    vector,
+                    metadata,
+                    similarity,
+                    distance,
+                });
+            }
+        }
+
+        info!("Found {} similar vectors", results.len());
+        Ok(results)
     }
 
     async fn search_with_filters(
@@ -502,6 +609,96 @@ mod tests {
         // Verify total count
         let stats = store.get_stats().await.unwrap();
         assert_eq!(stats.total_vectors, 3);
+    }
+
+    #[tokio::test]
+    async fn test_search_vectors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add test vectors
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0, 0.0],
+                metadata: {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("label".to_string(), "first".to_string());
+                    map
+                },
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0, 0.0],
+                metadata: {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("label".to_string(), "second".to_string());
+                    map
+                },
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Search for similar vectors
+        // Query vector is close to vec1 [1.0, 0.0, 0.0, 0.0]
+        let query = vec![0.9, 0.1, 0.0, 0.0];
+        let results = store.search_vectors(query, 2, None).await.unwrap();
+
+        // Should return 2 results (vec1 and vec2)
+        assert_eq!(results.len(), 2);
+
+        // First result should be vec1 (closest to query)
+        assert_eq!(results[0].id, "vec1");
+        assert!(results[0].similarity > results[1].similarity);
+
+        // Verify metadata
+        assert_eq!(results[0].metadata.get("label").unwrap(), "first");
+        assert_eq!(results[1].metadata.get("label").unwrap(), "second");
+    }
+
+    #[tokio::test]
+    async fn test_search_with_threshold() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add test vectors
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec3".to_string(),
+                vector: vec![0.0, 0.0, 1.0],
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Search with high threshold - should filter out distant vectors
+        let query = vec![1.0, 0.0, 0.0];
+        let results = store.search_vectors(query.clone(), 10, Some(0.8)).await.unwrap();
+
+        // Only vec1 should pass the threshold (exact match, similarity = 1.0)
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "vec1");
+        assert!(results[0].similarity >= 0.8);
     }
 }
 
