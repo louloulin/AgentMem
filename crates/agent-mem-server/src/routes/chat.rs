@@ -33,7 +33,7 @@ use serde_json::{json, Value as JsonValue};
 use std::sync::Arc;
 use std::convert::Infallible;
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use utoipa::ToSchema;
 
 /// Request to send a chat message
@@ -252,8 +252,10 @@ pub async fn send_chat_message_stream(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    use agent_mem_llm::LLMClient;
-    use agent_mem_traits::{Message, MessageRole};
+    use futures::stream::{self, StreamExt};
+    use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
+
+    let start_time = Instant::now();
 
     // Validate agent exists and belongs to user's organization
     let agent_repo = repositories.agents.clone();
@@ -273,30 +275,44 @@ pub async fn send_chat_message_stream(
         return Err(ServerError::bad_request("Message cannot be empty"));
     }
 
-    // Create LLM client
-    let llm_config = agent_mem_traits::LLMConfig {
-        provider: "openai".to_string(),
-        model: "gpt-4".to_string(), // TODO: Get from agent config
-        api_key: std::env::var("OPENAI_API_KEY").ok(),
-        ..Default::default()
+    // Determine user_id
+    let user_id = req.user_id.clone().unwrap_or_else(|| auth_user.user_id.clone());
+
+    info!(
+        "Starting streaming chat for agent_id={}, user_id={}, message_len={}",
+        agent_id,
+        user_id,
+        req.message.len()
+    );
+
+    // Create AgentOrchestrator
+    let orchestrator = create_orchestrator(&agent, &repositories)
+        .await
+        .map_err(|e| {
+            error!("Failed to create orchestrator: {}", e);
+            ServerError::internal_error(format!("Failed to create orchestrator: {}", e))
+        })?;
+
+    // Create orchestrator request
+    let orchestrator_request = OrchestratorChatRequest {
+        message: req.message.clone(),
+        agent_id: agent_id.clone(),
+        user_id: user_id.clone(),
+        organization_id: auth_user.org_id.clone(),
+        stream: true,
+        max_memories: 10,
     };
 
-    let llm_client = LLMClient::new(&llm_config)
-        .map_err(|e| ServerError::internal_error(format!("Failed to create LLM client: {e}")))?;
+    // Clone for the stream
+    let orchestrator = Arc::new(orchestrator);
+    let orchestrator_clone = orchestrator.clone();
 
-    // Create message
-    let messages = vec![Message {
-        role: MessageRole::User,
-        content: req.message.clone(),
-        timestamp: Some(chrono::Utc::now()),
-    }];
-
-    // Create streaming response using futures::stream
-    use futures::stream;
-
-    let stream = stream::unfold(
-        (llm_client, messages, 0),
-        |(client, msgs, state)| async move {
+    // Create streaming response
+    // Note: 由于 AgentOrchestrator 目前不支持真正的流式响应，
+    // 我们先实现一个简化版本，将完整响应分块发送
+    let response_stream = stream::unfold(
+        (orchestrator_clone, orchestrator_request, 0),
+        |(orch, req, state)| async move {
             match state {
                 0 => {
                     // Send start chunk
@@ -308,29 +324,31 @@ pub async fn send_chat_message_stream(
                     };
 
                     if let Ok(json) = serde_json::to_string(&chunk) {
-                        Some((Ok(Event::default().data(json)), (client, msgs, 1)))
+                        Some((Ok(Event::default().data(json)), (orch, req, 1)))
                     } else {
                         None
                     }
                 }
                 1 => {
-                    // Get streaming response from LLM
-                    match client.generate(&msgs).await {
-                        Ok(content) => {
+                    // Execute orchestrator and get response
+                    match orch.step(req.clone()).await {
+                        Ok(response) => {
+                            // Send content chunk
                             let chunk = StreamChunk {
                                 chunk_type: "content".to_string(),
-                                content: Some(content),
+                                content: Some(response.content.clone()),
                                 tool_call: None,
-                                memories_count: None,
+                                memories_count: Some(response.memories_count),
                             };
 
                             if let Ok(json) = serde_json::to_string(&chunk) {
-                                Some((Ok(Event::default().data(json)), (client, msgs, 2)))
+                                Some((Ok(Event::default().data(json)), (orch, req, 2)))
                             } else {
                                 None
                             }
                         }
                         Err(e) => {
+                            // Send error chunk
                             let error_chunk = StreamChunk {
                                 chunk_type: "error".to_string(),
                                 content: Some(format!("Error: {}", e)),
@@ -339,7 +357,7 @@ pub async fn send_chat_message_stream(
                             };
 
                             if let Ok(json) = serde_json::to_string(&error_chunk) {
-                                Some((Ok(Event::default().data(json)), (client, msgs, 2)))
+                                Some((Ok(Event::default().data(json)), (orch, req, 3)))
                             } else {
                                 None
                             }
@@ -356,7 +374,7 @@ pub async fn send_chat_message_stream(
                     };
 
                     if let Ok(json) = serde_json::to_string(&done_chunk) {
-                        Some((Ok(Event::default().data(json)), (client, msgs, 3)))
+                        Some((Ok(Event::default().data(json)), (orch, req, 3)))
                     } else {
                         None
                     }
@@ -366,7 +384,11 @@ pub async fn send_chat_message_stream(
         },
     );
 
-    Ok(Sse::new(stream))
+    Ok(Sse::new(response_stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("keep-alive"),
+    ))
 }
 
 /// Get chat history for an agent

@@ -95,6 +95,14 @@ impl LLMClient {
         self.provider.generate_with_functions(messages, functions).await
     }
 
+    /// 生成流式响应
+    pub async fn generate_stream(
+        &self,
+        messages: &[Message],
+    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+        self.provider.generate_stream(messages).await
+    }
+
     /// 带重试的生成文本响应
     fn generate_with_retry<'a>(
         &'a self,
