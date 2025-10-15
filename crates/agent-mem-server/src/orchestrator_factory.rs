@@ -14,7 +14,7 @@ use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 /// 从 Agent 配置中解析 LLM 配置
 pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
@@ -86,17 +86,27 @@ pub async fn create_orchestrator(
     let message_repo = repositories.messages.clone();
     debug!("Got MessageRepository");
     
-    // 5. 创建 ToolExecutor
+    // 5. 创建 ToolExecutor 并注册内置工具
     let tool_executor = Arc::new(ToolExecutor::new());
     debug!("Created ToolExecutor");
-    
+
+    // 注册所有内置工具
+    use agent_mem_tools::builtin::register_all_builtin_tools;
+    register_all_builtin_tools(&tool_executor)
+        .await
+        .map_err(|e| {
+            error!("Failed to register builtin tools: {}", e);
+            ServerError::internal_error(format!("Failed to register builtin tools: {}", e))
+        })?;
+    info!("Registered all builtin tools");
+
     // 6. 创建 OrchestratorConfig
     let orchestrator_config = OrchestratorConfig {
         max_tool_rounds: 5,
         max_memories: 10,
         auto_extract_memories: true,
         memory_extraction_threshold: 0.5,
-        enable_tool_calling: false, // 暂时禁用工具调用
+        enable_tool_calling: true, // ✅ 启用工具调用
     };
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
     
