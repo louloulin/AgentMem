@@ -386,11 +386,29 @@ impl VectorStore for LanceDBStore {
     }
 
     async fn delete_vectors(&self, ids: Vec<String>) -> Result<()> {
-        debug!("Deleting {} vectors", ids.len());
+        if ids.is_empty() {
+            return Ok(());
+        }
 
-        // TODO: Implement vector deletion
-        warn!("LanceDB delete_vectors is not fully implemented yet");
+        info!("Deleting {} vectors", ids.len());
 
+        // 1. 获取表
+        let table = self.get_or_create_table().await?;
+
+        // 2. 构建删除条件
+        // LanceDB delete API 使用 SQL-like 条件: "id = 'vec1' OR id = 'vec2'"
+        let condition = ids.iter()
+            .map(|id| format!("id = '{}'", id.replace("'", "''"))) // 转义单引号
+            .collect::<Vec<_>>()
+            .join(" OR ");
+
+        // 3. 执行删除
+        table
+            .delete(&condition)
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Delete failed: {}", e)))?;
+
+        info!("Successfully deleted {} vectors", ids.len());
         Ok(())
     }
 
@@ -699,6 +717,108 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "vec1");
         assert!(results[0].similarity >= 0.8);
+    }
+
+    #[tokio::test]
+    async fn test_delete_vectors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add test vectors
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec3".to_string(),
+                vector: vec![0.0, 0.0, 1.0],
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Verify all vectors are added
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 3);
+
+        // Delete vec2
+        store.delete_vectors(vec!["vec2".to_string()]).await.unwrap();
+
+        // Verify vec2 is deleted
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 2);
+
+        // Search should not return vec2
+        let results = store.search_vectors(vec![0.0, 1.0, 0.0], 10, None).await.unwrap();
+        assert!(!results.iter().any(|r| r.id == "vec2"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_multiple_vectors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add test vectors
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0],
+                metadata: std::collections::HashMap::new(),
+            },
+            VectorData {
+                id: "vec3".to_string(),
+                vector: vec![0.0, 0.0, 1.0],
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Delete vec1 and vec3
+        store.delete_vectors(vec!["vec1".to_string(), "vec3".to_string()]).await.unwrap();
+
+        // Verify only vec2 remains
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 1);
+
+        // Search should only return vec2
+        let results = store.search_vectors(vec![0.0, 1.0, 0.0], 10, None).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "vec2");
+    }
+
+    #[tokio::test]
+    async fn test_delete_empty_list() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Delete empty list should not error
+        store.delete_vectors(vec![]).await.unwrap();
     }
 }
 
