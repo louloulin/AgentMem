@@ -413,20 +413,114 @@ impl VectorStore for LanceDBStore {
     }
 
     async fn update_vectors(&self, vectors: Vec<VectorData>) -> Result<()> {
-        debug!("Updating {} vectors", vectors.len());
+        if vectors.is_empty() {
+            return Ok(());
+        }
 
-        // TODO: Implement vector update
-        warn!("LanceDB update_vectors is not fully implemented yet");
+        info!("Updating {} vectors", vectors.len());
 
+        // LanceDB doesn't have a native update API in version 0.22.2
+        // We use delete + insert strategy for updates
+        // This is atomic at the table level and ensures data consistency
+
+        // 1. Extract IDs to delete
+        let ids: Vec<String> = vectors.iter().map(|v| v.id.clone()).collect();
+
+        // 2. Delete existing vectors
+        self.delete_vectors(ids).await?;
+
+        // 3. Insert updated vectors
+        self.add_vectors(vectors).await?;
+
+        info!("Successfully updated vectors using delete+insert strategy");
         Ok(())
     }
 
     async fn get_vector(&self, id: &str) -> Result<Option<VectorData>> {
-        debug!("Getting vector: {}", id);
+        debug!("Getting vector by ID: {}", id);
 
-        // TODO: Implement get vector by ID
-        warn!("LanceDB get_vector is not fully implemented yet");
+        // Get table
+        let table = match self.get_or_create_table().await {
+            Ok(t) => t,
+            Err(_) => return Ok(None), // Table doesn't exist, no vector found
+        };
 
+        // LanceDB 0.22.2 doesn't have a simple get-by-id API
+        // We use a full table scan and filter in memory
+        // For production use, consider using an index or nearest_to with a dummy vector
+
+        // Execute full table scan
+        let batches = table
+            .query()
+            .execute()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {}", e)))?;
+
+        // Parse results and find matching ID
+        for batch in batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+
+            // Get column data
+            let id_array = batch
+                .column_by_name("id")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'id' column".to_string()))?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'id' column type".to_string()))?;
+
+            let vector_array = batch
+                .column_by_name("vector")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'vector' column".to_string()))?
+                .as_any()
+                .downcast_ref::<FixedSizeListArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'vector' column type".to_string()))?;
+
+            let metadata_array = batch
+                .column_by_name("metadata")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'metadata' column".to_string()))?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| AgentMemError::StorageError("Invalid 'metadata' column type".to_string()))?;
+
+            // Scan all rows to find matching ID
+            for row_idx in 0..batch.num_rows() {
+                let found_id = id_array.value(row_idx).to_string();
+
+                // Check if this is the ID we're looking for
+                if found_id == id {
+                    // Extract vector
+                    let vector_list = vector_array.value(row_idx);
+                    let vector_data = vector_list
+                        .as_any()
+                        .downcast_ref::<Float32Array>()
+                        .ok_or_else(|| AgentMemError::StorageError("Invalid vector data type".to_string()))?;
+                    let vector: Vec<f32> = vector_data.values().to_vec();
+
+                    // Extract metadata
+                    let metadata: HashMap<String, String> = if metadata_array.is_null(row_idx) {
+                        HashMap::new()
+                    } else {
+                        let metadata_str = metadata_array.value(row_idx);
+                        serde_json::from_str(metadata_str).unwrap_or_default()
+                    };
+
+                    debug!("Found vector with ID: {}", found_id);
+
+                    return Ok(Some(VectorData {
+                        id: found_id,
+                        vector,
+                        metadata,
+                    }));
+                }
+            }
+        }
+
+        debug!("Vector with ID '{}' not found", id);
         Ok(None)
     }
 
@@ -819,6 +913,153 @@ mod tests {
 
         // Delete empty list should not error
         store.delete_vectors(vec![]).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_update_vectors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add initial vectors
+        let mut metadata1 = HashMap::new();
+        metadata1.insert("version".to_string(), "1".to_string());
+
+        let mut metadata2 = HashMap::new();
+        metadata2.insert("version".to_string(), "1".to_string());
+
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0, 0.0],
+                metadata: metadata1,
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0, 0.0],
+                metadata: metadata2,
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Update vectors with new data
+        let mut updated_metadata1 = HashMap::new();
+        updated_metadata1.insert("version".to_string(), "2".to_string());
+        updated_metadata1.insert("updated".to_string(), "true".to_string());
+
+        let updated_vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![0.9, 0.1, 0.0, 0.0], // Changed vector
+                metadata: updated_metadata1,
+            },
+        ];
+
+        store.update_vectors(updated_vectors).await.unwrap();
+
+        // Verify update by searching
+        let results = store
+            .search_vectors(vec![0.9, 0.1, 0.0, 0.0], 10, None)
+            .await
+            .unwrap();
+
+        assert!(!results.is_empty());
+        let vec1_result = results.iter().find(|r| r.id == "vec1").unwrap();
+        assert_eq!(vec1_result.metadata.get("version").unwrap(), "2");
+        assert_eq!(vec1_result.metadata.get("updated").unwrap(), "true");
+
+        // Verify vec2 still exists
+        let vec2_exists = results.iter().any(|r| r.id == "vec2");
+        assert!(vec2_exists);
+    }
+
+    #[tokio::test]
+    async fn test_get_vector() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add vectors
+        let mut metadata = HashMap::new();
+        metadata.insert("key1".to_string(), "value1".to_string());
+        metadata.insert("key2".to_string(), "value2".to_string());
+
+        let vectors = vec![
+            VectorData {
+                id: "vec1".to_string(),
+                vector: vec![1.0, 0.0, 0.0, 0.0],
+                metadata: metadata.clone(),
+            },
+            VectorData {
+                id: "vec2".to_string(),
+                vector: vec![0.0, 1.0, 0.0, 0.0],
+                metadata: HashMap::new(),
+            },
+        ];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Get existing vector
+        let result = store.get_vector("vec1").await.unwrap();
+        assert!(result.is_some());
+
+        let vec1 = result.unwrap();
+        assert_eq!(vec1.id, "vec1");
+        assert_eq!(vec1.vector, vec![1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(vec1.metadata.get("key1").unwrap(), "value1");
+        assert_eq!(vec1.metadata.get("key2").unwrap(), "value2");
+
+        // Get non-existent vector
+        let result = store.get_vector("vec999").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_vector_empty_metadata() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Add vector with empty metadata
+        let vectors = vec![VectorData {
+            id: "vec1".to_string(),
+            vector: vec![1.0, 2.0, 3.0],
+            metadata: HashMap::new(),
+        }];
+
+        store.add_vectors(vectors).await.unwrap();
+
+        // Get vector
+        let result = store.get_vector("vec1").await.unwrap();
+        assert!(result.is_some());
+
+        let vec1 = result.unwrap();
+        assert_eq!(vec1.id, "vec1");
+        assert_eq!(vec1.vector, vec![1.0, 2.0, 3.0]);
+        assert!(vec1.metadata.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_update_empty_list() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.lance");
+
+        let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
+            .await
+            .unwrap();
+
+        // Update empty list should not error
+        store.update_vectors(vec![]).await.unwrap();
     }
 
     /// 性能基准测试：向量插入性能

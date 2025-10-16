@@ -98,6 +98,7 @@ members = [
     "examples/vector-store-demo",
     "examples/multimodal-real-demo",
     "examples/storage-migration-demo",
+    "examples/embedded-mode-demo",
     "examples/advanced-search-demo",
     "examples/context-aware-demo",
     "examples/personalization-demo",
