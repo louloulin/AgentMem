@@ -99,6 +99,7 @@ members = [
     "examples/multimodal-real-demo",
     "examples/storage-migration-demo",
     "examples/embedded-mode-demo",
+    "examples/embedded-persistent-demo",
     "examples/advanced-search-demo",
     "examples/context-aware-demo",
     "examples/personalization-demo",
