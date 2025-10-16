@@ -17,6 +17,7 @@ agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-tools = { path = "../agent-mem-tools" }
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-observability = { path = "../agent-mem-observability" }
+agent-mem-storage = { path = "../agent-mem-storage", optional = true }
 
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
@@ -81,11 +82,14 @@ sha2.workspace = true
 default = ["libsql"]
 postgres = ["agent-mem-core/postgres"]
 libsql = ["agent-mem-core/libsql"]
+lancedb = ["agent-mem-storage/lancedb"]
 
 [dev-dependencies]
 tokio-test = "0.4"
 tower-test = "0.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
+rand = "0.8"
+tempfile = "3.8"
 
 [[bench]]
 name = "database_performance"
@@ -93,4 +97,8 @@ harness = false
 
 [[bench]]
 name = "performance_benchmark"
+harness = false
+
+[[bench]]
+name = "vector_performance"
 harness = false
