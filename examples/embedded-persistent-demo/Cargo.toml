@@ -7,11 +7,13 @@ edition = "2021"
 agent-mem-core = { path = "../../crates/agent-mem-core", features = ["libsql"] }
 agent-mem-traits = { path = "../../crates/agent-mem-traits" }
 agent-mem-storage = { path = "../../crates/agent-mem-storage", features = ["libsql", "lancedb"] }
+agent-mem-config = { path = "../../crates/agent-mem-config" }
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
 serde_json = "1.0"
+regex = "1.10"
 
 [[example]]
 name = "verify_persistence"
@@ -20,4 +22,24 @@ path = "examples/verify_persistence.rs"
 [[example]]
 name = "full_feature_test"
 path = "examples/full_feature_test.rs"
+
+[[example]]
+name = "code_aware_batch_demo"
+path = "examples/code_aware_batch_demo.rs"
+
+[[example]]
+name = "code_search_demo"
+path = "examples/code_search_demo.rs"
+
+[[example]]
+name = "real_code_indexer"
+path = "examples/real_code_indexer.rs"
+
+[[example]]
+name = "persistent_code_indexer"
+path = "examples/persistent_code_indexer.rs"
+
+[[example]]
+name = "search_analysis_demo"
+path = "examples/search_analysis_demo.rs"
 
