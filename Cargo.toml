@@ -16,6 +16,7 @@ members = [
     "crates/agent-mem-utils",
     "crates/agent-mem-config",
     "crates/agent-mem-core",
+    "crates/agent-mem",  # 新增：统一 API
     "crates/agent-mem-llm",
     "crates/agent-mem-storage",
     "crates/agent-mem-embeddings",
