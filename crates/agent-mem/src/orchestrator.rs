@@ -466,9 +466,9 @@ impl MemoryOrchestrator {
         Ok(results)
     }
 
-    /// 搜索记忆 (混合搜索)
+    /// 搜索记忆 (简单模式 - 向后兼容)
     ///
-    /// TODO: Phase 1 Step 1.3 - 实现混合搜索方法
+    /// 这是简化版本，直接调用 search_memories_hybrid()
     pub async fn search_memories(
         &self,
         query: String,
@@ -477,9 +477,110 @@ impl MemoryOrchestrator {
         limit: usize,
         memory_type: Option<MemoryType>,
     ) -> Result<Vec<MemoryItem>> {
-        warn!("search_memories() 方法待重构实现 (Phase 1 Step 1.3)");
+        debug!(
+            "搜索记忆 (简单模式): query={}, agent_id={}, user_id={:?}, limit={}, memory_type={:?}",
+            query, agent_id, user_id, limit, memory_type
+        );
 
-        // 临时实现：返回空结果
+        // 调用混合搜索方法
+        self.search_memories_hybrid(
+            query,
+            user_id.unwrap_or_else(|| "default".to_string()),
+            limit,
+            Some(0.7), // 默认阈值
+            None,      // 无额外过滤
+        )
+        .await
+    }
+
+    /// 混合搜索记忆 (智能模式 - Phase 1 Step 1.3)
+    ///
+    /// 使用 HybridSearchEngine 实现高性能混合搜索
+    ///
+    /// # 流水线步骤
+    ///
+    /// 1. 查询预处理
+    /// 2. 并行多路搜索 (Vector + FullText)
+    /// 3. RRF 融合
+    /// 4. 相似度阈值过滤
+    /// 5. 结果转换
+    ///
+    /// # 参数
+    ///
+    /// * `query` - 搜索查询文本
+    /// * `user_id` - 用户 ID
+    /// * `limit` - 最大结果数
+    /// * `threshold` - 相似度阈值 (0.0 - 1.0)
+    /// * `filters` - 额外过滤条件
+    ///
+    /// # 返回
+    ///
+    /// 返回搜索到的记忆列表
+    #[cfg(feature = "postgres")]
+    pub async fn search_memories_hybrid(
+        &self,
+        query: String,
+        user_id: String,
+        limit: usize,
+        threshold: Option<f32>,
+        filters: Option<HashMap<String, String>>,
+    ) -> Result<Vec<MemoryItem>> {
+        info!(
+            "混合搜索记忆: query={}, user_id={}, limit={}, threshold={:?}",
+            query, user_id, limit, threshold
+        );
+
+        // ========== Step 1: 查询预处理 ==========
+        let processed_query = self.preprocess_query(&query).await?;
+        debug!("查询预处理完成: {}", processed_query);
+
+        // ========== Step 2-4: 使用 HybridSearchEngine 执行搜索 ==========
+        if let Some(hybrid_engine) = &self.hybrid_search_engine {
+            // 生成查询向量
+            let query_vector = self.generate_query_embedding(&processed_query).await?;
+
+            // 构建搜索查询
+            let search_query = SearchQuery {
+                query: processed_query.clone(),
+                limit,
+                threshold,
+                vector_weight: 0.7,
+                fulltext_weight: 0.3,
+                filters: None, // TODO: 转换 filters
+            };
+
+            // 执行混合搜索
+            let hybrid_result = hybrid_engine.search(query_vector, &search_query).await?;
+
+            debug!(
+                "混合搜索完成: {} 个结果, 耗时 {} ms",
+                hybrid_result.results.len(),
+                hybrid_result.stats.total_time_ms
+            );
+
+            // ========== Step 5: 转换为 MemoryItem ==========
+            let memory_items = self
+                .convert_search_results_to_memory_items(hybrid_result.results)
+                .await?;
+
+            Ok(memory_items)
+        } else {
+            warn!("HybridSearchEngine 未初始化，返回空结果");
+            Ok(Vec::new())
+        }
+    }
+
+    /// 混合搜索记忆 (非 postgres 特性时的降级实现)
+    #[cfg(not(feature = "postgres"))]
+    pub async fn search_memories_hybrid(
+        &self,
+        query: String,
+        user_id: String,
+        limit: usize,
+        threshold: Option<f32>,
+        filters: Option<HashMap<String, String>>,
+    ) -> Result<Vec<MemoryItem>> {
+        warn!("HybridSearchEngine 需要 postgres 特性，返回空结果");
         Ok(Vec::new())
     }
 
@@ -1029,5 +1130,75 @@ impl MemoryOrchestrator {
             results,
             relations: None,
         })
+    }
+
+    // ========== 搜索辅助方法 (Phase 1 Step 1.3) ==========
+
+    /// 查询预处理
+    ///
+    /// 清理和标准化查询文本
+    async fn preprocess_query(&self, query: &str) -> Result<String> {
+        // 简单的预处理：去除多余空格，转小写
+        let processed = query.trim().to_lowercase();
+        Ok(processed)
+    }
+
+    /// 生成查询嵌入向量
+    ///
+    /// 使用 LLM Provider 生成查询的向量表示
+    async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
+        if let Some(llm_provider) = &self.llm_provider {
+            // TODO: 调用 LLM Provider 生成嵌入
+            // 临时实现：返回零向量
+            warn!("generate_query_embedding() 待实现，返回零向量");
+            Ok(vec![0.0; 1536]) // OpenAI embedding 维度
+        } else {
+            warn!("LLM Provider 未配置，返回零向量");
+            Ok(vec![0.0; 1536])
+        }
+    }
+
+    /// 转换搜索结果为 MemoryItem
+    ///
+    /// 将 SearchResult 转换为 MemoryItem 格式
+    #[cfg(feature = "postgres")]
+    async fn convert_search_results_to_memory_items(
+        &self,
+        results: Vec<SearchResult>,
+    ) -> Result<Vec<MemoryItem>> {
+        let mut memory_items = Vec::new();
+
+        for result in results {
+            // 解析元数据
+            let metadata = if let Some(meta) = result.metadata {
+                if let Ok(map) = serde_json::from_value::<HashMap<String, String>>(meta) {
+                    map
+                } else {
+                    HashMap::new()
+                }
+            } else {
+                HashMap::new()
+            };
+
+            // 创建 MemoryItem
+            let memory_item = MemoryItem {
+                id: result.id,
+                memory: result.content,
+                hash: String::new(), // TODO: 计算哈希
+                metadata,
+                categories: Vec::new(),
+                created_at: chrono::Utc::now().to_rfc3339(),
+                updated_at: chrono::Utc::now().to_rfc3339(),
+                user_id: None,
+                agent_id: None,
+                run_id: None,
+                memory_type: MemoryType::Semantic, // 默认类型
+                importance: result.score,
+            };
+
+            memory_items.push(memory_item);
+        }
+
+        Ok(memory_items)
     }
 }
