@@ -32,6 +32,8 @@ use agent_mem_intelligence::{
     ConflictDetection,
     // 冲突解决
     ConflictResolver,
+    // 决策上下文
+    DecisionContext,
     EnhancedDecisionEngine,
     // 重要性评估
     EnhancedImportanceEvaluator,
@@ -581,7 +583,9 @@ impl MemoryOrchestrator {
 
         // ========== Step 4: 重要性评估 ==========
         info!("Step 4: 重要性评估");
-        let importance_evaluations = self.evaluate_importance(&structured_facts).await?;
+        let importance_evaluations = self
+            .evaluate_importance(&structured_facts, &agent_id, user_id.clone())
+            .await?;
         info!("完成 {} 个事实的重要性评估", importance_evaluations.len());
 
         // ========== Step 5: 搜索相似记忆 ==========
@@ -594,7 +598,12 @@ impl MemoryOrchestrator {
         // ========== Step 6: 冲突检测 ==========
         info!("Step 6: 冲突检测");
         let conflicts = self
-            .detect_conflicts(&structured_facts, &existing_memories)
+            .detect_conflicts(
+                &structured_facts,
+                &existing_memories,
+                &agent_id,
+                user_id.clone(),
+            )
             .await?;
         info!("检测到 {} 个冲突", conflicts.len());
 
@@ -606,6 +615,8 @@ impl MemoryOrchestrator {
                 &existing_memories,
                 &importance_evaluations,
                 &conflicts,
+                &agent_id,
+                user_id.clone(),
             )
             .await?;
         info!("生成 {} 个决策", decisions.len());
@@ -1074,34 +1085,61 @@ impl MemoryOrchestrator {
     async fn evaluate_importance(
         &self,
         structured_facts: &[StructuredFact],
+        agent_id: &str,
+        user_id: Option<String>,
     ) -> Result<Vec<ImportanceEvaluation>> {
-        // TODO: 使用 EnhancedImportanceEvaluator.evaluate_importance() 需要 Memory 类型
-        // 暂时使用简化的重要性评估逻辑
+        if let Some(evaluator) = &self.importance_evaluator {
+            info!(
+                "使用 EnhancedImportanceEvaluator 评估 {} 个事实的重要性",
+                structured_facts.len()
+            );
 
-        warn!("重要性评估暂时使用简化逻辑（完整实现需要 Memory 类型）");
+            let mut evaluations = Vec::new();
 
-        // 简化评估：基于事实的置信度和重要性字段
-        let evaluations = structured_facts
-            .iter()
-            .map(|fact| ImportanceEvaluation {
-                memory_id: fact.id.clone(),
-                importance_score: fact.importance,
-                confidence: fact.confidence,
-                factors: ImportanceFactors {
-                    content_complexity: fact.importance,
-                    entity_importance: 0.5,
-                    relation_importance: 0.5,
-                    temporal_relevance: 0.5,
-                    user_interaction: 0.5,
-                    contextual_relevance: 0.5,
-                    emotional_intensity: 0.5,
-                },
-                evaluated_at: chrono::Utc::now(),
-                reasoning: format!("基于事实重要性: {:.2}", fact.importance),
-            })
-            .collect();
+            for fact in structured_facts {
+                // 将 StructuredFact 转换为 MemoryItem
+                let memory = Self::structured_fact_to_memory_item(
+                    fact,
+                    agent_id.to_string(),
+                    user_id.clone(),
+                );
 
-        Ok(evaluations)
+                // 调用 EnhancedImportanceEvaluator
+                let evaluation = evaluator
+                    .evaluate_importance(&memory, &[fact.clone()], &[])
+                    .await?;
+
+                evaluations.push(evaluation);
+            }
+
+            info!("重要性评估完成，生成 {} 个评估结果", evaluations.len());
+            Ok(evaluations)
+        } else {
+            // 降级：使用简化的重要性评估逻辑
+            warn!("EnhancedImportanceEvaluator 未初始化，使用简化逻辑");
+
+            let evaluations = structured_facts
+                .iter()
+                .map(|fact| ImportanceEvaluation {
+                    memory_id: fact.id.clone(),
+                    importance_score: fact.importance,
+                    confidence: fact.confidence,
+                    factors: ImportanceFactors {
+                        content_complexity: fact.importance,
+                        entity_importance: 0.5,
+                        relation_importance: 0.5,
+                        temporal_relevance: 0.5,
+                        user_interaction: 0.5,
+                        contextual_relevance: 0.5,
+                        emotional_intensity: 0.5,
+                    },
+                    evaluated_at: chrono::Utc::now(),
+                    reasoning: format!("简化评估: {:.2}", fact.importance),
+                })
+                .collect();
+
+            Ok(evaluations)
+        }
     }
 
     /// Step 5: 搜索相似记忆
@@ -1120,63 +1158,144 @@ impl MemoryOrchestrator {
     /// Step 6: 冲突检测
     async fn detect_conflicts(
         &self,
-        _structured_facts: &[StructuredFact],
-        _existing_memories: &[ExistingMemory],
+        structured_facts: &[StructuredFact],
+        existing_memories: &[ExistingMemory],
+        agent_id: &str,
+        user_id: Option<String>,
     ) -> Result<Vec<ConflictDetection>> {
-        // TODO: 使用 ConflictResolver.detect_conflicts() 需要 Memory 类型
-        // 暂时跳过冲突检测
+        if let Some(resolver) = &self.conflict_resolver {
+            info!(
+                "使用 ConflictResolver 检测冲突，新事实: {}, 现有记忆: {}",
+                structured_facts.len(),
+                existing_memories.len()
+            );
 
-        warn!("冲突检测暂时跳过（完整实现需要 Memory 类型）");
-        Ok(Vec::new())
+            // 将 StructuredFact 转换为 MemoryItem
+            let new_memory_items: Vec<MemoryItem> = structured_facts
+                .iter()
+                .map(|fact| {
+                    Self::structured_fact_to_memory_item(
+                        fact,
+                        agent_id.to_string(),
+                        user_id.clone(),
+                    )
+                })
+                .collect();
+
+            // 将 ExistingMemory 转换为 MemoryItem
+            let existing_memory_items: Vec<MemoryItem> = existing_memories
+                .iter()
+                .map(Self::existing_memory_to_memory_item)
+                .collect();
+
+            // 调用 ConflictResolver
+            let conflicts = resolver
+                .detect_conflicts(&new_memory_items, &existing_memory_items)
+                .await?;
+
+            info!("冲突检测完成，检测到 {} 个冲突", conflicts.len());
+            Ok(conflicts)
+        } else {
+            // 降级：跳过冲突检测
+            warn!("ConflictResolver 未初始化，跳过冲突检测");
+            Ok(Vec::new())
+        }
     }
 
     /// Step 7: 智能决策
     async fn make_intelligent_decisions(
         &self,
         structured_facts: &[StructuredFact],
-        _existing_memories: &[ExistingMemory],
+        existing_memories: &[ExistingMemory],
         importance_evaluations: &[ImportanceEvaluation],
-        _conflicts: &[ConflictDetection],
+        conflicts: &[ConflictDetection],
+        agent_id: &str,
+        user_id: Option<String>,
     ) -> Result<Vec<MemoryDecision>> {
-        // TODO: 使用 EnhancedDecisionEngine.make_decisions() 需要构造完整的 DecisionContext
-        // 暂时使用简化的决策逻辑
+        if let Some(engine) = &self.enhanced_decision_engine {
+            info!(
+                "使用 EnhancedDecisionEngine 制定智能决策，事实: {}, 记忆: {}",
+                structured_facts.len(),
+                existing_memories.len()
+            );
 
-        warn!("智能决策暂时使用简化逻辑（完整实现需要 DecisionContext）");
+            // 将 ExistingMemory 转换为 MemoryItem
+            // 注意：DecisionContext.existing_memories 的类型是 Vec<agent_mem_core::Memory>
+            // 而 agent_mem_core::Memory 实际上是 agent_mem_traits::MemoryItem 的别名
+            let existing_memory_items: Vec<MemoryItem> = existing_memories
+                .iter()
+                .map(Self::existing_memory_to_memory_item)
+                .collect();
 
-        // 简化决策：根据重要性决定是否添加
-        let mut decisions = Vec::new();
+            // 构建 DecisionContext
+            let context = DecisionContext {
+                new_facts: structured_facts.to_vec(),
+                existing_memories: existing_memory_items,
+                importance_evaluations: importance_evaluations.to_vec(),
+                conflict_detections: conflicts.to_vec(),
+                user_preferences: HashMap::new(),
+            };
 
-        for (i, fact) in structured_facts.iter().enumerate() {
-            // 获取对应的重要性评估
-            let importance = importance_evaluations
-                .get(i)
-                .map(|e| e.importance_score)
-                .unwrap_or(0.5);
+            // 调用 EnhancedDecisionEngine
+            let decision_result = engine.make_decisions(&context).await?;
 
-            // 如果重要性太低，跳过
-            if importance < 0.3 {
-                info!(
-                    "事实重要性太低 ({})，跳过: {}",
-                    importance, fact.description
-                );
-                continue;
+            // 将 DecisionResult 转换为 Vec<MemoryDecision>
+            let decisions: Vec<MemoryDecision> = decision_result
+                .recommended_actions
+                .into_iter()
+                .map(|action| MemoryDecision {
+                    action,
+                    confidence: decision_result.confidence,
+                    reasoning: decision_result.reasoning.clone(),
+                    affected_memories: Vec::new(),
+                    estimated_impact: decision_result.expected_impact.performance_impact,
+                })
+                .collect();
+
+            info!(
+                "智能决策完成，生成 {} 个决策，置信度: {:.2}",
+                decisions.len(),
+                decision_result.confidence
+            );
+            Ok(decisions)
+        } else {
+            // 降级：使用简化的决策逻辑
+            warn!("EnhancedDecisionEngine 未初始化，使用简化逻辑");
+
+            let mut decisions = Vec::new();
+
+            for (i, fact) in structured_facts.iter().enumerate() {
+                // 获取对应的重要性评估
+                let importance = importance_evaluations
+                    .get(i)
+                    .map(|e| e.importance_score)
+                    .unwrap_or(0.5);
+
+                // 如果重要性太低，跳过
+                if importance < 0.3 {
+                    info!(
+                        "事实重要性太低 ({})，跳过: {}",
+                        importance, fact.description
+                    );
+                    continue;
+                }
+
+                // 创建 ADD 决策
+                decisions.push(MemoryDecision {
+                    action: MemoryAction::Add {
+                        content: fact.description.clone(),
+                        importance,
+                        metadata: fact.metadata.clone(),
+                    },
+                    confidence: importance,
+                    reasoning: format!("简化决策: {:.2}", importance),
+                    affected_memories: Vec::new(),
+                    estimated_impact: importance,
+                });
             }
 
-            // 创建 ADD 决策
-            decisions.push(MemoryDecision {
-                action: MemoryAction::Add {
-                    content: fact.description.clone(),
-                    importance,
-                    metadata: fact.metadata.clone(),
-                },
-                confidence: importance,
-                reasoning: format!("重要性评分: {:.2}", importance),
-                affected_memories: Vec::new(),
-                estimated_impact: importance,
-            });
+            Ok(decisions)
         }
-
-        Ok(decisions)
     }
 
     /// Step 8: 执行决策
@@ -1371,17 +1490,59 @@ impl MemoryOrchestrator {
         Ok(memory_items)
     }
 
-    // ========== 类型转换方法 (Phase 1 Step 1.5) ==========
+    // ========== 类型转换方法 (Phase 1 Step 1.5-1.6) ==========
+
+    /// 将 StructuredFact 转换为 MemoryItem
+    ///
+    /// 用于调用 Intelligence 组件（如 EnhancedImportanceEvaluator, ConflictResolver）
+    fn structured_fact_to_memory_item(
+        fact: &StructuredFact,
+        agent_id: String,
+        user_id: Option<String>,
+    ) -> MemoryItem {
+        use agent_mem_traits::Session;
+        use chrono::Utc;
+
+        let now = Utc::now();
+
+        // 将 StructuredFact 的 metadata 转换为 HashMap<String, serde_json::Value>
+        let metadata: HashMap<String, serde_json::Value> = fact
+            .metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect();
+
+        MemoryItem {
+            id: fact.id.clone(),
+            content: fact.description.clone(),
+            hash: None,
+            metadata,
+            score: Some(fact.confidence),
+            created_at: now,
+            updated_at: Some(now),
+            session: Session::new(),
+            memory_type: agent_mem_traits::MemoryType::Semantic,
+            entities: Vec::new(), // TODO: 转换 agent_mem_intelligence::Entity 到 agent_mem_traits::Entity
+            relations: Vec::new(), // TODO: 转换 agent_mem_intelligence::Relation 到 agent_mem_traits::Relation
+            agent_id,
+            user_id,
+            importance: fact.importance,
+            embedding: None,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            version: 1,
+        }
+    }
 
     /// 将 StructuredFact 转换为 CoreMemory
     ///
-    /// 用于调用 Intelligence 组件（如 EnhancedImportanceEvaluator）
+    /// 用于调用 Intelligence 组件（如 EnhancedDecisionEngine）
     fn structured_fact_to_core_memory(
         fact: &StructuredFact,
         agent_id: String,
         user_id: Option<String>,
     ) -> CoreMemory {
-        use agent_mem_traits::Vector;
         use chrono::Utc;
 
         let now = Utc::now().timestamp();
@@ -1410,9 +1571,60 @@ impl MemoryOrchestrator {
         }
     }
 
-    /// 将 ExistingMemory 转换为 CoreMemory
+    /// 将 ExistingMemory 转换为 MemoryItem
     ///
     /// 用于调用 Intelligence 组件（如 ConflictResolver）
+    fn existing_memory_to_memory_item(memory: &ExistingMemory) -> MemoryItem {
+        use agent_mem_traits::Session;
+        use chrono::Utc;
+
+        let now = Utc::now();
+
+        // 将 ExistingMemory 的 metadata 转换为 HashMap<String, serde_json::Value>
+        let metadata: HashMap<String, serde_json::Value> = memory
+            .metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect();
+
+        // 解析 created_at 字符串为 DateTime
+        let created_at = chrono::DateTime::parse_from_rfc3339(&memory.created_at)
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or(now);
+
+        // 解析 updated_at 字符串为 DateTime
+        let updated_at = memory
+            .updated_at
+            .as_ref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        MemoryItem {
+            id: memory.id.clone(),
+            content: memory.content.clone(),
+            hash: None,
+            metadata,
+            score: Some(memory.importance),
+            created_at,
+            updated_at,
+            session: Session::new(),
+            memory_type: agent_mem_traits::MemoryType::Semantic,
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id: "default_agent".to_string(), // ExistingMemory 没有 agent_id 字段
+            user_id: None,                         // ExistingMemory 没有 user_id 字段
+            importance: memory.importance,
+            embedding: None,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            version: 1,
+        }
+    }
+
+    /// 将 ExistingMemory 转换为 CoreMemory
+    ///
+    /// 用于调用 Intelligence 组件（如 EnhancedDecisionEngine）
     fn existing_memory_to_core_memory(memory: &ExistingMemory) -> CoreMemory {
         use chrono::Utc;
 
