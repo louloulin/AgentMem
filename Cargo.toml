@@ -71,6 +71,7 @@ members = [
     "examples/advanced-reasoning-demo",
     "examples/single-binary-demo",
     "examples/observability-demo",
+    "examples/fastembed-demo",
 
     # 示例
     "examples/demo",

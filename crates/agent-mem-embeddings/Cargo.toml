@@ -42,6 +42,9 @@ ndarray = { version = "0.15", optional = true }
 # HuggingFace Hub集成（可选）
 hf-hub = { version = "0.3", optional = true }
 
+# FastEmbed-rs 支持（推荐的本地嵌入方案）
+fastembed = { version = "5", optional = true }
+
 # 本地模型缓存和管理
 dirs = "5.0"
 sha2 = "0.10"
@@ -52,15 +55,16 @@ tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["openai"]
+default = ["openai", "fastembed"]
 
 # 嵌入提供商
 openai = []
 huggingface = ["dep:hf-hub"]
+fastembed = ["dep:fastembed"]  # FastEmbed-rs（推荐的本地嵌入方案）
 local = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
 onnx = ["dep:ort", "dep:ndarray", "dep:tokenizers"]
 anthropic = []
 cohere = []
 
 # 所有提供商
-all-providers = ["openai", "huggingface", "local", "onnx"]
+all-providers = ["openai", "huggingface", "fastembed", "local", "onnx"]

@@ -307,3 +307,4 @@ examples/data/
 # Profiling data
 *.prof
 *.trace
+.fastembed_cache/

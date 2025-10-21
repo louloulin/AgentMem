@@ -2,6 +2,8 @@
 
 use crate::config::EmbeddingConfig;
 use crate::providers::{LocalEmbedder, OpenAIEmbedder};
+#[cfg(feature = "fastembed")]
+use crate::providers::FastEmbedProvider;
 use agent_mem_traits::{AgentMemError, Embedder, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -9,6 +11,8 @@ use std::sync::Arc;
 /// 嵌入提供商枚举，包装不同的嵌入实现
 pub enum EmbedderEnum {
     OpenAI(OpenAIEmbedder),
+    #[cfg(feature = "fastembed")]
+    FastEmbed(FastEmbedProvider),
     #[cfg(feature = "huggingface")]
     HuggingFace(HuggingFaceEmbedder),
     #[cfg(feature = "local")]
@@ -22,6 +26,8 @@ impl Embedder for EmbedderEnum {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.embed(text).await,
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.embed(text).await,
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.embed(text).await,
             #[cfg(feature = "local")]
@@ -34,6 +40,8 @@ impl Embedder for EmbedderEnum {
     async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.embed_batch(texts).await,
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.embed_batch(texts).await,
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.embed_batch(texts).await,
             #[cfg(feature = "local")]
@@ -46,6 +54,8 @@ impl Embedder for EmbedderEnum {
     fn dimension(&self) -> usize {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.dimension(),
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.dimension(),
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.dimension(),
             #[cfg(feature = "local")]
@@ -58,6 +68,8 @@ impl Embedder for EmbedderEnum {
     fn provider_name(&self) -> &str {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.provider_name(),
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.provider_name(),
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.provider_name(),
             #[cfg(feature = "local")]
@@ -70,6 +82,8 @@ impl Embedder for EmbedderEnum {
     fn model_name(&self) -> &str {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.model_name(),
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.model_name(),
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.model_name(),
             #[cfg(feature = "local")]
@@ -80,6 +94,8 @@ impl Embedder for EmbedderEnum {
     async fn health_check(&self) -> Result<bool> {
         match self {
             EmbedderEnum::OpenAI(embedder) => embedder.health_check().await,
+            #[cfg(feature = "fastembed")]
+            EmbedderEnum::FastEmbed(embedder) => embedder.health_check().await,
             #[cfg(feature = "huggingface")]
             EmbedderEnum::HuggingFace(embedder) => embedder.health_check().await,
             #[cfg(feature = "local")]
@@ -105,6 +121,19 @@ impl EmbeddingFactory {
         config.validate()?;
 
         let embedder_enum = match config.provider.as_str() {
+            "fastembed" => {
+                #[cfg(feature = "fastembed")]
+                {
+                    let embedder = FastEmbedProvider::new(config.clone()).await?;
+                    EmbedderEnum::FastEmbed(embedder)
+                }
+                #[cfg(not(feature = "fastembed"))]
+                {
+                    return Err(AgentMemError::unsupported_provider(
+                        "FastEmbed feature not enabled",
+                    ));
+                }
+            }
             "openai" => {
                 let embedder = OpenAIEmbedder::new(config.clone()).await?;
                 EmbedderEnum::OpenAI(embedder)
@@ -163,6 +192,9 @@ impl EmbeddingFactory {
     pub fn supported_providers() -> Vec<&'static str> {
         let mut providers = Vec::new();
 
+        #[cfg(feature = "fastembed")]
+        providers.push("fastembed");
+
         providers.push("openai");
 
         #[cfg(feature = "huggingface")]
@@ -183,6 +215,62 @@ impl EmbeddingFactory {
     /// 检查提供商是否受支持
     pub fn is_provider_supported(provider: &str) -> bool {
         Self::supported_providers().contains(&provider)
+    }
+
+    /// 创建默认的嵌入器（使用 FastEmbed，零配置）
+    ///
+    /// 这是推荐的默认方案，提供：
+    /// - 完全本地运行，无需 API 密钥
+    /// - 高性能（延迟 < 10ms）
+    /// - 零成本
+    /// - 自动下载和缓存模型
+    /// - 支持多语言（中文、英文等）
+    #[cfg(feature = "fastembed")]
+    pub async fn create_default() -> Result<Arc<dyn Embedder + Send + Sync>> {
+        let config = EmbeddingConfig {
+            provider: "fastembed".to_string(),
+            model: "multilingual-e5-small".to_string(),  // 使用多语言模型，支持中文
+            dimension: 384,
+            batch_size: 256,
+            ..Default::default()
+        };
+        Self::create_embedder(&config).await
+    }
+
+    /// 创建 FastEmbed 嵌入器
+    ///
+    /// # 参数
+    /// - `model`: 模型名称，支持的模型包括：
+    ///   - "bge-small-en-v1.5" (384维，推荐)
+    ///   - "bge-base-en-v1.5" (768维)
+    ///   - "bge-large-en-v1.5" (1024维)
+    ///   - "all-MiniLM-L6-v2" (384维，轻量级)
+    ///   - "all-MiniLM-L12-v2" (384维)
+    ///   - "mxbai-embed-large-v1" (1024维)
+    ///   - "nomic-embed-text-v1" (768维)
+    ///   - "nomic-embed-text-v1.5" (768维)
+    ///   - "multilingual-e5-small" (384维，多语言)
+    ///   - "multilingual-e5-base" (768维，多语言)
+    ///   - "multilingual-e5-large" (1024维，多语言)
+    #[cfg(feature = "fastembed")]
+    pub async fn create_fastembed(
+        model: &str,
+    ) -> Result<Arc<dyn Embedder + Send + Sync>> {
+        let dimension = match model {
+            "bge-small-en-v1.5" | "all-MiniLM-L6-v2" | "all-MiniLM-L12-v2" | "multilingual-e5-small" => 384,
+            "bge-base-en-v1.5" | "nomic-embed-text-v1" | "nomic-embed-text-v1.5" | "multilingual-e5-base" => 768,
+            "bge-large-en-v1.5" | "mxbai-embed-large-v1" | "multilingual-e5-large" => 1024,
+            _ => 768, // 默认维度
+        };
+
+        let config = EmbeddingConfig {
+            provider: "fastembed".to_string(),
+            model: model.to_string(),
+            dimension,
+            batch_size: 256,
+            ..Default::default()
+        };
+        Self::create_embedder(&config).await
     }
 
     /// 创建默认的OpenAI嵌入器
@@ -257,10 +345,43 @@ impl EmbeddingFactory {
     }
 
     /// 从环境变量创建嵌入器
+    ///
+    /// 环境变量：
+    /// - `EMBEDDING_PROVIDER`: 提供商名称（默认: "fastembed"）
+    /// - `FASTEMBED_MODEL`: FastEmbed 模型名称（默认: "multilingual-e5-small"）
+    /// - `OPENAI_API_KEY`: OpenAI API 密钥
+    /// - `HUGGINGFACE_MODEL`: HuggingFace 模型名称
+    /// - `LOCAL_MODEL_PATH`: 本地模型路径
+    /// - `LOCAL_MODEL_DIMENSION`: 本地模型维度
+    /// - `COHERE_API_KEY`: Cohere API 密钥
+    /// - `COHERE_MODEL`: Cohere 模型名称
     pub async fn from_env() -> Result<Arc<dyn Embedder + Send + Sync>> {
-        let provider = std::env::var("EMBEDDING_PROVIDER").unwrap_or_else(|_| "openai".to_string());
+        let provider = std::env::var("EMBEDDING_PROVIDER").unwrap_or_else(|_| {
+            #[cfg(feature = "fastembed")]
+            {
+                "fastembed".to_string()
+            }
+            #[cfg(not(feature = "fastembed"))]
+            {
+                "openai".to_string()
+            }
+        });
 
         match provider.as_str() {
+            "fastembed" => {
+                #[cfg(feature = "fastembed")]
+                {
+                    let model = std::env::var("FASTEMBED_MODEL")
+                        .unwrap_or_else(|_| "multilingual-e5-small".to_string());
+                    Self::create_fastembed(&model).await
+                }
+                #[cfg(not(feature = "fastembed"))]
+                {
+                    Err(AgentMemError::unsupported_provider(
+                        "FastEmbed feature not enabled",
+                    ))
+                }
+            }
             "openai" => {
                 let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
                     AgentMemError::config_error("OPENAI_API_KEY environment variable not set")

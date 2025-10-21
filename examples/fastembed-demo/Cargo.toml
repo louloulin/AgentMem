@@ -1,0 +1,14 @@
+[package]
+name = "fastembed-demo"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings", features = ["fastembed"] }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
