@@ -13,6 +13,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+// ========== LLM 和 Embedding 导入 ==========
+use agent_mem_embeddings::EmbeddingFactory;
+use agent_mem_llm::LLMFactory;
+use agent_mem_traits::{Embedder, LLMConfig};
+
 // ========== Manager 导入 (替代 Agent) ==========
 use agent_mem_core::managers::CoreMemoryManager;
 
@@ -147,6 +152,7 @@ pub struct MemoryOrchestrator {
 
     // ========== 辅助组件 ==========
     llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>>,
+    embedder: Option<Arc<dyn Embedder + Send + Sync>>,
 
     // ========== 配置 ==========
     config: OrchestratorConfig,
@@ -199,7 +205,13 @@ impl MemoryOrchestrator {
             (None, None, None, None, None, None, None)
         };
 
-        // ========== Step 3: 创建 Search 组件 ==========
+        // ========== Step 3: 创建 Embedder ==========
+        let embedder = {
+            info!("创建 Embedder...");
+            Self::create_embedder(&config).await?
+        };
+
+        // ========== Step 4: 创建 Search 组件 ==========
         #[cfg(feature = "postgres")]
         let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) = {
             info!("创建 Search 组件...");
@@ -236,6 +248,7 @@ impl MemoryOrchestrator {
 
             // 辅助组件
             llm_provider,
+            embedder,
 
             // 配置
             config,
@@ -244,7 +257,7 @@ impl MemoryOrchestrator {
 
     /// 创建 Intelligence 组件
     async fn create_intelligence_components(
-        _config: &OrchestratorConfig,
+        config: &OrchestratorConfig,
     ) -> Result<(
         Option<Arc<FactExtractor>>,
         Option<Arc<AdvancedFactExtractor>>,
@@ -254,9 +267,8 @@ impl MemoryOrchestrator {
         Option<Arc<ConflictResolver>>,
         Option<Arc<dyn LLMProvider + Send + Sync>>,
     )> {
-        // TODO: 创建 LLM Provider
-        // let llm_provider = Self::create_llm_provider(config).await?;
-        let llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>> = None;
+        // 创建 LLM Provider
+        let llm_provider = Self::create_llm_provider(config).await?;
 
         if llm_provider.is_none() {
             warn!("LLM Provider 未配置，Intelligence 组件将不可用");
@@ -304,10 +316,155 @@ impl MemoryOrchestrator {
     async fn create_llm_provider(
         config: &OrchestratorConfig,
     ) -> Result<Option<Arc<dyn LLMProvider + Send + Sync>>> {
-        // TODO: 实现 LLM Provider 创建逻辑
-        // 根据 config.llm_provider 和 config.llm_model 创建对应的 LLM Provider
-        warn!("LLM Provider 创建逻辑待实现");
-        Ok(None)
+        // 检查是否启用智能功能
+        if !config.enable_intelligent_features {
+            info!("智能功能未启用，跳过 LLM Provider 创建");
+            return Ok(None);
+        }
+
+        // 检查是否配置了 LLM Provider
+        let provider = match &config.llm_provider {
+            Some(p) => p.clone(),
+            None => {
+                // 尝试从环境变量获取
+                match std::env::var("LLM_PROVIDER") {
+                    Ok(p) => p,
+                    Err(_) => {
+                        info!("未配置 LLM Provider，使用默认值: openai");
+                        "openai".to_string()
+                    }
+                }
+            }
+        };
+
+        // 检查是否配置了 LLM Model
+        let model = match &config.llm_model {
+            Some(m) => m.clone(),
+            None => {
+                // 尝试从环境变量获取
+                match std::env::var("LLM_MODEL") {
+                    Ok(m) => m,
+                    Err(_) => {
+                        info!("未配置 LLM Model，使用默认值: gpt-4");
+                        "gpt-4".to_string()
+                    }
+                }
+            }
+        };
+
+        // 获取 API Key
+        let api_key = match std::env::var("OPENAI_API_KEY")
+            .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
+            .or_else(|_| std::env::var("LLM_API_KEY"))
+        {
+            Ok(key) => Some(key),
+            Err(_) => {
+                warn!(
+                    "未找到 LLM API Key 环境变量 (OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_API_KEY)"
+                );
+                None
+            }
+        };
+
+        if api_key.is_none() {
+            warn!("LLM API Key 未配置，LLM Provider 将不可用");
+            return Ok(None);
+        }
+
+        // 创建 LLM Config
+        let llm_config = LLMConfig {
+            provider: provider.clone(),
+            model: model.clone(),
+            api_key,
+            base_url: None,
+            max_tokens: Some(4096),
+            temperature: Some(0.7),
+            top_p: Some(1.0),
+            frequency_penalty: Some(0.0),
+            presence_penalty: Some(0.0),
+            response_format: None,
+        };
+
+        // 使用 LLMFactory 创建 Provider
+        match LLMFactory::create_provider(&llm_config) {
+            Ok(llm_provider) => {
+                info!("成功创建 LLM Provider: {} ({})", provider, model);
+                Ok(Some(llm_provider))
+            }
+            Err(e) => {
+                warn!("创建 LLM Provider 失败: {}", e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// 创建 Embedder
+    async fn create_embedder(
+        config: &OrchestratorConfig,
+    ) -> Result<Option<Arc<dyn Embedder + Send + Sync>>> {
+        // 检查是否配置了 Embedder Provider
+        let provider = match &config.embedder_provider {
+            Some(p) => p.clone(),
+            None => {
+                // 尝试从环境变量获取
+                match std::env::var("EMBEDDING_PROVIDER") {
+                    Ok(p) => p,
+                    Err(_) => {
+                        info!("未配置 Embedding Provider，使用默认值: fastembed");
+                        "fastembed".to_string()
+                    }
+                }
+            }
+        };
+
+        // 使用 EmbeddingFactory 创建 Embedder
+        match provider.as_str() {
+            "fastembed" => {
+                #[cfg(feature = "fastembed")]
+                {
+                    match EmbeddingFactory::create_default().await {
+                        Ok(embedder) => {
+                            info!("成功创建 FastEmbed Embedder (multilingual-e5-small, 384维)");
+                            Ok(Some(embedder))
+                        }
+                        Err(e) => {
+                            warn!("创建 FastEmbed Embedder 失败: {}", e);
+                            Ok(None)
+                        }
+                    }
+                }
+                #[cfg(not(feature = "fastembed"))]
+                {
+                    warn!("FastEmbed 特性未启用，无法创建 Embedder");
+                    Ok(None)
+                }
+            }
+            "openai" => {
+                // 获取 API Key
+                let api_key = match std::env::var("OPENAI_API_KEY") {
+                    Ok(key) => key,
+                    Err(_) => {
+                        warn!("未找到 OPENAI_API_KEY 环境变量");
+                        return Ok(None);
+                    }
+                };
+
+                match EmbeddingFactory::create_openai_embedder(api_key).await {
+                    Ok(embedder) => {
+                        info!("成功创建 OpenAI Embedder (text-embedding-ada-002, 1536维)");
+                        Ok(Some(embedder))
+                    }
+                    Err(e) => {
+                        warn!("创建 OpenAI Embedder 失败: {}", e);
+                        Ok(None)
+                    }
+                }
+            }
+            _ => {
+                warn!("不支持的 Embedding Provider: {}", provider);
+                Ok(None)
+            }
+        }
     }
 
     /// 添加记忆 (简单模式，不使用智能推理)
@@ -1145,16 +1302,28 @@ impl MemoryOrchestrator {
 
     /// 生成查询嵌入向量
     ///
-    /// 使用 LLM Provider 生成查询的向量表示
+    /// 使用 Embedder 生成查询的向量表示
     async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
-        if let Some(llm_provider) = &self.llm_provider {
-            // TODO: 调用 LLM Provider 生成嵌入
-            // 临时实现：返回零向量
-            warn!("generate_query_embedding() 待实现，返回零向量");
-            Ok(vec![0.0; 1536]) // OpenAI embedding 维度
+        if let Some(embedder) = &self.embedder {
+            // 使用 Embedder 生成嵌入向量
+            match embedder.embed(query).await {
+                Ok(embedding) => {
+                    debug!(
+                        "成功生成查询嵌入向量: query={}, dimension={}",
+                        query,
+                        embedding.len()
+                    );
+                    Ok(embedding)
+                }
+                Err(e) => {
+                    warn!("生成查询嵌入向量失败: {}, 返回零向量", e);
+                    // 降级：返回零向量
+                    Ok(vec![0.0; embedder.dimension()])
+                }
+            }
         } else {
-            warn!("LLM Provider 未配置，返回零向量");
-            Ok(vec![0.0; 1536])
+            warn!("Embedder 未配置，返回零向量 (384维)");
+            Ok(vec![0.0; 384]) // FastEmbed 默认维度
         }
     }
 
