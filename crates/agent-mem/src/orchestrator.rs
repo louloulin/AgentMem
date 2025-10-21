@@ -179,10 +179,11 @@ impl MemoryOrchestrator {
         // ========== Step 1: 创建 Managers (替代 Agents) ==========
         info!("创建 Managers...");
 
-        // TODO: 暂时设为 None，等待实现 Manager 创建逻辑
-        // 需要创建存储后端，然后初始化各个 Managers
-        let core_manager = None;
+        // 创建 CoreMemoryManager (不需要存储后端，使用内存存储)
+        let core_manager = Some(Arc::new(CoreMemoryManager::new()));
+        info!("✅ CoreMemoryManager 创建成功");
 
+        // TODO: PostgreSQL Managers 需要数据库连接，暂时设为 None
         #[cfg(feature = "postgres")]
         let semantic_manager = None;
         #[cfg(feature = "postgres")]
@@ -487,11 +488,22 @@ impl MemoryOrchestrator {
 
         // 简单模式：直接添加到 core_manager
         if let Some(core_manager) = &self.core_manager {
-            // TODO: 实现直接添加逻辑
-            warn!("core_manager 可用，但直接添加逻辑待实现");
-            Err(agent_mem_traits::AgentMemError::UnsupportedOperation(
-                "简单添加模式待实现".to_string(),
-            ))
+            info!("使用 CoreMemoryManager 添加记忆（简单模式）");
+
+            // 将内容作为 Persona 块添加到 CoreMemoryManager
+            // 注意：这是一个简化的实现，实际应该根据 memory_type 选择不同的存储方式
+            let block_id = core_manager
+                .create_persona_block(content.clone(), None)
+                .await
+                .map_err(|e| {
+                    agent_mem_traits::AgentMemError::StorageError(format!(
+                        "创建 Persona 块失败: {:?}",
+                        e
+                    ))
+                })?;
+
+            info!("✅ 记忆添加成功，block_id: {}", block_id);
+            Ok(block_id)
         } else {
             Err(agent_mem_traits::AgentMemError::UnsupportedOperation(
                 "core_manager 未初始化".to_string(),
