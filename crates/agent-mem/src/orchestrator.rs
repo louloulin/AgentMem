@@ -10,12 +10,16 @@ use tracing::{debug, info, warn};
 use agent_mem_core::{
     CoreAgent, EpisodicAgent, SemanticAgent, ProceduralAgent,
     ResourceAgent, WorkingAgent, KnowledgeAgent, ContextualAgent,
+    MemoryAgent,  // 导入 MemoryAgent trait
 };
 use agent_mem_traits::{
-    MemoryItem, MemoryType, Result,
+    MemoryItem, Result,
     // TODO: 在任务 1.2 中使用这些类型
     // FactExtractor, DecisionEngine, LLMProvider,
 };
+
+// 使用 agent_mem_core 的 MemoryType（与 TaskRequest 兼容）
+use agent_mem_core::types::MemoryType;
 
 use crate::auto_config::AutoConfig;
 use crate::types::{AddResult, MemoryEvent, MemoryStats, RelationEvent};
@@ -96,42 +100,67 @@ impl MemoryOrchestrator {
         // 创建所有 Agents
         // 注意：这里使用 from_env() 会自动从环境变量创建存储后端
         let core_agent = match CoreAgent::from_env("default".to_string()).await {
-            Ok(agent) => {
-                info!("CoreAgent 初始化成功");
-                Some(Arc::new(RwLock::new(agent)))
+            Ok(mut agent) => {
+                // 调用 initialize() 方法
+                if let Err(e) = agent.initialize().await {
+                    warn!("CoreAgent 初始化失败: {}, 将禁用核心记忆功能", e);
+                    None
+                } else {
+                    info!("CoreAgent 初始化成功");
+                    Some(Arc::new(RwLock::new(agent)))
+                }
             }
             Err(e) => {
-                warn!("CoreAgent 初始化失败: {}, 将禁用核心记忆功能", e);
+                warn!("CoreAgent 创建失败: {}, 将禁用核心记忆功能", e);
                 None
             }
         };
-        
+
         let episodic_agent = match EpisodicAgent::from_env("default".to_string()).await {
-            Ok(agent) => {
-                info!("EpisodicAgent 初始化成功");
-                Some(Arc::new(RwLock::new(agent)))
+            Ok(mut agent) => {
+                // 调用 initialize() 方法
+                if let Err(e) = agent.initialize().await {
+                    warn!("EpisodicAgent 初始化失败: {}, 将禁用情景记忆功能", e);
+                    None
+                } else {
+                    info!("EpisodicAgent 初始化成功");
+                    Some(Arc::new(RwLock::new(agent)))
+                }
             }
             Err(e) => {
-                warn!("EpisodicAgent 初始化失败: {}, 将禁用情景记忆功能", e);
+                warn!("EpisodicAgent 创建失败: {}, 将禁用情景记忆功能", e);
                 None
             }
         };
-        
+
         let semantic_agent = match SemanticAgent::from_env("default".to_string()).await {
-            Ok(agent) => {
-                info!("SemanticAgent 初始化成功");
-                Some(Arc::new(RwLock::new(agent)))
+            Ok(mut agent) => {
+                // 调用 initialize() 方法
+                if let Err(e) = agent.initialize().await {
+                    warn!("SemanticAgent 初始化失败: {}, 将禁用语义记忆功能", e);
+                    None
+                } else {
+                    info!("SemanticAgent 初始化成功");
+                    Some(Arc::new(RwLock::new(agent)))
+                }
             }
             Err(e) => {
-                warn!("SemanticAgent 初始化失败: {}, 将禁用语义记忆功能", e);
+                warn!("SemanticAgent 创建失败: {}, 将禁用语义记忆功能", e);
                 None
             }
         };
-        
+
         // ProceduralAgent 暂时不支持 from_env，使用 new() 创建
         let procedural_agent = {
-            info!("ProceduralAgent 初始化（基础模式）");
-            Some(Arc::new(RwLock::new(ProceduralAgent::new("default".to_string()))))
+            let mut agent = ProceduralAgent::new("default".to_string());
+            // 调用 initialize() 方法
+            if let Err(e) = agent.initialize().await {
+                warn!("ProceduralAgent 初始化失败: {}", e);
+                None
+            } else {
+                info!("ProceduralAgent 初始化（基础模式）");
+                Some(Arc::new(RwLock::new(agent)))
+            }
         };
         
         // 其他 Agents 暂时设为 None（在后续任务中实现）
@@ -197,43 +226,126 @@ impl MemoryOrchestrator {
     
     /// 搜索记忆 (跨所有 Agents)
     ///
-    /// 注意：当前实现为基础版本，返回空结果
-    /// 完整的跨 Agent 搜索将在后续任务中实现
+    /// 真正调用 core 模块的 Agent 执行搜索任务
     pub async fn search_memories(
         &self,
         query: String,
-        _agent_id: String,
-        _user_id: Option<String>,
-        _limit: usize,
+        agent_id: String,
+        user_id: Option<String>,
+        limit: usize,
         memory_type: Option<MemoryType>,
     ) -> Result<Vec<MemoryItem>> {
+        use agent_mem_core::coordination::meta_manager::TaskRequest;
+
         debug!("搜索记忆: query={}, memory_type={:?}", query, memory_type);
+
+        let user_id_str = user_id.unwrap_or_else(|| "default".to_string());
+        let mut all_results = Vec::new();
+
+        // 准备搜索参数
+        let params = serde_json::json!({
+            "query": query,
+            "agent_id": agent_id,
+            "user_id": user_id_str,
+            "limit": limit,
+        });
 
         // 根据 memory_type 决定搜索哪些 Agents
         let search_all = memory_type.is_none();
 
+        // 搜索 CoreAgent
         if search_all || memory_type == Some(MemoryType::Core) {
-            if self.core_agent.is_some() {
-                debug!("将搜索 CoreAgent");
+            if let Some(agent) = &self.core_agent {
+                debug!("搜索 CoreAgent");
+                let task = TaskRequest::new(
+                    MemoryType::Core,
+                    "search".to_string(),
+                    params.clone(),
+                );
+
+                let mut agent_lock = agent.write().await;
+                if let Ok(response) = agent_lock.execute_task(task).await {
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(blocks) = data.get("blocks").and_then(|v| v.as_array()) {
+                                for block in blocks {
+                                    if let Ok(item) = serde_json::from_value::<MemoryItem>(block.clone()) {
+                                        all_results.push(item);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
+        // 搜索 EpisodicAgent
         if search_all || memory_type == Some(MemoryType::Episodic) {
-            if self.episodic_agent.is_some() {
-                debug!("将搜索 EpisodicAgent");
+            if let Some(agent) = &self.episodic_agent {
+                debug!("搜索 EpisodicAgent");
+                let task = TaskRequest::new(
+                    MemoryType::Episodic,
+                    "search".to_string(),
+                    params.clone(),
+                );
+
+                let mut agent_lock = agent.write().await;
+                if let Ok(response) = agent_lock.execute_task(task).await {
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(events) = data.get("events").and_then(|v| v.as_array()) {
+                                for event in events {
+                                    if let Ok(item) = serde_json::from_value::<MemoryItem>(event.clone()) {
+                                        all_results.push(item);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
+        // 搜索 SemanticAgent
         if search_all || memory_type == Some(MemoryType::Semantic) {
-            if self.semantic_agent.is_some() {
-                debug!("将搜索 SemanticAgent");
+            if let Some(agent) = &self.semantic_agent {
+                debug!("搜索 SemanticAgent");
+                let task = TaskRequest::new(
+                    MemoryType::Semantic,
+                    "search".to_string(),
+                    params.clone(),
+                );
+
+                let mut agent_lock = agent.write().await;
+                if let Ok(response) = agent_lock.execute_task(task).await {
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(knowledge) = data.get("knowledge").and_then(|v| v.as_array()) {
+                                for item in knowledge {
+                                    if let Ok(mem_item) = serde_json::from_value::<MemoryItem>(item.clone()) {
+                                        all_results.push(mem_item);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // TODO: 实现实际的跨 Agent 搜索
-        // 当前返回空结果
-        debug!("搜索完成（基础实现），返回空结果");
-        Ok(vec![])
+        // 按重要性和时间排序
+        all_results.sort_by(|a, b| {
+            b.importance.partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.created_at.cmp(&a.created_at))
+        });
+
+        // 限制结果数量
+        all_results.truncate(limit);
+
+        debug!("搜索完成，返回 {} 条结果", all_results.len());
+        Ok(all_results)
     }
     
     /// 获取所有记忆
@@ -325,54 +437,170 @@ impl MemoryOrchestrator {
 
     /// 路由添加操作到对应的 Agent
     ///
-    /// 注意：当前实现为基础版本，返回占位符 ID
-    /// 完整的 Agent 集成将在后续任务中实现
+    /// 真正调用 core 模块的 Agent 执行任务
     async fn route_add_to_agent(
         &self,
         memory_type: MemoryType,
-        _content: String,
-        _agent_id: String,
-        _user_id: Option<String>,
-        _metadata: Option<HashMap<String, serde_json::Value>>,
+        content: String,
+        agent_id: String,
+        user_id: Option<String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<String> {
-        // 根据记忆类型记录日志
+        use agent_mem_core::coordination::meta_manager::TaskRequest;
+
+        debug!("路由到 Agent: type={:?}", memory_type);
+
+        // 准备任务参数
+        let mut params = serde_json::json!({
+            "content": content,
+            "agent_id": agent_id,
+            "user_id": user_id.unwrap_or_else(|| "default".to_string()),
+        });
+
+        if let Some(meta) = metadata {
+            params["metadata"] = serde_json::to_value(meta)?;
+        }
+
+        // 根据记忆类型路由到对应的 Agent
         match memory_type {
             MemoryType::Core => {
-                if self.core_agent.is_some() {
+                if let Some(agent) = &self.core_agent {
                     debug!("路由到 CoreAgent");
+                    let task = TaskRequest::new(
+                        MemoryType::Core,
+                        "create_block".to_string(),
+                        params,
+                    );
+
+                    let mut agent_lock = agent.write().await;
+                    let response = agent_lock.execute_task(task).await.map_err(|e| agent_mem_traits::AgentMemError::MemoryError(e.to_string()))?;
+
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(block_id) = data.get("block_id").and_then(|v| v.as_str()) {
+                                return Ok(block_id.to_string());
+                            }
+                        }
+                    }
+
+                    return Err(agent_mem_traits::AgentMemError::MemoryError(
+                        "Failed to create core memory block".to_string()
+                    ));
                 } else {
-                    warn!("CoreAgent 未初始化");
+                    warn!("CoreAgent 未初始化，降级到 SemanticAgent");
                 }
             }
             MemoryType::Episodic => {
-                if self.episodic_agent.is_some() {
+                if let Some(agent) = &self.episodic_agent {
                     debug!("路由到 EpisodicAgent");
+                    let task = TaskRequest::new(
+                        MemoryType::Episodic,
+                        "create_event".to_string(),
+                        params,
+                    );
+
+                    let mut agent_lock = agent.write().await;
+                    let response = agent_lock.execute_task(task).await.map_err(|e| agent_mem_traits::AgentMemError::MemoryError(e.to_string()))?;
+
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(event_id) = data.get("event_id").and_then(|v| v.as_str()) {
+                                return Ok(event_id.to_string());
+                            }
+                        }
+                    }
+
+                    return Err(agent_mem_traits::AgentMemError::MemoryError(
+                        "Failed to create episodic event".to_string()
+                    ));
                 } else {
-                    warn!("EpisodicAgent 未初始化");
-                }
-            }
-            MemoryType::Semantic => {
-                if self.semantic_agent.is_some() {
-                    debug!("路由到 SemanticAgent");
-                } else {
-                    warn!("SemanticAgent 未初始化");
+                    warn!("EpisodicAgent 未初始化，降级到 SemanticAgent");
                 }
             }
             MemoryType::Procedural => {
-                if self.procedural_agent.is_some() {
+                if let Some(agent) = &self.procedural_agent {
                     debug!("路由到 ProceduralAgent");
+                    let task = TaskRequest::new(
+                        MemoryType::Procedural,
+                        "create_skill".to_string(),
+                        params,
+                    );
+
+                    let mut agent_lock = agent.write().await;
+                    let response = agent_lock.execute_task(task).await.map_err(|e| agent_mem_traits::AgentMemError::MemoryError(e.to_string()))?;
+
+                    if response.success {
+                        if let Some(data) = response.data {
+                            if let Some(skill_id) = data.get("skill_id").and_then(|v| v.as_str()) {
+                                return Ok(skill_id.to_string());
+                            }
+                        }
+                    }
+
+                    return Err(agent_mem_traits::AgentMemError::MemoryError(
+                        "Failed to create procedural skill".to_string()
+                    ));
                 } else {
-                    warn!("ProceduralAgent 未初始化");
+                    warn!("ProceduralAgent 未初始化，降级到 SemanticAgent");
                 }
             }
             _ => {
-                debug!("记忆类型 {:?} 使用默认处理", memory_type);
+                debug!("记忆类型 {:?} 使用 SemanticAgent", memory_type);
             }
         }
 
-        // TODO: 实现实际的 Agent 调用
-        // 当前返回占位符 ID
-        Ok(uuid::Uuid::new_v4().to_string())
+        // 默认使用 SemanticAgent（最通用的记忆类型）
+        if let Some(agent) = &self.semantic_agent {
+            use chrono::Utc;
+
+            debug!("使用 SemanticAgent 处理记忆");
+
+            // 构造完整的 SemanticMemoryItem
+            let user_id_str = params.get("user_id").and_then(|v| v.as_str()).unwrap_or("default").to_string();
+            let item = agent_mem_traits::SemanticMemoryItem {
+                id: uuid::Uuid::new_v4().to_string(),
+                organization_id: "default".to_string(),
+                user_id: user_id_str,
+                agent_id: agent_id.clone(),
+                name: content.chars().take(100).collect(),  // 使用前100个字符作为名称
+                summary: content.clone(),
+                details: Some(content.clone()),
+                source: None,
+                tree_path: vec![],
+                metadata: params.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            let item_params = serde_json::to_value(&item)?;
+
+            let task = TaskRequest::new(
+                MemoryType::Semantic,
+                "insert".to_string(),
+                item_params,
+            );
+
+            let mut agent_lock = agent.write().await;
+            let response = agent_lock.execute_task(task).await.map_err(|e| agent_mem_traits::AgentMemError::MemoryError(e.to_string()))?;
+
+            if response.success {
+                if let Some(data) = response.data {
+                    // SemanticAgent 返回 "item_id" 而不是 "knowledge_id"
+                    if let Some(item_id) = data.get("item_id").and_then(|v| v.as_str()) {
+                        return Ok(item_id.to_string());
+                    }
+                }
+            }
+
+            return Err(agent_mem_traits::AgentMemError::MemoryError(
+                format!("Failed to insert semantic knowledge: {:?}", response.error)
+            ));
+        }
+
+        // 如果所有 Agent 都不可用，返回错误
+        Err(agent_mem_traits::AgentMemError::MemoryError(
+            "No available agent to handle memory".to_string()
+        ))
     }
 
     // ========== mem0 兼容 API ==========
@@ -446,12 +674,79 @@ impl MemoryOrchestrator {
 
     /// 获取单个记忆
     pub async fn get_memory(&self, memory_id: &str) -> Result<MemoryItem> {
+        use agent_mem_core::coordination::meta_manager::TaskRequest;
+
         debug!("获取记忆: {}", memory_id);
 
-        // TODO: 实现从存储后端获取记忆
-        // 当前返回错误
+        // 准备参数
+        let params = serde_json::json!({
+            "id": memory_id,
+        });
+
+        // 尝试从各个 Agent 获取（因为我们不知道记忆存储在哪个 Agent）
+        // 优先尝试 SemanticAgent（最常用）
+        if let Some(agent) = &self.semantic_agent {
+            let task = TaskRequest::new(
+                MemoryType::Semantic,
+                "read_knowledge".to_string(),
+                params.clone(),
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 尝试 EpisodicAgent
+        if let Some(agent) = &self.episodic_agent {
+            let task = TaskRequest::new(
+                MemoryType::Episodic,
+                "read_event".to_string(),
+                params.clone(),
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 尝试 CoreAgent
+        if let Some(agent) = &self.core_agent {
+            let task = TaskRequest::new(
+                MemoryType::Core,
+                "read_block".to_string(),
+                params,
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 如果所有 Agent 都找不到，返回错误
         Err(agent_mem_traits::AgentMemError::NotFound(format!(
-            "Memory {} not found (get_memory not yet implemented)",
+            "Memory {} not found",
             memory_id
         )))
     }
@@ -484,42 +779,179 @@ impl MemoryOrchestrator {
     pub async fn update_memory(
         &self,
         memory_id: &str,
-        _data: HashMap<String, serde_json::Value>,
+        data: HashMap<String, serde_json::Value>,
     ) -> Result<MemoryItem> {
+        use agent_mem_core::coordination::meta_manager::TaskRequest;
+
         debug!("更新记忆: {}", memory_id);
 
-        // TODO: 实现记忆更新
-        // 当前返回错误
+        // 准备参数
+        let mut params = serde_json::json!({
+            "id": memory_id,
+        });
+
+        // 合并更新数据
+        if let Some(obj) = params.as_object_mut() {
+            for (key, value) in data {
+                obj.insert(key, value);
+            }
+        }
+
+        // 尝试从各个 Agent 更新
+        if let Some(agent) = &self.semantic_agent {
+            let task = TaskRequest::new(
+                MemoryType::Semantic,
+                "update_knowledge".to_string(),
+                params.clone(),
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(agent) = &self.episodic_agent {
+            let task = TaskRequest::new(
+                MemoryType::Episodic,
+                "update_event".to_string(),
+                params.clone(),
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(agent) = &self.core_agent {
+            let task = TaskRequest::new(
+                MemoryType::Core,
+                "update_block".to_string(),
+                params,
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    if let Some(data) = response.data {
+                        if let Ok(item) = serde_json::from_value::<MemoryItem>(data) {
+                            return Ok(item);
+                        }
+                    }
+                }
+            }
+        }
+
         Err(agent_mem_traits::AgentMemError::NotFound(format!(
-            "Memory {} not found (update_memory not yet implemented)",
+            "Memory {} not found",
             memory_id
         )))
     }
 
     /// 删除记忆
     pub async fn delete_memory(&self, memory_id: &str) -> Result<()> {
+        use agent_mem_core::coordination::meta_manager::TaskRequest;
+
         debug!("删除记忆: {}", memory_id);
 
-        // TODO: 实现记忆删除
-        // 当前返回错误
-        Err(agent_mem_traits::AgentMemError::NotFound(format!(
-            "Memory {} not found (delete_memory not yet implemented)",
-            memory_id
-        )))
+        let params = serde_json::json!({
+            "id": memory_id,
+        });
+
+        // 尝试从各个 Agent 删除
+        let mut deleted = false;
+
+        if let Some(agent) = &self.semantic_agent {
+            let task = TaskRequest::new(
+                MemoryType::Semantic,
+                "delete_knowledge".to_string(),
+                params.clone(),
+            );
+
+            let mut agent_lock = agent.write().await;
+            if let Ok(response) = agent_lock.execute_task(task).await {
+                if response.success {
+                    deleted = true;
+                }
+            }
+        }
+
+        if !deleted {
+            if let Some(agent) = &self.episodic_agent {
+                let task = TaskRequest::new(
+                    MemoryType::Episodic,
+                    "delete_event".to_string(),
+                    params.clone(),
+                );
+
+                let mut agent_lock = agent.write().await;
+                if let Ok(response) = agent_lock.execute_task(task).await {
+                    if response.success {
+                        deleted = true;
+                    }
+                }
+            }
+        }
+
+        if !deleted {
+            if let Some(agent) = &self.core_agent {
+                let task = TaskRequest::new(
+                    MemoryType::Core,
+                    "delete_block".to_string(),
+                    params,
+                );
+
+                let mut agent_lock = agent.write().await;
+                if let Ok(response) = agent_lock.execute_task(task).await {
+                    if response.success {
+                        deleted = true;
+                    }
+                }
+            }
+        }
+
+        if deleted {
+            Ok(())
+        } else {
+            Err(agent_mem_traits::AgentMemError::NotFound(format!(
+                "Memory {} not found",
+                memory_id
+            )))
+        }
     }
 
     /// 删除所有记忆
     pub async fn delete_all_memories(
         &self,
-        _agent_id: String,
-        _user_id: Option<String>,
+        agent_id: String,
+        user_id: Option<String>,
         _run_id: Option<String>,
     ) -> Result<usize> {
         debug!("删除所有记忆");
 
-        // TODO: 实现批量删除
-        // 当前返回 0
-        Ok(0)
+        // 获取所有记忆
+        let memories = self.get_all_memories(agent_id, user_id).await?;
+        let count = memories.len();
+
+        // 逐个删除
+        for memory in memories {
+            let _ = self.delete_memory(&memory.id).await;
+        }
+
+        Ok(count)
     }
 }
 
