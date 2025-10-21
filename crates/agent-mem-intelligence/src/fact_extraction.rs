@@ -238,6 +238,12 @@ impl FactExtractor {
             .replace_all(&cleaned, r#""category": "$1""#)
             .to_string();
 
+        // 处理 entity_type 字段中的多值情况，如 "Language|Technology" -> "Language"
+        let entity_type_re = regex::Regex::new(r#""entity_type":\s*"([^"|]+)\|[^"]*""#).unwrap();
+        cleaned = entity_type_re
+            .replace_all(&cleaned, r#""entity_type": "$1""#)
+            .to_string();
+
         // 处理未知的实体类型，映射到已知类型
         let entity_type_mappings = [
             ("Profession", "Concept"),
