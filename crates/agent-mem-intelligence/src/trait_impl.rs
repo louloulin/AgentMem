@@ -26,7 +26,9 @@ impl FactExtractorTrait for FactExtractor {
                 content: fact.content,
                 confidence: fact.confidence,
                 category: fact.category,
-                metadata: fact.metadata,
+                metadata: fact.metadata.into_iter()
+                    .map(|(k, v)| (k, v.to_string()))
+                    .collect(),
             })
             .collect();
 

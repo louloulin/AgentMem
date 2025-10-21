@@ -92,7 +92,9 @@ impl LLMClient {
         messages: &[Message],
         functions: &[FunctionDefinition],
     ) -> Result<FunctionCallResponse> {
-        self.provider.generate_with_functions(messages, functions).await
+        self.provider
+            .generate_with_functions(messages, functions)
+            .await
     }
 
     /// 生成流式响应

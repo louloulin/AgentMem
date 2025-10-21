@@ -7,6 +7,7 @@ use crate::providers::DeepSeekProvider;
 use crate::providers::GeminiProvider;
 use crate::providers::LiteLLMProvider;
 use crate::providers::OllamaProvider; // 移除条件编译，确保总是可用
+use crate::providers::ZhipuProvider;
 use crate::providers::{AnthropicProvider, OpenAIProvider};
 use crate::providers::{ClaudeProvider, CohereProvider, MistralProvider, PerplexityProvider};
 
@@ -33,6 +34,7 @@ pub enum LLMProviderEnum {
     Mistral(MistralProvider),
     Perplexity(PerplexityProvider),
     DeepSeek(DeepSeekProvider),
+    Zhipu(ZhipuProvider),
 }
 
 #[async_trait]
@@ -69,6 +71,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Mistral(provider) => provider.generate(messages).await,
             LLMProviderEnum::Perplexity(provider) => provider.generate(messages).await,
             LLMProviderEnum::DeepSeek(provider) => provider.generate(messages).await,
+            LLMProviderEnum::Zhipu(provider) => provider.generate(messages).await,
         }
     }
 
@@ -98,6 +101,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Mistral(provider) => provider.generate_stream(messages).await,
             LLMProviderEnum::Perplexity(provider) => provider.generate_stream(messages).await,
             LLMProviderEnum::DeepSeek(provider) => provider.generate_stream(messages).await,
+            LLMProviderEnum::Zhipu(provider) => provider.generate_stream(messages).await,
         }
     }
 
@@ -125,6 +129,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Mistral(provider) => provider.get_model_info(),
             LLMProviderEnum::Perplexity(provider) => provider.get_model_info(),
             LLMProviderEnum::DeepSeek(provider) => provider.get_model_info(),
+            LLMProviderEnum::Zhipu(provider) => provider.get_model_info(),
         }
     }
 
@@ -149,6 +154,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Mistral(provider) => provider.validate_config(),
             LLMProviderEnum::Perplexity(provider) => provider.validate_config(),
             LLMProviderEnum::DeepSeek(provider) => provider.validate_config(),
+            LLMProviderEnum::Zhipu(provider) => provider.validate_config(),
         }
     }
 }
@@ -257,6 +263,10 @@ impl LLMFactory {
                 let provider = DeepSeekProvider::from_config(config.clone())?;
                 LLMProviderEnum::DeepSeek(provider)
             }
+            "zhipu" => {
+                let provider = ZhipuProvider::new(config.clone())?;
+                LLMProviderEnum::Zhipu(provider)
+            }
             _ => return Err(AgentMemError::unsupported_provider(&config.provider)),
         };
 
@@ -289,6 +299,7 @@ impl LLMFactory {
         providers.push("mistral");
         providers.push("perplexity");
         providers.push("deepseek");
+        providers.push("zhipu");
 
         providers
     }
@@ -564,6 +575,11 @@ impl RealLLMFactory {
             }
             "deepseek" => {
                 let provider = DeepSeekProvider::from_config(config.clone())?;
+                Self::validate_provider(&provider).await?;
+                Ok(Arc::new(provider))
+            }
+            "zhipu" => {
+                let provider = ZhipuProvider::new(config.clone())?;
                 Self::validate_provider(&provider).await?;
                 Ok(Arc::new(provider))
             }

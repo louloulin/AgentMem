@@ -195,7 +195,7 @@ impl IntelligentMemoryProcessor {
                 metadata: fact
                     .metadata
                     .iter()
-                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .map(|(k, v)| (k.clone(), v.clone()))
                     .collect(),
                 score: Some(fact.confidence),
                 created_at: chrono::Utc::now(),
@@ -212,7 +212,7 @@ impl IntelligentMemoryProcessor {
                         attributes: e
                             .attributes
                             .iter()
-                            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                            .map(|(k, v)| (k.clone(), v.clone()))
                             .collect(),
                     })
                     .collect(),

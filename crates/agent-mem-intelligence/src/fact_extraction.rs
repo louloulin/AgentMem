@@ -24,7 +24,7 @@ pub struct ExtractedFact {
     pub entities: Vec<Entity>,
     pub temporal_info: Option<TemporalInfo>,
     pub source_message_id: Option<String>,
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, serde_json::Value>,
 }
 
 /// 事实类别（扩展版本）
@@ -53,7 +53,7 @@ pub struct Entity {
     pub name: String,
     pub entity_type: EntityType,
     pub confidence: f32,
-    pub attributes: HashMap<String, String>,
+    pub attributes: HashMap<String, serde_json::Value>,
     pub id: String,
 }
 
@@ -176,7 +176,12 @@ impl FactExtractor {
         // 尝试提取 JSON 部分
         let json_text = self.extract_json_from_response(&response_text)?;
 
+        // 调试：打印 JSON 文本
+        debug!("Extracted JSON: {}", json_text);
+
         let response: FactExtractionResponse = serde_json::from_str(&json_text).map_err(|e| {
+            warn!("Failed to parse JSON: {}", e);
+            warn!("JSON text: {}", json_text);
             agent_mem_traits::AgentMemError::internal_error(format!(
                 "Failed to parse response: {}",
                 e

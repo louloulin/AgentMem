@@ -63,6 +63,12 @@ impl AutoConfig {
 
     /// 检测 LLM 提供商
     fn detect_llm_provider() -> Option<(String, String)> {
+        // 检测智谱 AI (Zhipu)
+        if env::var("ZHIPU_API_KEY").is_ok() {
+            let model = env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4-plus".to_string());
+            return Some(("zhipu".to_string(), model));
+        }
+
         // 检测 OpenAI
         if env::var("OPENAI_API_KEY").is_ok() {
             let model = env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());

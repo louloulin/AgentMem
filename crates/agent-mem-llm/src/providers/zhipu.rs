@@ -166,11 +166,9 @@ impl ZhipuProvider {
 #[async_trait]
 impl LLMProvider for ZhipuProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
-        let api_key = self
-            .config
-            .api_key
-            .as_ref()
-            .ok_or_else(|| AgentMemError::ConfigError("Zhipu API key not configured".to_string()))?;
+        let api_key = self.config.api_key.as_ref().ok_or_else(|| {
+            AgentMemError::ConfigError("Zhipu API key not configured".to_string())
+        })?;
 
         let base_url = self
             .config
@@ -237,11 +235,9 @@ impl LLMProvider for ZhipuProvider {
         messages: &[Message],
         functions: &[FunctionDefinition],
     ) -> Result<FunctionCallResponse> {
-        let api_key = self
-            .config
-            .api_key
-            .as_ref()
-            .ok_or_else(|| AgentMemError::ConfigError("Zhipu API key not configured".to_string()))?;
+        let api_key = self.config.api_key.as_ref().ok_or_else(|| {
+            AgentMemError::ConfigError("Zhipu API key not configured".to_string())
+        })?;
 
         let base_url = self
             .config
@@ -344,4 +340,3 @@ impl LLMProvider for ZhipuProvider {
         Ok(())
     }
 }
-
