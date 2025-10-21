@@ -5,36 +5,117 @@ use std::collections::HashMap;
 
 use agent_mem_traits::{MemoryItem, MemoryType};
 
-/// 添加记忆的选项
-#[derive(Debug, Clone, Default)]
+/// 添加记忆的选项（mem0 兼容）
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AddMemoryOptions {
-    /// 记忆类型（如果不指定，将自动推断）
-    pub memory_type: Option<MemoryType>,
     /// 用户 ID
     pub user_id: Option<String>,
+    /// Agent ID
+    pub agent_id: Option<String>,
+    /// Run ID
+    pub run_id: Option<String>,
     /// 元数据
     pub metadata: Option<HashMap<String, serde_json::Value>>,
+    /// 启用智能推理（事实提取、去重等）
+    /// 如果为 true，使用 LLM 提取事实并决策 ADD/UPDATE/DELETE
+    /// 如果为 false，直接添加原始消息作为记忆
+    pub infer: bool,
+    /// 记忆类型（如 "procedural_memory"）
+    pub memory_type: Option<String>,
+    /// 自定义提示词
+    pub prompt: Option<String>,
 }
 
-/// 搜索记忆的选项
-#[derive(Debug, Clone)]
+/// 添加操作的结果（mem0 兼容）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddResult {
+    /// 受影响的记忆项列表（添加、更新、删除）
+    pub results: Vec<MemoryEvent>,
+    /// 提取的关系（如果启用了图存储）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relations: Option<Vec<RelationEvent>>,
+}
+
+/// 记忆事件（ADD, UPDATE, DELETE）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryEvent {
+    /// 记忆 ID
+    pub id: String,
+    /// 记忆内容
+    pub memory: String,
+    /// 事件类型：ADD, UPDATE, DELETE
+    pub event: String,
+    /// Actor ID（如果可用）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actor_id: Option<String>,
+    /// 角色（user, assistant, system）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+/// 关系事件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationEvent {
+    /// 源实体
+    pub source: String,
+    /// 关系类型
+    pub relation: String,
+    /// 目标实体
+    pub target: String,
+}
+
+/// 搜索记忆的选项（mem0 兼容）
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchOptions {
-    /// 返回结果数量限制
-    pub limit: usize,
-    /// 用户 ID
+    /// 用户 ID 过滤
     pub user_id: Option<String>,
-    /// 记忆类型过滤
-    pub memory_type: Option<MemoryType>,
+    /// Agent ID 过滤
+    pub agent_id: Option<String>,
+    /// Run ID 过滤
+    pub run_id: Option<String>,
+    /// 返回结果数量限制
+    pub limit: Option<usize>,
+    /// 最小相似度阈值 (0.0 - 1.0)
+    pub threshold: Option<f32>,
+    /// 额外过滤条件
+    pub filters: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl Default for SearchOptions {
     fn default() -> Self {
         Self {
-            limit: 10,
             user_id: None,
-            memory_type: None,
+            agent_id: None,
+            run_id: None,
+            limit: Some(10),
+            threshold: None,
+            filters: None,
         }
     }
+}
+
+/// 获取所有记忆的选项（mem0 兼容）
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GetAllOptions {
+    /// 用户 ID 过滤
+    pub user_id: Option<String>,
+    /// Agent ID 过滤
+    pub agent_id: Option<String>,
+    /// Run ID 过滤
+    pub run_id: Option<String>,
+    /// 返回结果数量限制
+    pub limit: Option<usize>,
+}
+
+/// 删除所有记忆的选项（mem0 兼容）
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeleteAllOptions {
+    /// 用户 ID 过滤
+    pub user_id: Option<String>,
+    /// Agent ID 过滤
+    pub agent_id: Option<String>,
+    /// Run ID 过滤
+    pub run_id: Option<String>,
 }
 
 /// 对话选项

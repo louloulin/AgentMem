@@ -81,9 +81,8 @@ pub mod visualization;
 pub use builder::MemoryBuilder;
 pub use memory::Memory;
 pub use types::{
-    AddMemoryOptions, MemoryStats, SearchOptions,
-    // TODO: 在任务 2.1 和 2.2 中导出这些类型
-    // ChatOptions, MemoryVisualization,
+    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryStats,
+    RelationEvent, SearchOptions,
 };
 
 // 重新导出 traits 中的常用类型

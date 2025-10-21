@@ -72,6 +72,7 @@ members = [
     "examples/single-binary-demo",
     "examples/observability-demo",
     "examples/fastembed-demo",
+    "examples/mem0-api-demo",
 
     # 示例
     "examples/demo",

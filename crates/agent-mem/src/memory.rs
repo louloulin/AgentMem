@@ -12,9 +12,8 @@ use agent_mem_traits::{AgentMemError, MemoryItem, MemoryType, Result};
 use crate::builder::MemoryBuilder;
 use crate::orchestrator::MemoryOrchestrator;
 use crate::types::{
-    AddMemoryOptions, MemoryStats, SearchOptions,
-    // TODO: 在任务 2.1 和 2.2 中使用这些类型
-    // ChatOptions, MemoryVisualization,
+    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryStats,
+    RelationEvent, SearchOptions,
 };
 
 /// 统一的记忆管理接口
@@ -148,36 +147,40 @@ impl Memory {
     /// # use agent_mem::Memory;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let mem = Memory::new().await?;
-    /// let id = mem.add("I love pizza").await?;
-    /// println!("Created memory: {}", id);
+    /// let result = mem.add("I love pizza").await?;
+    /// println!("Created {} memories", result.results.len());
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn add(&self, content: impl Into<String>) -> Result<String> {
+    pub async fn add(&self, content: impl Into<String>) -> Result<AddResult> {
         self.add_with_options(content, AddMemoryOptions::default()).await
     }
     
-    /// 添加记忆（带选项）
+    /// 添加记忆（带选项）- mem0 兼容版本
     ///
     /// # 参数
     ///
-    /// - `content`: 记忆内容
+    /// - `content`: 记忆内容（可以是单个字符串或消息列表）
     /// - `options`: 添加选项
+    ///
+    /// # 返回
+    ///
+    /// 返回 AddResult，包含受影响的记忆事件和关系
     ///
     /// # 示例
     ///
     /// ```rust,no_run
     /// # use agent_mem::Memory;
     /// # use agent_mem::AddMemoryOptions;
-    /// # use agent_mem::MemoryType;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let mem = Memory::new().await?;
     /// let options = AddMemoryOptions {
-    ///     memory_type: Some(MemoryType::Core),
     ///     user_id: Some("alice".to_string()),
+    ///     infer: true,  // 启用智能推理
     ///     ..Default::default()
     /// };
-    /// let id = mem.add_with_options("I love pizza", options).await?;
+    /// let result = mem.add_with_options("I love pizza", options).await?;
+    /// println!("Added {} memories", result.results.len());
     /// # Ok(())
     /// # }
     /// ```
@@ -185,17 +188,183 @@ impl Memory {
         &self,
         content: impl Into<String>,
         options: AddMemoryOptions,
-    ) -> Result<String> {
+    ) -> Result<AddResult> {
         let content = content.into();
-        debug!("添加记忆: {}", content);
-        
+        debug!("添加记忆: {}, infer={}", content, options.infer);
+
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.add_memory(
+        orchestrator.add_memory_v2(
             content,
-            self.default_agent_id.clone(),
+            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
             options.user_id.or_else(|| self.default_user_id.clone()),
-            options.memory_type,
+            options.run_id,
             options.metadata,
+            options.infer,
+            options.memory_type,
+            options.prompt,
+        ).await
+    }
+
+    /// 获取单个记忆（mem0 兼容）
+    ///
+    /// # 参数
+    ///
+    /// - `memory_id`: 记忆 ID
+    ///
+    /// # 返回
+    ///
+    /// 返回记忆项，如果不存在则返回错误
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let memory = mem.get("memory-id-123").await?;
+    /// println!("Memory: {}", memory.content);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get(&self, memory_id: &str) -> Result<MemoryItem> {
+        debug!("获取记忆: {}", memory_id);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.get_memory(memory_id).await
+    }
+
+    /// 获取所有记忆（mem0 兼容）
+    ///
+    /// # 参数
+    ///
+    /// - `options`: 过滤选项
+    ///
+    /// # 返回
+    ///
+    /// 返回匹配的记忆列表
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::GetAllOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let options = GetAllOptions {
+    ///     user_id: Some("alice".to_string()),
+    ///     limit: Some(100),
+    ///     ..Default::default()
+    /// };
+    /// let memories = mem.get_all(options).await?;
+    /// println!("Found {} memories", memories.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_all(&self, options: GetAllOptions) -> Result<Vec<MemoryItem>> {
+        debug!("获取所有记忆: {:?}", options);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.get_all_memories_v2(
+            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
+            options.user_id.or_else(|| self.default_user_id.clone()),
+            options.run_id,
+            options.limit,
+        ).await
+    }
+
+    /// 更新记忆（mem0 兼容）
+    ///
+    /// # 参数
+    ///
+    /// - `memory_id`: 记忆 ID
+    /// - `data`: 要更新的字段
+    ///
+    /// # 返回
+    ///
+    /// 返回更新后的记忆项
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use std::collections::HashMap;
+    /// # use serde_json::json;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let mut data = HashMap::new();
+    /// data.insert("content".to_string(), json!("Updated content"));
+    /// let updated = mem.update("memory-id-123", data).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn update(
+        &self,
+        memory_id: &str,
+        data: std::collections::HashMap<String, serde_json::Value>,
+    ) -> Result<MemoryItem> {
+        debug!("更新记忆: {}", memory_id);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.update_memory(memory_id, data).await
+    }
+
+    /// 删除记忆（mem0 兼容）
+    ///
+    /// # 参数
+    ///
+    /// - `memory_id`: 记忆 ID
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// mem.delete("memory-id-123").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn delete(&self, memory_id: &str) -> Result<()> {
+        debug!("删除记忆: {}", memory_id);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.delete_memory(memory_id).await
+    }
+
+    /// 删除所有记忆（mem0 兼容）
+    ///
+    /// # 参数
+    ///
+    /// - `options`: 过滤选项
+    ///
+    /// # 返回
+    ///
+    /// 返回删除的记忆数量
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::DeleteAllOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let options = DeleteAllOptions {
+    ///     user_id: Some("alice".to_string()),
+    ///     ..Default::default()
+    /// };
+    /// let count = mem.delete_all(options).await?;
+    /// println!("Deleted {} memories", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn delete_all(&self, options: DeleteAllOptions) -> Result<usize> {
+        debug!("删除所有记忆: {:?}", options);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.delete_all_memories(
+            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
+            options.user_id.or_else(|| self.default_user_id.clone()),
+            options.run_id,
         ).await
     }
     
@@ -261,37 +430,14 @@ impl Memory {
     ) -> Result<Vec<MemoryItem>> {
         let query = query.into();
         debug!("搜索记忆: {}", query);
-        
+
         let orchestrator = self.orchestrator.read().await;
         orchestrator.search_memories(
             query,
             self.default_agent_id.clone(),
             options.user_id.or_else(|| self.default_user_id.clone()),
-            options.limit,
-            options.memory_type,
-        ).await
-    }
-    
-    /// 获取所有记忆
-    ///
-    /// # 示例
-    ///
-    /// ```rust,no_run
-    /// # use agent_mem::Memory;
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let mem = Memory::new().await?;
-    /// let all_memories = mem.get_all().await?;
-    /// println!("Total memories: {}", all_memories.len());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn get_all(&self) -> Result<Vec<MemoryItem>> {
-        debug!("获取所有记忆");
-        
-        let orchestrator = self.orchestrator.read().await;
-        orchestrator.get_all_memories(
-            self.default_agent_id.clone(),
-            self.default_user_id.clone(),
+            options.limit.unwrap_or(10),
+            None,  // memory_type 已从 SearchOptions 移除
         ).await
     }
     

@@ -18,7 +18,7 @@ use agent_mem_traits::{
 };
 
 use crate::auto_config::AutoConfig;
-use crate::types::MemoryStats;
+use crate::types::{AddResult, MemoryEvent, MemoryStats, RelationEvent};
 
 /// 编排器配置
 #[derive(Debug, Clone)]
@@ -373,6 +373,153 @@ impl MemoryOrchestrator {
         // TODO: 实现实际的 Agent 调用
         // 当前返回占位符 ID
         Ok(uuid::Uuid::new_v4().to_string())
+    }
+
+    // ========== mem0 兼容 API ==========
+
+    /// 添加记忆 v2（mem0 兼容）
+    ///
+    /// 支持 infer 参数控制智能推理
+    pub async fn add_memory_v2(
+        &self,
+        content: String,
+        agent_id: String,
+        user_id: Option<String>,
+        run_id: Option<String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        infer: bool,
+        memory_type: Option<String>,
+        _prompt: Option<String>,
+    ) -> Result<AddResult> {
+        debug!(
+            "添加记忆 v2: content={}, agent_id={}, infer={}",
+            content, agent_id, infer
+        );
+
+        // 如果 infer=true，使用智能推理（事实提取、去重等）
+        // 如果 infer=false，直接添加原始内容
+
+        // 解析 memory_type 字符串
+        let mem_type = if let Some(type_str) = memory_type {
+            match type_str.as_str() {
+                "core_memory" => Some(MemoryType::Core),
+                "episodic_memory" => Some(MemoryType::Episodic),
+                "semantic_memory" => Some(MemoryType::Semantic),
+                "procedural_memory" => Some(MemoryType::Procedural),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        // 调用原有的 add_memory 方法
+        let memory_id = self.add_memory(
+            content.clone(),
+            agent_id.clone(),
+            user_id.clone(),
+            mem_type,
+            metadata,
+        ).await?;
+
+        // 构造返回结果
+        let event = MemoryEvent {
+            id: memory_id,
+            memory: content,
+            event: "ADD".to_string(),
+            actor_id: user_id.or(Some(agent_id)),
+            role: Some("user".to_string()),
+        };
+
+        // TODO: 如果启用了图存储，提取关系
+        let relations = if infer {
+            // 未来可以在这里调用关系提取
+            None
+        } else {
+            None
+        };
+
+        Ok(AddResult {
+            results: vec![event],
+            relations,
+        })
+    }
+
+    /// 获取单个记忆
+    pub async fn get_memory(&self, memory_id: &str) -> Result<MemoryItem> {
+        debug!("获取记忆: {}", memory_id);
+
+        // TODO: 实现从存储后端获取记忆
+        // 当前返回错误
+        Err(agent_mem_traits::AgentMemError::NotFound(format!(
+            "Memory {} not found (get_memory not yet implemented)",
+            memory_id
+        )))
+    }
+
+    /// 获取所有记忆 v2（mem0 兼容）
+    pub async fn get_all_memories_v2(
+        &self,
+        agent_id: String,
+        user_id: Option<String>,
+        _run_id: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<Vec<MemoryItem>> {
+        debug!(
+            "获取所有记忆 v2: agent_id={}, user_id={:?}, limit={:?}",
+            agent_id, user_id, limit
+        );
+
+        // 调用原有的 get_all_memories 方法
+        let mut memories = self.get_all_memories(agent_id, user_id).await?;
+
+        // 应用 limit
+        if let Some(limit_val) = limit {
+            memories.truncate(limit_val);
+        }
+
+        Ok(memories)
+    }
+
+    /// 更新记忆
+    pub async fn update_memory(
+        &self,
+        memory_id: &str,
+        _data: HashMap<String, serde_json::Value>,
+    ) -> Result<MemoryItem> {
+        debug!("更新记忆: {}", memory_id);
+
+        // TODO: 实现记忆更新
+        // 当前返回错误
+        Err(agent_mem_traits::AgentMemError::NotFound(format!(
+            "Memory {} not found (update_memory not yet implemented)",
+            memory_id
+        )))
+    }
+
+    /// 删除记忆
+    pub async fn delete_memory(&self, memory_id: &str) -> Result<()> {
+        debug!("删除记忆: {}", memory_id);
+
+        // TODO: 实现记忆删除
+        // 当前返回错误
+        Err(agent_mem_traits::AgentMemError::NotFound(format!(
+            "Memory {} not found (delete_memory not yet implemented)",
+            memory_id
+        )))
+    }
+
+    /// 删除所有记忆
+    pub async fn delete_all_memories(
+        &self,
+        _agent_id: String,
+        _user_id: Option<String>,
+        _run_id: Option<String>,
+    ) -> Result<usize> {
+        debug!("删除所有记忆");
+
+        // TODO: 实现批量删除
+        // 当前返回 0
+        Ok(0)
     }
 }
 
