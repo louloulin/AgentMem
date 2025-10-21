@@ -321,9 +321,12 @@ impl MemoryOrchestrator {
                 if let Ok(response) = agent_lock.execute_task(task).await {
                     if response.success {
                         if let Some(data) = response.data {
-                            if let Some(knowledge) = data.get("knowledge").and_then(|v| v.as_array()) {
-                                for item in knowledge {
-                                    if let Ok(mem_item) = serde_json::from_value::<MemoryItem>(item.clone()) {
+                            // SemanticAgent 返回 "results" 字段，包含 SemanticMemoryItem 数组
+                            if let Some(results) = data.get("results").and_then(|v| v.as_array()) {
+                                for item in results {
+                                    if let Ok(semantic_item) = serde_json::from_value::<agent_mem_traits::SemanticMemoryItem>(item.clone()) {
+                                        // 转换 SemanticMemoryItem 到 MemoryItem
+                                        let mem_item = Self::semantic_to_memory_item(semantic_item);
                                         all_results.push(mem_item);
                                     }
                                 }
@@ -952,6 +955,59 @@ impl MemoryOrchestrator {
         }
 
         Ok(count)
+    }
+
+    // ========== 辅助方法 ==========
+
+    /// 将 SemanticMemoryItem 转换为 MemoryItem
+    fn semantic_to_memory_item(item: agent_mem_traits::SemanticMemoryItem) -> MemoryItem {
+        use agent_mem_traits::{Session, Entity, Relation};
+        use std::collections::HashMap;
+
+        let mut metadata = HashMap::new();
+        if let Some(details) = &item.details {
+            metadata.insert("details".to_string(), serde_json::json!(details));
+        }
+        if let Some(source) = &item.source {
+            metadata.insert("source".to_string(), serde_json::json!(source));
+        }
+        metadata.insert("tree_path".to_string(), serde_json::json!(item.tree_path));
+        metadata.insert("organization_id".to_string(), serde_json::json!(item.organization_id));
+
+        // 合并原有的 metadata
+        if let Ok(meta_map) = serde_json::from_value::<HashMap<String, serde_json::Value>>(item.metadata.clone()) {
+            metadata.extend(meta_map);
+        }
+
+        MemoryItem {
+            id: item.id,
+            content: item.summary,
+            hash: None,
+            metadata,
+            score: None,
+            created_at: item.created_at,
+            updated_at: Some(item.updated_at),
+            session: Session {
+                id: "default".to_string(),
+                user_id: Some(item.user_id.clone()),
+                agent_id: Some(item.agent_id.clone()),
+                run_id: None,
+                actor_id: Some(item.agent_id.clone()),
+                created_at: item.created_at,
+                metadata: HashMap::new(),
+            },
+            memory_type: agent_mem_traits::MemoryType::Semantic,
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id: item.agent_id,
+            user_id: Some(item.user_id),
+            importance: 0.5,  // 默认重要性
+            embedding: None,
+            last_accessed_at: item.updated_at,
+            access_count: 0,
+            expires_at: None,
+            version: 1,
+        }
     }
 }
 
