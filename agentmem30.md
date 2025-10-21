@@ -1207,12 +1207,28 @@ cargo test --package agent-mem --test intelligence_real_test -- --ignored --noca
   - [x] 性能测试通过，结果超出预期
   - [x] 添加性能提升 +21.1% (超出目标 +20%)
   - [x] 吞吐量提升 +26.7%
-- [x] **Step 1.10**: 真实 Intelligence 组件测试 ✅ (commit 443fa4d)
+- [x] **Step 1.10**: 真实 Intelligence 组件测试 ✅ (commit 443fa4d, 177c449, 1736774)
   - [x] 创建 intelligence_real_test.rs (300 行)
   - [x] 创建测试 README.md (280 行)
-  - [x] 支持多种 LLM Provider (OpenAI/Anthropic/Ollama)
+  - [x] 支持多种 LLM Provider (OpenAI/Anthropic/Ollama/Zhipu)
   - [x] 实现自动降级机制
   - [x] 4 个真实测试用例（需要 LLM Provider）
+  - [x] **集成智谱 AI (Zhipu) Provider** ✅ (commit 177c449)
+    - 在 LLMFactory 中添加 ZhipuProvider 支持
+    - 更新测试优先级（Zhipu > OpenAI > Anthropic > Ollama）
+    - 添加自动配置检测（ZHIPU_API_KEY）
+    - 修复 ExtractedFact 和 Entity 的 metadata/attributes 类型
+    - 支持 glm-4-plus 模型
+  - [x] **修复智谱 AI 多值实体类型解析问题** ✅ (commit 1736774)
+    - 在 clean_json_response() 中添加 entity_type 多值处理
+    - 将 "Language|Technology" 拆分为 "Language"（取第一个值）
+    - 所有测试通过：4 passed; 0 failed (100%)
+    - 测试时间：30.50s
+  - [x] **所有 Intelligence 组件测试通过** ✅
+    - test_fact_extractor_real: 成功提取 6 个事实
+    - test_advanced_fact_extractor_real: 通过
+    - test_importance_evaluator_real: 重要性评估成功
+    - test_full_intelligence_pipeline: 完整流水线测试成功
 
 **实施记录 (2025-10-21)**:
 
