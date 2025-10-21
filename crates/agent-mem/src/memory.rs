@@ -103,7 +103,7 @@ impl Memory {
             "default".to_string(),
         ))
     }
-    
+
     /// 使用 Builder 模式初始化
     ///
     /// # 示例
@@ -124,7 +124,7 @@ impl Memory {
     pub fn builder() -> MemoryBuilder {
         MemoryBuilder::new()
     }
-    
+
     /// 添加记忆
     ///
     /// 自动执行：
@@ -153,9 +153,10 @@ impl Memory {
     /// # }
     /// ```
     pub async fn add(&self, content: impl Into<String>) -> Result<AddResult> {
-        self.add_with_options(content, AddMemoryOptions::default()).await
+        self.add_with_options(content, AddMemoryOptions::default())
+            .await
     }
-    
+
     /// 添加记忆（带选项）- mem0 兼容版本
     ///
     /// # 参数
@@ -193,16 +194,20 @@ impl Memory {
         debug!("添加记忆: {}, infer={}", content, options.infer);
 
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.add_memory_v2(
-            content,
-            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
-            options.user_id.or_else(|| self.default_user_id.clone()),
-            options.run_id,
-            options.metadata,
-            options.infer,
-            options.memory_type,
-            options.prompt,
-        ).await
+        orchestrator
+            .add_memory_v2(
+                content,
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                options.user_id.or_else(|| self.default_user_id.clone()),
+                options.run_id,
+                options.metadata,
+                options.infer,
+                options.memory_type,
+                options.prompt,
+            )
+            .await
     }
 
     /// 获取单个记忆（mem0 兼容）
@@ -264,12 +269,16 @@ impl Memory {
         debug!("获取所有记忆: {:?}", options);
 
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.get_all_memories_v2(
-            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
-            options.user_id.or_else(|| self.default_user_id.clone()),
-            options.run_id,
-            options.limit,
-        ).await
+        orchestrator
+            .get_all_memories_v2(
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                options.user_id.or_else(|| self.default_user_id.clone()),
+                options.run_id,
+                options.limit,
+            )
+            .await
     }
 
     /// 更新记忆（mem0 兼容）
@@ -361,13 +370,17 @@ impl Memory {
         debug!("删除所有记忆: {:?}", options);
 
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.delete_all_memories(
-            options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),
-            options.user_id.or_else(|| self.default_user_id.clone()),
-            options.run_id,
-        ).await
+        orchestrator
+            .delete_all_memories(
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                options.user_id.or_else(|| self.default_user_id.clone()),
+                options.run_id,
+            )
+            .await
     }
-    
+
     /// 搜索记忆
     ///
     /// 支持：
@@ -397,9 +410,10 @@ impl Memory {
     /// # }
     /// ```
     pub async fn search(&self, query: impl Into<String>) -> Result<Vec<MemoryItem>> {
-        self.search_with_options(query, SearchOptions::default()).await
+        self.search_with_options(query, SearchOptions::default())
+            .await
     }
-    
+
     /// 搜索记忆（带选项）
     ///
     /// # 参数
@@ -432,15 +446,17 @@ impl Memory {
         debug!("搜索记忆: {}", query);
 
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.search_memories(
-            query,
-            self.default_agent_id.clone(),
-            options.user_id.or_else(|| self.default_user_id.clone()),
-            options.limit.unwrap_or(10),
-            None,  // memory_type 已从 SearchOptions 移除
-        ).await
+        orchestrator
+            .search_memories(
+                query,
+                self.default_agent_id.clone(),
+                options.user_id.or_else(|| self.default_user_id.clone()),
+                options.limit.unwrap_or(10),
+                None, // memory_type 已从 SearchOptions 移除
+            )
+            .await
     }
-    
+
     /// 获取记忆统计信息
     ///
     /// # 示例
@@ -456,13 +472,11 @@ impl Memory {
     /// ```
     pub async fn get_stats(&self) -> Result<MemoryStats> {
         debug!("获取记忆统计信息");
-        
+
         let orchestrator = self.orchestrator.read().await;
-        orchestrator.get_stats(
-            self.default_user_id.clone(),
-        ).await
+        orchestrator.get_stats(self.default_user_id.clone()).await
     }
-    
+
     /// 设置默认用户 ID
     ///
     /// # 示例
@@ -479,10 +493,9 @@ impl Memory {
     pub fn set_default_user(&mut self, user_id: impl Into<String>) {
         self.default_user_id = Some(user_id.into());
     }
-    
+
     /// 设置默认 Agent ID
     pub fn set_default_agent(&mut self, agent_id: impl Into<String>) {
         self.default_agent_id = agent_id.into();
     }
 }
-

@@ -86,13 +86,10 @@ pub use types::{
 };
 
 // 重新导出 traits 中的常用类型
-pub use agent_mem_traits::{
-    AgentMemError, MemoryItem, MemoryType, Result,
-};
+pub use agent_mem_traits::{AgentMemError, MemoryItem, MemoryType, Result};
 
 // 重新导出 core 中的 Agent 类型（用于高级用户）
 pub use agent_mem_core::{
-    CoreAgent, EpisodicAgent, SemanticAgent, ProceduralAgent,
-    ResourceAgent, WorkingAgent, KnowledgeAgent, ContextualAgent,
+    ContextualAgent, CoreAgent, EpisodicAgent, KnowledgeAgent, ProceduralAgent, ResourceAgent,
+    SemanticAgent, WorkingAgent,
 };
-

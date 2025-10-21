@@ -43,7 +43,7 @@ impl MemoryBuilder {
             default_agent_id: "default".to_string(),
         }
     }
-    
+
     /// 配置存储后端
     ///
     /// 支持的 URL 格式：
@@ -68,7 +68,7 @@ impl MemoryBuilder {
         self.config.storage_url = Some(url.into());
         self
     }
-    
+
     /// 配置 LLM 提供商
     ///
     /// 支持的提供商：
@@ -94,7 +94,7 @@ impl MemoryBuilder {
         self.config.llm_model = Some(model.into());
         self
     }
-    
+
     /// 配置 Embedder
     ///
     /// 支持的提供商：
@@ -118,7 +118,7 @@ impl MemoryBuilder {
         self.config.embedder_model = Some(model.into());
         self
     }
-    
+
     /// 配置向量存储
     ///
     /// 支持的 URL 格式：
@@ -142,7 +142,7 @@ impl MemoryBuilder {
         self.config.vector_store_url = Some(url.into());
         self
     }
-    
+
     /// 启用智能功能
     ///
     /// 启用后将自动：
@@ -166,7 +166,7 @@ impl MemoryBuilder {
         self.config.enable_intelligent_features = true;
         self
     }
-    
+
     /// 禁用智能功能
     ///
     /// 禁用后将使用基础模式，不进行事实提取和智能决策。
@@ -187,7 +187,7 @@ impl MemoryBuilder {
         self.config.enable_intelligent_features = false;
         self
     }
-    
+
     /// 设置默认用户
     ///
     /// # 示例
@@ -206,7 +206,7 @@ impl MemoryBuilder {
         self.default_user_id = Some(user_id.into());
         self
     }
-    
+
     /// 设置默认 Agent
     ///
     /// # 示例
@@ -225,7 +225,7 @@ impl MemoryBuilder {
         self.default_agent_id = agent_id.into();
         self
     }
-    
+
     /// 构建 Memory 实例
     ///
     /// # 示例
@@ -259,4 +259,3 @@ impl Default for MemoryBuilder {
         Self::new()
     }
 }
-
