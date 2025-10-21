@@ -878,54 +878,56 @@ impl MemoryOrchestrator {
             content, agent_id, infer
         );
 
-        // 如果 infer=true，使用智能推理（事实提取、去重等）
-        // 如果 infer=false，直接添加原始内容
+        // ========== 根据 infer 参数选择处理模式 ==========
+        if infer {
+            // infer=true: 使用智能推理模式（完整的 10 步流水线）
+            info!("使用智能推理模式 (infer=true)");
 
-        // 解析 memory_type 字符串
-        let mem_type = if let Some(type_str) = memory_type {
-            match type_str.as_str() {
-                "core_memory" => Some(MemoryType::Core),
-                "episodic_memory" => Some(MemoryType::Episodic),
-                "semantic_memory" => Some(MemoryType::Semantic),
-                "procedural_memory" => Some(MemoryType::Procedural),
-                _ => None,
-            }
+            // 调用智能添加方法
+            self.add_memory_intelligent(content, agent_id, user_id, metadata)
+                .await
         } else {
-            None
-        };
+            // infer=false: 使用简单模式（直接添加原始内容）
+            info!("使用简单模式 (infer=false)");
 
-        // 调用原有的 add_memory 方法
-        let memory_id = self
-            .add_memory(
-                content.clone(),
-                agent_id.clone(),
-                user_id.clone(),
-                mem_type,
-                metadata,
-            )
-            .await?;
+            // 解析 memory_type 字符串
+            let mem_type = if let Some(type_str) = memory_type {
+                match type_str.as_str() {
+                    "core_memory" => Some(MemoryType::Core),
+                    "episodic_memory" => Some(MemoryType::Episodic),
+                    "semantic_memory" => Some(MemoryType::Semantic),
+                    "procedural_memory" => Some(MemoryType::Procedural),
+                    _ => None,
+                }
+            } else {
+                None
+            };
 
-        // 构造返回结果
-        let event = MemoryEvent {
-            id: memory_id,
-            memory: content,
-            event: "ADD".to_string(),
-            actor_id: user_id.or(Some(agent_id)),
-            role: Some("user".to_string()),
-        };
+            // 调用简单添加方法
+            let memory_id = self
+                .add_memory(
+                    content.clone(),
+                    agent_id.clone(),
+                    user_id.clone(),
+                    mem_type,
+                    metadata,
+                )
+                .await?;
 
-        // TODO: 如果启用了图存储，提取关系
-        let relations = if infer {
-            // 未来可以在这里调用关系提取
-            None
-        } else {
-            None
-        };
+            // 构造返回结果
+            let event = MemoryEvent {
+                id: memory_id,
+                memory: content,
+                event: "ADD".to_string(),
+                actor_id: user_id.or(Some(agent_id)),
+                role: Some("user".to_string()),
+            };
 
-        Ok(AddResult {
-            results: vec![event],
-            relations,
-        })
+            Ok(AddResult {
+                results: vec![event],
+                relations: None,
+            })
+        }
     }
 
     /// 获取单个记忆

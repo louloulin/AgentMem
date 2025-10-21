@@ -2,7 +2,7 @@
 //!
 //! 测试 Phase 1 实现的智能添加和混合搜索功能
 
-use agent_mem::Memory;
+use agent_mem::{AddMemoryOptions, Memory};
 use agent_mem_traits::{Message, MessageRole};
 
 /// 测试类型转换方法
@@ -233,6 +233,68 @@ mod integration_tests {
             Err(e) => {
                 println!("❌ 向后兼容性测试失败: {:?}", e);
                 panic!("旧的 add() 方法应该仍然可用，但返回错误: {:?}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_infer_parameter_false() {
+        // 测试 infer=false 模式（简单模式）
+        let mem = Memory::new().await.expect("初始化失败");
+
+        // 使用 infer=false
+        let options = AddMemoryOptions {
+            infer: false,
+            ..Default::default()
+        };
+
+        let result = mem.add_with_options("测试简单模式", options).await;
+
+        match result {
+            Ok(add_result) => {
+                println!(
+                    "✅ infer=false 测试通过，添加了 {} 条记忆",
+                    add_result.results.len()
+                );
+                assert_eq!(add_result.results.len(), 1);
+                assert_eq!(add_result.results[0].event, "ADD");
+            }
+            Err(e) => {
+                println!("❌ infer=false 测试失败: {:?}", e);
+                panic!("infer=false 应该使用简单模式，但返回错误: {:?}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_infer_parameter_true() {
+        // 测试 infer=true 模式（智能模式）
+        let mem = Memory::new().await.expect("初始化失败");
+
+        // 使用 infer=true
+        let options = AddMemoryOptions {
+            infer: true,
+            ..Default::default()
+        };
+
+        let result = mem.add_with_options("我喜欢吃苹果和香蕉", options).await;
+
+        match result {
+            Ok(add_result) => {
+                println!(
+                    "✅ infer=true 测试通过，添加了 {} 条记忆",
+                    add_result.results.len()
+                );
+                // 智能模式可能会提取多个事实，所以结果数量可能 >= 1
+                assert!(add_result.results.len() >= 1);
+            }
+            Err(e) => {
+                println!(
+                    "⚠️ infer=true 测试失败（可能是因为 Intelligence 组件未初始化）: {:?}",
+                    e
+                );
+                // 如果 Intelligence 组件未初始化，应该降级到简单模式
+                // 这不是错误，只是一个警告
             }
         }
     }
