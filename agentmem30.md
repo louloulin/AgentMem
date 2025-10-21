@@ -1107,6 +1107,57 @@ pub use agent_mem_traits::{
 3. 直接使用 Managers，减少间接调用
 4. Intelligence 组件未初始化时降级到简单模式，但架构优化带来性能提升
 
+#### 5. 真实 Intelligence 组件测试（Step 1.10）
+
+**测试文件**: `crates/agent-mem/tests/intelligence_real_test.rs` (300 行)
+
+**测试用例**:
+1. `test_fact_extractor_real` - 测试事实提取功能
+2. `test_advanced_fact_extractor_real` - 测试结构化事实提取功能
+3. `test_importance_evaluator_real` - 测试重要性评估功能
+4. `test_full_intelligence_pipeline` - 测试完整 Intelligence 流水线
+
+**LLM Provider 支持**:
+- **OpenAI** (优先级 1): 需要 `OPENAI_API_KEY` 环境变量
+- **Anthropic** (优先级 2): 需要 `ANTHROPIC_API_KEY` 环境变量
+- **Ollama** (优先级 3): 本地服务 `http://localhost:11434`
+
+**自动降级机制**:
+```rust
+async fn create_llm_provider() -> Option<Arc<dyn LLMProvider + Send + Sync>> {
+    // 1. 尝试 OpenAI
+    if let Ok(api_key) = env::var("OPENAI_API_KEY") { ... }
+
+    // 2. 尝试 Anthropic
+    if let Ok(api_key) = env::var("ANTHROPIC_API_KEY") { ... }
+
+    // 3. 尝试 Ollama (本地)
+    let config = LLMConfig { provider: "ollama", ... };
+    ...
+}
+```
+
+**运行方式**:
+```bash
+# 使用 OpenAI
+export OPENAI_API_KEY=your_key
+cargo test --package agent-mem --test intelligence_real_test -- --ignored --nocapture
+
+# 使用 Anthropic
+export ANTHROPIC_API_KEY=your_key
+cargo test --package agent-mem --test intelligence_real_test -- --ignored --nocapture
+
+# 使用 Ollama (本地)
+ollama serve
+cargo test --package agent-mem --test intelligence_real_test -- --ignored --nocapture
+```
+
+**测试指南**: `crates/agent-mem/tests/README.md` (280 行)
+- 详细的 LLM Provider 配置说明
+- 运行测试的命令示例
+- 故障排除指南
+- 预期输出示例
+
 ---
 
 **验收标准**:
@@ -1156,6 +1207,12 @@ pub use agent_mem_traits::{
   - [x] 性能测试通过，结果超出预期
   - [x] 添加性能提升 +21.1% (超出目标 +20%)
   - [x] 吞吐量提升 +26.7%
+- [x] **Step 1.10**: 真实 Intelligence 组件测试 ✅ (commit 443fa4d)
+  - [x] 创建 intelligence_real_test.rs (300 行)
+  - [x] 创建测试 README.md (280 行)
+  - [x] 支持多种 LLM Provider (OpenAI/Anthropic/Ollama)
+  - [x] 实现自动降级机制
+  - [x] 4 个真实测试用例（需要 LLM Provider）
 
 **实施记录 (2025-10-21)**:
 
