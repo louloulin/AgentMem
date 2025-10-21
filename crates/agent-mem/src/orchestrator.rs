@@ -64,7 +64,7 @@ use agent_mem_core::search::{
 };
 
 // ========== 基础类型导入 ==========
-use agent_mem_core::types::MemoryType;
+use agent_mem_core::types::{Memory as CoreMemory, MemoryType};
 use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{MemoryItem, Result};
 
@@ -1369,5 +1369,77 @@ impl MemoryOrchestrator {
         }
 
         Ok(memory_items)
+    }
+
+    // ========== 类型转换方法 (Phase 1 Step 1.5) ==========
+
+    /// 将 StructuredFact 转换为 CoreMemory
+    ///
+    /// 用于调用 Intelligence 组件（如 EnhancedImportanceEvaluator）
+    fn structured_fact_to_core_memory(
+        fact: &StructuredFact,
+        agent_id: String,
+        user_id: Option<String>,
+    ) -> CoreMemory {
+        use agent_mem_traits::Vector;
+        use chrono::Utc;
+
+        let now = Utc::now().timestamp();
+
+        // 将 StructuredFact 的 metadata 转换为 HashMap<String, String>
+        let metadata: HashMap<String, String> = fact
+            .metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        CoreMemory {
+            id: fact.id.clone(),
+            agent_id,
+            user_id,
+            memory_type: MemoryType::Semantic, // StructuredFact 通常是语义记忆
+            content: fact.description.clone(),
+            importance: fact.importance,
+            embedding: None, // TODO: 从 fact 中提取 embedding
+            created_at: now,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            metadata,
+            version: 1,
+        }
+    }
+
+    /// 将 ExistingMemory 转换为 CoreMemory
+    ///
+    /// 用于调用 Intelligence 组件（如 ConflictResolver）
+    fn existing_memory_to_core_memory(memory: &ExistingMemory) -> CoreMemory {
+        use chrono::Utc;
+
+        let now = Utc::now().timestamp();
+
+        // 将 ExistingMemory 的 metadata 转换为 HashMap<String, String>
+        let metadata: HashMap<String, String> = memory.metadata.clone();
+
+        // 解析 created_at 字符串为时间戳
+        let created_at = chrono::DateTime::parse_from_rfc3339(&memory.created_at)
+            .map(|dt| dt.timestamp())
+            .unwrap_or(now);
+
+        CoreMemory {
+            id: memory.id.clone(),
+            agent_id: "default_agent".to_string(), // ExistingMemory 没有 agent_id 字段
+            user_id: None,                         // ExistingMemory 没有 user_id 字段
+            memory_type: MemoryType::Semantic,     // 默认类型
+            content: memory.content.clone(),
+            importance: memory.importance,
+            embedding: None, // TODO: 从 memory 中提取 embedding
+            created_at,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            metadata,
+            version: 1,
+        }
     }
 }
