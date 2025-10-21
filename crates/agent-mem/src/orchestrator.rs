@@ -14,9 +14,12 @@ use agent_mem_core::{
 };
 use agent_mem_traits::{
     MemoryItem, Result,
-    // TODO: 在任务 1.2 中使用这些类型
-    // FactExtractor, DecisionEngine, LLMProvider,
 };
+use agent_mem_intelligence::{
+    FactExtractor, MemoryDecisionEngine, ExtractedFact, MemoryAction,
+    ExistingMemory, MemoryDecision,
+};
+use agent_mem_llm::LLMProvider;
 
 // 使用 agent_mem_core 的 MemoryType（与 TaskRequest 兼容）
 use agent_mem_core::types::MemoryType;
@@ -74,12 +77,12 @@ pub struct MemoryOrchestrator {
     working_agent: Option<Arc<RwLock<WorkingAgent>>>,
     knowledge_agent: Option<Arc<RwLock<KnowledgeAgent>>>,
     contextual_agent: Option<Arc<RwLock<ContextualAgent>>>,
-    
-    // 智能组件 (TODO: 在任务 1.2 中实现)
-    // fact_extractor: Option<Arc<dyn FactExtractor>>,
-    // decision_engine: Option<Arc<dyn DecisionEngine>>,
-    // llm_provider: Option<Arc<dyn LLMProvider>>,
-    
+
+    // 智能组件 (Phase 1.1-1.2: 已集成)
+    fact_extractor: Option<Arc<FactExtractor>>,
+    decision_engine: Option<Arc<MemoryDecisionEngine>>,
+    llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>>,
+
     // 配置
     config: OrchestratorConfig,
 }
@@ -168,14 +171,15 @@ impl MemoryOrchestrator {
         let working_agent = None;
         let knowledge_agent = None;
         let contextual_agent = None;
-        
-        // TODO: 在任务 1.2 中创建智能组件
-        // let (fact_extractor, decision_engine, llm_provider) = if config.enable_intelligent_features {
-        //     Self::create_intelligent_components(&config).await?
-        // } else {
-        //     (None, None, None)
-        // };
-        
+
+        // Phase 1.1-1.2: 创建智能组件
+        let (fact_extractor, decision_engine, llm_provider) = if config.enable_intelligent_features {
+            Self::create_intelligent_components(&config).await?
+        } else {
+            info!("智能功能已禁用，将使用基础模式");
+            (None, None, None)
+        };
+
         Ok(Self {
             core_agent,
             episodic_agent,
@@ -185,6 +189,9 @@ impl MemoryOrchestrator {
             working_agent,
             knowledge_agent,
             contextual_agent,
+            fact_extractor,
+            decision_engine,
+            llm_provider,
             config,
         })
     }
