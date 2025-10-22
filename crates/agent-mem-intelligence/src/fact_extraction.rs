@@ -652,6 +652,116 @@ Requirements:
             intersection as f32 / union as f32
         }
     }
+
+    /// P1 优化 #3: 基于规则的事实提取（降级方案）
+    /// 
+    /// 当 LLM 解析失败时使用此方法作为后备方案
+    fn rule_based_fact_extraction(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
+        info!("使用基于规则的事实提取（降级方案）");
+        
+        let mut facts = Vec::new();
+
+        for message in messages {
+            let content = &message.content;
+            
+            // 规则1: 提取包含关键词的句子作为事实
+            let sentences: Vec<&str> = content.split('。').collect();
+            
+            for (idx, sentence) in sentences.iter().enumerate() {
+                let sentence = sentence.trim();
+                if sentence.is_empty() {
+                    continue;
+                }
+
+                // 判断事实类别
+                let category = self.classify_by_keywords(sentence);
+                
+                // 构建事实
+                let fact = ExtractedFact {
+                    content: sentence.to_string(),
+                    confidence: 0.6, // 规则提取置信度较低
+                    category,
+                    entities: vec![],
+                    temporal_info: None,
+                    source_message_id: Some(format!("rule_extract_{}", idx)),
+                    metadata: {
+                        let mut map = HashMap::new();
+                        map.insert(
+                            "extraction_method".to_string(),
+                            serde_json::json!("rule_based")
+                        );
+                        map
+                    },
+                };
+                
+                facts.push(fact);
+            }
+        }
+
+        if facts.is_empty() {
+            // 如果没有提取到任何事实，至少返回原始内容
+            for message in messages {
+                facts.push(ExtractedFact {
+                    content: message.content.clone(),
+                    confidence: 0.5,
+                    category: FactCategory::Knowledge,
+                    entities: vec![],
+                    temporal_info: None,
+                    source_message_id: None,
+                    metadata: {
+                        let mut map = HashMap::new();
+                        map.insert(
+                            "extraction_method".to_string(),
+                            serde_json::json!("fallback_raw")
+                        );
+                        map
+                    },
+                });
+            }
+        }
+
+        info!("规则提取完成: {} 个事实", facts.len());
+        Ok(facts)
+    }
+
+    /// 基于关键词分类事实类别
+    fn classify_by_keywords(&self, text: &str) -> FactCategory {
+        let text_lower = text.to_lowercase();
+        
+        // 个人信息关键词
+        if text_lower.contains("我") && (text_lower.contains("叫") || text_lower.contains("是")) {
+            return FactCategory::Personal;
+        }
+        
+        // 偏好关键词
+        if text_lower.contains("喜欢") || text_lower.contains("讨厌") || text_lower.contains("爱") {
+            return FactCategory::Preference;
+        }
+        
+        // 关系关键词
+        if text_lower.contains("朋友") || text_lower.contains("家人") || text_lower.contains("同事") {
+            return FactCategory::Relationship;
+        }
+        
+        // 事件关键词
+        if text_lower.contains("发生") || text_lower.contains("经历") || text_lower.contains("做了") {
+            return FactCategory::Event;
+        }
+        
+        // 技能关键词
+        if text_lower.contains("会") || text_lower.contains("能") || text_lower.contains("擅长") {
+            return FactCategory::Skill;
+        }
+        
+        // 目标关键词
+        if text_lower.contains("想") || text_lower.contains("打算") || text_lower.contains("计划") {
+            return FactCategory::Goal;
+        }
+        
+        // 默认为知识类
+        FactCategory::Knowledge
+    }
+
     /// 提取人物实体
     fn extract_person_entities(&self, content: &str) -> Option<Entity> {
         // 简化的人物实体识别

@@ -770,8 +770,9 @@ async fn convert_search_results_to_memory_items(
 
 **修复优先级**：8✅ > 1✅ > 4✅ > 6✅ > 15✅ > 29✅ > 27 > 其他
 
-**已完成 P1 优化 (9/13, 69%)**：
+**已完成 P1 优化 (10/13, 77%)**：
 - ✅ #1: FactExtractor 添加LRU缓存
+- ✅ #3: 完善降级逻辑（事实提取失败时使用规则提取）
 - ✅ #4: BatchEntityExtractor 批量实体提取
 - ✅ #6: BatchImportanceEvaluator 批量重要性评估
 - ✅ #8: search_similar_memories 优化（单次搜索）
@@ -781,8 +782,7 @@ async fn convert_search_results_to_memory_items(
 - ✅ #20: Embedder 添加LRU缓存
 - ✅ #29: convert_results 批量转换
 
-**待实现 P1 优化 (4/13)**：
-- ⏳ #3: 完善降级逻辑（事实提取失败时）
+**待实现 P1 优化 (3/13)**：
 - ⏳ #11: ConflictResolver 降级逻辑（LLM失败时使用规则）
 - ⏳ #23: parallel_search 部分失败处理
 - ⏳ #27: context_aware_rerank 优化（仅重排序top-k）

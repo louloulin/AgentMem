@@ -3233,6 +3233,7 @@ impl MemoryOrchestrator {
     /// # 返回
     ///
     /// 重排序后的记忆列表
+    /// P1 优化 #27: 优化重排序 - 仅对top-k重排序
     pub async fn context_aware_rerank(
         &self,
         memory_items: Vec<MemoryItem>,
@@ -3249,52 +3250,75 @@ impl MemoryOrchestrator {
             return Ok(memory_items);
         }
 
-        // 使用 LLM 进行重排序
-        if let Some(llm) = &self.llm_provider {
+        // P1 优化 #27: 仅重排序top-k，减少LLM调用成本
+        const RERANK_TOP_K: usize = 20;
+        
+        let (to_rerank, unchanged): (Vec<_>, Vec<_>) = if memory_items.len() > RERANK_TOP_K {
+            info!(
+                "✅ 优化：仅重排序前 {} 个结果，其余 {} 个保持原序",
+                RERANK_TOP_K,
+                memory_items.len() - RERANK_TOP_K
+            );
+            let mut items = memory_items;
+            let unchanged = items.split_off(RERANK_TOP_K);
+            (items, unchanged)
+        } else {
+            (memory_items, Vec::new())
+        };
+
+        // 使用 LLM 进行重排序（仅对 to_rerank 部分）
+        let reranked = if let Some(llm) = &self.llm_provider {
             // 构建重排序提示词
-            let rerank_prompt = self.build_rerank_prompt(query, &memory_items, user_id);
+            let rerank_prompt = self.build_rerank_prompt(query, &to_rerank, user_id);
 
             // 调用 LLM
             match llm.generate(&[Message::user(&rerank_prompt)]).await {
                 Ok(response) => {
                     // 解析 LLM 返回的排序索引
-                    match self.parse_rerank_response(&response, memory_items.len()) {
+                    match self.parse_rerank_response(&response, to_rerank.len()) {
                         Ok(indices) => {
                             // 根据索引重排序
-                            let mut reranked = Vec::new();
+                            let mut reranked_top = Vec::new();
                             for idx in &indices {
-                                if *idx < memory_items.len() {
-                                    reranked.push(memory_items[*idx].clone());
+                                if *idx < to_rerank.len() {
+                                    reranked_top.push(to_rerank[*idx].clone());
                                 }
                             }
 
                             // 如果解析的索引不完整，补充剩余项
-                            if reranked.len() < memory_items.len() {
-                                for (i, item) in memory_items.iter().enumerate() {
+                            if reranked_top.len() < to_rerank.len() {
+                                for (i, item) in to_rerank.iter().enumerate() {
                                     if !indices.contains(&i) {
-                                        reranked.push(item.clone());
+                                        reranked_top.push(item.clone());
                                     }
                                 }
                             }
 
-                            info!("✅ 重排序成功，调整了顺序");
-                            Ok(reranked)
+                            info!("✅ 重排序成功，top-{} 已重排", to_rerank.len());
+                            reranked_top
                         }
                         Err(e) => {
                             warn!("解析重排序结果失败: {}, 返回原始顺序", e);
-                            Ok(memory_items)
+                            to_rerank
                         }
                     }
                 }
                 Err(e) => {
                     warn!("LLM 重排序失败: {}, 返回原始顺序", e);
-                    Ok(memory_items)
+                    to_rerank
                 }
             }
         } else {
             debug!("LLM 未初始化，跳过重排序");
-            Ok(memory_items)
-        }
+            to_rerank
+        };
+
+        // P1 优化 #27: 合并重排序后的top-k和未改变的部分
+        let mut final_results = reranked;
+        final_results.extend(unchanged);
+        
+        info!("重排序完成，最终结果: {} 个", final_results.len());
+        Ok(final_results)
     }
 
     /// 构建重排序提示词

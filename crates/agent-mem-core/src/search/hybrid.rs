@@ -145,11 +145,16 @@ impl HybridSearchEngine {
     }
 
     /// 并行执行向量搜索和全文搜索
+    /// P1 优化 #23: 并行搜索支持部分失败
+    /// 
+    /// 优化策略：允许某个搜索失败，仍能返回其他搜索的结果
     async fn parallel_search(
         &self,
         query_vector: Vec<f32>,
         query: &SearchQuery,
     ) -> Result<(Vec<SearchResult>, Vec<SearchResult>, u64, u64)> {
+        use tracing::{debug, warn};
+        
         let vector_engine = self.vector_engine.clone();
         let fulltext_engine = self.fulltext_engine.clone();
         let query_clone = query.clone();
@@ -160,8 +165,35 @@ impl HybridSearchEngine {
             fulltext_engine.search(&query_clone)
         );
 
-        let (vector_results, vector_time) = vector_result?;
-        let (fulltext_results, fulltext_time) = fulltext_result?;
+        // P1 优化 #23: 处理部分失败情况
+        let (vector_results, vector_time) = match vector_result {
+            Ok((results, time)) => {
+                debug!("✅ 向量搜索成功: {} 个结果", results.len());
+                (results, time)
+            }
+            Err(e) => {
+                warn!("向量搜索失败: {}, 继续使用空结果", e);
+                (Vec::new(), 0) // 失败时使用空结果
+            }
+        };
+
+        let (fulltext_results, fulltext_time) = match fulltext_result {
+            Ok((results, time)) => {
+                debug!("✅ 全文搜索成功: {} 个结果", results.len());
+                (results, time)
+            }
+            Err(e) => {
+                warn!("全文搜索失败: {}, 继续使用空结果", e);
+                (Vec::new(), 0) // 失败时使用空结果
+            }
+        };
+
+        // P1 优化 #23: 即使一个搜索失败，只要有结果就继续
+        if vector_results.is_empty() && fulltext_results.is_empty() {
+            return Err(agent_mem_traits::AgentMemError::SearchError(
+                "Both vector and fulltext search failed or returned no results".to_string()
+            ));
+        }
 
         Ok((vector_results, fulltext_results, vector_time, fulltext_time))
     }

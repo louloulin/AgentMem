@@ -322,18 +322,20 @@ Score 0.0-1.0 for each fact."#,
                     .into_iter()
                     .zip(facts.iter())
                     .map(|(eval, fact)| ImportanceEvaluation {
-                        fact_id: fact.id.clone(),
+                        memory_id: fact.id.clone(),
                         importance_score: eval.importance_score.clamp(0.0, 1.0),
+                        confidence: 0.8, // 批量评估的置信度
                         factors: crate::importance_evaluator::ImportanceFactors {
-                            category_importance: eval.category_importance,
-                            temporal_importance: eval.temporal_importance,
+                            content_complexity: eval.category_importance,
                             entity_importance: 0.5, // 默认值
                             relation_importance: 0.5,
-                            context_importance: eval.context_importance,
-                            novelty_score: 0.5,
+                            temporal_relevance: eval.temporal_importance,
+                            user_interaction: 0.5,
+                            contextual_relevance: eval.context_importance,
+                            emotional_intensity: 0.5,
                         },
-                        reasoning: eval.reasoning,
                         evaluated_at: chrono::Utc::now(),
+                        reasoning: eval.reasoning,
                     })
                     .collect();
                 Ok(evaluations)
@@ -350,18 +352,20 @@ Score 0.0-1.0 for each fact."#,
         let evaluations = facts
             .iter()
             .map(|fact| ImportanceEvaluation {
-                fact_id: fact.id.clone(),
+                memory_id: fact.id.clone(),
                 importance_score: fact.importance,
+                confidence: 0.6, // 规则评估的置信度较低
                 factors: crate::importance_evaluator::ImportanceFactors {
-                    category_importance: 0.5,
-                    temporal_importance: 0.5,
+                    content_complexity: 0.5,
                     entity_importance: 0.5,
                     relation_importance: 0.5,
-                    context_importance: 0.5,
-                    novelty_score: 0.5,
+                    temporal_relevance: 0.5,
+                    user_interaction: 0.5,
+                    contextual_relevance: 0.5,
+                    emotional_intensity: 0.5,
                 },
-                reasoning: "基于规则评估".to_string(),
                 evaluated_at: chrono::Utc::now(),
+                reasoning: "基于规则评估".to_string(),
             })
             .collect();
 
