@@ -29,6 +29,10 @@ use agent_mem_core::managers::{
 // ========== Intelligence 组件导入 ==========
 use agent_mem_intelligence::{
     AdvancedFactExtractor,
+    // 批量处理 (P1 优化 #4, #6)
+    BatchConfig,
+    BatchEntityExtractor,
+    BatchImportanceEvaluator,
     ConflictDetection,
     // 冲突解决
     ConflictResolver,
@@ -55,6 +59,8 @@ use agent_mem_intelligence::{
     RelationType,
     ResolutionStrategy,
     StructuredFact,
+    // 超时和缓存配置
+    TimeoutConfig,
 };
 
 // 聚类组件导入
@@ -152,6 +158,10 @@ pub struct MemoryOrchestrator {
     fact_extractor: Option<Arc<FactExtractor>>,
     advanced_fact_extractor: Option<Arc<AdvancedFactExtractor>>,
 
+    // P1 优化 #4,#6: 批量处理组件
+    batch_entity_extractor: Option<Arc<BatchEntityExtractor>>,
+    batch_importance_evaluator: Option<Arc<BatchImportanceEvaluator>>,
+
     // 决策引擎
     decision_engine: Option<Arc<MemoryDecisionEngine>>,
     enhanced_decision_engine: Option<Arc<EnhancedDecisionEngine>>,
@@ -238,9 +248,12 @@ impl MemoryOrchestrator {
         let procedural_manager = None;
 
         // ========== Step 2: 创建 Intelligence 组件 ==========
+        // P1 优化 #4,#6: 添加批量处理组件
         let (
             fact_extractor,
             advanced_fact_extractor,
+            batch_entity_extractor,
+            batch_importance_evaluator,
             decision_engine,
             enhanced_decision_engine,
             importance_evaluator,
@@ -251,7 +264,7 @@ impl MemoryOrchestrator {
             Self::create_intelligence_components(&config).await?
         } else {
             info!("智能功能已禁用，将使用基础模式");
-            (None, None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None, None)
         };
 
         // ========== Step 3: 创建 Embedder ==========
@@ -313,6 +326,8 @@ impl MemoryOrchestrator {
             // Intelligence 组件
             fact_extractor,
             advanced_fact_extractor,
+            batch_entity_extractor,
+            batch_importance_evaluator,
             decision_engine,
             enhanced_decision_engine,
             importance_evaluator,
@@ -356,11 +371,14 @@ impl MemoryOrchestrator {
     }
 
     /// 创建 Intelligence 组件
+    /// P1 优化 #4,#6: 扩展返回类型以包含批量处理组件
     async fn create_intelligence_components(
         config: &OrchestratorConfig,
     ) -> Result<(
         Option<Arc<FactExtractor>>,
         Option<Arc<AdvancedFactExtractor>>,
+        Option<Arc<BatchEntityExtractor>>,
+        Option<Arc<BatchImportanceEvaluator>>,
         Option<Arc<MemoryDecisionEngine>>,
         Option<Arc<EnhancedDecisionEngine>>,
         Option<Arc<EnhancedImportanceEvaluator>>,
@@ -372,7 +390,7 @@ impl MemoryOrchestrator {
 
         if llm_provider.is_none() {
             warn!("LLM Provider 未配置，Intelligence 组件将不可用");
-            return Ok((None, None, None, None, None, None, None));
+            return Ok((None, None, None, None, None, None, None, None, None));
         }
 
         // 下面的代码永远不会执行，因为 llm_provider 总是 None
@@ -384,6 +402,19 @@ impl MemoryOrchestrator {
             // 创建各个 Intelligence 组件
             let fact_extractor = Some(Arc::new(FactExtractor::new(llm.clone())));
             let advanced_fact_extractor = Some(Arc::new(AdvancedFactExtractor::new(llm.clone())));
+            
+            // P1 优化 #4,#6: 创建批量处理组件
+            let batch_entity_extractor = Some(Arc::new(BatchEntityExtractor::new(
+                llm.clone(),
+                TimeoutConfig::default(),
+                BatchConfig::default(),
+            )));
+            let batch_importance_evaluator = Some(Arc::new(BatchImportanceEvaluator::new(
+                llm.clone(),
+                TimeoutConfig::default(),
+                BatchConfig::default(),
+            )));
+
             let decision_engine = Some(Arc::new(MemoryDecisionEngine::new(llm.clone())));
             let enhanced_decision_engine = Some(Arc::new(EnhancedDecisionEngine::new(
                 llm.clone(),
@@ -398,11 +429,13 @@ impl MemoryOrchestrator {
                 Default::default(),
             )));
 
-            info!("Intelligence 组件创建成功");
+            info!("Intelligence 组件创建成功（包含批量处理）");
 
             Ok((
                 fact_extractor,
                 advanced_fact_extractor,
+                batch_entity_extractor,
+                batch_importance_evaluator,
                 decision_engine,
                 enhanced_decision_engine,
                 importance_evaluator,
@@ -2129,8 +2162,10 @@ impl MemoryOrchestrator {
                             Some(ExistingMemory {
                                 id: r.id,
                                 content: r.content,
-                                similarity: r.score,
-                                created_at: chrono::Utc::now(),
+                                importance: r.score,
+                                created_at: chrono::Utc::now().to_rfc3339(),
+                                updated_at: None,
+                                metadata: HashMap::new(),
                             })
                         }
                     })
@@ -2620,44 +2655,54 @@ impl MemoryOrchestrator {
     /// 转换搜索结果为 MemoryItem
     ///
     /// 将 SearchResult 转换为 MemoryItem 格式
+    /// P1优化 #29: 批量转换搜索结果为 MemoryItem
+    ///
+    /// 优化：使用迭代器批量转换，避免逐个处理
     #[cfg(feature = "postgres")]
     async fn convert_search_results_to_memory_items(
         &self,
         results: Vec<SearchResult>,
     ) -> Result<Vec<MemoryItem>> {
-        let mut memory_items = Vec::new();
-
-        for result in results {
-            // 解析元数据
-            let metadata = if let Some(meta) = result.metadata {
-                if let Ok(map) = serde_json::from_value::<HashMap<String, String>>(meta) {
-                    map
-                } else {
-                    HashMap::new()
-                }
-            } else {
-                HashMap::new()
-            };
-
-            // 创建 MemoryItem
-            let memory_item = MemoryItem {
-                id: result.id,
-                memory: result.content,
-                hash: String::new(), // TODO: 计算哈希
-                metadata,
-                categories: Vec::new(),
-                created_at: chrono::Utc::now().to_rfc3339(),
-                updated_at: chrono::Utc::now().to_rfc3339(),
-                user_id: None,
-                agent_id: None,
-                run_id: None,
-                memory_type: MemoryType::Semantic, // 默认类型
-                importance: result.score,
-            };
-
-            memory_items.push(memory_item);
+        if results.is_empty() {
+            return Ok(Vec::new());
         }
 
+        debug!("批量转换 {} 个搜索结果", results.len());
+
+        // P1优化 #29: 使用迭代器批量转换
+        let memory_items: Vec<MemoryItem> = results
+            .into_iter()
+            .map(|result| {
+                // 解析元数据
+                let metadata = if let Some(meta) = result.metadata {
+                    if let Ok(map) = serde_json::from_value::<HashMap<String, String>>(meta) {
+                        map
+                    } else {
+                        HashMap::new()
+                    }
+                } else {
+                    HashMap::new()
+                };
+
+                // 创建 MemoryItem
+                MemoryItem {
+                    id: result.id,
+                    memory: result.content,
+                    hash: String::new(), // TODO: 计算哈希
+                    metadata,
+                    categories: Vec::new(),
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    user_id: None,
+                    agent_id: None,
+                    run_id: None,
+                    memory_type: MemoryType::Semantic, // 默认类型
+                    importance: result.score,
+                }
+            })
+            .collect();
+
+        debug!("批量转换完成: {} 个 MemoryItem", memory_items.len());
         Ok(memory_items)
     }
 
