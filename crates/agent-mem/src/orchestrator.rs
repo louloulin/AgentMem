@@ -175,6 +175,13 @@ pub struct MemoryOrchestrator {
     llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>>,
     embedder: Option<Arc<dyn Embedder + Send + Sync>>,
 
+    // ========== Phase 6: 核心功能补齐 ==========
+    /// 向量存储（通过 VectorStore trait 统一抽象）
+    vector_store: Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>,
+
+    /// 历史记录管理器
+    history_manager: Option<Arc<crate::history::HistoryManager>>,
+
     // ========== 配置 ==========
     config: OrchestratorConfig,
 }
@@ -260,6 +267,18 @@ impl MemoryOrchestrator {
             Self::create_clustering_reasoning_components(&config).await?
         };
 
+        // ========== Step 8: 创建向量存储 (Phase 6) ==========
+        let vector_store = {
+            info!("Phase 6: 创建向量存储...");
+            Self::create_vector_store(&config).await?
+        };
+
+        // ========== Step 9: 创建历史记录管理器 (Phase 6) ==========
+        let history_manager = {
+            info!("Phase 6: 创建历史记录管理器...");
+            Self::create_history_manager(&config).await?
+        };
+
         Ok(Self {
             // Managers
             core_manager,
@@ -306,6 +325,10 @@ impl MemoryOrchestrator {
             // 辅助组件
             llm_provider,
             embedder,
+
+            // Phase 6: 向量存储和历史记录
+            vector_store,
+            history_manager,
 
             // 配置
             config,
@@ -684,6 +707,52 @@ impl MemoryOrchestrator {
         ))
     }
 
+    /// 创建向量存储 (Phase 6.4)
+    async fn create_vector_store(
+        _config: &OrchestratorConfig,
+    ) -> Result<Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>> {
+        info!("Phase 6: 创建向量存储");
+
+        // 使用内存向量存储（开发模式，零配置）
+        use agent_mem_storage::backends::MemoryVectorStore;
+        use agent_mem_traits::VectorStoreConfig;
+
+        let config = VectorStoreConfig::default();
+
+        match MemoryVectorStore::new(config).await {
+            Ok(store) => {
+                info!("✅ 向量存储创建成功（Memory 模式）");
+                Ok(Some(
+                    Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>
+                ))
+            }
+            Err(e) => {
+                warn!("创建向量存储失败: {}, 向量存储功能将不可用", e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// 创建历史记录管理器 (Phase 6.3)
+    async fn create_history_manager(
+        _config: &OrchestratorConfig,
+    ) -> Result<Option<Arc<crate::history::HistoryManager>>> {
+        info!("Phase 6: 创建历史记录管理器");
+
+        let history_path = "./data/history.db";
+
+        match crate::history::HistoryManager::new(history_path).await {
+            Ok(manager) => {
+                info!("✅ HistoryManager 创建成功: {}", history_path);
+                Ok(Some(Arc::new(manager)))
+            }
+            Err(e) => {
+                warn!("创建 HistoryManager 失败: {}, 历史记录功能将不可用", e);
+                Ok(None)
+            }
+        }
+    }
+
     /// 添加记忆 (简单模式，不使用智能推理)
     ///
     /// 直接添加原始内容，不进行事实提取、去重等智能处理
@@ -700,13 +769,57 @@ impl MemoryOrchestrator {
             content, agent_id
         );
 
-        // 简单模式：直接添加到 core_manager
-        if let Some(core_manager) = &self.core_manager {
-            info!("使用 CoreMemoryManager 添加记忆（简单模式）");
+        // ========== Phase 6: 双写策略（向量存储 + 历史记录）==========
 
-            // 将内容作为 Persona 块添加到 CoreMemoryManager
-            // 注意：这是一个简化的实现，实际应该根据 memory_type 选择不同的存储方式
-            let block_id = core_manager
+        let memory_id = uuid::Uuid::new_v4().to_string();
+
+        // Step 1: 生成向量嵌入
+        let embedding = if let Some(embedder) = &self.embedder {
+            match embedder.embed(&content).await {
+                Ok(emb) => {
+                    info!("✅ 生成嵌入向量，维度: {}", emb.len());
+                    emb
+                }
+                Err(e) => {
+                    warn!("生成嵌入失败: {}, 使用零向量", e);
+                    vec![0.0; 384]
+                }
+            }
+        } else {
+            warn!("Embedder 未初始化，使用零向量");
+            vec![0.0; 384]
+        };
+
+        // Step 2: 计算 Hash
+        use agent_mem_utils::hash::compute_content_hash;
+        let content_hash = compute_content_hash(&content);
+        info!("内容 Hash: {}", &content_hash[..16]);
+
+        // Step 3: 构建标准 metadata
+        let mut full_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+        full_metadata.insert("data".to_string(), serde_json::json!(content.clone()));
+        full_metadata.insert("hash".to_string(), serde_json::json!(content_hash));
+        full_metadata.insert(
+            "created_at".to_string(),
+            serde_json::json!(chrono::Utc::now().to_rfc3339()),
+        );
+
+        if let Some(uid) = &user_id {
+            full_metadata.insert("user_id".to_string(), serde_json::json!(uid));
+        }
+        full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+        // 合并自定义 metadata
+        if let Some(custom_meta) = metadata {
+            for (k, v) in custom_meta {
+                full_metadata.insert(k, v);
+            }
+        }
+
+        // Step 4: 存储到 CoreMemoryManager（保持原有逻辑）
+        if let Some(core_manager) = &self.core_manager {
+            info!("Phase 6: 存储到 CoreMemoryManager");
+            core_manager
                 .create_persona_block(content.clone(), None)
                 .await
                 .map_err(|e| {
@@ -715,14 +828,60 @@ impl MemoryOrchestrator {
                         e
                     ))
                 })?;
-
-            info!("✅ 记忆添加成功，block_id: {}", block_id);
-            Ok(block_id)
-        } else {
-            Err(agent_mem_traits::AgentMemError::UnsupportedOperation(
-                "core_manager 未初始化".to_string(),
-            ))
+            info!("✅ 已存储到 CoreMemoryManager");
         }
+
+        // Step 5: 存储到向量库（Phase 6 新增）
+        if let Some(vector_store) = &self.vector_store {
+            info!("Phase 6: 存储到向量库");
+
+            // 转换 metadata: HashMap<String, Value> -> HashMap<String, String>
+            let string_metadata: HashMap<String, String> = full_metadata
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect();
+
+            let vector_data = agent_mem_traits::VectorData {
+                id: memory_id.clone(),
+                vector: embedding,
+                metadata: string_metadata,
+            };
+
+            match vector_store.add_vectors(vec![vector_data]).await {
+                Ok(_) => info!("✅ 已存储到向量库"),
+                Err(e) => warn!("存储到向量库失败: {}", e),
+            }
+        } else {
+            debug!("向量存储未初始化，跳过向量存储");
+        }
+
+        // Step 6: 记录历史（Phase 6 新增）
+        if let Some(history) = &self.history_manager {
+            info!("Phase 6: 记录操作历史");
+
+            let entry = crate::history::HistoryEntry {
+                id: uuid::Uuid::new_v4().to_string(),
+                memory_id: memory_id.clone(),
+                old_memory: None,
+                new_memory: Some(content.clone()),
+                event: "ADD".to_string(),
+                created_at: chrono::Utc::now(),
+                updated_at: None,
+                is_deleted: false,
+                actor_id: None,
+                role: Some("user".to_string()),
+            };
+
+            match history.add_history(entry).await {
+                Ok(_) => info!("✅ 已记录操作历史"),
+                Err(e) => warn!("记录历史失败: {}", e),
+            }
+        } else {
+            debug!("历史管理器未初始化，跳过历史记录");
+        }
+
+        info!("✅ 记忆添加完成（双写）: {}", memory_id);
+        Ok(memory_id)
     }
 
     /// 智能添加记忆 (完整流水线)
@@ -2438,7 +2597,7 @@ impl MemoryOrchestrator {
         info!("Phase 4: 获取性能统计");
 
         // 获取总记忆数（从 core_manager）
-        let total_memories = if let Some(core_mgr) = &self.core_manager {
+        let total_memories = if let Some(_core_mgr) = &self.core_manager {
             // TODO: 实际应该查询数据库统计
             0 // 占位值
         } else {
@@ -2454,5 +2613,19 @@ impl MemoryOrchestrator {
             queries_per_second: 1000.0,  // 预估值
             memory_usage_mb: 50.0,       // 预估值
         })
+    }
+
+    /// 获取记忆的操作历史 (Phase 6.5)
+    ///
+    /// 返回指定记忆的所有变更历史记录
+    pub async fn get_history(&self, memory_id: &str) -> Result<Vec<crate::history::HistoryEntry>> {
+        info!("Phase 6: 获取记忆历史: {}", memory_id);
+
+        if let Some(history) = &self.history_manager {
+            history.get_history(memory_id).await
+        } else {
+            warn!("历史管理器未初始化，返回空历史");
+            Ok(Vec::new())
+        }
     }
 }

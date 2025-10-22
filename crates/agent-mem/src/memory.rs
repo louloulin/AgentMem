@@ -830,6 +830,43 @@ impl Memory {
         let orchestrator = self.orchestrator.read().await;
         orchestrator.get_performance_stats().await
     }
+
+    /// 获取记忆的操作历史 (Phase 6.5)
+    ///
+    /// 返回指定记忆的所有变更历史（ADD/UPDATE/DELETE）
+    ///
+    /// # 参数
+    ///
+    /// * `memory_id` - 记忆 ID
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// let id = mem.add("原始内容").await?;
+    /// mem.update(&id, "更新后的内容").await?;
+    ///
+    /// // 查看历史
+    /// let history = mem.history(&id).await?;
+    /// for entry in history {
+    ///     println!("{}: {} -> {:?}", entry.event, entry.old_memory, entry.new_memory);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn history(
+        &self,
+        memory_id: impl Into<String>,
+    ) -> Result<Vec<crate::history::HistoryEntry>> {
+        let memory_id = memory_id.into();
+        info!("获取记忆历史: {}", memory_id);
+
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.get_history(&memory_id).await
+    }
 }
 
 /// 性能统计信息
