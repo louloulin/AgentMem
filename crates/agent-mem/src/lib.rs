@@ -72,6 +72,7 @@
 pub mod auto_config;
 pub mod builder;
 pub mod chat;
+pub mod history;
 pub mod memory;
 pub mod orchestrator;
 pub mod types;

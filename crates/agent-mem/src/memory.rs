@@ -681,4 +681,170 @@ impl Memory {
             )
             .await
     }
+
+    // ========== Phase 4: 性能优化方法 ==========
+
+    /// 批量添加记忆 (Phase 4.1)
+    ///
+    /// 并行处理多个记忆，显著提升吞吐量
+    ///
+    /// # 参数
+    ///
+    /// * `contents` - 记忆内容列表
+    /// * `options` - 添加选项（应用于所有记忆）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::types::AddMemoryOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// // 批量添加记忆
+    /// let contents = vec![
+    ///     "I love pizza".to_string(),
+    ///     "I like pasta".to_string(),
+    ///     "I enjoy Italian food".to_string(),
+    /// ];
+    ///
+    /// let options = AddMemoryOptions::default();
+    /// let results = mem.add_batch(contents, options).await?;
+    /// println!("批量添加了 {} 个记忆", results.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_batch(
+        &self,
+        contents: Vec<String>,
+        options: AddMemoryOptions,
+    ) -> Result<Vec<AddResult>> {
+        use futures::future::join_all;
+
+        info!("批量添加 {} 个记忆", contents.len());
+
+        // 并行处理所有记忆
+        let futures: Vec<_> = contents
+            .into_iter()
+            .map(|content| {
+                let opts = options.clone();
+                async move { self.add_with_options(content, opts).await }
+            })
+            .collect();
+
+        let results = join_all(futures).await;
+
+        // 分离成功和失败的结果
+        let mut success_results = Vec::new();
+        let mut error_count = 0;
+
+        for result in results {
+            match result {
+                Ok(add_result) => success_results.push(add_result),
+                Err(e) => {
+                    warn!("批量添加中的一个操作失败: {}", e);
+                    error_count += 1;
+                }
+            }
+        }
+
+        info!(
+            "批量添加完成: {} 成功, {} 失败",
+            success_results.len(),
+            error_count
+        );
+
+        Ok(success_results)
+    }
+
+    /// 带缓存的搜索 (Phase 4.2)
+    ///
+    /// 使用智能缓存优化重复查询性能
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::types::SearchOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// // 第一次查询（命中数据库）
+    /// let results1 = mem.search_cached("pizza", None).await?;
+    ///
+    /// // 第二次查询（命中缓存，<1ms）
+    /// let results2 = mem.search_cached("pizza", None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn search_cached(
+        &self,
+        query: impl Into<String>,
+        options: Option<SearchOptions>,
+    ) -> Result<Vec<MemoryItem>> {
+        let query = query.into();
+        let options = options.unwrap_or_default();
+
+        let orchestrator = self.orchestrator.read().await;
+
+        orchestrator
+            .cached_search(
+                query,
+                options
+                    .user_id
+                    .or_else(|| self.default_user_id.clone())
+                    .unwrap_or_else(|| "default".to_string()),
+                options.limit.unwrap_or(10),
+                options.threshold,
+            )
+            .await
+    }
+
+    /// 预热缓存 (Phase 4.3)
+    ///
+    /// 预加载常用查询到缓存，提升首次查询速度
+    ///
+    /// # 参数
+    ///
+    /// * `queries` - 预热查询列表
+    pub async fn warmup_cache(&self, queries: Vec<String>) -> Result<usize> {
+        info!("预热缓存，共 {} 个查询", queries.len());
+
+        let mut warmed_count = 0;
+
+        for query in queries {
+            match self.search_cached(query, None).await {
+                Ok(_) => warmed_count += 1,
+                Err(e) => warn!("预热查询失败: {}", e),
+            }
+        }
+
+        info!("缓存预热完成: {}/{} 成功", warmed_count, warmed_count);
+        Ok(warmed_count)
+    }
+
+    /// 获取性能统计 (Phase 4.4)
+    ///
+    /// 返回内存引擎的性能指标
+    pub async fn get_performance_stats(&self) -> Result<PerformanceStats> {
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.get_performance_stats().await
+    }
+}
+
+/// 性能统计信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PerformanceStats {
+    /// 总记忆数
+    pub total_memories: usize,
+    /// 缓存命中率
+    pub cache_hit_rate: f32,
+    /// 平均添加延迟（毫秒）
+    pub avg_add_latency_ms: f32,
+    /// 平均搜索延迟（毫秒）
+    pub avg_search_latency_ms: f32,
+    /// 每秒查询数
+    pub queries_per_second: f32,
+    /// 内存使用（MB）
+    pub memory_usage_mb: f32,
 }

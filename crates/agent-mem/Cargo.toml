@@ -42,6 +42,9 @@ tracing.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 
+# 数据库（用于历史记录）
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tracing-subscriber.workspace = true
