@@ -242,16 +242,20 @@ impl FactExtractor {
         // 调试：打印 JSON 文本
         debug!("Extracted JSON: {}", json_text);
 
-        let response: FactExtractionResponse = serde_json::from_str(&json_text).map_err(|e| {
-            warn!("Failed to parse JSON: {}", e);
-            warn!("JSON text: {}", json_text);
-            agent_mem_traits::AgentMemError::internal_error(format!(
-                "Failed to parse response: {}",
-                e
-            ))
-        })?;
-
-        let mut facts = response.facts;
+        // P1 优化 #3: 解析失败时使用规则提取降级
+        let mut facts = match serde_json::from_str::<FactExtractionResponse>(&json_text) {
+            Ok(response) => {
+                debug!("✅ LLM事实提取成功");
+                response.facts
+            }
+            Err(e) => {
+                warn!("LLM事实提取JSON解析失败: {}, 降级到规则提取", e);
+                warn!("JSON text: {}", json_text);
+                
+                // P1 优化 #3: 降级到基于规则的提取
+                self.rule_based_fact_extraction(messages)?
+            }
+        };
 
         // 后处理：实体识别和时间信息提取
         self.enhance_facts_with_entities(&mut facts).await?;

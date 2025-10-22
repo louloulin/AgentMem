@@ -736,38 +736,56 @@ async fn convert_search_results_to_memory_items(
 | 12 | 决策引擎无超时重试 | DecisionEngine | 服务不稳定 | ⭐ 低 | ✅ 已完成 |
 | 16 | 执行决策无事务支持 | Orchestrator | 数据不一致 | ⭐⭐⭐ 高 | ✅ 已完成 |
 | 18 | 三个存储写入未原子化 | add_memory | 数据不一致 | ⭐⭐⭐ 高 | ✅ 已完成 |
-| 21 | 查询向量零向量降级 | generate_query_embedding | 搜索失效 | ⭐ 低 | ⏳ 待实现 |
+| 21 | 查询向量零向量降级 | generate_query_embedding | 搜索失效 | ⭐ 低 | ✅ 已完成 |
 | 22 | 并行搜索无超时 | HybridSearch | 服务hang | ⭐ 低 | ✅ 已完成 |
 
-**修复优先级**：16✅ > 18✅ > 10✅ > 12✅ > 22✅ > 2✅ > 21
+**修复优先级**：16✅ > 18✅ > 10✅ > 12✅ > 22✅ > 2✅ > 21✅
 
-**已完成 P0 优化 (6/7, 86%)**：
+**已完成 P0 优化 (7/7, 100% ✅)**：
 - ✅ #2: FactExtractor 添加超时控制（30秒）
 - ✅ #10: ConflictResolver 限制记忆数量（最多20个）
 - ✅ #12: DecisionEngine 添加超时（60秒）和重试机制（最多2次）
 - ✅ #16: execute_decisions 添加事务支持和回滚机制
 - ✅ #18: add_memory 实现三阶段提交和事务回滚
+- ✅ #21: generate_query_embedding 修复零向量降级问题
 - ✅ #22: ConflictResolver 的 LLM 调用添加超时控制
 
 #### P1 - 重要问题（影响性能/质量）
 
-| # | 问题 | 位置 | 影响 | 修复难度 |
-|---|------|------|------|---------|
-| 1 | LLM调用无缓存 | FactExtractor | 性能降低50%+ | ⭐⭐ 中 |
-| 3 | 降级逻辑粗糙 | FactExtractor | 提取质量低 | ⭐⭐ 中 |
-| 4 | 实体提取无批量处理 | AdvancedFactExtractor | 性能降低3-5x | ⭐⭐ 中 |
-| 6 | 重要性评估无批量 | ImportanceEvaluator | 性能降低3x | ⭐⭐ 中 |
-| 8 | 相似搜索低效 | search_similar_memories | 延迟高3-5x | ⭐⭐⭐ 高 |
-| 9 | 搜索结果未去重 | search_similar_memories | 决策质量低 | ⭐ 低 |
-| 11 | 冲突检测降级缺失 | ConflictResolver | 检测不稳定 | ⭐⭐ 中 |
-| 15 | 决策顺序执行 | execute_decisions | 效率降低50%+ | ⭐⭐ 中 |
-| 17 | Embedder降级不合理 | add_memory | 搜索失效 | ⭐ 低 |
-| 20 | 查询向量无缓存 | generate_query_embedding | 延迟增加 | ⭐ 低 |
-| 23 | 部分失败未处理 | parallel_search | 可用性降低 | ⭐⭐ 中 |
-| 27 | 重排序成本高 | context_aware_rerank | 延迟高 | ⭐⭐ 中 |
-| 29 | 结果转换顺序执行 | convert_results | 延迟高N倍 | ⭐⭐ 中 |
+| # | 问题 | 位置 | 影响 | 修复难度 | 状态 |
+|---|------|------|------|---------|------|
+| 1 | LLM调用无缓存 | FactExtractor | 性能降低50%+ | ⭐⭐ 中 | ✅ 已完成 |
+| 3 | 降级逻辑粗糙 | FactExtractor | 提取质量低 | ⭐⭐ 中 | ⏳ 待实现 |
+| 4 | 实体提取无批量处理 | AdvancedFactExtractor | 性能降低3-5x | ⭐⭐ 中 | ✅ 已完成 |
+| 6 | 重要性评估无批量 | ImportanceEvaluator | 性能降低3x | ⭐⭐ 中 | ✅ 已完成 |
+| 8 | 相似搜索低效 | search_similar_memories | 延迟高3-5x | ⭐⭐⭐ 高 | ✅ 已完成 |
+| 9 | 搜索结果未去重 | search_similar_memories | 决策质量低 | ⭐ 低 | ✅ 已完成 |
+| 11 | 冲突检测降级缺失 | ConflictResolver | 检测不稳定 | ⭐⭐ 中 | ⏳ 待实现 |
+| 15 | 决策顺序执行 | execute_decisions | 效率降低50%+ | ⭐⭐ 中 | ✅ 已完成 |
+| 17 | Embedder降级不合理 | add_memory | 搜索失效 | ⭐ 低 | ✅ 已完成 |
+| 20 | 查询向量无缓存 | generate_query_embedding | 延迟增加 | ⭐ 低 | ✅ 已完成 |
+| 23 | 部分失败未处理 | parallel_search | 可用性降低 | ⭐⭐ 中 | ⏳ 待实现 |
+| 27 | 重排序成本高 | context_aware_rerank | 延迟高 | ⭐⭐ 中 | ⏳ 待实现 |
+| 29 | 结果转换顺序执行 | convert_results | 延迟高N倍 | ⭐⭐ 中 | ✅ 已完成 |
 
-**修复优先级**：8 > 1 > 4 > 6 > 15 > 29 > 27 > 其他
+**修复优先级**：8✅ > 1✅ > 4✅ > 6✅ > 15✅ > 29✅ > 27 > 其他
+
+**已完成 P1 优化 (9/13, 69%)**：
+- ✅ #1: FactExtractor 添加LRU缓存
+- ✅ #4: BatchEntityExtractor 批量实体提取
+- ✅ #6: BatchImportanceEvaluator 批量重要性评估
+- ✅ #8: search_similar_memories 优化（单次搜索）
+- ✅ #9: deduplicate_memory_items 自动去重
+- ✅ #15: execute_decisions 决策并行化
+- ✅ #17: Embedder失败时返回错误（P0-#21关联）
+- ✅ #20: Embedder 添加LRU缓存
+- ✅ #29: convert_results 批量转换
+
+**待实现 P1 优化 (4/13)**：
+- ⏳ #3: 完善降级逻辑（事实提取失败时）
+- ⏳ #11: ConflictResolver 降级逻辑（LLM失败时使用规则）
+- ⏳ #23: parallel_search 部分失败处理
+- ⏳ #27: context_aware_rerank 优化（仅重排序top-k）
 
 #### P2 - 次要问题（功能完善）
 
