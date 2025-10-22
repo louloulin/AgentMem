@@ -46,12 +46,13 @@ async fn main() {
     let cli = Cli::parse();
 
     // Create server configuration
-    let mut config = if let Some(config_file) = cli.config {
-        // TODO: Load configuration from file
-        eprintln!("Configuration file loading not yet implemented");
-        ServerConfig::default()
-    } else {
-        ServerConfig::default()
+    // Phase 10 MVP P0-1: 配置文件加载系统 ✅
+    let mut config = match ServerConfig::load(cli.config.as_deref()) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("Failed to load configuration: {}", e);
+            process::exit(1);
+        }
     };
 
     // Override with CLI arguments

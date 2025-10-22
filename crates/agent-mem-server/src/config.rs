@@ -96,6 +96,72 @@ impl ServerConfig {
         Self::default()
     }
 
+    /// Load configuration from TOML file
+    ///
+    /// Phase 10 (MVP P0-1): 配置文件加载系统
+    pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read config file: {}", e))?;
+        
+        toml::from_str(&content)
+            .map_err(|e| format!("Failed to parse config file: {}", e))
+    }
+
+    /// Load configuration with precedence: File < Env < CLI
+    ///
+    /// 1. Load from file (if specified)
+    /// 2. Override with environment variables
+    /// 3. Override with CLI arguments (done in main.rs)
+    pub fn load(config_file: Option<impl AsRef<std::path::Path>>) -> Result<Self, String> {
+        let mut config = if let Some(path) = config_file {
+            // Load from file
+            Self::from_file(path)?
+        } else {
+            // Use default with env vars
+            Self::default()
+        };
+        
+        // Override with environment variables (explicit, higher priority than file)
+        config = config.override_from_env();
+        
+        Ok(config)
+    }
+
+    /// Override configuration from environment variables
+    ///
+    /// This is called after loading from file to allow env vars to override file values
+    fn override_from_env(mut self) -> Self {
+        if let Ok(port) = env::var("AGENT_MEM_PORT") {
+            if let Ok(p) = port.parse() {
+                self.port = p;
+            }
+        }
+        if let Ok(host) = env::var("AGENT_MEM_HOST") {
+            self.host = host;
+        }
+        if let Ok(cors) = env::var("AGENT_MEM_ENABLE_CORS") {
+            if let Ok(c) = cors.parse() {
+                self.enable_cors = c;
+            }
+        }
+        if let Ok(auth) = env::var("AGENT_MEM_ENABLE_AUTH") {
+            if let Ok(a) = auth.parse() {
+                self.enable_auth = a;
+            }
+        }
+        if let Ok(secret) = env::var("AGENT_MEM_JWT_SECRET") {
+            self.jwt_secret = secret;
+        }
+        if let Ok(level) = env::var("AGENT_MEM_LOG_LEVEL") {
+            self.log_level = level;
+        }
+        if let Ok(db_url) = env::var("DATABASE_URL") {
+            self.database_url = db_url;
+        }
+        
+        self
+    }
+
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.port == 0 {

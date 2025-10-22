@@ -1,257 +1,103 @@
-# AgentMem 配置示例文件
-# 复制此文件为 config.toml 并根据需要修改
-
-# ============================================================================
-# 数据库配置
-# ============================================================================
-
-[database]
-# 数据库后端类型
-# 可选值: "libsql" (默认, 嵌入式), "postgres" (企业级)
-backend = "libsql"
-
-# 数据库连接 URL
-# LibSQL 示例: "./data/agentmem.db" (本地文件路径)
-# PostgreSQL 示例: "postgresql://user:password@localhost:5432/agentmem"
-url = "./data/agentmem.db"
-
-# 是否自动运行数据库迁移
-# 建议开发环境设为 true，生产环境设为 false 并手动管理迁移
-auto_migrate = true
-
-# 连接池配置 (仅 PostgreSQL)
-[database.pool]
-# 最大连接数
-max_connections = 10
-
-# 最小空闲连接数
-min_connections = 2
-
-# 连接超时时间 (秒)
-connect_timeout = 30
-
-# 空闲连接超时时间 (秒)
-idle_timeout = 600
-
-# ============================================================================
-# 服务器配置
-# ============================================================================
+# AgentMem Server Configuration Example
+# Phase 10 MVP P0-1: 配置文件示例
 
 [server]
-# 服务器监听地址
-host = "127.0.0.1"
-
-# 服务器监听端口
+# Server listening port
 port = 8080
 
-# 工作线程数 (0 表示使用 CPU 核心数)
-workers = 0
+# Server listening host
+host = "0.0.0.0"
 
-# 请求超时时间 (秒)
-request_timeout = 30
+# Enable CORS (Cross-Origin Resource Sharing)
+enable_cors = true
 
-# ============================================================================
-# 日志配置
-# ============================================================================
+# Enable authentication
+enable_auth = false
 
-[logging]
-# 日志级别
-# 可选值: "trace", "debug", "info", "warn", "error"
-level = "info"
+# JWT secret key (MUST change in production!)
+jwt_secret = "your-super-secret-jwt-key-minimum-32-characters-long-please-change"
 
-# 日志格式
-# 可选值: "json", "pretty"
-format = "pretty"
-
-# 日志输出目标
-# 可选值: "stdout", "file", "both"
-output = "stdout"
-
-# 日志文件路径 (当 output 为 "file" 或 "both" 时)
-file_path = "./logs/agentmem.log"
-
-# ============================================================================
-# 认证配置
-# ============================================================================
-
-[auth]
-# JWT 密钥 (生产环境请使用强随机密钥)
-jwt_secret = "your-secret-key-change-this-in-production"
-
-# JWT 过期时间 (秒)
-jwt_expiration = 86400  # 24 小时
-
-# API Key 过期时间 (秒, 0 表示永不过期)
-api_key_expiration = 0
-
-# ============================================================================
-# CORS 配置
-# ============================================================================
-
-[cors]
-# 是否启用 CORS
-enabled = true
-
-# 允许的源 (使用 "*" 允许所有源，生产环境不推荐)
-allowed_origins = ["http://localhost:3000", "http://localhost:8080"]
-
-# 允许的 HTTP 方法
-allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-
-# 允许的请求头
-allowed_headers = ["Content-Type", "Authorization", "X-API-Key"]
-
-# 是否允许携带凭证
-allow_credentials = true
-
-# ============================================================================
-# LLM 配置
-# ============================================================================
-
-[llm]
-# 默认 LLM 提供商
-# 可选值: "openai", "anthropic", "azure", "local"
-default_provider = "openai"
-
-# OpenAI 配置
-[llm.openai]
-api_key = "sk-..."
-model = "gpt-4"
-base_url = "https://api.openai.com/v1"
-max_tokens = 4096
-temperature = 0.7
-
-# Anthropic 配置
-[llm.anthropic]
-api_key = "sk-ant-..."
-model = "claude-3-opus-20240229"
-max_tokens = 4096
-temperature = 0.7
-
-# ============================================================================
-# 向量数据库配置
-# ============================================================================
-
-[vector_store]
-# 向量数据库类型
-# 可选值: "qdrant", "milvus", "weaviate", "pinecone", "chroma"
-provider = "qdrant"
-
-# Qdrant 配置
-[vector_store.qdrant]
-url = "http://localhost:6333"
-collection_name = "agentmem_vectors"
-vector_size = 1536
-
-# ============================================================================
-# 缓存配置
-# ============================================================================
-
-[cache]
-# 缓存类型
-# 可选值: "memory", "redis"
-provider = "memory"
-
-# Redis 配置 (当 provider 为 "redis" 时)
-[cache.redis]
-url = "redis://localhost:6379"
-db = 0
-pool_size = 10
-ttl = 3600  # 默认过期时间 (秒)
-
-# ============================================================================
-# 性能配置
-# ============================================================================
-
-[performance]
-# 是否启用查询缓存
-enable_query_cache = true
-
-# 查询缓存大小 (条目数)
-query_cache_size = 1000
-
-# 是否启用批量操作优化
-enable_batch_optimization = true
-
-# 批量操作最大大小
-max_batch_size = 100
-
-# ============================================================================
-# 监控配置
-# ============================================================================
-
-[monitoring]
-# 是否启用 Prometheus metrics
+# Enable metrics endpoint
 enable_metrics = true
 
-# Metrics 端点路径
-metrics_path = "/metrics"
+# Enable OpenAPI documentation
+enable_docs = true
 
-# 是否启用健康检查端点
-enable_health_check = true
+# Request timeout in seconds
+request_timeout = 30
 
-# 健康检查端点路径
-health_check_path = "/health"
+# Max request body size in bytes (1MB)
+max_body_size = 1048576
 
-# ============================================================================
-# 开发配置
-# ============================================================================
+# Enable request logging
+enable_logging = true
 
-[development]
-# 是否启用开发模式
-enabled = false
+# Log level: trace, debug, info, warn, error
+log_level = "info"
 
-# 是否启用热重载
-hot_reload = false
+# Multi-tenant mode
+multi_tenant = false
 
-# 是否显示详细错误信息
-verbose_errors = true
+# Rate limiting (requests per minute per IP)
+rate_limit_requests_per_minute = 100
 
-# 是否启用 SQL 查询日志
-log_sql_queries = false
+# Database connection URL
+database_url = "postgresql://agentmem:password@localhost:5432/agentmem"
 
-# ============================================================================
-# 环境变量覆盖说明
-# ============================================================================
-# 
-# 所有配置项都可以通过环境变量覆盖，格式为:
-# AGENTMEM_<SECTION>_<KEY>
-#
-# 示例:
-# AGENTMEM_DATABASE_BACKEND=postgres
-# AGENTMEM_DATABASE_URL=postgresql://localhost/agentmem
-# AGENTMEM_SERVER_PORT=9000
-# AGENTMEM_LOGGING_LEVEL=debug
-#
-# 特殊环境变量 (简化配置):
-# DATABASE_BACKEND - 等同于 AGENTMEM_DATABASE_BACKEND
-# DATABASE_URL - 等同于 AGENTMEM_DATABASE_URL
-# DATABASE_AUTO_MIGRATE - 等同于 AGENTMEM_DATABASE_AUTO_MIGRATE
-#
-# ============================================================================
+[memory]
+# Default agent ID
+default_agent_id = "default"
 
-# ============================================================================
-# 快速配置示例
-# ============================================================================
+# Enable intelligent features
+enable_intelligent_features = true
 
-# 示例 1: 开发环境 (LibSQL)
-# [database]
-# backend = "libsql"
-# url = "./data/dev.db"
-# auto_migrate = true
+# LLM provider
+llm_provider = "openai"
 
-# 示例 2: 生产环境 (PostgreSQL)
-# [database]
-# backend = "postgres"
-# url = "postgresql://agentmem:password@db.example.com:5432/agentmem_prod"
-# auto_migrate = false
-# [database.pool]
-# max_connections = 50
-# min_connections = 10
+# LLM model
+llm_model = "gpt-4"
 
-# 示例 3: 测试环境 (内存 LibSQL)
-# [database]
-# backend = "libsql"
-# url = ":memory:"
-# auto_migrate = true
+# Embedder provider
+embedder_provider = "openai"
 
+# Embedder model
+embedder_model = "text-embedding-3-small"
+
+# Vector store URL (optional, defaults to in-memory)
+# vector_store_url = "lancedb://./data/vectors.lance"
+
+[openai]
+# OpenAI API Key (can also use OPENAI_API_KEY env var)
+# api_key = "sk-..."
+
+# OpenAI API Base URL (for custom endpoints)
+# api_base = "https://api.openai.com/v1"
+
+[monitoring]
+# Enable Prometheus metrics
+enable_prometheus = true
+
+# Prometheus metrics port
+prometheus_port = 9090
+
+# Enable structured logging (JSON)
+structured_logging = true
+
+# Log file path (optional, defaults to stdout)
+# log_file = "./logs/agentmem.log"
+
+[security]
+# CORS allowed origins (comma-separated)
+cors_allowed_origins = "*"
+
+# CORS allowed methods
+cors_allowed_methods = "GET,POST,PUT,DELETE,OPTIONS"
+
+# CORS allowed headers
+cors_allowed_headers = "Authorization,Content-Type"
+
+# Maximum concurrent connections
+max_connections = 1000
+
+# Connection timeout in seconds
+connection_timeout = 60
