@@ -16,7 +16,7 @@ use agent_mem_traits::{Message, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 // P0 优化: 超时控制
 use crate::timeout::{with_timeout, with_timeout_and_retry, TimeoutConfig};
@@ -241,11 +241,17 @@ impl MemoryDecisionEngine {
             .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
 
         // 过滤低置信度的决策
-        let filtered_decisions = response
+        let mut filtered_decisions: Vec<MemoryDecision> = response
             .decisions
             .into_iter()
             .filter(|decision| decision.confidence >= self.confidence_threshold)
             .collect();
+
+        // P2 优化 #13: 验证决策一致性
+        filtered_decisions = self.validate_decision_consistency(filtered_decisions)?;
+
+        // P2 优化 #14: 记录决策审计日志
+        self.log_decisions(&filtered_decisions, new_facts, existing_memories);
 
         Ok(filtered_decisions)
     }
@@ -1175,4 +1181,235 @@ struct EvaluatedAction {
     candidate: CandidateAction,
     evaluation: ActionEvaluation,
     overall_score: f32,
+}
+
+impl MemoryDecisionEngine {
+    /// P2 优化 #13: 验证决策一致性
+    /// 
+    /// 确保决策之间没有冲突，例如：
+    /// - UPDATE和DELETE同一个记忆
+    /// - 多个DELETE同一个记忆
+    /// - MERGE中的记忆被DELETE
+    fn validate_decision_consistency(&self, mut decisions: Vec<MemoryDecision>) -> Result<Vec<MemoryDecision>> {
+        use std::collections::HashSet;
+        
+        info!("P2优化 #13: 开始验证决策一致性，共 {} 个决策", decisions.len());
+        
+        let mut to_update: HashSet<String> = HashSet::new();
+        let mut to_delete: HashSet<String> = HashSet::new();
+        let mut to_merge: HashSet<String> = HashSet::new();
+        let mut conflicts = Vec::new();
+        
+        // 第一遍：收集所有操作的目标记忆
+        for decision in decisions.iter() {
+            match &decision.action {
+                MemoryAction::Update { memory_id, .. } => {
+                    to_update.insert(memory_id.clone());
+                }
+                MemoryAction::Delete { memory_id, .. } => {
+                    to_delete.insert(memory_id.clone());
+                }
+                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+                    to_merge.insert(primary_memory_id.clone());
+                    for id in secondary_memory_ids {
+                        to_merge.insert(id.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        // 第二遍：检测冲突
+        for (idx, decision) in decisions.iter().enumerate() {
+            let mut has_conflict = false;
+            let mut conflict_reason = String::new();
+            
+            match &decision.action {
+                MemoryAction::Update { memory_id, .. } => {
+                    // UPDATE vs DELETE 冲突
+                    if to_delete.contains(memory_id) {
+                        has_conflict = true;
+                        conflict_reason = format!("记忆 {} 同时被UPDATE和DELETE", memory_id);
+                    }
+                    // UPDATE vs MERGE 冲突
+                    if to_merge.contains(memory_id) {
+                        has_conflict = true;
+                        conflict_reason = format!("记忆 {} 同时被UPDATE和MERGE", memory_id);
+                    }
+                }
+                MemoryAction::Delete { memory_id, .. } => {
+                    // DELETE vs MERGE 冲突
+                    if to_merge.contains(memory_id) {
+                        has_conflict = true;
+                        conflict_reason = format!("记忆 {} 同时被DELETE和MERGE", memory_id);
+                    }
+                }
+                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+                    // MERGE 内部冲突：主记忆被删除
+                    if to_delete.contains(primary_memory_id) {
+                        has_conflict = true;
+                        conflict_reason = format!("MERGE的主记忆 {} 被DELETE", primary_memory_id);
+                    }
+                    // MERGE 内部冲突：次要记忆被删除
+                    for id in secondary_memory_ids {
+                        if to_delete.contains(id) {
+                            has_conflict = true;
+                            conflict_reason = format!("MERGE的次要记忆 {} 被DELETE", id);
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+            
+            if has_conflict {
+                warn!("❌ 决策冲突 #{}: {}", idx, conflict_reason);
+                conflicts.push(idx);
+            }
+        }
+        
+        // 移除冲突的决策（保留置信度较高的）
+        if !conflicts.is_empty() {
+            warn!("发现 {} 个决策冲突，移除冲突决策", conflicts.len());
+            
+            let total_decisions = decisions.len();
+            
+            // 按置信度从高到低排序
+            decisions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // 重新验证（移除低置信度的冲突决策）
+            let mut validated = Vec::new();
+            let mut processed_memories: HashSet<String> = HashSet::new();
+            
+            for decision in decisions {
+                let memory_ids = self.get_affected_memory_ids(&decision.action);
+                let has_processed = memory_ids.iter().any(|id| processed_memories.contains(id));
+                
+                if !has_processed {
+                    // 记录已处理的记忆
+                    for id in memory_ids {
+                        processed_memories.insert(id);
+                    }
+                    validated.push(decision);
+                } else {
+                    warn!("移除冲突决策: {:?} (置信度: {})", decision.action, decision.confidence);
+                }
+            }
+            
+            info!("✅ 决策一致性验证完成：保留 {} 个决策，移除 {} 个冲突决策",
+                validated.len(),
+                total_decisions - validated.len()
+            );
+            
+            Ok(validated)
+        } else {
+            info!("✅ 所有决策一致，无冲突");
+            Ok(decisions)
+        }
+    }
+    
+    /// 获取决策影响的记忆ID列表
+    fn get_affected_memory_ids(&self, action: &MemoryAction) -> Vec<String> {
+        match action {
+            MemoryAction::Update { memory_id, .. } => vec![memory_id.clone()],
+            MemoryAction::Delete { memory_id, .. } => vec![memory_id.clone()],
+            MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+                let mut ids = vec![primary_memory_id.clone()];
+                ids.extend(secondary_memory_ids.clone());
+                ids
+            }
+            _ => Vec::new(),
+        }
+    }
+    
+    /// P2 优化 #14: 记录决策审计日志
+    /// 
+    /// 记录所有决策的详细信息，便于调试和追踪
+    fn log_decisions(
+        &self,
+        decisions: &[MemoryDecision],
+        new_facts: &[ExtractedFact],
+        existing_memories: &[ExistingMemory],
+    ) {
+        info!("==================== 决策审计日志 ====================");
+        info!("时间: {}", chrono::Utc::now());
+        info!("新事实数量: {}", new_facts.len());
+        info!("现有记忆数量: {}", existing_memories.len());
+        info!("决策数量: {}", decisions.len());
+        info!("");
+        
+        // 统计决策类型
+        let mut add_count = 0;
+        let mut update_count = 0;
+        let mut delete_count = 0;
+        let mut merge_count = 0;
+        let mut no_action_count = 0;
+        
+        for decision in decisions {
+            match &decision.action {
+                MemoryAction::Add { .. } => add_count += 1,
+                MemoryAction::Update { .. } => update_count += 1,
+                MemoryAction::Delete { .. } => delete_count += 1,
+                MemoryAction::Merge { .. } => merge_count += 1,
+                MemoryAction::NoAction { .. } => no_action_count += 1,
+            }
+        }
+        
+        info!("决策类型统计:");
+        info!("  - ADD: {}", add_count);
+        info!("  - UPDATE: {}", update_count);
+        info!("  - DELETE: {}", delete_count);
+        info!("  - MERGE: {}", merge_count);
+        info!("  - NO_ACTION: {}", no_action_count);
+        info!("");
+        
+        // 记录每个决策的详细信息
+        for (idx, decision) in decisions.iter().enumerate() {
+            info!("决策 #{}: {:?}", idx + 1, self.format_decision_action(&decision.action));
+            info!("  置信度: {:.2}", decision.confidence);
+            info!("  影响的记忆: {:?}", decision.affected_memories);
+            info!("  预估影响: {:.2}", decision.estimated_impact);
+            info!("  推理依据: {}", decision.reasoning.chars().take(100).collect::<String>());
+            
+            // 详细的操作参数
+            match &decision.action {
+                MemoryAction::Add { content, importance, .. } => {
+                    info!("  内容预览: {}", content.chars().take(50).collect::<String>());
+                    info!("  重要性: {:.2}", importance);
+                }
+                MemoryAction::Update { memory_id, new_content, merge_strategy, change_reason } => {
+                    info!("  目标记忆ID: {}", memory_id);
+                    info!("  新内容预览: {}", new_content.chars().take(50).collect::<String>());
+                    info!("  合并策略: {:?}", merge_strategy);
+                    info!("  变更原因: {}", change_reason);
+                }
+                MemoryAction::Delete { memory_id, deletion_reason } => {
+                    info!("  删除记忆ID: {}", memory_id);
+                    info!("  删除原因: {:?}", deletion_reason);
+                }
+                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
+                    info!("  主记忆ID: {}", primary_memory_id);
+                    info!("  次要记忆ID: {:?}", secondary_memory_ids);
+                    info!("  合并内容预览: {}", merged_content.chars().take(50).collect::<String>());
+                }
+                MemoryAction::NoAction { reason } => {
+                    info!("  原因: {}", reason);
+                }
+            }
+            info!("");
+        }
+        
+        info!("====================================================");
+    }
+    
+    /// 格式化决策动作类型
+    fn format_decision_action(&self, action: &MemoryAction) -> &'static str {
+        match action {
+            MemoryAction::Add { .. } => "ADD",
+            MemoryAction::Update { .. } => "UPDATE",
+            MemoryAction::Delete { .. } => "DELETE",
+            MemoryAction::Merge { .. } => "MERGE",
+            MemoryAction::NoAction { .. } => "NO_ACTION",
+        }
+    }
 }

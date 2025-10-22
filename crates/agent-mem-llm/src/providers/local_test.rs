@@ -317,7 +317,7 @@ mod tests {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
-        let model_info = provider.get_model_info().await.unwrap();
+        let model_info = provider.get_model_info().unwrap();
         assert_eq!(model_info.provider, "local_test");
         assert_eq!(model_info.name, "local-test-model");
     }

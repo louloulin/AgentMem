@@ -85,8 +85,9 @@ impl SearchResultRanker for RRFRanker {
         let total_weight: f32 = weights.iter().sum();
         let normalized_weights: Vec<f32> = weights.iter().map(|w| w / total_weight).collect();
 
-        // 计算每个文档的 RRF 分数
-        let mut doc_scores: HashMap<String, (f32, SearchResult)> = HashMap::new();
+        // P2 优化 #24,#25: 保留原始分数，不仅仅保留RRF分数
+        // 计算每个文档的 RRF 分数，同时保留原始的vector_score和fulltext_score
+        let mut doc_data: HashMap<String, (f32, SearchResult, Option<f32>, Option<f32>)> = HashMap::new();
 
         for (list_idx, results) in results_lists.iter().enumerate() {
             let weight = normalized_weights[list_idx];
@@ -94,22 +95,33 @@ impl SearchResultRanker for RRFRanker {
             for (rank, result) in results.iter().enumerate() {
                 let rrf_score = self.calculate_rrf_score(rank + 1) * weight;
 
-                doc_scores
+                doc_data
                     .entry(result.id.clone())
-                    .and_modify(|(score, _)| *score += rrf_score)
-                    .or_insert_with(|| (rrf_score, result.clone()));
+                    .and_modify(|(score, _, vector_score, fulltext_score)| {
+                        *score += rrf_score;
+                        // 保留最高的原始分数
+                        if let Some(vs) = result.vector_score {
+                            *vector_score = Some(vector_score.map_or(vs, |existing| existing.max(vs)));
+                        }
+                        if let Some(fs) = result.fulltext_score {
+                            *fulltext_score = Some(fulltext_score.map_or(fs, |existing| existing.max(fs)));
+                        }
+                    })
+                    .or_insert_with(|| (rrf_score, result.clone(), result.vector_score, result.fulltext_score));
             }
         }
 
-        // 按分数排序
-        let mut final_results: Vec<(f32, SearchResult)> = doc_scores.into_values().collect();
+        // 按RRF分数排序
+        let mut final_results: Vec<(f32, SearchResult, Option<f32>, Option<f32>)> = doc_data.into_values().collect();
         final_results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
-        // 更新分数并返回
+        // P2 优化 #25: 同时保留RRF分数和原始分数
         Ok(final_results
             .into_iter()
-            .map(|(score, mut result)| {
-                result.score = score;
+            .map(|(rrf_score, mut result, vector_score, fulltext_score)| {
+                result.score = rrf_score; // RRF融合分数
+                result.vector_score = vector_score; // 保留原始向量搜索分数
+                result.fulltext_score = fulltext_score; // 保留原始全文搜索分数
                 result
             })
             .collect())

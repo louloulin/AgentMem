@@ -1248,6 +1248,9 @@ impl MemoryOrchestrator {
         let processed_query = self.preprocess_query(&query).await?;
         debug!("查询预处理完成: {}", processed_query);
 
+        // ========== P2优化 #26: 动态阈值调整 ==========
+        let dynamic_threshold = self.calculate_dynamic_threshold(&query, threshold);
+
         // ========== Step 2-4: 使用 HybridSearchEngine 执行搜索 ==========
         if let Some(hybrid_engine) = &self.hybrid_search_engine {
             // 生成查询向量
@@ -1257,7 +1260,7 @@ impl MemoryOrchestrator {
             let search_query = SearchQuery {
                 query: processed_query.clone(),
                 limit,
-                threshold,
+                threshold: Some(dynamic_threshold), // 使用动态阈值
                 vector_weight: 0.7,
                 fulltext_weight: 0.3,
                 filters: None, // TODO: 转换 filters
@@ -1313,6 +1316,9 @@ impl MemoryOrchestrator {
         
         info!("向量搜索（嵌入式模式）: query={}, user_id={}, limit={}", query, user_id, limit);
 
+        // P2优化 #26: 动态阈值调整
+        let dynamic_threshold = Some(self.calculate_dynamic_threshold(&query, threshold));
+
         // 1. 生成查询向量
         let query_vector = self.generate_query_embedding(&query).await?;
 
@@ -1334,7 +1340,7 @@ impl MemoryOrchestrator {
             }
 
             let search_results = vector_store
-                .search_with_filters(query_vector, limit, &filter_map, threshold)
+                .search_with_filters(query_vector, limit, &filter_map, dynamic_threshold)
                 .await?;
 
             info!("向量搜索完成: {} 个结果", search_results.len());
@@ -2147,7 +2153,7 @@ impl MemoryOrchestrator {
                 filter_map.insert("agent_id".to_string(), serde_json::json!(agent_id));
 
                 let results = vector_store
-                    .search_vectors(query_vector, limit * 2, Some(filter_map))
+                    .search_with_filters(query_vector, limit * 2, &filter_map, Some(0.7))
                     .await?;
 
                 // 去重并转换
@@ -2159,13 +2165,20 @@ impl MemoryOrchestrator {
                             None
                         } else {
                             seen_ids.insert(r.id.clone());
+                            // 从 metadata 中获取内容
+                            let content = r.metadata.get("content")
+                                .cloned()
+                                .unwrap_or_else(|| "No content".to_string());
+                            
                             Some(ExistingMemory {
                                 id: r.id,
-                                content: r.content,
-                                importance: r.score,
+                                content,
+                                importance: r.similarity,
                                 created_at: chrono::Utc::now().to_rfc3339(),
                                 updated_at: None,
-                                metadata: HashMap::new(),
+                                metadata: r.metadata.into_iter()
+                                    .map(|(k, v)| (k, v))
+                                    .collect(),
                             })
                         }
                     })
@@ -2608,12 +2621,98 @@ impl MemoryOrchestrator {
 
     // ========== 搜索辅助方法 (Phase 1 Step 1.3) ==========
 
+    /// P2优化 #26: 动态阈值调整
+    ///
+    /// 根据查询特征动态调整搜索阈值
+    fn calculate_dynamic_threshold(&self, query: &str, base_threshold: Option<f32>) -> f32 {
+        let base = base_threshold.unwrap_or(0.7);
+        
+        let query_len = query.len();
+        let word_count = query.split_whitespace().count();
+        
+        // 规则1: 短查询（<10字符）提高阈值（更严格）
+        let len_adjustment = if query_len < 10 {
+            0.05 // 短查询提高阈值到0.75，避免误匹配
+        } else if query_len > 100 {
+            -0.05 // 长查询降低阈值到0.65，提高召回率
+        } else {
+            0.0
+        };
+        
+        // 规则2: 单词数少提高阈值
+        let word_adjustment = if word_count == 1 {
+            0.05 // 单词查询更严格
+        } else if word_count > 10 {
+            -0.05 // 多词查询更宽松
+        } else {
+            0.0
+        };
+        
+        // 规则3: 包含特殊字符/数字，提高精确度要求
+        let has_special = query.chars().any(|c| !c.is_alphanumeric() && !c.is_whitespace());
+        let special_adjustment = if has_special { 0.05 } else { 0.0 };
+        
+        // 计算最终阈值
+        let dynamic_threshold = base + len_adjustment + word_adjustment + special_adjustment;
+        
+        // 限制在合理范围内 [0.5, 0.9]
+        let final_threshold = dynamic_threshold.max(0.5).min(0.9);
+        
+        if final_threshold != base {
+            debug!(
+                "动态阈值调整: {} -> {} (查询长度: {}, 词数: {}, 特殊字符: {})",
+                base, final_threshold, query_len, word_count, has_special
+            );
+        }
+        
+        final_threshold
+    }
+
     /// 查询预处理
     ///
     /// 清理和标准化查询文本
+    /// P2优化 #19: 增强NLP处理
     async fn preprocess_query(&self, query: &str) -> Result<String> {
-        // 简单的预处理：去除多余空格，转小写
-        let processed = query.trim().to_lowercase();
+        // Step 1: 基础清理
+        let mut processed = query.trim().to_string();
+        
+        // Step 2: P2优化 #19 - 移除常见停用词（中英文）
+        let stopwords = [
+            // 英文停用词
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+            "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
+            "been", "being", "have", "has", "had", "do", "does", "did", "will",
+            "would", "should", "could", "may", "might", "can",
+            // 中文停用词
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都",
+            "一", "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会",
+        ];
+        
+        let words: Vec<&str> = processed.split_whitespace().collect();
+        let filtered_words: Vec<&str> = words
+            .into_iter()
+            .filter(|word| {
+                let lower = word.to_lowercase();
+                !stopwords.contains(&lower.as_str())
+            })
+            .collect();
+        
+        // Step 3: 重新组合（如果过滤后为空，保留原始查询）
+        if !filtered_words.is_empty() {
+            processed = filtered_words.join(" ");
+        }
+        
+        // Step 4: 转小写
+        processed = processed.to_lowercase();
+        
+        // Step 5: 移除多余空格
+        processed = processed
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ");
+        
+        debug!("查询预处理: '{}' -> '{}'", query, processed);
+        
         Ok(processed)
     }
 
