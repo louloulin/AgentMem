@@ -15,6 +15,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+// P0 优化: 超时控制
+use crate::timeout::{with_timeout, TimeoutConfig};
+
 /// 提取的事实信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedFact {
@@ -154,12 +157,22 @@ pub struct FactExtractionResponse {
 /// 事实提取器
 pub struct FactExtractor {
     llm: Arc<dyn LLMProvider + Send + Sync>,
+    // P0 优化: 超时配置
+    timeout_config: TimeoutConfig,
 }
 
 impl FactExtractor {
     /// 创建新的事实提取器
     pub fn new(llm: Arc<dyn LLMProvider + Send + Sync>) -> Self {
-        Self { llm }
+        Self { 
+            llm,
+            timeout_config: TimeoutConfig::default(),
+        }
+    }
+
+    /// 创建带自定义超时配置的事实提取器
+    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
+        Self { llm, timeout_config }
     }
 
     /// 从消息中提取事实（增强版本）- 内部实现
@@ -171,7 +184,15 @@ impl FactExtractor {
         let conversation = self.format_conversation(messages);
         let prompt = self.build_enhanced_extraction_prompt(&conversation);
 
-        let response_text = self.llm.generate(&[Message::user(&prompt)]).await?;
+        // P0 优化 #2: 添加超时控制
+        let llm = self.llm.clone();
+        let response_text = with_timeout(
+            async move {
+                llm.generate(&[Message::user(&prompt)]).await
+            },
+            self.timeout_config.fact_extraction_timeout_secs,
+            "fact_extraction",
+        ).await?;
 
         // 尝试提取 JSON 部分
         let json_text = self.extract_json_from_response(&response_text)?;
@@ -810,12 +831,22 @@ mod tests {
 /// - 语义理解和推理
 pub struct AdvancedFactExtractor {
     llm: Arc<dyn LLMProvider + Send + Sync>,
+    // P0 优化: 超时配置
+    timeout_config: TimeoutConfig,
 }
 
 impl AdvancedFactExtractor {
     /// 创建新的高级事实提取器
     pub fn new(llm: Arc<dyn LLMProvider + Send + Sync>) -> Self {
-        Self { llm }
+        Self {
+            llm,
+            timeout_config: TimeoutConfig::default(),
+        }
+    }
+
+    /// 创建带超时配置的高级事实提取器
+    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
+        Self { llm, timeout_config }
     }
 
     /// 提取结构化事实 (Mem5 核心功能)

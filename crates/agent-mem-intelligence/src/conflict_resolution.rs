@@ -16,6 +16,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+// P0 优化: 超时控制
+use crate::timeout::{with_timeout, TimeoutConfig};
+
 /// 冲突类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ConflictType {
@@ -117,6 +120,8 @@ pub struct ConflictResolver {
     llm: Arc<dyn LLMProvider + Send + Sync>,
     similarity: SemanticSimilarity,
     config: ConflictResolverConfig,
+    // P0 优化: 超时配置
+    timeout_config: TimeoutConfig,
 }
 
 /// 冲突解决器配置
@@ -130,6 +135,8 @@ pub struct ConflictResolverConfig {
     pub auto_resolution_threshold: f32,
     /// 最大合并记忆数量
     pub max_merge_memories: usize,
+    /// P0 优化 #10: 最大考虑记忆数量（防止prompt过长）
+    pub max_consideration_memories: usize,
 }
 
 impl Default for ConflictResolverConfig {
@@ -139,6 +146,8 @@ impl Default for ConflictResolverConfig {
             temporal_conflict_window_hours: 24,
             auto_resolution_threshold: 0.8,
             max_merge_memories: 5,
+            // P0 优化 #10: 限制为20个记忆，防止prompt过长
+            max_consideration_memories: 20,
         }
     }
 }
@@ -152,6 +161,23 @@ impl ConflictResolver {
             llm,
             similarity,
             config,
+            timeout_config: TimeoutConfig::default(),
+        }
+    }
+
+    /// 创建带超时配置的冲突解决器
+    pub fn with_timeout_config(
+        llm: Arc<dyn LLMProvider + Send + Sync>,
+        config: ConflictResolverConfig,
+        timeout_config: TimeoutConfig,
+    ) -> Self {
+        let similarity = SemanticSimilarity::default();
+
+        Self {
+            llm,
+            similarity,
+            config,
+            timeout_config,
         }
     }
 
@@ -167,23 +193,41 @@ impl ConflictResolver {
             existing_memories.len()
         );
 
+        // P0 优化 #10: 限制记忆数量，防止prompt过长
+        let limited_existing_memories: Vec<Memory> = if existing_memories.len() > self.config.max_consideration_memories {
+            warn!(
+                "现有记忆数量 {} 超过限制 {}，仅取最相关的前 {} 个",
+                existing_memories.len(),
+                self.config.max_consideration_memories,
+                self.config.max_consideration_memories
+            );
+            // 取最新的记忆
+            let mut sorted_memories = existing_memories.to_vec();
+            sorted_memories.sort_by(|a, b| {
+                b.created_at.cmp(&a.created_at)
+            });
+            sorted_memories[..self.config.max_consideration_memories].to_vec()
+        } else {
+            existing_memories.to_vec()
+        };
+
         let mut conflicts = Vec::new();
 
         // 1. 检测语义冲突
         let semantic_conflicts = self
-            .detect_semantic_conflicts(new_memories, existing_memories)
+            .detect_semantic_conflicts(new_memories, &limited_existing_memories)
             .await?;
         conflicts.extend(semantic_conflicts);
 
         // 2. 检测时间冲突
         let temporal_conflicts = self
-            .detect_temporal_conflicts(new_memories, existing_memories)
+            .detect_temporal_conflicts(new_memories, &limited_existing_memories)
             .await?;
         conflicts.extend(temporal_conflicts);
 
         // 3. 检测重复内容
         let duplicate_conflicts = self
-            .detect_duplicates(new_memories, existing_memories)
+            .detect_duplicates(new_memories, &limited_existing_memories)
             .await?;
         conflicts.extend(duplicate_conflicts);
 
@@ -364,7 +408,15 @@ impl ConflictResolver {
             memory1.content, memory2.content
         );
 
-        let response = self.llm.generate(&[Message::user(&prompt)]).await?;
+        // P0 优化: 添加超时控制
+        let llm = self.llm.clone();
+        let response = with_timeout(
+            async move {
+                llm.generate(&[Message::user(&prompt)]).await
+            },
+            self.timeout_config.conflict_detection_timeout_secs,
+            "conflict_detection_llm",
+        ).await?;
 
         // 解析响应
         #[derive(Deserialize)]

@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 // ========== LLM 和 Embedding 导入 ==========
 use agent_mem_embeddings::EmbeddingFactory;
@@ -769,11 +769,13 @@ impl MemoryOrchestrator {
             content, agent_id
         );
 
-        // ========== Phase 6: 双写策略（向量存储 + 历史记录）==========
+        // ========== Phase 6+: 带事务支持的双写策略 ==========
+        // P0修复: 实现事务支持，确保数据一致性
 
         let memory_id = uuid::Uuid::new_v4().to_string();
+        let mut completed_steps = Vec::new();
 
-        // Step 1: 生成向量嵌入
+        // Step 1: 生成向量嵌入（Prepare阶段）
         let embedding = if let Some(embedder) = &self.embedder {
             match embedder.embed(&content).await {
                 Ok(emb) => {
@@ -781,13 +783,19 @@ impl MemoryOrchestrator {
                     emb
                 }
                 Err(e) => {
-                    warn!("生成嵌入失败: {}, 使用零向量", e);
-                    vec![0.0; 384]
+                    // P0修复: Embedder失败时返回错误而非零向量
+                    error!("生成嵌入失败: {}, 中止操作", e);
+                    return Err(agent_mem_traits::AgentMemError::EmbeddingError(
+                        format!("Failed to generate embedding: {}", e)
+                    ));
                 }
             }
         } else {
-            warn!("Embedder 未初始化，使用零向量");
-            vec![0.0; 384]
+            // P0修复: Embedder未初始化时返回错误
+            error!("Embedder 未初始化，中止操作");
+            return Err(agent_mem_traits::AgentMemError::ConfigurationError(
+                "Embedder not initialized".to_string()
+            ));
         };
 
         // Step 2: 计算 Hash
@@ -816,24 +824,25 @@ impl MemoryOrchestrator {
             }
         }
 
-        // Step 4: 存储到 CoreMemoryManager（保持原有逻辑）
+        // Step 4: 存储到 CoreMemoryManager（带事务支持）
+        // P0修复: 记录每个成功的步骤，失败时回滚
         if let Some(core_manager) = &self.core_manager {
-            info!("Phase 6: 存储到 CoreMemoryManager");
-            core_manager
-                .create_persona_block(content.clone(), None)
-                .await
-                .map_err(|e| {
-                    agent_mem_traits::AgentMemError::StorageError(format!(
-                        "创建 Persona 块失败: {:?}",
-                        e
-                    ))
-                })?;
-            info!("✅ 已存储到 CoreMemoryManager");
+            info!("Commit Phase 1/3: 存储到 CoreMemoryManager");
+            match core_manager.create_persona_block(content.clone(), None).await {
+                Ok(_) => {
+                    completed_steps.push("core_manager");
+                    info!("✅ 已存储到 CoreMemoryManager");
+                }
+                Err(e) => {
+                    error!("存储到 CoreMemoryManager 失败: {:?}", e);
+                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                }
+            }
         }
 
-        // Step 5: 存储到向量库（Phase 6 新增）
+        // Step 5: 存储到向量库（带事务支持）
         if let Some(vector_store) = &self.vector_store {
-            info!("Phase 6: 存储到向量库");
+            info!("Commit Phase 2/3: 存储到向量库");
 
             // 转换 metadata: HashMap<String, Value> -> HashMap<String, String>
             let string_metadata: HashMap<String, String> = full_metadata
@@ -848,16 +857,22 @@ impl MemoryOrchestrator {
             };
 
             match vector_store.add_vectors(vec![vector_data]).await {
-                Ok(_) => info!("✅ 已存储到向量库"),
-                Err(e) => warn!("存储到向量库失败: {}", e),
+                Ok(_) => {
+                    completed_steps.push("vector_store");
+                    info!("✅ 已存储到向量库");
+                }
+                Err(e) => {
+                    error!("存储到向量库失败: {}", e);
+                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                }
             }
         } else {
             debug!("向量存储未初始化，跳过向量存储");
         }
 
-        // Step 6: 记录历史（Phase 6 新增）
+        // Step 6: 记录历史（带事务支持）
         if let Some(history) = &self.history_manager {
-            info!("Phase 6: 记录操作历史");
+            info!("Commit Phase 3/3: 记录操作历史");
 
             let entry = crate::history::HistoryEntry {
                 id: uuid::Uuid::new_v4().to_string(),
@@ -873,15 +888,73 @@ impl MemoryOrchestrator {
             };
 
             match history.add_history(entry).await {
-                Ok(_) => info!("✅ 已记录操作历史"),
-                Err(e) => warn!("记录历史失败: {}", e),
+                Ok(_) => {
+                    completed_steps.push("history_manager");
+                    info!("✅ 已记录操作历史");
+                }
+                Err(e) => {
+                    error!("记录历史失败: {}", e);
+                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                }
             }
         } else {
             debug!("历史管理器未初始化，跳过历史记录");
         }
 
-        info!("✅ 记忆添加完成（双写）: {}", memory_id);
+        info!("✅ 记忆添加完成（事务提交成功）: {}", memory_id);
         Ok(memory_id)
+    }
+
+    /// 回滚add_memory操作
+    /// 
+    /// P0修复: 实现事务回滚机制
+    async fn rollback_add_memory(
+        &self,
+        completed_steps: Vec<&str>,
+        memory_id: String,
+        error: String,
+    ) -> Result<String> {
+        warn!("事务失败，开始回滚。已完成步骤: {:?}", completed_steps);
+        
+        // 逆序回滚已完成的步骤
+        for step in completed_steps.iter().rev() {
+            match *step {
+                "core_manager" => {
+                    if let Some(core_manager) = &self.core_manager {
+                        info!("回滚: 删除 CoreMemoryManager 中的数据");
+                        // Note: CoreMemoryManager可能没有delete方法，这里标记为TODO
+                        // TODO: 实现CoreMemoryManager的删除逻辑
+                        debug!("CoreMemoryManager 回滚跳过（待实现delete方法）");
+                    }
+                }
+                "vector_store" => {
+                    if let Some(vector_store) = &self.vector_store {
+                        info!("回滚: 删除向量库中的数据");
+                        if let Err(e) = vector_store.delete(&memory_id).await {
+                            warn!("回滚向量存储失败: {}", e);
+                        } else {
+                            info!("✅ 已回滚向量存储");
+                        }
+                    }
+                }
+                "history_manager" => {
+                    if let Some(history) = &self.history_manager {
+                        info!("回滚: 删除历史记录");
+                        if let Err(e) = history.delete_by_memory_id(&memory_id).await {
+                            warn!("回滚历史记录失败: {}", e);
+                        } else {
+                            info!("✅ 已回滚历史记录");
+                        }
+                    }
+                }
+                _ => {
+                    warn!("未知步骤: {}", step);
+                }
+            }
+        }
+        
+        error!("事务回滚完成，原因: {}", error);
+        Err(agent_mem_traits::AgentMemError::TransactionFailed(error))
     }
 
     /// 智能添加记忆 (完整流水线)

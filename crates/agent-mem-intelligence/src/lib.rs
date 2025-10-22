@@ -30,6 +30,9 @@ pub mod importance_evaluator;
 // 多模态内容处理模块
 pub mod multimodal;
 
+// 超时控制模块 (P0 优化)
+pub mod timeout;
+
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Result};
 
@@ -60,3 +63,4 @@ pub use intelligent_processor::{
     EnhancedIntelligentProcessor, EnhancedProcessingResult, IntelligentMemoryProcessor,
     IntelligentProcessingResult, MemoryHealthReport,
 };
+pub use timeout::{with_timeout, with_timeout_and_retry, TimeoutConfig};

@@ -18,6 +18,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+// P0 优化: 超时控制
+use crate::timeout::{with_timeout, with_timeout_and_retry, TimeoutConfig};
+
 /// 记忆操作决策
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryDecision {
@@ -133,6 +136,8 @@ pub struct MemoryDecisionEngine {
     conflict_detection_enabled: bool,
     importance_weight: f32,
     temporal_weight: f32,
+    // P0 优化: 超时配置
+    timeout_config: TimeoutConfig,
 }
 
 impl MemoryDecisionEngine {
@@ -145,6 +150,7 @@ impl MemoryDecisionEngine {
             conflict_detection_enabled: true,
             importance_weight: 0.3,
             temporal_weight: 0.2,
+            timeout_config: TimeoutConfig::default(),
         }
     }
 
@@ -162,6 +168,20 @@ impl MemoryDecisionEngine {
             conflict_detection_enabled,
             importance_weight: 0.3,
             temporal_weight: 0.2,
+            timeout_config: TimeoutConfig::default(),
+        }
+    }
+
+    /// 创建带超时配置的决策引擎
+    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
+        Self {
+            llm,
+            similarity_threshold: 0.7,
+            confidence_threshold: 0.5,
+            conflict_detection_enabled: true,
+            importance_weight: 0.3,
+            temporal_weight: 0.2,
+            timeout_config,
         }
     }
 
@@ -201,7 +221,21 @@ impl MemoryDecisionEngine {
             content: prompt,
             timestamp: Some(chrono::Utc::now()),
         }];
-        let response_text = self.llm.generate(&messages).await?;
+        
+        // P0 优化 #12: 添加超时和重试
+        let llm = self.llm.clone();
+        let response_text = with_timeout_and_retry(
+            || {
+                let llm = llm.clone();
+                let messages = messages.clone();
+                async move {
+                    llm.generate(&messages).await
+                }
+            },
+            self.timeout_config.decision_timeout_secs,
+            2, // 最多重试2次
+            "decision_making",
+        ).await?;
         let cleaned_json = self.extract_json_from_response(&response_text)?;
         let response: DecisionResponse = serde_json::from_str(&cleaned_json)
             .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
@@ -238,7 +272,16 @@ impl MemoryDecisionEngine {
             content: prompt,
             timestamp: Some(chrono::Utc::now()),
         }];
-        let response_text = self.llm.generate(&messages).await?;
+        
+        // P0 优化 #12: 添加超时控制
+        let llm = self.llm.clone();
+        let response_text = with_timeout(
+            async move {
+                llm.generate(&messages).await
+            },
+            self.timeout_config.conflict_detection_timeout_secs,
+            "conflict_detection",
+        ).await?;
         let response: ConflictDetection = serde_json::from_str(&response_text)
             .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
 
