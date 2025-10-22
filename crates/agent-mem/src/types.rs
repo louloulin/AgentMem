@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use agent_mem_traits::{MemoryItem, MemoryType};
 
 /// 添加记忆的选项（mem0 兼容）
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddMemoryOptions {
     /// 用户 ID
     pub user_id: Option<String>,
@@ -14,8 +14,8 @@ pub struct AddMemoryOptions {
     pub agent_id: Option<String>,
     /// Run ID
     pub run_id: Option<String>,
-    /// 元数据
-    pub metadata: Option<HashMap<String, serde_json::Value>>,
+    /// 元数据（支持多种类型数据）
+    pub metadata: HashMap<String, String>,
     /// 启用智能推理（事实提取、去重等）
     /// 如果为 true，使用 LLM 提取事实并决策 ADD/UPDATE/DELETE
     /// 如果为 false，直接添加原始消息作为记忆
@@ -24,6 +24,20 @@ pub struct AddMemoryOptions {
     pub memory_type: Option<String>,
     /// 自定义提示词
     pub prompt: Option<String>,
+}
+
+impl Default for AddMemoryOptions {
+    fn default() -> Self {
+        Self {
+            user_id: None,
+            agent_id: None,
+            run_id: None,
+            metadata: HashMap::new(),
+            infer: false,
+            memory_type: None,
+            prompt: None,
+        }
+    }
 }
 
 /// 添加操作的结果（mem0 兼容）

@@ -3,6 +3,7 @@
 //! Memory 提供了简洁的 API 来管理所有类型的记忆，
 //! 内部自动路由到对应的专门 Agent 处理。
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -194,6 +195,21 @@ impl Memory {
         debug!("添加记忆: {}, infer={}", content, options.infer);
 
         let orchestrator = self.orchestrator.read().await;
+
+        // 转换 metadata 类型: HashMap<String, String> -> Option<HashMap<String, serde_json::Value>>
+        let metadata_json: Option<HashMap<String, serde_json::Value>> =
+            if options.metadata.is_empty() {
+                None
+            } else {
+                Some(
+                    options
+                        .metadata
+                        .into_iter()
+                        .map(|(k, v)| (k, serde_json::Value::String(v)))
+                        .collect(),
+                )
+            };
+
         orchestrator
             .add_memory_v2(
                 content,
@@ -202,7 +218,7 @@ impl Memory {
                     .unwrap_or_else(|| self.default_agent_id.clone()),
                 options.user_id.or_else(|| self.default_user_id.clone()),
                 options.run_id,
-                options.metadata,
+                metadata_json,
                 options.infer,
                 options.memory_type,
                 options.prompt,
@@ -497,5 +513,172 @@ impl Memory {
     /// 设置默认 Agent ID
     pub fn set_default_agent(&mut self, agent_id: impl Into<String>) {
         self.default_agent_id = agent_id.into();
+    }
+
+    // ========== Phase 2: 多模态记忆方法 ==========
+
+    /// 添加图像记忆 (Phase 2.1)
+    ///
+    /// 处理图像内容并创建记忆
+    ///
+    /// # 参数
+    ///
+    /// * `image_data` - 图像二进制数据
+    /// * `options` - 添加选项（可包含文件名等元数据）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::types::AddMemoryOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// // 读取图像文件
+    /// let image_data = std::fs::read("photo.jpg")?;
+    ///
+    /// // 添加图像记忆
+    /// let mut options = AddMemoryOptions::default();
+    /// options.metadata.insert("filename".to_string(), "photo.jpg".to_string());
+    /// options.metadata.insert("source".to_string(), "camera".to_string());
+    ///
+    /// let result = mem.add_image(image_data, Some(options)).await?;
+    /// println!("添加了 {} 个记忆事件", result.results.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_image(
+        &self,
+        image_data: Vec<u8>,
+        options: Option<AddMemoryOptions>,
+    ) -> Result<AddResult> {
+        info!("添加图像记忆, size={}KB", image_data.len() / 1024);
+
+        let options = options.unwrap_or_default();
+        let orchestrator = self.orchestrator.read().await;
+
+        orchestrator
+            .add_image_memory(
+                image_data,
+                options
+                    .user_id
+                    .or_else(|| self.default_user_id.clone())
+                    .unwrap_or_else(|| "default".to_string()),
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                Some(options.metadata),
+            )
+            .await
+    }
+
+    /// 添加音频记忆 (Phase 2.2)
+    ///
+    /// 处理音频内容并创建记忆
+    ///
+    /// # 参数
+    ///
+    /// * `audio_data` - 音频二进制数据
+    /// * `options` - 添加选项（可包含文件名、语言等元数据）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::types::AddMemoryOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// // 读取音频文件
+    /// let audio_data = std::fs::read("recording.mp3")?;
+    ///
+    /// // 添加音频记忆
+    /// let mut options = AddMemoryOptions::default();
+    /// options.metadata.insert("filename".to_string(), "recording.mp3".to_string());
+    /// options.metadata.insert("language".to_string(), "zh".to_string());
+    ///
+    /// let result = mem.add_audio(audio_data, Some(options)).await?;
+    /// println!("添加了 {} 个记忆事件", result.results.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_audio(
+        &self,
+        audio_data: Vec<u8>,
+        options: Option<AddMemoryOptions>,
+    ) -> Result<AddResult> {
+        info!("添加音频记忆, size={}KB", audio_data.len() / 1024);
+
+        let options = options.unwrap_or_default();
+        let orchestrator = self.orchestrator.read().await;
+
+        orchestrator
+            .add_audio_memory(
+                audio_data,
+                options
+                    .user_id
+                    .or_else(|| self.default_user_id.clone())
+                    .unwrap_or_else(|| "default".to_string()),
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                Some(options.metadata),
+            )
+            .await
+    }
+
+    /// 添加视频记忆 (Phase 2.3)
+    ///
+    /// 处理视频内容并创建记忆
+    ///
+    /// # 参数
+    ///
+    /// * `video_data` - 视频二进制数据
+    /// * `options` - 添加选项（可包含文件名、时长等元数据）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::types::AddMemoryOptions;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    ///
+    /// // 读取视频文件
+    /// let video_data = std::fs::read("video.mp4")?;
+    ///
+    /// // 添加视频记忆
+    /// let mut options = AddMemoryOptions::default();
+    /// options.metadata.insert("filename".to_string(), "video.mp4".to_string());
+    /// options.metadata.insert("duration".to_string(), "60".to_string());
+    ///
+    /// let result = mem.add_video(video_data, Some(options)).await?;
+    /// println!("添加了 {} 个记忆事件", result.results.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_video(
+        &self,
+        video_data: Vec<u8>,
+        options: Option<AddMemoryOptions>,
+    ) -> Result<AddResult> {
+        info!("添加视频记忆, size={}KB", video_data.len() / 1024);
+
+        let options = options.unwrap_or_default();
+        let orchestrator = self.orchestrator.read().await;
+
+        orchestrator
+            .add_video_memory(
+                video_data,
+                options
+                    .user_id
+                    .or_else(|| self.default_user_id.clone())
+                    .unwrap_or_else(|| "default".to_string()),
+                options
+                    .agent_id
+                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                Some(options.metadata),
+            )
+            .await
     }
 }

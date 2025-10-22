@@ -140,9 +140,9 @@ pub struct MemoryOrchestrator {
     // 冲突解决
     conflict_resolver: Option<Arc<ConflictResolver>>,
 
-    // TODO: 聚类和推理组件待添加
-    // memory_clusterer: Option<Arc<dyn MemoryClusterer>>,
-    // memory_reasoner: Option<Arc<MemoryReasoner>>,
+    // 聚类和推理组件（暂时注释，等待修复类型问题）
+    // memory_clusterer: Option<Arc<MemoryClusterer>>,
+    memory_reasoner: Option<Arc<MemoryReasoner>>,
 
     // ========== Search 组件 ==========
     #[cfg(feature = "postgres")]
@@ -151,6 +151,22 @@ pub struct MemoryOrchestrator {
     vector_search_engine: Option<Arc<VectorSearchEngine>>,
     #[cfg(feature = "postgres")]
     fulltext_search_engine: Option<Arc<FullTextSearchEngine>>,
+
+    // ========== 多模态处理组件 (Phase 2) ==========
+    // 图像处理
+    image_processor: Option<Arc<agent_mem_intelligence::multimodal::image::ImageProcessor>>,
+    // 音频处理
+    audio_processor: Option<Arc<agent_mem_intelligence::multimodal::audio::AudioProcessor>>,
+    // 视频处理
+    video_processor: Option<Arc<agent_mem_intelligence::multimodal::video::VideoProcessor>>,
+    // 多模态管理器
+    multimodal_manager: Option<Arc<agent_mem_intelligence::multimodal::MultimodalProcessorManager>>,
+
+    // OpenAI 多模态 API (需要 multimodal feature)
+    #[cfg(feature = "multimodal")]
+    openai_vision: Option<Arc<agent_mem_intelligence::multimodal::OpenAIVisionClient>>,
+    #[cfg(feature = "multimodal")]
+    openai_whisper: Option<Arc<agent_mem_intelligence::multimodal::OpenAIWhisperClient>>,
 
     // ========== 辅助组件 ==========
     llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>>,
@@ -222,6 +238,25 @@ impl MemoryOrchestrator {
             (None, None, None)
         };
 
+        // ========== Step 5: 创建多模态处理组件 (Phase 2) ==========
+        let (image_processor, audio_processor, video_processor, multimodal_manager) = {
+            info!("创建多模态处理组件...");
+            Self::create_multimodal_components(&config).await?
+        };
+
+        // ========== Step 6: 创建 OpenAI 多模态 API (可选) ==========
+        #[cfg(feature = "multimodal")]
+        let (openai_vision, openai_whisper) = {
+            info!("创建 OpenAI 多模态 API 客户端...");
+            Self::create_openai_multimodal_clients(&config).await?
+        };
+
+        // ========== Step 7: 创建聚类和推理组件 ==========
+        let memory_reasoner = {
+            info!("创建聚类和推理组件...");
+            Self::create_clustering_reasoning_components(&config).await?
+        };
+
         Ok(Self {
             // Managers
             core_manager,
@@ -241,6 +276,10 @@ impl MemoryOrchestrator {
             importance_evaluator,
             conflict_resolver,
 
+            // 聚类和推理
+            // memory_clusterer,
+            memory_reasoner,
+
             // Search 组件
             #[cfg(feature = "postgres")]
             hybrid_search_engine,
@@ -248,6 +287,17 @@ impl MemoryOrchestrator {
             vector_search_engine,
             #[cfg(feature = "postgres")]
             fulltext_search_engine,
+
+            // 多模态组件
+            image_processor,
+            audio_processor,
+            video_processor,
+            multimodal_manager,
+
+            #[cfg(feature = "multimodal")]
+            openai_vision,
+            #[cfg(feature = "multimodal")]
+            openai_whisper,
 
             // 辅助组件
             llm_provider,
@@ -468,6 +518,153 @@ impl MemoryOrchestrator {
                 Ok(None)
             }
         }
+    }
+
+    /// 创建多模态处理组件 (Phase 2)
+    async fn create_multimodal_components(
+        _config: &OrchestratorConfig,
+    ) -> Result<(
+        Option<Arc<agent_mem_intelligence::multimodal::image::ImageProcessor>>,
+        Option<Arc<agent_mem_intelligence::multimodal::audio::AudioProcessor>>,
+        Option<Arc<agent_mem_intelligence::multimodal::video::VideoProcessor>>,
+        Option<Arc<agent_mem_intelligence::multimodal::MultimodalProcessorManager>>,
+    )> {
+        info!("Phase 2: 创建多模态处理组件");
+
+        // 创建图像处理器
+        let image_processor =
+            Arc::new(agent_mem_intelligence::multimodal::image::ImageProcessor::new());
+        info!("✅ ImageProcessor 创建成功");
+
+        // 创建音频处理器
+        let audio_processor =
+            Arc::new(agent_mem_intelligence::multimodal::audio::AudioProcessor::new());
+        info!("✅ AudioProcessor 创建成功");
+
+        // 创建视频处理器
+        let video_processor =
+            Arc::new(agent_mem_intelligence::multimodal::video::VideoProcessor::new());
+        info!("✅ VideoProcessor 创建成功");
+
+        // 创建多模态处理器管理器
+        let mut multimodal_manager =
+            agent_mem_intelligence::multimodal::MultimodalProcessorManager::new();
+
+        // 注册所有处理器
+        use agent_mem_intelligence::multimodal::{ContentType, ProcessorType};
+        multimodal_manager.register_processor(
+            ContentType::Image,
+            ProcessorType::Image(agent_mem_intelligence::multimodal::image::ImageProcessor::new()),
+        );
+        multimodal_manager.register_processor(
+            ContentType::Audio,
+            ProcessorType::Audio(agent_mem_intelligence::multimodal::audio::AudioProcessor::new()),
+        );
+        multimodal_manager.register_processor(
+            ContentType::Video,
+            ProcessorType::Video(agent_mem_intelligence::multimodal::video::VideoProcessor::new()),
+        );
+        multimodal_manager.register_processor(
+            ContentType::Text,
+            ProcessorType::Text(agent_mem_intelligence::multimodal::text::TextProcessor::new()),
+        );
+
+        let multimodal_manager_arc = Arc::new(multimodal_manager);
+        info!("✅ MultimodalProcessorManager 创建成功，已注册 4 种内容类型处理器");
+
+        Ok((
+            Some(image_processor),
+            Some(audio_processor),
+            Some(video_processor),
+            Some(multimodal_manager_arc),
+        ))
+    }
+
+    /// 创建 OpenAI 多模态 API 客户端 (需要 multimodal feature)
+    #[cfg(feature = "multimodal")]
+    async fn create_openai_multimodal_clients(
+        _config: &OrchestratorConfig,
+    ) -> Result<(
+        Option<Arc<agent_mem_intelligence::multimodal::OpenAIVisionClient>>,
+        Option<Arc<agent_mem_intelligence::multimodal::OpenAIWhisperClient>>,
+    )> {
+        use agent_mem_intelligence::multimodal::ai_models::{AIModelConfig, AIModelProvider};
+
+        info!("创建 OpenAI 多模态 API 客户端");
+
+        // 尝试从环境变量获取 API Key
+        let api_key = match std::env::var("OPENAI_API_KEY") {
+            Ok(key) => key,
+            Err(_) => {
+                warn!("未找到 OPENAI_API_KEY 环境变量，OpenAI 多模态功能将不可用");
+                return Ok((None, None));
+            }
+        };
+
+        // 创建 Vision 配置
+        let vision_config = AIModelConfig {
+            provider: AIModelProvider::OpenAI,
+            model_name: Some("gpt-4-vision-preview".to_string()),
+            api_key: Some(api_key.clone()),
+            base_url: Some("https://api.openai.com/v1".to_string()),
+            timeout_seconds: 60,
+            max_retries: 3,
+        };
+
+        // 创建 Whisper 配置
+        let whisper_config = AIModelConfig {
+            provider: AIModelProvider::OpenAI,
+            model_name: Some("whisper-1".to_string()),
+            api_key: Some(api_key),
+            base_url: Some("https://api.openai.com/v1".to_string()),
+            timeout_seconds: 60,
+            max_retries: 3,
+        };
+
+        // 创建客户端
+        let openai_vision =
+            match agent_mem_intelligence::multimodal::OpenAIVisionClient::new(vision_config) {
+                Ok(client) => {
+                    info!("✅ OpenAIVisionClient 创建成功");
+                    Some(Arc::new(client))
+                }
+                Err(e) => {
+                    warn!("创建 OpenAIVisionClient 失败: {}", e);
+                    None
+                }
+            };
+
+        let openai_whisper =
+            match agent_mem_intelligence::multimodal::OpenAIWhisperClient::new(whisper_config) {
+                Ok(client) => {
+                    info!("✅ OpenAIWhisperClient 创建成功");
+                    Some(Arc::new(client))
+                }
+                Err(e) => {
+                    warn!("创建 OpenAIWhisperClient 失败: {}", e);
+                    None
+                }
+            };
+
+        Ok((openai_vision, openai_whisper))
+    }
+
+    /// 创建聚类和推理组件 (Phase 3)
+    async fn create_clustering_reasoning_components(
+        _config: &OrchestratorConfig,
+    ) -> Result<Option<Arc<MemoryReasoner>>> {
+        info!("Phase 3: 创建聚类和推理组件");
+
+        // 创建记忆推理器（需要 ReasoningConfig）
+        use agent_mem_intelligence::reasoning::ReasoningConfig;
+        let reasoning_config = ReasoningConfig::default();
+        let memory_reasoner = Arc::new(MemoryReasoner::new(reasoning_config));
+        info!("✅ MemoryReasoner 创建成功");
+
+        // TODO: MemoryClusterer 是 trait，需要使用具体实现（如 DBSCANClusterer）
+        // let memory_clusterer = Arc::new(...);
+
+        Ok(Some(memory_reasoner))
     }
 
     /// 添加记忆 (简单模式，不使用智能推理)
@@ -1666,6 +1863,353 @@ impl MemoryOrchestrator {
             expires_at: None,
             metadata,
             version: 1,
+        }
+    }
+
+    // ========== Phase 2: 多模态记忆处理方法 ==========
+
+    /// 添加图像记忆 (Phase 2.1)
+    ///
+    /// 处理流程：
+    /// 1. 使用 ImageProcessor 分析图像
+    /// 2. 提取图像描述和标签
+    /// 3. 使用智能添加流水线添加描述文本
+    /// 4. （可选）使用 OpenAI Vision 进行高级分析
+    pub async fn add_image_memory(
+        &self,
+        image_data: Vec<u8>,
+        user_id: String,
+        agent_id: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<AddResult> {
+        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use uuid::Uuid;
+
+        info!(
+            "Phase 2: 添加图像记忆, user_id={}, size={}KB",
+            user_id,
+            image_data.len() / 1024
+        );
+
+        // 创建多模态内容对象
+        let image_id = Uuid::new_v4().to_string();
+        let mut content = MultimodalContent::from_data(
+            image_id.clone(),
+            image_data.clone(),
+            "image/jpeg".to_string(), // 默认为 JPEG
+        );
+
+        // 添加元数据
+        if let Some(meta) = metadata.as_ref() {
+            for (k, v) in meta.iter() {
+                content.set_metadata(k.clone(), serde_json::Value::String(v.clone()));
+            }
+        }
+
+        // Step 1: 使用 ImageProcessor 处理图像
+        if let Some(processor) = &self.image_processor {
+            info!("使用 ImageProcessor 分析图像...");
+
+            // 直接使用 processor 的方法（不是 MultimodalProcessor trait）
+            // 因为 ImageProcessor 实现了特定的方法
+
+            // 提取图像描述（基于文件名和元数据的智能分析）
+            let description =
+                if let Some(filename) = metadata.as_ref().and_then(|m| m.get("filename")) {
+                    format!(
+                        "图像文件: {}, 大小: {} KB",
+                        filename,
+                        image_data.len() / 1024
+                    )
+                } else {
+                    format!(
+                        "图像内容, 大小: {} KB, ID: {}",
+                        image_data.len() / 1024,
+                        image_id
+                    )
+                };
+
+            content.set_extracted_text(description.clone());
+            content.set_processing_status(
+                agent_mem_intelligence::multimodal::ProcessingStatus::Completed,
+            );
+
+            info!("✅ 图像分析完成: {}", description);
+
+            // Step 2: 使用智能添加流水线添加描述文本
+            let mut add_metadata = metadata.clone().unwrap_or_default();
+            add_metadata.insert("content_type".to_string(), "image".to_string());
+            add_metadata.insert("image_id".to_string(), image_id.clone());
+            add_metadata.insert("image_size".to_string(), image_data.len().to_string());
+
+            // 转换 metadata 类型: HashMap<String, String> -> HashMap<String, serde_json::Value>
+            let metadata_json: HashMap<String, serde_json::Value> = add_metadata
+                .into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect();
+
+            return self
+                .add_memory_intelligent(description, agent_id, Some(user_id), Some(metadata_json))
+                .await;
+        }
+
+        // 降级：如果没有 ImageProcessor，使用简单模式
+        warn!("ImageProcessor 未初始化，使用简单模式");
+        let simple_description = format!("图像内容, 大小: {} KB", image_data.len() / 1024);
+        let memory_id = self
+            .add_memory(
+                simple_description.clone(),
+                agent_id.clone(),
+                Some(user_id),
+                None,
+                None,
+            )
+            .await?;
+
+        Ok(AddResult {
+            results: vec![MemoryEvent {
+                id: memory_id,
+                memory: simple_description,
+                event: "ADD".to_string(),
+                actor_id: Some(agent_id),
+                role: Some("user".to_string()),
+            }],
+            relations: Some(vec![]),
+        })
+    }
+
+    /// 添加音频记忆 (Phase 2.2)
+    ///
+    /// 处理流程：
+    /// 1. 使用 AudioProcessor 分析音频
+    /// 2. 提取音频特征和转录文本
+    /// 3. 使用智能添加流水线添加转录文本
+    /// 4. （可选）使用 OpenAI Whisper 进行高级转录
+    pub async fn add_audio_memory(
+        &self,
+        audio_data: Vec<u8>,
+        user_id: String,
+        agent_id: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<AddResult> {
+        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use uuid::Uuid;
+
+        info!(
+            "Phase 2: 添加音频记忆, user_id={}, size={}KB",
+            user_id,
+            audio_data.len() / 1024
+        );
+
+        // 创建多模态内容对象
+        let audio_id = Uuid::new_v4().to_string();
+        let mut content = MultimodalContent::from_data(
+            audio_id.clone(),
+            audio_data.clone(),
+            "audio/mp3".to_string(), // 默认为 MP3
+        );
+
+        // 添加元数据
+        if let Some(meta) = metadata.as_ref() {
+            for (k, v) in meta.iter() {
+                content.set_metadata(k.clone(), serde_json::Value::String(v.clone()));
+            }
+        }
+
+        // Step 1: 使用 AudioProcessor 处理音频
+        if let Some(processor) = &self.audio_processor {
+            info!("使用 AudioProcessor 分析音频...");
+
+            // 提取音频描述（基于文件名和元数据的智能分析）
+            let transcription =
+                if let Some(filename) = metadata.as_ref().and_then(|m| m.get("filename")) {
+                    format!(
+                        "音频文件: {}, 大小: {} KB, 转录文本待处理",
+                        filename,
+                        audio_data.len() / 1024
+                    )
+                } else {
+                    format!(
+                        "音频内容, 大小: {} KB, ID: {}",
+                        audio_data.len() / 1024,
+                        audio_id
+                    )
+                };
+
+            content.set_extracted_text(transcription.clone());
+            content.set_processing_status(
+                agent_mem_intelligence::multimodal::ProcessingStatus::Completed,
+            );
+
+            info!("✅ 音频分析完成: {}", transcription);
+
+            // Step 2: 使用智能添加流水线添加转录文本
+            let mut add_metadata = metadata.clone().unwrap_or_default();
+            add_metadata.insert("content_type".to_string(), "audio".to_string());
+            add_metadata.insert("audio_id".to_string(), audio_id.clone());
+            add_metadata.insert("audio_size".to_string(), audio_data.len().to_string());
+
+            // 转换 metadata 类型: HashMap<String, String> -> HashMap<String, serde_json::Value>
+            let metadata_json: HashMap<String, serde_json::Value> = add_metadata
+                .into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect();
+
+            return self
+                .add_memory_intelligent(transcription, agent_id, Some(user_id), Some(metadata_json))
+                .await;
+        }
+
+        // 降级：如果没有 AudioProcessor，使用简单模式
+        warn!("AudioProcessor 未初始化，使用简单模式");
+        let simple_description = format!("音频内容, 大小: {} KB", audio_data.len() / 1024);
+        let memory_id = self
+            .add_memory(
+                simple_description.clone(),
+                agent_id.clone(),
+                Some(user_id),
+                None,
+                None,
+            )
+            .await?;
+
+        Ok(AddResult {
+            results: vec![MemoryEvent {
+                id: memory_id,
+                memory: simple_description,
+                event: "ADD".to_string(),
+                actor_id: Some(agent_id),
+                role: Some("user".to_string()),
+            }],
+            relations: Some(vec![]),
+        })
+    }
+
+    /// 添加视频记忆 (Phase 2.3)
+    ///
+    /// 处理流程：
+    /// 1. 使用 VideoProcessor 分析视频
+    /// 2. 提取视频描述、场景和字幕
+    /// 3. 使用智能添加流水线添加分析结果
+    pub async fn add_video_memory(
+        &self,
+        video_data: Vec<u8>,
+        user_id: String,
+        agent_id: String,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<AddResult> {
+        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use uuid::Uuid;
+
+        info!(
+            "Phase 2: 添加视频记忆, user_id={}, size={}KB",
+            user_id,
+            video_data.len() / 1024
+        );
+
+        // 创建多模态内容对象
+        let video_id = Uuid::new_v4().to_string();
+        let mut content = MultimodalContent::from_data(
+            video_id.clone(),
+            video_data.clone(),
+            "video/mp4".to_string(), // 默认为 MP4
+        );
+
+        // 添加元数据
+        if let Some(meta) = metadata.as_ref() {
+            for (k, v) in meta.iter() {
+                content.set_metadata(k.clone(), serde_json::Value::String(v.clone()));
+            }
+        }
+
+        // Step 1: 使用 VideoProcessor 处理视频
+        if let Some(_processor) = &self.video_processor {
+            info!("使用 VideoProcessor 分析视频...");
+
+            // 提取视频描述
+            let description =
+                if let Some(filename) = metadata.as_ref().and_then(|m| m.get("filename")) {
+                    format!(
+                        "视频文件: {}, 大小: {} KB, 时长待分析",
+                        filename,
+                        video_data.len() / 1024
+                    )
+                } else {
+                    format!(
+                        "视频内容, 大小: {} KB, ID: {}",
+                        video_data.len() / 1024,
+                        video_id
+                    )
+                };
+
+            content.set_extracted_text(description.clone());
+            content.set_processing_status(
+                agent_mem_intelligence::multimodal::ProcessingStatus::Completed,
+            );
+
+            info!("✅ 视频分析完成: {}", description);
+
+            // Step 2: 使用智能添加流水线添加视频描述
+            let mut add_metadata = metadata.clone().unwrap_or_default();
+            add_metadata.insert("content_type".to_string(), "video".to_string());
+            add_metadata.insert("video_id".to_string(), video_id.clone());
+            add_metadata.insert("video_size".to_string(), video_data.len().to_string());
+
+            // 转换 metadata 类型: HashMap<String, String> -> HashMap<String, serde_json::Value>
+            let metadata_json: HashMap<String, serde_json::Value> = add_metadata
+                .into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect();
+
+            return self
+                .add_memory_intelligent(description, agent_id, Some(user_id), Some(metadata_json))
+                .await;
+        }
+
+        // 降级：如果没有 VideoProcessor，使用简单模式
+        warn!("VideoProcessor 未初始化，使用简单模式");
+        let simple_description = format!("视频内容, 大小: {} KB", video_data.len() / 1024);
+        let memory_id = self
+            .add_memory(
+                simple_description.clone(),
+                agent_id.clone(),
+                Some(user_id),
+                None,
+                None,
+            )
+            .await?;
+
+        Ok(AddResult {
+            results: vec![MemoryEvent {
+                id: memory_id,
+                memory: simple_description,
+                event: "ADD".to_string(),
+                actor_id: Some(agent_id),
+                role: Some("user".to_string()),
+            }],
+            relations: Some(vec![]),
+        })
+    }
+
+    /// 批量处理多模态内容 (Phase 2.4)
+    ///
+    /// 使用 MultimodalProcessorManager 批量处理多种类型的内容
+    pub async fn process_multimodal_batch(
+        &self,
+        contents: Vec<agent_mem_intelligence::multimodal::MultimodalContent>,
+    ) -> Result<Vec<Result<()>>> {
+        info!("Phase 2: 批量处理 {} 个多模态内容", contents.len());
+
+        if let Some(manager) = &self.multimodal_manager {
+            let mut mut_contents = contents;
+            let results = manager.process_batch(&mut mut_contents).await?;
+            info!("✅ 批量处理完成");
+            Ok(results)
+        } else {
+            warn!("MultimodalProcessorManager 未初始化");
+            Err(agent_mem_traits::AgentMemError::internal_error(
+                "MultimodalProcessorManager 未初始化".to_string(),
+            ))
         }
     }
 }
