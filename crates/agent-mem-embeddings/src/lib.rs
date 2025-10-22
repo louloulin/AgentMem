@@ -14,8 +14,12 @@ pub mod factory;
 pub mod providers;
 pub mod utils;
 
+// P1 优化 #20: 缓存embedder
+pub mod cached_embedder;
+
 pub use config::EmbeddingConfig;
 pub use factory::{EmbeddingFactory, RealEmbeddingFactory};
+pub use cached_embedder::CachedEmbedder;
 
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Embedder, Result};

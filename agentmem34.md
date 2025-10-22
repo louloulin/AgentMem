@@ -734,17 +734,19 @@ async fn convert_search_results_to_memory_items(
 | 2 | LLM调用无超时控制 | FactExtractor | 服务hang | ⭐ 低 | ✅ 已完成 |
 | 10 | Prompt长度未控制 | ConflictResolver | 功能失效 | ⭐⭐ 中 | ✅ 已完成 |
 | 12 | 决策引擎无超时重试 | DecisionEngine | 服务不稳定 | ⭐ 低 | ✅ 已完成 |
-| 16 | 执行决策无事务支持 | Orchestrator | 数据不一致 | ⭐⭐⭐ 高 | ⏳ 待实现 |
-| 18 | 三个存储写入未原子化 | add_memory | 数据不一致 | ⭐⭐⭐ 高 | ⏳ 待实现 |
+| 16 | 执行决策无事务支持 | Orchestrator | 数据不一致 | ⭐⭐⭐ 高 | ✅ 已完成 |
+| 18 | 三个存储写入未原子化 | add_memory | 数据不一致 | ⭐⭐⭐ 高 | ✅ 已完成 |
 | 21 | 查询向量零向量降级 | generate_query_embedding | 搜索失效 | ⭐ 低 | ⏳ 待实现 |
 | 22 | 并行搜索无超时 | HybridSearch | 服务hang | ⭐ 低 | ✅ 已完成 |
 
-**修复优先级**：16 > 18 > 10✅ > 12✅ > 22✅ > 2✅ > 21
+**修复优先级**：16✅ > 18✅ > 10✅ > 12✅ > 22✅ > 2✅ > 21
 
-**已完成 P0 优化 (4/7)**：
+**已完成 P0 优化 (6/7, 86%)**：
 - ✅ #2: FactExtractor 添加超时控制（30秒）
 - ✅ #10: ConflictResolver 限制记忆数量（最多20个）
 - ✅ #12: DecisionEngine 添加超时（60秒）和重试机制（最多2次）
+- ✅ #16: execute_decisions 添加事务支持和回滚机制
+- ✅ #18: add_memory 实现三阶段提交和事务回滚
 - ✅ #22: ConflictResolver 的 LLM 调用添加超时控制
 
 #### P1 - 重要问题（影响性能/质量）
@@ -1619,7 +1621,7 @@ graph LR
 
 **更新时间**: 2025-10-22
 
-### 已完成的优化 (P0: 4/7)
+### 已完成的优化 (P0: 6/7, 86%)
 
 #### ✅ 1. 超时控制模块 (P0-#2, #12, #22)
 
@@ -1659,12 +1661,55 @@ pub struct TimeoutConfig {
 - 防止 prompt 过长导致 LLM 上下文溢出
 - 提高冲突检测的稳定性
 
-### 待完成的优化
+#### ✅ 3. 事务支持 (P0-#16, #18)
 
-#### ⏳ 3. 事务支持 (P0-#16, #18)
-**优先级**: 最高  
-**预计时间**: 2天  
-**影响**: 数据一致性
+**实现文件**: `crates/agent-mem/src/orchestrator.rs`
+
+**功能**:
+
+**#18: add_memory 三阶段提交和回滚**:
+- 实现了三阶段提交机制（CoreMemoryManager → VectorStore → HistoryManager）
+- 记录 `completed_steps`，失败时自动回滚
+- `rollback_add_memory` 函数逆序清理已完成的步骤
+- Embedder 失败时立即返回错误而非零向量
+
+**#16: execute_decisions 事务支持**:
+- 新增 `CompletedOperation` 枚举记录已完成的操作
+- 支持 ADD/UPDATE/DELETE/MERGE 操作的事务管理
+- 实现 `rollback_decisions` 函数处理回滚
+- 任何决策失败时自动回滚所有已完成的操作
+
+**核心代码**:
+```rust
+// CompletedOperation 枚举
+enum CompletedOperation {
+    Add { memory_id: String },
+    Update { memory_id: String, old_content: String },
+    Delete { memory_id: String, deleted_content: String },
+    Merge { primary_memory_id: String, secondary_memory_ids: Vec<String> },
+}
+
+// add_memory 中的事务管理
+let mut completed_steps = Vec::new();
+// ... 执行操作 ...
+if error {
+    return self.rollback_add_memory(completed_steps, memory_id, error).await;
+}
+
+// execute_decisions 中的事务管理
+let mut completed_operations = Vec::new();
+// ... 执行决策 ...
+if error {
+    return self.rollback_decisions(completed_operations, error).await;
+}
+```
+
+**效果**:
+- 确保数据一致性：要么全部成功，要么全部回滚
+- 防止部分成功导致的数据不一致问题
+- 提高系统可靠性
+
+### 待完成的优化
 
 #### ⏳ 4. 零向量降级修复 (P0-#21)
 **优先级**: 中  
@@ -1680,6 +1725,19 @@ pub struct TimeoutConfig {
 - ✅ DecisionEngine 超时和重试测试
 - ✅ ConflictResolver 记忆数量限制测试
 - ✅ TimeoutConfig 默认值测试
+- ✅ add_memory 事务支持测试
+- ✅ execute_decisions 事务回滚测试
+- ✅ ACID 属性验证测试
 
 **下一步**: 添加更多集成测试和性能基准测试
+
+### P0 优化完成度总结
+
+| 优化项 | 状态 | 完成度 | 预期收益 |
+|--------|------|--------|----------|
+| 超时控制 (#2, #12, #22) | ✅ | 100% | 服务可用性 +5% |
+| Prompt长度控制 (#10) | ✅ | 100% | 功能成功率 +50% |
+| 事务支持 (#16, #18) | ✅ | 100% | 数据一致性 +40% |
+| 零向量降级修复 (#21) | ⏳ | 0% | 搜索可用性 +10% |
+| **总计** | **6/7** | **86%** | **稳定性显著提升** |
 

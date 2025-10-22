@@ -18,6 +18,9 @@ use tracing::{debug, info, warn};
 // P0 优化: 超时控制
 use crate::timeout::{with_timeout, TimeoutConfig};
 
+// P1 优化: 缓存
+use crate::caching::{CacheConfig, LruCacheWrapper};
+
 /// 提取的事实信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedFact {
@@ -159,6 +162,8 @@ pub struct FactExtractor {
     llm: Arc<dyn LLMProvider + Send + Sync>,
     // P0 优化: 超时配置
     timeout_config: TimeoutConfig,
+    // P1 优化 #1: LRU缓存
+    cache: Option<Arc<LruCacheWrapper<Vec<ExtractedFact>>>>,
 }
 
 impl FactExtractor {
@@ -167,12 +172,39 @@ impl FactExtractor {
         Self { 
             llm,
             timeout_config: TimeoutConfig::default(),
+            cache: None,
         }
     }
 
     /// 创建带自定义超时配置的事实提取器
     pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
-        Self { llm, timeout_config }
+        Self { 
+            llm, 
+            timeout_config,
+            cache: None,
+        }
+    }
+
+    /// 创建带缓存的事实提取器 (P1 优化 #1)
+    pub fn with_cache(llm: Arc<dyn LLMProvider + Send + Sync>, cache_config: CacheConfig) -> Self {
+        Self {
+            llm,
+            timeout_config: TimeoutConfig::default(),
+            cache: Some(Arc::new(LruCacheWrapper::new(cache_config))),
+        }
+    }
+
+    /// 创建带超时和缓存的事实提取器
+    pub fn with_timeout_and_cache(
+        llm: Arc<dyn LLMProvider + Send + Sync>,
+        timeout_config: TimeoutConfig,
+        cache_config: CacheConfig,
+    ) -> Self {
+        Self {
+            llm,
+            timeout_config,
+            cache: Some(Arc::new(LruCacheWrapper::new(cache_config))),
+        }
     }
 
     /// 从消息中提取事实（增强版本）- 内部实现
@@ -182,6 +214,16 @@ impl FactExtractor {
         }
 
         let conversation = self.format_conversation(messages);
+
+        // P1 优化 #1: 检查缓存
+        if let Some(cache) = &self.cache {
+            let cache_key = LruCacheWrapper::<Vec<ExtractedFact>>::compute_key(&conversation);
+            if let Some(cached_facts) = cache.get(&cache_key) {
+                info!("✅ 缓存命中，直接返回事实");
+                return Ok(cached_facts);
+            }
+        }
+
         let prompt = self.build_enhanced_extraction_prompt(&conversation);
 
         // P0 优化 #2: 添加超时控制
@@ -221,7 +263,20 @@ impl FactExtractor {
         // 合并相似事实
         facts = self.merge_similar_facts(facts);
 
+        // P1 优化 #1: 写入缓存
+        if let Some(cache) = &self.cache {
+            let conversation = self.format_conversation(messages);
+            let cache_key = LruCacheWrapper::<Vec<ExtractedFact>>::compute_key(&conversation);
+            cache.put(cache_key, facts.clone());
+            debug!("✅ 事实已缓存");
+        }
+
         Ok(facts)
+    }
+
+    /// 获取缓存统计信息
+    pub fn cache_stats(&self) -> Option<crate::caching::CacheStats> {
+        self.cache.as_ref().map(|c| c.stats())
     }
 
     /// 从响应中提取 JSON 部分

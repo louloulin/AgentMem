@@ -14,6 +14,7 @@ description = "Embedding models for AgentMem memory platform"
 [dependencies]
 agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-utils = { path = "../agent-mem-utils" }
+agent-mem-intelligence = { path = "../agent-mem-intelligence" }
 
 # 核心依赖
 serde.workspace = true

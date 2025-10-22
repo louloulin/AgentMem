@@ -33,6 +33,12 @@ pub mod multimodal;
 // 超时控制模块 (P0 优化)
 pub mod timeout;
 
+// 缓存模块 (P1 优化)
+pub mod caching;
+
+// 批量处理模块 (P1 优化)
+pub mod batch_processing;
+
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Result};
 
@@ -64,3 +70,5 @@ pub use intelligent_processor::{
     IntelligentProcessingResult, MemoryHealthReport,
 };
 pub use timeout::{with_timeout, with_timeout_and_retry, TimeoutConfig};
+pub use caching::{CacheConfig, CacheStats, LruCacheWrapper};
+pub use batch_processing::{BatchConfig, BatchEntityExtractor, BatchImportanceEvaluator};

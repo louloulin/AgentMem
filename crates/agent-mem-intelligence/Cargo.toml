@@ -33,6 +33,7 @@ futures = "0.3"
 dashmap = "5.5"
 num_cpus = "1.16"
 lru = "0.12"
+sha2 = "0.10"
 
 # 数学和统计计算
 nalgebra = { version = "0.32", optional = true }
