@@ -397,6 +397,33 @@ impl Memory {
             .await
     }
 
+    /// 重置所有记忆（危险操作）
+    ///
+    /// ⚠️ 此操作将清空：
+    /// - 所有向量存储
+    /// - 所有历史记录
+    /// - 所有记忆块
+    ///
+    /// **不可恢复！请谨慎使用！**
+    ///
+    /// Phase 8.1: reset() 方法实现
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// mem.reset().await?;  // ⚠️ 清空所有记忆
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn reset(&self) -> Result<()> {
+        warn!("⚠️ 重置所有记忆（危险操作）");
+        let orchestrator = self.orchestrator.write().await;
+        orchestrator.reset().await
+    }
+
     /// 搜索记忆
     ///
     /// 支持：
