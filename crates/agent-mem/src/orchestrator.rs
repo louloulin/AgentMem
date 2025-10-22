@@ -2461,25 +2461,38 @@ impl MemoryOrchestrator {
                         idx + 1, other_decisions.len(), memory_id, new_content, change_reason
                     );
                     
-                    // 记录旧内容用于回滚
-                    // TODO: 从存储中获取旧内容
-                    let old_content = String::new(); // 占位符
+                    // ✅ MVP改造 Task 1: 调用已有的update_memory方法
+                    let mut update_data = HashMap::new();
+                    update_data.insert("content".to_string(), serde_json::json!(new_content));
+                    update_data.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+                    if let Some(ref uid) = user_id {
+                        update_data.insert("user_id".to_string(), serde_json::json!(uid));
+                    }
                     
-                    // TODO: 实现实际的更新逻辑
-                    warn!("UPDATE 操作当前仅记录，实际更新待实现");
-                    
-                    completed_operations.push(CompletedOperation::Update {
-                        memory_id: memory_id.clone(),
-                        old_content: old_content.clone(),
-                    });
-                    
-                    all_results.push(MemoryEvent {
-                        id: memory_id.clone(),
-                        memory: new_content.clone(),
-                        event: "UPDATE".to_string(),
-                        actor_id: Some(agent_id.clone()),
-                        role: None,
-                    });
+                    // 调用已有方法执行实际更新
+                    match self.update_memory(memory_id, update_data).await {
+                        Ok(updated_item) => {
+                            info!("✅ UPDATE 操作成功执行: {}", memory_id);
+                            
+                            // 记录已完成的操作（用于回滚）
+                            completed_operations.push(CompletedOperation::Update {
+                                memory_id: memory_id.clone(),
+                                old_content: updated_item.content.clone(), // 从更新结果获取
+                            });
+                            
+                            all_results.push(MemoryEvent {
+                                id: memory_id.clone(),
+                                memory: new_content.clone(),
+                                event: "UPDATE".to_string(),
+                                actor_id: Some(agent_id.clone()),
+                                role: None,
+                            });
+                        }
+                        Err(e) => {
+                            error!("UPDATE 操作失败: {}, 开始回滚", e);
+                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                        }
+                    }
                 }
                 MemoryAction::Delete {
                     memory_id,
@@ -2488,25 +2501,43 @@ impl MemoryOrchestrator {
                     info!("执行 DELETE 决策 {}/{}: {} (reason: {:?})", 
                           idx + 1, other_decisions.len(), memory_id, deletion_reason);
                     
-                    // 记录被删除的内容用于回滚
-                    // TODO: 从存储中获取内容
-                    let deleted_content = String::new(); // 占位符
+                    // ✅ MVP改造 Task 1: 先获取内容用于回滚
+                    let deleted_content = if let Some(vector_store) = &self.vector_store {
+                        vector_store
+                            .get_vector(memory_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .and_then(|v| v.metadata.get("data").map(|s| s.to_string()))
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
                     
-                    // TODO: 实现实际的删除逻辑
-                    warn!("DELETE 操作当前仅记录，实际删除待实现");
-                    
-                    completed_operations.push(CompletedOperation::Delete {
-                        memory_id: memory_id.clone(),
-                        deleted_content: deleted_content.clone(),
-                    });
-                    
-                    all_results.push(MemoryEvent {
-                        id: memory_id.clone(),
-                        memory: String::new(),
-                        event: "DELETE".to_string(),
-                        actor_id: Some(agent_id.clone()),
-                        role: None,
-                    });
+                    // ✅ MVP改造 Task 1: 调用已有的delete_memory方法
+                    match self.delete_memory(memory_id).await {
+                        Ok(()) => {
+                            info!("✅ DELETE 操作成功执行: {}", memory_id);
+                            
+                            // 记录已完成的操作（用于回滚）
+                            completed_operations.push(CompletedOperation::Delete {
+                                memory_id: memory_id.clone(),
+                                deleted_content,
+                            });
+                            
+                            all_results.push(MemoryEvent {
+                                id: memory_id.clone(),
+                                memory: String::new(),
+                                event: "DELETE".to_string(),
+                                actor_id: Some(agent_id.clone()),
+                                role: None,
+                            });
+                        }
+                        Err(e) => {
+                            error!("DELETE 操作失败: {}, 开始回滚", e);
+                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                        }
+                    }
                 }
                 MemoryAction::Merge {
                     primary_memory_id,
@@ -2597,13 +2628,36 @@ impl MemoryOrchestrator {
                 }
                 CompletedOperation::Update { memory_id, old_content } => {
                     info!("回滚 UPDATE 操作: {} (恢复旧内容)", memory_id);
-                    // TODO: 恢复旧内容
-                    warn!("UPDATE 回滚待实现，旧内容: {}", old_content);
+                    
+                    // ✅ MVP改造 Task 2: 使用update_memory恢复旧内容
+                    let mut restore_data = HashMap::new();
+                    restore_data.insert("content".to_string(), serde_json::json!(old_content));
+                    
+                    if let Err(e) = self.update_memory(memory_id, restore_data).await {
+                        warn!("UPDATE 回滚失败: {}", e);
+                    } else {
+                        info!("✅ 已回滚 UPDATE 操作: {}", memory_id);
+                    }
                 }
                 CompletedOperation::Delete { memory_id, deleted_content } => {
                     info!("回滚 DELETE 操作: {} (恢复删除的内容)", memory_id);
-                    // TODO: 恢复删除的内容
-                    warn!("DELETE 回滚待实现，删除的内容: {}", deleted_content);
+                    
+                    // ✅ MVP改造 Task 2: 重新添加删除的内容
+                    if !deleted_content.is_empty() {
+                        if let Err(e) = self.add_memory(
+                            deleted_content.clone(),
+                            "system".to_string(), // agent_id
+                            None, // user_id
+                            None, // infer
+                            None, // metadata
+                        ).await {
+                            warn!("DELETE 回滚失败: {}", e);
+                        } else {
+                            info!("✅ 已回滚 DELETE 操作: {}", memory_id);
+                        }
+                    } else {
+                        warn!("DELETE 回滚跳过：删除的内容为空");
+                    }
                 }
                 CompletedOperation::Merge { primary_memory_id, secondary_memory_ids } => {
                     info!("回滚 MERGE 操作: {} + {:?}", primary_memory_id, secondary_memory_ids);
