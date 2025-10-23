@@ -571,16 +571,18 @@ impl ContextualMemoryManager {
         self.cleanup_correlations_for_context(context_id)?;
 
         // 如果是当前活跃上下文，清除引用
-        let mut current_id = self
-            .current_context_id
-            .write()
-            .map_err(|_| CoreError::InvalidInput("获取当前上下文写锁失败".to_string()))?;
+        {
+            let mut current_id = self
+                .current_context_id
+                .write()
+                .map_err(|_| CoreError::InvalidInput("获取当前上下文写锁失败".to_string()))?;
 
-        if let Some(ref current) = *current_id {
-            if current == context_id {
-                *current_id = None;
+            if let Some(ref current) = *current_id {
+                if current == context_id {
+                    *current_id = None;
+                }
             }
-        }
+        } // 释放写锁
 
         // 更新统计信息
         self.update_stats()?;
@@ -764,12 +766,14 @@ impl ContextualMemoryManager {
             last_verified_at: now,
         };
 
-        let mut correlations = self
-            .correlations
-            .write()
-            .map_err(|_| CoreError::InvalidInput("获取关联写锁失败".to_string()))?;
+        {
+            let mut correlations = self
+                .correlations
+                .write()
+                .map_err(|_| CoreError::InvalidInput("获取关联写锁失败".to_string()))?;
 
-        correlations.insert(id.clone(), correlation);
+            correlations.insert(id.clone(), correlation);
+        } // 释放写锁
 
         // 更新统计信息
         self.update_stats()?;

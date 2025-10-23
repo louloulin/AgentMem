@@ -436,9 +436,12 @@ impl ResourceMemoryManager {
 
     /// 删除资源
     pub async fn delete_resource(&self, resource_id: &str) -> CoreResult<()> {
-        let mut resources = self.resources.write().await;
+        let resource = {
+            let mut resources = self.resources.write().await;
+            resources.remove(resource_id)
+        };
 
-        if let Some(resource) = resources.remove(resource_id) {
+        if let Some(resource) = resource {
             // 删除物理文件
             if resource.storage_path.exists() {
                 tokio::fs::remove_file(&resource.storage_path)
@@ -447,8 +450,10 @@ impl ResourceMemoryManager {
             }
 
             // 从哈希映射中移除
-            let mut hash_to_resource = self.hash_to_resource.write().await;
-            hash_to_resource.remove(&resource.file_hash);
+            {
+                let mut hash_to_resource = self.hash_to_resource.write().await;
+                hash_to_resource.remove(&resource.file_hash);
+            } // 释放写锁
 
             // 更新统计信息
             self.update_stats().await;

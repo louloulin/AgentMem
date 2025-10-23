@@ -261,7 +261,7 @@ async fn test_agent_task_execution() {
     let task = TaskRequest::new(
         MemoryType::Episodic,
         "search".to_string(),
-        json!({"query": "test query"}),
+        json!({"user_id": "test_user", "query": "test query"}),
     );
 
     // Execute the task
@@ -307,7 +307,7 @@ async fn test_agent_statistics() {
     let task = TaskRequest::new(
         MemoryType::Episodic,
         "search".to_string(),
-        json!({"query": "test"}),
+        json!({"user_id": "test_user", "query": "test"}),
     );
 
     agent.execute_task(task).await.unwrap();

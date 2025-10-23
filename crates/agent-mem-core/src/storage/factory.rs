@@ -241,10 +241,17 @@ mod tests {
 
         let repos = RepositoryFactory::create_repositories(&config).await.unwrap();
 
-        // Verify migrations ran by checking we can create a user
-        use crate::storage::models::User;
+        // Verify migrations ran by checking we can create an organization first
+        use crate::storage::models::{Organization, User};
+        
+        // Create organization first (required for foreign key constraint)
+        let org = Organization::new("Test Org".to_string());
+        let org_result = repos.organizations.create(&org).await;
+        assert!(org_result.is_ok(), "Failed to create organization after migration: {:?}", org_result.err());
+        
+        // Now create user with the organization ID
         let user = User::new(
-            "org-123".to_string(),
+            org.id.clone(),
             "Test User".to_string(),
             "test@example.com".to_string(),
             "password_hash".to_string(),
