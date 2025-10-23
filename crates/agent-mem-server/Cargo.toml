@@ -10,6 +10,7 @@ categories = ["web-programming::http-server", "api-bindings"]
 
 [dependencies]
 # Core AgentMem dependencies
+agent-mem = { path = "../agent-mem" }  # ✅ 使用统一的Memory API
 agent-mem-core = { path = "../agent-mem-core" }
 agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-config = { path = "../agent-mem-config" }
