@@ -289,7 +289,8 @@ class AgentMemClient:
         if metadata:
             data["metadata"] = metadata
         
-        response = await self._make_request("POST", "/memories", data=data)
+        # ✅ 修复：使用正确的API端点路径
+        response = await self._make_request("POST", "/api/v1/memories", data=data)
         return response["id"]
 
     async def get_memory(self, memory_id: str) -> Memory:
@@ -302,7 +303,7 @@ class AgentMemClient:
         Returns:
             Memory object
         """
-        response = await self._make_request("GET", f"/memories/{memory_id}", use_cache=True)
+        response = await self._make_request("GET", f"/api/v1/memories/{memory_id}", use_cache=True)
         return Memory.from_dict(response)
 
     async def update_memory(
@@ -332,7 +333,7 @@ class AgentMemClient:
         if metadata is not None:
             data["metadata"] = metadata
 
-        response = await self._make_request("PUT", f"/memories/{memory_id}", data=data)
+        response = await self._make_request("PUT", f"/api/v1/memories/{memory_id}", data=data)
         return Memory.from_dict(response)
 
     async def delete_memory(self, memory_id: str) -> bool:
@@ -345,7 +346,7 @@ class AgentMemClient:
         Returns:
             True if successful
         """
-        await self._make_request("DELETE", f"/memories/{memory_id}")
+        await self._make_request("DELETE", f"/api/v1/memories/{memory_id}")
         return True
 
     async def search_memories(self, query: SearchQuery) -> List[SearchResult]:
@@ -358,7 +359,7 @@ class AgentMemClient:
         Returns:
             List of search results
         """
-        response = await self._make_request("POST", "/memories/search", data=query.to_dict())
+        response = await self._make_request("POST", "/api/v1/memories/search", data=query.to_dict())
         return [SearchResult.from_dict(result) for result in response["results"]]
 
     async def batch_add_memories(self, memories: List[Dict[str, Any]]) -> List[str]:
@@ -372,22 +373,76 @@ class AgentMemClient:
             List of memory IDs
         """
         data = {"memories": memories}
-        response = await self._make_request("POST", "/memories/batch", data=data)
-        return response["ids"]
+        response = await self._make_request("POST", "/api/v1/memories/batch", data=data)
+        return response["results"]  # ✅ 修复：使用正确的响应字段
 
-    async def get_memory_stats(self, agent_id: str) -> MemoryStats:
+    async def batch_delete_memories(self, memory_ids: List[str]) -> Dict[str, Any]:
         """
-        Get memory statistics for an agent.
+        Delete multiple memories in batch.
 
         Args:
-            agent_id: Agent identifier
+            memory_ids: List of memory IDs to delete
+
+        Returns:
+            Batch operation result
+        """
+        response = await self._make_request("POST", "/api/v1/memories/batch/delete", data=memory_ids)
+        return response
+
+    async def get_memory_history(self, memory_id: str) -> Dict[str, Any]:
+        """
+        Get memory history.
+
+        Args:
+            memory_id: Memory identifier
+
+        Returns:
+            Memory history
+        """
+        response = await self._make_request("GET", f"/api/v1/memories/{memory_id}/history", use_cache=True)
+        return response
+
+    async def get_all_memories(
+        self,
+        agent_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Memory]:
+        """
+        Get all memories (with optional filters).
+
+        Args:
+            agent_id: Optional agent filter
+            user_id: Optional user filter
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of memory objects
+        """
+        params = {"limit": limit}
+        if agent_id:
+            params["agent_id"] = agent_id
+        if user_id:
+            params["user_id"] = user_id
+        
+        response = await self._make_request("GET", "/api/v1/memories", params=params, use_cache=True)
+        return [Memory.from_dict(mem) for mem in response.get("memories", [])]
+
+    async def get_memory_stats(self, agent_id: Optional[str] = None) -> MemoryStats:
+        """
+        Get memory statistics.
+
+        Args:
+            agent_id: Optional agent identifier
 
         Returns:
             Memory statistics
         """
-        params = {"agent_id": agent_id}
-        response = await self._make_request("GET", "/memories/stats", params=params, use_cache=True)
-        return MemoryStats.from_dict(response)
+        params = {}
+        if agent_id:
+            params["agent_id"] = agent_id
+        response = await self._make_request("GET", "/metrics", params=params, use_cache=True)
+        return MemoryStats.from_dict(response.get("metrics", {}))
 
     async def health_check(self) -> Dict[str, Any]:
         """
