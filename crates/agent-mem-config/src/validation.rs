@@ -90,6 +90,10 @@ pub fn validate_storage_config(config: &VectorStoreConfig) -> Result<()> {
 
     // Check provider-specific requirements
     match config.provider.as_str() {
+        "memory" => {
+            // In-memory vector store for zero-config embedded mode
+            // No additional requirements
+        }
         "lancedb" => {
             if config.path.is_empty() {
                 return Err(AgentMemError::invalid_config("LanceDB requires a path"));

@@ -249,16 +249,27 @@ enable_decision_engine = true
 enable_deduplication = true
 
 [intelligence.fact_extraction]
-max_facts_per_memory = 10
-confidence_threshold = 0.7
+min_confidence = 0.7
+extract_entities = true
+extract_relations = true
+max_facts_per_message = 10
 
 [intelligence.decision_engine]
-confidence_threshold = 0.75
-enable_auto_merge = true
+similarity_threshold = 0.85
+min_decision_confidence = 0.75
+enable_intelligent_merge = true
+max_similar_memories = 5
 
 [intelligence.deduplication]
 similarity_threshold = 0.95
-check_window_size = 100
+time_window_seconds = 3600
+merge_strategy = "intelligent_merge"
+
+[performance]
+retry_attempts = 3
+base_delay_ms = 100
+max_delay_ms = 5000
+max_concurrent_operations = 10
 "#;
 
         let mut temp_file = NamedTempFile::new().unwrap();
