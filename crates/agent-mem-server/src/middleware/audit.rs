@@ -542,7 +542,7 @@ mod tests {
         use axum::http::{HeaderValue};
         
         // Test X-Forwarded-For header
-        let mut req = axum::http::Request::builder()
+        let req = axum::http::Request::builder()
             .header("x-forwarded-for", "203.0.113.1, 198.51.100.1")
             .body(())
             .unwrap();

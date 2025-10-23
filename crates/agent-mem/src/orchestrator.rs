@@ -117,6 +117,8 @@ enum CompletedOperation {
     Merge {
         primary_memory_id: String,
         secondary_memory_ids: Vec<String>,
+        /// 原始内容映射：memory_id -> 原始content（用于回滚）
+        original_contents: HashMap<String, String>,
     },
 }
 
@@ -2549,21 +2551,80 @@ impl MemoryOrchestrator {
                         idx + 1, other_decisions.len(), primary_memory_id, secondary_memory_ids, merged_content
                     );
                     
-                    // TODO: 实现实际的合并逻辑
-                    warn!("MERGE 操作当前仅记录，实际合并待实现");
+                    // ✅ MVP改造: 实现MERGE操作（基于现有方法的最小改动）
+                    // Step 1: 保存原始内容用于回滚
+                    let mut original_contents = HashMap::new();
                     
-                    completed_operations.push(CompletedOperation::Merge {
-                        primary_memory_id: primary_memory_id.clone(),
-                        secondary_memory_ids: secondary_memory_ids.clone(),
-                    });
+                    // 保存主记忆的原始内容
+                    if let Ok(primary_memory) = self.get_memory(primary_memory_id).await {
+                        original_contents.insert(
+                            primary_memory_id.clone(),
+                            primary_memory.content.clone()
+                        );
+                    }
                     
-                    all_results.push(MemoryEvent {
-                        id: primary_memory_id.clone(),
-                        memory: merged_content.clone(),
-                        event: "MERGE".to_string(),
-                        actor_id: Some(agent_id.clone()),
-                        role: None,
-                    });
+                    // 保存次要记忆的内容
+                    for secondary_id in secondary_memory_ids {
+                        if let Ok(secondary_memory) = self.get_memory(secondary_id).await {
+                            original_contents.insert(
+                                secondary_id.clone(),
+                                secondary_memory.content.clone()
+                            );
+                        }
+                    }
+                    
+                    // Step 2: 更新主记忆的内容（使用已有的update_memory）
+                    let mut update_data = HashMap::new();
+                    update_data.insert("content".to_string(), serde_json::json!(merged_content));
+                    update_data.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+                    if let Some(ref uid) = user_id {
+                        update_data.insert("user_id".to_string(), serde_json::json!(uid));
+                    }
+                    
+                    match self.update_memory(primary_memory_id, update_data).await {
+                        Ok(_) => {
+                            info!("✅ MERGE Step 1: 主记忆已更新");
+                            
+                            // Step 3: 删除次要记忆（使用已有的delete_memory）
+                            let mut all_deleted = true;
+                            for secondary_id in secondary_memory_ids {
+                                match self.delete_memory(secondary_id).await {
+                                    Ok(()) => {
+                                        info!("✅ MERGE Step 2: 删除次要记忆 {}", secondary_id);
+                                    }
+                                    Err(e) => {
+                                        warn!("MERGE 删除次要记忆失败 {}: {}", secondary_id, e);
+                                        all_deleted = false;
+                                    }
+                                }
+                            }
+                            
+                            if all_deleted {
+                                info!("✅ MERGE 操作完全成功");
+                            } else {
+                                warn!("⚠️ MERGE 操作部分成功（部分次要记忆删除失败）");
+                            }
+                            
+                            // 记录完成的操作（用于回滚）
+                            completed_operations.push(CompletedOperation::Merge {
+                                primary_memory_id: primary_memory_id.clone(),
+                                secondary_memory_ids: secondary_memory_ids.clone(),
+                                original_contents, // ✅ 保存原始内容用于回滚
+                            });
+                            
+                            all_results.push(MemoryEvent {
+                                id: primary_memory_id.clone(),
+                                memory: merged_content.clone(),
+                                event: "MERGE".to_string(),
+                                actor_id: Some(agent_id.clone()),
+                                role: None,
+                            });
+                        }
+                        Err(e) => {
+                            error!("MERGE 操作失败（更新主记忆失败）: {}, 开始回滚", e);
+                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                        }
+                    }
                 }
                 MemoryAction::NoAction { reason } => {
                     info!("执行 NoAction 决策: {}", reason);
@@ -2659,10 +2720,47 @@ impl MemoryOrchestrator {
                         warn!("DELETE 回滚跳过：删除的内容为空");
                     }
                 }
-                CompletedOperation::Merge { primary_memory_id, secondary_memory_ids } => {
+                CompletedOperation::Merge { 
+                    primary_memory_id, 
+                    secondary_memory_ids,
+                    original_contents,
+                } => {
                     info!("回滚 MERGE 操作: {} + {:?}", primary_memory_id, secondary_memory_ids);
-                    // TODO: 拆分合并的记忆
-                    warn!("MERGE 回滚待实现");
+                    
+                    // ✅ MVP改造: 实现MERGE回滚（最小改动）
+                    // Step 1: 恢复主记忆的原始内容
+                    if let Some(original_primary_content) = original_contents.get(primary_memory_id) {
+                        let mut restore_data = HashMap::new();
+                        restore_data.insert("content".to_string(), serde_json::json!(original_primary_content));
+                        
+                        match self.update_memory(primary_memory_id, restore_data).await {
+                            Ok(_) => info!("✅ MERGE回滚 Step 1: 主记忆内容已恢复"),
+                            Err(e) => warn!("MERGE回滚失败（恢复主记忆）: {}", e),
+                        }
+                    } else {
+                        warn!("MERGE回滚跳过：找不到主记忆的原始内容");
+                    }
+                    
+                    // Step 2: 重新添加被删除的次要记忆
+                    for secondary_id in secondary_memory_ids {
+                        if let Some(original_content) = original_contents.get(secondary_id) {
+                            // 重新添加次要记忆
+                            match self.add_memory(
+                                original_content.clone(),
+                                "system".to_string(), // agent_id
+                                None, // user_id
+                                None, // infer
+                                None, // metadata
+                            ).await {
+                                Ok(_) => info!("✅ MERGE回滚 Step 2: 重新添加次要记忆 {}", secondary_id),
+                                Err(e) => warn!("MERGE回滚失败（重新添加次要记忆{}）: {}", secondary_id, e),
+                            }
+                        } else {
+                            warn!("MERGE回滚跳过：找不到次要记忆{}的原始内容", secondary_id);
+                        }
+                    }
+                    
+                    info!("✅ MERGE 回滚完成");
                 }
             }
         }
