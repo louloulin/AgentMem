@@ -32,7 +32,7 @@ mod libsql_api_key_tests {
         org_repo.create(&org).await.unwrap();
 
         // Create user
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key
@@ -62,7 +62,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key
@@ -96,7 +96,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create multiple API keys for the same user
@@ -126,7 +126,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key
@@ -158,7 +158,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key
@@ -187,7 +187,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key
@@ -216,7 +216,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create multiple API keys
@@ -247,7 +247,7 @@ mod libsql_api_key_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
         user_repo.create(&user).await.unwrap();
 
         // Create API key with expiration

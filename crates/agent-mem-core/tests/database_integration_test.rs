@@ -133,7 +133,7 @@ async fn test_user_crud() {
         .expect("Failed to create organization");
 
     // Create user
-    let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
     let created_user = user_repo
         .create(&user)
         .await
@@ -182,7 +182,7 @@ async fn test_agent_crud_with_blocks() {
         .await
         .expect("Failed to create organization");
 
-    let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
     let user = user_repo
         .create(&user)
         .await
@@ -274,7 +274,7 @@ async fn test_message_crud() {
         .await
         .expect("Failed to create organization");
 
-    let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
     let user = user_repo
         .create(&user)
         .await
@@ -362,7 +362,7 @@ async fn test_block_validation() {
         .await
         .expect("Failed to create organization");
 
-    let user = User::new(org.id.clone(), "Test User".to_string(), "UTC".to_string());
+    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
     let user = user_repo
         .create(&user)
         .await

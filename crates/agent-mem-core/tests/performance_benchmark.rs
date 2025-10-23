@@ -108,6 +108,8 @@ async fn benchmark_crud_operations() {
     let user = User::new(
         org.id.clone(),
         "Benchmark User".to_string(),
+        "benchmark@example.com".to_string(),
+        "hashed_password".to_string(),
         "UTC".to_string(),
     );
     let user = user_repo
@@ -167,6 +169,8 @@ async fn benchmark_batch_operations() {
     let user = User::new(
         org.id.clone(),
         "Benchmark User".to_string(),
+        "benchmark@example.com".to_string(),
+        "hashed_password".to_string(),
         "UTC".to_string(),
     );
     let user = user_repo
@@ -217,6 +221,8 @@ async fn benchmark_memory_operations() {
     let user = User::new(
         org.id.clone(),
         "Benchmark User".to_string(),
+        "benchmark@example.com".to_string(),
+        "hashed_password".to_string(),
         "UTC".to_string(),
     );
     let user = user_repo

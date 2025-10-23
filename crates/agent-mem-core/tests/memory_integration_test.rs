@@ -50,16 +50,15 @@ async fn test_retrieve_memories_empty_query() {
 fn test_format_memory_for_prompt() {
     let memory = Memory {
         id: "mem-1".to_string(),
-        organization_id: "org-1".to_string(),
-        user_id: "user-1".to_string(),
+        user_id: Some("user-1".to_string()),
         agent_id: "agent-1".to_string(),
         content: "User prefers Python".to_string(),
         memory_type: MemoryType::Semantic,
         importance: 0.8,
-        score: Some(0.9),
-        metadata: serde_json::json!({}),
+        embedding: None,
+        metadata: std::collections::HashMap::new(),
         created_at: Utc::now().timestamp(),
-        updated_at: Some(Utc::now().timestamp()),
+        last_accessed_at: Utc::now().timestamp(),
         expires_at: None,
         access_count: 5,
         version: 1,
@@ -107,16 +106,15 @@ fn test_filter_by_relevance() {
 fn create_test_memory(id: &str, content: &str, score: f32) -> Memory {
     Memory {
         id: id.to_string(),
-        organization_id: "org-1".to_string(),
-        user_id: "user-1".to_string(),
+        user_id: Some("user-1".to_string()),
         agent_id: "agent-1".to_string(),
         content: content.to_string(),
         memory_type: MemoryType::Semantic,
         importance: score,
-        score: Some(score),
-        metadata: serde_json::json!({}),
+        embedding: None,
+        metadata: std::collections::HashMap::new(),
         created_at: Utc::now().timestamp(),
-        updated_at: Some(Utc::now().timestamp()),
+        last_accessed_at: Utc::now().timestamp(),
         expires_at: None,
         access_count: 0,
         version: 1,
@@ -226,7 +224,7 @@ fn test_max_memories_validation() {
 fn test_memory_metadata() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
     
-    assert!(memory.metadata.is_object());
+    assert!(memory.metadata.is_empty());
     assert_eq!(memory.version, 1);
     assert_eq!(memory.access_count, 0);
 }
@@ -236,7 +234,7 @@ fn test_memory_timestamps() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
     
     assert!(memory.created_at > 0);
-    assert!(memory.updated_at.is_some());
+    assert!(memory.last_accessed_at > 0);
     assert!(memory.expires_at.is_none());
 }
 

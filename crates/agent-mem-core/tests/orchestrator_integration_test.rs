@@ -150,6 +150,7 @@ async fn test_orchestrator_basic_conversation() {
     let request = ChatRequest {
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
+        organization_id: "test-org".to_string(),
         message: "What's the weather like?".to_string(),
         stream: false,
         max_memories: 10,
@@ -210,13 +211,16 @@ async fn test_orchestrator_with_memory_retrieval() {
         id: Uuid::new_v4().to_string(),
         content: "User likes Italian food".to_string(),
         memory_type: MemoryType::Semantic,
-        agent_id: Some(agent_id.clone()),
+        agent_id: agent_id.clone(),
         user_id: Some(user_id.clone()),
-        metadata: serde_json::json!({}),
-        score: Some(0.9),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        ..Default::default()
+        metadata: std::collections::HashMap::new(),
+        importance: 0.9,
+        embedding: None,
+        created_at: Utc::now().timestamp(),
+        last_accessed_at: Utc::now().timestamp(),
+        expires_at: None,
+        access_count: 0,
+        version: 1,
     };
 
     memory_engine
@@ -245,6 +249,7 @@ async fn test_orchestrator_with_memory_retrieval() {
     let request = ChatRequest {
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
+        organization_id: "test-org".to_string(),
         message: "What kind of food should I eat?".to_string(),
         stream: false,
         max_memories: 10,
@@ -306,6 +311,7 @@ async fn test_orchestrator_memory_extraction() {
     let request = ChatRequest {
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
+        organization_id: "test-org".to_string(),
         message: "I'm a vegetarian and I love pasta.".to_string(),
         stream: false,
         max_memories: 10,
@@ -361,6 +367,7 @@ async fn test_orchestrator_error_handling() {
     let request = ChatRequest {
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
+        organization_id: "test-org".to_string(),
         message: "This should fail".to_string(),
         stream: false,
         max_memories: 10,

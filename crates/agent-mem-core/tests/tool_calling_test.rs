@@ -78,40 +78,57 @@ impl Tool for CalculatorTool {
 
     fn schema(&self) -> ToolSchema {
         use agent_mem_tools::schema::{ParameterSchema, PropertySchema};
+        use std::collections::HashMap;
+
+        let mut properties = HashMap::new();
+        properties.insert(
+            "operation".to_string(),
+            PropertySchema {
+                prop_type: "string".to_string(),
+                description: "The operation to perform".to_string(),
+                enum_values: Some(vec![
+                    "add".to_string(),
+                    "subtract".to_string(),
+                    "multiply".to_string(),
+                    "divide".to_string(),
+                ]),
+                default: None,
+                minimum: None,
+                maximum: None,
+                items: None,
+            },
+        );
+        properties.insert(
+            "a".to_string(),
+            PropertySchema {
+                prop_type: "number".to_string(),
+                description: "First number".to_string(),
+                enum_values: None,
+                default: None,
+                minimum: None,
+                maximum: None,
+                items: None,
+            },
+        );
+        properties.insert(
+            "b".to_string(),
+            PropertySchema {
+                prop_type: "number".to_string(),
+                description: "Second number".to_string(),
+                enum_values: None,
+                default: None,
+                minimum: None,
+                maximum: None,
+                items: None,
+            },
+        );
 
         ToolSchema {
             name: "calculator".to_string(),
             description: "Perform basic arithmetic operations".to_string(),
             parameters: ParameterSchema {
-                schema_type: "object".to_string(),
-                properties: vec![
-                    PropertySchema {
-                        name: "operation".to_string(),
-                        property_type: "string".to_string(),
-                        description: "The operation to perform".to_string(),
-                        required: true,
-                        enum_values: Some(vec![
-                            "add".to_string(),
-                            "subtract".to_string(),
-                            "multiply".to_string(),
-                            "divide".to_string(),
-                        ]),
-                    },
-                    PropertySchema {
-                        name: "a".to_string(),
-                        property_type: "number".to_string(),
-                        description: "First number".to_string(),
-                        required: true,
-                        enum_values: None,
-                    },
-                    PropertySchema {
-                        name: "b".to_string(),
-                        property_type: "number".to_string(),
-                        description: "Second number".to_string(),
-                        required: true,
-                        enum_values: None,
-                    },
-                ],
+                param_type: "object".to_string(),
+                properties,
                 required: vec!["operation".to_string(), "a".to_string(), "b".to_string()],
             },
         }

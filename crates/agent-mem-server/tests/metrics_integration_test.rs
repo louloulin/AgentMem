@@ -6,22 +6,23 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_metrics_registry_creation() {
     let metrics = Arc::new(MetricsRegistry::new());
+    let collector = metrics.collector();
     
-    // Test incrementing requests
-    metrics.increment_requests("GET", "/test", "200").await;
-    metrics.increment_requests("POST", "/api/v1/memories", "201").await;
+    // Test recording requests
+    collector.record_request("GET", "/test", 200).await;
+    collector.record_request("POST", "/api/v1/memories", 201).await;
     
     // Test recording duration
-    metrics.record_request_duration("GET", "/test", 0.123).await;
+    collector.record_request_duration("GET", "/test", 0.123).await;
     
-    // Test incrementing errors
-    metrics.increment_errors("client_error").await;
+    // Test recording errors
+    collector.record_error("client_error").await;
     
     // Test setting memory usage
-    metrics.set_memory_usage(1024 * 1024 * 100).await; // 100MB
+    collector.set_memory_usage(1024 * 1024 * 100).await; // 100MB
     
     // Test recording tool execution
-    metrics.record_tool_execution("search", 0.456).await;
+    collector.record_tool_execution("search", 0.456).await;
     
     // Verify registry exists
     let registry = metrics.registry();
@@ -30,22 +31,15 @@ async fn test_metrics_registry_creation() {
 
 #[tokio::test]
 async fn test_prometheus_text_format() {
-    use prometheus::Encoder;
-    
     let metrics = Arc::new(MetricsRegistry::new());
+    let collector = metrics.collector();
     
     // Add some metrics
-    metrics.increment_requests("GET", "/health", "200").await;
-    metrics.record_request_duration("GET", "/health", 0.001).await;
+    collector.record_request("GET", "/health", 200).await;
+    collector.record_request_duration("GET", "/health", 0.001).await;
     
-    // Encode to Prometheus text format
-    let encoder = prometheus::TextEncoder::new();
-    let metric_families = metrics.registry().gather();
-    
-    let mut buffer = Vec::new();
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-    
-    let output = String::from_utf8(buffer).unwrap();
+    // Use the gather method from MetricsRegistry
+    let output = metrics.gather();
     
     // Verify output contains expected metrics
     assert!(output.contains("agentmem_requests_total"));

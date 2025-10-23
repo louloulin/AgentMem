@@ -102,7 +102,7 @@ use agent_mem_storage::{
     VectorStoreFactory,
 };
 use agent_mem_traits::{LLMConfig, MemoryProvider, Message, Session, VectorStoreConfig};
-use agent_mem_utils::{clean_text, extract_json, hash_content, Timer};
+use agent_mem_utils::{clean_text, extract_json, compute_content_hash, Timer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -154,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Hashing
     let content = "I love playing tennis";
-    let hash = hash_content(content);
+    let hash = compute_content_hash(content);
     println!("   Content hash: {}", &hash[..16]);
 
     // Performance timing
