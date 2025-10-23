@@ -2,12 +2,11 @@
 //!
 //! 演示如何使用嵌入式模式（LibSQL + LanceDB）进行基本的数据操作
 
-use agent_mem_config::{AgentMemConfig, DeploymentMode, EmbeddedModeConfig};
+use agent_mem_config::storage::DeploymentMode;
 use agent_mem_core::storage::factory::StorageFactory;
 use agent_mem_core::storage::models::{User, Organization, Agent};
 use anyhow::Result;
 use chrono::Utc;
-use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber;
 use uuid::Uuid;
@@ -22,21 +21,13 @@ async fn main() -> Result<()> {
     info!("🚀 AgentMem 嵌入式模式基础使用示例");
 
     // 1. 创建嵌入式模式配置
-    let config = AgentMemConfig {
-        deployment_mode: DeploymentMode::Embedded(EmbeddedModeConfig {
-            database_path: PathBuf::from("./data/agentmem.db"),
-            vector_path: PathBuf::from("./data/vectors.lance"),
-            dimension: 1536,
-            enable_wal: true,
-            cache_size_kb: 10240,
-        }),
-    };
+    let mode = DeploymentMode::embedded("./data");
 
-    info!("📝 配置: {:?}", config);
+    info!("📝 配置: {:?}", mode);
 
     // 2. 创建 Storage Factory
     info!("🔧 创建 Storage Factory...");
-    let repositories = StorageFactory::create(config).await?;
+    let repositories = StorageFactory::create(mode).await?;
     info!("✅ Storage Factory 创建成功");
 
     // 3. 创建组织
@@ -44,12 +35,9 @@ async fn main() -> Result<()> {
     let org = Organization {
         id: Uuid::new_v4().to_string(),
         name: "示例组织".to_string(),
-        status: "active".to_string(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
         is_deleted: false,
-        created_by_id: None,
-        last_updated_by_id: None,
     };
     
     let created_org = repositories.organizations.create(&org).await?;
@@ -61,6 +49,9 @@ async fn main() -> Result<()> {
         id: Uuid::new_v4().to_string(),
         organization_id: created_org.id.clone(),
         name: "张三".to_string(),
+        email: "zhangsan@example.com".to_string(),
+        password_hash: "hashed_password".to_string(),
+        roles: Some(vec!["user".to_string()]),
         status: "active".to_string(),
         timezone: "Asia/Shanghai".to_string(),
         created_at: Utc::now(),
@@ -78,14 +69,24 @@ async fn main() -> Result<()> {
     let agent = Agent {
         id: Uuid::new_v4().to_string(),
         organization_id: created_org.id.clone(),
-        name: "智能助手".to_string(),
-        agent_type: "assistant".to_string(),
-        status: "active".to_string(),
-        config: serde_json::json!({
+        name: Some("智能助手".to_string()),
+        agent_type: Some("assistant".to_string()),
+        description: None,
+        system: None,
+        topic: None,
+        message_ids: None,
+        metadata_: None,
+        llm_config: Some(serde_json::json!({
             "model": "gpt-4",
             "temperature": 0.7,
             "max_tokens": 2000
-        }),
+        })),
+        embedding_config: None,
+        tool_rules: None,
+        mcp_tools: None,
+        state: Some("idle".to_string()),
+        last_active_at: None,
+        error_message: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         is_deleted: false,
@@ -94,7 +95,7 @@ async fn main() -> Result<()> {
     };
     
     let created_agent = repositories.agents.create(&agent).await?;
-    info!("✅ Agent 创建成功: {} (ID: {})", created_agent.name, created_agent.id);
+    info!("✅ Agent 创建成功: {} (ID: {})", created_agent.name.as_deref().unwrap_or("未命名"), created_agent.id);
 
     // 6. 查询数据
     info!("\n🔍 查询数据...");
@@ -111,11 +112,11 @@ async fn main() -> Result<()> {
     // 7. 更新数据
     info!("\n📝 更新 Agent 配置...");
     let mut updated_agent = created_agent.clone();
-    updated_agent.config = serde_json::json!({
+    updated_agent.llm_config = Some(serde_json::json!({
         "model": "gpt-4-turbo",
         "temperature": 0.8,
         "max_tokens": 4000
-    });
+    }));
     updated_agent.updated_at = Utc::now();
     
     let updated_agent = repositories.agents.update(&updated_agent).await?;

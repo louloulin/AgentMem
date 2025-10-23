@@ -1,12 +1,10 @@
 //! LangGraph 集成演示
 
-use agent_mem_core::{AgentMemClient, MemoryType, Messages};
+use agent_mem_core::client::{AgentMemClient, Messages};
 use agent_mem_traits::Result;
 use colored::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
 
 /// 对话状态
 #[derive(Debug, Clone, Serialize, Deserialize)]

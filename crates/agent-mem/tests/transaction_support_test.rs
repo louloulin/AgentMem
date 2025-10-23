@@ -2,9 +2,7 @@
 //!
 //! 测试记忆添加和决策执行的事务机制
 
-use agent_mem::MemoryOrchestrator;
-use agent_mem::types::AddResult;
-use std::collections::HashMap;
+use agent_mem::orchestrator::MemoryOrchestrator;
 
 #[cfg(test)]
 mod tests {

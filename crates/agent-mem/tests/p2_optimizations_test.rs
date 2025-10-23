@@ -3,11 +3,8 @@
 //! 测试所有P2级优化的功能和性能
 
 use agent_mem_core::search::{RRFRanker, SearchResult, SearchResultRanker};
-use agent_mem_intelligence::{
-    DecisionEngine, EnhancedDecisionEngine, MemoryDecisionEngine,
-    ExistingMemory, ExtractedFact, FactCategory, MemoryAction,
-};
-use std::collections::HashMap;
+use agent_mem_intelligence::decision_engine;
+use agent_mem_traits::DecisionEngine;
 
 // ========== P2-#13 & P2-#14: 决策一致性验证和审计日志 ==========
 

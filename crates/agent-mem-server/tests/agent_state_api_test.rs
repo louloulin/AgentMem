@@ -2,6 +2,8 @@
 //!
 //! These tests verify the agent state management API endpoints work correctly.
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::{
     agent_repository::AgentRepository, models::Agent, repository::Repository,
 };

@@ -27,7 +27,3 @@ path = "src/basic_usage.rs"
 name = "vector-search"
 path = "src/vector_search.rs"
 
-[[bin]]
-name = "full-workflow"
-path = "src/full_workflow.rs"
-

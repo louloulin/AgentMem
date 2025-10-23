@@ -47,17 +47,16 @@ async fn main() -> Result<()> {
 
     // 3. 添加记忆（带选项）
     println!("{}", "3️⃣  添加记忆（带选项）".bright_green().bold());
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "demo".to_string());
+    metadata.insert("importance".to_string(), "0.8".to_string());
+    
     let options = AddMemoryOptions {
         user_id: Some("alice".to_string()),
         agent_id: Some("assistant-1".to_string()),
         infer: true,  // 启用智能推理
         memory_type: Some("semantic_memory".to_string()),
-        metadata: Some({
-            let mut map = HashMap::new();
-            map.insert("source".to_string(), serde_json::json!("demo"));
-            map.insert("importance".to_string(), serde_json::json!(0.8));
-            map
-        }),
+        metadata,
         ..Default::default()
     };
     let result2 = mem.add_with_options("I prefer morning meetings", options).await?;

@@ -226,7 +226,7 @@ mod enterprise_verification_tests {
     #[tokio::test]
     async fn test_all_enterprise_features_integrated() {
         println!("\n🎯 INTEGRATION TEST: All Enterprise Features");
-        println!("=".repeat(60));
+        println!("{}", "=".repeat(60));
 
         // 1. JWT Authentication
         let auth = AuthService::new("super-secret-key-for-production-use-only");
@@ -266,7 +266,7 @@ mod enterprise_verification_tests {
         assert!(quota_manager.check_request_quota("acme-corp").await.is_ok());
         println!("✅ Rate Limiting: Quota management working");
 
-        println!("=".repeat(60));
+        println!("{}", "=".repeat(60));
         println!("✅ ALL ENTERPRISE FEATURES: 100% REAL IMPLEMENTATION");
         println!("✅ PRODUCTION READY\n");
     }

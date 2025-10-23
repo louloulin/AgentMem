@@ -31,45 +31,45 @@ async fn main() -> Result<()> {
             id: "doc1".to_string(),
             vector: generate_mock_embedding("Rust 是一门系统编程语言"),
             metadata: HashMap::from([
-                ("text".to_string(), serde_json::json!("Rust 是一门系统编程语言")),
-                ("category".to_string(), serde_json::json!("programming")),
-                ("language".to_string(), serde_json::json!("zh")),
+                ("text".to_string(), "Rust 是一门系统编程语言".to_string()),
+                ("category".to_string(), "programming".to_string()),
+                ("language".to_string(), "zh".to_string()),
             ]),
         },
         VectorData {
             id: "doc2".to_string(),
             vector: generate_mock_embedding("Python 是一门高级编程语言"),
             metadata: HashMap::from([
-                ("text".to_string(), serde_json::json!("Python 是一门高级编程语言")),
-                ("category".to_string(), serde_json::json!("programming")),
-                ("language".to_string(), serde_json::json!("zh")),
+                ("text".to_string(), "Python 是一门高级编程语言".to_string()),
+                ("category".to_string(), "programming".to_string()),
+                ("language".to_string(), "zh".to_string()),
             ]),
         },
         VectorData {
             id: "doc3".to_string(),
             vector: generate_mock_embedding("机器学习是人工智能的一个分支"),
             metadata: HashMap::from([
-                ("text".to_string(), serde_json::json!("机器学习是人工智能的一个分支")),
-                ("category".to_string(), serde_json::json!("ai")),
-                ("language".to_string(), serde_json::json!("zh")),
+                ("text".to_string(), "机器学习是人工智能的一个分支".to_string()),
+                ("category".to_string(), "ai".to_string()),
+                ("language".to_string(), "zh".to_string()),
             ]),
         },
         VectorData {
             id: "doc4".to_string(),
             vector: generate_mock_embedding("深度学习使用神经网络"),
             metadata: HashMap::from([
-                ("text".to_string(), serde_json::json!("深度学习使用神经网络")),
-                ("category".to_string(), serde_json::json!("ai")),
-                ("language".to_string(), serde_json::json!("zh")),
+                ("text".to_string(), "深度学习使用神经网络".to_string()),
+                ("category".to_string(), "ai".to_string()),
+                ("language".to_string(), "zh".to_string()),
             ]),
         },
         VectorData {
             id: "doc5".to_string(),
             vector: generate_mock_embedding("数据库用于存储和管理数据"),
             metadata: HashMap::from([
-                ("text".to_string(), serde_json::json!("数据库用于存储和管理数据")),
-                ("category".to_string(), serde_json::json!("database")),
-                ("language".to_string(), serde_json::json!("zh")),
+                ("text".to_string(), "数据库用于存储和管理数据".to_string()),
+                ("category".to_string(), "database".to_string()),
+                ("language".to_string(), "zh".to_string()),
             ]),
         },
     ];
@@ -94,9 +94,9 @@ async fn main() -> Result<()> {
     info!("找到 {} 个结果:", results1.len());
     for (i, result) in results1.iter().enumerate() {
         let text = result.metadata.get("text")
-            .and_then(|v| v.as_str())
+            .map(|v| v.as_str())
             .unwrap_or("N/A");
-        info!("  {}. [相似度: {:.4}] {}", i + 1, result.score, text);
+        info!("  {}. [相似度: {:.4}] {}", i + 1, result.similarity, text);
     }
 
     // 搜索 2: 查找与 "人工智能" 相关的文档
@@ -107,16 +107,16 @@ async fn main() -> Result<()> {
     info!("找到 {} 个结果 (相似度阈值 > 0.5):", results2.len());
     for (i, result) in results2.iter().enumerate() {
         let text = result.metadata.get("text")
-            .and_then(|v| v.as_str())
+            .map(|v| v.as_str())
             .unwrap_or("N/A");
-        info!("  {}. [相似度: {:.4}] {}", i + 1, result.score, text);
+        info!("  {}. [相似度: {:.4}] {}", i + 1, result.similarity, text);
     }
 
     // 5. 获取单个向量
     info!("\n📄 获取单个向量...");
     if let Some(vector) = vector_store.get_vector("doc1").await? {
         let text = vector.metadata.get("text")
-            .and_then(|v| v.as_str())
+            .map(|v| v.as_str())
             .unwrap_or("N/A");
         info!("✅ 找到向量 doc1: {}", text);
         info!("   向量维度: {}", vector.vector.len());
@@ -128,10 +128,10 @@ async fn main() -> Result<()> {
         id: "doc1".to_string(),
         vector: generate_mock_embedding("Rust 是一门安全高效的系统编程语言"),
         metadata: HashMap::from([
-            ("text".to_string(), serde_json::json!("Rust 是一门安全高效的系统编程语言")),
-            ("category".to_string(), serde_json::json!("programming")),
-            ("language".to_string(), serde_json::json!("zh")),
-            ("updated".to_string(), serde_json::json!(true)),
+            ("text".to_string(), "Rust 是一门安全高效的系统编程语言".to_string()),
+            ("category".to_string(), "programming".to_string()),
+            ("language".to_string(), "zh".to_string()),
+            ("updated".to_string(), "true".to_string()),
         ]),
     };
     
@@ -141,11 +141,11 @@ async fn main() -> Result<()> {
     // 验证更新
     if let Some(vector) = vector_store.get_vector("doc1").await? {
         let text = vector.metadata.get("text")
-            .and_then(|v| v.as_str())
+            .map(|v| v.as_str())
             .unwrap_or("N/A");
         let updated = vector.metadata.get("updated")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .map(|v| v.as_str())
+            .unwrap_or("false");
         info!("✅ 验证更新: {} (updated={})", text, updated);
     }
 
@@ -166,7 +166,7 @@ async fn main() -> Result<()> {
     let stats = vector_store.get_stats().await?;
     info!("  总向量数: {}", stats.total_vectors);
     info!("  向量维度: {}", stats.dimension);
-    info!("  健康状态: {}", stats.health.status);
+    info!("  索引大小: {} bytes", stats.index_size);
 
     info!("\n🎉 向量搜索示例完成！");
     info!("💾 向量数据已保存到: ./data/vectors.lance");

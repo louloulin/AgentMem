@@ -36,10 +36,10 @@ async fn test_add_memory() {
     let result = mem.add("I love pizza").await;
     assert!(result.is_ok(), "add() 应该成功");
 
-    let memory_id = result.unwrap();
-    assert!(!memory_id.is_empty(), "记忆 ID 不应为空");
+    let add_result = result.unwrap();
+    assert!(!add_result.results.is_empty(), "记忆 ID 不应为空");
 
-    println!("✅ 添加记忆成功: {}", memory_id);
+    println!("✅ 添加记忆成功: {:?}", add_result);
 }
 
 #[tokio::test]
@@ -70,7 +70,8 @@ async fn test_get_all_memories() {
     mem.add("Memory 3").await.expect("添加失败");
 
     // 获取所有记忆
-    let result = mem.get_all().await;
+    use agent_mem::types::GetAllOptions;
+    let result = mem.get_all(GetAllOptions::default()).await;
     assert!(result.is_ok(), "get_all() 应该成功");
 
     let memories = result.unwrap();
