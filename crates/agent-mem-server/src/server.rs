@@ -1,6 +1,7 @@
 //! Main server implementation
 
-use crate::routes::memory::MemoryManager;
+// ✅ 使用新的memory_unified::MemoryManager（基于agent-mem统一API）
+use crate::routes::memory_unified::MemoryManager;
 use crate::{
     config::ServerConfig,
     error::{ServerError, ServerResult},
@@ -54,8 +55,13 @@ impl MemoryServer {
 
         info!("Database repositories initialized");
 
-        // Create memory manager
-        let memory_manager = Arc::new(MemoryManager::new());
+        // Create memory manager (✅ 使用异步new()方法)
+        let memory_manager = Arc::new(
+            MemoryManager::new()
+                .await
+                .map_err(|e| ServerError::ServerError(format!("Failed to create memory manager: {e}")))?
+        );
+        info!("Memory manager initialized (using agent-mem unified API)");
 
         // Create metrics registry
         let metrics_registry = Arc::new(MetricsRegistry::new());

@@ -10,6 +10,7 @@ pub mod graph;
 pub mod health;
 pub mod mcp;
 pub mod memory;
+pub mod memory_unified; // ✅ 新增：基于agent-mem统一API的实现
 pub mod messages;
 pub mod metrics;
 pub mod organizations;
@@ -18,7 +19,8 @@ pub mod users;
 
 use crate::error::ServerResult;
 use crate::middleware::{audit_logging_middleware, metrics_middleware, quota_middleware};
-use crate::routes::memory::MemoryManager;
+// ✅ 使用新的memory_unified::MemoryManager（基于agent-mem统一API）
+use crate::routes::memory_unified::MemoryManager;
 use crate::sse::SseManager;
 use crate::websocket::WebSocketManager;
 use agent_mem_core::storage::factory::Repositories;
@@ -44,21 +46,21 @@ pub async fn create_router(
     let sse_manager = Arc::new(SseManager::new());
 
     let mut app = Router::new()
-        // Memory management routes
-        .route("/api/v1/memories", post(memory::add_memory))
-        .route("/api/v1/memories/:id", get(memory::get_memory))
-        .route("/api/v1/memories/:id", put(memory::update_memory))
-        .route("/api/v1/memories/:id", delete(memory::delete_memory))
-        .route("/api/v1/memories/search", post(memory::search_memories))
+        // Memory management routes (✅ 使用memory_unified统一API)
+        .route("/api/v1/memories", post(memory_unified::add_memory))
+        .route("/api/v1/memories/:id", get(memory_unified::get_memory))
+        .route("/api/v1/memories/:id", put(memory_unified::update_memory))
+        .route("/api/v1/memories/:id", delete(memory_unified::delete_memory))
+        .route("/api/v1/memories/search", post(memory_unified::search_memories))
         .route(
             "/api/v1/memories/:id/history",
-            get(memory::get_memory_history),
+            get(memory_unified::get_memory_history),
         )
         // Batch operations
-        .route("/api/v1/memories/batch", post(memory::batch_add_memories))
+        .route("/api/v1/memories/batch", post(memory_unified::batch_add_memories))
         .route(
             "/api/v1/memories/batch/delete",
-            post(memory::batch_delete_memories),
+            post(memory_unified::batch_delete_memories),
         )
         // Health and monitoring
         .route("/health", get(health::health_check))
@@ -191,14 +193,14 @@ pub async fn create_router(
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        memory::add_memory,
-        memory::get_memory,
-        memory::update_memory,
-        memory::delete_memory,
-        memory::search_memories,
-        memory::get_memory_history,
-        memory::batch_add_memories,
-        memory::batch_delete_memories,
+        memory_unified::add_memory,
+        memory_unified::get_memory,
+        memory_unified::update_memory,
+        memory_unified::delete_memory,
+        memory_unified::search_memories,
+        memory_unified::get_memory_history,
+        memory_unified::batch_add_memories,
+        memory_unified::batch_delete_memories,
         users::register_user,
         users::login_user,
         users::get_current_user,

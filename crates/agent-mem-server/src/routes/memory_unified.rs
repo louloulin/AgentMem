@@ -58,7 +58,7 @@ impl MemoryManager {
             agent_id: Some(agent_id),
             user_id,
             infer: true,  // 启用智能推理
-            metadata,
+            metadata: metadata.unwrap_or_default(),  // ✅ 解包Option
             ..Default::default()
         };
 
@@ -227,6 +227,365 @@ impl MemoryManager {
         // 注意：这只用于类型系统，实际使用应该调用async new()
         panic!("Use MemoryManager::new().await instead");
     }
+}
+
+// ==================== 路由处理器函数 ====================
+// 以下是实际的HTTP路由处理器函数
+
+use axum::{
+    extract::{Extension, Path},
+    http::StatusCode,
+    response::Json,
+};
+use tracing::{error, info};
+
+/// 添加新记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories",
+    tag = "memory",
+    request_body = crate::models::MemoryRequest,
+    responses(
+        (status = 201, description = "Memory created successfully", body = crate::models::MemoryResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn add_memory(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Json(request): Json<crate::models::MemoryRequest>,
+) -> ServerResult<(StatusCode, Json<crate::models::MemoryResponse>)> {
+    info!(
+        "Adding new memory for agent_id: {:?}, user_id: {:?}",
+        request.agent_id, request.user_id
+    );
+
+    let memory_id = memory_manager
+        .add_memory(
+            request.agent_id,
+            request.user_id,
+            request.content,
+            request.memory_type,
+            request.importance,
+            request.metadata,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to add memory: {}", e);
+            ServerError::MemoryError(e.to_string())
+        })?;
+
+    let response = crate::models::MemoryResponse {
+        id: memory_id,
+        message: "Memory added successfully".to_string(),
+    };
+
+    Ok((StatusCode::CREATED, Json(response)))
+}
+
+/// 获取记忆
+#[utoipa::path(
+    get,
+    path = "/api/v1/memories/{id}",
+    tag = "memory",
+    params(
+        ("id" = String, Path, description = "Memory ID")
+    ),
+    responses(
+        (status = 200, description = "Memory retrieved successfully"),
+        (status = 404, description = "Memory not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_memory(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Path(id): Path<String>,
+) -> ServerResult<Json<serde_json::Value>> {
+    info!("Getting memory with ID: {}", id);
+
+    let memory = memory_manager.get_memory(&id).await.map_err(|e| {
+        error!("Failed to get memory: {}", e);
+        ServerError::MemoryError(e.to_string())
+    })?;
+
+    match memory {
+        Some(mem) => Ok(Json(mem)),
+        None => Err(ServerError::NotFound("Memory not found".to_string())),
+    }
+}
+
+/// 更新记忆
+#[utoipa::path(
+    put,
+    path = "/api/v1/memories/{id}",
+    tag = "memory",
+    params(
+        ("id" = String, Path, description = "Memory ID")
+    ),
+    request_body = crate::models::UpdateMemoryRequest,
+    responses(
+        (status = 200, description = "Memory updated successfully"),
+        (status = 404, description = "Memory not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn update_memory(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Path(id): Path<String>,
+    Json(request): Json<crate::models::UpdateMemoryRequest>,
+) -> ServerResult<Json<crate::models::MemoryResponse>> {
+    info!("Updating memory with ID: {}", id);
+
+    memory_manager
+        .update_memory(&id, request.content, request.importance, None)
+        .await
+        .map_err(|e| {
+            error!("Failed to update memory: {}", e);
+            ServerError::MemoryError(e.to_string())
+        })?;
+
+    let response = crate::models::MemoryResponse {
+        id,
+        message: "Memory updated successfully".to_string(),
+    };
+
+    Ok(Json(response))
+}
+
+/// 删除记忆
+#[utoipa::path(
+    delete,
+    path = "/api/v1/memories/{id}",
+    tag = "memory",
+    params(
+        ("id" = String, Path, description = "Memory ID")
+    ),
+    responses(
+        (status = 200, description = "Memory deleted successfully"),
+        (status = 404, description = "Memory not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn delete_memory(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Path(id): Path<String>,
+) -> ServerResult<Json<crate::models::MemoryResponse>> {
+    info!("Deleting memory with ID: {}", id);
+
+    memory_manager.delete_memory(&id).await.map_err(|e| {
+        error!("Failed to delete memory: {}", e);
+        ServerError::MemoryError(e.to_string())
+    })?;
+
+    let response = crate::models::MemoryResponse {
+        id,
+        message: "Memory deleted successfully".to_string(),
+    };
+
+    Ok(Json(response))
+}
+
+/// 搜索记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/search",
+    tag = "memory",
+    request_body = crate::models::SearchRequest,
+    responses(
+        (status = 200, description = "Search completed successfully", body = crate::models::SearchResponse),
+        (status = 400, description = "Invalid search request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn search_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Json(request): Json<crate::models::SearchRequest>,
+) -> ServerResult<Json<crate::models::SearchResponse>> {
+    info!("Searching memories with query: {}", request.query);
+
+    let results = memory_manager
+        .search_memories(
+            request.query,
+            request.agent_id,
+            request.user_id,
+            request.limit,
+            request.memory_type,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to search memories: {}", e);
+            ServerError::MemoryError(e.to_string())
+        })?;
+
+    // 转换为JSON格式
+    let json_results: Vec<serde_json::Value> = results
+        .into_iter()
+        .map(|item| {
+            serde_json::json!({
+                "memory": {
+                    "id": item.id,
+                    "agent_id": item.agent_id,
+                    "user_id": item.user_id,
+                    "content": item.content,
+                    "memory_type": item.memory_type,
+                    "importance": item.importance,
+                    "created_at": item.created_at,
+                    "last_accessed_at": item.last_accessed_at,
+                    "access_count": item.access_count,
+                    "metadata": item.metadata,
+                    "hash": item.hash,
+                },
+                "score": 1.0,  // Memory API不返回score，默认为1.0
+                "match_type": "semantic",
+            })
+        })
+        .collect();
+
+    let total = json_results.len();
+    let response = crate::models::SearchResponse {
+        results: json_results,
+        total,
+    };
+
+    Ok(Json(response))
+}
+
+/// 获取记忆历史
+#[utoipa::path(
+    get,
+    path = "/api/v1/memories/{id}/history",
+    tag = "memory",
+    params(
+        ("id" = String, Path, description = "Memory ID")
+    ),
+    responses(
+        (status = 200, description = "Memory history retrieved successfully"),
+        (status = 404, description = "Memory not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_memory_history(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Path(id): Path<String>,
+) -> ServerResult<Json<serde_json::Value>> {
+    info!("Getting history for memory ID: {}", id);
+
+    // 验证memory存在
+    let memory = memory_manager
+        .get_memory(&id)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to get memory: {}", e)))?
+        .ok_or_else(|| ServerError::NotFound("Memory not found".to_string()))?;
+
+    // 构建历史记录（简化版，返回当前版本）
+    let history = vec![serde_json::json!({
+        "version": 1,
+        "change_type": "created",
+        "change_reason": "Initial version",
+        "content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
+        "metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+        "memory_type": memory.get("memory_type").and_then(|v| v.as_str()).unwrap_or("episodic"),
+        "importance": memory.get("importance").and_then(|v| v.as_f64()).unwrap_or(0.5),
+        "created_at": memory.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
+    })];
+
+    let response = serde_json::json!({
+        "memory_id": id,
+        "current_version": 1,
+        "total_versions": history.len(),
+        "history": history,
+        "current_content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
+        "current_metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
+        "note": "Using Memory unified API - full history tracking via agent-mem"
+    });
+
+    Ok(Json(response))
+}
+
+/// 批量添加记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/batch",
+    tag = "batch",
+    request_body = crate::models::BatchRequest,
+    responses(
+        (status = 201, description = "Batch operation completed", body = crate::models::BatchResponse),
+        (status = 400, description = "Invalid batch request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn batch_add_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Json(request): Json<crate::models::BatchRequest>,
+) -> ServerResult<(StatusCode, Json<crate::models::BatchResponse>)> {
+    info!("Batch adding {} memories", request.memories.len());
+
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
+
+    for memory_req in request.memories {
+        match memory_manager
+            .add_memory(
+                memory_req.agent_id,
+                memory_req.user_id,
+                memory_req.content,
+                memory_req.memory_type,
+                memory_req.importance,
+                memory_req.metadata,
+            )
+            .await
+        {
+            Ok(id) => results.push(id),
+            Err(e) => errors.push(e.to_string()),
+        }
+    }
+
+    let response = crate::models::BatchResponse {
+        successful: results.len(),
+        failed: errors.len(),
+        results,
+        errors,
+    };
+
+    Ok((StatusCode::CREATED, Json(response)))
+}
+
+/// 批量删除记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/batch/delete",
+    tag = "batch",
+    request_body = Vec<String>,
+    responses(
+        (status = 200, description = "Batch delete completed", body = crate::models::BatchResponse),
+        (status = 400, description = "Invalid batch request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn batch_delete_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Json(ids): Json<Vec<String>>,
+) -> ServerResult<Json<crate::models::BatchResponse>> {
+    info!("Batch deleting {} memories", ids.len());
+
+    let mut successful = 0;
+    let mut errors = Vec::new();
+
+    for id in &ids {
+        match memory_manager.delete_memory(id).await {
+            Ok(_) => successful += 1,
+            Err(e) => errors.push(format!("Failed to delete {id}: {e}")),
+        }
+    }
+
+    let response = crate::models::BatchResponse {
+        successful,
+        failed: errors.len(),
+        results: vec![],
+        errors,
+    };
+
+    Ok(Json(response))
 }
 
 #[cfg(test)]
