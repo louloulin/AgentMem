@@ -1,4 +1,8 @@
 //! Supabase 后端测试
+//! 
+//! NOTE: These tests require Supabase credentials to run.
+//! They are ignored by default. To run them, use:
+//! `cargo test --lib -p agent-mem-storage -- --ignored`
 
 #[cfg(test)]
 mod tests {
@@ -33,6 +37,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_supabase_store_creation() {
         let store = create_test_store().await;
         let count = store.count_vectors().await.unwrap();
@@ -40,6 +45,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_add_and_get_vector() {
         let store = create_test_store().await;
 
@@ -67,6 +73,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_search_vectors() {
         let store = create_test_store().await;
 
@@ -89,6 +96,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_search_with_threshold() {
         let store = create_test_store().await;
 
@@ -113,6 +121,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_update_vectors() {
         let store = create_test_store().await;
 
@@ -130,6 +139,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_delete_vectors() {
         let store = create_test_store().await;
 
@@ -158,6 +168,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_clear_store() {
         let store = create_test_store().await;
 
@@ -176,6 +187,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_dimension_validation() {
         let store = create_test_store().await;
 
@@ -191,6 +203,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_empty_id_generation() {
         let store = create_test_store().await;
 
@@ -212,6 +225,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_batch_operations() {
         let store = create_test_store().await;
 
@@ -239,6 +253,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_similarity_calculation() {
         let store = create_test_store().await;
 
@@ -269,6 +284,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_postgresql_features() {
         let store = create_test_store().await;
 
@@ -307,6 +323,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_realtime_capabilities() {
         let store = create_test_store().await;
 
@@ -337,6 +354,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_edge_computing_simulation() {
         let store = create_test_store().await;
 
@@ -370,6 +388,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Supabase credentials
     async fn test_open_source_compatibility() {
         let store = create_test_store().await;
 
