@@ -387,9 +387,9 @@ mod tests {
 
     #[test]
     fn test_batch_entity_extractor_creation() {
-        use agent_mem_llm::MockLLMProvider;
+        use agent_mem_llm::{LocalTestProvider, LLMConfig};
         
-        let llm = Arc::new(MockLLMProvider::new());
+        let llm = Arc::new(LocalTestProvider::new(LLMConfig::default()).unwrap());
         let extractor = BatchEntityExtractor::new(
             llm,
             TimeoutConfig::default(),

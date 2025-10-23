@@ -23,3 +23,6 @@ pub use retry::{ErrorType, RetryConfig, RetryExecutor};
 
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo, Result};
+
+// 导出测试提供商（用于其他 crate 的测试）
+pub use providers::LocalTestProvider;

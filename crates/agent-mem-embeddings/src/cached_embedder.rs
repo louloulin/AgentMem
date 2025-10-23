@@ -121,7 +121,50 @@ impl Embedder for CachedEmbedder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_embeddings::MockEmbedder;
+
+    // 简单的 Mock Embedder 用于测试
+    struct MockEmbedder {
+        dimension: usize,
+    }
+
+    impl MockEmbedder {
+        fn new(dimension: usize) -> Self {
+            Self { dimension }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Embedder for MockEmbedder {
+        async fn embed(&self, text: &str) -> Result<Vec<f32>> {
+            // 返回基于文本哈希的确定性向量
+            let hash = text.len() as f32;
+            Ok(vec![hash / self.dimension as f32; self.dimension])
+        }
+
+        async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+            let mut embeddings = Vec::with_capacity(texts.len());
+            for text in texts {
+                embeddings.push(self.embed(text).await?);
+            }
+            Ok(embeddings)
+        }
+
+        fn dimension(&self) -> usize {
+            self.dimension
+        }
+
+        fn provider_name(&self) -> &str {
+            "mock"
+        }
+
+        fn model_name(&self) -> &str {
+            "mock-model"
+        }
+
+        async fn health_check(&self) -> Result<bool> {
+            Ok(true)
+        }
+    }
 
     #[tokio::test]
     async fn test_cached_embedder_basic() {
@@ -167,11 +210,11 @@ mod tests {
             "text3".to_string(),
         ];
 
-        let embeddings1 = cached_embedder.embed_batch(texts.clone()).await.unwrap();
+        let embeddings1 = cached_embedder.embed_batch(&texts).await.unwrap();
         assert_eq!(embeddings1.len(), 3);
 
         // 再次嵌入（应该全部命中缓存）
-        let embeddings2 = cached_embedder.embed_batch(texts).await.unwrap();
+        let embeddings2 = cached_embedder.embed_batch(&texts).await.unwrap();
         
         let stats = cached_embedder.cache_stats();
         assert_eq!(stats.hits, 3); // 第二次应该全部命中

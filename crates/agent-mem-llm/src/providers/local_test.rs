@@ -317,9 +317,9 @@ mod tests {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
-        let model_info = provider.get_model_info().unwrap();
+        let model_info = provider.get_model_info();
         assert_eq!(model_info.provider, "local_test");
-        assert_eq!(model_info.name, "local-test-model");
+        assert_eq!(model_info.model, "local-test-model");
     }
 
     #[tokio::test]

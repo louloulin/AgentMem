@@ -609,7 +609,7 @@ mod tests {
         let call_count = Arc::new(AtomicU32::new(0));
         let call_count_clone = call_count.clone();
 
-        let operation = move || {
+        let operation = move || -> Pin<Box<dyn Future<Output = Result<String>> + Send>> {
             let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
             Box::pin(async move {
                 if count < 2 {

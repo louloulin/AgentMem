@@ -193,7 +193,7 @@ mod tests {
     fn test_create_memory_config() {
         let config = ConfigFactory::create_memory_config();
         assert_eq!(config.llm.provider, "openai");
-        assert_eq!(config.vector_store.provider, "lancedb");
+        assert_eq!(config.vector_store.provider, "memory"); // Changed to "memory" for zero-config embedded mode
     }
 
     #[test]
@@ -244,6 +244,21 @@ clustering_threshold = 0.7
 enable_conflict_detection = true
 enable_memory_summarization = true
 importance_scoring = true
+enable_intelligent_extraction = true
+enable_decision_engine = true
+enable_deduplication = true
+
+[intelligence.fact_extraction]
+max_facts_per_memory = 10
+confidence_threshold = 0.7
+
+[intelligence.decision_engine]
+confidence_threshold = 0.75
+enable_auto_merge = true
+
+[intelligence.deduplication]
+similarity_threshold = 0.95
+check_window_size = 100
 "#;
 
         let mut temp_file = NamedTempFile::new().unwrap();
