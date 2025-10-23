@@ -1,8 +1,8 @@
-//! Memory Unified API测试
+//! Memory统一API测试
 //!
-//! 验证server从core迁移到mem统一API的功能完整性
+//! 验证server使用mem统一API的功能完整性
 
-use agent_mem_server::routes::memory_unified::MemoryManager;
+use agent_mem_server::routes::memory::MemoryManager;
 use std::collections::HashMap;
 
 #[tokio::test]

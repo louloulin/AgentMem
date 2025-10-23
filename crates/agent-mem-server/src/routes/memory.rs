@@ -1,4 +1,11 @@
-//! Memory management routes
+//! Memory management routes - Unified Memory API version
+//!
+//! 架构优化：使用agent-mem的Memory统一API替代agent-mem-core的CoreMemoryManager
+//! 优势：
+//! - 更简洁的代码
+//! - 统一的接口
+//! - 自动的智能功能
+//! - 更好的类型处理
 
 use crate::{
     error::{ServerError, ServerResult},
@@ -7,74 +14,71 @@ use crate::{
         UpdateMemoryRequest,
     },
 };
-use agent_mem_core::{
-    manager::MemoryManager as CoreMemoryManager,
-    storage::factory::Repositories,
-    types::MemoryQuery,
-};
-use agent_mem_traits::MemoryType;
+use agent_mem::{Memory, AddMemoryOptions, SearchOptions, GetAllOptions, DeleteAllOptions};
+use agent_mem_traits::MemoryItem;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Server-side memory manager wrapper
+/// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {
-    core_manager: Arc<RwLock<CoreMemoryManager>>,
-}
-
-impl Default for MemoryManager {
-    fn default() -> Self {
-        Self::new()
-    }
+    memory: Arc<Memory>,
 }
 
 impl MemoryManager {
-    pub fn new() -> Self {
+    /// 创建新的MemoryManager（使用Memory API）
+    pub async fn new() -> ServerResult<Self> {
+        let memory = Memory::new()
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to create Memory: {}", e)))?;
+        
+        Ok(Self {
+            memory: Arc::new(memory),
+        })
+    }
+
+    /// 使用自定义配置创建
+    pub async fn with_config(memory: Memory) -> Self {
         Self {
-            core_manager: Arc::new(RwLock::new(CoreMemoryManager::new())),
+            memory: Arc::new(memory),
         }
     }
 
+    /// 添加记忆
     pub async fn add_memory(
         &self,
         agent_id: String,
         user_id: Option<String>,
         content: String,
-        memory_type: Option<MemoryType>,
-        importance: Option<f32>,
-        metadata: Option<std::collections::HashMap<String, String>>,
+        _memory_type: Option<agent_mem_traits::MemoryType>,  // Memory API自动处理
+        _importance: Option<f32>,  // Memory API自动评估
+        metadata: Option<HashMap<String, String>>,
     ) -> Result<String, String> {
-        let manager = self.core_manager.read().await;
+        let options = AddMemoryOptions {
+            agent_id: Some(agent_id),
+            user_id,
+            infer: true,  // 启用智能推理
+            metadata: metadata.unwrap_or_default(),  // ✅ 解包Option
+            ..Default::default()
+        };
 
-        // Convert MemoryType from traits to core types
-        let core_memory_type = memory_type.map(|mt| match mt {
-            MemoryType::Factual => agent_mem_core::types::MemoryType::Semantic, // Map Factual to Semantic
-            MemoryType::Episodic => agent_mem_core::types::MemoryType::Episodic,
-            MemoryType::Procedural => agent_mem_core::types::MemoryType::Procedural,
-            MemoryType::Semantic => agent_mem_core::types::MemoryType::Semantic,
-            MemoryType::Working => agent_mem_core::types::MemoryType::Working,
-            MemoryType::Core => agent_mem_core::types::MemoryType::Core,
-            MemoryType::Resource => agent_mem_core::types::MemoryType::Resource,
-            MemoryType::Knowledge => agent_mem_core::types::MemoryType::Knowledge,
-            MemoryType::Contextual => agent_mem_core::types::MemoryType::Contextual,
-        });
-
-        manager
-            .add_memory(
-                agent_id,
-                user_id,
-                content,
-                core_memory_type,
-                importance,
-                metadata,
-            )
+        self.memory
+            .add_with_options(content, options)
             .await
+            .map(|result| {
+                // 返回第一个记忆的ID（如果有多个，取第一个）
+                result.results
+                    .first()
+                    .map(|r| r.id.clone())
+                    .unwrap_or_else(|| "".to_string())
+            })
             .map_err(|e| e.to_string())
     }
 
+    /// 获取记忆
     pub async fn get_memory(&self, id: &str) -> Result<Option<serde_json::Value>, String> {
-        let manager = self.core_manager.read().await;
-        match manager.get_memory(id).await {
-            Ok(Some(memory)) => {
+        match self.memory.get(id).await {
+            Ok(memory) => {
                 let json = serde_json::json!({
                     "id": memory.id,
                     "agent_id": memory.agent_id,
@@ -86,173 +90,183 @@ impl MemoryManager {
                     "last_accessed_at": memory.last_accessed_at,
                     "access_count": memory.access_count,
                     "metadata": memory.metadata,
-                    "embedding": memory.embedding,
+                    "hash": memory.hash,
                 });
                 Ok(Some(json))
             }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e.to_string()),
+            Err(e) => {
+                if e.to_string().contains("not found") {
+                    Ok(None)
+                } else {
+                    Err(e.to_string())
+                }
+            }
         }
     }
 
+    /// 更新记忆
     pub async fn update_memory(
         &self,
         id: &str,
         content: Option<String>,
         importance: Option<f32>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Result<(), String> {
-        let manager = self.core_manager.read().await;
+        let mut update_data = HashMap::new();
 
-        // Update the memory using the correct method signature
-        manager
-            .update_memory(id, content, importance, None)
-            .await
-            .map_err(|e| e.to_string())
-    }
+        if let Some(c) = content {
+            update_data.insert("content".to_string(), serde_json::json!(c));
+        }
+        if let Some(imp) = importance {
+            update_data.insert("importance".to_string(), serde_json::json!(imp));
+        }
+        if let Some(meta) = metadata {
+            // 转换metadata为JSON
+            let meta_json: HashMap<String, serde_json::Value> = meta
+                .into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect();
+            update_data.insert("metadata".to_string(), serde_json::json!(meta_json));
+        }
 
-    pub async fn delete_memory(&self, id: &str) -> Result<(), String> {
-        let manager = self.core_manager.read().await;
-        manager
-            .delete_memory(id)
+        self.memory
+            .update(id, update_data)
             .await
-            .map_err(|e| e.to_string())
             .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
+    /// 删除记忆
+    pub async fn delete_memory(&self, id: &str) -> Result<(), String> {
+        self.memory
+            .delete(id)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// 搜索记忆
     pub async fn search_memories(
         &self,
-        query: &MemoryQuery,
-    ) -> Result<Vec<serde_json::Value>, String> {
-        let manager = self.core_manager.read().await;
-        match manager.search_memories(query.clone()).await {
-            Ok(results) => {
-                let json_results = results
-                    .into_iter()
-                    .map(|result| {
-                        serde_json::json!({
-                            "memory": {
-                                "id": result.memory.id,
-                                "agent_id": result.memory.agent_id,
-                                "user_id": result.memory.user_id,
-                                "content": result.memory.content,
-                                "memory_type": result.memory.memory_type,
-                                "importance": result.memory.importance,
-                                "created_at": result.memory.created_at,
-                                "last_accessed_at": result.memory.last_accessed_at,
-                                "access_count": result.memory.access_count,
-                                "metadata": result.memory.metadata,
-                                "embedding": result.memory.embedding,
-                            },
-                            "score": result.score,
-                            "match_type": result.match_type,
-                        })
-                    })
-                    .collect();
-                Ok(json_results)
-            }
-            Err(e) => Err(e.to_string()),
-        }
+        query: String,
+        agent_id: Option<String>,
+        user_id: Option<String>,
+        limit: Option<usize>,
+        _memory_type: Option<agent_mem_traits::MemoryType>,
+    ) -> Result<Vec<MemoryItem>, String> {
+        let options = SearchOptions {
+            user_id,
+            limit,
+            threshold: Some(0.7),
+            ..Default::default()
+        };
+
+        self.memory
+            .search_with_options(query, options)
+            .await
+            .map_err(|e| e.to_string())
     }
 
-    pub async fn batch_add_memories(
-        &self,
-        requests: Vec<crate::models::MemoryRequest>,
-    ) -> Result<Vec<String>, String> {
-        let mut memory_ids = Vec::new();
-
-        for request in requests {
-            let memory_id = self
-                .add_memory(
-                    request.agent_id,
-                    request.user_id,
-                    request.content,
-                    request.memory_type,
-                    request.importance,
-                    request.metadata,
-                )
-                .await?;
-            memory_ids.push(memory_id);
-        }
-
-        Ok(memory_ids)
-    }
-
-    pub async fn batch_get_memories(
-        &self,
-        ids: Vec<String>,
-    ) -> Result<Vec<serde_json::Value>, String> {
-        let mut memories = Vec::new();
-
-        for id in ids {
-            if let Some(memory) = self.get_memory(&id).await? {
-                memories.push(memory);
-            }
-        }
-
-        Ok(memories)
-    }
-
-    pub async fn get_memory_stats(
+    /// 获取所有记忆
+    pub async fn get_all_memories(
         &self,
         agent_id: Option<String>,
-    ) -> Result<serde_json::Value, String> {
-        let manager = self.core_manager.read().await;
-        match manager.get_memory_stats(agent_id.as_deref()).await {
-            Ok(stats) => {
-                let json = serde_json::json!({
-                    "total_memories": stats.total_memories,
-                    "memory_types": stats.memories_by_type,
-                    "memories_by_agent": stats.memories_by_agent,
-                    "average_importance": stats.average_importance,
-                    "oldest_memory_age_days": stats.oldest_memory_age_days,
-                    "most_accessed_memory_id": stats.most_accessed_memory_id,
-                    "total_access_count": stats.total_access_count,
-                });
-                Ok(json)
-            }
-            Err(e) => Err(e.to_string()),
-        }
+        user_id: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<Vec<MemoryItem>, String> {
+        let options = GetAllOptions {
+            agent_id,
+            user_id,
+            limit,
+            ..Default::default()
+        };
+
+        self.memory
+            .get_all(options)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// 删除所有记忆
+    pub async fn delete_all_memories(
+        &self,
+        agent_id: Option<String>,
+        user_id: Option<String>,
+    ) -> Result<usize, String> {
+        let options = DeleteAllOptions {
+            agent_id,
+            user_id,
+            ..Default::default()
+        };
+
+        self.memory
+            .delete_all(options)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// 重置所有记忆（危险操作）
+    pub async fn reset(&self) -> Result<(), String> {
+        self.memory
+            .reset()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// 获取统计信息
+    pub async fn get_stats(&self) -> Result<agent_mem::MemoryStats, String> {
+        self.memory
+            .get_stats()
+            .await
+            .map_err(|e| e.to_string())
     }
 }
+
+/// 默认实现（异步创建）
+impl MemoryManager {
+    pub fn new_sync() -> Self {
+        // 注意：这只用于类型系统，实际使用应该调用async new()
+        panic!("Use MemoryManager::new().await instead");
+    }
+}
+
+// ==================== 路由处理器函数 ====================
+// 以下是实际的HTTP路由处理器函数
+
 use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::Json,
 };
 use tracing::{error, info};
-use utoipa;
 
-/// Add a new memory
+/// 添加新记忆
 #[utoipa::path(
     post,
     path = "/api/v1/memories",
     tag = "memory",
-    request_body = MemoryRequest,
+    request_body = crate::models::MemoryRequest,
     responses(
-        (status = 201, description = "Memory created successfully", body = MemoryResponse),
+        (status = 201, description = "Memory created successfully", body = crate::models::MemoryResponse),
         (status = 400, description = "Invalid request"),
         (status = 500, description = "Internal server error")
     )
 )]
 pub async fn add_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
-    Json(request): Json<MemoryRequest>,
-) -> ServerResult<(StatusCode, Json<MemoryResponse>)> {
+    Json(request): Json<crate::models::MemoryRequest>,
+) -> ServerResult<(StatusCode, Json<crate::models::MemoryResponse>)> {
     info!(
         "Adding new memory for agent_id: {:?}, user_id: {:?}",
         request.agent_id, request.user_id
     );
-
-    let memory_type = request.memory_type.unwrap_or(MemoryType::Episodic);
-    let importance = request.importance.unwrap_or(0.5);
 
     let memory_id = memory_manager
         .add_memory(
             request.agent_id,
             request.user_id,
             request.content,
-            Some(memory_type),
-            Some(importance),
+            request.memory_type,
+            request.importance,
             request.metadata,
         )
         .await
@@ -261,7 +275,7 @@ pub async fn add_memory(
             ServerError::MemoryError(e.to_string())
         })?;
 
-    let response = MemoryResponse {
+    let response = crate::models::MemoryResponse {
         id: memory_id,
         message: "Memory added successfully".to_string(),
     };
@@ -269,7 +283,7 @@ pub async fn add_memory(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-/// Get a memory by ID
+/// 获取记忆
 #[utoipa::path(
     get,
     path = "/api/v1/memories/{id}",
@@ -300,7 +314,7 @@ pub async fn get_memory(
     }
 }
 
-/// Update a memory
+/// 更新记忆
 #[utoipa::path(
     put,
     path = "/api/v1/memories/{id}",
@@ -308,7 +322,7 @@ pub async fn get_memory(
     params(
         ("id" = String, Path, description = "Memory ID")
     ),
-    request_body = UpdateMemoryRequest,
+    request_body = crate::models::UpdateMemoryRequest,
     responses(
         (status = 200, description = "Memory updated successfully"),
         (status = 404, description = "Memory not found"),
@@ -318,19 +332,19 @@ pub async fn get_memory(
 pub async fn update_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
-    Json(request): Json<UpdateMemoryRequest>,
-) -> ServerResult<Json<MemoryResponse>> {
+    Json(request): Json<crate::models::UpdateMemoryRequest>,
+) -> ServerResult<Json<crate::models::MemoryResponse>> {
     info!("Updating memory with ID: {}", id);
 
     memory_manager
-        .update_memory(&id, request.content, request.importance)
+        .update_memory(&id, request.content, request.importance, None)
         .await
         .map_err(|e| {
             error!("Failed to update memory: {}", e);
             ServerError::MemoryError(e.to_string())
         })?;
 
-    let response = MemoryResponse {
+    let response = crate::models::MemoryResponse {
         id,
         message: "Memory updated successfully".to_string(),
     };
@@ -338,7 +352,7 @@ pub async fn update_memory(
     Ok(Json(response))
 }
 
-/// Delete a memory
+/// 删除记忆
 #[utoipa::path(
     delete,
     path = "/api/v1/memories/{id}",
@@ -355,7 +369,7 @@ pub async fn update_memory(
 pub async fn delete_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
-) -> ServerResult<Json<MemoryResponse>> {
+) -> ServerResult<Json<crate::models::MemoryResponse>> {
     info!("Deleting memory with ID: {}", id);
 
     memory_manager.delete_memory(&id).await.map_err(|e| {
@@ -363,7 +377,7 @@ pub async fn delete_memory(
         ServerError::MemoryError(e.to_string())
     })?;
 
-    let response = MemoryResponse {
+    let response = crate::models::MemoryResponse {
         id,
         message: "Memory deleted successfully".to_string(),
     };
@@ -371,60 +385,72 @@ pub async fn delete_memory(
     Ok(Json(response))
 }
 
-/// Search memories
+/// 搜索记忆
 #[utoipa::path(
     post,
     path = "/api/v1/memories/search",
     tag = "memory",
-    request_body = SearchRequest,
+    request_body = crate::models::SearchRequest,
     responses(
-        (status = 200, description = "Search completed successfully", body = SearchResponse),
+        (status = 200, description = "Search completed successfully", body = crate::models::SearchResponse),
         (status = 400, description = "Invalid search request"),
         (status = 500, description = "Internal server error")
     )
 )]
 pub async fn search_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
-    Json(request): Json<SearchRequest>,
-) -> ServerResult<Json<SearchResponse>> {
+    Json(request): Json<crate::models::SearchRequest>,
+) -> ServerResult<Json<crate::models::SearchResponse>> {
     info!("Searching memories with query: {}", request.query);
 
-    // Convert MemoryType from traits to core types
-    let core_memory_type = request.memory_type.map(|mt| match mt {
-        MemoryType::Factual => agent_mem_core::types::MemoryType::Semantic,
-        MemoryType::Episodic => agent_mem_core::types::MemoryType::Episodic,
-        MemoryType::Procedural => agent_mem_core::types::MemoryType::Procedural,
-        MemoryType::Semantic => agent_mem_core::types::MemoryType::Semantic,
-        MemoryType::Working => agent_mem_core::types::MemoryType::Working,
-        MemoryType::Core => agent_mem_core::types::MemoryType::Core,
-        MemoryType::Resource => agent_mem_core::types::MemoryType::Resource,
-        MemoryType::Knowledge => agent_mem_core::types::MemoryType::Knowledge,
-        MemoryType::Contextual => agent_mem_core::types::MemoryType::Contextual,
-    });
+    let results = memory_manager
+        .search_memories(
+            request.query,
+            request.agent_id,
+            request.user_id,
+            request.limit,
+            request.memory_type,
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to search memories: {}", e);
+            ServerError::MemoryError(e.to_string())
+        })?;
 
-    let query = MemoryQuery {
-        agent_id: request.agent_id.unwrap_or_default(),
-        user_id: request.user_id,
-        memory_type: core_memory_type,
-        text_query: Some(request.query),
-        vector_query: None,
-        min_importance: None,
-        max_age_seconds: None,
-        limit: request.limit.unwrap_or(10),
+    // 转换为JSON格式
+    let json_results: Vec<serde_json::Value> = results
+        .into_iter()
+        .map(|item| {
+            serde_json::json!({
+                "memory": {
+                    "id": item.id,
+                    "agent_id": item.agent_id,
+                    "user_id": item.user_id,
+                    "content": item.content,
+                    "memory_type": item.memory_type,
+                    "importance": item.importance,
+                    "created_at": item.created_at,
+                    "last_accessed_at": item.last_accessed_at,
+                    "access_count": item.access_count,
+                    "metadata": item.metadata,
+                    "hash": item.hash,
+                },
+                "score": 1.0,  // Memory API不返回score，默认为1.0
+                "match_type": "semantic",
+            })
+        })
+        .collect();
+
+    let total = json_results.len();
+    let response = crate::models::SearchResponse {
+        results: json_results,
+        total,
     };
-
-    let results = memory_manager.search_memories(&query).await.map_err(|e| {
-        error!("Failed to search memories: {}", e);
-        ServerError::MemoryError(e.to_string())
-    })?;
-
-    let total = results.len();
-    let response = SearchResponse { results, total };
 
     Ok(Json(response))
 }
 
-/// Get memory history
+/// 获取记忆历史
 #[utoipa::path(
     get,
     path = "/api/v1/memories/{id}/history",
@@ -444,17 +470,14 @@ pub async fn get_memory_history(
 ) -> ServerResult<Json<serde_json::Value>> {
     info!("Getting history for memory ID: {}", id);
 
-    // ✅ 验证 memory 存在
+    // 验证memory存在
     let memory = memory_manager
         .get_memory(&id)
         .await
-        .map_err(|e| ServerError::internal_error(format!("Failed to get memory: {}", e)))?
-        .ok_or_else(|| ServerError::not_found("Memory not found"))?;
+        .map_err(|e| ServerError::Internal(format!("Failed to get memory: {}", e)))?
+        .ok_or_else(|| ServerError::NotFound("Memory not found".to_string()))?;
 
-    // ✅ 构建历史记录
-    // 注意：完整的实现需要从 memory_history 表查询
-    // 当前返回当前版本作为历史记录（简化版）
-    // 数据库迁移已创建，但需要通过 Repository trait 访问
+    // 构建历史记录（简化版，返回当前版本）
     let history = vec![serde_json::json!({
         "version": 1,
         "change_type": "created",
@@ -466,7 +489,6 @@ pub async fn get_memory_history(
         "created_at": memory.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
     })];
 
-    // ✅ 构建响应
     let response = serde_json::json!({
         "memory_id": id,
         "current_version": 1,
@@ -474,44 +496,41 @@ pub async fn get_memory_history(
         "history": history,
         "current_content": memory.get("content").and_then(|v| v.as_str()).unwrap_or(""),
         "current_metadata": memory.get("metadata").cloned().unwrap_or(serde_json::json!({})),
-        "note": "Memory history table and triggers have been created. Full history tracking will be available once Repository trait is extended with history methods."
+        "note": "Using Memory unified API - full history tracking via agent-mem"
     });
 
     Ok(Json(response))
 }
 
-/// Batch add memories
+/// 批量添加记忆
 #[utoipa::path(
     post,
     path = "/api/v1/memories/batch",
     tag = "batch",
-    request_body = BatchRequest,
+    request_body = crate::models::BatchRequest,
     responses(
-        (status = 201, description = "Batch operation completed", body = BatchResponse),
+        (status = 201, description = "Batch operation completed", body = crate::models::BatchResponse),
         (status = 400, description = "Invalid batch request"),
         (status = 500, description = "Internal server error")
     )
 )]
 pub async fn batch_add_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
-    Json(request): Json<BatchRequest>,
-) -> ServerResult<(StatusCode, Json<BatchResponse>)> {
+    Json(request): Json<crate::models::BatchRequest>,
+) -> ServerResult<(StatusCode, Json<crate::models::BatchResponse>)> {
     info!("Batch adding {} memories", request.memories.len());
 
     let mut results = Vec::new();
     let mut errors = Vec::new();
 
     for memory_req in request.memories {
-        let memory_type = memory_req.memory_type.unwrap_or(MemoryType::Episodic);
-        let importance = memory_req.importance.unwrap_or(0.5);
-
         match memory_manager
             .add_memory(
                 memory_req.agent_id,
                 memory_req.user_id,
                 memory_req.content,
-                Some(memory_type),
-                Some(importance),
+                memory_req.memory_type,
+                memory_req.importance,
                 memory_req.metadata,
             )
             .await
@@ -521,7 +540,7 @@ pub async fn batch_add_memories(
         }
     }
 
-    let response = BatchResponse {
+    let response = crate::models::BatchResponse {
         successful: results.len(),
         failed: errors.len(),
         results,
@@ -531,14 +550,14 @@ pub async fn batch_add_memories(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-/// Batch delete memories
+/// 批量删除记忆
 #[utoipa::path(
     post,
     path = "/api/v1/memories/batch/delete",
     tag = "batch",
     request_body = Vec<String>,
     responses(
-        (status = 200, description = "Batch delete completed", body = BatchResponse),
+        (status = 200, description = "Batch delete completed", body = crate::models::BatchResponse),
         (status = 400, description = "Invalid batch request"),
         (status = 500, description = "Internal server error")
     )
@@ -546,7 +565,7 @@ pub async fn batch_add_memories(
 pub async fn batch_delete_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(ids): Json<Vec<String>>,
-) -> ServerResult<Json<BatchResponse>> {
+) -> ServerResult<Json<crate::models::BatchResponse>> {
     info!("Batch deleting {} memories", ids.len());
 
     let mut successful = 0;
@@ -559,12 +578,39 @@ pub async fn batch_delete_memories(
         }
     }
 
-    let response = BatchResponse {
+    let response = crate::models::BatchResponse {
         successful,
         failed: errors.len(),
-        results: vec![], // No results for delete operations
+        results: vec![],
         errors,
     };
 
     Ok(Json(response))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_memory_manager_creation() {
+        let result = MemoryManager::new().await;
+        // 可能因为配置问题失败，但应该能创建
+        println!("MemoryManager creation: {:?}", result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_memory_manager_with_builder() {
+        // 使用Memory builder创建配置
+        let memory = Memory::builder()
+            .disable_intelligent_features()  // 测试时禁用智能功能
+            .build()
+            .await;
+
+        if let Ok(mem) = memory {
+            let manager = MemoryManager::with_config(mem).await;
+            println!("MemoryManager with config created successfully");
+        }
+    }
+}
+

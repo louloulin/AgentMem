@@ -1,7 +1,7 @@
 //! Main server implementation
 
-// ✅ 使用新的memory_unified::MemoryManager（基于agent-mem统一API）
-use crate::routes::memory_unified::MemoryManager;
+// ✅ 使用memory::MemoryManager（基于agent-mem统一API）
+use crate::routes::memory::MemoryManager;
 use crate::{
     config::ServerConfig,
     error::{ServerError, ServerResult},
