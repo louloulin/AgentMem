@@ -48,6 +48,7 @@ async fn test_retrieve_memories_empty_query() {
 
 #[test]
 fn test_format_memory_for_prompt() {
+    use agent_mem_traits::{Session, Entity, Relation};
     let memory = Memory {
         id: "mem-1".to_string(),
         user_id: Some("user-1".to_string()),
@@ -55,10 +56,16 @@ fn test_format_memory_for_prompt() {
         content: "User prefers Python".to_string(),
         memory_type: MemoryType::Semantic,
         importance: 0.8,
+        hash: Some("hash123".to_string()),
         embedding: None,
         metadata: std::collections::HashMap::new(),
-        created_at: Utc::now().timestamp(),
-        last_accessed_at: Utc::now().timestamp(),
+        created_at: Utc::now(),
+        updated_at: Some(Utc::now()),
+        last_accessed_at: Utc::now(),
+        session: Session::default(),
+        entities: Vec::<Entity>::new(),
+        relations: Vec::<Relation>::new(),
+        score: Some(0.9),
         expires_at: None,
         access_count: 5,
         version: 1,
@@ -104,6 +111,7 @@ fn test_filter_by_relevance() {
 
 // 辅助函数：创建测试记忆
 fn create_test_memory(id: &str, content: &str, score: f32) -> Memory {
+    use agent_mem_traits::{Session, Entity, Relation};
     Memory {
         id: id.to_string(),
         user_id: Some("user-1".to_string()),
@@ -111,10 +119,16 @@ fn create_test_memory(id: &str, content: &str, score: f32) -> Memory {
         content: content.to_string(),
         memory_type: MemoryType::Semantic,
         importance: score,
+        hash: Some(format!("hash-{}", id)),
         embedding: None,
         metadata: std::collections::HashMap::new(),
-        created_at: Utc::now().timestamp(),
-        last_accessed_at: Utc::now().timestamp(),
+        created_at: Utc::now(),
+        updated_at: Some(Utc::now()),
+        last_accessed_at: Utc::now(),
+        session: Session::default(),
+        entities: Vec::<Entity>::new(),
+        relations: Vec::<Relation>::new(),
+        score: Some(score),
         expires_at: None,
         access_count: 0,
         version: 1,
@@ -233,8 +247,8 @@ fn test_memory_metadata() {
 fn test_memory_timestamps() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
     
-    assert!(memory.created_at > 0);
-    assert!(memory.last_accessed_at > 0);
+    assert!(memory.created_at.timestamp() > 0);
+    assert!(memory.last_accessed_at.timestamp() > 0);
     assert!(memory.expires_at.is_none());
 }
 
