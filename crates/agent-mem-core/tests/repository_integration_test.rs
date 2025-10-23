@@ -3,6 +3,8 @@
 //! These tests require a running PostgreSQL database.
 //! Set DATABASE_URL environment variable to run these tests.
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::{
     agent_repository::AgentRepository,
     batch::BatchOperations,

@@ -1,5 +1,7 @@
 //! 情景记忆管理器测试
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::managers::{EpisodicEvent, EpisodicMemoryManager, EpisodicQuery};
 use chrono::Utc;
 use serde_json::json;

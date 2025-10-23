@@ -2,6 +2,8 @@
 //!
 //! 测试工具管理器的核心功能
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::managers::{
     CreateToolRequest, ToolManager, ToolManagerConfig, ToolType, UpdateToolRequest,
 };

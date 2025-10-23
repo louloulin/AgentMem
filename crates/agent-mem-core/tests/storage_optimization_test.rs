@@ -7,6 +7,8 @@
 //! - Slow query detection
 //! - Index recommendations
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::{
     migration_manager::MigrationManager,
     pool_manager::{PoolConfig, PoolManager},

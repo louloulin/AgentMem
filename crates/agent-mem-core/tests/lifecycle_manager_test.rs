@@ -1,5 +1,7 @@
 //! LifecycleManager 单元测试
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::managers::{
     LifecycleEventType, LifecycleManager, LifecycleManagerConfig, MemoryState,
 };

@@ -1,5 +1,7 @@
 //! 语义记忆管理器测试
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::managers::{SemanticMemoryItem, SemanticMemoryManager, SemanticQuery};
 use chrono::Utc;
 use serde_json::json;

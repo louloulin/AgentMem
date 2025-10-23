@@ -1,5 +1,7 @@
 //! Core Memory 数据库持久化测试
 
+#![cfg(feature = "postgres")]
+
 use chrono::Utc;
 use serde_json::json;
 

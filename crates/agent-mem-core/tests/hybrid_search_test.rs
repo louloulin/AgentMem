@@ -2,6 +2,8 @@
 //!
 //! 测试向量搜索 + 全文搜索的混合搜索功能
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::search::{HybridSearchConfig, SearchFilters, SearchQuery};
 
 /// 测试混合搜索配置

@@ -1,5 +1,7 @@
 //! 程序记忆管理器测试
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::managers::{ProceduralMemoryItem, ProceduralMemoryManager, ProceduralQuery};
 use chrono::Utc;
 use serde_json::json;

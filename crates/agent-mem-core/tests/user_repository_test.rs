@@ -2,6 +2,8 @@
 //!
 //! These tests verify the user repository functionality with a real database.
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::user_repository::{UserAuth, UserRepository};
 use sqlx::PgPool;
 
