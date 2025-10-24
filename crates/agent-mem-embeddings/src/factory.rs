@@ -372,7 +372,7 @@ impl EmbeddingFactory {
                 #[cfg(feature = "fastembed")]
                 {
                     let model = std::env::var("FASTEMBED_MODEL")
-                        .unwrap_or_else(|_| "multilingual-e5-small".to_string());
+                        .unwrap_or_else(|_| "bge-small-en-v1.5".to_string());  // 更稳定的默认模型
                     Self::create_fastembed(&model).await
                 }
                 #[cfg(not(feature = "fastembed"))]
