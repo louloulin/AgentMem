@@ -124,8 +124,7 @@ impl AgentRegistry {
         let agent_map = self.agent_map.read().await;
         let agent_type = agent_map.get(memory_type).ok_or_else(|| {
             agent_mem_traits::AgentMemError::NotFound(format!(
-                "No agent registered for memory type: {:?}",
-                memory_type
+                "No agent registered for memory type: {memory_type:?}"
             ))
         })?;
 

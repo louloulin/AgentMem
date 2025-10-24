@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::graph_memory::{GraphEdge, GraphMemoryEngine, GraphNode, MemoryId, RelationType};
+use crate::graph_memory::{GraphEdge, GraphMemoryEngine, GraphNode, MemoryId};
 
 /// 时间范围
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -154,7 +154,7 @@ impl TemporalEdge {
         self.strength_history
             .iter()
             .filter(|(t, _)| t <= time)
-            .last()
+            .next_back()
             .map(|(_, strength)| *strength)
     }
 
@@ -553,7 +553,7 @@ impl TemporalGraphEngine {
             versions
                 .iter()
                 .filter(|node| node.valid_time.contains(time))
-                .last()
+                .next_back()
                 .cloned()
         } else {
             None
@@ -571,7 +571,7 @@ impl TemporalGraphEngine {
             versions
                 .iter()
                 .filter(|edge| edge.valid_time.contains(time))
-                .last()
+                .next_back()
                 .cloned()
         } else {
             None

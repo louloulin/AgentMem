@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 /// Extended storage configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct StorageConfig {
     /// Vector store configuration
     pub vector_store: VectorStoreConfig,
@@ -20,16 +21,6 @@ pub struct StorageConfig {
     pub history_store: HistoryStoreConfig,
 }
 
-impl Default for StorageConfig {
-    fn default() -> Self {
-        Self {
-            vector_store: VectorStoreConfig::default(),
-            graph_store: None,
-            kv_store: KeyValueStoreConfig::default(),
-            history_store: HistoryStoreConfig::default(),
-        }
-    }
-}
 
 /// Extended vector store configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

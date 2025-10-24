@@ -74,7 +74,7 @@ impl MemgraphStore {
         // 创建认证头（如果提供了用户名和密码）
         let auth_header =
             if let (Some(username), Some(password)) = (&config.username, &config.password) {
-                let auth_string = format!("{}:{}", username, password);
+                let auth_string = format!("{username}:{password}");
                 Some(format!("Basic {}", base64::encode(&auth_string)))
             } else {
                 None
@@ -84,7 +84,7 @@ impl MemgraphStore {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let store = Self {
@@ -124,7 +124,7 @@ impl MemgraphStore {
         let response = request
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -133,13 +133,12 @@ impl MemgraphStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph connection test failed {}: {}",
-                status, error_text
+                "Memgraph connection test failed {status}: {error_text}"
             )));
         }
 
         let result: MemgraphQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if !result.errors.is_empty() {
@@ -180,7 +179,7 @@ impl MemgraphStore {
         let response = request
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -189,13 +188,12 @@ impl MemgraphStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph query failed {}: {}",
-                status, error_text
+                "Memgraph query failed {status}: {error_text}"
             )));
         }
 
         let result: MemgraphQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if !result.errors.is_empty() {
@@ -324,7 +322,7 @@ impl GraphStore for MemgraphStore {
 
         for result in response.results {
             for data_row in result.data {
-                if let Some(_entity_data) = data_row.row.get(0) {
+                if let Some(_entity_data) = data_row.row.first() {
                     // 解析实体数据（简化实现）
                     let entity = Entity {
                         id: "parsed_id".to_string(), // 实际实现需要从JSON中解析
@@ -351,11 +349,10 @@ impl GraphStore for MemgraphStore {
         let statement = format!(
             r#"
             MATCH (start:Entity {{id: $entity_id}})
-            MATCH (start)-[*1..{}]-(neighbor:Entity)
+            MATCH (start)-[*1..{depth}]-(neighbor:Entity)
             RETURN DISTINCT neighbor
             LIMIT 50
-        "#,
-            depth
+        "#
         );
 
         let mut parameters = HashMap::new();
@@ -370,7 +367,7 @@ impl GraphStore for MemgraphStore {
 
         for result in response.results {
             for data_row in result.data {
-                if let Some(_entity_data) = data_row.row.get(0) {
+                if let Some(_entity_data) = data_row.row.first() {
                     // 解析实体数据（简化实现）
                     let entity = Entity {
                         id: "neighbor_id".to_string(), // 实际实现需要从JSON中解析
@@ -544,8 +541,7 @@ mod tests {
             let confidence = n.as_f64().unwrap();
             assert!(
                 (confidence - 0.9).abs() < 1e-6,
-                "Expected confidence ~0.9, got {}",
-                confidence
+                "Expected confidence ~0.9, got {confidence}"
             );
         } else {
             panic!("Expected confidence to be a number");

@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Err(e) =
             agent_mem_observability::metrics::start_metrics_server(registry.registry(), 9090).await
         {
-            eprintln!("指标服务器错误: {}", e);
+            eprintln!("指标服务器错误: {e}");
         }
     });
 

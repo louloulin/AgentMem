@@ -9,7 +9,6 @@ use agent_mem_deployment::config_embed::{ConfigTemplate, EmbeddedConfigManager};
 use agent_mem_deployment::packaging::config::{PackageConfig, TargetPlatform, OptimizationLevel};
 use anyhow::Result;
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -253,7 +253,7 @@ impl ConfigLoader {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<DeploymentMode> {
         let path = path.as_ref();
         let content = std::fs::read_to_string(path)
-            .map_err(|e| AgentMemError::ConfigError(format!("Failed to read config file: {}", e)))?;
+            .map_err(|e| AgentMemError::ConfigError(format!("Failed to read config file: {e}")))?;
 
         let format = ConfigFormat::from_extension(path)
             .ok_or_else(|| AgentMemError::ConfigError("Unknown config file format".to_string()))?;
@@ -265,11 +265,11 @@ impl ConfigLoader {
     pub fn load_from_str(content: &str, format: ConfigFormat) -> Result<DeploymentMode> {
         let config: ConfigFile = match format {
             ConfigFormat::Toml => toml::from_str(content)
-                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse TOML: {}", e)))?,
+                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse TOML: {e}")))?,
             ConfigFormat::Json => serde_json::from_str(content)
-                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse JSON: {}", e)))?,
+                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse JSON: {e}")))?,
             ConfigFormat::Yaml => serde_yaml::from_str(content)
-                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse YAML: {}", e)))?,
+                .map_err(|e| AgentMemError::ConfigError(format!("Failed to parse YAML: {e}")))?,
         };
 
         Self::validate_and_convert(config)
@@ -316,7 +316,7 @@ impl ConfigLoader {
 
                 Ok(DeploymentMode::Server(mode_config))
             }
-            mode => Err(AgentMemError::ConfigError(format!("Unknown deployment mode: {}", mode))),
+            mode => Err(AgentMemError::ConfigError(format!("Unknown deployment mode: {mode}"))),
         }
     }
 
@@ -337,7 +337,7 @@ impl ConfigLoader {
             "faiss" => Ok(VectorServiceType::FAISS),
             "azure_ai_search" => Ok(VectorServiceType::AzureAISearch),
             "memory" => Ok(VectorServiceType::Memory),
-            _ => Err(AgentMemError::ConfigError(format!("Unknown vector service: {}", service))),
+            _ => Err(AgentMemError::ConfigError(format!("Unknown vector service: {service}"))),
         }
     }
 }

@@ -6,7 +6,6 @@
 use agent_mem_llm::providers::{LocalTestProvider, OllamaProvider};
 use agent_mem_traits::{LLMConfig, LLMProvider, Message, MessageRole};
 use chrono::Utc;
-use serde_json;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{info, warn};

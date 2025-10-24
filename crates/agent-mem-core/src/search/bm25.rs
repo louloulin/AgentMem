@@ -3,8 +3,8 @@
 //! 实现 BM25 (Best Matching 25) 算法，这是一种基于概率的信息检索算法，
 //! 广泛用于全文搜索和文档排序。
 
-use super::{SearchFilters, SearchQuery, SearchResult};
-use agent_mem_traits::{AgentMemError, Result};
+use super::{SearchQuery, SearchResult};
+use agent_mem_traits::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

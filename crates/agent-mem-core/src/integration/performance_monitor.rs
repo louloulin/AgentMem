@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// 负责监控系统性能指标，提供实时性能数据和性能分析功能
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tokio::time::interval;
 
@@ -128,7 +128,7 @@ impl PerformanceMonitor {
                 if let Err(e) =
                     Self::collect_metrics(&system_manager, &config, &metrics, &system_metrics).await
                 {
-                    eprintln!("性能指标收集失败: {}", e);
+                    eprintln!("性能指标收集失败: {e}");
                 }
             }
         });
@@ -346,7 +346,7 @@ impl PerformanceMonitor {
             // 这里可以添加具体的组件指标收集逻辑
             Self::record_metric_internal(
                 metrics,
-                &format!("{}_operations_total", component_name),
+                &format!("{component_name}_operations_total"),
                 1.0, // 示例值
                 labels.clone(),
                 timestamp,

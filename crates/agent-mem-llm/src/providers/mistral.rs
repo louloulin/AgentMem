@@ -100,7 +100,7 @@ impl MistralProvider {
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -177,24 +177,24 @@ impl MistralProvider {
 
         let response = self
             .client
-            .post(&format!("{}/v1/chat/completions", self.base_url))
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Mistral API request failed: {}", e))
+                AgentMemError::network_error(format!("Mistral API request failed: {e}"))
             })?;
 
         let status = response.status();
         let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(&format!("Failed to read response: {}", e))
+            AgentMemError::network_error(format!("Failed to read response: {e}"))
         })?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse Mistral response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse Mistral response: {e}"))
             })
         } else {
             // Try to parse error response
@@ -203,15 +203,14 @@ impl MistralProvider {
                     "Mistral API error: {} - {}",
                     error.error.error_type, error.error.message
                 );
-                Err(AgentMemError::llm_error(&format!(
+                Err(AgentMemError::llm_error(format!(
                     "Mistral API error: {}",
                     error.error.message
                 )))
             } else {
                 error!("Mistral API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!(
-                    "Mistral API error: HTTP {}",
-                    status
+                Err(AgentMemError::llm_error(format!(
+                    "Mistral API error: HTTP {status}"
                 )))
             }
         }

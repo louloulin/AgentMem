@@ -131,7 +131,7 @@ impl BedrockProvider {
             .timeout(Duration::from_secs(60)) // Bedrock 可能需要更长时间
             .build()
             .map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -224,7 +224,7 @@ impl BedrockProvider {
         };
 
         let body = serde_json::to_string(&request).map_err(|e| {
-            AgentMemError::llm_error(&format!("Failed to serialize request: {}", e))
+            AgentMemError::llm_error(format!("Failed to serialize request: {e}"))
         })?;
 
         let url = self.build_api_url(&self.config.model);
@@ -233,11 +233,11 @@ impl BedrockProvider {
         let response = request_builder
             .send()
             .await
-            .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
             let claude_response: BedrockClaudeResponse = response.json().await.map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                AgentMemError::llm_error(format!("Failed to parse response: {e}"))
             })?;
 
             Ok(claude_response.completion)
@@ -247,9 +247,8 @@ impl BedrockProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            Err(AgentMemError::llm_error(&format!(
-                "Bedrock API error: {}",
-                error_text
+            Err(AgentMemError::llm_error(format!(
+                "Bedrock API error: {error_text}"
             )))
         }
     }
@@ -264,7 +263,7 @@ impl BedrockProvider {
         };
 
         let body = serde_json::to_string(&request).map_err(|e| {
-            AgentMemError::llm_error(&format!("Failed to serialize request: {}", e))
+            AgentMemError::llm_error(format!("Failed to serialize request: {e}"))
         })?;
 
         let url = self.build_api_url(&self.config.model);
@@ -273,11 +272,11 @@ impl BedrockProvider {
         let response = request_builder
             .send()
             .await
-            .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
             let llama_response: BedrockLlamaResponse = response.json().await.map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                AgentMemError::llm_error(format!("Failed to parse response: {e}"))
             })?;
 
             Ok(llama_response.generation)
@@ -287,9 +286,8 @@ impl BedrockProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            Err(AgentMemError::llm_error(&format!(
-                "Bedrock API error: {}",
-                error_text
+            Err(AgentMemError::llm_error(format!(
+                "Bedrock API error: {error_text}"
             )))
         }
     }
@@ -307,7 +305,7 @@ impl BedrockProvider {
         };
 
         let body = serde_json::to_string(&request).map_err(|e| {
-            AgentMemError::llm_error(&format!("Failed to serialize request: {}", e))
+            AgentMemError::llm_error(format!("Failed to serialize request: {e}"))
         })?;
 
         let url = self.build_api_url(&self.config.model);
@@ -316,11 +314,11 @@ impl BedrockProvider {
         let response = request_builder
             .send()
             .await
-            .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
             let titan_response: BedrockTitanResponse = response.json().await.map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                AgentMemError::llm_error(format!("Failed to parse response: {e}"))
             })?;
 
             Ok(titan_response.output_text)
@@ -330,9 +328,8 @@ impl BedrockProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            Err(AgentMemError::llm_error(&format!(
-                "Bedrock API error: {}",
-                error_text
+            Err(AgentMemError::llm_error(format!(
+                "Bedrock API error: {error_text}"
             )))
         }
     }

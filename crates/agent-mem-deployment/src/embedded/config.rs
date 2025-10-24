@@ -112,44 +112,44 @@ impl EmbeddedConfig {
     /// 从 TOML 文件加载配置
     pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("读取配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("读取配置文件失败: {e}"))
         })?;
         
         toml::from_str(&content).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("解析配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("解析配置文件失败: {e}"))
         })
     }
     
     /// 保存配置到 TOML 文件
     pub fn save_to_toml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let content = toml::to_string_pretty(self).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("序列化配置失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("序列化配置失败: {e}"))
         })?;
         
         std::fs::write(path, content).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("写入配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("写入配置文件失败: {e}"))
         })
     }
     
     /// 从 JSON 文件加载配置
     pub fn from_json_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("读取配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("读取配置文件失败: {e}"))
         })?;
         
         serde_json::from_str(&content).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("解析配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("解析配置文件失败: {e}"))
         })
     }
     
     /// 保存配置到 JSON 文件
     pub fn save_to_json_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let content = serde_json::to_string_pretty(self).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("序列化配置失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("序列化配置失败: {e}"))
         })?;
         
         std::fs::write(path, content).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("写入配置文件失败: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("写入配置文件失败: {e}"))
         })
     }
 }

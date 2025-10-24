@@ -7,7 +7,7 @@
 //! - Unified interface
 
 use super::{Cache, CacheKey, CacheStats, MemoryCache, MemoryCacheConfig};
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -214,11 +214,10 @@ impl Cache for MultiLevelCache {
     
     async fn exists(&self, key: &CacheKey) -> Result<bool> {
         // Check L1 first
-        if self.config.enable_l1 {
-            if self.l1.exists(key).await? {
+        if self.config.enable_l1
+            && self.l1.exists(key).await? {
                 return Ok(true);
             }
-        }
         
         // Check L2
         if self.config.enable_l2 {

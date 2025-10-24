@@ -40,13 +40,13 @@ impl LibSqlMemoryRepository {
         let last_accessed = last_accessed_ts.and_then(|ts| DateTime::from_timestamp(ts, 0));
 
         let created_at_ts: i64 = row.get(14).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get created_at: {}", e))
+            AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
         })?;
         let created_at = DateTime::from_timestamp(created_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?;
 
         let updated_at_ts: i64 = row.get(15).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get updated_at: {}", e))
+            AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
         })?;
         let updated_at = DateTime::from_timestamp(updated_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?;
@@ -55,23 +55,23 @@ impl LibSqlMemoryRepository {
 
         let score_f64: Option<f64> = row.get(7).ok();
         let importance_f64: f64 = row.get(11).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get importance: {}", e))
+            AgentMemError::StorageError(format!("Failed to get importance: {e}"))
         })?;
 
         Ok(Memory {
-            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
-            organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {}", e)))?,
-            user_id: row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {}", e)))?,
-            agent_id: row.get(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {}", e)))?,
-            content: row.get(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {}", e)))?,
+            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+            organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
+            user_id: row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
+            agent_id: row.get(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?,
+            content: row.get(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?,
             hash: row.get(5).ok(),
             metadata,
             score: score_f64.map(|v| v as f32),
-            memory_type: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get memory_type: {}", e)))?,
-            scope: row.get(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get scope: {}", e)))?,
-            level: row.get(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get level: {}", e)))?,
+            memory_type: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get memory_type: {e}")))?,
+            scope: row.get(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get scope: {e}")))?,
+            level: row.get(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get level: {e}")))?,
             importance: importance_f64 as f32,
-            access_count: row.get(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get access_count: {}", e)))?,
+            access_count: row.get(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get access_count: {e}")))?,
             last_accessed,
             created_at,
             updated_at,
@@ -88,7 +88,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         let conn = self.conn.lock().await;
 
         let metadata_json = serde_json::to_string(&memory.metadata)
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {e}")))?;
 
         conn.execute(
             "INSERT INTO memories (
@@ -119,7 +119,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory: {e}")))?;
 
         Ok(memory.clone())
     }
@@ -135,15 +135,15 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                  FROM memories WHERE id = ? AND is_deleted = 0"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memory: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memory: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             Ok(Some(Self::row_to_memory(&row)?))
         } else {
@@ -163,16 +163,16 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                  ORDER BY created_at DESC LIMIT ?"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![agent_id, limit])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {e}")))?;
 
         let mut memories = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             memories.push(Self::row_to_memory(&row)?);
         }
@@ -192,16 +192,16 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                  ORDER BY created_at DESC LIMIT ?"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![user_id, limit])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {e}")))?;
 
         let mut memories = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             memories.push(Self::row_to_memory(&row)?);
         }
@@ -212,7 +212,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     async fn search(&self, query: &str, limit: i64) -> Result<Vec<Memory>> {
         let conn = self.conn.lock().await;
 
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = format!("%{query}%");
 
         let mut stmt = conn
             .prepare(
@@ -223,16 +223,16 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                  ORDER BY importance DESC, created_at DESC LIMIT ?"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![search_pattern, limit])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {e}")))?;
 
         let mut memories = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             memories.push(Self::row_to_memory(&row)?);
         }
@@ -244,7 +244,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         let conn = self.conn.lock().await;
 
         let metadata_json = serde_json::to_string(&memory.metadata)
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {e}")))?;
 
         conn.execute(
             "UPDATE memories SET 
@@ -273,7 +273,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update memory: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update memory: {e}")))?;
 
         Ok(memory.clone())
     }
@@ -286,7 +286,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             libsql::params![Utc::now().timestamp(), id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memory: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memory: {e}")))?;
 
         Ok(())
     }
@@ -299,7 +299,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             libsql::params![Utc::now().timestamp(), agent_id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memories by agent_id: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memories by agent_id: {e}")))?;
 
         Ok(result as u64)
     }
@@ -316,16 +316,16 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                  ORDER BY created_at DESC LIMIT ? OFFSET ?"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![limit, offset])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories: {e}")))?;
 
         let mut memories = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             memories.push(Self::row_to_memory(&row)?);
         }

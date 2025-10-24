@@ -1,7 +1,7 @@
 //! 打包功能测试
 
 use agent_mem_deployment::packaging::{PackageConfig, BinaryOptimizer};
-use agent_mem_deployment::packaging::config::{TargetPlatform, OptimizationLevel, CompressionAlgorithm};
+use agent_mem_deployment::packaging::config::{TargetPlatform, OptimizationLevel};
 
 #[test]
 fn test_package_config_creation() {

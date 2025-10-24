@@ -65,7 +65,7 @@ impl ContextualAgent {
             "query": query
         });
 
-        log::info!("Contextual agent: Searched for '{}'", query);
+        log::info!("Contextual agent: Searched for '{query}'");
         Ok(response)
     }
 }

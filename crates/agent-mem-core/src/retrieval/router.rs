@@ -349,7 +349,7 @@ impl RetrievalRouter {
 
         // 基于主题类别选择策略
         if let Some(category) = &features.primary_topic_category {
-            let category_key = format!("{:?}", category).to_lowercase();
+            let category_key = format!("{category:?}").to_lowercase();
             if let Some(topic_strategies) = self.config.topic_strategy_mapping.get(&category_key) {
                 strategies.extend(topic_strategies.clone());
             }
@@ -494,7 +494,7 @@ impl RetrievalRouter {
         let mut reasoning = Vec::new();
 
         reasoning.push(format!("选择了 {} 种检索策略", strategies.len()));
-        reasoning.push(format!("目标记忆类型: {:?}", memory_types));
+        reasoning.push(format!("目标记忆类型: {memory_types:?}"));
 
         if !topics.is_empty() {
             reasoning.push(format!("基于 {} 个提取的主题进行路由", topics.len()));
@@ -550,7 +550,7 @@ impl RetrievalRouter {
         for memory_type in memory_types {
             *stats
                 .memory_type_routing_stats
-                .entry(memory_type.clone())
+                .entry(*memory_type)
                 .or_insert(0) += 1;
         }
 
@@ -563,9 +563,9 @@ impl RetrievalRouter {
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<serde_json::Value> {
         let stats = self.stats.read().await;
-        Ok(serde_json::to_value(&*stats).map_err(|e| {
-            AgentMemError::ProcessingError(format!("Failed to serialize stats: {}", e))
-        })?)
+        serde_json::to_value(&*stats).map_err(|e| {
+            AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}"))
+        })
     }
 }
 

@@ -70,7 +70,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create tool: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create tool: {e}")))?;
 
         Ok(tool.clone())
     }
@@ -87,17 +87,17 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         let mut stmt = conn
             .prepare(query)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {e}")))?;
 
         let mut rows = stmt
             .query([id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let created_at_ts: i64 = row.get(9).unwrap();
             let updated_at_ts: i64 = row.get(10).unwrap();
@@ -114,9 +114,9 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 tags: Self::deserialize_tags(row.get(7).unwrap()),
                 metadata_: Self::deserialize_json(row.get(8).unwrap()),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 is_deleted: is_deleted_int != 0,
                 created_by_id: row.get(12).unwrap(),
                 last_updated_by_id: row.get(13).unwrap(),
@@ -140,18 +140,18 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         let mut stmt = conn
             .prepare(query)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {e}")))?;
 
         let mut rows = stmt
             .query([org_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?;
 
         let mut tools = Vec::new();
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let created_at_ts: i64 = row.get(9).unwrap();
             let updated_at_ts: i64 = row.get(10).unwrap();
@@ -168,9 +168,9 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 tags: Self::deserialize_tags(row.get(7).unwrap()),
                 metadata_: Self::deserialize_json(row.get(8).unwrap()),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 is_deleted: is_deleted_int != 0,
                 created_by_id: row.get(12).unwrap(),
                 last_updated_by_id: row.get(13).unwrap(),
@@ -200,18 +200,18 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         let mut stmt = conn
             .prepare(query)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {e}")))?;
 
         let mut rows = stmt
             .query([org_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?;
 
         let mut tools = Vec::new();
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let created_at_ts: i64 = row.get(9).unwrap();
             let updated_at_ts: i64 = row.get(10).unwrap();
@@ -240,9 +240,9 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 tags: tool_tags,
                 metadata_: Self::deserialize_json(row.get(8).unwrap()),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 is_deleted: is_deleted_int != 0,
                 created_by_id: row.get(12).unwrap(),
                 last_updated_by_id: row.get(13).unwrap(),
@@ -282,7 +282,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                     ],
                 )
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to update tool: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to update tool: {e}")))?;
 
             if rows_affected == 0 {
                 return Err(AgentMemError::NotFound(format!(
@@ -295,7 +295,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         // Fetch and return the updated tool
         self.find_by_id(&tool_id)
             .await?
-            .ok_or_else(|| AgentMemError::NotFound(format!("Tool with id {} not found", tool_id)))
+            .ok_or_else(|| AgentMemError::NotFound(format!("Tool with id {tool_id} not found")))
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
@@ -307,12 +307,11 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 libsql::params![Utc::now().timestamp(), id.to_string()],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete tool: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete tool: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AgentMemError::NotFound(format!(
-                "Tool with id {} not found",
-                id
+                "Tool with id {id} not found"
             )));
         }
 
@@ -331,18 +330,18 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         let mut stmt = conn
             .prepare(query)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare query: {e}")))?;
 
         let mut rows = stmt
             .query((limit, offset))
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?;
 
         let mut tools = Vec::new();
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let created_at_ts: i64 = row.get(9).unwrap();
             let updated_at_ts: i64 = row.get(10).unwrap();
@@ -359,9 +358,9 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 tags: Self::deserialize_tags(row.get(7).unwrap()),
                 metadata_: Self::deserialize_json(row.get(8).unwrap()),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
-                    .unwrap_or_else(|| Utc::now()),
+                    .unwrap_or_else(Utc::now),
                 is_deleted: is_deleted_int != 0,
                 created_by_id: row.get(12).unwrap(),
                 last_updated_by_id: row.get(13).unwrap(),

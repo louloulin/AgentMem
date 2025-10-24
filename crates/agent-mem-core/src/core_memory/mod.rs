@@ -20,7 +20,6 @@ pub use block_manager::{BlockManager, BlockManagerConfig};
 pub use compiler::{CompilerConfig, CoreMemoryCompiler};
 pub use template_engine::{TemplateContext, TemplateEngine};
 
-use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 
 /// Block 类型

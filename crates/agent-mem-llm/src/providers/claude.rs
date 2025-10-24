@@ -93,7 +93,7 @@ impl ClaudeProvider {
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -174,7 +174,7 @@ impl ClaudeProvider {
 
         let response = self
             .client
-            .post(&format!("{}/v1/messages", self.base_url))
+            .post(format!("{}/v1/messages", self.base_url))
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -182,31 +182,30 @@ impl ClaudeProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Claude API request failed: {}", e))
+                AgentMemError::network_error(format!("Claude API request failed: {e}"))
             })?;
 
         let status = response.status();
         let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(&format!("Failed to read response: {}", e))
+            AgentMemError::network_error(format!("Failed to read response: {e}"))
         })?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse Claude response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse Claude response: {e}"))
             })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<ClaudeError>(&response_text) {
                 error!("Claude API error: {} - {}", error.error_type, error.message);
-                Err(AgentMemError::llm_error(&format!(
+                Err(AgentMemError::llm_error(format!(
                     "Claude API error: {}",
                     error.message
                 )))
             } else {
                 error!("Claude API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!(
-                    "Claude API error: HTTP {}",
-                    status
+                Err(AgentMemError::llm_error(format!(
+                    "Claude API error: HTTP {status}"
                 )))
             }
         }

@@ -2,10 +2,7 @@
 ///
 /// 提供系统生命周期管理、组件协调和统一API接口
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
-use tokio::time::interval;
+use std::time::Instant;
 use uuid::Uuid;
 
 use super::{ComponentHealth, HealthStatus, SystemIntegrationManager, SystemState, SystemStatus};
@@ -152,7 +149,7 @@ impl SystemIntegrationManager {
             s.synthesized_memories
                 .into_iter()
                 .next()
-                .map(|sm| synthesized_to_memory_item(sm))
+                .map(synthesized_to_memory_item)
         }))
     }
 

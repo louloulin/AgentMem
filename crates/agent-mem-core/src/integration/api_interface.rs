@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::{ComponentHealth, SystemIntegrationManager, SystemStatus};
-use agent_mem_traits::{AgentMemError, MemoryItem as Memory, MemoryType, Result};
+use super::SystemIntegrationManager;
+use agent_mem_traits::{AgentMemError, MemoryItem as Memory, Result};
 
 /// API请求
 #[derive(Debug, Clone, Serialize, Deserialize)]

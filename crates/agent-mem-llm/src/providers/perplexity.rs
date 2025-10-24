@@ -100,7 +100,7 @@ impl PerplexityProvider {
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -176,24 +176,24 @@ impl PerplexityProvider {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.base_url))
+            .post(format!("{}/chat/completions", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Perplexity API request failed: {}", e))
+                AgentMemError::network_error(format!("Perplexity API request failed: {e}"))
             })?;
 
         let status = response.status();
         let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(&format!("Failed to read response: {}", e))
+            AgentMemError::network_error(format!("Failed to read response: {e}"))
         })?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse Perplexity response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse Perplexity response: {e}"))
             })
         } else {
             // Try to parse error response
@@ -202,7 +202,7 @@ impl PerplexityProvider {
                     "Perplexity API error: {} - {}",
                     error.error.error_type, error.error.message
                 );
-                Err(AgentMemError::llm_error(&format!(
+                Err(AgentMemError::llm_error(format!(
                     "Perplexity API error: {}",
                     error.error.message
                 )))
@@ -211,9 +211,8 @@ impl PerplexityProvider {
                     "Perplexity API error (status {}): {}",
                     status, response_text
                 );
-                Err(AgentMemError::llm_error(&format!(
-                    "Perplexity API error: HTTP {}",
-                    status
+                Err(AgentMemError::llm_error(format!(
+                    "Perplexity API error: HTTP {status}"
                 )))
             }
         }

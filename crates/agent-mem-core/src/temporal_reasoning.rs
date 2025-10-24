@@ -15,9 +15,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::graph_memory::{MemoryId, ReasoningType, RelationType};
+use crate::graph_memory::MemoryId;
 use crate::temporal_graph::{
-    RelationshipEvolution, TemporalEdge, TemporalGraphEngine, TemporalNode, TimeRange,
+    TemporalGraphEngine, TemporalNode, TimeRange,
 };
 
 /// 时序推理类型
@@ -268,11 +268,11 @@ impl TemporalReasoningEngine {
         let minutes = duration.num_minutes() % 60;
 
         if days > 0 {
-            format!("{} days {} hours", days, hours)
+            format!("{days} days {hours} hours")
         } else if hours > 0 {
-            format!("{} hours {} minutes", hours, minutes)
+            format!("{hours} hours {minutes} minutes")
         } else {
-            format!("{} minutes", minutes)
+            format!("{minutes} minutes")
         }
     }
 
@@ -624,8 +624,7 @@ impl TemporalReasoningEngine {
             predicted_outcomes,
             confidence,
             reasoning: format!(
-                "If the original event changed, {} subsequent events might be affected",
-                num_outcomes
+                "If the original event changed, {num_outcomes} subsequent events might be affected"
             ),
         })
     }
@@ -703,7 +702,7 @@ impl TemporalReasoningEngine {
                     time_intervals: intervals,
                     frequency,
                     confidence: (frequency as f32 / nodes.len() as f32).min(1.0),
-                    description: format!("Sequential pattern with {} occurrences", frequency),
+                    description: format!("Sequential pattern with {frequency} occurrences"),
                 });
             }
         }
@@ -767,7 +766,7 @@ impl TemporalReasoningEngine {
         for node in nodes {
             type_groups
                 .entry(format!("{:?}", node.node.node_type))
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(node);
         }
 
@@ -896,7 +895,7 @@ impl TemporalReasoningEngine {
                     let predicted_time = self.predict_next_event_time(pattern);
 
                     predictions.push(PredictionResult {
-                        predicted_event: format!("Event similar to {}", next_event),
+                        predicted_event: format!("Event similar to {next_event}"),
                         predicted_time,
                         confidence: pattern.confidence,
                         based_on_patterns: vec![pattern.clone()],

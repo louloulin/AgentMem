@@ -168,9 +168,8 @@ impl AzureAISearchStore {
             .timeout(Duration::from_secs(config.request_timeout))
             .build()
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "Failed to create HTTP client: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "Failed to create HTTP client: {e}"
                 ))
             })?;
 
@@ -212,9 +211,8 @@ impl AzureAISearchStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!(
-                    "Failed to connect to Azure AI Search: {}",
-                    e
+                AgentMemError::network_error(format!(
+                    "Failed to connect to Azure AI Search: {e}"
                 ))
             })?;
 
@@ -227,9 +225,8 @@ impl AzureAISearchStore {
         } else {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            Err(AgentMemError::storage_error(&format!(
-                "Azure AI Search connection failed: {} - {}",
-                status, error_text
+            Err(AgentMemError::storage_error(format!(
+                "Azure AI Search connection failed: {status} - {error_text}"
             )))
         }
     }
@@ -363,7 +360,7 @@ impl VectorStore for AzureAISearchStore {
 
             // 验证向量维度
             if vector_data.vector.len() != self.config.vector_dimension {
-                return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+                return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                     "Vector dimension {} does not match expected dimension {}",
                     vector_data.vector.len(),
                     self.config.vector_dimension
@@ -400,7 +397,7 @@ impl VectorStore for AzureAISearchStore {
     ) -> Result<Vec<VectorSearchResult>> {
         // 验证查询向量维度
         if query_vector.len() != self.config.vector_dimension {
-            return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+            return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                 "Query vector dimension {} does not match expected dimension {}",
                 query_vector.len(),
                 self.config.vector_dimension
@@ -479,7 +476,7 @@ impl VectorStore for AzureAISearchStore {
 
             // 验证向量维度
             if vector_data.vector.len() != self.config.vector_dimension {
-                return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+                return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                     "Vector dimension {} does not match expected dimension {}",
                     vector_data.vector.len(),
                     self.config.vector_dimension

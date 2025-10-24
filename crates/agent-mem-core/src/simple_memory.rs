@@ -25,14 +25,14 @@
 //! ```
 
 use crate::manager::MemoryManager;
-use crate::types::{Memory, MemoryQuery, MemorySearchResult};
+use crate::types::MemoryQuery;
 use agent_mem_config::memory::{
     DecisionEngineConfig, DeduplicationConfig, FactExtractionConfig, IntelligenceConfig,
     EmbedderConfig, PerformanceConfig, SessionConfig,
 };
 use agent_mem_config::MemoryConfig;
 use agent_mem_traits::{
-    AgentMemError, DecisionEngine, FactExtractor, LLMConfig, MemoryItem, MemoryType, Result,
+    DecisionEngine, FactExtractor, LLMConfig, MemoryItem, Result,
     VectorStoreConfig,
 };
 use agent_mem_llm::LLMProvider;

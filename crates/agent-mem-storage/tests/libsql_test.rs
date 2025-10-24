@@ -97,10 +97,10 @@ mod tests {
         // 插入多条记录
         for i in 1..=5 {
             let record = agent_mem_storage::backends::libsql_store::MemoryRecord {
-                id: format!("test-{}", i),
+                id: format!("test-{i}"),
                 agent_id: "agent-1".to_string(),
                 user_id: Some("user-1".to_string()),
-                content: format!("Memory content {}", i),
+                content: format!("Memory content {i}"),
                 memory_type: "episodic".to_string(),
                 importance: 0.5 + (i as f32 * 0.1),
                 created_at: chrono::Utc::now(),
@@ -133,10 +133,10 @@ mod tests {
         // 插入一些记录
         for i in 1..=5 {
             let record = agent_mem_storage::backends::libsql_store::MemoryRecord {
-                id: format!("test-{}", i),
+                id: format!("test-{i}"),
                 agent_id: "agent-1".to_string(),
                 user_id: Some("user-1".to_string()),
-                content: format!("Content {}", i),
+                content: format!("Content {i}"),
                 memory_type: "episodic".to_string(),
                 importance: 0.5,
                 created_at: chrono::Utc::now(),

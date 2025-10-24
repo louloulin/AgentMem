@@ -121,11 +121,11 @@ impl SemanticAgent {
             if let Some(manager) = &self.semantic_store {
                 // Parse item data
                 let item: SemanticMemoryItem = serde_json::from_value(parameters.clone())
-                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {}", e)))?;
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {e}")))?;
 
                 // Create item using manager
                 let created_item = manager.create_item(item).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create item: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create item: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -163,10 +163,10 @@ impl SemanticAgent {
                 let query = SemanticQuery {
                     name_query: parameters.get("name_query")
                         .and_then(|v| v.as_str())
-                        .map(|s| format!("%{}%", s)),
+                        .map(|s| format!("%{s}%")),
                     summary_query: parameters.get("summary_query")
                         .and_then(|v| v.as_str())
-                        .map(|s| format!("%{}%", s)),
+                        .map(|s| format!("%{s}%")),
                     tree_path_prefix: parameters.get("tree_path_prefix")
                         .and_then(|v| serde_json::from_value(v.clone()).ok()),
                     limit: parameters.get("limit")
@@ -175,7 +175,7 @@ impl SemanticAgent {
 
                 // Query items using manager
                 let items = manager.query_items(user_id, query).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query items: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query items: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -218,12 +218,12 @@ impl SemanticAgent {
 
             // Get the concept item
             let item = store.get_item(concept_id, user_id).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get item: {}", e)))?;
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get item: {e}")))?;
 
             if let Some(item) = item {
                 // Use tree_path to find related items (simplified relationship model)
                 let related_items = store.search_by_tree_path(user_id, item.tree_path.clone()).await
-                    .map_err(|e| AgentError::MemoryManagerError(format!("Failed to search by tree path: {}", e)))?;
+                    .map_err(|e| AgentError::MemoryManagerError(format!("Failed to search by tree path: {e}")))?;
 
                 // Filter out the concept itself
                 let relationships: Vec<_> = related_items
@@ -251,7 +251,7 @@ impl SemanticAgent {
                     "relationship_type": "tree_based"
                 }));
             } else {
-                log::warn!("Semantic agent: Concept {} not found", concept_id);
+                log::warn!("Semantic agent: Concept {concept_id} not found");
                 return Ok(serde_json::json!({
                     "success": false,
                     "concept_id": concept_id,
@@ -308,11 +308,11 @@ impl SemanticAgent {
 
             // Get the starting concept
             let start_item = store.get_item(start_concept, user_id).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get start concept: {}", e)))?;
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get start concept: {e}")))?;
 
             if let Some(start_item) = start_item {
                 // Simplified traversal: explore tree path hierarchy
-                let mut traversal_path = vec![serde_json::json!({
+                let traversal_path = vec![serde_json::json!({
                     "id": start_item.id,
                     "name": start_item.name,
                     "depth": 0
@@ -328,7 +328,7 @@ impl SemanticAgent {
                         current_path.truncate(current_path.len() - depth + 1);
 
                         let items = store.search_by_tree_path(user_id, current_path).await
-                            .map_err(|e| AgentError::MemoryManagerError(format!("Failed to traverse: {}", e)))?;
+                            .map_err(|e| AgentError::MemoryManagerError(format!("Failed to traverse: {e}")))?;
 
                         for item in items {
                             if item.id != start_concept {
@@ -359,7 +359,7 @@ impl SemanticAgent {
                     "traversal_type": "tree_based"
                 }));
             } else {
-                log::warn!("Semantic agent: Start concept {} not found", start_concept);
+                log::warn!("Semantic agent: Start concept {start_concept} not found");
                 return Ok(serde_json::json!({
                     "success": false,
                     "start_concept": start_concept,
@@ -394,11 +394,11 @@ impl SemanticAgent {
         if let Some(store) = &self.semantic_store {
             // Parse the updated item from parameters
             let item: SemanticMemoryItem = serde_json::from_value(parameters.clone())
-                .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {}", e)))?;
+                .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {e}")))?;
 
             // Update the item in the store
             let updated = store.update_item(item.clone()).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to update item: {}", e)))?;
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to update item: {e}")))?;
 
             if updated {
                 log::info!("Semantic agent: Updated item {} in real storage", item.id);
@@ -454,17 +454,17 @@ impl SemanticAgent {
 
             // Delete the item from the store
             let deleted = store.delete_item(item_id, user_id).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to delete item: {}", e)))?;
+                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to delete item: {e}")))?;
 
             if deleted {
-                log::info!("Semantic agent: Deleted item {} from real storage", item_id);
+                log::info!("Semantic agent: Deleted item {item_id} from real storage");
                 return Ok(serde_json::json!({
                     "success": true,
                     "item_id": item_id,
                     "message": "Semantic knowledge deleted successfully"
                 }));
             } else {
-                log::warn!("Semantic agent: Item {} not found for deletion", item_id);
+                log::warn!("Semantic agent: Item {item_id} not found for deletion");
                 return Ok(serde_json::json!({
                     "success": false,
                     "item_id": item_id,
@@ -523,7 +523,7 @@ impl MemoryAgent for SemanticAgent {
                     context.stats.total_tasks = items.len() as u64;
                 }
                 Err(e) => {
-                    log::warn!("查询语义记忆失败: {}，将从空状态开始", e);
+                    log::warn!("查询语义记忆失败: {e}，将从空状态开始");
                 }
             }
         } else {

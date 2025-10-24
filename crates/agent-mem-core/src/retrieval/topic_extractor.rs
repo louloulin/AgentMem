@@ -273,7 +273,7 @@ impl TopicExtractor {
                 category,
                 confidence: 0.8 - (i as f32 * 0.1), // 简化的置信度计算
                 keywords: vec![keyword.clone()],
-                description: Some(format!("主题: {}", keyword)),
+                description: Some(format!("主题: {keyword}")),
                 hierarchy_level: 0,
                 parent_topic_id: None,
                 relevance_score: 0.9 - (i as f32 * 0.1),
@@ -407,7 +407,7 @@ impl TopicExtractor {
         let mut hasher = DefaultHasher::new();
         text.hash(&mut hasher);
         if let Some(ctx) = context {
-            format!("{:?}", ctx).hash(&mut hasher);
+            format!("{ctx:?}").hash(&mut hasher);
         }
 
         format!("topic_{}", hasher.finish())
@@ -458,9 +458,9 @@ impl TopicExtractor {
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<serde_json::Value> {
         let stats = self.stats.read().await;
-        Ok(serde_json::to_value(&*stats).map_err(|e| {
-            AgentMemError::ProcessingError(format!("Failed to serialize stats: {}", e))
-        })?)
+        serde_json::to_value(&*stats).map_err(|e| {
+            AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}"))
+        })
     }
 
     /// 清理缓存

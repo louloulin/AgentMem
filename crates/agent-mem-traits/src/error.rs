@@ -49,10 +49,10 @@ impl ErrorContext {
     pub fn format(&self) -> String {
         let mut parts = vec![format!("operation: {}", self.operation)];
         for (key, value) in &self.details {
-            parts.push(format!("{}: {}", key, value));
+            parts.push(format!("{key}: {value}"));
         }
         if let Some(ts) = self.timestamp {
-            parts.push(format!("timestamp: {}", ts));
+            parts.push(format!("timestamp: {ts}"));
         }
         parts.join(", ")
     }
@@ -313,18 +313,18 @@ impl AgentMemError {
     /// Get a user-friendly error message
     pub fn user_message(&self) -> String {
         match self {
-            Self::MemoryError(msg) => format!("记忆操作失败: {}", msg),
-            Self::LLMError(msg) => format!("LLM 服务错误: {}", msg),
-            Self::StorageError(msg) => format!("存储错误: {}", msg),
-            Self::EmbeddingError(msg) => format!("嵌入模型错误: {}", msg),
-            Self::NetworkError(msg) => format!("网络错误: {}", msg),
-            Self::AuthError(msg) => format!("认证失败: {}", msg),
-            Self::RateLimitError(msg) => format!("请求频率超限: {}", msg),
-            Self::TimeoutError(msg) => format!("操作超时: {}", msg),
-            Self::ValidationError(msg) => format!("验证失败: {}", msg),
-            Self::NotFound(msg) => format!("未找到: {}", msg),
-            Self::InvalidInput(msg) => format!("无效输入: {}", msg),
-            Self::ConfigError(msg) => format!("配置错误: {}", msg),
+            Self::MemoryError(msg) => format!("记忆操作失败: {msg}"),
+            Self::LLMError(msg) => format!("LLM 服务错误: {msg}"),
+            Self::StorageError(msg) => format!("存储错误: {msg}"),
+            Self::EmbeddingError(msg) => format!("嵌入模型错误: {msg}"),
+            Self::NetworkError(msg) => format!("网络错误: {msg}"),
+            Self::AuthError(msg) => format!("认证失败: {msg}"),
+            Self::RateLimitError(msg) => format!("请求频率超限: {msg}"),
+            Self::TimeoutError(msg) => format!("操作超时: {msg}"),
+            Self::ValidationError(msg) => format!("验证失败: {msg}"),
+            Self::NotFound(msg) => format!("未找到: {msg}"),
+            Self::InvalidInput(msg) => format!("无效输入: {msg}"),
+            Self::ConfigError(msg) => format!("配置错误: {msg}"),
             _ => self.to_string(),
         }
     }

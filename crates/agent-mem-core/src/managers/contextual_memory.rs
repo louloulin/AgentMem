@@ -469,7 +469,7 @@ impl ContextualMemoryManager {
 
         let context = contexts
             .get_mut(context_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {} 不存在", context_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {context_id} 不存在")))?;
 
         // 检查是否过期
         if let Some(expires_at) = context.expires_at {
@@ -507,7 +507,7 @@ impl ContextualMemoryManager {
 
         let context = contexts
             .get_mut(context_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {} 不存在", context_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {context_id} 不存在")))?;
 
         // 检查是否过期
         if let Some(expires_at) = context.expires_at {
@@ -563,7 +563,7 @@ impl ContextualMemoryManager {
 
         contexts
             .remove(context_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {} 不存在", context_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("上下文 {context_id} 不存在")))?;
 
         drop(contexts);
 
@@ -600,8 +600,7 @@ impl ContextualMemoryManager {
 
         if !contexts.contains_key(context_id) {
             return Err(CoreError::InvalidInput(format!(
-                "上下文 {} 不存在",
-                context_id
+                "上下文 {context_id} 不存在"
             )));
         }
         drop(contexts);
@@ -739,15 +738,13 @@ impl ContextualMemoryManager {
 
         if !contexts.contains_key(source_context_id) {
             return Err(CoreError::InvalidInput(format!(
-                "源上下文 {} 不存在",
-                source_context_id
+                "源上下文 {source_context_id} 不存在"
             )));
         }
 
         if !contexts.contains_key(target_context_id) {
             return Err(CoreError::InvalidInput(format!(
-                "目标上下文 {} 不存在",
-                target_context_id
+                "目标上下文 {target_context_id} 不存在"
             )));
         }
         drop(contexts);
@@ -1057,12 +1054,12 @@ impl ContextualMemoryManager {
         stats.expired_contexts = expired_contexts;
         stats.total_correlations = correlations.len();
         stats.change_events_count = change_events.len();
-        stats.average_importance = if contexts.len() > 0 {
+        stats.average_importance = if !contexts.is_empty() {
             total_importance / contexts.len() as f64
         } else {
             0.0
         };
-        stats.average_access_count = if contexts.len() > 0 {
+        stats.average_access_count = if !contexts.is_empty() {
             total_access_count as f64 / contexts.len() as f64
         } else {
             0.0

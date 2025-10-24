@@ -131,7 +131,7 @@ pub fn get_storage_config_from_env() -> Result<StorageConfig> {
             if path.starts_with("file:") || path.starts_with("libsql://") {
                 path
             } else {
-                format!("file:{}", path)
+                format!("file:{path}")
             }
         }
     };

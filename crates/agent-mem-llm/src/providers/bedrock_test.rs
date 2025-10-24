@@ -333,7 +333,7 @@ mod tests {
             let config = LLMConfig {
                 provider: "bedrock".to_string(),
                 model: "anthropic.claude-3-sonnet-20240229-v1:0".to_string(),
-                api_key: Some(format!("access:secret:{}", region)),
+                api_key: Some(format!("access:secret:{region}")),
                 base_url: None,
                 temperature: Some(0.7),
                 max_tokens: Some(1000),
@@ -346,7 +346,7 @@ mod tests {
             let provider = BedrockProvider::new(config).unwrap();
             let url = provider.build_api_url("test-model");
 
-            assert!(url.contains(&format!("bedrock-runtime.{}.amazonaws.com", region)));
+            assert!(url.contains(&format!("bedrock-runtime.{region}.amazonaws.com")));
         }
     }
 
@@ -372,8 +372,8 @@ mod tests {
 
         let mut messages = vec![];
         for i in 0..10 {
-            messages.push(Message::user(&format!("User message {}", i)));
-            messages.push(Message::assistant(&format!("Assistant response {}", i)));
+            messages.push(Message::user(&format!("User message {i}")));
+            messages.push(Message::assistant(&format!("Assistant response {i}")));
         }
         messages.push(Message::user("Final question"));
 

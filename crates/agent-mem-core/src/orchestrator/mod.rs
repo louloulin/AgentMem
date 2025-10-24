@@ -10,15 +10,14 @@ use crate::{
 };
 
 use agent_mem_llm::LLMClient;
-use agent_mem_tools::{ToolExecutor, ExecutionContext};
+use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::{
-    llm::{FunctionDefinition, FunctionCall},
-    AgentMemError, Message, MessageRole, Result,
+    llm::FunctionDefinition,
+    AgentMemError, Message, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 pub mod memory_integration;

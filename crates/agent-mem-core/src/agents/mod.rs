@@ -35,7 +35,6 @@
 //! - **ContextualAgent**: Handles environmental context and situational awareness
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
@@ -274,7 +273,7 @@ impl BaseAgent {
     pub async fn send_response(&self, response: TaskResponse) -> AgentResult<()> {
         if let Some(ref tx) = self.response_tx {
             tx.send(response).map_err(|e| {
-                AgentError::InternalError(format!("Failed to send response: {}", e))
+                AgentError::InternalError(format!("Failed to send response: {e}"))
             })?;
         }
         Ok(())

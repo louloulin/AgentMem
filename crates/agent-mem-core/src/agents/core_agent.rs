@@ -236,20 +236,19 @@ impl CoreAgent {
                         }
                     });
 
-                    log::info!("Core agent: Read memory block with label '{}'", key);
-                    return Ok(response);
+                    log::info!("Core agent: Read memory block with label '{key}'");
+                    Ok(response)
                 } else {
-                    return Err(AgentError::InternalError(format!(
-                        "Core memory block with label '{}' not found",
-                        key
-                    )));
+                    Err(AgentError::InternalError(format!(
+                        "Core memory block with label '{key}' not found"
+                    )))
                 }
             } else {
                 // If only block_id is provided, we need to get all and filter
                 // This is not efficient, but CoreMemoryStore doesn't have get_by_id
-                return Err(AgentError::InvalidParameters(
+                Err(AgentError::InvalidParameters(
                     "Retrieving by block_id is not supported, use 'label' instead".to_string(),
-                ));
+                ))
             }
         } else {
             // No store configured - return error instead of mock
@@ -297,12 +296,11 @@ impl CoreAgent {
                     "message": "Core memory block updated successfully"
                 });
 
-                log::info!("Core agent: Updated memory block '{}'", label);
+                log::info!("Core agent: Updated memory block '{label}'");
                 Ok(response)
             } else {
                 Err(AgentError::InternalError(format!(
-                    "Core memory block with label '{}' not found",
-                    label
+                    "Core memory block with label '{label}' not found"
                 )))
             }
         } else {
@@ -348,12 +346,11 @@ impl CoreAgent {
                     "message": "Core memory block deleted successfully"
                 });
 
-                log::info!("Core agent: Deleted memory block '{}'", label);
+                log::info!("Core agent: Deleted memory block '{label}'");
                 Ok(response)
             } else {
                 Err(AgentError::InternalError(format!(
-                    "Core memory block with label '{}' not found",
-                    label
+                    "Core memory block with label '{label}' not found"
                 )))
             }
         } else {
@@ -537,7 +534,7 @@ impl MemoryAgent for CoreAgent {
                     context.stats.total_tasks = items.len() as u64;
                 }
                 Err(e) => {
-                    log::warn!("加载核心记忆项失败: {}，将从空状态开始", e);
+                    log::warn!("加载核心记忆项失败: {e}，将从空状态开始");
                 }
             }
         } else {

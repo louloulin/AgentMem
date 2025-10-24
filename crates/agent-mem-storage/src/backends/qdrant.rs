@@ -105,7 +105,7 @@ impl QdrantStore {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let store = Self {
@@ -158,7 +158,7 @@ impl QdrantStore {
             .json(&create_request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -167,8 +167,7 @@ impl QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
@@ -249,7 +248,7 @@ impl VectorStore for QdrantStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -258,8 +257,7 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
@@ -292,7 +290,7 @@ impl VectorStore for QdrantStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -301,13 +299,12 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
         let search_response: QdrantSearchResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         let results: Vec<VectorSearchResult> = search_response
@@ -339,7 +336,7 @@ impl VectorStore for QdrantStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -348,8 +345,7 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
@@ -372,7 +368,7 @@ impl VectorStore for QdrantStore {
             .get(&url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if response.status() == 404 {
             return Ok(None);
@@ -385,13 +381,12 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
         let point_response: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if let Some(result) = point_response.get("result") {
@@ -433,7 +428,7 @@ impl VectorStore for QdrantStore {
             .get(&url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -442,13 +437,12 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 
         let info: QdrantCollectionInfo = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         Ok(info.result.points_count)
@@ -462,7 +456,7 @@ impl VectorStore for QdrantStore {
             .delete(&url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -471,8 +465,7 @@ impl VectorStore for QdrantStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Qdrant API error {}: {}",
-                status, error_text
+                "Qdrant API error {status}: {error_text}"
             )));
         }
 

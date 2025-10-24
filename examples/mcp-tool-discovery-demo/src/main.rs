@@ -3,7 +3,6 @@
 //! 演示动态工具发现、加载和注册
 
 use agent_mem_tools::mcp::{ToolDiscovery, ToolMetadata, ToolType, HttpToolLoader, ToolLoader};
-use serde_json::json;
 use std::collections::HashMap;
 use tracing::error;
 
@@ -185,7 +184,7 @@ async fn demo_tool_search_and_filter() {
 
     // 2. 按标签过滤
     println!("\n2️⃣ 按标签 'api' 过滤:");
-    let results = discovery.filter_by_tags(&vec!["api".to_string()]).await;
+    let results = discovery.filter_by_tags(&["api".to_string()]).await;
     println!("  找到 {} 个工具:", results.len());
     for tool in &results {
         println!("    - {}: {:?}", tool.name, tool.tags);
@@ -193,7 +192,7 @@ async fn demo_tool_search_and_filter() {
 
     // 3. 按标签 'file' 过滤
     println!("\n3️⃣ 按标签 'file' 过滤:");
-    let results = discovery.filter_by_tags(&vec!["file".to_string()]).await;
+    let results = discovery.filter_by_tags(&["file".to_string()]).await;
     println!("  找到 {} 个工具:", results.len());
     for tool in &results {
         println!("    - {}: {:?}", tool.name, tool.tags);
@@ -250,7 +249,7 @@ async fn demo_tool_loader() {
     // 2. 检查工具是否已加载
     println!("\n2️⃣ 检查工具是否已加载:");
     let is_loaded = loader.is_loaded("api_client").await;
-    println!("  api_client 已加载: {}", is_loaded);
+    println!("  api_client 已加载: {is_loaded}");
 
     // 3. 尝试加载非 HTTP 工具
     println!("\n3️⃣ 尝试加载非 HTTP 工具:");
@@ -284,7 +283,7 @@ async fn demo_tool_loader() {
         Ok(_) => {
             println!("  ✅ 工具卸载成功");
             let is_loaded = loader.is_loaded("api_client").await;
-            println!("  api_client 已加载: {}", is_loaded);
+            println!("  api_client 已加载: {is_loaded}");
         }
         Err(e) => {
             error!("  ❌ 卸载失败: {}", e);

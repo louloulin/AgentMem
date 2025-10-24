@@ -194,7 +194,7 @@ impl PromptTemplates {
             let mut rendered = template.clone();
 
             for (key, value) in variables {
-                let placeholder = format!("{{{}}}", key);
+                let placeholder = format!("{{{key}}}");
                 rendered = rendered.replace(&placeholder, value);
             }
 

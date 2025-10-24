@@ -108,9 +108,9 @@ async fn main() -> Result<()> {
         Commands::Init { name, template } => {
             println!(
                 "{}",
-                format!("🚀 Initializing new AgentMem project: {}", name).green()
+                format!("🚀 Initializing new AgentMem project: {name}").green()
             );
-            println!("Template: {}", template);
+            println!("Template: {template}");
             println!("✅ Project initialized successfully!");
             Ok(())
         }

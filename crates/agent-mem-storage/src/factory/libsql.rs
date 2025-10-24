@@ -70,11 +70,11 @@ impl LibSqlStorageFactory {
         };
 
         let db = db.map_err(|e| {
-            AgentMemError::storage_error(&format!("Failed to connect to LibSQL: {}", e))
+            AgentMemError::storage_error(format!("Failed to connect to LibSQL: {e}"))
         })?;
 
         let conn = db.connect().map_err(|e| {
-            AgentMemError::storage_error(&format!("Failed to create LibSQL connection: {}", e))
+            AgentMemError::storage_error(format!("Failed to create LibSQL connection: {e}"))
         })?;
 
         Ok(conn)

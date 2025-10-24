@@ -30,7 +30,6 @@ pub use vector_search::{
     VectorSearchEngine,
 };
 
-use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 
 /// 搜索查询

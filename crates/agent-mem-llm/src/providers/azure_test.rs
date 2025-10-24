@@ -359,7 +359,7 @@ mod tests {
             let provider = AzureProvider::new(config).unwrap();
             let url = provider.build_api_url();
 
-            assert!(url.contains(&format!("/deployments/{}/", deployment_name)));
+            assert!(url.contains(&format!("/deployments/{deployment_name}/")));
         }
     }
 

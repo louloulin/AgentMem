@@ -137,7 +137,7 @@ impl PromptManager {
             .templates
             .render_template(template_name, &variables)
             .ok_or_else(|| {
-                AgentMemError::llm_error(&format!("Failed to render template: {}", template_name))
+                AgentMemError::llm_error(format!("Failed to render template: {template_name}"))
             })?;
 
         Ok(vec![Message {
@@ -192,7 +192,7 @@ impl PromptManager {
         variables: &HashMap<String, String>,
     ) -> Result<()> {
         let template = self.templates.get_template(template_name).ok_or_else(|| {
-            AgentMemError::llm_error(&format!("Template not found: {}", template_name))
+            AgentMemError::llm_error(format!("Template not found: {template_name}"))
         })?;
 
         // 简单的变量验证：检查模板中的占位符是否都有对应的变量
@@ -266,9 +266,8 @@ impl PromptManager {
         }
 
         if !missing_variables.is_empty() {
-            return Err(AgentMemError::llm_error(&format!(
-                "Missing variables for template {}: {:?}",
-                template_name, missing_variables
+            return Err(AgentMemError::llm_error(format!(
+                "Missing variables for template {template_name}: {missing_variables:?}"
             )));
         }
 
@@ -335,7 +334,7 @@ mod tests {
 
         let result = manager.validate_template_variables("memory_extraction", &variables);
         if let Err(ref e) = result {
-            println!("Validation error: {}", e);
+            println!("Validation error: {e}");
         }
         assert!(result.is_ok());
 

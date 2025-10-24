@@ -65,7 +65,7 @@ impl KnowledgeAgent {
             "query": query
         });
 
-        log::info!("Knowledge agent: Searched for '{}'", query);
+        log::info!("Knowledge agent: Searched for '{query}'");
         Ok(response)
     }
 }

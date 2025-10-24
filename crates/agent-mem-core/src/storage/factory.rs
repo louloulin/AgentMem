@@ -8,7 +8,7 @@
 //! 2. `StorageFactory`: New factory using `DeploymentMode` (Task 3.2)
 
 use agent_mem_config::{
-    database::{DatabaseBackend, DatabaseConfig, PoolConfig as DbPoolConfig},
+    database::{DatabaseBackend, DatabaseConfig},
     DeploymentMode, EmbeddedModeConfig, ServerModeConfig,
 };
 use agent_mem_traits::Result;
@@ -116,13 +116,13 @@ impl RepositoryFactory {
         // Create connection pool
         let conn = create_libsql_pool(&config.url)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}")))?;
 
         // Run migrations if auto_migrate is enabled
         if config.auto_migrate {
             run_migrations(conn.clone())
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {e}")))?;
         }
 
         // Create repository instances
@@ -433,12 +433,12 @@ impl StorageFactory {
         // 1. Create LibSQL connection
         let conn = create_libsql_pool(&config.database_path.to_string_lossy())
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}")))?;
 
         // 2. Run migrations
         run_migrations(conn.clone())
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {e}")))?;
 
         // 3. Create repository instances
         Ok(Repositories {

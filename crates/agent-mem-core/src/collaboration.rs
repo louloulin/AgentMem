@@ -514,6 +514,12 @@ pub enum PolicyAction {
     },
 }
 
+impl Default for PermissionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PermissionManager {
     /// 创建新的权限管理器
     pub fn new() -> Self {
@@ -599,7 +605,7 @@ impl PermissionManager {
         Ok(PermissionDecision {
             allowed,
             policy_id: None,
-            reason: format!("Default permission level: {:?}", permission_level),
+            reason: format!("Default permission level: {permission_level:?}"),
             requires_approval: false,
         })
     }
@@ -979,6 +985,12 @@ impl ConflictResolver {
     }
 }
 
+impl Default for VotingSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VotingSystem {
     /// 创建新的投票系统
     pub fn new() -> Self {
@@ -1176,7 +1188,7 @@ impl KnowledgePropagator {
     /// 订阅知识类型
     pub async fn subscribe(&self, agent_id: String, knowledge_type: KnowledgeType) -> Result<()> {
         let mut subscriptions = self.subscriptions.write().await;
-        let knowledge_type_str = format!("{:?}", knowledge_type);
+        let knowledge_type_str = format!("{knowledge_type:?}");
         subscriptions
             .entry(agent_id)
             .or_insert_with(HashSet::new)
@@ -1187,7 +1199,7 @@ impl KnowledgePropagator {
     /// 检查订阅关系
     async fn is_subscribed(&self, agent_id: &str, knowledge_type: &KnowledgeType) -> Result<bool> {
         let subscriptions = self.subscriptions.read().await;
-        let knowledge_type_str = format!("{:?}", knowledge_type);
+        let knowledge_type_str = format!("{knowledge_type:?}");
         Ok(subscriptions
             .get(agent_id)
             .map(|subs| subs.contains(&knowledge_type_str))

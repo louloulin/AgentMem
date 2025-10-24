@@ -181,7 +181,7 @@ impl AutoRewriter {
             content,
             target_length,
             context
-                .map(|c| format!("Context: {}", c))
+                .map(|c| format!("Context: {c}"))
                 .unwrap_or_default()
         );
 
@@ -197,12 +197,11 @@ impl AutoRewriter {
         context: Option<&str>,
     ) -> String {
         let context_str = context
-            .map(|c| format!("\n\nContext: {}", c))
+            .map(|c| format!("\n\nContext: {c}"))
             .unwrap_or_default();
 
         format!(
-            "Please summarize the following content to approximately {} characters while preserving the most important information.{}\n\nContent:\n{}",
-            target_length, context_str, content
+            "Please summarize the following content to approximately {target_length} characters while preserving the most important information.{context_str}\n\nContent:\n{content}"
         )
     }
 

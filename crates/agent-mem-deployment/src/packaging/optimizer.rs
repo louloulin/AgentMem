@@ -6,7 +6,7 @@ use super::PackageConfig;
 use agent_mem_traits::{AgentMemError, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// 二进制优化器
 pub struct BinaryOptimizer {
@@ -53,7 +53,7 @@ impl BinaryOptimizer {
         tokio::fs::copy(binary_path, &stripped_path)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("复制文件失败: {}", e))
+                AgentMemError::internal_error(format!("复制文件失败: {e}"))
             })?;
         
         // 执行 strip 命令
@@ -74,7 +74,7 @@ impl BinaryOptimizer {
             .arg(&stripped_path)
             .output()
             .map_err(|e| {
-                AgentMemError::internal_error(format!("执行 strip 失败: {}", e))
+                AgentMemError::internal_error(format!("执行 strip 失败: {e}"))
             })?;
         
         if !output.status.success() {
@@ -111,21 +111,20 @@ impl BinaryOptimizer {
             .arg(binary_path)
             .output()
             .map_err(|e| {
-                AgentMemError::internal_error(format!("执行 gzip 失败: {}", e))
+                AgentMemError::internal_error(format!("执行 gzip 失败: {e}"))
             })?;
         
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(AgentMemError::internal_error(format!(
-                "Gzip 压缩失败: {}",
-                stderr
+                "Gzip 压缩失败: {stderr}"
             )));
         }
         
         tokio::fs::write(&compressed_path, output.stdout)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("写入压缩文件失败: {}", e))
+                AgentMemError::internal_error(format!("写入压缩文件失败: {e}"))
             })?;
         
         info!("Gzip 压缩完成");
@@ -145,14 +144,13 @@ impl BinaryOptimizer {
             .arg(binary_path)
             .output()
             .map_err(|e| {
-                AgentMemError::internal_error(format!("执行 zstd 失败: {}", e))
+                AgentMemError::internal_error(format!("执行 zstd 失败: {e}"))
             })?;
         
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(AgentMemError::internal_error(format!(
-                "Zstd 压缩失败: {}",
-                stderr
+                "Zstd 压缩失败: {stderr}"
             )));
         }
         
@@ -170,7 +168,7 @@ impl BinaryOptimizer {
         tokio::fs::copy(binary_path, &compressed_path)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("复制文件失败: {}", e))
+                AgentMemError::internal_error(format!("复制文件失败: {e}"))
             })?;
         
         let output = Command::new("upx")
@@ -179,14 +177,13 @@ impl BinaryOptimizer {
             .arg(&compressed_path)
             .output()
             .map_err(|e| {
-                AgentMemError::internal_error(format!("执行 upx 失败: {}", e))
+                AgentMemError::internal_error(format!("执行 upx 失败: {e}"))
             })?;
         
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(AgentMemError::internal_error(format!(
-                "UPX 压缩失败: {}",
-                stderr
+                "UPX 压缩失败: {stderr}"
             )));
         }
         
@@ -227,7 +224,7 @@ pub async fn get_binary_size(path: &Path) -> Result<u64> {
         .await
         .map(|m| m.len())
         .map_err(|e| {
-            AgentMemError::internal_error(format!("获取文件大小失败: {}", e))
+            AgentMemError::internal_error(format!("获取文件大小失败: {e}"))
         })
 }
 
@@ -244,7 +241,7 @@ pub fn format_size(bytes: u64) -> String {
     } else if bytes >= KB {
         format!("{:.2} KB", bytes as f64 / KB as f64)
     } else {
-        format!("{} bytes", bytes)
+        format!("{bytes} bytes")
     }
 }
 

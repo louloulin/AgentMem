@@ -166,7 +166,7 @@ impl MilvusStore {
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self { config, client })
@@ -237,13 +237,13 @@ impl MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/collection", self.config.url))
+            .post(format!("{}/v1/collection", self.config.url))
             .header("Content-Type", "application/json")
             .json(&create_request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create collection: {}", e))
+                AgentMemError::network_error(format!("Failed to create collection: {e}"))
             })?;
 
         if response.status().is_success() {
@@ -257,9 +257,8 @@ impl MilvusStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to create collection: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Collection creation failed: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Collection creation failed: {error_text}"
             )))
         }
     }
@@ -268,14 +267,14 @@ impl MilvusStore {
     async fn collection_exists(&self) -> Result<bool> {
         let response = self
             .client
-            .get(&format!(
+            .get(format!(
                 "{}/v1/collection/{}",
                 self.config.url, self.config.collection_name
             ))
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to check collection: {}", e))
+                AgentMemError::network_error(format!("Failed to check collection: {e}"))
             })?;
 
         Ok(response.status().is_success())
@@ -302,12 +301,12 @@ impl MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/index", self.config.url))
+            .post(format!("{}/v1/index", self.config.url))
             .header("Content-Type", "application/json")
             .json(&index_request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to create index: {e}")))?;
 
         if response.status().is_success() {
             info!("Index created successfully");
@@ -403,13 +402,13 @@ impl EmbeddingVectorStore for MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/entities", self.config.url))
+            .post(format!("{}/v1/entities", self.config.url))
             .header("Content-Type", "application/json")
             .json(&insert_request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to store embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to store embedding: {e}"))
             })?;
 
         if response.status().is_success() {
@@ -419,9 +418,8 @@ impl EmbeddingVectorStore for MilvusStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to store embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to store embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to store embedding: {error_text}"
             )))
         }
     }
@@ -457,30 +455,29 @@ impl EmbeddingVectorStore for MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/search", self.config.url))
+            .post(format!("{}/v1/search", self.config.url))
             .header("Content-Type", "application/json")
             .json(&search_request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to search: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to search: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Search failed: {} - {}", status, error_text);
-            return Err(AgentMemError::storage_error(&format!(
-                "Search failed: {}",
-                error_text
+            return Err(AgentMemError::storage_error(format!(
+                "Search failed: {error_text}"
             )));
         }
 
         let search_response: MilvusSearchResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(&format!("Failed to parse search response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse search response: {e}"))
         })?;
 
         if search_response.status.error_code != 0 {
             error!("Milvus search error: {}", search_response.status.reason);
-            return Err(AgentMemError::storage_error(&format!(
+            return Err(AgentMemError::storage_error(format!(
                 "Milvus error: {}",
                 search_response.status.reason
             )));
@@ -537,13 +534,13 @@ impl EmbeddingVectorStore for MilvusStore {
 
         let response = self
             .client
-            .delete(&format!("{}/v1/entities", self.config.url))
+            .delete(format!("{}/v1/entities", self.config.url))
             .header("Content-Type", "application/json")
             .json(&delete_request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to delete embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to delete embedding: {e}"))
             })?;
 
         if response.status().is_success() {
@@ -553,9 +550,8 @@ impl EmbeddingVectorStore for MilvusStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to delete embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to delete embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to delete embedding: {error_text}"
             )))
         }
     }
@@ -584,23 +580,23 @@ impl EmbeddingVectorStore for MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/query", self.config.url))
+            .post(format!("{}/v1/query", self.config.url))
             .header("Content-Type", "application/json")
             .json(&query_request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to get embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to get embedding: {e}"))
             })?;
 
         if response.status().is_success() {
             // Parse response and extract embedding
             let query_response: MilvusQueryResponse = response.json().await.map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse query response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse query response: {e}"))
             })?;
 
             if query_response.status.error_code != 0 {
-                return Err(AgentMemError::storage_error(&format!(
+                return Err(AgentMemError::storage_error(format!(
                     "Milvus query failed: {}",
                     query_response.status.reason
                 )));
@@ -627,9 +623,8 @@ impl EmbeddingVectorStore for MilvusStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to get embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to get embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to get embedding: {error_text}"
             )))
         }
     }
@@ -638,7 +633,7 @@ impl EmbeddingVectorStore for MilvusStore {
         debug!("Listing embeddings with prefix: {:?}", prefix);
 
         let expr = if let Some(prefix) = prefix {
-            format!("memory_id like \"{}%\"", prefix)
+            format!("memory_id like \"{prefix}%\"")
         } else {
             "memory_id != \"\"".to_string()
         };
@@ -651,23 +646,23 @@ impl EmbeddingVectorStore for MilvusStore {
 
         let response = self
             .client
-            .post(&format!("{}/v1/query", self.config.url))
+            .post(format!("{}/v1/query", self.config.url))
             .header("Content-Type", "application/json")
             .json(&query_request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to list embeddings: {}", e))
+                AgentMemError::network_error(format!("Failed to list embeddings: {e}"))
             })?;
 
         if response.status().is_success() {
             // Parse response and extract memory IDs
             let query_response: MilvusQueryResponse = response.json().await.map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse list response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse list response: {e}"))
             })?;
 
             if query_response.status.error_code != 0 {
-                return Err(AgentMemError::storage_error(&format!(
+                return Err(AgentMemError::storage_error(format!(
                     "Milvus list query failed: {}",
                     query_response.status.reason
                 )));
@@ -693,9 +688,8 @@ impl EmbeddingVectorStore for MilvusStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to list embeddings: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to list embeddings: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to list embeddings: {error_text}"
             )))
         }
     }

@@ -16,7 +16,6 @@ use agent_mem_tools::executor::ToolExecutor;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tracing::{info, Level};
-use tracing_subscriber;
 use serde_json::json;
 
 #[tokio::main]

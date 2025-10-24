@@ -64,7 +64,7 @@ impl ChromaStore {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -99,12 +99,12 @@ impl ChromaStore {
             .get(&collections_url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
             let collections: Vec<ChromaCollectionResponse> =
                 response.json().await.map_err(|e| {
-                    AgentMemError::parsing_error(format!("Failed to parse collections: {}", e))
+                    AgentMemError::parsing_error(format!("Failed to parse collections: {e}"))
                 })?;
 
             // 检查集合是否已存在
@@ -135,7 +135,7 @@ impl ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -185,7 +185,7 @@ impl VectorStore for ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -194,8 +194,7 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
@@ -222,7 +221,7 @@ impl VectorStore for ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -231,25 +230,24 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
         let chroma_response: ChromaQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         let mut results = Vec::new();
 
         if let (Some(ids), Some(distances)) =
-            (chroma_response.ids.get(0), chroma_response.distances.get(0))
+            (chroma_response.ids.first(), chroma_response.distances.first())
         {
             for (i, (id, distance)) in ids.iter().zip(distances.iter()).enumerate() {
                 let vector = chroma_response
                     .embeddings
                     .as_ref()
-                    .and_then(|embs| embs.get(0))
+                    .and_then(|embs| embs.first())
                     .and_then(|emb| emb.get(i))
                     .cloned()
                     .unwrap_or_default();
@@ -257,7 +255,7 @@ impl VectorStore for ChromaStore {
                 let metadata = chroma_response
                     .metadatas
                     .as_ref()
-                    .and_then(|metas| metas.get(0))
+                    .and_then(|metas| metas.first())
                     .and_then(|meta| meta.get(i))
                     .and_then(|m| m.as_ref())
                     .and_then(|v| serde_json::from_value(v.clone()).ok())
@@ -292,7 +290,7 @@ impl VectorStore for ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -301,8 +299,7 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
@@ -331,7 +328,7 @@ impl VectorStore for ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -340,8 +337,7 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
@@ -362,7 +358,7 @@ impl VectorStore for ChromaStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -371,13 +367,12 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
         let response_data: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         // 解析响应并构建VectorData
@@ -395,7 +390,7 @@ impl VectorStore for ChromaStore {
 
                 let metadata = response_data["metadatas"]
                     .as_array()
-                    .and_then(|metas| metas.get(0))
+                    .and_then(|metas| metas.first())
                     .and_then(|meta| serde_json::from_value(meta.clone()).ok())
                     .unwrap_or_default();
 
@@ -417,7 +412,7 @@ impl VectorStore for ChromaStore {
             .get(&url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -426,13 +421,12 @@ impl VectorStore for ChromaStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Chroma API error {}: {}",
-                status, error_text
+                "Chroma API error {status}: {error_text}"
             )));
         }
 
         let count: usize = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         Ok(count)
@@ -449,7 +443,7 @@ impl VectorStore for ChromaStore {
             .delete(&url)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();

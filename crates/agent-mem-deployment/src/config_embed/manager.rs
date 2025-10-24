@@ -65,12 +65,12 @@ impl EmbeddedConfigManager {
         // 创建父目录
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                AgentMemError::internal_error(format!("创建目录失败: {}", e))
+                AgentMemError::internal_error(format!("创建目录失败: {e}"))
             })?;
         }
         
         std::fs::write(path.as_ref(), config).map_err(|e| {
-            AgentMemError::internal_error(format!("写入配置文件失败: {}", e))
+            AgentMemError::internal_error(format!("写入配置文件失败: {e}"))
         })?;
         
         info!("配置已导出到: {:?}", path.as_ref());
@@ -99,7 +99,7 @@ impl EmbeddedConfigManager {
         
         // 尝试解析 TOML
         toml::from_str::<toml::Value>(&config).map_err(|e| {
-            AgentMemError::internal_error(format!("配置验证失败: {}", e))
+            AgentMemError::internal_error(format!("配置验证失败: {e}"))
         })?;
         
         debug!("配置验证通过");

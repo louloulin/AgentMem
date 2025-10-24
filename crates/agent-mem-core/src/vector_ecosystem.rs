@@ -373,13 +373,13 @@ impl VectorEcosystemManager {
             if let Some(perf) = benchmarks.get(provider) {
                 let perf_score = self.calculate_performance_score(perf);
                 score += perf_score * criteria.performance_priority;
-                reasons.push(format!("性能评分: {:.2}", perf_score));
+                reasons.push(format!("性能评分: {perf_score:.2}"));
             }
 
             // 功能评分
             let feature_score = self.calculate_feature_score(capability);
             score += feature_score * 0.3;
-            reasons.push(format!("功能评分: {:.2}", feature_score));
+            reasons.push(format!("功能评分: {feature_score:.2}"));
 
             // 易用性评分
             let ease_score = if capability.is_cloud_service {
@@ -388,7 +388,7 @@ impl VectorEcosystemManager {
                 0.6
             };
             score += ease_score * criteria.ease_of_use_priority;
-            reasons.push(format!("易用性评分: {:.2}", ease_score));
+            reasons.push(format!("易用性评分: {ease_score:.2}"));
 
             // 成本评分（云服务成本较高）
             let cost_score = if capability.is_cloud_service {
@@ -397,7 +397,7 @@ impl VectorEcosystemManager {
                 0.9
             };
             score += cost_score * criteria.cost_priority;
-            reasons.push(format!("成本评分: {:.2}", cost_score));
+            reasons.push(format!("成本评分: {cost_score:.2}"));
 
             recommendations.push(StorageRecommendation {
                 provider: provider.clone(),

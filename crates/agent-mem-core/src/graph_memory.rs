@@ -102,6 +102,12 @@ pub struct GraphMemoryEngine {
     node_index: Arc<RwLock<HashMap<String, HashSet<MemoryId>>>>,
 }
 
+impl Default for GraphMemoryEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GraphMemoryEngine {
     /// 创建新的图记忆引擎
     pub fn new() -> Self {
@@ -142,7 +148,7 @@ impl GraphMemoryEngine {
             .insert(node_id.clone(), Vec::new());
 
         // 更新索引
-        let type_key = format!("type:{:?}", node_type);
+        let type_key = format!("type:{node_type:?}");
         self.node_index
             .write()
             .await

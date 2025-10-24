@@ -243,7 +243,7 @@ impl SecuritySystem {
         let system_clone = system.clone();
         tokio::spawn(async move {
             if let Err(e) = system_clone.initialize_defaults().await {
-                eprintln!("Failed to initialize security defaults: {}", e);
+                eprintln!("Failed to initialize security defaults: {e}");
             }
         });
 
@@ -529,7 +529,7 @@ impl SecuritySystem {
         match action {
             ThreatAction::LogEvent => {
                 // Log would be handled by logging system
-                println!("Threat detected from IP: {}", source_ip);
+                println!("Threat detected from IP: {source_ip}");
             }
             ThreatAction::SendAlert => {
                 // Send alert to administrators

@@ -220,7 +220,7 @@ impl ResourceMemoryManager {
         // 确保存储目录存在
         if !config.storage_root.exists() {
             std::fs::create_dir_all(&config.storage_root).map_err(|e| {
-                CoreError::IoError(format!("Failed to create storage directory: {}", e))
+                CoreError::IoError(format!("Failed to create storage directory: {e}"))
             })?;
         }
 
@@ -236,13 +236,13 @@ impl ResourceMemoryManager {
     async fn calculate_file_hash(file_path: &Path) -> CoreResult<String> {
         let content = tokio::fs::read(file_path)
             .await
-            .map_err(|e| CoreError::IoError(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| CoreError::IoError(format!("Failed to read file: {e}")))?;
 
         let mut hasher = Sha256::new();
         hasher.update(&content);
         let hash = hasher.finalize();
 
-        Ok(format!("{:x}", hash))
+        Ok(format!("{hash:x}"))
     }
 
     /// 获取MIME类型
@@ -280,7 +280,7 @@ impl ResourceMemoryManager {
         let filename = if extension.is_empty() {
             resource_id.to_string()
         } else {
-            format!("{}.{}", resource_id, extension)
+            format!("{resource_id}.{extension}")
         };
 
         self.config.storage_root.join(filename)
@@ -296,15 +296,14 @@ impl ResourceMemoryManager {
         // 检查文件是否存在
         if !file_path.exists() {
             return Err(CoreError::NotFound(format!(
-                "File not found: {:?}",
-                file_path
+                "File not found: {file_path:?}"
             )));
         }
 
         // 获取文件信息
         let metadata = tokio::fs::metadata(file_path)
             .await
-            .map_err(|e| CoreError::IoError(format!("Failed to read file metadata: {}", e)))?;
+            .map_err(|e| CoreError::IoError(format!("Failed to read file metadata: {e}")))?;
 
         let file_size = metadata.len();
 
@@ -376,7 +375,7 @@ impl ResourceMemoryManager {
         // 复制文件到存储位置
         tokio::fs::copy(file_path, &storage_path)
             .await
-            .map_err(|e| CoreError::IoError(format!("Failed to copy file to storage: {}", e)))?;
+            .map_err(|e| CoreError::IoError(format!("Failed to copy file to storage: {e}")))?;
 
         // 如果启用压缩且文件大小超过阈值，进行压缩
         if self.config.enable_compression && file_size > self.config.compression_threshold {
@@ -446,7 +445,7 @@ impl ResourceMemoryManager {
             if resource.storage_path.exists() {
                 tokio::fs::remove_file(&resource.storage_path)
                     .await
-                    .map_err(|e| CoreError::IoError(format!("Failed to delete file: {}", e)))?;
+                    .map_err(|e| CoreError::IoError(format!("Failed to delete file: {e}")))?;
             }
 
             // 从哈希映射中移除
@@ -461,8 +460,7 @@ impl ResourceMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Resource {} not found",
-                resource_id
+                "Resource {resource_id} not found"
             )))
         }
     }
@@ -534,8 +532,7 @@ impl ResourceMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Resource {} not found",
-                resource_id
+                "Resource {resource_id} not found"
             )))
         }
     }
@@ -553,8 +550,7 @@ impl ResourceMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Resource {} not found",
-                resource_id
+                "Resource {resource_id} not found"
             )))
         }
     }

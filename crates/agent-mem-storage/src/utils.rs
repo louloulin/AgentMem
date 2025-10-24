@@ -62,8 +62,7 @@ pub trait VectorStoreDefaults: Send + Sync {
         Ok(HealthStatus {
             status: "healthy".to_string(),
             message: format!(
-                "{} store is healthy with {} vectors",
-                store_name, vector_count
+                "{store_name} store is healthy with {vector_count} vectors"
             ),
             timestamp: chrono::Utc::now(),
             details: HashMap::from([

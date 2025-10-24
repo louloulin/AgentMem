@@ -115,7 +115,7 @@ impl LLMClient {
             match self.provider.generate(messages).await {
                 Ok(response) => {
                     if self.config.enable_logging {
-                        println!("LLM Response: {}", response);
+                        println!("LLM Response: {response}");
                     }
                     Ok(response)
                 }
@@ -123,8 +123,7 @@ impl LLMClient {
                     if retries_left > 0 {
                         if self.config.enable_logging {
                             println!(
-                                "LLM request failed, retrying... ({} retries left): {}",
-                                retries_left, e
+                                "LLM request failed, retrying... ({retries_left} retries left): {e}"
                             );
                         }
 

@@ -132,7 +132,7 @@ impl ProceduralAgent {
             let created_item = store
                 .create_item(item)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create procedure: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create procedure: {e}")))?;
 
             let response = serde_json::json!({
                 "success": true,
@@ -186,7 +186,7 @@ impl ProceduralAgent {
             let items = store
                 .query_items(user_id, query)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query procedures: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query procedures: {e}")))?;
 
             let results: Vec<_> = items
                 .iter()
@@ -247,8 +247,8 @@ impl ProceduralAgent {
             let existing_item = store
                 .get_item(item_id, user_id)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get procedure: {}", e)))?
-                .ok_or_else(|| AgentError::InternalError(format!("Procedure with ID '{}' not found", item_id)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get procedure: {e}")))?
+                .ok_or_else(|| AgentError::InternalError(format!("Procedure with ID '{item_id}' not found")))?;
 
             // Update fields
             use agent_mem_traits::ProceduralMemoryItem;
@@ -291,7 +291,7 @@ impl ProceduralAgent {
             let updated = store
                 .update_item(updated_item)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update procedure: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update procedure: {e}")))?;
 
             if updated {
                 let response = serde_json::json!({
@@ -299,12 +299,11 @@ impl ProceduralAgent {
                     "item_id": item_id,
                     "message": "Procedural memory updated successfully"
                 });
-                log::info!("Procedural agent: Updated procedure '{}'", item_id);
+                log::info!("Procedural agent: Updated procedure '{item_id}'");
                 return Ok(response);
             } else {
                 return Err(AgentError::InternalError(format!(
-                    "Failed to update procedure '{}'",
-                    item_id
+                    "Failed to update procedure '{item_id}'"
                 )));
             }
         }
@@ -340,7 +339,7 @@ impl ProceduralAgent {
             let deleted = store
                 .delete_item(item_id, user_id)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete procedure: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete procedure: {e}")))?;
 
             if deleted {
                 let response = serde_json::json!({
@@ -348,12 +347,11 @@ impl ProceduralAgent {
                     "item_id": item_id,
                     "message": "Procedural memory deleted successfully"
                 });
-                log::info!("Procedural agent: Deleted procedure '{}'", item_id);
+                log::info!("Procedural agent: Deleted procedure '{item_id}'");
                 return Ok(response);
             } else {
                 return Err(AgentError::InternalError(format!(
-                    "Procedure with ID '{}' not found",
-                    item_id
+                    "Procedure with ID '{item_id}' not found"
                 )));
             }
         }
@@ -410,7 +408,7 @@ impl MemoryAgent for ProceduralAgent {
                     context.stats.total_tasks = items.len() as u64;
                 }
                 Err(e) => {
-                    log::warn!("查询程序记忆失败: {}，将从空状态开始", e);
+                    log::warn!("查询程序记忆失败: {e}，将从空状态开始");
                 }
             }
         } else {

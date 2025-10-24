@@ -421,9 +421,7 @@ impl MetaMemoryManager {
         stats.healthy_agents += 1;
 
         log::info!(
-            "Registered agent {} with capacity {}",
-            agent_id,
-            max_capacity
+            "Registered agent {agent_id} with capacity {max_capacity}"
         );
         Ok(())
     }
@@ -452,7 +450,7 @@ impl MetaMemoryManager {
             stats.healthy_agents -= 1;
         }
 
-        log::info!("Unregistered agent {}", agent_id);
+        log::info!("Unregistered agent {agent_id}");
         Ok(())
     }
 
@@ -511,7 +509,7 @@ impl MetaMemoryManager {
         let agents_by_type = self.agents_by_type.read().await;
         let agent_status = self.agent_status.read().await;
 
-        let available_agents = agents_by_type.get(memory_type).ok_or_else(|| {
+        let available_agents = agents_by_type.get(memory_type).ok_or({
             CoordinationError::NoAvailableAgents {
                 memory_type: *memory_type,
             }
@@ -608,7 +606,7 @@ impl MetaMemoryManager {
             "meta_manager".to_string(),
             agent_id.to_string(),
             serde_json::to_value(task).map_err(|e| {
-                CoordinationError::InternalError(format!("Failed to serialize task: {}", e))
+                CoordinationError::InternalError(format!("Failed to serialize task: {e}"))
             })?,
         )
         .with_priority(task.priority);
@@ -617,7 +615,7 @@ impl MetaMemoryManager {
             .send(message)
             .map_err(|e| CoordinationError::CommunicationError {
                 agent_id: agent_id.to_string(),
-                error: format!("Failed to send message: {}", e),
+                error: format!("Failed to send message: {e}"),
             })?;
 
         Ok(())

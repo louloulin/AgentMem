@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use super::{AccessControlLevel, CacheConfig, MonitoringConfig, SecurityConfig, SystemConfig};
+use super::SystemConfig;
 use agent_mem_traits::{AgentMemError, Result};
 
 /// 配置源类型
@@ -326,7 +326,7 @@ impl ConfigManager {
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let backup_file = backup_path
             .as_ref()
-            .join(format!("config_backup_{}.json", timestamp));
+            .join(format!("config_backup_{timestamp}.json"));
         self.save_to_file(backup_file).await
     }
 
@@ -398,8 +398,7 @@ impl ConfigManager {
             }
             _ => {
                 return Err(AgentMemError::ConfigValidationError(format!(
-                    "未知的配置项: {}",
-                    key
+                    "未知的配置项: {key}"
                 )));
             }
         }

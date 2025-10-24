@@ -106,7 +106,7 @@ impl CohereProvider {
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -210,38 +210,37 @@ impl CohereProvider {
 
         let response = self
             .client
-            .post(&format!("{}/v1/chat", self.base_url))
+            .post(format!("{}/v1/chat", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Cohere API request failed: {}", e))
+                AgentMemError::network_error(format!("Cohere API request failed: {e}"))
             })?;
 
         let status = response.status();
         let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(&format!("Failed to read response: {}", e))
+            AgentMemError::network_error(format!("Failed to read response: {e}"))
         })?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse Cohere response: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse Cohere response: {e}"))
             })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<CohereError>(&response_text) {
                 error!("Cohere API error: {}", error.message);
-                Err(AgentMemError::llm_error(&format!(
+                Err(AgentMemError::llm_error(format!(
                     "Cohere API error: {}",
                     error.message
                 )))
             } else {
                 error!("Cohere API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!(
-                    "Cohere API error: HTTP {}",
-                    status
+                Err(AgentMemError::llm_error(format!(
+                    "Cohere API error: HTTP {status}"
                 )))
             }
         }

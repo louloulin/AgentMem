@@ -32,10 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut metadata = HashMap::new();
         metadata.insert("category".to_string(), format!("category_{}", i % 10));
         metadata.insert("index".to_string(), i.to_string());
-        metadata.insert("description".to_string(), format!("Test vector {}", i));
+        metadata.insert("description".to_string(), format!("Test vector {i}"));
 
         test_vectors.push(VectorData {
-            id: format!("test_vector_{}", i),
+            id: format!("test_vector_{i}"),
             vector: (0..128).map(|j| (i + j) as f32 / 1000.0).collect(),
             metadata,
         });
@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 随机验证几条记录的内容
     info!("验证数据完整性...");
     for i in [0, 100, 500, 999] {
-        let source_id = format!("test_vector_{}", i);
+        let source_id = format!("test_vector_{i}");
         let source_vector = source.get_vector(&source_id).await?;
         let target_vector = target.get_vector(&source_id).await?;
 

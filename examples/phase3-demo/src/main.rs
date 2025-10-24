@@ -12,7 +12,6 @@ use agent_mem_storage::backends::weaviate::WeaviateConfig;
 use agent_mem_storage::backends::{ElasticsearchStore, MilvusStore, WeaviateStore};
 use agent_mem_traits::{LLMProvider, Result};
 use std::collections::HashMap;
-use tokio;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,7 +57,7 @@ async fn demo_llm_providers() -> Result<()> {
             println!("   ✅ Provider: {}", model_info.provider);
             println!("   ✅ Model: {}", model_info.model);
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     // Cohere Provider Demo
@@ -82,7 +81,7 @@ async fn demo_llm_providers() -> Result<()> {
             println!("   ✅ Provider: {}", model_info.provider);
             println!("   ✅ Model: {}", model_info.model);
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     // Mistral Provider Demo
@@ -106,7 +105,7 @@ async fn demo_llm_providers() -> Result<()> {
             println!("   ✅ Provider: {}", model_info.provider);
             println!("   ✅ Model: {}", model_info.model);
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     // Perplexity Provider Demo
@@ -130,7 +129,7 @@ async fn demo_llm_providers() -> Result<()> {
             println!("   ✅ Provider: {}", model_info.provider);
             println!("   ✅ Model: {}", model_info.model);
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     Ok(())
@@ -160,10 +159,10 @@ async fn demo_storage_backends() -> Result<()> {
                 ("content".to_string(), "Demo memory content".to_string()),
                 ("agent_id".to_string(), "demo-agent".to_string()),
             ]);
-            let _embedding = vec![0.1, 0.2, 0.3, 0.4, 0.5]; // Demo embedding
+            let _embedding = [0.1, 0.2, 0.3, 0.4, 0.5]; // Demo embedding
             println!("   📝 Demo: store_embedding('demo-memory', embedding, metadata)");
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     // Milvus Demo
@@ -188,10 +187,10 @@ async fn demo_storage_backends() -> Result<()> {
                 ("content".to_string(), "High-performance memory".to_string()),
                 ("user_id".to_string(), "demo-user".to_string()),
             ]);
-            let _embedding = vec![0.9, 0.8, 0.7, 0.6, 0.5]; // Demo embedding
+            let _embedding = [0.9, 0.8, 0.7, 0.6, 0.5]; // Demo embedding
             println!("   📝 Demo: search_similar(query_embedding, limit=10, threshold=0.8)");
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     // Elasticsearch Demo
@@ -219,10 +218,10 @@ async fn demo_storage_backends() -> Result<()> {
                 ),
                 ("category".to_string(), "business".to_string()),
             ]);
-            let _embedding = vec![0.5, 0.6, 0.7, 0.8, 0.9]; // Demo embedding
+            let _embedding = [0.5, 0.6, 0.7, 0.8, 0.9]; // Demo embedding
             println!("   📝 Demo: kNN search with cosine similarity");
         }
-        Err(e) => println!("   ⚠️  Demo mode: {}", e),
+        Err(e) => println!("   ⚠️  Demo mode: {e}"),
     }
 
     Ok(())

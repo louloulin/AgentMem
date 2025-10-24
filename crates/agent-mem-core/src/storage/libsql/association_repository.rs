@@ -24,7 +24,7 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
         debug!("Creating association: {} -> {}", association.from_memory_id, association.to_memory_id);
 
         let metadata_json = serde_json::to_string(&association.metadata)
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {e}")))?;
 
         let conn = self.conn.lock().await;
 
@@ -51,7 +51,7 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
             ),
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create association: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create association: {e}")))?;
 
         Ok(association.clone())
     }
@@ -70,29 +70,29 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
              WHERE id = ?"
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query association: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query association: {e}")))?;
 
         if let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             
             let metadata_str: String = row.get(9)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str)
                 .unwrap_or(serde_json::Value::Null);
 
             let created_at_ts: i64 = row.get(10)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
             let updated_at_ts: i64 = row.get(11)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
 
             let strength_f64: f64 = row.get(7)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {e}")))?;
             let confidence_f64: f64 = row.get(8)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {e}")))?;
 
             Ok(Some(MemoryAssociation {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
@@ -130,30 +130,30 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
              ORDER BY strength DESC"
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([memory_id, memory_id, user_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {e}")))?;
 
         let mut associations = Vec::new();
         while let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             
             let metadata_str: String = row.get(9)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str)
                 .unwrap_or(serde_json::Value::Null);
 
             let created_at_ts: i64 = row.get(10)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
             let updated_at_ts: i64 = row.get(11)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
 
             let strength_f64: f64 = row.get(7)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {e}")))?;
             let confidence_f64: f64 = row.get(8)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {e}")))?;
 
             associations.push(MemoryAssociation {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
@@ -193,30 +193,30 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
              ORDER BY strength DESC"
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([memory_id, memory_id, user_id, association_type])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {e}")))?;
 
         let mut associations = Vec::new();
         while let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             
             let metadata_str: String = row.get(9)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str)
                 .unwrap_or(serde_json::Value::Null);
 
             let created_at_ts: i64 = row.get(10)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
             let updated_at_ts: i64 = row.get(11)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
 
             let strength_f64: f64 = row.get(7)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {e}")))?;
             let confidence_f64: f64 = row.get(8)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {e}")))?;
 
             associations.push(MemoryAssociation {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,
@@ -250,7 +250,7 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
             (strength as f64, now, id),
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update strength: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update strength: {e}")))?;
 
         Ok(())
     }
@@ -262,7 +262,7 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
 
         conn.execute("DELETE FROM memory_associations WHERE id = ?", [id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete association: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete association: {e}")))?;
 
         Ok(())
     }
@@ -272,16 +272,16 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
 
         let mut stmt = conn.prepare("SELECT COUNT(*) FROM memory_associations WHERE user_id = ?")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([user_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query count: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query count: {e}")))?;
 
         if let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             let count: i64 = row.get(0)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {e}")))?;
             Ok(count)
         } else {
             Ok(0)
@@ -298,19 +298,19 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
              GROUP BY association_type"
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([user_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query counts: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query counts: {e}")))?;
 
         let mut results = Vec::new();
         while let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             let assoc_type: String = row.get(0)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get type: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get type: {e}")))?;
             let count: i64 = row.get(1)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {e}")))?;
             results.push((assoc_type, count));
         }
 
@@ -322,16 +322,16 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
 
         let mut stmt = conn.prepare("SELECT AVG(strength) FROM memory_associations WHERE user_id = ?")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([user_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query avg: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query avg: {e}")))?;
 
         if let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             let avg: f64 = row.get(0)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get avg: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get avg: {e}")))?;
             Ok(avg as f32)
         } else {
             Ok(0.0)
@@ -354,30 +354,30 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
              LIMIT ?"
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt.query([user_id, &limit.to_string()])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query associations: {e}")))?;
 
         let mut associations = Vec::new();
         while let Some(row) = rows.next().await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))? {
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))? {
             
             let metadata_str: String = row.get(9)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str)
                 .unwrap_or(serde_json::Value::Null);
 
             let created_at_ts: i64 = row.get(10)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
             let updated_at_ts: i64 = row.get(11)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
 
             let strength_f64: f64 = row.get(7)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get strength: {e}")))?;
             let confidence_f64: f64 = row.get(8)
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get confidence: {e}")))?;
 
             associations.push(MemoryAssociation {
                 id: row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?,

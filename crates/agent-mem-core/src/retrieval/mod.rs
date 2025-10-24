@@ -29,7 +29,7 @@ pub use topic_extractor::{
 };
 
 use crate::types::MemoryType;
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -347,7 +347,7 @@ impl ActiveRetrievalSystem {
         strategy: &RetrievalStrategy,
         strategy_weight: f32,
     ) -> Result<Vec<RetrievedMemory>> {
-        let agent_id = format!("{:?}Agent", memory_type);
+        let agent_id = format!("{memory_type:?}Agent");
 
         // 如果启用了真实 Agent，尝试调用真实 Agent
         if self.use_real_agents {
@@ -355,15 +355,13 @@ impl ActiveRetrievalSystem {
 
             if registry.has_agent(memory_type).await {
                 log::debug!(
-                    "Using real agent for {} with {:?} strategy",
-                    agent_id,
-                    strategy
+                    "Using real agent for {agent_id} with {strategy:?} strategy"
                 );
 
                 // 构建任务请求
                 let task = crate::coordination::TaskRequest {
                     task_id: uuid::Uuid::new_v4().to_string(),
-                    memory_type: memory_type.clone(),
+                    memory_type: *memory_type,
                     operation: "search".to_string(),
                     parameters: serde_json::json!({
                         "query": request.query,
@@ -388,17 +386,14 @@ impl ActiveRetrievalSystem {
                     }
                     Err(e) => {
                         log::warn!(
-                            "Failed to execute task on real agent {}: {}. Falling back to mock.",
-                            agent_id,
-                            e
+                            "Failed to execute task on real agent {agent_id}: {e}. Falling back to mock."
                         );
                         // 失败时回退到 Mock
                     }
                 }
             } else {
                 log::debug!(
-                    "No real agent registered for {:?}, using mock",
-                    memory_type
+                    "No real agent registered for {memory_type:?}, using mock"
                 );
             }
         }
@@ -459,7 +454,7 @@ impl ActiveRetrievalSystem {
                             .and_then(|v| v.as_str())
                             .unwrap_or("unknown")
                             .to_string(),
-                        memory_type: memory_type.clone(),
+                        memory_type: *memory_type,
                         content,
                         relevance_score: score * strategy_weight,
                         source_agent: agent_id.to_string(),
@@ -486,8 +481,7 @@ impl ActiveRetrievalSystem {
             Ok(retrieved_memories)
         } else {
             log::warn!(
-                "No memories found in agent response from {}",
-                agent_id
+                "No memories found in agent response from {agent_id}"
             );
             Ok(Vec::new())
         }
@@ -514,10 +508,10 @@ impl ActiveRetrievalSystem {
 
             let memory = RetrievedMemory {
                 id: format!("{}_{}_result_{}", memory_type.to_string().to_lowercase(), agent_id, i),
-                memory_type: memory_type.clone(),
+                memory_type: *memory_type,
                 content: format!(
                     "Mock {} memory result {} for query: '{}' (strategy: {:?})",
-                    memory_type.to_string(),
+                    memory_type,
                     i + 1,
                     request.query,
                     strategy

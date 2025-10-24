@@ -1,7 +1,6 @@
 //! Core memory types and data structures
 
-use agent_mem_traits::{AgentMemError, Entity, MemoryItem, Relation, Result, Session, Vector};
-use chrono::{DateTime, Utc};
+use agent_mem_traits::{AgentMemError, MemoryItem, Result, Vector};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -291,9 +290,9 @@ impl From<Memory> for MemoryItem {
             metadata,
             score: Some(memory.importance),
             created_at: DateTime::from_timestamp(memory.created_at, 0)
-                .unwrap_or_else(|| Utc::now()),
+                .unwrap_or_else(Utc::now),
             updated_at: Some(
-                DateTime::from_timestamp(memory.last_accessed_at, 0).unwrap_or_else(|| Utc::now()),
+                DateTime::from_timestamp(memory.last_accessed_at, 0).unwrap_or_else(Utc::now),
             ),
             session,
             memory_type: match memory.memory_type {
@@ -316,11 +315,11 @@ impl From<Memory> for MemoryItem {
             importance: memory.importance,
             embedding: memory.embedding.map(|v| v.values),
             last_accessed_at: DateTime::from_timestamp(memory.last_accessed_at, 0)
-                .unwrap_or_else(|| Utc::now()),
+                .unwrap_or_else(Utc::now),
             access_count: memory.access_count,
             expires_at: memory
                 .expires_at
-                .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(|| Utc::now())),
+                .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now)),
             version: memory.version,
         }
     }

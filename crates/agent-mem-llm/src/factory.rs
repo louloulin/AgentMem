@@ -407,93 +407,6 @@ impl LLMFactory {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_supported_providers() {
-        let providers = LLMFactory::supported_providers();
-        assert!(!providers.is_empty());
-
-        // 检查默认启用的提供商
-        #[cfg(feature = "openai")]
-        assert!(providers.contains(&"openai"));
-
-        #[cfg(feature = "anthropic")]
-        assert!(providers.contains(&"anthropic"));
-    }
-
-    #[test]
-    fn test_is_provider_supported() {
-        #[cfg(feature = "openai")]
-        assert!(LLMFactory::is_provider_supported("openai"));
-
-        #[cfg(feature = "anthropic")]
-        assert!(LLMFactory::is_provider_supported("anthropic"));
-
-        assert!(!LLMFactory::is_provider_supported("unsupported_provider"));
-    }
-
-    #[test]
-    fn test_create_provider_unsupported() {
-        let config = LLMConfig {
-            provider: "unsupported".to_string(),
-            ..Default::default()
-        };
-
-        let result = LLMFactory::create_provider(&config);
-        assert!(result.is_err());
-    }
-
-    #[cfg(feature = "openai")]
-    #[test]
-    fn test_create_openai_provider() {
-        let result = LLMFactory::create_openai_provider("test-key");
-        assert!(result.is_ok());
-    }
-
-    #[cfg(feature = "anthropic")]
-    #[test]
-    fn test_create_anthropic_provider() {
-        let result = LLMFactory::create_anthropic_provider("test-key");
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_create_claude_provider() {
-        let result = LLMFactory::create_claude_provider("test-key", None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_create_cohere_provider() {
-        let result = LLMFactory::create_cohere_provider("test-key", None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_create_mistral_provider() {
-        let result = LLMFactory::create_mistral_provider("test-key", None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_create_perplexity_provider() {
-        let result = LLMFactory::create_perplexity_provider("test-key", None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_new_providers_supported() {
-        let providers = LLMFactory::supported_providers();
-        assert!(providers.contains(&"claude"));
-        assert!(providers.contains(&"cohere"));
-        assert!(providers.contains(&"mistral"));
-        assert!(providers.contains(&"perplexity"));
-    }
-}
-
 /// 真实的 LLM 提供商工厂，用于替换 Mock 实现
 /// 提供健康检查、重试机制和降级策略
 pub struct RealLLMFactory;
@@ -585,7 +498,7 @@ impl RealLLMFactory {
             }
             // LiteLLM 需要特殊配置，暂时跳过
             // "litellm" => { ... },
-            _ => Err(AgentMemError::config_error(&format!(
+            _ => Err(AgentMemError::config_error(format!(
                 "Unsupported LLM provider: {}",
                 config.provider
             ))),
@@ -696,5 +609,92 @@ impl RealLLMFactory {
         Err(last_error.unwrap_or_else(|| {
             AgentMemError::config_error("Failed to create LLM provider after all retries")
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_supported_providers() {
+        let providers = LLMFactory::supported_providers();
+        assert!(!providers.is_empty());
+
+        // 检查默认启用的提供商
+        #[cfg(feature = "openai")]
+        assert!(providers.contains(&"openai"));
+
+        #[cfg(feature = "anthropic")]
+        assert!(providers.contains(&"anthropic"));
+    }
+
+    #[test]
+    fn test_is_provider_supported() {
+        #[cfg(feature = "openai")]
+        assert!(LLMFactory::is_provider_supported("openai"));
+
+        #[cfg(feature = "anthropic")]
+        assert!(LLMFactory::is_provider_supported("anthropic"));
+
+        assert!(!LLMFactory::is_provider_supported("unsupported_provider"));
+    }
+
+    #[test]
+    fn test_create_provider_unsupported() {
+        let config = LLMConfig {
+            provider: "unsupported".to_string(),
+            ..Default::default()
+        };
+
+        let result = LLMFactory::create_provider(&config);
+        assert!(result.is_err());
+    }
+
+    #[cfg(feature = "openai")]
+    #[test]
+    fn test_create_openai_provider() {
+        let result = LLMFactory::create_openai_provider("test-key");
+        assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "anthropic")]
+    #[test]
+    fn test_create_anthropic_provider() {
+        let result = LLMFactory::create_anthropic_provider("test-key");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_claude_provider() {
+        let result = LLMFactory::create_claude_provider("test-key", None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_cohere_provider() {
+        let result = LLMFactory::create_cohere_provider("test-key", None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_mistral_provider() {
+        let result = LLMFactory::create_mistral_provider("test-key", None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_perplexity_provider() {
+        let result = LLMFactory::create_perplexity_provider("test-key", None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_new_providers_supported() {
+        let providers = LLMFactory::supported_providers();
+        assert!(providers.contains(&"claude"));
+        assert!(providers.contains(&"cohere"));
+        assert!(providers.contains(&"mistral"));
+        assert!(providers.contains(&"perplexity"));
     }
 }

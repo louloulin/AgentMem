@@ -7,7 +7,6 @@ use agent_mem_tools::mcp::{
 };
 use futures::StreamExt;
 use tracing::Level;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -50,13 +49,13 @@ async fn demo_log_levels() -> Result<(), Box<dyn std::error::Error>> {
     let levels = vec!["trace", "debug", "info", "warn", "error"];
     for level_str in levels {
         if let Some(level) = LogLevel::from_str(level_str) {
-            println!("  \"{}\" -> {:?}", level_str, level);
+            println!("  \"{level_str}\" -> {level:?}");
         }
     }
 
     // 默认日志级别
     let default_level = LogLevel::default();
-    println!("\n✓ 默认日志级别: {:?}", default_level);
+    println!("\n✓ 默认日志级别: {default_level:?}");
 
     println!();
     Ok(())
@@ -210,17 +209,17 @@ async fn demo_stats() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ 记录多条日志...");
     for i in 0..5 {
         manager.log(
-            LogEntry::new(LogLevel::Info, format!("Info 日志 {}", i), "app")
+            LogEntry::new(LogLevel::Info, format!("Info 日志 {i}"), "app")
         ).await?;
     }
     for i in 0..3 {
         manager.log(
-            LogEntry::new(LogLevel::Warn, format!("Warn 日志 {}", i), "network")
+            LogEntry::new(LogLevel::Warn, format!("Warn 日志 {i}"), "network")
         ).await?;
     }
     for i in 0..2 {
         manager.log(
-            LogEntry::new(LogLevel::Error, format!("Error 日志 {}", i), "database")
+            LogEntry::new(LogLevel::Error, format!("Error 日志 {i}"), "database")
         ).await?;
     }
 
@@ -236,7 +235,7 @@ async fn demo_stats() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n✓ 各组件日志数:");
     for (component, count) in &stats.components {
-        println!("  {}: {}", component, count);
+        println!("  {component}: {count}");
     }
 
     // 清空日志
@@ -273,7 +272,7 @@ async fn demo_streaming() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         for i in 0..3 {
             let _ = manager_clone.log(
-                LogEntry::new(LogLevel::Info, format!("流式日志 {}", i), "stream-test")
+                LogEntry::new(LogLevel::Info, format!("流式日志 {i}"), "stream-test")
             ).await;
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }

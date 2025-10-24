@@ -157,9 +157,8 @@ impl VectorStore for MemoryVectorStore {
             if self.vectors.contains_key(&id) {
                 self.vectors.insert(id, vector);
             } else {
-                return Err(AgentMemError::not_found(&format!(
-                    "Vector with id {} not found",
-                    id
+                return Err(AgentMemError::not_found(format!(
+                    "Vector with id {id} not found"
                 )));
             }
         }

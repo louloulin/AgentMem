@@ -185,7 +185,7 @@ impl QueryCache {
         // 序列化值
         let data = bincode::serialize(&value)
             .map_err(|e| agent_mem_traits::AgentMemError::internal_error(
-                format!("Failed to serialize cache value: {}", e)
+                format!("Failed to serialize cache value: {e}")
             ))?;
         
         let ttl = Duration::from_secs(self.config.default_ttl_seconds);

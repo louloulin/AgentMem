@@ -288,8 +288,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Persona block {} not found",
-                block_id
+                "Persona block {block_id} not found"
             )))
         }
     }
@@ -313,8 +312,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Human block {} not found",
-                block_id
+                "Human block {block_id} not found"
             )))
         }
     }
@@ -342,8 +340,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Persona block {} not found",
-                block_id
+                "Persona block {block_id} not found"
             )))
         }
     }
@@ -371,8 +368,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Human block {} not found",
-                block_id
+                "Human block {block_id} not found"
             )))
         }
     }
@@ -388,8 +384,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Persona block {} not found",
-                block_id
+                "Persona block {block_id} not found"
             )))
         }
     }
@@ -405,8 +400,7 @@ impl CoreMemoryManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Human block {} not found",
-                block_id
+                "Human block {block_id} not found"
             )))
         }
     }
@@ -438,7 +432,7 @@ impl CoreMemoryManager {
         let mut current_size = 0;
 
         for line in important_lines {
-            if current_size + line.len() + 1 <= target_size {
+            if current_size + line.len() < target_size {
                 if !new_content.is_empty() {
                     new_content.push('\n');
                     current_size += 1;
@@ -562,7 +556,7 @@ impl CoreMemoryManager {
             }
         }
 
-        Err(CoreError::NotFound(format!("Block {} not found", block_id)))
+        Err(CoreError::NotFound(format!("Block {block_id} not found")))
     }
 
     /// 清空所有块

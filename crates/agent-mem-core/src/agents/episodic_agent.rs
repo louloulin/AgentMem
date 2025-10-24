@@ -127,11 +127,11 @@ impl EpisodicAgent {
             if let Some(manager) = &self.episodic_store {
                 // Parse event data
                 let event: EpisodicEvent = serde_json::from_value(event_data.clone())
-                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid event data: {}", e)))?;
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid event data: {e}")))?;
 
                 // Create event using manager
                 let created_event = manager.create_event(event).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create event: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create event: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -190,7 +190,7 @@ impl EpisodicAgent {
 
                 // Query events using manager
                 let events = manager.query_events(user_id, query).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -237,11 +237,11 @@ impl EpisodicAgent {
             if let Some(manager) = &self.episodic_store {
                 // Parse time strings
                 let start_time = chrono::DateTime::parse_from_rfc3339(start_time_str.unwrap())
-                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid start_time format: {}", e)))?
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid start_time format: {e}")))?
                     .with_timezone(&chrono::Utc);
 
                 let end_time = chrono::DateTime::parse_from_rfc3339(end_time_str.unwrap())
-                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid end_time format: {}", e)))?
+                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid end_time format: {e}")))?
                     .with_timezone(&chrono::Utc);
 
                 // Build query
@@ -260,7 +260,7 @@ impl EpisodicAgent {
 
                 // Query events using manager
                 let events = manager.query_events(user_id, query).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query events: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -312,7 +312,7 @@ impl EpisodicAgent {
                 // Check if updating importance score
                 if let Some(importance) = parameters.get("importance_score").and_then(|v| v.as_f64()) {
                     let updated = manager.update_importance(event_id, user_id, importance as f32).await
-                        .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update importance: {}", e)))?;
+                        .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update importance: {e}")))?;
 
                     let response = serde_json::json!({
                         "success": updated,
@@ -320,7 +320,7 @@ impl EpisodicAgent {
                         "message": if updated { "Importance updated successfully" } else { "Event not found" }
                     });
 
-                    log::info!("Episodic agent: Updated importance for event {}", event_id);
+                    log::info!("Episodic agent: Updated importance for event {event_id}");
                     return Ok(response);
                 }
 
@@ -363,7 +363,7 @@ impl EpisodicAgent {
             // Use actual episodic memory manager if available
             if let Some(manager) = &self.episodic_store {
                 let deleted = manager.delete_event(event_id, user_id).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete event: {}", e)))?;
+                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete event: {e}")))?;
 
                 let response = serde_json::json!({
                     "success": deleted,
@@ -371,7 +371,7 @@ impl EpisodicAgent {
                     "message": if deleted { "Event deleted successfully" } else { "Event not found" }
                 });
 
-                log::info!("Episodic agent: Deleted event {}", event_id);
+                log::info!("Episodic agent: Deleted event {event_id}");
                 return Ok(response);
             }
         }
@@ -427,7 +427,7 @@ impl MemoryAgent for EpisodicAgent {
                     context.stats.total_tasks = events.len() as u64;
                 }
                 Err(e) => {
-                    log::warn!("查询情景记忆失败: {}，将从空状态开始", e);
+                    log::warn!("查询情景记忆失败: {e}，将从空状态开始");
                 }
             }
         } else {

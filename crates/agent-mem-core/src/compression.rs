@@ -62,6 +62,12 @@ pub struct ImportanceEvaluator {
     relationship_weight: f32,
 }
 
+impl Default for ImportanceEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImportanceEvaluator {
     /// 创建新的重要性评估器
     pub fn new() -> Self {
@@ -366,6 +372,12 @@ pub struct CompressionContext {
     pub max_relationship_count: usize,
     /// 查询模式
     pub query_patterns: Vec<String>,
+}
+
+impl Default for CompressionContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CompressionContext {
@@ -764,7 +776,7 @@ impl AdaptiveController {
     /// 获取策略权重
     pub async fn get_strategy_weight(&self, strategy_name: &str) -> f32 {
         let weights = self.strategy_weights.read().await;
-        weights.get(strategy_name).unwrap_or(&0.5).clone()
+        *weights.get(strategy_name).unwrap_or(&0.5)
     }
 
     /// 获取推荐的压缩策略

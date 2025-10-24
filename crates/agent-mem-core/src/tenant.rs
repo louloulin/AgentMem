@@ -224,6 +224,12 @@ pub enum NetworkIsolationStrategy {
     FullIsolation,
 }
 
+impl Default for IsolationEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IsolationEngine {
     /// 创建新的隔离引擎
     pub fn new() -> Self {
@@ -361,6 +367,12 @@ pub struct TenantRegistry {
     tenants: Arc<RwLock<HashMap<TenantId, TenantConfig>>>,
     /// 租户资源使用情况
     resource_usage: Arc<RwLock<HashMap<TenantId, ResourceUsage>>>,
+}
+
+impl Default for TenantRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TenantRegistry {
@@ -621,6 +633,12 @@ pub struct BillingTracker {
     pricing_rules: Arc<RwLock<HashMap<String, u64>>>, // operation_type -> cost_per_unit_cents
 }
 
+impl Default for BillingTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BillingTracker {
     /// 创建新的计费追踪器
     pub fn new() -> Self {
@@ -685,8 +703,8 @@ impl BillingTracker {
             .iter()
             .filter(|record| {
                 record.tenant_id == *tenant_id
-                    && start_time.map_or(true, |start| record.timestamp >= start)
-                    && end_time.map_or(true, |end| record.timestamp <= end)
+                    && start_time.is_none_or(|start| record.timestamp >= start)
+                    && end_time.is_none_or(|end| record.timestamp <= end)
             })
             .cloned()
             .collect()
@@ -723,6 +741,12 @@ pub struct MultiTenantManager {
     pub isolation_engine: Arc<IsolationEngine>,
     /// 计费追踪器
     pub billing_tracker: Arc<BillingTracker>,
+}
+
+impl Default for MultiTenantManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MultiTenantManager {

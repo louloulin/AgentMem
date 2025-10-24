@@ -113,7 +113,7 @@ impl PineconeStore {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -207,7 +207,7 @@ impl VectorStore for PineconeStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -216,8 +216,7 @@ impl VectorStore for PineconeStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}",
-                status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
@@ -247,7 +246,7 @@ impl VectorStore for PineconeStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -256,13 +255,12 @@ impl VectorStore for PineconeStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}",
-                status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
         let query_response: PineconeQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         let mut results: Vec<VectorSearchResult> = query_response
@@ -297,7 +295,7 @@ impl VectorStore for PineconeStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -306,8 +304,7 @@ impl VectorStore for PineconeStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}",
-                status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
@@ -335,7 +332,7 @@ impl VectorStore for PineconeStore {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -344,13 +341,12 @@ impl VectorStore for PineconeStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}",
-                status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
         let fetch_response: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if let Some(vectors) = fetch_response.get("vectors") {
@@ -396,7 +392,7 @@ impl VectorStore for PineconeStore {
             .json(&serde_json::json!({}))
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -405,13 +401,12 @@ impl VectorStore for PineconeStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}",
-                status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
         let stats: PineconeStatsResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         Ok(stats.total_vector_count)

@@ -288,7 +288,7 @@ impl KnowledgeVaultManager {
 
         let encrypted = cipher
             .encrypt(nonce, content.as_bytes())
-            .map_err(|e| CoreError::InvalidInput(format!("加密失败: {}", e)))?;
+            .map_err(|e| CoreError::InvalidInput(format!("加密失败: {e}")))?;
 
         Ok((encrypted, nonce_bytes.to_vec()))
     }
@@ -300,10 +300,10 @@ impl KnowledgeVaultManager {
 
         let decrypted = cipher
             .decrypt(nonce, encrypted_content)
-            .map_err(|e| CoreError::InvalidInput(format!("解密失败: {}", e)))?;
+            .map_err(|e| CoreError::InvalidInput(format!("解密失败: {e}")))?;
 
         String::from_utf8(decrypted)
-            .map_err(|e| CoreError::InvalidInput(format!("解密内容不是有效UTF-8: {}", e)))
+            .map_err(|e| CoreError::InvalidInput(format!("解密内容不是有效UTF-8: {e}")))
     }
 
     /// 添加用户权限
@@ -352,7 +352,7 @@ impl KnowledgeVaultManager {
 
         let permissions = user_perms
             .get(user_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("用户 {} 不存在", user_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("用户 {user_id} 不存在")))?;
 
         // 检查用户是否激活
         if !permissions.active {
@@ -564,14 +564,13 @@ impl KnowledgeVaultManager {
 
         let entry = entries
             .get_mut(knowledge_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {} 不存在", knowledge_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {knowledge_id} 不存在")))?;
 
         // 检查读取权限
-        if self.config.access_control_enabled {
-            if !self.check_permission(user_id, &AccessPermission::Read, entry.sensitivity_level)? {
+        if self.config.access_control_enabled
+            && !self.check_permission(user_id, &AccessPermission::Read, entry.sensitivity_level)? {
                 return Err(CoreError::InvalidInput("用户没有读取权限".to_string()));
             }
-        }
 
         // 解密内容
         let content = self.decrypt_content(&entry.encrypted_content, &entry.nonce)?;
@@ -620,14 +619,13 @@ impl KnowledgeVaultManager {
 
         let entry = entries
             .get_mut(knowledge_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {} 不存在", knowledge_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {knowledge_id} 不存在")))?;
 
         // 检查写入权限
-        if self.config.access_control_enabled {
-            if !self.check_permission(user_id, &AccessPermission::Write, entry.sensitivity_level)? {
+        if self.config.access_control_enabled
+            && !self.check_permission(user_id, &AccessPermission::Write, entry.sensitivity_level)? {
                 return Err(CoreError::InvalidInput("用户没有更新权限".to_string()));
             }
-        }
 
         // 更新字段
         if let Some(new_title) = title {
@@ -683,18 +681,17 @@ impl KnowledgeVaultManager {
 
         let entry = entries
             .get(knowledge_id)
-            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {} 不存在", knowledge_id)))?;
+            .ok_or_else(|| CoreError::InvalidInput(format!("知识条目 {knowledge_id} 不存在")))?;
 
         // 检查删除权限
-        if self.config.access_control_enabled {
-            if !self.check_permission(
+        if self.config.access_control_enabled
+            && !self.check_permission(
                 user_id,
                 &AccessPermission::Delete,
                 entry.sensitivity_level,
             )? {
                 return Err(CoreError::InvalidInput("用户没有删除权限".to_string()));
             }
-        }
 
         entries.remove(knowledge_id);
         drop(entries);
@@ -738,15 +735,14 @@ impl KnowledgeVaultManager {
 
         for (id, entry) in entries.iter() {
             // 检查读取权限
-            if self.config.access_control_enabled {
-                if !self.check_permission(
+            if self.config.access_control_enabled
+                && !self.check_permission(
                     user_id,
                     &AccessPermission::Read,
                     entry.sensitivity_level,
                 )? {
                     continue;
                 }
-            }
 
             // 应用敏感度过滤器
             if let Some(filter_level) = sensitivity_filter {
@@ -1011,15 +1007,14 @@ impl KnowledgeVaultManager {
 
         for (id, entry) in entries.iter() {
             // 检查读取权限
-            if self.config.access_control_enabled {
-                if !self.check_permission(
+            if self.config.access_control_enabled
+                && !self.check_permission(
                     user_id,
                     &AccessPermission::Read,
                     entry.sensitivity_level,
                 )? {
                     continue;
                 }
-            }
 
             // 应用敏感度过滤器
             if let Some(filter_level) = sensitivity_filter {

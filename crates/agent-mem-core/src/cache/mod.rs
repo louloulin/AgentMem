@@ -14,7 +14,7 @@ pub use memory_cache::{MemoryCache, MemoryCacheConfig, MemoryCacheStats};
 pub use multi_level::{CacheLevel, MultiLevelCache, MultiLevelCacheConfig};
 pub use warming::{CacheWarmer, CacheWarmingConfig, DataLoader, WarmingStats, WarmingStrategy};
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

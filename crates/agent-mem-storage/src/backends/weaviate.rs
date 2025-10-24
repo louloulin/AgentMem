@@ -106,7 +106,7 @@ impl WeaviateStore {
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self { config, client })
@@ -154,16 +154,16 @@ impl WeaviateStore {
 
         let mut request = self
             .client
-            .post(&format!("{}/v1/schema", self.config.url))
+            .post(format!("{}/v1/schema", self.config.url))
             .header("Content-Type", "application/json")
             .json(&schema);
 
         if let Some(api_key) = &self.config.api_key {
-            request = request.header("Authorization", format!("Bearer {}", api_key));
+            request = request.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = request.send().await.map_err(|e| {
-            AgentMemError::network_error(&format!("Failed to create schema: {}", e))
+            AgentMemError::network_error(format!("Failed to create schema: {e}"))
         })?;
 
         if response.status().is_success() {
@@ -179,9 +179,8 @@ impl WeaviateStore {
                 Ok(())
             } else {
                 error!("Failed to initialize schema: {} - {}", status, error_text);
-                Err(AgentMemError::storage_error(&format!(
-                    "Schema initialization failed: {}",
-                    error_text
+                Err(AgentMemError::storage_error(format!(
+                    "Schema initialization failed: {error_text}"
                 )))
             }
         }
@@ -192,7 +191,7 @@ impl WeaviateStore {
         let mut request = self.client.request(method, url);
 
         if let Some(api_key) = &self.config.api_key {
-            request = request.header("Authorization", format!("Bearer {}", api_key));
+            request = request.header("Authorization", format!("Bearer {api_key}"));
         }
 
         request
@@ -237,7 +236,7 @@ impl EmbeddingVectorStore for WeaviateStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to store embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to store embedding: {e}"))
             })?;
 
         if response.status().is_success() {
@@ -247,9 +246,8 @@ impl EmbeddingVectorStore for WeaviateStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to store embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to store embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to store embedding: {error_text}"
             )))
         }
     }
@@ -300,20 +298,19 @@ impl EmbeddingVectorStore for WeaviateStore {
             .json(&query)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to search: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to search: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Search failed: {} - {}", status, error_text);
-            return Err(AgentMemError::storage_error(&format!(
-                "Search failed: {}",
-                error_text
+            return Err(AgentMemError::storage_error(format!(
+                "Search failed: {error_text}"
             )));
         }
 
         let search_response: WeaviateSearchResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(&format!("Failed to parse search response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse search response: {e}"))
         })?;
 
         let results: Vec<SearchResult> = search_response
@@ -374,7 +371,7 @@ impl EmbeddingVectorStore for WeaviateStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to delete embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to delete embedding: {e}"))
             })?;
 
         if response.status().is_success() {
@@ -384,9 +381,8 @@ impl EmbeddingVectorStore for WeaviateStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to delete embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to delete embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to delete embedding: {error_text}"
             )))
         }
     }
@@ -415,12 +411,12 @@ impl EmbeddingVectorStore for WeaviateStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to get embedding: {}", e))
+                AgentMemError::network_error(format!("Failed to get embedding: {e}"))
             })?;
 
         if response.status().is_success() {
             let object: WeaviateObject = response.json().await.map_err(|e| {
-                AgentMemError::parsing_error(&format!("Failed to parse object: {}", e))
+                AgentMemError::parsing_error(format!("Failed to parse object: {e}"))
             })?;
 
             Ok(object.vector)
@@ -430,9 +426,8 @@ impl EmbeddingVectorStore for WeaviateStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to get embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!(
-                "Failed to get embedding: {}",
-                error_text
+            Err(AgentMemError::storage_error(format!(
+                "Failed to get embedding: {error_text}"
             )))
         }
     }
@@ -463,21 +458,20 @@ impl EmbeddingVectorStore for WeaviateStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to list embeddings: {}", e))
+                AgentMemError::network_error(format!("Failed to list embeddings: {e}"))
             })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to list embeddings: {} - {}", status, error_text);
-            return Err(AgentMemError::storage_error(&format!(
-                "Failed to list embeddings: {}",
-                error_text
+            return Err(AgentMemError::storage_error(format!(
+                "Failed to list embeddings: {error_text}"
             )));
         }
 
         let search_response: WeaviateSearchResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(&format!("Failed to parse list response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse list response: {e}"))
         })?;
 
         let mut memory_ids: Vec<String> = search_response

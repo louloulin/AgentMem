@@ -10,8 +10,7 @@ use crate::{
 use agent_mem_config::MemoryConfig;
 use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{
-    AgentMemError, DecisionEngine, ExtractedFact, FactExtractor, HistoryEntry, MemoryActionType,
-    MemoryDecision, MemoryEvent, MemoryItem, MemoryProvider, Message, Result, Session,
+    AgentMemError, DecisionEngine, ExtractedFact, FactExtractor, HistoryEntry, MemoryActionType, MemoryEvent, MemoryItem, MemoryProvider, Message, Result, Session,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -581,7 +580,7 @@ impl MemoryProvider for MemoryManager {
                         memory_id: entry.memory_id.clone(),
                         event,
                         timestamp: chrono::DateTime::from_timestamp(entry.timestamp, 0)
-                            .unwrap_or_else(|| chrono::Utc::now()),
+                            .unwrap_or_else(chrono::Utc::now),
                         data: Some(serde_json::json!({
                             "content": entry.content,
                             "change_type": entry.change_type.to_string(),
@@ -695,9 +694,9 @@ impl MemoryManager {
                     metadata,
                     score: Some(result.score),
                     created_at: chrono::DateTime::from_timestamp(memory.created_at, 0)
-                        .unwrap_or_else(|| chrono::Utc::now()),
+                        .unwrap_or_else(chrono::Utc::now),
                     updated_at: Some(chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
-                        .unwrap_or_else(|| chrono::Utc::now())),
+                        .unwrap_or_else(chrono::Utc::now)),
                     session: Session {
                         id: memory.agent_id.clone(),
                         user_id: memory.user_id.clone(),
@@ -715,7 +714,7 @@ impl MemoryManager {
                     importance: memory.importance,
                     embedding: None,
                     last_accessed_at: chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
-                        .unwrap_or_else(|| chrono::Utc::now()),
+                        .unwrap_or_else(chrono::Utc::now),
                     access_count: 0,
                     expires_at: None,
                     version: 1,
@@ -795,7 +794,7 @@ impl MemoryManager {
                     agent_id.to_string(),
                     user_id.clone(),
                     content,
-                    memory_type.clone(),
+                    *memory_type,
                     Some(final_importance),
                     Some(combined_metadata),
                 ).await?;

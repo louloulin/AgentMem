@@ -22,7 +22,7 @@ mod tests {
         let mut metadata = HashMap::new();
         metadata.insert("test_key".to_string(), "test_value".to_string());
         metadata.insert("category".to_string(), "cache_test".to_string());
-        metadata.insert("content".to_string(), format!("Cached content for {}", id));
+        metadata.insert("content".to_string(), format!("Cached content for {id}"));
         metadata.insert("priority".to_string(), "high".to_string());
 
         VectorData {
@@ -374,7 +374,7 @@ mod tests {
                 ((i + 2) as f32) / 50.0,
                 ((i + 3) as f32) / 50.0,
             ];
-            vectors.push(create_test_vector(&format!("perf_test_{}", i), vector));
+            vectors.push(create_test_vector(&format!("perf_test_{i}"), vector));
         }
 
         store.add_vectors(vectors).await.unwrap();
@@ -417,7 +417,7 @@ mod tests {
             .unwrap();
 
         // 验证会话相关性
-        assert!(results.len() > 0);
+        assert!(!results.is_empty());
         assert_eq!(results[0].id, "session_user_1"); // 最相关的用户
 
         // 验证访问统计更新

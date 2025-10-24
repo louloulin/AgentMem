@@ -4,7 +4,6 @@
 
 use crate::{Memory, engine::MemoryEngine};
 use agent_mem_traits::{Result, MemoryType};
-use chrono::Utc;
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -111,7 +110,7 @@ impl MemoryIntegrator {
             // 添加时间戳（如果启用）
             if self.config.include_timestamp {
                 let time_str = memory.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
-                prompt.push_str(&format!(" ({})", time_str));
+                prompt.push_str(&format!(" ({time_str})"));
             }
 
             // 添加重要性分数（如果有）
@@ -119,7 +118,7 @@ impl MemoryIntegrator {
                 prompt.push_str(" [Important]");
             }
 
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         prompt.push_str("\nPlease use these memories to provide more contextual and personalized responses.\n");

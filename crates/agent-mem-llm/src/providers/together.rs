@@ -99,7 +99,7 @@ impl TogetherProvider {
             .timeout(Duration::from_secs(60)) // Together 可能需要更长时间
             .build()
             .map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -151,15 +151,15 @@ impl TogetherProvider {
                 .client
                 .post(&url)
                 .header("Content-Type", "application/json")
-                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Authorization", format!("Bearer {api_key}"))
                 .json(&request)
                 .send()
                 .await
-                .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+                .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
             if response.status().is_success() {
                 let together_response: TogetherResponse = response.json().await.map_err(|e| {
-                    AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                    AgentMemError::llm_error(format!("Failed to parse response: {e}"))
                 })?;
 
                 return Ok(together_response);
@@ -176,14 +176,13 @@ impl TogetherProvider {
 
                 // 尝试解析 Together 错误响应
                 if let Ok(together_error) = serde_json::from_str::<TogetherError>(&error_text) {
-                    return Err(AgentMemError::llm_error(&format!(
+                    return Err(AgentMemError::llm_error(format!(
                         "Together API error: {} ({})",
                         together_error.error.message, together_error.error.error_type
                     )));
                 } else {
-                    return Err(AgentMemError::llm_error(&format!(
-                        "HTTP error {}: {}",
-                        status, error_text
+                    return Err(AgentMemError::llm_error(format!(
+                        "HTTP error {status}: {error_text}"
                     )));
                 }
             }
@@ -201,9 +200,8 @@ impl TogetherProvider {
         // 检查完成原因
         if let Some(finish_reason) = &choice.finish_reason {
             if finish_reason != "stop" && finish_reason != "length" && finish_reason != "eos" {
-                return Err(AgentMemError::llm_error(&format!(
-                    "Generation stopped due to: {}",
-                    finish_reason
+                return Err(AgentMemError::llm_error(format!(
+                    "Generation stopped due to: {finish_reason}"
                 )));
             }
         }

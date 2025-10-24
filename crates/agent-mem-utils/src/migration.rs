@@ -489,7 +489,7 @@ mod tests {
 
             // 添加真实的测试数据
             for i in 0..vector_count {
-                let id = format!("{}_{}", name, i);
+                let id = format!("{name}_{i}");
                 let vector = Self::generate_realistic_vector(i, 128);
                 let mut metadata = HashMap::new();
                 metadata.insert("index".to_string(), i.to_string());

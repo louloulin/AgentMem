@@ -50,8 +50,7 @@ impl BackgroundAgentManager {
             let tasks = self.tasks.read().await;
             if tasks.contains_key(&agent_id) {
                 return Err(CoreError::InvalidInput(format!(
-                    "Agent {} is already running",
-                    agent_id
+                    "Agent {agent_id} is already running"
                 )));
             }
         }
@@ -133,8 +132,7 @@ impl BackgroundAgentManager {
             Ok(())
         } else {
             Err(CoreError::NotFound(format!(
-                "Agent {} is not running",
-                agent_id
+                "Agent {agent_id} is not running"
             )))
         }
     }
@@ -176,7 +174,7 @@ impl BackgroundAgentManager {
         self.message_queue
             .send_message(message)
             .await
-            .map_err(|e| CoreError::InvalidInput(e))
+            .map_err(CoreError::InvalidInput)
     }
 
     /// Stop all background agents

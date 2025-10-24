@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[cfg(feature = "embedded-vector")]
 use agent_mem_storage::backends::LanceDBVectorStore;
@@ -115,7 +115,7 @@ impl EmbeddedVectorStore {
             // 创建数据目录
             if self.config.auto_create_dir && !self.config.in_memory {
                 tokio::fs::create_dir_all(&self.config.path).await.map_err(|e| {
-                    AgentMemError::internal_error(format!("创建向量存储目录失败: {}", e))
+                    AgentMemError::internal_error(format!("创建向量存储目录失败: {e}"))
                 })?;
             }
 
@@ -133,7 +133,7 @@ impl EmbeddedVectorStore {
             let store = LanceDBVectorStore::new(path_str, &self.config.collection_name)
                 .await
                 .map_err(|e| {
-                    AgentMemError::internal_error(format!("创建 LanceDB 存储失败: {}", e))
+                    AgentMemError::internal_error(format!("创建 LanceDB 存储失败: {e}"))
                 })?;
 
             // 保存存储实例
@@ -221,7 +221,7 @@ impl EmbeddedVectorStore {
         
         // 创建目标目录
         tokio::fs::create_dir_all(dest.as_ref()).await.map_err(|e| {
-            AgentMemError::internal_error(format!("创建备份目录失败: {}", e))
+            AgentMemError::internal_error(format!("创建备份目录失败: {e}"))
         })?;
         
         // 复制向量存储目录
@@ -235,18 +235,18 @@ impl EmbeddedVectorStore {
 /// 递归复制目录
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst).map_err(|e| {
-        AgentMemError::internal_error(format!("创建目录失败: {}", e))
+        AgentMemError::internal_error(format!("创建目录失败: {e}"))
     })?;
 
     for entry in std::fs::read_dir(src).map_err(|e| {
-        AgentMemError::internal_error(format!("读取目录失败: {}", e))
+        AgentMemError::internal_error(format!("读取目录失败: {e}"))
     })? {
         let entry = entry.map_err(|e| {
-            AgentMemError::internal_error(format!("读取目录项失败: {}", e))
+            AgentMemError::internal_error(format!("读取目录项失败: {e}"))
         })?;
 
         let ty = entry.file_type().map_err(|e| {
-            AgentMemError::internal_error(format!("获取文件类型失败: {}", e))
+            AgentMemError::internal_error(format!("获取文件类型失败: {e}"))
         })?;
 
         let dst_path = dst.join(entry.file_name());
@@ -255,7 +255,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
             copy_dir_all(&entry.path(), &dst_path)?;
         } else {
             std::fs::copy(entry.path(), dst_path).map_err(|e| {
-                AgentMemError::internal_error(format!("复制文件失败: {}", e))
+                AgentMemError::internal_error(format!("复制文件失败: {e}"))
             })?;
         }
     }

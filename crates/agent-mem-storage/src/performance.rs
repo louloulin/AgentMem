@@ -320,61 +320,6 @@ fn percentile(sorted_values: &[f64], p: f64) -> f64 {
     sorted_values.get(index).copied().unwrap_or(0.0)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio::time::sleep;
-
-    #[tokio::test]
-    async fn test_performance_monitor() {
-        let monitor = PerformanceMonitor::new(1000, Duration::from_secs(60));
-
-        // 记录一些测试指标
-        let metric1 = PerformanceMetrics {
-            operation: "search".to_string(),
-            duration_ms: 100.0,
-            success: true,
-            data_size_bytes: Some(1024),
-            record_count: Some(10),
-            timestamp: chrono::Utc::now(),
-            metadata: HashMap::new(),
-        };
-
-        monitor.record_metric(metric1).await;
-
-        let metric2 = PerformanceMetrics {
-            operation: "search".to_string(),
-            duration_ms: 150.0,
-            success: true,
-            data_size_bytes: Some(2048),
-            record_count: Some(20),
-            timestamp: chrono::Utc::now(),
-            metadata: HashMap::new(),
-        };
-
-        monitor.record_metric(metric2).await;
-
-        // 获取统计信息
-        let stats = monitor.get_stats("search").await.unwrap();
-        assert_eq!(stats.total_requests, 2);
-        assert_eq!(stats.successful_requests, 2);
-        assert_eq!(stats.success_rate, 1.0);
-        assert_eq!(stats.avg_duration_ms, 125.0);
-    }
-
-    #[tokio::test]
-    async fn test_performance_timer() {
-        let timer = PerformanceTimer::new();
-        sleep(Duration::from_millis(10)).await;
-
-        let metric = timer.finish("test".to_string(), true, Some(100), Some(1), HashMap::new());
-
-        assert!(metric.duration_ms >= 10.0);
-        assert_eq!(metric.operation, "test");
-        assert!(metric.success);
-    }
-}
-
 /// 带性能监控的存储包装器
 pub struct MonitoredVectorStore {
     /// 底层存储
@@ -650,5 +595,60 @@ impl agent_mem_traits::VectorStore for MonitoredVectorStore {
 
         self.monitor.record_metric(metric).await;
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::time::sleep;
+
+    #[tokio::test]
+    async fn test_performance_monitor() {
+        let monitor = PerformanceMonitor::new(1000, Duration::from_secs(60));
+
+        // 记录一些测试指标
+        let metric1 = PerformanceMetrics {
+            operation: "search".to_string(),
+            duration_ms: 100.0,
+            success: true,
+            data_size_bytes: Some(1024),
+            record_count: Some(10),
+            timestamp: chrono::Utc::now(),
+            metadata: HashMap::new(),
+        };
+
+        monitor.record_metric(metric1).await;
+
+        let metric2 = PerformanceMetrics {
+            operation: "search".to_string(),
+            duration_ms: 150.0,
+            success: true,
+            data_size_bytes: Some(2048),
+            record_count: Some(20),
+            timestamp: chrono::Utc::now(),
+            metadata: HashMap::new(),
+        };
+
+        monitor.record_metric(metric2).await;
+
+        // 获取统计信息
+        let stats = monitor.get_stats("search").await.unwrap();
+        assert_eq!(stats.total_requests, 2);
+        assert_eq!(stats.successful_requests, 2);
+        assert_eq!(stats.success_rate, 1.0);
+        assert_eq!(stats.avg_duration_ms, 125.0);
+    }
+
+    #[tokio::test]
+    async fn test_performance_timer() {
+        let timer = PerformanceTimer::new();
+        sleep(Duration::from_millis(10)).await;
+
+        let metric = timer.finish("test".to_string(), true, Some(100), Some(1), HashMap::new());
+
+        assert!(metric.duration_ms >= 10.0);
+        assert_eq!(metric.operation, "test");
+        assert!(metric.success);
     }
 }

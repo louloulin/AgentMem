@@ -73,7 +73,7 @@ impl OllamaProvider {
             .timeout(Duration::from_secs(120)) // Ollama可能需要更长时间
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -145,7 +145,7 @@ impl LLMProvider for OllamaProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -154,8 +154,7 @@ impl LLMProvider for OllamaProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::llm_error(format!(
-                "Ollama API error {}: {}",
-                status, error_text
+                "Ollama API error {status}: {error_text}"
             )));
         }
 
@@ -163,10 +162,10 @@ impl LLMProvider for OllamaProvider {
         let response_text = response
             .text()
             .await
-            .map_err(|e| AgentMemError::llm_error(format!("Failed to read response: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Failed to read response: {e}")))?;
 
         let ollama_response: OllamaResponse = serde_json::from_str(&response_text)
-            .map_err(|e| AgentMemError::llm_error(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Failed to parse response: {e}")))?;
 
         // 如果 content 为空但有 thinking，使用 thinking 内容
         let content = if ollama_response.message.content.is_empty() {
@@ -222,14 +221,13 @@ impl LLMProvider for OllamaProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Ollama API request failed: {}", e))
+                AgentMemError::network_error(format!("Ollama API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "Ollama API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "Ollama API error: {error_text}"
             )));
         }
 
@@ -278,9 +276,8 @@ impl LLMProvider for OllamaProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(&format!(
-                        "Stream error: {}",
-                        e
+                    Err(e) => Err(AgentMemError::network_error(format!(
+                        "Stream error: {e}"
                     ))),
                 }
             })

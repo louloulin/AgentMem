@@ -4,7 +4,7 @@
 //! 支持 pgvector 扩展和性能优化
 
 use super::{SearchQuery, SearchResult};
-use agent_mem_traits::{AgentMemError, Result, VectorData, VectorSearchResult, VectorStore};
+use agent_mem_traits::{AgentMemError, Result, VectorData, VectorStore};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -175,7 +175,7 @@ impl VectorSearchEngine {
                 stats.cache_hits += 1;
                 stats.total_searches += 1;
 
-                log::debug!("Cache hit for vector search, saved {} ms", elapsed);
+                log::debug!("Cache hit for vector search, saved {elapsed} ms");
                 return Ok((cached_results, elapsed));
             }
         }
@@ -193,8 +193,7 @@ impl VectorSearchEngine {
                 id: vr.id,
                 content: vr
                     .metadata
-                    .get("content")
-                    .map(|s| s.clone())
+                    .get("content").cloned()
                     .unwrap_or_default(),
                 score: vr.similarity,
                 vector_score: Some(vr.similarity),
@@ -474,7 +473,7 @@ impl VectorSearchEngine {
         let mut results = Vec::new();
         for task in tasks {
             results.push(task.await.map_err(|e| {
-                AgentMemError::MemoryError(format!("Batch search task failed: {}", e))
+                AgentMemError::MemoryError(format!("Batch search task failed: {e}"))
             })??);
         }
 
@@ -750,29 +749,27 @@ pub fn build_vector_search_sql(
         let where_clause = match operator {
             VectorDistanceOperator::Cosine | VectorDistanceOperator::L2 => {
                 // 余弦和 L2: 距离越小越相似
-                format!("WHERE ({} {} $1) <= $2", column, op)
+                format!("WHERE ({column} {op} $1) <= $2")
             }
             VectorDistanceOperator::InnerProduct => {
                 // 内积: 值越大（越接近 0）越相似
-                format!("WHERE ({} {} $1) >= $2", column, op)
+                format!("WHERE ({column} {op} $1) >= $2")
             }
         };
 
         format!(
-            "SELECT *, ({} {} $1) as distance
-             FROM {}
-             {}
-             ORDER BY {} {} $1
-             LIMIT $3",
-            column, op, table, where_clause, column, op
+            "SELECT *, ({column} {op} $1) as distance
+             FROM {table}
+             {where_clause}
+             ORDER BY {column} {op} $1
+             LIMIT $3"
         )
     } else {
         format!(
-            "SELECT *, ({} {} $1) as distance
-             FROM {}
-             ORDER BY {} {} $1
-             LIMIT $2",
-            column, op, table, column, op
+            "SELECT *, ({column} {op} $1) as distance
+             FROM {table}
+             ORDER BY {column} {op} $1
+             LIMIT $2"
         )
     }
 }
@@ -829,15 +826,15 @@ pub fn build_hybrid_vector_search_sql(
         let similarity_expr = match operator {
             VectorDistanceOperator::Cosine => {
                 // 余弦距离: similarity = 1 - (distance / 2)
-                format!("({} * (1.0 - ({} {} ${}) / 2.0))", weight, column, op, param_index)
+                format!("({weight} * (1.0 - ({column} {op} ${param_index}) / 2.0))")
             }
             VectorDistanceOperator::L2 => {
                 // L2 距离: similarity = 1 / (1 + distance)
-                format!("({} / (1.0 + ({} {} ${})))", weight, column, op, param_index)
+                format!("({weight} / (1.0 + ({column} {op} ${param_index})))")
             }
             VectorDistanceOperator::InnerProduct => {
                 // 内积: similarity = -distance (假设已归一化)
-                format!("({} * (-({} {} ${})))", weight, column, op, param_index)
+                format!("({weight} * (-({column} {op} ${param_index})))")
             }
         };
 
@@ -848,11 +845,10 @@ pub fn build_hybrid_vector_search_sql(
     let combined_score = similarity_parts.join(" + ");
 
     let sql = format!(
-        "SELECT *, ({}) as combined_score
-         FROM {}
+        "SELECT *, ({combined_score}) as combined_score
+         FROM {table}
          ORDER BY combined_score DESC
-         LIMIT ${}",
-        combined_score, table, param_index
+         LIMIT ${param_index}"
     );
 
     (sql, param_index)

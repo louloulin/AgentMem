@@ -118,13 +118,13 @@ impl ContextAnalyzer {
         let words: Vec<&str> = query.split_whitespace().collect();
         let mut i = 0;
         while i < words.len() {
-            if words[i].chars().next().map_or(false, |c| c.is_uppercase()) {
+            if words[i].chars().next().is_some_and(|c| c.is_uppercase()) {
                 let mut entity_text = words[i].to_string();
                 let start = i;
                 i += 1;
 
                 // 继续收集连续的大写词
-                while i < words.len() && words[i].chars().next().map_or(false, |c| c.is_uppercase()) {
+                while i < words.len() && words[i].chars().next().is_some_and(|c| c.is_uppercase()) {
                     entity_text.push(' ');
                     entity_text.push_str(words[i]);
                     i += 1;

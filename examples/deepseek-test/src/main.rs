@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
             match provider.generate_text("你好，请简单介绍一下你自己").await {
                 Ok(response) => {
                     info!("✅ 文本生成成功:");
-                    println!("Response: {}", response);
+                    println!("Response: {response}");
                 }
                 Err(e) => {
                     error!("❌ 文本生成失败: {}", e);
@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
             {
                 Ok(response) => {
                     info!("✅ 系统提示测试成功:");
-                    println!("Response: {}", response);
+                    println!("Response: {response}");
                 }
                 Err(e) => {
                     error!("❌ 系统提示测试失败: {}", e);
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
             match provider.generate_json::<MemoryAnalysis>(json_prompt).await {
                 Ok(analysis) => {
                     info!("✅ JSON 生成成功:");
-                    println!("Analysis: {:#?}", analysis);
+                    println!("Analysis: {analysis:#?}");
                 }
                 Err(e) => {
                     error!("❌ JSON 生成失败: {}", e);

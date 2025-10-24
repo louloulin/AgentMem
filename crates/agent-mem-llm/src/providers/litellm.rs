@@ -194,7 +194,7 @@ impl LiteLLMProvider {
         let client = Client::builder()
             .timeout(config.timeout)
             .build()
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self { client, config })
     }
@@ -268,7 +268,7 @@ impl LiteLLMProvider {
 
         if let Some(choice) = response.choices.first() {
             let parsed: T = serde_json::from_str(&choice.message.content).map_err(|e| {
-                AgentMemError::LLMError(format!("Failed to parse JSON response: {}", e))
+                AgentMemError::LLMError(format!("Failed to parse JSON response: {e}"))
             })?;
             Ok(parsed)
         } else {
@@ -282,20 +282,20 @@ impl LiteLLMProvider {
             .config
             .api_base
             .as_ref()
-            .map(|base| format!("{}/chat/completions", base))
+            .map(|base| format!("{base}/chat/completions"))
             .unwrap_or_else(|| "https://api.openai.com/v1/chat/completions".to_string());
 
         let mut req_builder = self.client.post(&url).json(request);
 
         // 添加认证头
         if let Some(api_key) = &self.config.api_key {
-            req_builder = req_builder.header("Authorization", format!("Bearer {}", api_key));
+            req_builder = req_builder.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = req_builder
             .send()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response
@@ -303,15 +303,14 @@ impl LiteLLMProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::LLMError(format!(
-                "API error: {}",
-                error_text
+                "API error: {error_text}"
             )));
         }
 
         let llm_response: LiteLLMResponse = response
             .json()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse response: {e}")))?;
 
         Ok(llm_response)
     }

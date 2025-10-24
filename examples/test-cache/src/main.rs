@@ -16,6 +16,12 @@ pub struct SimpleCache {
     misses: Arc<RwLock<u64>>,
 }
 
+impl Default for SimpleCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleCache {
     pub fn new() -> Self {
         Self {

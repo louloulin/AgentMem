@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
+use tokio::time::interval;
 
-use super::{ComponentHealth, HealthStatus, SystemIntegrationManager};
+use super::{HealthStatus, SystemIntegrationManager};
 use agent_mem_traits::{AgentMemError, Result};
 
 /// 健康检查配置
@@ -96,7 +96,7 @@ impl HealthChecker {
                 )
                 .await
                 {
-                    eprintln!("健康检查失败: {}", e);
+                    eprintln!("健康检查失败: {e}");
                 }
             }
         });
@@ -219,7 +219,7 @@ impl HealthChecker {
                 .check_component_health(component, system_manager)
                 .await
             {
-                eprintln!("组件 {} 健康检查失败: {}", component, e);
+                eprintln!("组件 {component} 健康检查失败: {e}");
             }
         }
 
@@ -300,7 +300,7 @@ impl HealthChecker {
                 );
                 metrics.insert(
                     "average_file_size_mb".to_string(),
-                    stats.average_file_size as f64 / 1024.0 / 1024.0,
+                    stats.average_file_size / 1024.0 / 1024.0,
                 );
 
                 (HealthStatus::Healthy, None, metrics)

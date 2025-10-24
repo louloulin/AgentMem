@@ -79,7 +79,7 @@ impl AnthropicProvider {
             .timeout(Duration::from_secs(60)) // Anthropic可能需要更长时间
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -160,7 +160,7 @@ impl LLMProvider for AnthropicProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -169,13 +169,12 @@ impl LLMProvider for AnthropicProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::llm_error(format!(
-                "Anthropic API error {}: {}",
-                status, error_text
+                "Anthropic API error {status}: {error_text}"
             )));
         }
 
         let anthropic_response: AnthropicResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if anthropic_response.content.is_empty() {
@@ -243,7 +242,7 @@ impl LLMProvider for AnthropicProvider {
         // 发送流式请求
         let response = self
             .client
-            .post(&format!("{}/messages", self.base_url))
+            .post(format!("{}/messages", self.base_url))
             .header("x-api-key", self.config.api_key.as_ref().unwrap())
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
@@ -251,14 +250,13 @@ impl LLMProvider for AnthropicProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Anthropic API request failed: {}", e))
+                AgentMemError::network_error(format!("Anthropic API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "Anthropic API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "Anthropic API error: {error_text}"
             )));
         }
 
@@ -296,9 +294,8 @@ impl LLMProvider for AnthropicProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(&format!(
-                        "Stream error: {}",
-                        e
+                    Err(e) => Err(AgentMemError::network_error(format!(
+                        "Stream error: {e}"
                     ))),
                 }
             })

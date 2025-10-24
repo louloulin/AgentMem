@@ -36,13 +36,13 @@ impl LibSqlConnectionManager {
             tokio::fs::create_dir_all(parent)
                 .await
                 .map_err(|e| {
-                    AgentMemError::StorageError(format!("Failed to create directory: {}", e))
+                    AgentMemError::StorageError(format!("Failed to create directory: {e}"))
                 })?;
         }
 
         // Create or open database
         let db = Builder::new_local(path).build().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to open database at {}: {}", path, e))
+            AgentMemError::StorageError(format!("Failed to open database at {path}: {e}"))
         })?;
 
         Ok(Self { db })
@@ -51,7 +51,7 @@ impl LibSqlConnectionManager {
     /// Get a connection from the pool
     pub async fn get_connection(&self) -> Result<Arc<Mutex<Connection>>> {
         let conn = self.db.connect().map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get connection: {}", e))
+            AgentMemError::StorageError(format!("Failed to get connection: {e}"))
         })?;
 
         Ok(Arc::new(Mutex::new(conn)))
@@ -65,12 +65,12 @@ impl LibSqlConnectionManager {
         let mut rows = conn_guard
             .query("SELECT 1", ())
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {e}")))?;
 
         // Consume the result to verify the query worked
         rows.next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Health check failed: {e}")))?;
 
         Ok(())
     }
@@ -85,14 +85,14 @@ impl LibSqlConnectionManager {
             .query("PRAGMA page_count", ())
             .await
             .map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get page count: {}", e))
+                AgentMemError::StorageError(format!("Failed to get page count: {e}"))
             })?;
 
         let page_count: i64 = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to read page count: {}", e))
+            AgentMemError::StorageError(format!("Failed to read page count: {e}"))
         })? {
             row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to parse page count: {}", e))
+                AgentMemError::StorageError(format!("Failed to parse page count: {e}"))
             })?
         } else {
             0
@@ -103,14 +103,14 @@ impl LibSqlConnectionManager {
             .query("PRAGMA page_size", ())
             .await
             .map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get page size: {}", e))
+                AgentMemError::StorageError(format!("Failed to get page size: {e}"))
             })?;
 
         let page_size: i64 = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to read page size: {}", e))
+            AgentMemError::StorageError(format!("Failed to read page size: {e}"))
         })? {
             row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to parse page size: {}", e))
+                AgentMemError::StorageError(format!("Failed to parse page size: {e}"))
             })?
         } else {
             4096

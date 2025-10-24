@@ -50,7 +50,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create user: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create user: {e}")))?;
 
         Ok(user.clone())
     }
@@ -65,7 +65,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
                 libsql::params![id],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query user: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query user: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
             let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
@@ -108,7 +108,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
                 libsql::params![email, org_id],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query user by email: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query user by email: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
             let created_at_ts: i64 = row.get(8).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
@@ -150,7 +150,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
                 libsql::params![email, org_id],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to check email existence: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to check email existence: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
             let count: i64 = row.get(0).map_err(|e| AgentMemError::StorageError(e.to_string()))?;
@@ -170,7 +170,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
                 libsql::params![org_id],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query users: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query users: {e}")))?;
 
         let mut users = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
@@ -221,7 +221,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update user: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update user: {e}")))?;
 
         Ok(user.clone())
     }
@@ -234,7 +234,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
             libsql::params![password_hash, chrono::Utc::now().timestamp(), user_id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update password: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update password: {e}")))?;
 
         Ok(())
     }
@@ -247,7 +247,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
             libsql::params![chrono::Utc::now().timestamp(), id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete user: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete user: {e}")))?;
 
         Ok(())
     }
@@ -262,7 +262,7 @@ impl UserRepositoryTrait for LibSqlUserRepository {
                 libsql::params![limit, offset],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list users: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list users: {e}")))?;
 
         let mut users = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {

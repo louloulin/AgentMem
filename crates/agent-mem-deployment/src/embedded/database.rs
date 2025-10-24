@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[cfg(feature = "embedded-db")]
 use libsql::Database;
@@ -97,7 +97,7 @@ impl EmbeddedDatabase {
             if self.config.auto_create_dir && !self.config.in_memory {
                 if let Some(parent) = self.config.path.parent() {
                     tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                        AgentMemError::internal_error(format!("创建数据目录失败: {}", e))
+                        AgentMemError::internal_error(format!("创建数据目录失败: {e}"))
                     })?;
                 }
             }
@@ -106,7 +106,7 @@ impl EmbeddedDatabase {
             let db = if self.config.in_memory {
                 debug!("使用内存数据库");
                 Database::open(":memory:").map_err(|e| {
-                    AgentMemError::internal_error(format!("打开内存数据库失败: {}", e))
+                    AgentMemError::internal_error(format!("打开内存数据库失败: {e}"))
                 })?
             } else {
                 debug!("使用文件数据库: {:?}", self.config.path);
@@ -114,27 +114,27 @@ impl EmbeddedDatabase {
                     AgentMemError::internal_error("无效的数据库路径")
                 })?;
                 Database::open(path_str).map_err(|e| {
-                    AgentMemError::internal_error(format!("打开数据库失败: {}", e))
+                    AgentMemError::internal_error(format!("打开数据库失败: {e}"))
                 })?
             };
             
             // 配置数据库
             let conn = db.connect().map_err(|e| {
-                AgentMemError::internal_error(format!("连接数据库失败: {}", e))
+                AgentMemError::internal_error(format!("连接数据库失败: {e}"))
             })?;
             
             // 启用 WAL 模式
             if self.config.enable_wal && !self.config.in_memory {
                 conn.execute("PRAGMA journal_mode=WAL", ()).await.map_err(|e| {
-                    AgentMemError::internal_error(format!("启用 WAL 模式失败: {}", e))
+                    AgentMemError::internal_error(format!("启用 WAL 模式失败: {e}"))
                 })?;
                 debug!("已启用 WAL 模式");
             }
             
             // 设置缓存大小
             let cache_pages = self.config.cache_size_kb * 1024 / self.config.page_size;
-            conn.execute(&format!("PRAGMA cache_size={}", cache_pages), ()).await.map_err(|e| {
-                AgentMemError::internal_error(format!("设置缓存大小失败: {}", e))
+            conn.execute(&format!("PRAGMA cache_size={cache_pages}"), ()).await.map_err(|e| {
+                AgentMemError::internal_error(format!("设置缓存大小失败: {e}"))
             })?;
             debug!("缓存大小设置为 {} 页", cache_pages);
             
@@ -181,12 +181,12 @@ impl EmbeddedDatabase {
         })?;
 
         let conn = db.connect().map_err(|e| {
-            AgentMemError::internal_error(format!("连接数据库失败: {}", e))
+            AgentMemError::internal_error(format!("连接数据库失败: {e}"))
         })?;
 
         // LibSQL 的 execute 方法返回 Future
         conn.execute(sql, ()).await.map_err(|e| {
-            AgentMemError::internal_error(format!("执行 SQL 失败: {}", e))
+            AgentMemError::internal_error(format!("执行 SQL 失败: {e}"))
         })?;
 
         Ok(())
@@ -201,7 +201,7 @@ impl EmbeddedDatabase {
         })?;
         
         db.connect().map_err(|e| {
-            AgentMemError::internal_error(format!("连接数据库失败: {}", e))
+            AgentMemError::internal_error(format!("连接数据库失败: {e}"))
         })
     }
     
@@ -212,7 +212,7 @@ impl EmbeddedDatabase {
         }
         
         let metadata = tokio::fs::metadata(&self.config.path).await.map_err(|e| {
-            AgentMemError::internal_error(format!("获取数据库大小失败: {}", e))
+            AgentMemError::internal_error(format!("获取数据库大小失败: {e}"))
         })?;
         
         Ok(metadata.len())
@@ -238,13 +238,13 @@ impl EmbeddedDatabase {
         // 创建目标目录
         if let Some(parent) = dest.as_ref().parent() {
             tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                AgentMemError::internal_error(format!("创建备份目录失败: {}", e))
+                AgentMemError::internal_error(format!("创建备份目录失败: {e}"))
             })?;
         }
         
         // 复制数据库文件
         tokio::fs::copy(&self.config.path, dest.as_ref()).await.map_err(|e| {
-            AgentMemError::internal_error(format!("备份数据库失败: {}", e))
+            AgentMemError::internal_error(format!("备份数据库失败: {e}"))
         })?;
         
         info!("数据库备份完成");
@@ -289,14 +289,14 @@ mod tests {
         // 创建表
         let result = conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)", ()).await;
         if let Err(e) = &result {
-            eprintln!("执行 CREATE TABLE 失败: {:?}", e);
+            eprintln!("执行 CREATE TABLE 失败: {e:?}");
         }
         assert!(result.is_ok());
 
         // 插入数据
         let result = conn.execute("INSERT INTO test (name) VALUES ('test')", ()).await;
         if let Err(e) = &result {
-            eprintln!("执行 INSERT 失败: {:?}", e);
+            eprintln!("执行 INSERT 失败: {e:?}");
         }
         assert!(result.is_ok());
 

@@ -21,8 +21,10 @@ use std::fmt;
 /// Agent state enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum AgentState {
     /// Agent is idle and ready to receive messages
+    #[default]
     Idle,
     /// Agent is thinking/processing a message
     Thinking,
@@ -78,11 +80,6 @@ impl fmt::Display for AgentState {
     }
 }
 
-impl Default for AgentState {
-    fn default() -> Self {
-        AgentState::Idle
-    }
-}
 
 /// Agent state machine
 ///

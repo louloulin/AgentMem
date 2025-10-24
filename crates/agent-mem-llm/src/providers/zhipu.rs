@@ -122,7 +122,7 @@ impl ZhipuProvider {
         let client = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self { config, client })
     }
@@ -172,16 +172,14 @@ impl LLMProvider for ZhipuProvider {
 
         let base_url = self
             .config
-            .base_url
-            .as_ref()
-            .map(|s| s.as_str())
+            .base_url.as_deref()
             .unwrap_or("https://open.bigmodel.cn/api/paas/v4");
 
-        let url = format!("{}/chat/completions", base_url);
+        let url = format!("{base_url}/chat/completions");
 
         let request = ZhipuRequest {
             model: self.config.model.clone(),
-            messages: self.convert_messages(&messages),
+            messages: self.convert_messages(messages),
             temperature: self.config.temperature,
             max_tokens: self.config.max_tokens,
             top_p: self.config.top_p,
@@ -193,12 +191,12 @@ impl LLMProvider for ZhipuProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response
@@ -214,13 +212,12 @@ impl LLMProvider for ZhipuProvider {
             }
 
             return Err(AgentMemError::LLMError(format!(
-                "Zhipu API error: {}",
-                error_text
+                "Zhipu API error: {error_text}"
             )));
         }
 
         let zhipu_response: ZhipuResponse = response.json().await.map_err(|e| {
-            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {}", e))
+            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
         })?;
 
         zhipu_response
@@ -241,18 +238,16 @@ impl LLMProvider for ZhipuProvider {
 
         let base_url = self
             .config
-            .base_url
-            .as_ref()
-            .map(|s| s.as_str())
+            .base_url.as_deref()
             .unwrap_or("https://open.bigmodel.cn/api/paas/v4");
 
-        let url = format!("{}/chat/completions", base_url);
+        let url = format!("{base_url}/chat/completions");
 
-        let tools = self.convert_tools(&functions);
+        let tools = self.convert_tools(functions);
 
         let request = ZhipuRequest {
             model: self.config.model.clone(),
-            messages: self.convert_messages(&messages),
+            messages: self.convert_messages(messages),
             temperature: self.config.temperature,
             max_tokens: self.config.max_tokens,
             top_p: self.config.top_p,
@@ -264,12 +259,12 @@ impl LLMProvider for ZhipuProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response
@@ -277,13 +272,12 @@ impl LLMProvider for ZhipuProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::LLMError(format!(
-                "Zhipu API error: {}",
-                error_text
+                "Zhipu API error: {error_text}"
             )));
         }
 
         let zhipu_response: ZhipuResponse = response.json().await.map_err(|e| {
-            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {}", e))
+            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
         })?;
 
         let choice = zhipu_response

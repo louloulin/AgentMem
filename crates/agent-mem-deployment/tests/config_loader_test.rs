@@ -27,7 +27,7 @@ cache_size_kb = 10240
             assert_eq!(config.database_path, PathBuf::from("./data/test.db"));
             assert_eq!(config.vector_path, PathBuf::from("./data/vectors"));
             assert_eq!(config.vector_dimension, 1536);
-            assert_eq!(config.enable_wal, true);
+            assert!(config.enable_wal);
             assert_eq!(config.cache_size_kb, 10240);
         }
         _ => panic!("Expected embedded mode"),
@@ -152,7 +152,7 @@ vector_dimension = 1536
     match mode {
         DeploymentMode::Embedded(config) => {
             // 验证默认值
-            assert_eq!(config.enable_wal, true);
+            assert!(config.enable_wal);
             assert_eq!(config.cache_size_kb, 10240);
         }
         _ => panic!("Expected embedded mode"),
@@ -187,12 +187,11 @@ mode = "server"
 [server]
 database_url = "postgresql://localhost:5432/test"
 vector_dimension = 768
-vector_service = "{}"
+vector_service = "{service_name}"
 
 [server.pool]
 max_connections = 20
-"#,
-            service_name
+"#
         );
 
         let result = ConfigLoader::load_from_str(&toml_content, ConfigFormat::Toml);
@@ -208,11 +207,10 @@ max_connections = 20
             DeploymentMode::Server(config) => {
                 assert_eq!(
                     config.vector_service, expected_type,
-                    "Mismatch for service: {}",
-                    service_name
+                    "Mismatch for service: {service_name}"
                 );
             }
-            _ => panic!("Expected server mode for {}", service_name),
+            _ => panic!("Expected server mode for {service_name}"),
         }
     }
 }

@@ -71,9 +71,9 @@ impl FaissIndexType {
     /// 获取 FAISS 索引字符串
     pub fn to_faiss_string(&self, dimension: usize, nlist: Option<usize>) -> String {
         match self {
-            FaissIndexType::Flat => format!("Flat"),
+            FaissIndexType::Flat => "Flat".to_string(),
             FaissIndexType::IVF => format!("IVF{},Flat", nlist.unwrap_or(100)),
-            FaissIndexType::HNSW => format!("HNSW32"),
+            FaissIndexType::HNSW => "HNSW32".to_string(),
             FaissIndexType::PQ => format!("PQ{}x8", dimension / 8),
             FaissIndexType::IVFPQ => format!("IVF{},PQ{}x8", nlist.unwrap_or(100), dimension / 8),
         }
@@ -103,6 +103,7 @@ struct HierarchicalIndex {
 
 /// 索引层
 #[derive(Debug, Clone)]
+#[derive(Default)]
 struct IndexLayer {
     /// 节点连接图
     connections: HashMap<String, Vec<String>>,
@@ -121,14 +122,6 @@ impl Default for HierarchicalIndex {
     }
 }
 
-impl Default for IndexLayer {
-    fn default() -> Self {
-        Self {
-            connections: HashMap::new(),
-            node_vectors: HashMap::new(),
-        }
-    }
-}
 
 /// FAISS 存储实现
 /// 增强的高性能内存实现，兼容 FAISS 的核心算法
@@ -150,13 +143,13 @@ impl FaissStore {
         // 确保数据目录存在
         if let Some(parent) = config.data_path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to create data directory: {}", e))
+                AgentMemError::storage_error(format!("Failed to create data directory: {e}"))
             })?;
         }
 
         if let Some(parent) = config.metadata_path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to create metadata directory: {}", e))
+                AgentMemError::storage_error(format!("Failed to create metadata directory: {e}"))
             })?;
         }
 
@@ -201,20 +194,20 @@ impl FaissStore {
     async fn save_metadata(&self) -> Result<()> {
         let metadata = self.metadata.read().unwrap().clone();
         let content = serde_json::to_string_pretty(&metadata).map_err(|e| {
-            AgentMemError::storage_error(&format!("Failed to serialize metadata: {}", e))
+            AgentMemError::storage_error(format!("Failed to serialize metadata: {e}"))
         })?;
 
         // 确保父目录存在
         if let Some(parent) = self.config.metadata_path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to create metadata directory: {}", e))
+                AgentMemError::storage_error(format!("Failed to create metadata directory: {e}"))
             })?;
         }
 
         fs::write(&self.config.metadata_path, content)
             .await
             .map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to write metadata: {}", e))
+                AgentMemError::storage_error(format!("Failed to write metadata: {e}"))
             })?;
 
         Ok(())
@@ -278,7 +271,7 @@ impl VectorStore for FaissStore {
 
                 // 验证向量维度
                 if vector_data.vector.len() != self.config.dimension {
-                    return Err(AgentMemError::validation_error(&format!(
+                    return Err(AgentMemError::validation_error(format!(
                         "Vector dimension {} does not match expected dimension {}",
                         vector_data.vector.len(),
                         self.config.dimension
@@ -323,7 +316,7 @@ impl VectorStore for FaissStore {
     ) -> Result<Vec<VectorSearchResult>> {
         // 验证查询向量维度
         if query_vector.len() != self.config.dimension {
-            return Err(AgentMemError::validation_error(&format!(
+            return Err(AgentMemError::validation_error(format!(
                 "Query vector dimension {} does not match expected dimension {}",
                 query_vector.len(),
                 self.config.dimension
@@ -419,7 +412,7 @@ impl VectorStore for FaissStore {
 
                 // 验证向量维度
                 if vector_data.vector.len() != self.config.dimension {
-                    return Err(AgentMemError::validation_error(&format!(
+                    return Err(AgentMemError::validation_error(format!(
                         "Vector dimension {} does not match expected dimension {}",
                         vector_data.vector.len(),
                         self.config.dimension
@@ -537,11 +530,10 @@ impl VectorStore for FaissStore {
                 "degraded".to_string()
             },
             message: if is_healthy {
-                format!("FAISS store is healthy with {} vectors", vector_count)
+                format!("FAISS store is healthy with {vector_count} vectors")
             } else {
                 format!(
-                    "Data inconsistency detected: {} vectors vs {} metadata entries",
-                    vector_count, metadata_count
+                    "Data inconsistency detected: {vector_count} vectors vs {metadata_count} metadata entries"
                 )
             },
             timestamp: chrono::Utc::now(),
@@ -578,7 +570,7 @@ impl VectorStore for FaissStore {
         Ok(VectorStoreStats {
             total_vectors: vector_count,
             dimension: self.config.dimension,
-            index_size: index_size,
+            index_size,
         })
     }
 

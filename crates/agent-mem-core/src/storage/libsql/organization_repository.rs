@@ -40,7 +40,7 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create organization: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create organization: {e}")))?;
 
         Ok(org.clone())
     }
@@ -51,40 +51,40 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE id = ? AND is_deleted = 0")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {e}")))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let org = Organization {
                 id: row
                     .get::<String>(0)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
                 name: row
                     .get::<String>(1)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
                 is_deleted: row
                     .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {}", e)))?
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
                     != 0,
             };
             Ok(Some(org))
@@ -99,40 +99,40 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE name = ? AND is_deleted = 0")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![name])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {e}")))?;
 
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let org = Organization {
                 id: row
                     .get::<String>(0)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
                 name: row
                     .get::<String>(1)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
                 is_deleted: row
                     .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {}", e)))?
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
                     != 0,
             };
             Ok(Some(org))
@@ -153,7 +153,7 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update organization: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update organization: {e}")))?;
 
         Ok(org.clone())
     }
@@ -166,7 +166,7 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
             libsql::params![id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete organization: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete organization: {e}")))?;
 
         Ok(())
     }
@@ -177,41 +177,41 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![limit, offset])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organizations: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organizations: {e}")))?;
 
         let mut organizations = Vec::new();
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let org = Organization {
                 id: row
                     .get::<String>(0)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
                 name: row
                     .get::<String>(1)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {}", e)))?,
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
                 updated_at: chrono::DateTime::from_timestamp(
                     row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {}", e)))?,
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
                     0,
                 )
                 .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
                 is_deleted: row
                     .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {}", e)))?
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
                     != 0,
             };
             organizations.push(org);

@@ -54,7 +54,7 @@ impl LanceDBStore {
         // Expand home directory
         let expanded_path = if path.starts_with("~/") {
             let home = std::env::var("HOME").map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get HOME directory: {}", e))
+                AgentMemError::StorageError(format!("Failed to get HOME directory: {e}"))
             })?;
             path.replace("~", &home)
         } else {
@@ -64,7 +64,7 @@ impl LanceDBStore {
         // Create parent directory if needed
         if let Some(parent) = Path::new(&expanded_path).parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to create directory: {}", e))
+                AgentMemError::StorageError(format!("Failed to create directory: {e}"))
             })?;
         }
 
@@ -72,7 +72,7 @@ impl LanceDBStore {
         let conn = connect(&expanded_path)
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to connect to LanceDB: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to connect to LanceDB: {e}")))?;
 
         info!("LanceDB store initialized successfully");
 
@@ -90,7 +90,7 @@ impl LanceDBStore {
             .table_names()
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {e}")))?;
 
         if table_names.contains(&self.table_name) {
             // Open existing table
@@ -98,7 +98,7 @@ impl LanceDBStore {
                 .open_table(&self.table_name)
                 .execute()
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {}", e)))
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {e}")))
         } else {
             // Create new table with empty data
             // We'll add data later
@@ -116,7 +116,7 @@ impl LanceDBStore {
             .table_names()
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {e}")))?;
 
         if !table_names.contains(&self.table_name) {
             debug!("Creating new table: {}", self.table_name);
@@ -196,7 +196,7 @@ impl VectorStore for LanceDBStore {
             ],
         )
         .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to create RecordBatch: {}", e))
+            AgentMemError::StorageError(format!("Failed to create RecordBatch: {e}"))
         })?;
 
         debug!(
@@ -211,7 +211,7 @@ impl VectorStore for LanceDBStore {
             .table_names()
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list tables: {e}")))?;
 
         // Create RecordBatchIterator (implements RecordBatchReader)
         let batches = vec![Ok(batch)];
@@ -224,13 +224,13 @@ impl VectorStore for LanceDBStore {
                 .open_table(&self.table_name)
                 .execute()
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to open table: {e}")))?;
 
             table
                 .add(reader)
                 .execute()
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to add vectors: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to add vectors: {e}")))?;
 
             info!("Added {} vectors to existing table '{}'", num_vectors, self.table_name);
         } else {
@@ -240,7 +240,7 @@ impl VectorStore for LanceDBStore {
                 .execute()
                 .await
                 .map_err(|e| {
-                    AgentMemError::StorageError(format!("Failed to create table: {}", e))
+                    AgentMemError::StorageError(format!("Failed to create table: {e}"))
                 })?;
 
             info!("Created table '{}' with {} vectors", self.table_name, num_vectors);
@@ -265,14 +265,14 @@ impl VectorStore for LanceDBStore {
         let batches = table
             .query()
             .nearest_to(query_vector.as_slice())
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create nearest_to query: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create nearest_to query: {e}")))?
             .limit(limit)
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {e}")))?;
 
         // 3. 解析结果并转换为 VectorSearchResult
         let mut results = Vec::new();
@@ -406,7 +406,7 @@ impl VectorStore for LanceDBStore {
         table
             .delete(&condition)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Delete failed: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Delete failed: {e}")))?;
 
         info!("Successfully deleted {} vectors", ids.len());
         Ok(())
@@ -454,10 +454,10 @@ impl VectorStore for LanceDBStore {
             .query()
             .execute()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {e}")))?;
 
         // Parse results and find matching ID
         for batch in batches {
@@ -532,7 +532,7 @@ impl VectorStore for LanceDBStore {
                 let count = table
                     .count_rows(None)
                     .await
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to count rows: {}", e)))?;
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to count rows: {e}")))?;
                 Ok(count)
             }
             Err(_) => Ok(0),
@@ -553,8 +553,7 @@ impl VectorStore for LanceDBStore {
         match self.conn.table_names().execute().await {
             Ok(_) => Ok(agent_mem_traits::HealthStatus::healthy()),
             Err(e) => Ok(agent_mem_traits::HealthStatus::unhealthy(&format!(
-                "LanceDB health check failed: {}",
-                e
+                "LanceDB health check failed: {e}"
             ))),
         }
     }
@@ -1080,7 +1079,7 @@ mod tests {
 
         for i in 0..num_vectors {
             vectors.push(VectorData {
-                id: format!("vec_{}", i),
+                id: format!("vec_{i}"),
                 vector: vec![i as f32 / num_vectors as f32; dimension],
                 metadata: std::collections::HashMap::new(),
             });
@@ -1092,11 +1091,11 @@ mod tests {
         let duration = start.elapsed();
 
         let ops_per_sec = num_vectors as f64 / duration.as_secs_f64();
-        println!("插入性能: {:.2} ops/s (目标: > 1000 ops/s)", ops_per_sec);
-        println!("插入 {} 个向量耗时: {:?}", num_vectors, duration);
+        println!("插入性能: {ops_per_sec:.2} ops/s (目标: > 1000 ops/s)");
+        println!("插入 {num_vectors} 个向量耗时: {duration:?}");
 
         // 验证性能指标
-        assert!(ops_per_sec > 1000.0, "插入性能未达标: {:.2} ops/s < 1000 ops/s", ops_per_sec);
+        assert!(ops_per_sec > 1000.0, "插入性能未达标: {ops_per_sec:.2} ops/s < 1000 ops/s");
     }
 
     /// 性能基准测试：向量搜索性能 (1K 向量)
@@ -1117,7 +1116,7 @@ mod tests {
 
         for i in 0..num_vectors {
             vectors.push(VectorData {
-                id: format!("vec_{}", i),
+                id: format!("vec_{i}"),
                 vector: vec![i as f32 / num_vectors as f32; dimension],
                 metadata: std::collections::HashMap::new(),
             });
@@ -1131,11 +1130,11 @@ mod tests {
         let results = store.search_vectors(query, 10, None).await.unwrap();
         let duration = start.elapsed();
 
-        println!("搜索性能 (1K 向量): {:?} (目标: < 50ms)", duration);
+        println!("搜索性能 (1K 向量): {duration:?} (目标: < 50ms)");
         println!("返回结果数: {}", results.len());
 
         // 验证性能指标（LanceDB 嵌入式数据库，50ms 是合理目标）
-        assert!(duration.as_millis() < 50, "搜索延迟未达标: {:?} >= 50ms", duration);
+        assert!(duration.as_millis() < 50, "搜索延迟未达标: {duration:?} >= 50ms");
     }
 
     /// 性能基准测试：向量搜索性能 (10K 向量)
@@ -1161,7 +1160,7 @@ mod tests {
             for i in 0..batch_size {
                 let idx = batch_idx * batch_size + i;
                 vectors.push(VectorData {
-                    id: format!("vec_{}", idx),
+                    id: format!("vec_{idx}"),
                     vector: vec![idx as f32 / num_vectors as f32; dimension],
                     metadata: std::collections::HashMap::new(),
                 });
@@ -1175,11 +1174,11 @@ mod tests {
         let results = store.search_vectors(query, 10, None).await.unwrap();
         let duration = start.elapsed();
 
-        println!("搜索性能 (10K 向量): {:?} (目标: < 50ms)", duration);
+        println!("搜索性能 (10K 向量): {duration:?} (目标: < 50ms)");
         println!("返回结果数: {}", results.len());
 
         // 验证性能指标（10K 向量应该 < 50ms）
-        assert!(duration.as_millis() < 50, "搜索延迟未达标: {:?} >= 50ms", duration);
+        assert!(duration.as_millis() < 50, "搜索延迟未达标: {duration:?} >= 50ms");
     }
 }
 

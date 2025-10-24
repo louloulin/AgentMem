@@ -46,7 +46,7 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create API key: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create API key: {e}")))?;
 
         Ok(api_key.clone())
     }
@@ -62,15 +62,15 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  WHERE key_hash = ? AND is_deleted = 0",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![key_hash.to_string()])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API key: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API key: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
         })? {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();
@@ -109,16 +109,16 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  ORDER BY created_at DESC",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![user_id.to_string()])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {e}")))?;
 
         let mut api_keys = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
         })? {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();
@@ -169,7 +169,7 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                     ],
                 )
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to update API key: {}", e)))?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to update API key: {e}")))?;
 
             if rows_affected == 0 {
                 return Err(AgentMemError::NotFound(format!(
@@ -182,7 +182,7 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
         // Fetch and return the updated API key
         self.find_by_key(&api_key.key_hash)
             .await?
-            .ok_or_else(|| AgentMemError::NotFound(format!("API key with id {} not found", api_key_id)))
+            .ok_or_else(|| AgentMemError::NotFound(format!("API key with id {api_key_id} not found")))
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
@@ -194,12 +194,11 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                 libsql::params![id.to_string()],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete API key: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete API key: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AgentMemError::NotFound(format!(
-                "API key with id {} not found",
-                id
+                "API key with id {id} not found"
             )));
         }
 
@@ -215,12 +214,11 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                 libsql::params![Utc::now().timestamp(), id.to_string()],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to revoke API key: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to revoke API key: {e}")))?;
 
         if rows_affected == 0 {
             return Err(AgentMemError::NotFound(format!(
-                "API key with id {} not found",
-                id
+                "API key with id {id} not found"
             )));
         }
 
@@ -240,16 +238,16 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  LIMIT ? OFFSET ?",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![limit, offset])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {e}")))?;
 
         let mut api_keys = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
         })? {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();

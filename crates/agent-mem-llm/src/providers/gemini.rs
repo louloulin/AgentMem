@@ -90,7 +90,7 @@ impl GeminiProvider {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -149,11 +149,11 @@ impl GeminiProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
             let gemini_response: GeminiResponse = response.json().await.map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                AgentMemError::llm_error(format!("Failed to parse response: {e}"))
             })?;
 
             Ok(gemini_response)
@@ -164,9 +164,8 @@ impl GeminiProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            Err(AgentMemError::llm_error(&format!(
-                "HTTP error {}: {}",
-                status, error_text
+            Err(AgentMemError::llm_error(format!(
+                "HTTP error {status}: {error_text}"
             )))
         }
     }
@@ -181,9 +180,8 @@ impl GeminiProvider {
         // 检查完成原因
         if let Some(finish_reason) = &candidate.finish_reason {
             if finish_reason != "STOP" {
-                return Err(AgentMemError::llm_error(&format!(
-                    "Generation stopped due to: {}",
-                    finish_reason
+                return Err(AgentMemError::llm_error(format!(
+                    "Generation stopped due to: {finish_reason}"
                 )));
             }
         }
@@ -263,14 +261,13 @@ impl LLMProvider for GeminiProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Gemini API request failed: {}", e))
+                AgentMemError::network_error(format!("Gemini API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "Gemini API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "Gemini API error: {error_text}"
             )));
         }
 
@@ -311,9 +308,8 @@ impl LLMProvider for GeminiProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(&format!(
-                        "Stream error: {}",
-                        e
+                    Err(e) => Err(AgentMemError::network_error(format!(
+                        "Stream error: {e}"
                     ))),
                 }
             })

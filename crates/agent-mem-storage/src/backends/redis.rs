@@ -582,7 +582,7 @@ impl VectorStore for RedisStore {
 
             // 验证向量维度
             if vector_data.vector.len() != self.config.vector_dimension {
-                return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+                return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                     "Vector dimension {} does not match expected dimension {}",
                     vector_data.vector.len(),
                     self.config.vector_dimension
@@ -623,7 +623,7 @@ impl VectorStore for RedisStore {
     ) -> Result<Vec<VectorSearchResult>> {
         // 验证查询向量维度
         if query_vector.len() != self.config.vector_dimension {
-            return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+            return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                 "Query vector dimension {} does not match expected dimension {}",
                 query_vector.len(),
                 self.config.vector_dimension
@@ -703,7 +703,7 @@ impl VectorStore for RedisStore {
 
             // 验证向量维度
             if vector_data.vector.len() != self.config.vector_dimension {
-                return Err(agent_mem_traits::AgentMemError::validation_error(&format!(
+                return Err(agent_mem_traits::AgentMemError::validation_error(format!(
                     "Vector dimension {} does not match expected dimension {}",
                     vector_data.vector.len(),
                     self.config.vector_dimension

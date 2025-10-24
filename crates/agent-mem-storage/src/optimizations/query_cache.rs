@@ -324,7 +324,7 @@ mod tests {
     #[tokio::test]
     async fn test_cache_put_get() {
         let cache = QueryCache::<String>::new(QueryCacheConfig::default());
-        let key = CacheKey::new("test_query", &vec!["param1", "param2"]);
+        let key = CacheKey::new("test_query", vec!["param1", "param2"]);
         
         cache.put(key.clone(), "test_value".to_string()).await;
         let value = cache.get(&key).await;
@@ -335,7 +335,7 @@ mod tests {
     #[tokio::test]
     async fn test_cache_miss() {
         let cache = QueryCache::<String>::new(QueryCacheConfig::default());
-        let key = CacheKey::new("test_query", &vec!["param1"]);
+        let key = CacheKey::new("test_query", vec!["param1"]);
         
         let value = cache.get(&key).await;
         assert_eq!(value, None);
@@ -344,7 +344,7 @@ mod tests {
     #[tokio::test]
     async fn test_cache_invalidate() {
         let cache = QueryCache::<String>::new(QueryCacheConfig::default());
-        let key = CacheKey::new("test_query", &vec!["param1"]);
+        let key = CacheKey::new("test_query", vec!["param1"]);
         
         cache.put(key.clone(), "test_value".to_string()).await;
         cache.invalidate(&key).await;
@@ -356,11 +356,11 @@ mod tests {
     #[tokio::test]
     async fn test_cache_stats() {
         let cache = QueryCache::<String>::new(QueryCacheConfig::default());
-        let key = CacheKey::new("test_query", &vec!["param1"]);
+        let key = CacheKey::new("test_query", vec!["param1"]);
         
         cache.put(key.clone(), "test_value".to_string()).await;
         cache.get(&key).await; // hit
-        cache.get(&CacheKey::new("other", &vec!["param"])).await; // miss
+        cache.get(&CacheKey::new("other", vec!["param"])).await; // miss
         
         let stats = cache.stats().await;
         assert_eq!(stats.hits, 1);

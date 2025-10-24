@@ -87,7 +87,7 @@ impl DeepSeekProvider {
         let client = Client::builder()
             .timeout(config.timeout)
             .build()
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self { config, client })
     }
@@ -141,7 +141,7 @@ impl DeepSeekProvider {
     async fn send_request(&self, request: &DeepSeekRequest) -> Result<DeepSeekResponse> {
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.config.base_url))
+            .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .header("Content-Type", "application/json")
             .json(request)
@@ -155,9 +155,9 @@ impl DeepSeekProvider {
                         e
                     ))
                 } else if e.is_connect() {
-                    AgentMemError::LLMError(format!("Connection failed: {}", e))
+                    AgentMemError::LLMError(format!("Connection failed: {e}"))
                 } else {
-                    AgentMemError::LLMError(format!("Request failed: {}", e))
+                    AgentMemError::LLMError(format!("Request failed: {e}"))
                 }
             })?;
 
@@ -168,15 +168,14 @@ impl DeepSeekProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::LLMError(format!(
-                "DeepSeek API error {}: {}",
-                status, error_text
+                "DeepSeek API error {status}: {error_text}"
             )));
         }
 
         let deepseek_response: DeepSeekResponse = response
             .json()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse response: {e}")))?;
 
         Ok(deepseek_response)
     }
@@ -205,8 +204,7 @@ impl DeepSeekProvider {
         T: for<'de> Deserialize<'de>,
     {
         let json_prompt = format!(
-            "{}\n\nPlease respond with valid JSON only, no additional text or formatting.",
-            prompt
+            "{prompt}\n\nPlease respond with valid JSON only, no additional text or formatting."
         );
 
         let response_text = self.generate_text(&json_prompt).await?;
@@ -221,7 +219,7 @@ impl DeepSeekProvider {
             .trim();
 
         serde_json::from_str(cleaned_text)
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse JSON response: {}", e)))
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse JSON response: {e}")))
     }
 
     /// 生成系统和用户消息的响应

@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metrics_text = metrics_registry.gather();
     for line in metrics_text.lines().take(20) {
         if !line.starts_with('#') && !line.is_empty() {
-            println!("   {}", line);
+            println!("   {line}");
         }
     }
     println!("   {}", "-".repeat(60));

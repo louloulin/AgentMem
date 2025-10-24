@@ -576,7 +576,7 @@ impl ContextSynthesizer {
 
         let avg_relevance =
             memories.iter().map(|m| m.relevance_score).sum::<f32>() / memories.len() as f32;
-        insights.push(format!("平均相关性分数: {:.2}", avg_relevance));
+        insights.push(format!("平均相关性分数: {avg_relevance:.2}"));
 
         Ok(insights)
     }
@@ -598,8 +598,7 @@ impl ContextSynthesizer {
             / total_memories as f32;
 
         Ok(format!(
-            "成功合成了 {} 个记忆项，平均置信度 {:.2}。合成结果包含了多个来源的信息，经过冲突检测和解决处理。",
-            total_memories, avg_confidence
+            "成功合成了 {total_memories} 个记忆项，平均置信度 {avg_confidence:.2}。合成结果包含了多个来源的信息，经过冲突检测和解决处理。"
         ))
     }
 
@@ -694,8 +693,8 @@ impl ContextSynthesizer {
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<serde_json::Value> {
         let stats = self.stats.read().await;
-        Ok(serde_json::to_value(&*stats).map_err(|e| {
-            AgentMemError::ProcessingError(format!("Failed to serialize stats: {}", e))
-        })?)
+        serde_json::to_value(&*stats).map_err(|e| {
+            AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}"))
+        })
     }
 }

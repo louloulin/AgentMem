@@ -169,7 +169,7 @@ impl LocalTestProvider {
     /// 估算 token 数量（简单实现）
     fn estimate_tokens(&self, text: &str) -> usize {
         // 简单的 token 估算：大约每 4 个字符一个 token
-        (text.len() + 3) / 4
+        text.len().div_ceil(4)
     }
 }
 
@@ -292,7 +292,6 @@ impl LocalTestProvider {
             serde_json::Value::Object(
                 self.generate_usage_stats(input_tokens, output_tokens)
                     .into_iter()
-                    .map(|(k, v)| (k, v))
                     .collect(),
             ),
         );

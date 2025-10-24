@@ -76,7 +76,7 @@ async fn demo_direct_litellm() -> anyhow::Result<()> {
                 }
             }
             Err(e) => {
-                println!("   ⚠️  LLM 调用失败: {}", e);
+                println!("   ⚠️  LLM 调用失败: {e}");
                 println!("      这可能是由于网络问题或 API 配额限制");
             }
         }
@@ -141,7 +141,7 @@ async fn demo_factory_litellm() -> anyhow::Result<()> {
                         }
                     }
                     Err(e) => {
-                        println!("   ⚠️  工厂接口调用失败: {}", e);
+                        println!("   ⚠️  工厂接口调用失败: {e}");
                     }
                 }
             } else {
@@ -149,7 +149,7 @@ async fn demo_factory_litellm() -> anyhow::Result<()> {
             }
         }
         Err(e) => {
-            println!("   ❌ 工厂创建失败: {}", e);
+            println!("   ❌ 工厂创建失败: {e}");
         }
     }
 
@@ -200,7 +200,7 @@ fn demo_supported_models() {
     ];
 
     for (provider, provider_models) in models {
-        println!("      🏢 {}:", provider);
+        println!("      🏢 {provider}:");
         for model in provider_models {
             println!("         - {}", model.as_str());
         }

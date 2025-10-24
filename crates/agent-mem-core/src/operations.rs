@@ -66,13 +66,13 @@ impl InMemoryOperations {
         // Update agent index
         self.agent_index
             .entry(memory.agent_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(memory.id.clone());
 
         // Update type index
         self.type_index
             .entry(memory.memory_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(memory.id.clone());
     }
 
@@ -413,9 +413,8 @@ impl MemoryOperations for InMemoryOperations {
             let memory_id = memory.id.clone();
 
             if self.memories.contains_key(&memory_id) {
-                return Err(AgentMemError::memory_error(&format!(
-                    "Memory {} already exists",
-                    memory_id
+                return Err(AgentMemError::memory_error(format!(
+                    "Memory {memory_id} already exists"
                 )));
             }
 

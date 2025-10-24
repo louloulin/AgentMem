@@ -274,6 +274,12 @@ pub struct HierarchicalMemoryManager {
     inheritance_cache: HashMap<MemoryScope, Vec<MemoryScope>>,
 }
 
+impl Default for HierarchicalMemoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HierarchicalMemoryManager {
     /// Create a new hierarchical memory manager
     pub fn new() -> Self {
@@ -306,7 +312,7 @@ impl HierarchicalMemoryManager {
 
         self.memories
             .entry(scope)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(hierarchical_memory);
 
         Ok(Uuid::new_v4().to_string())

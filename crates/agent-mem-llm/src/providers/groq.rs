@@ -97,7 +97,7 @@ impl GroqProvider {
             .timeout(Duration::from_secs(30)) // Groq 以速度著称，30秒足够
             .build()
             .map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -149,15 +149,15 @@ impl GroqProvider {
                 .client
                 .post(&url)
                 .header("Content-Type", "application/json")
-                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Authorization", format!("Bearer {api_key}"))
                 .json(&request)
                 .send()
                 .await
-                .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+                .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
             if response.status().is_success() {
                 let groq_response: GroqResponse = response.json().await.map_err(|e| {
-                    AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                    AgentMemError::llm_error(format!("Failed to parse response: {e}"))
                 })?;
 
                 return Ok(groq_response);
@@ -174,14 +174,13 @@ impl GroqProvider {
 
                 // 尝试解析 Groq 错误响应
                 if let Ok(groq_error) = serde_json::from_str::<GroqError>(&error_text) {
-                    return Err(AgentMemError::llm_error(&format!(
+                    return Err(AgentMemError::llm_error(format!(
                         "Groq API error: {} ({})",
                         groq_error.error.message, groq_error.error.error_type
                     )));
                 } else {
-                    return Err(AgentMemError::llm_error(&format!(
-                        "HTTP error {}: {}",
-                        status, error_text
+                    return Err(AgentMemError::llm_error(format!(
+                        "HTTP error {status}: {error_text}"
                     )));
                 }
             }
@@ -199,9 +198,8 @@ impl GroqProvider {
         // 检查完成原因
         if let Some(finish_reason) = &choice.finish_reason {
             if finish_reason != "stop" && finish_reason != "length" {
-                return Err(AgentMemError::llm_error(&format!(
-                    "Generation stopped due to: {}",
-                    finish_reason
+                return Err(AgentMemError::llm_error(format!(
+                    "Generation stopped due to: {finish_reason}"
                 )));
             }
         }
@@ -283,7 +281,7 @@ impl LLMProvider for GroqProvider {
             return Err(AgentMemError::config_error("Model name is required"));
         }
         if !self.is_model_supported() {
-            return Err(AgentMemError::config_error(&format!(
+            return Err(AgentMemError::config_error(format!(
                 "Model '{}' is not supported by Groq. Supported models: {:?}",
                 self.config.model,
                 Self::supported_models()

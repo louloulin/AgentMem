@@ -60,7 +60,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::hierarchy::{HierarchicalMemory, MemoryLevel, MemoryScope};
-use crate::{types::*, CoreResult};
+use crate::CoreResult;
 
 /// Storage backend trait for persistent memory storage
 #[async_trait]
@@ -141,6 +141,7 @@ pub trait CacheBackend: Send + Sync {
 
 /// Storage configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct StorageConfig {
     /// PostgreSQL configuration
     #[cfg(feature = "postgres")]
@@ -261,17 +262,6 @@ pub struct HealthStatus {
     pub last_check: DateTime<Utc>,
 }
 
-impl Default for StorageConfig {
-    fn default() -> Self {
-        Self {
-            #[cfg(feature = "postgres")]
-            postgres: PostgresConfig::default(),
-            #[cfg(feature = "redis-cache")]
-            redis: RedisConfig::default(),
-            cache: CacheConfig::default(),
-        }
-    }
-}
 
 #[cfg(feature = "postgres")]
 impl Default for PostgresConfig {

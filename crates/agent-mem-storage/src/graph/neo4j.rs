@@ -81,14 +81,14 @@ impl Neo4jStore {
         };
 
         // 创建基本认证头
-        let auth_string = format!("{}:{}", username, password);
+        let auth_string = format!("{username}:{password}");
         let auth_header = format!("Basic {}", base64::encode(&auth_string));
 
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let store = Self {
@@ -130,7 +130,7 @@ impl Neo4jStore {
             .json(&query)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -139,13 +139,12 @@ impl Neo4jStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Neo4j connection test failed {}: {}",
-                status, error_text
+                "Neo4j connection test failed {status}: {error_text}"
             )));
         }
 
         let result: Neo4jQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if !result.errors.is_empty() {
@@ -188,7 +187,7 @@ impl Neo4jStore {
             .json(&query)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -197,13 +196,12 @@ impl Neo4jStore {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Neo4j query failed {}: {}",
-                status, error_text
+                "Neo4j query failed {status}: {error_text}"
             )));
         }
 
         let result: Neo4jQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if !result.errors.is_empty() {
@@ -369,7 +367,7 @@ impl GraphStore for Neo4jStore {
                                     rel_map.get("confidence").and_then(|v| v.as_f64()),
                                 ) {
                                     relations.push(Relation {
-                                        id: format!("{}_{}", source, target),
+                                        id: format!("{source}_{target}"),
                                         source: source.to_string(),
                                         target: target.to_string(),
                                         relation: rel_type.to_string(),
@@ -398,11 +396,10 @@ impl GraphStore for Neo4jStore {
         let statement = format!(
             r#"
             MATCH (start:Entity {{id: $entity_id}})
-            MATCH (start)-[*1..{}]-(neighbor:Entity)
+            MATCH (start)-[*1..{depth}]-(neighbor:Entity)
             RETURN DISTINCT neighbor.id as id, neighbor.entity_type as entity_type, neighbor.name as name
             LIMIT 50
-        "#,
-            depth
+        "#
         );
 
         let mut parameters = HashMap::new();

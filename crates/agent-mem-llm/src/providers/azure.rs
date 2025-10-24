@@ -114,7 +114,7 @@ impl AzureProvider {
             .timeout(Duration::from_secs(60)) // Azure 可能需要更长时间
             .build()
             .map_err(|e| {
-                AgentMemError::llm_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let api_version = "2024-02-01".to_string(); // 使用最新的稳定版本
@@ -180,11 +180,11 @@ impl AzureProvider {
                 .json(&request)
                 .send()
                 .await
-                .map_err(|e| AgentMemError::llm_error(&format!("Request failed: {}", e)))?;
+                .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
             if response.status().is_success() {
                 let azure_response: AzureResponse = response.json().await.map_err(|e| {
-                    AgentMemError::llm_error(&format!("Failed to parse response: {}", e))
+                    AgentMemError::llm_error(format!("Failed to parse response: {e}"))
                 })?;
 
                 return Ok(azure_response);
@@ -201,14 +201,13 @@ impl AzureProvider {
 
                 // 尝试解析 Azure 错误响应
                 if let Ok(azure_error) = serde_json::from_str::<AzureError>(&error_text) {
-                    return Err(AgentMemError::llm_error(&format!(
+                    return Err(AgentMemError::llm_error(format!(
                         "Azure OpenAI API error: {} ({})",
                         azure_error.error.message, azure_error.error.code
                     )));
                 } else {
-                    return Err(AgentMemError::llm_error(&format!(
-                        "HTTP error {}: {}",
-                        status, error_text
+                    return Err(AgentMemError::llm_error(format!(
+                        "HTTP error {status}: {error_text}"
                     )));
                 }
             }
@@ -230,9 +229,8 @@ impl AzureProvider {
                     "Content was filtered by Azure content policy",
                 ));
             } else if finish_reason != "stop" && finish_reason != "length" {
-                return Err(AgentMemError::llm_error(&format!(
-                    "Generation stopped due to: {}",
-                    finish_reason
+                return Err(AgentMemError::llm_error(format!(
+                    "Generation stopped due to: {finish_reason}"
                 )));
             }
         }
@@ -296,14 +294,13 @@ impl LLMProvider for AzureProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Azure OpenAI API request failed: {}", e))
+                AgentMemError::network_error(format!("Azure OpenAI API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "Azure OpenAI API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "Azure OpenAI API error: {error_text}"
             )));
         }
 
@@ -343,9 +340,8 @@ impl LLMProvider for AzureProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(&format!(
-                        "Stream error: {}",
-                        e
+                    Err(e) => Err(AgentMemError::network_error(format!(
+                        "Stream error: {e}"
                     ))),
                 }
             })

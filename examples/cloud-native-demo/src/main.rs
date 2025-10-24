@@ -295,7 +295,7 @@ async fn demo_kubernetes_deployment(deploy: bool, status: bool, scale: Option<u3
     }
 
     if let Some(replicas) = scale {
-        println!("{}", format!("📈 扩缩容到 {} 副本...", replicas).yellow());
+        println!("{}", format!("📈 扩缩容到 {replicas} 副本...").yellow());
         let pb = create_progress_bar("扩缩容");
 
         for i in 0..100 {
@@ -668,8 +668,7 @@ async fn show_logs_analysis() -> Result<()> {
             _ => level.normal(),
         };
         println!(
-            "{:<6} {:<20} {:<50} {:<15}",
-            level_colored, timestamp, message, service
+            "{level_colored:<6} {timestamp:<20} {message:<50} {service:<15}"
         );
     }
     println!();

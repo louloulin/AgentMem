@@ -41,7 +41,7 @@ async fn create_migrations_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create migrations table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create migrations table: {e}")))?;
 
     Ok(())
 }
@@ -57,7 +57,7 @@ async fn run_migration(
     let mut rows = conn
         .query("SELECT id FROM _migrations WHERE id = ?", libsql::params![version])
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to check migration status: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to check migration status: {e}")))?;
 
     if rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))?.is_some() {
         return Ok(()); // Already applied
@@ -72,7 +72,7 @@ async fn run_migration(
         libsql::params![version, name, chrono::Utc::now().timestamp()],
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to record migration: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to record migration: {e}")))?;
 
     Ok(())
 }
@@ -90,7 +90,7 @@ async fn create_organizations_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create organizations table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create organizations table: {e}")))?;
 
     Ok(())
 }
@@ -118,7 +118,7 @@ async fn create_users_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create users table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create users table: {e}")))?;
 
     Ok(())
 }
@@ -153,7 +153,7 @@ async fn create_agents_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create agents table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create agents table: {e}")))?;
 
     Ok(())
 }
@@ -190,7 +190,7 @@ async fn create_messages_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create messages table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create messages table: {e}")))?;
 
     Ok(())
 }
@@ -220,7 +220,7 @@ async fn create_blocks_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks table: {e}")))?;
 
     Ok(())
 }
@@ -248,7 +248,7 @@ async fn create_tools_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools table: {e}")))?;
 
     Ok(())
 }
@@ -286,7 +286,7 @@ async fn create_memories_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memories table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memories table: {e}")))?;
 
     Ok(())
 }
@@ -311,7 +311,7 @@ async fn create_api_keys_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create api_keys table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create api_keys table: {e}")))?;
 
     Ok(())
 }
@@ -331,7 +331,7 @@ async fn create_junction_tables(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks_agents table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks_agents table: {e}")))?;
 
     // tools_agents junction table
     conn.execute(
@@ -346,7 +346,7 @@ async fn create_junction_tables(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools_agents table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools_agents table: {e}")))?;
 
     Ok(())
 }
@@ -376,7 +376,7 @@ async fn create_memory_associations_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory_associations table: {}", e)))?;
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory_associations table: {e}")))?;
 
     Ok(())
 }
@@ -428,7 +428,7 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
     for index_sql in indexes {
         conn.execute(index_sql, ())
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
     }
 
     Ok(())

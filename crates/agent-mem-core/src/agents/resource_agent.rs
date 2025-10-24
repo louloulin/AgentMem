@@ -65,7 +65,7 @@ impl ResourceAgent {
             "query": query
         });
 
-        log::info!("Resource agent: Searched for '{}'", query);
+        log::info!("Resource agent: Searched for '{query}'");
         Ok(response)
     }
 }

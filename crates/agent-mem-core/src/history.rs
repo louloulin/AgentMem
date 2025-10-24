@@ -352,7 +352,7 @@ impl MemoryHistory {
         let memory_id = entry.memory_id.clone();
         self.history
             .entry(memory_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(entry);
 
         // Enforce limits immediately

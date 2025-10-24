@@ -25,7 +25,7 @@ mod tests {
         let mut metadata = HashMap::new();
         metadata.insert("test_key".to_string(), "test_value".to_string());
         metadata.insert("category".to_string(), "test".to_string());
-        metadata.insert("content".to_string(), format!("Test content for {}", id));
+        metadata.insert("content".to_string(), format!("Test content for {id}"));
 
         VectorData {
             id: id.to_string(),
@@ -331,7 +331,7 @@ mod tests {
                 ((i + 2) as f32) / 100.0,
                 ((i + 3) as f32) / 100.0,
             ];
-            vectors.push(create_test_vector(&format!("perf_test_{}", i), vector));
+            vectors.push(create_test_vector(&format!("perf_test_{i}"), vector));
         }
 
         let start = std::time::Instant::now();

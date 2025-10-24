@@ -13,7 +13,7 @@ use crate::managers::{
     ContextualMemoryManager, CoreMemoryManager, KnowledgeVaultManager, ResourceMemoryManager,
 };
 use crate::retrieval::ActiveRetrievalSystem;
-use agent_mem_traits::{AgentMemError, MemoryItem as Memory, MemoryType, Result};
+use agent_mem_traits::{AgentMemError, MemoryType, Result};
 
 /// 系统配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

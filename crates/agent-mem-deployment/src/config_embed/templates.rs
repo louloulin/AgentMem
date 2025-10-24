@@ -123,7 +123,7 @@ impl ConfigVariables {
         let mut result = template.to_string();
         
         for (key, value) in &self.variables {
-            let placeholder = format!("${{{}}}", key);
+            let placeholder = format!("${{{key}}}");
             result = result.replace(&placeholder, value);
         }
         

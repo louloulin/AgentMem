@@ -5,15 +5,14 @@
 /// - 冗余关系清理
 /// - 图分区
 /// - 查询优化
-use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::graph_memory::{GraphEdge, GraphMemoryEngine, GraphNode, MemoryId, RelationType};
+use crate::graph_memory::{GraphMemoryEngine, MemoryId};
 
 /// 图压缩配置
 #[derive(Debug, Clone)]
@@ -298,7 +297,7 @@ impl GraphOptimizationEngine {
 
     /// 查找弱关系
     async fn find_weak_relations(&self) -> Result<Vec<RedundantRelation>> {
-        let mut redundant = Vec::new();
+        let redundant = Vec::new();
 
         // 查找权重低于阈值的边
         // 简化实现
@@ -308,7 +307,7 @@ impl GraphOptimizationEngine {
 
     /// 查找自环
     async fn find_self_loops(&self) -> Result<Vec<RedundantRelation>> {
-        let mut redundant = Vec::new();
+        let redundant = Vec::new();
 
         // 查找指向自己的边
         // 简化实现
@@ -362,7 +361,7 @@ impl GraphOptimizationEngine {
 
     /// 查找相似节点对
     async fn find_similar_node_pairs(&self) -> Result<Vec<(MemoryId, MemoryId, f32)>> {
-        let mut pairs = Vec::new();
+        let pairs = Vec::new();
 
         // 简化实现：基于节点类型和属性计算相似度
         // 实际实现需要访问 graph_engine 的节点数据
@@ -381,7 +380,7 @@ impl GraphOptimizationEngine {
 
     /// 移除低权重边
     async fn remove_weak_edges(&self) -> Result<usize> {
-        let mut removed_count = 0;
+        let removed_count = 0;
 
         // 查找并移除权重低于阈值的边
         // 简化实现
@@ -414,7 +413,7 @@ impl GraphOptimizationEngine {
 
         for i in 0..num_partitions {
             partitions.push(GraphPartition {
-                partition_id: format!("hash_partition_{}", i),
+                partition_id: format!("hash_partition_{i}"),
                 nodes: HashSet::new(),
                 edges: HashSet::new(),
                 size_bytes: 0,
@@ -436,7 +435,7 @@ impl GraphOptimizationEngine {
 
         for node_type in node_types {
             partitions.push(GraphPartition {
-                partition_id: format!("type_partition_{}", node_type),
+                partition_id: format!("type_partition_{node_type}"),
                 nodes: HashSet::new(),
                 edges: HashSet::new(),
                 size_bytes: 0,
@@ -448,7 +447,7 @@ impl GraphOptimizationEngine {
 
     /// 基于社区的分区
     async fn community_based_partition(&self) -> Result<Vec<GraphPartition>> {
-        let mut partitions = Vec::new();
+        let partitions = Vec::new();
 
         // 使用社区检测算法（如 Louvain 算法）
         // 简化实现
@@ -458,7 +457,7 @@ impl GraphOptimizationEngine {
 
     /// 基于时间的分区
     async fn time_based_partition(&self, time_window_days: i64) -> Result<Vec<GraphPartition>> {
-        let mut partitions = Vec::new();
+        let partitions = Vec::new();
 
         // 按时间窗口划分节点
         // 简化实现
@@ -493,7 +492,7 @@ impl GraphOptimizationEngine {
         Ok(QueryOptimizationHint {
             use_index,
             index_name: if use_index {
-                Some(format!("node_index_{}", start_node))
+                Some(format!("node_index_{start_node}"))
             } else {
                 None
             },

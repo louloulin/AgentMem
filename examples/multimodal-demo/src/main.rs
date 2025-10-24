@@ -78,7 +78,7 @@ async fn demo_litellm_multimodal() -> anyhow::Result<()> {
                 }
             }
             Err(e) => {
-                println!("   ⚠️  多模态调用失败: {}", e);
+                println!("   ⚠️  多模态调用失败: {e}");
                 println!("      这可能是由于模型不支持或 API 配额限制");
             }
         }
@@ -106,8 +106,7 @@ fn demo_content_type_detection() {
     for (filename, expected_mime) in test_cases {
         let detected_type = detect_content_type_from_filename(filename);
         println!(
-            "      📄 {} -> {} (预期: {})",
-            filename, detected_type, expected_mime
+            "      📄 {filename} -> {detected_type} (预期: {expected_mime})"
         );
     }
 
@@ -187,7 +186,7 @@ async fn demo_litellm_multimodal_integration() -> anyhow::Result<()> {
                         }
                     }
                     Err(e) => {
-                        println!("   ⚠️  集成分析失败: {}", e);
+                        println!("   ⚠️  集成分析失败: {e}");
                     }
                 }
             } else {
@@ -195,7 +194,7 @@ async fn demo_litellm_multimodal_integration() -> anyhow::Result<()> {
             }
         }
         Err(e) => {
-            println!("   ❌ 集成提供商创建失败: {}", e);
+            println!("   ❌ 集成提供商创建失败: {e}");
         }
     }
 
@@ -209,7 +208,7 @@ async fn demo_litellm_multimodal_integration() -> anyhow::Result<()> {
     ];
 
     for (name, model_id, provider_name) in multimodal_models {
-        println!("      - {}: {} ({})", name, model_id, provider_name);
+        println!("      - {name}: {model_id} ({provider_name})");
     }
 
     Ok(())
@@ -217,7 +216,7 @@ async fn demo_litellm_multimodal_integration() -> anyhow::Result<()> {
 
 /// 简化的内容类型检测
 fn detect_content_type_from_filename(filename: &str) -> &'static str {
-    let extension = filename.split('.').last().unwrap_or("");
+    let extension = filename.split('.').next_back().unwrap_or("");
     match extension.to_lowercase().as_str() {
         "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" => "image/*",
         "mp3" | "wav" | "flac" | "aac" | "ogg" => "audio/*",

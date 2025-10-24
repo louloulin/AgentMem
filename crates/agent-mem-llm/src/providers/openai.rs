@@ -123,7 +123,7 @@ impl OpenAIProvider {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let base_url = config
@@ -192,12 +192,12 @@ impl LLMProvider for OpenAIProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -206,13 +206,12 @@ impl LLMProvider for OpenAIProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::llm_error(format!(
-                "OpenAI API error {}: {}",
-                status, error_text
+                "OpenAI API error {status}: {error_text}"
             )));
         }
 
         let openai_response: OpenAIResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         if openai_response.choices.is_empty() {
@@ -260,7 +259,7 @@ impl LLMProvider for OpenAIProvider {
         // 发送流式请求
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.base_url))
+            .post(format!("{}/chat/completions", self.base_url))
             .header(
                 "Authorization",
                 format!("Bearer {}", self.config.api_key.as_ref().unwrap()),
@@ -270,14 +269,13 @@ impl LLMProvider for OpenAIProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("OpenAI API request failed: {}", e))
+                AgentMemError::network_error(format!("OpenAI API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "OpenAI API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "OpenAI API error: {error_text}"
             )));
         }
 
@@ -315,9 +313,8 @@ impl LLMProvider for OpenAIProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(&format!(
-                        "Stream error: {}",
-                        e
+                    Err(e) => Err(AgentMemError::network_error(format!(
+                        "Stream error: {e}"
                     ))),
                 }
             })
@@ -392,7 +389,7 @@ impl LLMProvider for OpenAIProvider {
         // 发送请求
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.base_url))
+            .post(format!("{}/chat/completions", self.base_url))
             .header(
                 "Authorization",
                 format!("Bearer {}", self.config.api_key.as_ref().unwrap()),
@@ -402,19 +399,18 @@ impl LLMProvider for OpenAIProvider {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(&format!("OpenAI API request failed: {}", e))
+                AgentMemError::network_error(format!("OpenAI API request failed: {e}"))
             })?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AgentMemError::llm_error(&format!(
-                "OpenAI API error: {}",
-                error_text
+            return Err(AgentMemError::llm_error(format!(
+                "OpenAI API error: {error_text}"
             )));
         }
 
         let openai_response: OpenAIResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(&format!("Failed to parse OpenAI response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse OpenAI response: {e}"))
         })?;
 
         if openai_response.choices.is_empty() {

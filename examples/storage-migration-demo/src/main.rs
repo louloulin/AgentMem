@@ -221,7 +221,7 @@ async fn create_populated_store(name: &str, count: usize) -> Result<Arc<MemoryVe
     // 生成测试数据
     let mut vectors = Vec::new();
     for i in 0..count {
-        let id = format!("{}_{}", name, i);
+        let id = format!("{name}_{i}");
         let vector = generate_test_vector(i, 128);
         let mut metadata = HashMap::new();
         metadata.insert("index".to_string(), i.to_string());

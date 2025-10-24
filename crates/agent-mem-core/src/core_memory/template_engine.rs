@@ -91,7 +91,7 @@ impl TemplateEngine {
     fn process_variables(&self, template: &str, context: &TemplateContext) -> Result<String> {
         let mut result = template.to_string();
         let var_pattern = regex::Regex::new(r"\{\{([^}]+)\}\}").map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to compile regex: {}", e))
+            AgentMemError::internal_error(format!("Failed to compile regex: {e}"))
         })?;
 
         for cap in var_pattern.captures_iter(template) {
@@ -111,8 +111,7 @@ impl TemplateEngine {
                 val.clone()
             } else if self.strict_mode {
                 return Err(AgentMemError::validation_error(format!(
-                    "Undefined variable: {}",
-                    var_name
+                    "Undefined variable: {var_name}"
                 )));
             } else {
                 String::new()
@@ -136,7 +135,7 @@ impl TemplateEngine {
         let mut result = template.to_string();
         let if_pattern = regex::Regex::new(r"(?s)\{%\s*if\s+([^%]+)\s*%\}(.*?)\{%\s*endif\s*%\}")
             .map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to compile regex: {}", e))
+            AgentMemError::internal_error(format!("Failed to compile regex: {e}"))
         })?;
 
         for cap in if_pattern.captures_iter(template) {
@@ -165,7 +164,7 @@ impl TemplateEngine {
         let for_pattern =
             regex::Regex::new(r"(?s)\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}(.*?)\{%\s*endfor\s*%\}")
                 .map_err(|e| {
-                AgentMemError::internal_error(format!("Failed to compile regex: {}", e))
+                AgentMemError::internal_error(format!("Failed to compile regex: {e}"))
             })?;
 
         for cap in for_pattern.captures_iter(template) {
@@ -179,8 +178,7 @@ impl TemplateEngine {
                 list
             } else if self.strict_mode {
                 return Err(AgentMemError::validation_error(format!(
-                    "Undefined list: {}",
-                    list_name
+                    "Undefined list: {list_name}"
                 )));
             } else {
                 &Vec::new()
@@ -234,8 +232,7 @@ impl TemplateEngine {
                 }
             }
             _ => Err(AgentMemError::validation_error(format!(
-                "Unknown filter: {}",
-                filter
+                "Unknown filter: {filter}"
             ))),
         }
     }

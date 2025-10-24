@@ -110,7 +110,7 @@ impl MessageQueue {
         if let Some(tx) = queues.get(&message.agent_id) {
             tx.send(message)
                 .await
-                .map_err(|e| format!("Failed to send message: {}", e))?;
+                .map_err(|e| format!("Failed to send message: {e}"))?;
             Ok(())
         } else {
             Err(format!("Agent queue not found: {}", message.agent_id))

@@ -35,13 +35,13 @@ impl LibSqlBlockRepository {
             .and_then(|s| serde_json::from_str(&s).ok());
 
         let created_at_ts: i64 = row.get(10).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get created_at: {}", e))
+            AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
         })?;
         let created_at = DateTime::from_timestamp(created_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?;
 
         let updated_at_ts: i64 = row.get(11).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get updated_at: {}", e))
+            AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
         })?;
         let updated_at = DateTime::from_timestamp(updated_at_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?;
@@ -50,15 +50,15 @@ impl LibSqlBlockRepository {
         let is_template_int: i64 = row.get(5).unwrap_or(0);
 
         Ok(Block {
-            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {}", e)))?,
-            organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {}", e)))?,
-            user_id: row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {}", e)))?,
+            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+            organization_id: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
+            user_id: row.get(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
             template_name: row.get(3).ok(),
             description: row.get(4).ok(),
             is_template: is_template_int != 0,
-            label: row.get(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {}", e)))?,
-            value: row.get(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get value: {}", e)))?,
-            limit: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get limit: {}", e)))?,
+            label: row.get(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {e}")))?,
+            value: row.get(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get value: {e}")))?,
+            limit: row.get(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get limit: {e}")))?,
             metadata_,
             created_at,
             updated_at,
@@ -103,7 +103,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to create block: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create block: {e}")))?;
 
         Ok(block.clone())
     }
@@ -119,15 +119,15 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
                  FROM blocks WHERE id = ? AND is_deleted = 0"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {e}")))?;
 
         if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             Ok(Some(Self::row_to_block(&row)?))
         } else {
@@ -149,16 +149,16 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
                  ORDER BY b.created_at DESC"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![agent_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query blocks: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query blocks: {e}")))?;
 
         let mut blocks = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             blocks.push(Self::row_to_block(&row)?);
         }
@@ -195,7 +195,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to update block: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update block: {e}")))?;
 
         Ok(block.clone())
     }
@@ -208,7 +208,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
             libsql::params![Utc::now().timestamp(), id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete block: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete block: {e}")))?;
 
         Ok(())
     }
@@ -220,19 +220,19 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         let mut stmt = conn
             .prepare("SELECT label FROM blocks WHERE id = ? AND is_deleted = 0")
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![block_id])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to query block: {e}")))?;
 
         let block_label: String = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
-            row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {}", e)))?
+            row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get label: {e}")))?
         } else {
-            return Err(AgentMemError::NotFound(format!("Block {} not found", block_id)));
+            return Err(AgentMemError::NotFound(format!("Block {block_id} not found")));
         };
 
         // Insert into junction table
@@ -241,7 +241,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
             libsql::params![block_id, block_label, agent_id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to link block to agent: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to link block to agent: {e}")))?;
 
         Ok(())
     }
@@ -254,7 +254,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
             libsql::params![block_id, agent_id],
         )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to unlink block from agent: {}", e)))?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to unlink block from agent: {e}")))?;
 
         Ok(())
     }
@@ -271,16 +271,16 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
                  ORDER BY created_at DESC LIMIT ? OFFSET ?"
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(libsql::params![limit, offset])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list blocks: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list blocks: {e}")))?;
 
         let mut blocks = Vec::new();
         while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {}", e))
+            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
             blocks.push(Self::row_to_block(&row)?);
         }

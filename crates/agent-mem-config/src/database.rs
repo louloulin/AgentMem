@@ -40,7 +40,7 @@ impl std::str::FromStr for DatabaseBackend {
         match s.to_lowercase().as_str() {
             "libsql" | "sqlite" => Ok(Self::LibSql),
             "postgres" | "postgresql" | "pg" => Ok(Self::Postgres),
-            _ => Err(format!("Unknown database backend: {}", s)),
+            _ => Err(format!("Unknown database backend: {s}")),
         }
     }
 }
@@ -239,7 +239,7 @@ impl DatabaseConfig {
                 if let Some(scheme_end) = self.url.find("://") {
                     let scheme = &self.url[..scheme_end + 3];
                     let host_part = &self.url[at_pos..];
-                    return format!("{}***{}", scheme, host_part);
+                    return format!("{scheme}***{host_part}");
                 }
             }
         }

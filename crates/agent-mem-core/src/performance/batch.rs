@@ -133,7 +133,7 @@ impl BatchProcessor {
         for item in chunk {
             let permit = self.semaphore.clone().acquire_owned().await
                 .map_err(|e| agent_mem_traits::AgentMemError::internal_error(
-                    format!("Failed to acquire semaphore: {}", e)
+                    format!("Failed to acquire semaphore: {e}")
                 ))?;
             
             let operation = operation.clone();
@@ -152,7 +152,7 @@ impl BatchProcessor {
         for task in tasks {
             let result = task.await
                 .map_err(|e| agent_mem_traits::AgentMemError::internal_error(
-                    format!("Task failed: {}", e)
+                    format!("Task failed: {e}")
                 ))??;
             results.push(result);
         }

@@ -125,7 +125,7 @@ impl WorkingAgent {
             let created_item = store
                 .add_item(item)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to add working memory: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to add working memory: {e}")))?;
 
             let response = serde_json::json!({
                 "success": true,
@@ -158,7 +158,7 @@ impl WorkingAgent {
             let items = store
                 .get_session_items(session_id)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get session items: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get session items: {e}")))?;
 
             let results: Vec<_> = items
                 .iter()
@@ -204,7 +204,7 @@ impl WorkingAgent {
             let deleted = store
                 .remove_item(item_id)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete item: {}", e)))?;
+                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete item: {e}")))?;
 
             if deleted {
                 let response = serde_json::json!({
@@ -212,12 +212,11 @@ impl WorkingAgent {
                     "item_id": item_id,
                     "message": "Working memory item deleted successfully"
                 });
-                log::info!("Working agent: Deleted item '{}'", item_id);
+                log::info!("Working agent: Deleted item '{item_id}'");
                 return Ok(response);
             } else {
                 return Err(AgentError::InternalError(format!(
-                    "Working memory item with ID '{}' not found",
-                    item_id
+                    "Working memory item with ID '{item_id}' not found"
                 )));
             }
         }
@@ -264,7 +263,7 @@ impl MemoryAgent for WorkingAgent {
                     context.stats.total_tasks = items.len() as u64;
                 }
                 Err(e) => {
-                    log::warn!("查询工作记忆失败: {}，将从空状态开始", e);
+                    log::warn!("查询工作记忆失败: {e}，将从空状态开始");
                 }
             }
         } else {

@@ -12,7 +12,7 @@ use agent_mem_traits::{llm::FunctionCall, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// 工具调用结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,7 +119,7 @@ impl ToolIntegrator {
                         arguments: function_call.arguments.clone(),
                         result: String::new(),
                         success: false,
-                        error: Some(format!("Invalid JSON arguments: {}", e)),
+                        error: Some(format!("Invalid JSON arguments: {e}")),
                         execution_time_ms: start_time.elapsed().as_millis() as u64,
                     });
                     continue;
@@ -223,12 +223,12 @@ impl ToolIntegrator {
             formatted.push_str(&format!("{}. Tool: {}\n", index + 1, result.tool_name));
 
             if result.success {
-                formatted.push_str(&format!("   Status: ✅ Success\n"));
+                formatted.push_str("   Status: ✅ Success\n");
                 formatted.push_str(&format!("   Result: {}\n", result.result));
             } else {
-                formatted.push_str(&format!("   Status: ❌ Failed\n"));
+                formatted.push_str("   Status: ❌ Failed\n");
                 if let Some(error) = &result.error {
-                    formatted.push_str(&format!("   Error: {}\n", error));
+                    formatted.push_str(&format!("   Error: {error}\n"));
                 }
             }
 

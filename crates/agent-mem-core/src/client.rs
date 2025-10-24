@@ -322,7 +322,7 @@ impl FilterBuilder {
     /// Add custom filter
     pub fn custom<T: Serialize>(mut self, key: String, value: T) -> Result<Self> {
         let value = serde_json::to_value(value).map_err(|e| {
-            AgentMemError::validation_error(&format!("Invalid filter value: {}", e))
+            AgentMemError::validation_error(format!("Invalid filter value: {e}"))
         })?;
         self.filters.insert(key, value);
         Ok(self)
@@ -370,7 +370,7 @@ impl MetadataBuilder {
     /// Add custom metadata
     pub fn custom<T: Serialize>(mut self, key: String, value: T) -> Result<Self> {
         let value = serde_json::to_value(value).map_err(|e| {
-            AgentMemError::validation_error(&format!("Invalid metadata value: {}", e))
+            AgentMemError::validation_error(format!("Invalid metadata value: {e}"))
         })?;
         self.data.insert(key, value);
         Ok(self)
@@ -524,7 +524,7 @@ impl AgentMemClient {
             match agent_mem_llm::LLMClient::new(llm_config) {
                 Ok(client) => Some(Arc::new(client)),
                 Err(e) => {
-                    eprintln!("Warning: Failed to initialize LLM client: {}", e);
+                    eprintln!("Warning: Failed to initialize LLM client: {e}");
                     None
                 }
             }
@@ -553,9 +553,9 @@ impl AgentMemClient {
             crate::CoreError::ValidationError(msg) => AgentMemError::validation_error(&msg),
             crate::CoreError::InvalidInput(msg) => AgentMemError::validation_error(&msg),
             crate::CoreError::SerializationError(msg) => {
-                AgentMemError::internal_error(&format!("Serialization error: {}", msg))
+                AgentMemError::internal_error(format!("Serialization error: {msg}"))
             }
-            _ => AgentMemError::internal_error(&err.to_string()),
+            _ => AgentMemError::internal_error(err.to_string()),
         }
     }
 
@@ -609,7 +609,7 @@ impl AgentMemClient {
 
         // Acquire semaphore permit
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Search using engine
@@ -620,7 +620,7 @@ impl AgentMemClient {
             .map_err(Self::convert_error)?;
 
         // Convert to search results and apply filters
-        let mut results: Vec<MemorySearchResult> = memories
+        let results: Vec<MemorySearchResult> = memories
             .into_iter()
             .filter(|memory| {
                 // Apply user_id filter
@@ -681,7 +681,7 @@ impl AgentMemClient {
 
         // Acquire semaphore permit
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Get from engine
@@ -716,7 +716,7 @@ impl AgentMemClient {
 
         // Acquire semaphore permit
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Get existing memory
@@ -726,7 +726,7 @@ impl AgentMemClient {
             .await
             .map_err(Self::convert_error)?
             .ok_or_else(|| {
-                AgentMemError::not_found(&format!("Memory {} not found", request.memory_id))
+                AgentMemError::not_found(format!("Memory {} not found", request.memory_id))
             })?;
 
         // Update content if provided
@@ -765,7 +765,7 @@ impl AgentMemClient {
 
         // Acquire semaphore permit
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Delete from engine
@@ -788,7 +788,7 @@ impl AgentMemClient {
     ) -> Result<Vec<MemorySearchResult>> {
         // Acquire semaphore permit
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Get all memories from engine (using empty query to get all)
@@ -868,7 +868,7 @@ impl AgentMemClient {
         for request in requests {
             let client = self.clone();
             let permit = semaphore.clone().acquire_owned().await.map_err(|e| {
-                AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
             })?;
 
             let task = tokio::spawn(async move {
@@ -888,9 +888,8 @@ impl AgentMemClient {
                 Ok(Ok(add_result)) => final_results.push(add_result),
                 Ok(Err(e)) => return Err(e),
                 Err(e) => {
-                    return Err(AgentMemError::internal_error(&format!(
-                        "Task failed: {}",
-                        e
+                    return Err(AgentMemError::internal_error(format!(
+                        "Task failed: {e}"
                     )))
                 }
             }
@@ -913,7 +912,7 @@ impl AgentMemClient {
         for request in requests {
             let client = self.clone();
             let permit = semaphore.clone().acquire_owned().await.map_err(|e| {
-                AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
             })?;
 
             let task = tokio::spawn(async move {
@@ -933,9 +932,8 @@ impl AgentMemClient {
                 Ok(Ok(update_result)) => final_results.push(update_result),
                 Ok(Err(e)) => return Err(e),
                 Err(e) => {
-                    return Err(AgentMemError::internal_error(&format!(
-                        "Task failed: {}",
-                        e
+                    return Err(AgentMemError::internal_error(format!(
+                        "Task failed: {e}"
                     )))
                 }
             }
@@ -958,7 +956,7 @@ impl AgentMemClient {
         for memory_id in memory_ids {
             let client = self.clone();
             let permit = semaphore.clone().acquire_owned().await.map_err(|e| {
-                AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
             })?;
 
             let task = tokio::spawn(async move {
@@ -991,7 +989,7 @@ impl AgentMemClient {
 
         // Acquire semaphore permit for concurrency control
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
         })?;
 
         // Convert messages to memory content
@@ -1233,8 +1231,7 @@ impl AgentMemClient {
         });
 
         Ok(format!(
-            "{}\n\n{}\n\nUser: {}",
-            prefix, memory_context, message
+            "{prefix}\n\n{memory_context}\n\nUser: {message}"
         ))
     }
 
@@ -1425,7 +1422,7 @@ impl AgentMemClient {
 
             // 保存助手回复
             self.add(
-                Messages::Single(format!("Assistant: {}", response)),
+                Messages::Single(format!("Assistant: {response}")),
                 user_id,
                 None,
                 None,

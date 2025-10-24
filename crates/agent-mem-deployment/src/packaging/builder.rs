@@ -6,7 +6,7 @@ use super::{BinaryOptimizer, PackageConfig};
 use agent_mem_traits::{AgentMemError, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// 打包构建器
 pub struct PackageBuilder {
@@ -76,14 +76,14 @@ impl PackageBuilder {
             tokio::fs::remove_dir_all(&self.config.output_dir)
                 .await
                 .map_err(|e| {
-                    AgentMemError::internal_error(format!("清理输出目录失败: {}", e))
+                    AgentMemError::internal_error(format!("清理输出目录失败: {e}"))
                 })?;
         }
         
         tokio::fs::create_dir_all(&self.config.output_dir)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("创建输出目录失败: {}", e))
+                AgentMemError::internal_error(format!("创建输出目录失败: {e}"))
             })?;
         
         Ok(())
@@ -115,14 +115,13 @@ impl PackageBuilder {
         debug!("执行命令: {:?}", cmd);
         
         let output = cmd.output().map_err(|e| {
-            AgentMemError::internal_error(format!("执行 cargo build 失败: {}", e))
+            AgentMemError::internal_error(format!("执行 cargo build 失败: {e}"))
         })?;
         
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(AgentMemError::internal_error(format!(
-                "构建失败: {}",
-                stderr
+                "构建失败: {stderr}"
             )));
         }
         
@@ -132,12 +131,11 @@ impl PackageBuilder {
             .join("target")
             .join(self.config.target.rust_target())
             .join("release")
-            .join(&self.config.full_binary_name());
+            .join(self.config.full_binary_name());
         
         if !binary_path.exists() {
             return Err(AgentMemError::internal_error(format!(
-                "找不到构建的二进制文件: {:?}",
-                binary_path
+                "找不到构建的二进制文件: {binary_path:?}"
             )));
         }
         
@@ -162,7 +160,7 @@ impl PackageBuilder {
         tokio::fs::copy(binary_path, &output_path)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("复制二进制文件失败: {}", e))
+                AgentMemError::internal_error(format!("复制二进制文件失败: {e}"))
             })?;
         
         Ok(output_path)
@@ -176,7 +174,7 @@ impl PackageBuilder {
         tokio::fs::create_dir_all(&config_dir)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("创建配置目录失败: {}", e))
+                AgentMemError::internal_error(format!("创建配置目录失败: {e}"))
             })?;
         
         // 导出所有配置模板
@@ -201,7 +199,7 @@ impl PackageBuilder {
         tokio::fs::create_dir_all(&docs_dir)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("创建文档目录失败: {}", e))
+                AgentMemError::internal_error(format!("创建文档目录失败: {e}"))
             })?;
         
         // 复制 README
@@ -211,7 +209,7 @@ impl PackageBuilder {
             tokio::fs::copy(&readme_src, &readme_dst)
                 .await
                 .map_err(|e| {
-                    AgentMemError::internal_error(format!("复制 README 失败: {}", e))
+                    AgentMemError::internal_error(format!("复制 README 失败: {e}"))
                 })?;
         }
         
@@ -239,13 +237,13 @@ impl PackageBuilder {
         
         let metadata_path = self.config.output_dir.join("metadata.json");
         let content = serde_json::to_string_pretty(&metadata).map_err(|e| {
-            AgentMemError::internal_error(format!("序列化元数据失败: {}", e))
+            AgentMemError::internal_error(format!("序列化元数据失败: {e}"))
         })?;
         
         tokio::fs::write(&metadata_path, content)
             .await
             .map_err(|e| {
-                AgentMemError::internal_error(format!("写入元数据失败: {}", e))
+                AgentMemError::internal_error(format!("写入元数据失败: {e}"))
             })?;
         
         info!("元数据已生成: {:?}", metadata_path);

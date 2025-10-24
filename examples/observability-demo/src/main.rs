@@ -159,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (name, status) in &readiness.components {
         println!("  - {}: {}", name, status.status);
         if let Some(msg) = &status.message {
-            println!("    消息: {}", msg);
+            println!("    消息: {msg}");
         }
     }
     println!();
