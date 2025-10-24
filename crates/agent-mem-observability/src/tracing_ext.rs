@@ -120,10 +120,11 @@ pub fn get_trace_id() -> Option<String> {
 /// ```rust
 /// use agent_mem_observability::traced;
 ///
-/// #[traced]
-/// async fn my_function(arg: i32) -> Result<String, Box<dyn std::error::Error>> {
-///     // Function body
-///     Ok(format!("Result: {}", arg))
+/// traced! {
+///     async fn my_function(arg: i32) -> Result<String, Box<dyn std::error::Error>> {
+///         // Function body
+///         Ok(format!("Result: {}", arg))
+///     }
 /// }
 /// ```
 #[macro_export]
