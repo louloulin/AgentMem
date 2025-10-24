@@ -21,7 +21,7 @@ agent-mem-config = { path = "../agent-mem-config" }
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
-pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+pyo3-asyncio = { version = "0.21", features = ["tokio-runtime"] }  # 升级到 0.21
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -29,6 +29,9 @@ serde_json = "1.0"
 
 # Logging
 tracing = "0.1"
+
+# For Arc wrapper
+parking_lot = "0.12"
 
 [build-dependencies]
 pyo3-build-config = "0.20"

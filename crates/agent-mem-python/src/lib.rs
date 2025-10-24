@@ -8,11 +8,16 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
 
 /// Python wrapper for SimpleMemory
+/// 
+/// Uses Arc<RwLock<>> to solve lifetime and Clone issues
 #[pyclass(name = "Memory")]
+#[derive(Clone)]
 struct PyMemory {
-    inner: RustSimpleMemory,
+    inner: Arc<RwLock<RustSimpleMemory>>,
 }
 
 #[pymethods]
@@ -25,7 +30,9 @@ impl PyMemory {
             .block_on(async { RustSimpleMemory::new().await })
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create Memory: {}", e)))?;
 
-        Ok(Self { inner })
+        Ok(Self { 
+            inner: Arc::new(RwLock::new(inner))
+        })
     }
 
     /// Add a memory
@@ -46,7 +53,7 @@ impl PyMemory {
         user_id: Option<String>,
         metadata: Option<&PyDict>,
     ) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
         
         // Convert Python dict to Rust HashMap
         let metadata_map = if let Some(meta) = metadata {
@@ -62,11 +69,17 @@ impl PyMemory {
         };
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
+            // Get read lock to access inner memory
+            let memory = {
+                let guard = inner.read();
+                guard.clone()  // Clone the SimpleMemory for async usage
+            };
+
             // Set user_id and agent_id if provided
             let memory = if let Some(user_id) = user_id {
-                inner.with_user_id(user_id)
+                memory.with_user_id(user_id)
             } else {
-                inner
+                memory
             };
 
             let memory = if let Some(agent_id) = agent_id {
@@ -101,11 +114,15 @@ impl PyMemory {
         query: String,
         limit: Option<usize>,
     ) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
         let limit = limit.unwrap_or(10);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let results = inner
+            let memory = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let results = memory
                 .search_with_limit(query, limit)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to search: {}", e)))?;
@@ -130,10 +147,14 @@ impl PyMemory {
     /// Returns:
     ///     dict or None: Memory dictionary or None if not found
     fn get<'py>(&self, py: Python<'py>, memory_id: String) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let memory = inner
+            let mem = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let memory = mem
                 .get(&memory_id)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to get memory: {}", e)))?;
@@ -157,10 +178,14 @@ impl PyMemory {
     /// Returns:
     ///     list: List of memory dictionaries
     fn get_all<'py>(&self, py: Python<'py>, limit: Option<usize>) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let results = inner
+            let memory = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let results = memory
                 .get_all(limit)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to get all: {}", e)))?;
@@ -192,10 +217,14 @@ impl PyMemory {
         content: Option<String>,
         importance: Option<f32>,
     ) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let memory = inner
+            let mem = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let memory = mem
                 .update(&memory_id, content, importance)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to update: {}", e)))?;
@@ -215,10 +244,14 @@ impl PyMemory {
     /// Returns:
     ///     bool: True if deleted successfully
     fn delete<'py>(&self, py: Python<'py>, memory_id: String) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let success = inner
+            let memory = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let success = memory
                 .delete(&memory_id)
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to delete: {}", e)))?;
@@ -232,10 +265,14 @@ impl PyMemory {
     /// Returns:
     ///     int: Number of memories deleted
     fn clear<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
-        let inner = self.inner.clone();
+        let inner = Arc::clone(&self.inner);
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let count = inner
+            let memory = {
+                let guard = inner.read();
+                guard.clone()
+            };
+            let count = memory
                 .clear()
                 .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear: {}", e)))?;

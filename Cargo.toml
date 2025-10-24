@@ -5,9 +5,9 @@ resolver = "2"
 # These can be fixed later without impacting production readiness
 exclude = [
     # "examples/test-intelligent-integration",  # ✅ FIXED: Added chrono dependency
-    "examples/intelligent-memory-demo",       # MemoryManager import error, API changes
-    "examples/phase4-demo",                   # API changes in FactExtractor
-    "crates/agent-mem-python",                # Lifetime and Clone issues (Python bindings)
+    # "examples/intelligent-memory-demo",       # ✅ FIXED: Updated to use Memory API
+    # "examples/phase4-demo",                   # ✅ FIXED: Updated LLM factory API
+    # "crates/agent-mem-python",                # ✅ FIXED: Upgraded pyo3-asyncio, used Arc<RwLock<>>
 ]
 
 members = [
@@ -32,7 +32,7 @@ members = [
     # "crates/agent-mem-intelligence",
 
     # 多语言绑定
-    # "crates/agent-mem-python",  # Temporarily excluded - needs lifetime fixes
+    "crates/agent-mem-python",  # ✅ FIXED: Upgraded pyo3-asyncio 0.21, Arc<RwLock<>> pattern
     # "bindings/agent-mem-node",
     # "bindings/agent-mem-c",
 
@@ -80,7 +80,7 @@ members = [
     "examples/comprehensive-test",
     "examples/phase1-integration-demo",
     "examples/phase3-demo",
-    # "examples/phase4-demo",  # Temporarily excluded - API changes in FactExtractor
+    "examples/phase4-demo",  # ✅ FIXED: Updated LLM factory API
     "examples/phase5-production-demo",
     "examples/phase6-optimization-demo",
     "examples/server-demo",
@@ -88,8 +88,9 @@ members = [
     "examples/mem0-compat-demo",
     "examples/client-server-integration-test",
     "examples/intelligent-reasoning-demo",
+    "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
     "examples/graph-memory-demo",
-    # "examples/test-intelligent-integration",  # Temporarily excluded - missing chrono dependency, API changes
+    "examples/test-intelligent-integration",  # ✅ FIXED: Added chrono dependency
     "examples/test-cache",
     "examples/simple-memory-demo",
     "examples/simple-api-test",

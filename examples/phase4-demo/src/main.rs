@@ -99,7 +99,7 @@ async fn create_llm_provider() -> Arc<dyn agent_mem_traits::LLMProvider + Send +
             continue;
         }
 
-        match RealLLMFactory::create_with_retry(&config, 3).await {
+        match RealLLMFactory::create_provider(&config) {
             Ok(provider) => {
                 info!("✅ 成功创建 LLM 提供商: {}", config.provider);
                 return provider;
