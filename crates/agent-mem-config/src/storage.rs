@@ -174,6 +174,7 @@ impl Default for HistoryStoreConfig {
 /// - **服务器模式**: 使用 PostgreSQL + 多种向量服务，适合生产环境和分布式部署
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "lowercase")]
+#[allow(clippy::large_enum_variant)]
 pub enum DeploymentMode {
     /// 嵌入式模式（LibSQL + LanceDB）
     ///

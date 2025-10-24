@@ -156,6 +156,7 @@ async fn main() -> Result<()> {
 }
 
 /// Print welcome message for new users
+#[allow(dead_code)]
 fn print_welcome() {
     println!("{}", "🧠 Welcome to AgentMem CLI!".bright_blue().bold());
     println!();

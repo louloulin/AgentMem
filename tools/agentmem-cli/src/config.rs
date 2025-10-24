@@ -157,6 +157,7 @@ impl CliConfig {
     }
 
     /// Save configuration to file
+    #[allow(dead_code)]
     pub fn save(&self, config_path: Option<&str>) -> Result<()> {
         let config_file = match config_path {
             Some(path) => PathBuf::from(path),
@@ -221,6 +222,7 @@ impl CliConfig {
     }
 
     /// Initialize a new project configuration
+    #[allow(dead_code)]
     pub fn init_project(&mut self, name: String, description: Option<String>) {
         self.project = Some(ProjectConfig {
             name,
@@ -231,6 +233,7 @@ impl CliConfig {
     }
 
     /// Set deployment configuration
+    #[allow(dead_code)]
     pub fn set_deploy_config(&mut self, deploy_config: DeployConfig) {
         self.deploy = Some(deploy_config);
     }
@@ -238,6 +241,7 @@ impl CliConfig {
 
 /// Merged configuration from file and CLI arguments
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MergedConfig {
     pub api_key: Option<String>,
     pub base_url: String,
@@ -259,16 +263,19 @@ impl MergedConfig {
     }
 
     /// Check if project is initialized
+    #[allow(dead_code)]
     pub fn is_project_initialized(&self) -> bool {
         self.project.is_some()
     }
 
     /// Get project name
+    #[allow(dead_code)]
     pub fn project_name(&self) -> Option<&str> {
         self.project.as_ref().map(|p| p.name.as_str())
     }
 
     /// Get default agent ID
+    #[allow(dead_code)]
     pub fn default_agent_id(&self) -> Option<&str> {
         self.project
             .as_ref()
