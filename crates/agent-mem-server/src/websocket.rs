@@ -126,9 +126,8 @@ impl WebSocketManager {
 
     /// Broadcast a message to all connections
     pub fn broadcast(&self, message: WsMessage) -> ServerResult<()> {
-        self.broadcast_tx.send(message).map_err(|e| {
-            ServerError::internal_error(format!("Failed to broadcast message: {e}"))
-        })?;
+        // Ignore errors when there are no receivers (e.g., during testing)
+        let _ = self.broadcast_tx.send(message);
         Ok(())
     }
 }

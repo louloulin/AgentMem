@@ -663,7 +663,8 @@ mod tests {
         };
 
         let config_json = serde_json::to_string_pretty(&config).unwrap();
-        let temp_file = NamedTempFile::new().unwrap();
+        // Create a temporary file with .json extension
+        let temp_file = NamedTempFile::with_suffix(".json").unwrap();
         fs::write(temp_file.path(), config_json).unwrap();
 
         let source = FileConfigSource::new(temp_file.path().to_string_lossy().to_string());

@@ -33,7 +33,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_creation() {
-        let config = ServerConfig::default();
+        let mut config = ServerConfig::default();
+        config.database_url = ":memory:".to_string(); // Use LibSql in-memory database for testing
         let server = MemoryServer::new(config).await;
         assert!(server.is_ok());
     }

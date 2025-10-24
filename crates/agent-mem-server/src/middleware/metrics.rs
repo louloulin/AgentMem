@@ -72,10 +72,12 @@ mod tests {
     async fn test_metrics_middleware() {
         let metrics = Arc::new(MetricsRegistry::new());
 
+        // Layer order matters: they execute from bottom to top
+        // So Extension must be added AFTER middleware for middleware to extract it
         let app = Router::new()
             .route("/test", get(test_handler))
-            .layer(Extension(metrics.clone()))
-            .layer(middleware::from_fn(metrics_middleware));
+            .layer(middleware::from_fn(metrics_middleware))
+            .layer(Extension(metrics.clone()));
 
         let request = Request::builder()
             .uri("/test")
