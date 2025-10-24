@@ -1,3 +1,4 @@
+#![cfg(feature = "postgres")]
 //! AgentOrchestrator 集成测试
 //!
 //! 测试完整的对话循环，包括记忆检索、LLM 调用、记忆提取
