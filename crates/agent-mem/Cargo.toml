@@ -51,8 +51,9 @@ tracing-subscriber.workspace = true
 tempfile.workspace = true
 
 [features]
-default = ["libsql"]
+default = ["libsql", "fastembed"]
 libsql = ["agent-mem-storage/libsql", "agent-mem-core/libsql"]
 postgres = ["agent-mem-storage/postgres", "agent-mem-core/postgres"]
-all-providers = ["agent-mem-llm/all-providers"]
+fastembed = ["agent-mem-embeddings/fastembed"]
+all-providers = ["agent-mem-llm/all-providers", "agent-mem-embeddings/all-providers"]
 

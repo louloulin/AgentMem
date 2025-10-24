@@ -305,7 +305,7 @@ impl MemoryOrchestrator {
         // ========== Step 8: 创建向量存储 (Phase 6) ==========
         let vector_store = {
             info!("Phase 6: 创建向量存储...");
-            Self::create_vector_store(&config).await?
+            Self::create_vector_store(&config, embedder.as_ref()).await?
         };
 
         // ========== Step 9: 创建历史记录管理器 (Phase 6) ==========
@@ -765,6 +765,7 @@ impl MemoryOrchestrator {
     /// 创建向量存储 (Phase 6.4)
     async fn create_vector_store(
         _config: &OrchestratorConfig,
+        embedder: Option<&Arc<dyn agent_mem_traits::Embedder + Send + Sync>>,
     ) -> Result<Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>> {
         info!("Phase 6: 创建向量存储");
 
@@ -772,11 +773,23 @@ impl MemoryOrchestrator {
         use agent_mem_storage::backends::MemoryVectorStore;
         use agent_mem_traits::VectorStoreConfig;
 
-        let config = VectorStoreConfig::default();
+        // 获取向量维度（从 Embedder 或使用默认值）
+        let vector_dimension = if let Some(emb) = embedder {
+            let dim = emb.dimension();
+            info!("从 Embedder 获取向量维度: {}", dim);
+            dim
+        } else {
+            let default_dim = 384; // 默认使用 384 维（兼容 FastEmbed 轻量级模型）
+            warn!("Embedder 未配置，使用默认维度: {}", default_dim);
+            default_dim
+        };
+
+        let mut config = VectorStoreConfig::default();
+        config.dimension = Some(vector_dimension);
 
         match MemoryVectorStore::new(config).await {
             Ok(store) => {
-                info!("✅ 向量存储创建成功（Memory 模式）");
+                info!("✅ 向量存储创建成功（Memory 模式，维度: {}）", vector_dimension);
                 Ok(Some(
                     Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>
                 ))
@@ -867,9 +880,11 @@ impl MemoryOrchestrator {
             serde_json::json!(chrono::Utc::now().to_rfc3339()),
         );
 
-        if let Some(uid) = &user_id {
-            full_metadata.insert("user_id".to_string(), serde_json::json!(uid));
-        }
+        // 总是添加 user_id（使用 "default" 作为默认值）
+        full_metadata.insert(
+            "user_id".to_string(),
+            serde_json::json!(user_id.unwrap_or_else(|| "default".to_string()))
+        );
         full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
 
         // 合并自定义 metadata
