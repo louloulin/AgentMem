@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 /// MCP 服务端配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,7 +154,7 @@ impl McpServer {
 
         if tools.contains_key(&tool_name) {
             return Err(McpError::ConfigError(
-                format!("Tool '{}' already registered", tool_name)
+                format!("Tool '{tool_name}' already registered")
             ));
         }
 
@@ -170,7 +170,7 @@ impl McpServer {
 
         if tools.remove(tool_name).is_none() {
             return Err(McpError::ConfigError(
-                format!("Tool '{}' not found", tool_name)
+                format!("Tool '{tool_name}' not found")
             ));
         }
 
@@ -229,7 +229,7 @@ impl McpServer {
         // 转换结果为 MCP 格式
         let content = vec![McpContent::Text {
             text: serde_json::to_string_pretty(&result)
-                .unwrap_or_else(|_| format!("{:?}", result)),
+                .unwrap_or_else(|_| format!("{result:?}")),
         }];
 
         Ok(McpToolCallResponse {

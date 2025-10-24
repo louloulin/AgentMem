@@ -45,9 +45,9 @@ impl Transport for SseTransport {
 
         // 创建 SSE 客户端
         let client = es::ClientBuilder::for_url(&self.url)
-            .map_err(|e| McpError::TransportError(format!("Failed to create SSE client: {}", e)))?
+            .map_err(|e| McpError::TransportError(format!("Failed to create SSE client: {e}")))?
             .header("Accept", "text/event-stream")
-            .map_err(|e| McpError::TransportError(format!("Failed to set header: {}", e)))?
+            .map_err(|e| McpError::TransportError(format!("Failed to set header: {e}")))?
             .build();
 
         // 获取事件流并启动监听

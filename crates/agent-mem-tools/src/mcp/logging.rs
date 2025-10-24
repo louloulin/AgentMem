@@ -19,12 +19,14 @@ use tracing::{debug, error, info, trace, warn};
 /// 日志级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum LogLevel {
     /// 追踪级别（最详细）
     Trace,
     /// 调试级别
     Debug,
     /// 信息级别
+    #[default]
     Info,
     /// 警告级别
     Warn,
@@ -57,11 +59,6 @@ impl LogLevel {
     }
 }
 
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Info
-    }
-}
 
 /// 日志条目
 #[derive(Debug, Clone, Serialize, Deserialize)]

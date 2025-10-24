@@ -130,13 +130,12 @@ impl FileReadTool {
 
         if !path.exists() {
             return Err(ToolError::ExecutionFailed(format!(
-                "File not found: {}",
-                filename
+                "File not found: {filename}"
             )));
         }
 
         let file = fs::File::open(&path).await.map_err(|e| {
-            ToolError::ExecutionFailed(format!("Failed to open file: {}", e))
+            ToolError::ExecutionFailed(format!("Failed to open file: {e}"))
         })?;
 
         let reader = BufReader::new(file);
@@ -145,7 +144,7 @@ impl FileReadTool {
         let mut current_line = 1;
 
         while let Some(line) = lines.next_line().await.map_err(|e| {
-            ToolError::ExecutionFailed(format!("Failed to read line: {}", e))
+            ToolError::ExecutionFailed(format!("Failed to read line: {e}"))
         })? {
             if current_line >= line_start && current_line < line_start + num_lines {
                 result_lines.push(line);
@@ -270,15 +269,15 @@ impl FileWriteTool {
         } else {
             fs::File::create(&path).await
         }
-        .map_err(|e| ToolError::ExecutionFailed(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| ToolError::ExecutionFailed(format!("Failed to open file: {e}")))?;
 
         file.write_all(content.as_bytes())
             .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write to file: {}", e)))?;
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write to file: {e}")))?;
 
         if append {
             file.write_all(b"\n").await.map_err(|e| {
-                ToolError::ExecutionFailed(format!("Failed to write newline: {}", e))
+                ToolError::ExecutionFailed(format!("Failed to write newline: {e}"))
             })?;
         }
 

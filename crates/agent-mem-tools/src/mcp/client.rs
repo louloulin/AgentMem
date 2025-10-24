@@ -10,7 +10,7 @@ use super::types::{
 use super::transport::{Transport, HttpTransport, SseTransport, StdioTransport};
 use super::discovery::ToolDiscovery;
 use serde_json::Value;
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -191,7 +191,7 @@ impl McpClient {
 
                     // 解析响应
                     let tools_response: McpListToolsResponse = serde_json::from_value(response)
-                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tools list: {}", e)))?;
+                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tools list: {e}")))?;
 
                     Ok(tools_response.tools)
                 } else {
@@ -238,7 +238,7 @@ impl McpClient {
 
                     // 解析响应
                     serde_json::from_value(response)
-                        .map_err(|e| McpError::SerializationError(format!("Failed to parse tool response: {}", e)))
+                        .map_err(|e| McpError::SerializationError(format!("Failed to parse tool response: {e}")))
                 } else {
                     Err(McpError::NotConnected)
                 }
@@ -261,7 +261,7 @@ impl McpClient {
 
                     // 解析响应
                     serde_json::from_value(response)
-                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tool response: {}", e)))
+                        .map_err(|e| McpError::DeserializationError(format!("Failed to parse tool response: {e}")))
                 } else {
                     Err(McpError::NotConnected)
                 }
@@ -273,7 +273,7 @@ impl McpClient {
     pub async fn disconnect(&self) -> McpResult<()> {
         if let Some(mut child) = self.process.write().await.take() {
             child.kill()
-                .map_err(|e| McpError::ConnectionError(format!("Failed to kill process: {}", e)))?;
+                .map_err(|e| McpError::ConnectionError(format!("Failed to kill process: {e}")))?;
         }
         
         *self.initialized.write().await = false;

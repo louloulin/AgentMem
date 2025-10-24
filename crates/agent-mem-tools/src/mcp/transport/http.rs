@@ -111,7 +111,7 @@ impl HttpTransport {
             .json(&body)
             .send()
             .await
-            .map_err(|e| McpError::TransportError(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("HTTP request failed: {e}")))?;
         
         let status = response.status();
         
@@ -119,12 +119,12 @@ impl HttpTransport {
             let error_text = response.text().await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(McpError::TransportError(
-                format!("HTTP request failed with status {}: {}", status, error_text)
+                format!("HTTP request failed with status {status}: {error_text}")
             ));
         }
         
         let result = response.json::<Value>().await
-            .map_err(|e| McpError::TransportError(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("Failed to parse response: {e}")))?;
         
         debug!("Response: {}", result);
         
@@ -141,7 +141,7 @@ impl HttpTransport {
             .get(&url)
             .send()
             .await
-            .map_err(|e| McpError::TransportError(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("HTTP request failed: {e}")))?;
         
         let status = response.status();
         
@@ -149,12 +149,12 @@ impl HttpTransport {
             let error_text = response.text().await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(McpError::TransportError(
-                format!("HTTP request failed with status {}: {}", status, error_text)
+                format!("HTTP request failed with status {status}: {error_text}")
             ));
         }
         
         let result = response.json::<Value>().await
-            .map_err(|e| McpError::TransportError(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("Failed to parse response: {e}")))?;
         
         debug!("Response: {}", result);
         

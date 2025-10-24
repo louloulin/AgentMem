@@ -9,7 +9,6 @@
 //! - 提示词版本管理
 
 use super::error::{McpError, McpResult};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -232,10 +231,10 @@ impl PromptManager {
         let mut engine = self.template_engine.write().await;
         for (idx, content) in prompt.content.iter().enumerate() {
             if let PromptContent::Text { text } = content {
-                let template_name = format!("{}_{}", name, idx);
+                let template_name = format!("{name}_{idx}");
                 engine
                     .register_template_string(&template_name, text)
-                    .map_err(|e| McpError::Internal(format!("Failed to register template: {}", e)))?;
+                    .map_err(|e| McpError::Internal(format!("Failed to register template: {e}")))?;
             }
         }
         drop(engine);
@@ -269,7 +268,7 @@ impl PromptManager {
         let prompts = self.prompts.read().await;
         let prompt = prompts
             .get(name)
-            .ok_or_else(|| McpError::Internal(format!("Prompt not found: {}", name)))?
+            .ok_or_else(|| McpError::Internal(format!("Prompt not found: {name}")))?
             .clone();
         drop(prompts);
         
@@ -290,10 +289,10 @@ impl PromptManager {
         for (idx, content) in prompt.content.iter().enumerate() {
             match content {
                 PromptContent::Text { .. } => {
-                    let template_name = format!("{}_{}", name, idx);
+                    let template_name = format!("{name}_{idx}");
                     let rendered = engine
                         .render(&template_name, &arguments)
-                        .map_err(|e| McpError::Internal(format!("Failed to render template: {}", e)))?;
+                        .map_err(|e| McpError::Internal(format!("Failed to render template: {e}")))?;
                     
                     rendered_content.push(PromptContent::Text { text: rendered });
                 }
@@ -350,9 +349,9 @@ mod tests {
         // 注册多个提示词
         for i in 0..3 {
             let prompt = McpPrompt::new(
-                format!("prompt_{}", i),
+                format!("prompt_{i}"),
                 vec![PromptContent::Text {
-                    text: format!("Prompt {}", i),
+                    text: format!("Prompt {i}"),
                 }],
             );
             manager.register_prompt(prompt).await.unwrap();

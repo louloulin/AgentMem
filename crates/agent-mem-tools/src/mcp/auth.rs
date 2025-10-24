@@ -418,7 +418,7 @@ impl AuthManager {
         let token_data = decode::<JwtClaims>(token, &decoding_key, &validation)
             .map_err(|e| {
                 warn!("JWT verification failed: {}", e);
-                McpError::AuthenticationFailed(format!("Invalid JWT: {}", e))
+                McpError::AuthenticationFailed(format!("Invalid JWT: {e}"))
             })?;
 
         let claims = token_data.claims;
@@ -499,7 +499,7 @@ impl AuthManager {
         // 编码 JWT
         let encoding_key = EncodingKey::from_secret(self.jwt_config.secret.as_bytes());
         let token = encode(&Header::default(), &claims, &encoding_key)
-            .map_err(|e| McpError::AuthenticationFailed(format!("Failed to generate JWT: {}", e)))?;
+            .map_err(|e| McpError::AuthenticationFailed(format!("Failed to generate JWT: {e}")))?;
 
         Ok(token)
     }
@@ -526,7 +526,7 @@ impl AuthManager {
             .await
             .map_err(|e| {
                 warn!("OAuth2 introspection request failed: {}", e);
-                McpError::AuthenticationFailed(format!("OAuth2 verification failed: {}", e))
+                McpError::AuthenticationFailed(format!("OAuth2 verification failed: {e}"))
             })?;
 
         // ✅ 2. 解析响应

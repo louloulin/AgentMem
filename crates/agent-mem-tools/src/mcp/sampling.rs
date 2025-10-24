@@ -274,7 +274,7 @@ impl SamplingManager {
         let llm_client = if let Some(config) = llm_config {
             Some(Arc::new(
                 LLMClient::new(config)
-                    .map_err(|e| McpError::Internal(format!("Failed to create LLM client: {}", e)))?,
+                    .map_err(|e| McpError::Internal(format!("Failed to create LLM client: {e}")))?,
             ))
         } else {
             None
@@ -346,7 +346,7 @@ impl SamplingManager {
         let response_text = llm_client
             .generate(&messages)
             .await
-            .map_err(|e| McpError::Internal(format!("LLM generation failed: {}", e)))?;
+            .map_err(|e| McpError::Internal(format!("LLM generation failed: {e}")))?;
         let elapsed = start_time.elapsed();
 
         debug!("LLM generation completed in {:?}", elapsed);

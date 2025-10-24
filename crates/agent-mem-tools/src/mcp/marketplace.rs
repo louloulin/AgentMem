@@ -273,7 +273,7 @@ impl McpMarketplace {
     pub fn remove_server(&mut self, server_id: &str) -> Result<McpServerListing, String> {
         self.servers
             .remove(server_id)
-            .ok_or_else(|| format!("Server with ID '{}' not found", server_id))
+            .ok_or_else(|| format!("Server with ID '{server_id}' not found"))
     }
     
     /// 获取服务器数量

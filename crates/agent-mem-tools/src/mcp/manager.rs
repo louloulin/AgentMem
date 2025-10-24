@@ -35,7 +35,7 @@ impl McpClientManager {
         // 检查是否已存在
         if self.clients.read().await.contains_key(&server_name) {
             return Err(McpError::ConfigError(
-                format!("Server '{}' already exists", server_name)
+                format!("Server '{server_name}' already exists")
             ));
         }
         
@@ -56,7 +56,7 @@ impl McpClientManager {
     pub async fn remove_server(&self, server_name: &str) -> McpResult<()> {
         let client = self.clients.write().await.remove(server_name)
             .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{}' not found", server_name)
+                format!("Server '{server_name}' not found")
             ))?;
         
         // 断开连接
@@ -80,12 +80,12 @@ impl McpClientManager {
         
         let client = clients.get(server_name)
             .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{}' not found", server_name)
+                format!("Server '{server_name}' not found")
             ))?;
         
         let config = configs.get(server_name)
             .ok_or_else(|| McpError::ConfigError(
-                format!("Config for server '{}' not found", server_name)
+                format!("Config for server '{server_name}' not found")
             ))?;
         
         Ok(McpServerInfo {
@@ -108,7 +108,7 @@ impl McpClientManager {
                     all_tools.insert(server_name.clone(), tools);
                 }
                 Err(e) => {
-                    eprintln!("Failed to list tools for server '{}': {}", server_name, e);
+                    eprintln!("Failed to list tools for server '{server_name}': {e}");
                     all_tools.insert(server_name.clone(), vec![]);
                 }
             }
@@ -122,7 +122,7 @@ impl McpClientManager {
         let clients = self.clients.read().await;
         let client = clients.get(server_name)
             .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{}' not found", server_name)
+                format!("Server '{server_name}' not found")
             ))?;
         
         client.list_tools().await
@@ -138,7 +138,7 @@ impl McpClientManager {
         let clients = self.clients.read().await;
         let client = clients.get(server_name)
             .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{}' not found", server_name)
+                format!("Server '{server_name}' not found")
             ))?;
         
         client.execute_tool(tool_name, arguments).await
@@ -165,7 +165,7 @@ impl McpClientManager {
         
         for (server_name, client) in clients.iter() {
             if let Err(e) = client.disconnect().await {
-                eprintln!("Failed to disconnect server '{}': {}", server_name, e);
+                eprintln!("Failed to disconnect server '{server_name}': {e}");
             }
         }
         
@@ -190,7 +190,7 @@ impl Drop for McpClientManager {
         // 注意：这里不能使用 async，所以只是尽力而为
         if let Ok(clients) = self.clients.try_read() {
             for (server_name, _client) in clients.iter() {
-                eprintln!("Warning: MCP client '{}' not properly disconnected", server_name);
+                eprintln!("Warning: MCP client '{server_name}' not properly disconnected");
             }
         }
     }
@@ -199,7 +199,7 @@ impl Drop for McpClientManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mcp::types::McpServerType;
+    
 
     #[tokio::test]
     async fn test_create_manager() {

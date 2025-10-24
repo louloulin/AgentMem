@@ -100,11 +100,11 @@ impl StdioTransport {
         // 写入到 stdout
         let mut stdout = tokio::io::stdout();
         stdout.write_all(json.as_bytes()).await
-            .map_err(|e| McpError::TransportError(format!("写入 stdout 失败: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("写入 stdout 失败: {e}")))?;
         stdout.write_all(b"\n").await
-            .map_err(|e| McpError::TransportError(format!("写入换行符失败: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("写入换行符失败: {e}")))?;
         stdout.flush().await
-            .map_err(|e| McpError::TransportError(format!("刷新 stdout 失败: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("刷新 stdout 失败: {e}")))?;
         
         Ok(())
     }
@@ -116,7 +116,7 @@ impl StdioTransport {
         let mut line = String::new();
         
         reader.read_line(&mut line).await
-            .map_err(|e| McpError::TransportError(format!("读取 stdin 失败: {}", e)))?;
+            .map_err(|e| McpError::TransportError(format!("读取 stdin 失败: {e}")))?;
         
         debug!("接收 JSON-RPC 响应: {}", line.trim());
         
@@ -211,7 +211,7 @@ impl Transport for StdioTransport {
         let response = self.read_jsonrpc_response().await?;
         
         response.result.ok_or_else(|| {
-            McpError::ProtocolError(format!("响应缺少 result 字段: method={}", method))
+            McpError::ProtocolError(format!("响应缺少 result 字段: method={method}"))
         })
     }
     

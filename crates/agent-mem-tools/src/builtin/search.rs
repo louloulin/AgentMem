@@ -97,12 +97,12 @@ impl SearchTool {
         // 在实际实现中，这里应该调用真实的搜索 API（如 DuckDuckGo、Google 等）
         let results = vec![
             SearchResult {
-                title: format!("Search result for: {}", query),
+                title: format!("Search result for: {query}"),
                 url: "https://example.com/result1".to_string(),
-                description: format!("This is a search result for the query: {}", query),
+                description: format!("This is a search result for the query: {query}"),
             },
             SearchResult {
-                title: format!("Another result for: {}", query),
+                title: format!("Another result for: {query}"),
                 url: "https://example.com/result2".to_string(),
                 description: "More information about the search query".to_string(),
             },

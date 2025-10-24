@@ -43,8 +43,7 @@ impl SandboxType {
             "docker" => Ok(SandboxType::Docker),
             "vm" => Ok(SandboxType::VM),
             _ => Err(ToolError::InvalidArgument(format!(
-                "Invalid sandbox type: {}",
-                s
+                "Invalid sandbox type: {s}"
             ))),
         }
     }
@@ -230,7 +229,7 @@ impl ToolExecutionSandbox {
         // 确保沙箱目录存在
         if !self.local_config.sandbox_dir.exists() {
             std::fs::create_dir_all(&self.local_config.sandbox_dir).map_err(|e| {
-                ToolError::ExecutionFailed(format!("Failed to create sandbox directory: {}", e))
+                ToolError::ExecutionFailed(format!("Failed to create sandbox directory: {e}"))
             })?;
         }
 
@@ -245,7 +244,7 @@ impl ToolExecutionSandbox {
         ));
 
         std::fs::write(&temp_file, script).map_err(|e| {
-            ToolError::ExecutionFailed(format!("Failed to write execution script: {}", e))
+            ToolError::ExecutionFailed(format!("Failed to write execution script: {e}"))
         })?;
 
         // 执行

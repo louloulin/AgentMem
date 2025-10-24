@@ -106,7 +106,7 @@ impl ToolDiscovery {
         
         // 解析响应
         let tools_response: McpListToolsResponse = serde_json::from_value(response)
-            .map_err(|e| McpError::SerializationError(format!("Failed to parse tools response: {}", e)))?;
+            .map_err(|e| McpError::SerializationError(format!("Failed to parse tools response: {e}")))?;
         
         // 断开连接
         transport.disconnect().await?;
@@ -284,7 +284,7 @@ impl ToolLoader for HttpToolLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    
 
     #[tokio::test]
     async fn test_tool_discovery_creation() {
@@ -399,7 +399,7 @@ mod tests {
         discovery.register_metadata(metadata1).await.unwrap();
         discovery.register_metadata(metadata2).await.unwrap();
         
-        let results = discovery.filter_by_tags(&vec!["test".to_string()]).await;
+        let results = discovery.filter_by_tags(&["test".to_string()]).await;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "tool1");
     }

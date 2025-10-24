@@ -143,8 +143,7 @@ impl HttpRequestTool {
         // 这里提供一个模拟实现
         let status_code = 200;
         let response_body = format!(
-            "{{\"message\": \"Mock response for {} {}\", \"success\": true}}",
-            method, url
+            "{{\"message\": \"Mock response for {method} {url}\", \"success\": true}}"
         );
 
         let mut response_headers = HashMap::new();

@@ -13,11 +13,9 @@ use crate::error::{ToolError, ToolResult};
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::time::Duration;
-use tokio::process::Command;
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 /// Sandbox configuration
 #[derive(Debug, Clone)]

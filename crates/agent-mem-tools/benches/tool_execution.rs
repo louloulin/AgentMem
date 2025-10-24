@@ -1,6 +1,6 @@
 //! Benchmarks for tool execution
 
-use agent_mem_tools::{builtin::CalculatorTool, ExecutionContext, Tool, ToolExecutor};
+use agent_mem_tools::{builtin::CalculatorTool, ExecutionContext, ToolExecutor};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::json;
 use std::sync::Arc;

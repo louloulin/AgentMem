@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    println!("   Result: {}\n", result);
+    println!("   Result: {result}\n");
 
     // 5. Execute string operations tool
     println!("5. Executing string_ops tool (uppercase)...");
@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    println!("   Result: {}\n", result);
+    println!("   Result: {result}\n");
 
     // 6. Execute time operations tool
     println!("6. Executing time_ops tool (current_time)...");
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    println!("   Result: {}\n", result);
+    println!("   Result: {result}\n");
 
     // 7. Execute echo tool
     println!("7. Executing echo tool...");
@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    println!("   Result: {}\n", result);
+    println!("   Result: {result}\n");
 
     // 8. Execute JSON parser tool
     println!("8. Executing json_parser tool...");
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    println!("   Result: {}\n", result);
+    println!("   Result: {result}\n");
 
     // 9. Show statistics
     println!("9. Tool execution statistics:");

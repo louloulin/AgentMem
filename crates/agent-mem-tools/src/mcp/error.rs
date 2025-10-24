@@ -79,56 +79,55 @@ pub enum McpError {
 impl fmt::Display for McpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            McpError::ConnectionError(msg) => write!(f, "MCP connection error: {}", msg),
+            McpError::ConnectionError(msg) => write!(f, "MCP connection error: {msg}"),
             McpError::TimeoutError { operation, server_name, timeout_seconds } => {
                 write!(
                     f,
-                    "MCP timeout error: {} for server '{}' after {} seconds",
-                    operation, server_name, timeout_seconds
+                    "MCP timeout error: {operation} for server '{server_name}' after {timeout_seconds} seconds"
                 )
             }
             McpError::NotInitializedError(server) => {
-                write!(f, "MCP server '{}' not initialized", server)
+                write!(f, "MCP server '{server}' not initialized")
             }
             McpError::ToolExecutionError { tool_name, message } => {
-                write!(f, "MCP tool '{}' execution error: {}", tool_name, message)
+                write!(f, "MCP tool '{tool_name}' execution error: {message}")
             }
-            McpError::ConfigError(msg) => write!(f, "MCP configuration error: {}", msg),
-            McpError::SerializationError(msg) => write!(f, "MCP serialization error: {}", msg),
-            McpError::DeserializationError(msg) => write!(f, "MCP deserialization error: {}", msg),
-            McpError::ProtocolError(msg) => write!(f, "MCP protocol error: {}", msg),
-            McpError::ServerError(msg) => write!(f, "MCP server error: {}", msg),
+            McpError::ConfigError(msg) => write!(f, "MCP configuration error: {msg}"),
+            McpError::SerializationError(msg) => write!(f, "MCP serialization error: {msg}"),
+            McpError::DeserializationError(msg) => write!(f, "MCP deserialization error: {msg}"),
+            McpError::ProtocolError(msg) => write!(f, "MCP protocol error: {msg}"),
+            McpError::ServerError(msg) => write!(f, "MCP server error: {msg}"),
             McpError::UnsupportedServerType(server_type) => {
-                write!(f, "Unsupported MCP server type: {}", server_type)
+                write!(f, "Unsupported MCP server type: {server_type}")
             }
             McpError::ResourceNotFound(uri) => {
-                write!(f, "MCP resource not found: {}", uri)
+                write!(f, "MCP resource not found: {uri}")
             }
             McpError::SubscriptionNotFound(id) => {
-                write!(f, "MCP subscription not found: {}", id)
+                write!(f, "MCP subscription not found: {id}")
             }
             McpError::ToolNotFound(name) => {
-                write!(f, "MCP tool not found: {}", name)
+                write!(f, "MCP tool not found: {name}")
             }
             McpError::ToolLoadError(name) => {
-                write!(f, "MCP tool load error: {}", name)
+                write!(f, "MCP tool load error: {name}")
             }
             McpError::TransportError(msg) => {
-                write!(f, "MCP transport error: {}", msg)
+                write!(f, "MCP transport error: {msg}")
             }
             McpError::NotConnected => {
                 write!(f, "MCP not connected")
             }
             McpError::AuthenticationFailed(msg) => {
-                write!(f, "MCP authentication failed: {}", msg)
+                write!(f, "MCP authentication failed: {msg}")
             }
             McpError::PermissionDenied(msg) => {
-                write!(f, "MCP permission denied: {}", msg)
+                write!(f, "MCP permission denied: {msg}")
             }
             McpError::Internal(msg) => {
-                write!(f, "MCP internal error: {}", msg)
+                write!(f, "MCP internal error: {msg}")
             }
-            McpError::Other(msg) => write!(f, "MCP error: {}", msg),
+            McpError::Other(msg) => write!(f, "MCP error: {msg}"),
         }
     }
 }
