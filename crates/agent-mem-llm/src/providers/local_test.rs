@@ -4,10 +4,10 @@
 //! 它实现了确定性的响应生成，不依赖外部 API 服务。
 
 use agent_mem_traits::{
-    AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result,
+    AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo, Result,
 };
 use async_trait::async_trait;
-use futures::stream::{self, BoxStream};
+use futures::stream::{self};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;

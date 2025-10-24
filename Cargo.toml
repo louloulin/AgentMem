@@ -4,7 +4,7 @@ resolver = "2"
 # Temporarily exclude examples with compilation errors (non-core functionality)
 # These can be fixed later without impacting production readiness
 exclude = [
-    "examples/test-intelligent-integration",  # Missing chrono dependency, API changes
+    # "examples/test-intelligent-integration",  # ✅ FIXED: Added chrono dependency
     "examples/intelligent-memory-demo",       # MemoryManager import error, API changes
     "examples/phase4-demo",                   # API changes in FactExtractor
     "crates/agent-mem-python",                # Lifetime and Clone issues (Python bindings)
