@@ -56,7 +56,7 @@ tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["openai", "fastembed"]
+default = ["openai"]  # FastEmbed 依赖 ONNX Runtime，可能导致编译问题，默认禁用
 
 # 嵌入提供商
 openai = []

@@ -592,6 +592,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires LLM provider access
     async fn test_recommendation_generation() {
         // 创建测试数据
         let facts = vec![

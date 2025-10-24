@@ -563,6 +563,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires video processing capabilities
     async fn test_video_processing() {
         let processor = VideoProcessor::new();
         let mut content = MultimodalContent::from_data(

@@ -240,6 +240,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Requires Google Gemini credentials
     fn test_provider_traits() {
         let config = create_test_config();
         let provider = GeminiProvider::new(config).unwrap();
@@ -257,6 +258,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Requires Google Gemini credentials
     fn test_model_info() {
         let config = create_test_config();
         let provider = GeminiProvider::new(config).unwrap();

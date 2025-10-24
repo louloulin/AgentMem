@@ -224,6 +224,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires HuggingFace API access
     async fn test_embed_single_text() {
         let config = EmbeddingConfig::huggingface("sentence-transformers/all-MiniLM-L6-v2");
         let embedder = HuggingFaceEmbedder::new(config).await.unwrap();
@@ -236,6 +237,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires HuggingFace API access
     async fn test_embed_batch() {
         let config = EmbeddingConfig::huggingface("sentence-transformers/all-MiniLM-L6-v2");
         let embedder = HuggingFaceEmbedder::new(config).await.unwrap();
@@ -257,6 +259,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires HuggingFace API access
     async fn test_health_check() {
         let config = EmbeddingConfig::huggingface("sentence-transformers/all-MiniLM-L6-v2");
         let embedder = HuggingFaceEmbedder::new(config).await.unwrap();

@@ -8,7 +8,8 @@ pub mod openai;
 #[cfg(feature = "fastembed")]
 pub mod fastembed;
 
-#[cfg(test)]
+// Local tests require local or onnx features
+#[cfg(all(test, any(feature = "local", feature = "onnx")))]
 mod local_test;
 
 pub use cohere::CohereEmbedder;

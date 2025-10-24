@@ -276,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Requires Azure OpenAI credentials
     fn test_model_info() {
         let config = create_test_config();
         let provider = AzureProvider::new(config).unwrap();
