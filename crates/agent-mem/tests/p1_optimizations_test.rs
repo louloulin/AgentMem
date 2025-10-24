@@ -15,8 +15,68 @@ mod p1_optimizations_tests {
         caching::CacheConfig,
         BatchConfig, FactExtractor,
     };
-    use agent_mem_llm::LLMProvider;
+    use agent_mem_llm::{LLMProvider, Message, ModelInfo};
+    use agent_mem_traits::{Embedder, Result as TraitResult};
     use std::sync::Arc;
+    use async_trait::async_trait;
+
+    // Mock implementations for testing
+    struct MockLLMProvider;
+
+    impl MockLLMProvider {
+        fn new() -> Self {
+            Self
+        }
+    }
+
+    #[async_trait]
+    impl LLMProvider for MockLLMProvider {
+        async fn generate(&self, _messages: &[Message]) -> TraitResult<String> {
+            Ok("Mock response".to_string())
+        }
+
+        fn get_model_info(&self) -> ModelInfo {
+            ModelInfo {
+                model: "mock-model".to_string(),
+                max_tokens: 1000,
+                supports_streaming: false,
+                supports_functions: false,
+            }
+        }
+
+        async fn validate_config(&self) -> TraitResult<()> {
+            Ok(())
+        }
+    }
+
+    struct MockEmbedder {
+        dimension: usize,
+    }
+
+    impl MockEmbedder {
+        fn new(dimension: usize) -> Self {
+            Self { dimension }
+        }
+    }
+
+    #[async_trait]
+    impl Embedder for MockEmbedder {
+        async fn embed(&self, _text: &str) -> TraitResult<Vec<f32>> {
+            Ok(vec![0.0; self.dimension])
+        }
+
+        async fn embed_batch(&self, texts: &[&str]) -> TraitResult<Vec<Vec<f32>>> {
+            Ok(vec![vec![0.0; self.dimension]; texts.len()])
+        }
+
+        fn dimensions(&self) -> usize {
+            self.dimension
+        }
+
+        async fn health_check(&self) -> TraitResult<()> {
+            Ok(())
+        }
+    }
 
     /// 测试 P1-#1: FactExtractor 缓存功能
     #[tokio::test]
