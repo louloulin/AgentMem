@@ -133,11 +133,12 @@ members = [
     # "examples/migration-from-agentmen",
     # "examples/mem0-compatibility",
     
-    # 新的真实演示示例（2025-10-24）
-    "examples/demo-memory-api",           # Memory API基础演示
-    "examples/demo-multimodal",           # 多模态处理演示
-    "examples/demo-intelligent-chat",     # 智能对话演示
-    "examples/demo-performance-benchmark", # 性能基准测试工具（需FastEmbed）
+# 新的真实演示示例（2025-10-24）
+"examples/demo-memory-api",           # Memory API基础演示
+"examples/demo-multimodal",           # 多模态处理演示
+"examples/demo-intelligent-chat",     # 智能对话演示
+"examples/demo-performance-benchmark", # 性能基准测试工具
+"examples/demo-codebase-memory",      # 代码库记忆与搜索演示（需FastEmbed）
     "examples/demo-performance-simple",    # 简化性能测试（无Embedder依赖）
 ]
 
