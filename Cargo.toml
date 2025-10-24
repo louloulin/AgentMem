@@ -132,6 +132,12 @@ members = [
     # "examples/advanced-features",
     # "examples/migration-from-agentmen",
     # "examples/mem0-compatibility",
+    
+    # 新的真实演示示例（2025-10-24）
+    "examples/demo-memory-api",           # Memory API基础演示
+    "examples/demo-multimodal",           # 多模态处理演示
+    "examples/demo-intelligent-chat",     # 智能对话演示
+    "examples/demo-performance-benchmark", # 性能基准测试工具
 ]
 
 [workspace.package]
