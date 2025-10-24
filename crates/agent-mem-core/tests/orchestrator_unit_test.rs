@@ -15,6 +15,8 @@ use uuid::Uuid;
 
 // 辅助函数：创建测试用的 Memory
 fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
+    // importance 和 score 保持一致
+    let importance = score.unwrap_or(0.5);
     Memory {
         id: Uuid::new_v4().to_string(),
         content: content.to_string(),
@@ -29,7 +31,7 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
         relations: vec![],
         agent_id: "test-agent".to_string(),
         user_id: Some("test-user".to_string()),
-        importance: 0.5,
+        importance,
         embedding: None,
         last_accessed_at: Utc::now(),
         access_count: 0,
@@ -47,24 +49,8 @@ async fn test_memory_integrator_format_memories() {
 
     // 2. 创建测试记忆
     let memories = vec![
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "User likes coffee".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.9),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "User met John yesterday".to_string(),
-            memory_type: MemoryType::Episodic,
-            score: Some(0.8),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
+        create_test_memory("User likes coffee", MemoryType::Semantic, Some(0.9)),
+        create_test_memory("User met John yesterday", MemoryType::Episodic, Some(0.8)),
     ];
 
     // 3. 格式化记忆
@@ -91,33 +77,9 @@ async fn test_memory_integrator_filter_by_relevance() {
 
     // 2. 创建测试记忆（不同的相关性分数）
     let memories = vec![
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "High relevance".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.9),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "Low relevance".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.5),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "Medium relevance".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.75),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
+        create_test_memory("High relevance", MemoryType::Semantic, Some(0.9)),
+        create_test_memory("Low relevance", MemoryType::Semantic, Some(0.5)),
+        create_test_memory("Medium relevance", MemoryType::Semantic, Some(0.75)),
     ];
 
     // 3. 过滤记忆
@@ -142,33 +104,9 @@ async fn test_memory_integrator_sort_memories() {
 
     // 2. 创建测试记忆（不同的分数）
     let memories = vec![
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "Low score".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.5),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "High score".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.9),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "Medium score".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: Some(0.7),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
+        create_test_memory("Low score", MemoryType::Semantic, Some(0.5)),
+        create_test_memory("High score", MemoryType::Semantic, Some(0.9)),
+        create_test_memory("Medium score", MemoryType::Semantic, Some(0.7)),
     ];
 
     // 3. 排序记忆
@@ -222,15 +160,7 @@ async fn test_memory_integrator_no_score() {
 
     // 2. 创建没有分数的记忆
     let memories = vec![
-        Memory {
-            id: Uuid::new_v4().to_string(),
-            content: "No score memory".to_string(),
-            memory_type: MemoryType::Semantic,
-            score: None,
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        },
+        create_test_memory("No score memory", MemoryType::Semantic, None),
     ];
 
     // 3. 过滤记忆（没有分数的记忆应该被过滤掉）
@@ -253,8 +183,8 @@ async fn test_memory_integrator_config() {
     let custom_config = MemoryIntegratorConfig {
         relevance_threshold: 0.8,
         max_memories: 20,
-        importance_weight: 0.6,
-        recency_weight: 0.4,
+        include_timestamp: true,
+        sort_by_importance: true,
     };
     assert_eq!(custom_config.relevance_threshold, 0.8);
     assert_eq!(custom_config.max_memories, 20);
@@ -277,16 +207,7 @@ async fn test_memory_types() {
     ];
 
     for memory_type in memory_types {
-        let memory = Memory {
-            id: Uuid::new_v4().to_string(),
-            content: format!("Test {:?} memory", memory_type),
-            memory_type: memory_type.clone(),
-            score: Some(0.8),
-            created_at: Utc::now(),
-            updated_at: Some(Utc::now()),
-            ..Default::default()
-        };
-
+        let memory = create_test_memory(&format!("Test {:?} memory", memory_type), memory_type.clone(), Some(0.8));
         assert_eq!(memory.memory_type, memory_type);
     }
 
