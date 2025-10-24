@@ -62,6 +62,7 @@ use tracing::{debug, info};
 ///     Ok(())
 /// }
 /// ```
+#[derive(Clone)]
 pub struct SimpleMemory {
     /// Internal memory manager
     manager: Arc<MemoryManager>,

@@ -21,7 +21,7 @@ agent-mem-config = { path = "../agent-mem-config" }
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
-pyo3-asyncio = { version = "0.21", features = ["tokio-runtime"] }  # 升级到 0.21
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
