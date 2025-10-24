@@ -108,12 +108,12 @@ impl BenchmarkResults {
 
 /// 创建测试用的Memory实例
 async fn create_test_memory() -> Result<Memory> {
-    MemoryBuilder::new()
+    Ok(MemoryBuilder::new()
         .with_agent("benchmark_agent")
         .with_embedder("fastembed", "all-MiniLM-L6-v2")
         .disable_intelligent_features()
         .build()
-        .await
+        .await?)
 }
 
 /// 1. 内存添加操作基准测试

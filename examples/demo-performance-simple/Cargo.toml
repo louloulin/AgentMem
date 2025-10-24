@@ -1,0 +1,16 @@
+[package]
+name = "demo-performance-simple"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.35", features = ["full"] }
+anyhow = "1.0"
+colored = "2.1"
+
+[[bin]]
+name = "demo-performance-simple"
+path = "src/main.rs"
+
