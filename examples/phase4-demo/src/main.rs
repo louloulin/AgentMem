@@ -99,7 +99,7 @@ async fn create_llm_provider() -> Arc<dyn agent_mem_traits::LLMProvider + Send +
             continue;
         }
 
-        match RealLLMFactory::create_provider(&config) {
+        match LLMFactory::create_provider(&config) {
             Ok(provider) => {
                 info!("✅ 成功创建 LLM 提供商: {}", config.provider);
                 return provider;
@@ -143,7 +143,7 @@ async fn demo_fact_extraction() -> Result<()> {
     let fact_extractor = FactExtractor::new(llm);
 
     // 提取事实
-    let facts = fact_extractor.extract_facts(&messages).await?;
+    let facts = fact_extractor.extract_facts_internal(&messages).await?;
 
     info!("提取到 {} 个事实:", facts.len());
     for (i, fact) in facts.iter().enumerate() {
@@ -321,7 +321,7 @@ async fn demo_integrated_processing() -> Result<()> {
     let start_time = std::time::Instant::now();
 
     // 1. 提取事实
-    let extracted_facts = fact_extractor.extract_facts(&messages).await?;
+    let extracted_facts = fact_extractor.extract_facts_internal(&messages).await?;
 
     // 2. 生成决策
     let memory_decisions = decision_engine

@@ -50,6 +50,7 @@ use crate::types::{
 ///     Ok(())
 /// }
 /// ```
+#[derive(Clone)]
 pub struct Memory {
     /// 内部编排器，负责协调各个 Agent
     orchestrator: Arc<RwLock<MemoryOrchestrator>>,

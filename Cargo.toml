@@ -4,10 +4,7 @@ resolver = "2"
 # Temporarily exclude examples with compilation errors (non-core functionality)
 # These can be fixed later without impacting production readiness
 exclude = [
-    # "examples/test-intelligent-integration",  # ✅ FIXED: Added chrono dependency
-    # "examples/intelligent-memory-demo",       # ✅ FIXED: Updated to use Memory API
-    # "examples/phase4-demo",                   # ✅ FIXED: Updated LLM factory API
-    # "crates/agent-mem-python",                # ✅ FIXED: Upgraded pyo3-asyncio, used Arc<RwLock<>>
+    "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
 ]
 
 members = [
@@ -90,7 +87,7 @@ members = [
     "examples/intelligent-reasoning-demo",
     "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
     "examples/graph-memory-demo",
-    "examples/test-intelligent-integration",  # ✅ FIXED: Added chrono dependency
+    # "examples/test-intelligent-integration",  # ⚠️ 已移至 exclude（使用废弃的 trait API）
     "examples/test-cache",
     "examples/simple-memory-demo",
     "examples/simple-api-test",
