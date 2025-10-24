@@ -37,26 +37,32 @@ async fn demo_basic_operations() -> Result<()> {
     info!("✅ Memory 实例创建成功");
 
     // 添加记忆
-    let memory_id_1 = memory.add("我喜欢吃披萨").await?;
-    info!("✅ 添加记忆 1: {}", memory_id_1);
+    let result1 = memory.add("我喜欢吃披萨").await?;
+    if let Some(first) = result1.results.first() {
+        info!("✅ 添加记忆 1: {}", first.id);
+    }
 
-    let memory_id_2 = memory.add("今天天气很好").await?;
-    info!("✅ 添加记忆 2: {}", memory_id_2);
+    let result2 = memory.add("今天天气很好").await?;
+    if let Some(first) = result2.results.first() {
+        info!("✅ 添加记忆 2: {}", first.id);
+    }
 
-    let memory_id_3 = memory.add("我正在学习 Rust 编程").await?;
-    info!("✅ 添加记忆 3: {}", memory_id_3);
+    let result3 = memory.add("我正在学习 Rust 编程").await?;
+    if let Some(first) = result3.results.first() {
+        info!("✅ 添加记忆 3: {}", first.id);
+    }
 
     // 搜索记忆
     info!("\n搜索记忆: '披萨'");
-    let results = memory.search("披萨", None, None, None).await?;
+    let results = memory.search("披萨").await?;
     info!("找到 {} 条相关记忆", results.len());
     for result in results {
-        info!("  - {}", result.memory.content);
+        info!("  - {}", result.content);
     }
 
     // 获取所有记忆
-    let all_memories = memory.get_all(None, None, None, None).await?;
-    info!("\n当前共有 {} 条记忆", all_memories.memories.len());
+    let all_memories = memory.get_all(agent_mem::GetAllOptions::default()).await?;
+    info!("\n当前共有 {} 条记忆", all_memories.len());
 
     Ok(())
 }
@@ -65,13 +71,10 @@ async fn demo_basic_operations() -> Result<()> {
 async fn demo_intelligent_operations() -> Result<()> {
     info!("\n🧠 === 演示 2: 智能记忆操作 ===");
 
-    // 创建支持智能功能的 Memory 实例
-    let memory = Memory::builder()
-        .with_llm_from_env()  // 从环境变量读取 LLM 配置
-        .build()
-        .await?;
+    // 创建 Memory 实例（会自动检测环境变量中的 LLM 配置）
+    let memory = Memory::new().await?;
 
-    info!("✅ 启用智能功能的 Memory 创建成功");
+    info!("✅ Memory 创建成功（智能功能取决于环境变量配置）");
 
     // 添加包含多个事实的复杂内容
     let complex_content = "我叫张三，今年30岁，在北京工作。我喜欢编程和阅读，最喜欢的编程语言是 Rust。";
@@ -79,14 +82,15 @@ async fn demo_intelligent_operations() -> Result<()> {
     info!("添加复杂记忆: {}", complex_content);
     
     match memory.add(complex_content).await {
-        Ok(memory_id) => {
-            info!("✅ 记忆添加成功: {}", memory_id);
+        Ok(result) => {
+            if let Some(first) = result.results.first() {
+                info!("✅ 记忆添加成功: {}", first.id);
+            }
             
             // 获取该记忆
-            if let Ok(results) = memory.get_all(None, None, None, None).await {
-                if let Some(mem) = results.memories.last() {
+            if let Ok(memories) = memory.get_all(agent_mem::GetAllOptions::default()).await {
+                if let Some(mem) = memories.last() {
                     info!("记忆内容: {}", mem.content);
-                    info!("重要性: {}", mem.importance);
                 }
             }
         }
@@ -103,11 +107,12 @@ async fn demo_intelligent_operations() -> Result<()> {
 
     // 搜索相关记忆
     info!("\n搜索 'Rust'");
-    match memory.search("Rust", None, None, None).await {
+    match memory.search("Rust").await {
         Ok(results) => {
             info!("找到 {} 条相关记忆", results.len());
             for result in results.iter().take(3) {
-                info!("  - {} (相似度: {:.2})", result.memory.content, result.score);
+                let score = result.score.unwrap_or(0.0);
+                info!("  - {} (相似度: {:.2})", result.content, score);
             }
         }
         Err(e) => {
@@ -147,13 +152,13 @@ async fn demo_search_and_retrieval() -> Result<()> {
 
     for query in search_queries {
         info!("\n搜索: '{}'", query);
-        match memory.search(query, None, Some(3), None).await {
+        match memory.search(query).await {
             Ok(results) => {
                 if results.is_empty() {
                     info!("  未找到相关记忆");
                 } else {
-                    for result in results {
-                        info!("  - {}", result.memory.content);
+                    for result in results.iter().take(3) {
+                        info!("  - {}", result.content);
                     }
                 }
             }
@@ -165,8 +170,8 @@ async fn demo_search_and_retrieval() -> Result<()> {
 
     // 获取统计信息
     info!("\n记忆统计:");
-    let all_memories = memory.get_all(None, None, None, None).await?;
-    info!("  总计: {} 条记忆", all_memories.memories.len());
+    let all_memories = memory.get_all(agent_mem::GetAllOptions::default()).await?;
+    info!("  总计: {} 条记忆", all_memories.len());
 
     Ok(())
 }

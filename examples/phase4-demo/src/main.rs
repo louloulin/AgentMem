@@ -14,7 +14,7 @@ use agent_mem_intelligence::{
     importance_evaluator::{ImportanceEvaluator, ImportanceEvaluatorConfig},
     intelligent_processor::IntelligentMemoryProcessor,
 };
-use agent_mem_llm::factory::RealLLMFactory;
+use agent_mem_llm::factory::{LLMFactory, RealLLMFactory};
 use agent_mem_traits::{
     LLMConfig, MemoryItem, MemoryType, Message, MessageRole, ProcessingResult, Session,
 };
