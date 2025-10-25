@@ -1,0 +1,8 @@
+# AgentMem 多用户管理示例依赖
+
+# 彩色终端输出
+colorama>=0.4.6
+
+# AgentMem Python绑定（需要编译）
+# 请参考 ../../crates/agent-mem-python/README.md
+
