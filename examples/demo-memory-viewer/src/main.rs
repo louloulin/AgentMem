@@ -9,12 +9,11 @@
 //
 // 真实实现，对标MIRIX的mirix_memory_viewer.py
 
-use agent_mem::{Memory, MemoryBuilder, MemoryItem, GetAllOptions, SearchOptions};
+use agent_mem::{Memory, MemoryBuilder, MemoryItem, GetAllOptions, AddMemoryOptions};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::collections::HashMap;
 use tabled::{
     builder::Builder,
     settings::{object::Columns, object::Rows, Alignment, Modify, Style, Width},
@@ -137,7 +136,7 @@ impl MemoryStatistics {
             }
 
             // 元数据
-            if mem.metadata.is_some() {
+            if !mem.metadata.is_empty() {
                 stats.with_metadata += 1;
             } else {
                 stats.without_metadata += 1;
@@ -200,7 +199,12 @@ async fn create_memory(agent_id: &str) -> Result<Memory> {
 async fn list_memories(memory: &Memory, limit: usize, brief: bool) -> Result<()> {
     println!("\n{}", "🔍 获取记忆列表...".cyan());
 
-    let options = GetAllOptions { limit: Some(limit) };
+    let options = GetAllOptions {
+        user_id: None,
+        agent_id: None,
+        run_id: None,
+        limit: Some(limit),
+    };
     let memories = memory.get_all(options).await.context("Failed to get memories")?;
 
     if memories.is_empty() {
@@ -290,9 +294,9 @@ async fn search_memories(memory: &Memory, query: &str, limit: usize) -> Result<(
                 .green()
         );
 
-        if let Some(metadata) = &mem.metadata {
+        if !mem.metadata.is_empty() {
             println!("  元数据:");
-            for (key, value) in metadata.iter() {
+            for (key, value) in mem.metadata.iter() {
                 println!("    - {}: {}", key.cyan(), value);
             }
         }
@@ -306,7 +310,12 @@ async fn search_memories(memory: &Memory, query: &str, limit: usize) -> Result<(
 async fn show_statistics(memory: &Memory) -> Result<()> {
     println!("\n{}", "📊 计算统计信息...".cyan());
 
-    let options = GetAllOptions { limit: None };
+    let options = GetAllOptions {
+        user_id: None,
+        agent_id: None,
+        run_id: None,
+        limit: None,
+    };
     let memories = memory.get_all(options).await.context("Failed to get memories")?;
 
     if memories.is_empty() {
@@ -324,7 +333,12 @@ async fn show_statistics(memory: &Memory) -> Result<()> {
 async fn show_memory_detail(memory: &Memory, id: &str) -> Result<()> {
     println!("\n{}", format!("🔍 查找记忆: {}", id).cyan());
 
-    let options = GetAllOptions { limit: None };
+    let options = GetAllOptions {
+        user_id: None,
+        agent_id: None,
+        run_id: None,
+        limit: None,
+    };
     let memories = memory.get_all(options).await.context("Failed to get memories")?;
 
     let mem = memories
@@ -347,21 +361,23 @@ async fn show_memory_detail(memory: &Memory, id: &str) -> Result<()> {
             .to_string()
             .green()
     );
-    println!(
-        "  - 更新时间: {}",
-        mem.updated_at
-            .with_timezone(&Local)
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string()
-            .green()
-    );
+    if let Some(updated_at) = mem.updated_at {
+        println!(
+            "  - 更新时间: {}",
+            updated_at
+                .with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+                .green()
+        );
+    }
 
     println!("\n{}", "内容:".yellow().bold());
     println!("  {}", mem.content);
 
-    if let Some(metadata) = &mem.metadata {
+    if !mem.metadata.is_empty() {
         println!("\n{}", "元数据:".yellow().bold());
-        for (key, value) in metadata.iter() {
+        for (key, value) in mem.metadata.iter() {
             println!("  - {}: {}", key.cyan(), value);
         }
     }
@@ -391,11 +407,21 @@ async fn add_test_memories(memory: &Memory, count: usize) -> Result<()> {
     let mut added = 0;
     for i in 0..count {
         let content = test_memories[i % test_memories.len()];
-        let mut metadata = serde_json::Map::new();
-        metadata.insert("test".to_string(), serde_json::Value::Bool(true));
-        metadata.insert("index".to_string(), serde_json::Value::Number(i.into()));
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("test".to_string(), "true".to_string());
+        metadata.insert("index".to_string(), i.to_string());
 
-        match memory.add_with_metadata(content, Some(metadata)).await {
+        let options = AddMemoryOptions {
+            user_id: None,
+            agent_id: None,
+            run_id: None,
+            metadata,
+            infer: false,
+            memory_type: None,
+            prompt: None,
+        };
+
+        match memory.add_with_options(content, options).await {
             Ok(_) => {
                 added += 1;
                 if (i + 1) % 5 == 0 || i + 1 == count {
@@ -421,7 +447,12 @@ async fn add_test_memories(memory: &Memory, count: usize) -> Result<()> {
 async fn export_memories(memory: &Memory, output_path: &str) -> Result<()> {
     println!("\n{}", format!("💾 导出记忆到: {}", output_path).cyan());
 
-    let options = GetAllOptions { limit: None };
+    let options = GetAllOptions {
+        user_id: None,
+        agent_id: None,
+        run_id: None,
+        limit: None,
+    };
     let memories = memory.get_all(options).await.context("Failed to get memories")?;
 
     if memories.is_empty() {
@@ -448,7 +479,12 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
     println!("{}", "║            🎨 记忆可视化                            ║".cyan());
     println!("{}", "╚═══════════════════════════════════════════════════════╝".cyan());
 
-    let options = GetAllOptions { limit: None };
+    let options = GetAllOptions {
+        user_id: None,
+        agent_id: None,
+        run_id: None,
+        limit: None,
+    };
     let memories = memory.get_all(options).await.context("Failed to get memories")?;
 
     if memories.is_empty() {
@@ -470,15 +506,13 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
     );
 
     // 按用户分组（如果有user_id元数据）
-    let mut by_user: HashMap<String, Vec<&MemoryItem>> = HashMap::new();
+    let mut by_user: std::collections::HashMap<String, Vec<&MemoryItem>> = std::collections::HashMap::new();
     for mem in &memories {
-        if let Some(metadata) = &mem.metadata {
-            if let Some(user_id) = metadata.get("user_id").and_then(|v| v.as_str()) {
-                by_user
-                    .entry(user_id.to_string())
-                    .or_insert_with(Vec::new)
-                    .push(mem);
-            }
+        if let Some(user_id) = mem.metadata.get("user_id") {
+            by_user
+                .entry(user_id.to_string())
+                .or_insert_with(Vec::new)
+                .push(mem);
         }
     }
 
@@ -502,10 +536,11 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
         } else {
             mem.content.clone()
         };
+        let time_str = mem.created_at.with_timezone(&Local).format("%H:%M:%S").to_string();
         println!(
             "  {}. {} | {}",
             (idx + 1).to_string().cyan(),
-            mem.created_at.with_timezone(&Local).format("%H:%M:%S").to_string().bright_black(),
+            time_str.bright_black(),
             preview
         );
     }
@@ -518,9 +553,9 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
             println!("\n{}", format!("--- 记忆 {} ---", idx + 1).cyan());
             println!("  ID: {}", mem.id.bright_black());
             println!("  内容: {}", mem.content);
-            if let Some(metadata) = &mem.metadata {
+            if !mem.metadata.is_empty() {
                 println!("  元数据:");
-                for (key, value) in metadata.iter() {
+                for (key, value) in mem.metadata.iter() {
                     println!("    - {}: {}", key.cyan(), value);
                 }
             }

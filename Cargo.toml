@@ -141,6 +141,7 @@ members = [
     "examples/demo-codebase-memory",      # 代码库记忆与搜索演示（需FastEmbed）
     "examples/demo-performance-simple",    # 简化性能测试（无Embedder依赖）
     "examples/demo-memory-viewer",        # 记忆可视化工具（对标MIRIX）
+    "examples/demo-performance-comparison", # 性能对比测试（对标MIRIX）
 ]
 
 [workspace.package]
