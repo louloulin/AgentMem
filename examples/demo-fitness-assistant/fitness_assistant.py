@@ -392,7 +392,7 @@ def run_demo():
     stats = assistant.get_stats()
     print(f"  总记忆数: {stats.get('total_memories', 0)}")
     print(f"  训练记录: {stats.get('workouts_logged', 0)}")
-    print(f("  饮食记录: {stats.get('meals_logged', 0)}")
+    print(f"  饮食记录: {stats.get('meals_logged', 0)}")
     print(f"  恢复记录: {stats.get('recovery_sessions', 0)}")
     print(f"  咨询次数: {stats.get('consultations', 0)}")
     
