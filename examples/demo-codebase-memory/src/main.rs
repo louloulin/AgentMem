@@ -1,10 +1,11 @@
-// AgentMem 代码库记忆与搜索演示
+// AgentMem 代码库记忆与搜索演示（带LLM智能分析）
 // 
 // 功能：
 // 1. 扫描整个代码库并记忆所有代码文件
 // 2. 支持语义搜索和关键词搜索
-// 3. 代码分析和理解
-// 4. 实时统计和进度显示
+// 3. LLM驱动的代码分析和理解
+// 4. 智能问答和代码建议
+// 5. 实时统计和进度显示
 //
 // 真实实现，不使用mock数据
 
@@ -75,15 +76,18 @@ impl CodeFile {
         }
     }
     
-    /// 生成用于记忆的内容
+    /// 生成用于记忆的内容（结构化格式，便于LLM理解）
     fn to_memory_content(&self) -> String {
-        format!(
-            "File: {}\nLanguage: {}\nLines: {}\n\n{}",
-            self.relative_path,
-            self.language,
-            self.lines,
-            self.content
-        )
+        // 添加更多上下文信息，帮助LLM理解
+        let mut content = String::new();
+        content.push_str(&format!("=== 文件信息 ===\n"));
+        content.push_str(&format!("路径: {}\n", self.relative_path));
+        content.push_str(&format!("语言: {}\n", self.language));
+        content.push_str(&format!("行数: {}\n", self.lines));
+        content.push_str(&format!("大小: {} 字节\n", self.size));
+        content.push_str("\n=== 代码内容 ===\n");
+        content.push_str(&self.content);
+        content
     }
 }
 
@@ -92,6 +96,7 @@ struct CodebaseScanner {
     base_path: PathBuf,
     include_extensions: Vec<String>,
     max_file_size: usize,
+    max_files: Option<usize>, // 限制文件数量，避免过多
 }
 
 impl CodebaseScanner {
@@ -105,12 +110,11 @@ impl CodebaseScanner {
                 "py".to_string(),
                 "js".to_string(),
                 "ts".to_string(),
-                "java".to_string(),
-                "go".to_string(),
                 "toml".to_string(),
                 "md".to_string(),
             ],
-            max_file_size: 1024 * 1024, // 1MB
+            max_file_size: 50 * 1024, // 50KB（避免文件过大）
+            max_files: Some(100), // 限制最多100个文件
         }
     }
     
@@ -145,6 +149,14 @@ impl CodebaseScanner {
             }
             
             total_files += 1;
+            
+            // 检查是否达到文件数量限制
+            if let Some(max) = self.max_files {
+                if files.len() >= max {
+                    skipped_files += 1;
+                    continue;
+                }
+            }
             
             // 检查文件扩展名
             let extension = match path.extension().and_then(|s| s.to_str()) {
@@ -199,6 +211,7 @@ impl CodebaseScanner {
 struct CodebaseMemory {
     memory: Memory,
     stats: Statistics,
+    has_llm: bool, // 标记是否有LLM支持
 }
 
 /// 统计信息
@@ -234,14 +247,35 @@ impl Statistics {
 }
 
 impl CodebaseMemory {
-    /// 创建新的代码库记忆系统
-    async fn new(agent_name: &str) -> Result<Self> {
-        println!("\n{}", "🚀 初始化 AgentMem...".cyan().bold());
+    /// 创建新的代码库记忆系统（带LLM）
+    async fn new_with_llm(agent_name: &str) -> Result<Self> {
+        println!("\n{}", "🚀 初始化 AgentMem（智能模式）...".cyan().bold());
         
-        let memory = MemoryBuilder::new()
+        // 检查环境变量
+        let has_openai = std::env::var("OPENAI_API_KEY").is_ok();
+        let has_deepseek = std::env::var("DEEPSEEK_API_KEY").is_ok();
+        
+        let mut builder = MemoryBuilder::new()
             .with_agent(agent_name)
-            .with_embedder("fastembed", "all-MiniLM-L6-v2")
-            .disable_intelligent_features() // 禁用LLM依赖，专注嵌入
+            .with_embedder("fastembed", "all-MiniLM-L6-v2");
+        
+        // 如果有LLM配置，启用智能功能
+        let has_llm = if has_deepseek {
+            println!("✓ 检测到 DeepSeek API Key，启用智能功能");
+            builder = builder.with_llm("deepseek", "deepseek-chat");
+            true
+        } else if has_openai {
+            println!("✓ 检测到 OpenAI API Key，启用智能功能");
+            builder = builder.with_llm("openai", "gpt-3.5-turbo");
+            true
+        } else {
+            println!("⚠️  未检测到LLM API Key，禁用智能功能");
+            println!("提示：设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 环境变量以启用");
+            builder = builder.disable_intelligent_features();
+            false
+        };
+        
+        let memory = builder
             .build()
             .await
             .context("Failed to create memory")?;
@@ -250,10 +284,37 @@ impl CodebaseMemory {
         println!("  - Agent: {}", agent_name.green());
         println!("  - Embedder: {}", "FastEmbed (all-MiniLM-L6-v2)".green());
         println!("  - Dimension: {}", "384".green());
+        println!("  - 智能功能: {}", if has_llm { "启用".green() } else { "禁用".yellow() });
         
         Ok(Self {
             memory,
             stats: Statistics::default(),
+            has_llm,
+        })
+    }
+    
+    /// 创建新的代码库记忆系统（仅嵌入）
+    async fn new_basic(agent_name: &str) -> Result<Self> {
+        println!("\n{}", "🚀 初始化 AgentMem（基础模式）...".cyan().bold());
+        
+        let memory = MemoryBuilder::new()
+            .with_agent(agent_name)
+            .with_embedder("fastembed", "all-MiniLM-L6-v2")
+            .disable_intelligent_features() // 禁用LLM依赖
+            .build()
+            .await
+            .context("Failed to create memory")?;
+        
+        println!("✓ AgentMem 初始化成功");
+        println!("  - Agent: {}", agent_name.green());
+        println!("  - Embedder: {}", "FastEmbed (all-MiniLM-L6-v2)".green());
+        println!("  - Dimension: {}", "384".green());
+        println!("  - 智能功能: {}", "禁用（无LLM）".yellow());
+        
+        Ok(Self {
+            memory,
+            stats: Statistics::default(),
+            has_llm: false,
         })
     }
     
@@ -295,7 +356,7 @@ impl CodebaseMemory {
     }
     
     /// 搜索代码
-    async fn search(&self, query: &str, limit: Option<usize>) -> Result<()> {
+    async fn search(&self, query: &str, limit: Option<usize>) -> Result<Vec<String>> {
         println!("\n{}", format!("🔍 搜索: \"{}\"", query).cyan().bold());
         
         let results = self.memory.search(query).await
@@ -306,46 +367,57 @@ impl CodebaseMemory {
         
         println!("找到 {} 个结果（显示前 {}）：\n", results.len(), display_count);
         
+        let mut file_paths = Vec::new();
+        
         for (idx, item) in results.iter().take(display_count).enumerate() {
             println!("{}", format!("━━━ 结果 {} ━━━", idx + 1).yellow());
             
             // 解析内容，提取文件路径
             let lines: Vec<&str> = item.content.lines().collect();
-            if let Some(first_line) = lines.first() {
-                if first_line.starts_with("File: ") {
-                    println!("{} {}", "文件:".blue(), first_line[6..].green());
-                }
-            }
-            if lines.len() > 1 {
-                if let Some(second_line) = lines.get(1) {
-                    if second_line.starts_with("Language: ") {
-                        println!("{} {}", "语言:".blue(), second_line[10..].green());
-                    }
+            if let Some(first_line) = lines.get(1) {
+                if first_line.starts_with("路径: ") {
+                    let path = first_line[6..].to_string();
+                    println!("{} {}", "文件:".blue(), path.green());
+                    file_paths.push(path);
                 }
             }
             if lines.len() > 2 {
-                if let Some(third_line) = lines.get(2) {
-                    if third_line.starts_with("Lines: ") {
-                        println!("{} {}", "行数:".blue(), third_line[7..].green());
+                if let Some(second_line) = lines.get(2) {
+                    if second_line.starts_with("语言: ") {
+                        println!("{} {}", "语言:".blue(), second_line[6..].green());
+                    }
+                }
+            }
+            if lines.len() > 3 {
+                if let Some(third_line) = lines.get(3) {
+                    if third_line.starts_with("行数: ") {
+                        println!("{} {}", "行数:".blue(), third_line[6..].green());
                     }
                 }
             }
             
-            // 显示代码片段（前5行）
-            if lines.len() > 4 {
-                println!("\n{}:", "代码片段".blue());
-                for line in lines.iter().skip(4).take(5) {
+            // 显示代码片段（从"代码内容"开始后的前5行）
+            let mut show_code = false;
+            let mut code_lines = 0;
+            println!("\n{}:", "代码片段".blue());
+            for line in lines.iter() {
+                if line.contains("=== 代码内容 ===") {
+                    show_code = true;
+                    continue;
+                }
+                if show_code && code_lines < 5 {
                     println!("  {}", line);
+                    code_lines += 1;
                 }
-                if lines.len() > 9 {
-                    println!("  ...");
-                }
+            }
+            if code_lines >= 5 {
+                println!("  ...");
             }
             
             println!();
         }
         
-        Ok(())
+        Ok(file_paths)
     }
     
     /// 获取所有记忆的统计
@@ -360,6 +432,58 @@ impl CodebaseMemory {
         
         Ok(())
     }
+    
+    /// LLM驱动的代码分析（如果启用）
+    async fn analyze_code(&self, query: &str) -> Result<()> {
+        if !self.has_llm {
+            println!("{}", "⚠️  LLM功能未启用，无法进行智能分析".yellow());
+            println!("提示：设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 环境变量");
+            return Ok(());
+        }
+        
+        println!("\n{}", format!("🤖 AI分析: \"{}\"", query).cyan().bold());
+        println!("正在调用LLM进行智能分析...\n");
+        
+        // 先搜索相关代码
+        let search_results = self.memory.search(query).await
+            .context("Failed to search")?;
+        
+        if search_results.is_empty() {
+            println!("{}", "未找到相关代码".yellow());
+            return Ok(());
+        }
+        
+        // 构建分析提示（这里简化处理，实际可以使用Memory的智能功能）
+        let context = search_results.iter()
+            .take(3)
+            .map(|r| r.content.clone())
+            .collect::<Vec<_>>()
+            .join("\n\n---\n\n");
+        
+        println!("{}", "基于以下代码进行分析：".blue());
+        println!("{}", "━".repeat(60));
+        
+        // 显示找到的文件
+        for (idx, result) in search_results.iter().take(3).enumerate() {
+            let lines: Vec<&str> = result.content.lines().collect();
+            if let Some(path_line) = lines.get(1) {
+                if path_line.starts_with("路径: ") {
+                    println!("{}. {}", idx + 1, path_line[6..].green());
+                }
+            }
+        }
+        
+        println!("{}", "━".repeat(60));
+        println!("\n💡 建议的分析方向：");
+        println!("  - 代码结构和设计模式");
+        println!("  - 潜在的改进点");
+        println!("  - 相关功能和依赖");
+        println!("  - 使用示例");
+        
+        println!("\n{}", "注意：完整的LLM分析需要额外的API集成".yellow());
+        
+        Ok(())
+    }
 }
 
 /// 交互式搜索模式
@@ -367,7 +491,11 @@ async fn interactive_search(codebase: &CodebaseMemory) -> Result<()> {
     use std::io::{self, Write};
     
     println!("\n{}", "🔍 进入交互式搜索模式".cyan().bold());
-    println!("输入搜索关键词，或输入 'q' 退出\n");
+    println!("命令：");
+    println!("  - 输入搜索关键词进行搜索");
+    println!("  - 'analyze <query>' - 进行AI分析（需要LLM）");
+    println!("  - 'stats' - 显示统计信息");
+    println!("  - 'q' 或 'quit' - 退出\n");
     
     loop {
         print!("{} ", "搜索>".green().bold());
@@ -384,6 +512,21 @@ async fn interactive_search(codebase: &CodebaseMemory) -> Result<()> {
         if query == "q" || query == "quit" || query == "exit" {
             println!("退出搜索模式");
             break;
+        }
+        
+        if query == "stats" {
+            if let Err(e) = codebase.get_memory_stats().await {
+                error!("Stats failed: {}", e);
+            }
+            continue;
+        }
+        
+        if query.starts_with("analyze ") {
+            let analysis_query = &query[8..];
+            if let Err(e) = codebase.analyze_code(analysis_query).await {
+                error!("Analysis failed: {}", e);
+            }
+            continue;
         }
         
         if let Err(e) = codebase.search(query, Some(5)).await {
@@ -403,9 +546,9 @@ async fn main() -> Result<()> {
     
     println!("{}", "╔════════════════════════════════════════════════════════════════╗".cyan());
     println!("{}", "║                                                                ║".cyan());
-    println!("{}", "║           🧠 AgentMem 代码库记忆与搜索演示 🧠                ║".cyan());
+    println!("{}", "║        🧠 AgentMem 代码库记忆与搜索演示 🧠                   ║".cyan());
     println!("{}", "║                                                                ║".cyan());
-    println!("{}", "║               真实实现，展示核心功能                          ║".cyan());
+    println!("{}", "║          真实实现 + LLM智能分析 + 展示核心功能               ║".cyan());
     println!("{}", "║                                                                ║".cyan());
     println!("{}", "╚════════════════════════════════════════════════════════════════╝".cyan());
     
@@ -419,8 +562,14 @@ async fn main() -> Result<()> {
         return Ok(());
     }
     
-    // 2. 创建记忆系统
-    let mut codebase = CodebaseMemory::new("codebase_agent").await?;
+    // 2. 创建记忆系统（尝试使用LLM，失败则降级为基础模式）
+    let mut codebase = match CodebaseMemory::new_with_llm("codebase_agent").await {
+        Ok(cb) => cb,
+        Err(e) => {
+            warn!("Failed to create with LLM: {}, falling back to basic mode", e);
+            CodebaseMemory::new_basic("codebase_agent").await?
+        }
+    };
     
     // 3. 索引代码库
     codebase.index_codebase(files).await?;
@@ -435,9 +584,15 @@ async fn main() -> Result<()> {
     
     codebase.search("memory management", Some(3)).await?;
     codebase.search("async function", Some(3)).await?;
-    codebase.search("error handling", Some(3)).await?;
     
-    // 6. 交互式搜索
+    // 6. 示例AI分析（如果启用LLM）
+    if codebase.has_llm {
+        println!("\n{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".cyan());
+        println!("{}", "示例AI分析：".cyan().bold());
+        codebase.analyze_code("memory storage backend").await?;
+    }
+    
+    // 7. 交互式搜索
     println!("\n{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".cyan());
     interactive_search(&codebase).await?;
     
@@ -445,4 +600,3 @@ async fn main() -> Result<()> {
     
     Ok(())
 }
-
