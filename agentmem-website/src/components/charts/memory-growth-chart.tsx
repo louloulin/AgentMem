@@ -66,9 +66,9 @@ export function MemoryGrowthChart({ data = defaultData }: MemoryGrowthChartProps
             <Line 
               type="monotone" 
               dataKey="count" 
-              stroke="#3b82f6" 
+              stroke="#3ECF8E" 
               strokeWidth={2}
-              dot={{ fill: '#3b82f6', strokeWidth: 2 }}
+              dot={{ fill: '#3ECF8E', strokeWidth: 2 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>

@@ -22,46 +22,81 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // Supabase Brand Colors
+        'supabase-green': {
+          DEFAULT: '#3ECF8E',
+          light: '#4ADE95',
+          dark: '#2CB574',
+        },
+        // Background Colors
+        'bg-primary': '#1C1C1C',
+        'bg-secondary': '#2A2A2A',
+        'bg-tertiary': '#1A1A1A',
+        // Original shadcn/ui colors (保持兼容)
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: '#3ECF8E', // 改为 Supabase Green
+          foreground: '#FFFFFF',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: '#2A2A2A',
+          foreground: '#FFFFFF',
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: '#2A2A2A',
+          foreground: '#9CA3AF',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: '#3ECF8E',
+          foreground: '#FFFFFF',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: '#1A1A1A',
+          foreground: '#FFFFFF',
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: '#1A1A1A',
+          foreground: '#FFFFFF',
         },
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        lg: '1rem',     // 16px - Supabase style
+        md: '0.75rem',  // 12px
+        sm: '0.5rem',   // 8px
+        xl: '1.5rem',   // 24px
+        '2xl': '2rem',  // 32px
+      },
+      boxShadow: {
+        'glow-green': '0 0 20px rgba(62, 207, 142, 0.3)',
+        'glow-green-lg': '0 0 30px rgba(62, 207, 142, 0.4)',
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-primary': 'linear-gradient(135deg, #3ECF8E 0%, #2CB574 100%)',
+        'gradient-hero': 'linear-gradient(180deg, #1C1C1C 0%, #0F0F0F 100%)',
+        'gradient-card': 'linear-gradient(135deg, rgba(62, 207, 142, 0.1) 0%, rgba(44, 181, 116, 0.05) 100%)',
       },
       keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-in': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        'glow': {
+          '0%, 100%': { boxShadow: '0 0 20px rgba(62, 207, 142, 0.2)' },
+          '50%': { boxShadow: '0 0 30px rgba(62, 207, 142, 0.4)' },
+        },
         'gradient-x': {
           '0%, 100%': {
             'background-position': '0% 50%',
@@ -72,10 +107,10 @@ const config: Config = {
         },
         'pulse-glow': {
           '0%, 100%': {
-            'box-shadow': '0 0 20px rgba(139, 92, 246, 0.3)',
+            'box-shadow': '0 0 20px rgba(62, 207, 142, 0.3)',
           },
           '50%': {
-            'box-shadow': '0 0 40px rgba(139, 92, 246, 0.6)',
+            'box-shadow': '0 0 40px rgba(62, 207, 142, 0.6)',
           },
         },
         float: {
@@ -104,6 +139,9 @@ const config: Config = {
         },
       },
       animation: {
+        'fade-in': 'fade-in 0.5s ease-out',
+        'slide-in': 'slide-in 0.3s ease-out',
+        'glow': 'glow 2s ease-in-out infinite',
         'gradient-x': 'gradient-x 3s ease infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         'float': 'float 3s ease-in-out infinite',
@@ -115,7 +153,8 @@ const config: Config = {
         '300': '300% 300%',
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', 'monospace'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', 'monospace'],
       },
     },
   },

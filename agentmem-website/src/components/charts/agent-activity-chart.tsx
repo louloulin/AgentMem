@@ -64,13 +64,13 @@ export function AgentActivityChart({ data = defaultData }: AgentActivityChartPro
                 fontSize: '14px',
               }}
             />
-            <Bar dataKey="memories" fill="#3b82f6" radius={[4, 4, 0, 0]} name="记忆数" />
-            <Bar dataKey="interactions" fill="#10b981" radius={[4, 4, 0, 0]} name="交互次数" />
+            <Bar dataKey="memories" fill="#3ECF8E" radius={[4, 4, 0, 0]} name="记忆数" />
+            <Bar dataKey="interactions" fill="#2CB574" radius={[4, 4, 0, 0]} name="交互次数" />
           </BarChart>
         </ResponsiveContainer>
         <div className="mt-4 flex justify-around text-sm text-gray-600 dark:text-gray-400">
           <div>
-            <p className="font-semibold text-blue-600 dark:text-blue-400">
+            <p className="font-semibold text-supabase-green">
               {data.reduce((sum, item) => sum + item.memories, 0)}
             </p>
             <p>总记忆数</p>
