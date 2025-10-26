@@ -254,12 +254,12 @@ html:not(.dark) .border-slate-700 {
   
   /* Supabase-style Navigation Item */
   .nav-item-supabase {
-    @apply text-muted-foreground px-4 py-2 rounded-lg 
-           transition-all duration-200 font-medium
-           hover:text-foreground hover:bg-bg-secondary;
+    @apply px-4 py-2 rounded-lg transition-all duration-200 font-medium;
+    @apply text-slate-300 hover:text-white hover:bg-slate-800/50;
   }
   
   .nav-item-supabase.active {
-    @apply text-supabase-green bg-supabase-green/10 font-semibold;
+    @apply bg-purple-900/30 text-purple-400 font-semibold;
+    @apply border-l-4 border-purple-400 pl-[12px];
   }
 }

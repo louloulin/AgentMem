@@ -136,6 +136,9 @@ export default function HomePage() {
               <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
                 架构
               </Link>
+              <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+                Admin
+              </Link>
               <Link href="/demo" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
                 {t('nav.demo')}
               </Link>
@@ -271,14 +274,18 @@ export default function HomePage() {
             </SlideIn>
             <SlideIn direction="up" delay={600}>
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white transition-all duration-300 hover:scale-105">
-                  <Rocket className="mr-2 h-5 w-5" />
-                  {t('home.getStarted')}
-                </Button>
-                <Button size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 transition-all duration-300">
-                  <Code className="mr-2 h-5 w-5" />
-                  {t('home.viewDocs')}
-                </Button>
+                <Link href="/admin">
+                  <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white transition-all duration-300 hover:scale-105 w-full sm:w-auto">
+                    <Rocket className="mr-2 h-5 w-5" />
+                    进入 Admin Dashboard
+                  </Button>
+                </Link>
+                <Link href="/docs">
+                  <Button size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 transition-all duration-300 w-full sm:w-auto">
+                    <Code className="mr-2 h-5 w-5" />
+                    {t('home.viewDocs')}
+                  </Button>
+                </Link>
               </div>
             </SlideIn>
             {/* 统计数据 */}
@@ -743,12 +750,17 @@ export default function HomePage() {
             立即体验下一代智能记忆管理平台，为您的 AI 应用提供强大的记忆能力。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
-              开始免费试用
-            </Button>
-            <Button size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
-              联系销售团队
-            </Button>
+            <Link href="/admin">
+              <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto">
+                <Rocket className="mr-2 h-5 w-5" />
+                进入 Admin Dashboard
+              </Button>
+            </Link>
+            <Link href="/pricing">
+              <Button size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 w-full sm:w-auto">
+                查看定价
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

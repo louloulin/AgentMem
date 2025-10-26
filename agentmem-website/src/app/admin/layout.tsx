@@ -18,6 +18,7 @@ import { usePathname } from 'next/navigation';
 import { Bot, Brain, Users, Settings, Home, MessageSquare, Network } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -25,15 +26,15 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+      <aside className="w-64 bg-slate-900/50 backdrop-blur-sm border-r border-slate-800">
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-center h-16 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-center h-16 border-b border-slate-800">
             <Link href="/admin" className="flex items-center space-x-2">
-              <Bot className="w-8 h-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
+              <Bot className="w-8 h-8 text-purple-400 animate-pulse-glow" />
+              <span className="text-xl font-bold text-white">
                 AgentMem
               </span>
             </Link>
@@ -67,8 +68,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <div className="p-4 border-t border-slate-800">
+            <p className="text-xs text-slate-400 text-center">
               AgentMem v2.1
             </p>
           </div>
@@ -78,15 +79,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <header className="h-16 bg-slate-900/50 backdrop-blur-sm border-b border-slate-800">
           <div className="flex items-center justify-between h-full px-6">
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-2xl font-semibold text-white">
               Admin Dashboard
             </h1>
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-                <Settings className="w-5 h-5" />
-              </button>
+              <ThemeToggle />
+              <Link href="/admin/settings">
+                <button className="p-2 text-slate-300 hover:bg-slate-800/50 rounded-lg transition-colors">
+                  <Settings className="w-5 h-5" />
+                </button>
+              </Link>
             </div>
           </div>
         </header>
