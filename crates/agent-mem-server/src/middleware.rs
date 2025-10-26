@@ -51,10 +51,23 @@ pub async fn request_logging_middleware(request: Request, next: Next) -> Respons
     response
 }
 
-/// Authentication middleware (placeholder)
-pub async fn auth_middleware(request: Request, next: Next) -> Response {
-    // TODO: Implement JWT authentication
-    // For now, just pass through
+/// Default authentication middleware (when auth is disabled)
+/// 
+/// This middleware injects a default AuthUser for development/testing
+/// when authentication is disabled. In production, use jwt_auth_middleware
+/// or api_key_auth_middleware instead.
+pub async fn default_auth_middleware(mut request: Request, next: Next) -> Response {
+    // Check if AuthUser already exists (from optional_auth_middleware)
+    if request.extensions().get::<AuthUser>().is_none() {
+        // Inject a default AuthUser for development
+        let default_user = AuthUser {
+            user_id: "default-user".to_string(),
+            org_id: "default-org".to_string(),
+            roles: vec!["admin".to_string(), "user".to_string()],
+        };
+        request.extensions_mut().insert(default_user);
+    }
+    
     next.run(request).await
 }
 

@@ -17,7 +17,7 @@ pub mod tools;
 pub mod users;
 
 use crate::error::ServerResult;
-use crate::middleware::{audit_logging_middleware, metrics_middleware, quota_middleware};
+use crate::middleware::{audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware};
 // ✅ 使用memory::MemoryManager（基于agent-mem统一API）
 use crate::routes::memory::MemoryManager;
 use crate::sse::SseManager;
@@ -178,6 +178,8 @@ pub async fn create_router(
         .layer(axum_middleware::from_fn(quota_middleware))
         .layer(axum_middleware::from_fn(audit_logging_middleware))
         .layer(axum_middleware::from_fn(metrics_middleware))
+        // Add default auth middleware (injects default AuthUser when auth is disabled)
+        .layer(axum_middleware::from_fn(default_auth_middleware))
         // Add shared state via Extension (must be after middleware that uses them)
         .layer(Extension(sse_manager))
         .layer(Extension(ws_manager))

@@ -27,6 +27,9 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
     run_migration(&conn_guard, 10, "create_memory_associations", create_memory_associations_table(&conn_guard)).await?;
     run_migration(&conn_guard, 11, "create_indexes", create_indexes(&conn_guard)).await?;
 
+    // Initialize default data (idempotent - safe to run multiple times)
+    init_default_data(&conn_guard).await?;
+
     Ok(())
 }
 
@@ -431,6 +434,48 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
     }
 
+    Ok(())
+}
+
+/// Initialize default data (organizations, users)
+/// This is idempotent - safe to run multiple times
+async fn init_default_data(conn: &Connection) -> Result<()> {
+    use chrono::Utc;
+    
+    let now = Utc::now().timestamp();
+    
+    // Insert default organization (if not exists)
+    conn.execute(
+        "INSERT OR IGNORE INTO organizations (id, name, created_at, updated_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?)",
+        libsql::params![
+            "default-org",
+            "Default Organization",
+            now,
+            now,
+            0
+        ],
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to insert default organization: {e}")))?;
+    
+    // Insert default user (if not exists)
+    conn.execute(
+        "INSERT OR IGNORE INTO users (id, organization_id, email, name, created_at, updated_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        libsql::params![
+            "default-user",
+            "default-org",
+            "default@agentmem.local",
+            "Default User",
+            now,
+            now,
+            0
+        ],
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to insert default user: {e}")))?;
+    
     Ok(())
 }
 
