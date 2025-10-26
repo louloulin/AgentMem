@@ -84,7 +84,8 @@ impl Default for ServerConfig {
                 .parse()
                 .unwrap_or(100),
             database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
-                "postgresql://agentmem:password@localhost:5432/agentmem".to_string()
+                // Default to LibSQL local file database (auto-detected by server.rs logic)
+                "file:./data/agentmem.db".to_string()
             }),
         }
     }
