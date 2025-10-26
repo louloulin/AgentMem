@@ -1,132 +1,24 @@
 {
   "name": "AgentMem - 智能记忆管理平台",
   "short_name": "AgentMem",
-  "description": "基于 Rust 构建的下一代智能记忆管理平台，集成 DeepSeek 推理引擎",
+  "description": "基于 Rust 构建的下一代智能记忆管理平台",
   "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0f0f23",
-  "theme_color": "#7c3aed",
-  "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "zh-CN",
-  "dir": "ltr",
-  "categories": ["productivity", "developer", "ai"],
-  "screenshots": [
-    {
-      "src": "/screenshot-desktop.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "AgentMem 桌面版界面"
-    },
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "AgentMem 移动版界面"
-    }
-  ],
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#a855f7",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/favicon.ico",
-      "sizes": "16x16 32x32 48x48",
-      "type": "image/x-icon",
-      "purpose": "any"
+      "sizes": "any",
+      "type": "image/x-icon"
     },
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/maskable-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/maskable-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "文档",
-      "short_name": "文档",
-      "description": "查看 AgentMem 文档",
-      "url": "/docs",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "演示",
-      "short_name": "演示",
-      "description": "体验 AgentMem 演示",
-      "url": "/demo",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "GitHub",
-      "short_name": "GitHub",
-      "description": "访问 GitHub 仓库",
-      "url": "https://github.com/agentmem/agentmem",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    }
-  ],
-  "related_applications": [
-    {
-      "platform": "web",
-      "url": "https://agentmem.ai"
-    },
-    {
-      "platform": "github",
-      "url": "https://github.com/agentmem/agentmem"
-    }
-  ],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  }
+  ]
 }
