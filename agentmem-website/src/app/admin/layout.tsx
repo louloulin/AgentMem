@@ -3,11 +3,21 @@
  * 
  * Provides the main layout structure for the admin dashboard,
  * including sidebar navigation and header.
+ * 
+ * Enhanced with Supabase-style modern UI:
+ * - Active state highlighting
+ * - Smooth transitions
+ * - Better visual hierarchy
  */
+
+'use client';
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Bot, Brain, Users, Settings, Home, MessageSquare, Network } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Toaster } from '@/components/ui/toaster';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -86,12 +96,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }
 
 /**
  * Navigation Link Component
+ * Enhanced with active state detection and Supabase-style highlighting
  */
 interface NavLinkProps {
   href: string;
@@ -100,10 +114,19 @@ interface NavLinkProps {
 }
 
 function NavLink({ href, icon, children }: NavLinkProps) {
+  const pathname = usePathname();
+  const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href));
+  
   return (
     <Link
       href={href}
-      className="flex items-center space-x-3 px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+      className={cn(
+        "flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200",
+        "hover:bg-gray-100 dark:hover:bg-gray-700/70",
+        isActive
+          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium shadow-sm"
+          : "text-gray-700 dark:text-gray-300"
+      )}
     >
       {icon}
       <span>{children}</span>
