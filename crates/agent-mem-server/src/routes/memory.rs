@@ -588,6 +588,56 @@ pub async fn batch_delete_memories(
     Ok(Json(response))
 }
 
+/// 获取特定Agent的所有记忆
+#[utoipa::path(
+    get,
+    path = "/api/v1/agents/{agent_id}/memories",
+    tag = "memory",
+    params(
+        ("agent_id" = String, Path, description = "Agent ID")
+    ),
+    responses(
+        (status = 200, description = "Memories retrieved successfully"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_agent_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Path(agent_id): Path<String>,
+) -> ServerResult<Json<Vec<serde_json::Value>>> {
+    info!("Getting all memories for agent_id: {}", agent_id);
+
+    let memories = memory_manager
+        .get_all_memories(Some(agent_id.clone()), None, Some(100))
+        .await
+        .map_err(|e| {
+            error!("Failed to get agent memories: {}", e);
+            ServerError::MemoryError(e.to_string())
+        })?;
+
+    // 转换为JSON格式
+    let memories_json: Vec<serde_json::Value> = memories
+        .into_iter()
+        .map(|m| {
+            serde_json::json!({
+                "id": m.id,
+                "agent_id": m.agent_id,
+                "user_id": m.user_id,
+                "content": m.content,
+                "memory_type": m.memory_type,
+                "importance": m.importance,
+                "created_at": m.created_at,
+                "last_accessed_at": m.last_accessed_at,
+                "access_count": m.access_count,
+                "metadata": m.metadata,
+                "hash": m.hash,
+            })
+        })
+        .collect();
+
+    Ok(Json(memories_json))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

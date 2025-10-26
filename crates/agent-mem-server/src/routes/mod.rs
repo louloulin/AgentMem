@@ -128,6 +128,11 @@ pub async fn create_router(
             "/api/v1/agents/:agent_id/state",
             put(agents::update_agent_state),
         )
+        // Agent memories route
+        .route(
+            "/api/v1/agents/:agent_id/memories",
+            get(memory::get_agent_memories),
+        )
         // Message management routes
         .route("/api/v1/messages", post(messages::create_message))
         .route("/api/v1/messages/:id", get(messages::get_message))
@@ -202,6 +207,7 @@ pub async fn create_router(
         memory::get_memory_history,
         memory::batch_add_memories,
         memory::batch_delete_memories,
+        memory::get_agent_memories,
         users::register_user,
         users::login_user,
         users::get_current_user,

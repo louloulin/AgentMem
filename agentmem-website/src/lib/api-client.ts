@@ -130,34 +130,68 @@ class ApiClient {
   }
 
   /**
-   * Make HTTP request
+   * Retry helper with exponential backoff
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    options: {
+      retries?: number;
+      delay?: number;
+      backoff?: number;
+    } = {}
+  ): Promise<T> {
+    const { retries = 3, delay = 1000, backoff = 2 } = options;
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        const isLastAttempt = i === retries - 1;
+        if (isLastAttempt) {
+          throw error;
+        }
+
+        // 指数退避
+        const waitTime = delay * Math.pow(backoff, i);
+        console.log(`API request failed, retrying ${i + 1}/${retries} after ${waitTime}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+
+    throw new Error('Unreachable');
+  }
+
+  /**
+   * Make HTTP request with retry
    */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
+    return this.withRetry(async () => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options.headers as Record<string, string>),
+      };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
+      if (this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+      }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({
+          error: response.statusText,
+        }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      return response.json();
     });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        error: response.statusText,
-      }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
   }
 
   // ==================== Agent APIs ====================
