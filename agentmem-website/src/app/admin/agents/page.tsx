@@ -2,18 +2,22 @@
  * Agents Management Page
  * 
  * Allows viewing, creating, and managing agents.
+ * Enhanced with Supabase-style modern UI and Toast notifications.
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bot, Plus, Trash2, Edit, Activity } from 'lucide-react';
+import { Bot, Plus, Trash2, Edit, Activity, AlertCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 import { apiClient, Agent } from '@/lib/api-client';
 
 export default function AgentsPage() {
@@ -21,6 +25,7 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { toast } = useToast();
 
   // Load agents on mount
   useEffect(() => {
@@ -34,7 +39,13 @@ export default function AgentsPage() {
       const data = await apiClient.getAgents();
       setAgents(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load agents');
+      const message = err instanceof Error ? err.message : 'Failed to load agents';
+      setError(message);
+      toast({
+        title: 'Error loading agents',
+        description: message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -44,22 +55,40 @@ export default function AgentsPage() {
     try {
       await apiClient.createAgent({ name, description });
       setShowCreateDialog(false);
+      toast({
+        title: 'Agent created',
+        description: `Successfully created agent "${name}"`,
+      });
       await loadAgents();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create agent');
+      const message = err instanceof Error ? err.message : 'Failed to create agent';
+      toast({
+        title: 'Error creating agent',
+        description: message,
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleDeleteAgent = async (agentId: string) => {
+  const handleDeleteAgent = async (agentId: string, agentName: string) => {
     if (!confirm('Are you sure you want to delete this agent?')) {
       return;
     }
 
     try {
       await apiClient.deleteAgent(agentId);
+      toast({
+        title: 'Agent deleted',
+        description: `Successfully deleted agent "${agentName}"`,
+      });
       await loadAgents();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete agent');
+      const message = err instanceof Error ? err.message : 'Failed to delete agent';
+      toast({
+        title: 'Error deleting agent',
+        description: message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -83,15 +112,26 @@ export default function AgentsPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
-        </div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <div>
+            <h4 className="font-semibold">Error</h4>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        </Alert>
       )}
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-12 w-12 rounded-lg mb-4" />
+              <Skeleton className="h-6 w-3/4 mb-2" />
+              <Skeleton className="h-4 w-full mb-4" />
+              <Skeleton className="h-9 w-full" />
+            </Card>
+          ))}
         </div>
       )}
 
@@ -118,7 +158,7 @@ export default function AgentsPage() {
             <AgentCard
               key={agent.id}
               agent={agent}
-              onDelete={() => handleDeleteAgent(agent.id)}
+              onDelete={() => handleDeleteAgent(agent.id, agent.name || 'Unnamed Agent')}
             />
           ))}
         </div>

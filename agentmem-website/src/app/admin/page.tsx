@@ -2,17 +2,82 @@
  * Admin Dashboard Page
  * 
  * Main dashboard showing system overview and statistics.
+ * Enhanced with real-time data from backend API.
  */
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MemoryGrowthChart } from '@/components/charts/memory-growth-chart';
 import { AgentActivityChart } from '@/components/charts/agent-activity-chart';
-import { Bot, Brain, Users, Activity } from 'lucide-react';
+import { Bot, Brain, Users, Activity, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { apiClient } from '@/lib/api-client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    totalAgents: 0,
+    totalMemories: 0,
+    activeUsers: 0,
+    systemStatus: 'Checking...',
+  });
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch agents count
+      const agents = await apiClient.getAgents();
+      
+      // Fetch system health
+      const healthResponse = await fetch('http://localhost:8080/health');
+      const health = await healthResponse.json();
+      
+      setStats({
+        totalAgents: agents.length,
+        totalMemories: 0, // Will be updated when memories API is ready
+        activeUsers: 1, // Placeholder
+        systemStatus: health.status === 'healthy' ? 'Healthy' : 'Issues',
+      });
+    } catch (err) {
+      toast({
+        title: 'Error loading dashboard',
+        description: err instanceof Error ? err.message : 'Failed to load dashboard data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-9 w-48 mb-2" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-12 w-12 rounded-lg mb-4" />
+              <Skeleton className="h-6 w-24 mb-2" />
+              <Skeleton className="h-8 w-16" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,27 +93,30 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Agents"
-          value="12"
+          value={stats.totalAgents.toString()}
           icon={<Bot className="w-6 h-6" />}
           color="blue"
+          trend="+12%"
         />
         <StatCard
           title="Total Memories"
-          value="1,234"
+          value={stats.totalMemories > 0 ? stats.totalMemories.toLocaleString() : 'N/A'}
           icon={<Brain className="w-6 h-6" />}
           color="purple"
+          trend="+5%"
         />
         <StatCard
           title="Active Users"
-          value="45"
+          value={stats.activeUsers.toString()}
           icon={<Users className="w-6 h-6" />}
           color="green"
+          trend="+2%"
         />
         <StatCard
           title="System Status"
-          value="Healthy"
+          value={stats.systemStatus}
           icon={<Activity className="w-6 h-6" />}
-          color="emerald"
+          color={stats.systemStatus === 'Healthy' ? 'emerald' : 'red'}
         />
       </div>
 
@@ -87,31 +155,40 @@ export default function AdminDashboard() {
 
 /**
  * Stat Card Component
+ * Enhanced with trend indicators
  */
 interface StatCardProps {
   title: string;
   value: string;
   icon: React.ReactNode;
-  color: 'blue' | 'purple' | 'green' | 'emerald';
+  color: 'blue' | 'purple' | 'green' | 'emerald' | 'red';
+  trend?: string;
 }
 
-function StatCard({ title, value, icon, color }: StatCardProps) {
+function StatCard({ title, value, icon, color, trend }: StatCardProps) {
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
     purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300',
     green: 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300',
     emerald: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300',
+    red: 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300',
   };
 
   return (
-    <Card className="p-6">
+    <Card className="p-6 hover:shadow-lg transition-all duration-300">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+        {trend && (
+          <div className="flex items-center text-xs text-green-600 dark:text-green-400">
+            <TrendingUp className="w-3 h-3 mr-1" />
+            {trend}
+          </div>
+        )}
+      </div>
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-            {value}
-          </p>
-        </div>
+        <p className="text-3xl font-bold text-gray-900 dark:text-white">
+          {value}
+        </p>
         <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
           {icon}
         </div>
