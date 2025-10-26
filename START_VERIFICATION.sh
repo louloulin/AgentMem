@@ -1,0 +1,33 @@
+#!/bin/bash
+
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║  AgentMem 极简方案 - 一键启动验证                          ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "此脚本将引导您完成验证流程。"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  准备工作"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "请打开3个Terminal窗口，分别执行："
+echo ""
+echo "📌 Terminal 1 - 后端服务:"
+echo "   cd /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen"
+echo "   cargo run --release"
+echo ""
+echo "📌 Terminal 2 - 前端服务:"
+echo "   cd /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen/agentmem-website"
+echo "   npm run dev"
+echo ""
+echo "📌 Terminal 3 - 验证脚本:"
+echo "   /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen/scripts/auto_verify_and_update.sh"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "详细步骤请查看: QUICK_START_VERIFICATION.md"
+echo ""
+echo "按 Enter 键打开快速验证指南..."
+read
+
+cat /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen/QUICK_START_VERIFICATION.md
