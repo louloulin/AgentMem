@@ -118,7 +118,7 @@ async fn check_database(
     repos: &agent_mem_core::storage::factory::Repositories,
 ) -> ComponentStatus {
     // Try to perform a simple operation to verify connectivity
-    match repos.agent_repo.list(None, None).await {
+    match repos.agents.list(10, 0).await {
         Ok(_) => ComponentStatus {
             status: "healthy".to_string(),
             message: Some("Database connection successful".to_string()),
@@ -148,12 +148,21 @@ async fn check_memory_system() -> ComponentStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_mem_core::storage::factory::Repositories;
 
     #[tokio::test]
-    async fn test_health_check() {
-        let result = health_check().await;
+    async fn test_liveness_check() {
+        let result = liveness_check().await;
         assert!(result.is_ok());
-        let (_status, response) = result.unwrap();
-        assert_eq!(response.0.status, "healthy");
+        let (status, response) = result.unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(response.0["status"], "alive");
+    }
+
+    #[tokio::test]
+    async fn test_check_memory_system() {
+        let status = check_memory_system().await;
+        assert_eq!(status.status, "healthy");
+        assert!(status.message.is_some());
     }
 }

@@ -116,6 +116,19 @@ pub struct BatchResponse {
     pub errors: Vec<String>,
 }
 
+/// Component health status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ComponentStatus {
+    /// Component status (healthy, degraded, unhealthy)
+    pub status: String,
+
+    /// Optional status message
+    pub message: Option<String>,
+
+    /// Last check timestamp
+    pub last_check: DateTime<Utc>,
+}
+
 /// Health check response
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
@@ -129,7 +142,7 @@ pub struct HealthResponse {
     pub version: String,
 
     /// Individual component health checks
-    pub checks: HashMap<String, String>,
+    pub checks: HashMap<String, ComponentStatus>,
 }
 
 /// Metrics response

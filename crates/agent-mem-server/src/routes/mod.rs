@@ -63,6 +63,8 @@ pub async fn create_router(
         )
         // Health and monitoring
         .route("/health", get(health::health_check))
+        .route("/health/live", get(health::liveness_check))
+        .route("/health/ready", get(health::readiness_check))
         .route("/metrics", get(metrics::get_metrics))
         .route("/metrics/prometheus", get(metrics::get_prometheus_metrics));
 
@@ -247,6 +249,8 @@ pub async fn create_router(
         mcp::health_check,
         // Note: graph routes are only available with postgres feature
         health::health_check,
+        health::liveness_check,
+        health::readiness_check,
         metrics::get_metrics,
         metrics::get_prometheus_metrics,
     ),
@@ -259,6 +263,7 @@ pub async fn create_router(
             crate::models::BatchRequest,
             crate::models::BatchResponse,
             crate::models::HealthResponse,
+            crate::models::ComponentStatus,
             crate::models::MetricsResponse,
             users::RegisterRequest,
             users::LoginRequest,
