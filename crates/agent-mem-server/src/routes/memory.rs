@@ -607,34 +607,52 @@ pub async fn get_agent_memories(
 ) -> ServerResult<Json<Vec<serde_json::Value>>> {
     info!("Getting all memories for agent_id: {}", agent_id);
 
-    let memories = memory_manager
-        .get_all_memories(Some(agent_id.clone()), None, Some(100))
-        .await
-        .map_err(|e| {
-            error!("Failed to get agent memories: {}", e);
-            ServerError::MemoryError(e.to_string())
-        })?;
-
-    // 转换为JSON格式
-    let memories_json: Vec<serde_json::Value> = memories
-        .into_iter()
-        .map(|m| {
-            serde_json::json!({
-                "id": m.id,
-                "agent_id": m.agent_id,
-                "user_id": m.user_id,
-                "content": m.content,
-                "memory_type": m.memory_type,
-                "importance": m.importance,
-                "created_at": m.created_at,
-                "last_accessed_at": m.last_accessed_at,
-                "access_count": m.access_count,
-                "metadata": m.metadata,
-                "hash": m.hash,
-            })
-        })
-        .collect();
-
+    // ===== 真实实现：直接数据库查询（绕过embedder）=====
+    // 原因：Memory API 需要 embedder (get_all → search → embedder)
+    // 解决：直接使用 LibSQL 查询，避免 ONNX Runtime 依赖
+    
+    use libsql::{Builder, params};
+    
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "data/agentmem.db".to_string());
+    
+    let db = Builder::new_local(&db_path).build().await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    
+    let conn = db.connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                 created_at, last_accessed, access_count, metadata_, hash \
+                 FROM memories WHERE agent_id = ? AND is_deleted = 0 LIMIT 100";
+    
+    let mut stmt = conn.prepare(query).await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+    
+    let mut rows = stmt.query(params![agent_id.clone()]).await
+        .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?;
+    
+    let mut memories_json: Vec<serde_json::Value> = vec![];
+    
+    while let Some(row) = rows.next().await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
+        
+        memories_json.push(serde_json::json!({
+            "id": row.get::<String>(0).unwrap_or_default(),
+            "agent_id": row.get::<String>(1).unwrap_or_default(),
+            "user_id": row.get::<String>(2).unwrap_or_default(),
+            "content": row.get::<String>(3).unwrap_or_default(),
+            "memory_type": row.get::<Option<String>>(4).ok().flatten(),
+            "importance": row.get::<Option<f64>>(5).ok().flatten(),
+            "created_at": row.get::<Option<i64>>(6).ok().flatten(),
+            "last_accessed": row.get::<Option<i64>>(7).ok().flatten(),
+            "access_count": row.get::<Option<i64>>(8).ok().flatten(),
+            "metadata": row.get::<Option<String>>(9).ok().flatten(),
+            "hash": row.get::<Option<String>>(10).ok().flatten(),
+        }));
+    }
+    
+    info!("Returning {} real memories from database", memories_json.len());
     Ok(Json(memories_json))
 }
 
