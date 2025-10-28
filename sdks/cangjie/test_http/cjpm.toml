@@ -1,0 +1,17 @@
+[package]
+name = "agentmem_http_test"
+version = "0.1.0"
+cjc-version = "0.60.5"
+description = "AgentMem HTTP SDK Test"
+authors = ["AgentMem Team"]
+license = "MIT"
+output-type = "executable"
+src-dir = "../src/http_new"
+main-file = "../src/http_new/tests.cj"
+
+[dependencies]
+
+[profile]
+build = {incremental = false}
+test = {}
+
