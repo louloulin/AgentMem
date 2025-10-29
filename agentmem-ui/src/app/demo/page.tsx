@@ -64,14 +64,15 @@ export default function DemoPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeDemo, setActiveDemo] = useState("add");
+  // ✅ Real-time stats from API
   const [realTimeStats, setRealTimeStats] = useState({
-    totalMemories: 1247,
-    avgResponseTime: "12ms",
-    activeConnections: 23,
-    memoryHits: 98.7,
-    dailyQueries: 15420,
-    storageUsed: 2.3,
-    uptime: 99.9
+    totalMemories: 0,
+    avgResponseTime: "0ms",
+    activeConnections: 0,
+    memoryHits: 0,
+    dailyQueries: 0,
+    storageUsed: 0,
+    uptime: 0
   });
   const [selectedDemo, setSelectedDemo] = useState('interactive');
   // 定义记忆项的类型接口
@@ -85,32 +86,9 @@ export default function DemoPage() {
     relevance?: number;
   }
   
-  const [memoryList, setMemoryList] = useState<Memory[]>([
-    {
-      id: 'mem_001',
-      content: '用户喜欢在周末进行户外活动，特别是徒步和骑行',
-      category: 'preferences',
-      importance: 0.9,
-      created_at: '2024-01-15T10:30:00Z',
-      user_id: 'user_123'
-    },
-    {
-      id: 'mem_002', 
-      content: '用户对环保话题很感兴趣，经常参与相关讨论',
-      category: 'interests',
-      importance: 0.8,
-      created_at: '2024-01-14T15:45:00Z',
-      user_id: 'user_123'
-    },
-    {
-      id: 'mem_003',
-      content: '用户是一名软件工程师，专注于 AI 和机器学习',
-      category: 'professional',
-      importance: 0.95,
-      created_at: '2024-01-13T09:20:00Z', 
-      user_id: 'user_123'
-    }
-  ]);
+  // ✅ Real memory list from API (initialized empty)
+  const [memoryList, setMemoryList] = useState<Memory[]>([]);
+  const [demoAgentId, setDemoAgentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Memory[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -118,45 +96,89 @@ export default function DemoPage() {
   const [demoOutput, setDemoOutput] = useState("");
   const [copiedCode, setCopiedCode] = useState("");
 
-  // 实时更新统计数据
+  // ✅ Load real-time stats from API
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRealTimeStats(prev => ({
-        totalMemories: prev.totalMemories + Math.floor(Math.random() * 3),
-        avgResponseTime: `${Math.floor(Math.random() * 20 + 10)}ms`,
-        activeConnections: Math.max(1, prev.activeConnections + Math.floor(Math.random() * 5 - 2)),
-        memoryHits: Math.min(99.9, prev.memoryHits + (Math.random() - 0.5) * 0.1),
-        dailyQueries: prev.dailyQueries + Math.floor(Math.random() * 10),
-        storageUsed: Math.min(10, prev.storageUsed + (Math.random() - 0.5) * 0.1),
-        uptime: Math.max(99.0, prev.uptime + (Math.random() - 0.5) * 0.01)
-      }));
-    }, 3000);
+    const loadRealTimeStats = async () => {
+      try {
+        const metrics = await apiClient.getMetrics();
+        setRealTimeStats({
+          totalMemories: metrics.total_memories || 0,
+          avgResponseTime: metrics.avg_response_time_ms ? `${metrics.avg_response_time_ms}ms` : "N/A",
+          activeConnections: metrics.active_connections || 0,
+          memoryHits: 0, // TODO: Add cache hit rate to metrics
+          dailyQueries: 0, // TODO: Add daily queries to metrics
+          storageUsed: 0, // TODO: Add storage info to metrics
+          uptime: 99.9 // TODO: Add uptime to metrics
+        });
+      } catch (error) {
+        console.error('Failed to load metrics:', error);
+      }
+    };
 
+    // Initialize demo agent and load data
+    const initializeDemo = async () => {
+      try {
+        let agents = await apiClient.getAgents();
+        let demoAgent = agents.find(a => a.name === 'Demo Agent');
+        
+        if (!demoAgent) {
+          demoAgent = await apiClient.createAgent({
+            name: 'Demo Agent',
+            description: 'Agent for interactive demos'
+          });
+        }
+        
+        setDemoAgentId(demoAgent.id);
+        
+        // Load demo agent's memories
+        const memories = await apiClient.getMemories(demoAgent.id);
+        setMemoryList(memories.map(m => ({
+          id: m.id,
+          content: m.content,
+          category: m.memory_type,
+          importance: m.importance,
+          created_at: m.created_at,
+          user_id: m.agent_id
+        })));
+      } catch (error) {
+        console.error('Failed to initialize demo:', error);
+      }
+    };
+
+    loadRealTimeStats();
+    initializeDemo();
+
+    // Refresh stats every 5 seconds
+    const interval = setInterval(loadRealTimeStats, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // 模拟搜索功能
+  // ✅ Real search using API
   const handleSearch = async (query: string) => {
-    if (!query.trim()) {
+    if (!query.trim() || !demoAgentId) {
       setSearchResults([]);
       return;
     }
     
     setIsSearching(true);
     
-    // 模拟搜索延迟
-    setTimeout(() => {
-      const results = memoryList.filter(memory => 
-        memory.content.toLowerCase().includes(query.toLowerCase()) ||
-        memory.category.toLowerCase().includes(query.toLowerCase())
-      ).map(memory => ({
-        ...memory,
-        relevance: Math.random() * 0.3 + 0.7 // 0.7-1.0 的相关性分数
-      })).sort((a, b) => b.relevance - a.relevance);
-      
-      setSearchResults(results);
+    try {
+      const results = await apiClient.searchMemories(query, demoAgentId);
+      setSearchResults(results.map(m => ({
+        id: m.id,
+        content: m.content,
+        category: m.memory_type,
+        importance: m.importance,
+        created_at: m.created_at,
+        user_id: m.agent_id,
+        relevance: m.importance // Use importance as relevance score
+      })));
+    } catch (error) {
+      console.error('Search failed:', error);
+      setSearchResults([]);
+    } finally {
       setIsSearching(false);
-    }, 800);
+    }
   };
 
   // 添加新记忆
@@ -179,25 +201,9 @@ export default function DemoPage() {
     setMemoryList(prev => prev.filter(memory => memory.id !== id));
   };
 
-  // 执行搜索
-  const performSearch = () => {
-    if (!searchQuery.trim()) return;
-    
-    setIsLoading(true);
-    
-    // 模拟搜索延迟
-    setTimeout(() => {
-      const results = memoryList.filter(memory => 
-        memory.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        memory.category.toLowerCase().includes(searchQuery.toLowerCase())
-      ).map(memory => ({
-        ...memory,
-        relevance: Math.random() * 0.3 + 0.7 // 0.7-1.0 的相关性分数
-      })).sort((a, b) => b.relevance - a.relevance);
-      
-      setSearchResults(results);
-      setIsLoading(false);
-    }, 800);
+  // ✅ Real search execution
+  const performSearch = async () => {
+    await handleSearch(searchQuery);
   };
 
   /**

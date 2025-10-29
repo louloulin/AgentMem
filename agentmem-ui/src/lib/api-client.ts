@@ -370,6 +370,82 @@ class ApiClient {
     const response = await this.request<ApiResponse<User>>('/api/v1/users/me');
     return response.data;
   }
+
+  // ==================== Extended Memory APIs ====================
+
+  /**
+   * Update memory
+   */
+  async updateMemory(memoryId: string, data: Partial<Memory>): Promise<Memory> {
+    const response = await this.request<ApiResponse<Memory>>(
+      `/api/v1/memories/${memoryId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Get single memory
+   */
+  async getMemory(memoryId: string): Promise<Memory> {
+    const response = await this.request<ApiResponse<Memory>>(
+      `/api/v1/memories/${memoryId}`
+    );
+    return response.data;
+  }
+
+  // ==================== Health & Metrics APIs ====================
+
+  /**
+   * Get system health
+   */
+  async getHealth(): Promise<HealthResponse> {
+    const response = await this.request<HealthResponse>('/health');
+    return response;
+  }
+
+  /**
+   * Get system metrics
+   */
+  async getMetrics(): Promise<MetricsResponse> {
+    const response = await this.request<MetricsResponse>('/metrics');
+    return response;
+  }
+}
+
+// ==================== Additional Types ====================
+
+export interface HealthResponse {
+  status: string;
+  timestamp: string;
+  components?: Record<string, ComponentStatus>;
+}
+
+export interface ComponentStatus {
+  status: string;
+  message?: string;
+}
+
+export interface MetricsResponse {
+  total_memories?: number;
+  total_agents?: number;
+  total_users?: number;
+  avg_response_time_ms?: number;
+  active_connections?: number;
+  // Memory growth data for charts
+  memory_growth?: Array<{
+    date: string;
+    count: number;
+  }>;
+  // Agent activity data for charts
+  agent_activity?: Array<{
+    agent: string;
+    memories: number;
+    interactions: number;
+  }>;
 }
 
 // Export singleton instance

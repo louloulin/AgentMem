@@ -34,17 +34,37 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       
-      // Fetch agents count
-      const agents = await apiClient.getAgents();
+      // ✅ Parallel fetch all data
+      const [agents, users, health, metrics] = await Promise.all([
+        apiClient.getAgents(),
+        apiClient.getUsers().catch(() => [] as any[]), // Fallback to empty array if fails
+        apiClient.getHealth(),
+        apiClient.getMetrics().catch(() => ({ total_memories: 0 }) as any), // Fallback
+      ]);
       
-      // Fetch system health
-      const healthResponse = await fetch('http://localhost:8080/health');
-      const health = await healthResponse.json();
+      // Calculate total memories from agents or use metrics
+      let totalMemories = metrics.total_memories || 0;
+      
+      // If metrics doesn't provide memory count, calculate from agents
+      if (totalMemories === 0 && agents.length > 0) {
+        try {
+          const memoryCounts = await Promise.all(
+            agents.map(agent => 
+              apiClient.getMemories(agent.id)
+                .then(memories => memories.length)
+                .catch(() => 0)
+            )
+          );
+          totalMemories = memoryCounts.reduce((sum, count) => sum + count, 0);
+        } catch (error) {
+          console.error('Failed to calculate total memories:', error);
+        }
+      }
       
       setStats({
         totalAgents: agents.length,
-        totalMemories: 0, // Will be updated when memories API is ready
-        activeUsers: 1, // Placeholder
+        totalMemories: totalMemories, // ✅ Real data
+        activeUsers: users.length, // ✅ Real data
         systemStatus: health.status === 'healthy' ? 'Healthy' : 'Issues',
       });
     } catch (err) {
