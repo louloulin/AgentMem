@@ -49,13 +49,13 @@ export default function GraphPage() {
   }, []);
 
   useEffect(() => {
-    if (memories.length > 0) {
+    if (memories && memories.length > 0) {
       buildGraph();
     }
   }, [memories, filterType]);
 
   useEffect(() => {
-    if (nodes.length > 0) {
+    if (nodes && nodes.length > 0) {
       drawGraph();
     }
   }, [nodes, edges, zoom, selectedNode]);
@@ -64,8 +64,9 @@ export default function GraphPage() {
     try {
       setLoading(true);
       const allMemories = await apiClient.searchMemories('');
-      setMemories(allMemories);
+      setMemories(allMemories || []);
     } catch (error) {
+      setMemories([]);
       console.error('Failed to load memories:', error);
     } finally {
       setLoading(false);
@@ -75,8 +76,8 @@ export default function GraphPage() {
   const buildGraph = () => {
     // Filter memories by type
     const filteredMemories = filterType === 'all'
-      ? memories
-      : memories.filter(m => m.memory_type === filterType);
+      ? (memories || [])
+      : (memories || []).filter(m => m.memory_type === filterType);
 
     // Create nodes
     const graphNodes: GraphNode[] = filteredMemories.map((memory, index) => ({
