@@ -133,7 +133,16 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  organization_id?: string;
+  roles?: string[];
   created_at: string;
+}
+
+export interface UsersListResponse {
+  users: User[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 /**
@@ -567,19 +576,31 @@ class ApiClient {
   // ==================== User APIs ====================
 
   /**
-   * Get all users (cached for 30s)
+   * Get all users (cached for 30s, with pagination support)
    */
-  async getUsers(): Promise<User[]> {
-    const cacheKey = 'users:list';
+  async getUsers(page: number = 1, pageSize: number = 50): Promise<User[]> {
+    const cacheKey = `users:list:${page}:${pageSize}`;
     const cached = this.getCached<User[]>(cacheKey);
     if (cached) {
-      console.log('✅ Cache hit: users:list');
+      console.log(`✅ Cache hit: users:list:${page}:${pageSize}`);
       return cached;
     }
 
-    console.log('🔄 Cache miss: users:list');
-    const response = await this.request<ApiResponse<User[]>>('/api/v1/users');
-    this.setCache(cacheKey, response.data, 30000); // 30s TTL
+    console.log(`🔄 Cache miss: users:list:${page}:${pageSize}`);
+    const response = await this.request<ApiResponse<UsersListResponse>>(
+      `/api/v1/users?page=${page}&page_size=${pageSize}`
+    );
+    this.setCache(cacheKey, response.data.users, 30000); // 30s TTL
+    return response.data.users;
+  }
+
+  /**
+   * Get users list with full pagination info
+   */
+  async getUsersWithPagination(page: number = 1, pageSize: number = 50): Promise<UsersListResponse> {
+    const response = await this.request<ApiResponse<UsersListResponse>>(
+      `/api/v1/users?page=${page}&page_size=${pageSize}`
+    );
     return response.data;
   }
 

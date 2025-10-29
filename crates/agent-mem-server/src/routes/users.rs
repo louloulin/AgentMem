@@ -79,6 +79,15 @@ pub struct ChangePasswordRequest {
     pub new_password: String,
 }
 
+/// Users list response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UsersListResponse {
+    pub users: Vec<UserResponse>,
+    pub total: usize,
+    pub page: usize,
+    pub page_size: usize,
+}
+
 /// Register a new user
 #[utoipa::path(
     post,
@@ -447,4 +456,85 @@ pub async fn get_user_by_id(
     };
 
     Ok(Json(user))
+}
+
+/// Get all users (admin only, with pagination)
+#[utoipa::path(
+    get,
+    path = "/api/v1/users",
+    params(
+        ("page" = Option<usize>, Query, description = "Page number (default: 1)"),
+        ("page_size" = Option<usize>, Query, description = "Page size (default: 50, max: 100)")
+    ),
+    responses(
+        (status = 200, description = "Users list", body = UsersListResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Forbidden - Admin role required")
+    ),
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_users_list(
+    Extension(repositories): Extension<Arc<Repositories>>,
+    Extension(auth_user): Extension<AuthUser>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> ServerResult<impl IntoResponse> {
+    // Check if user is admin
+    if !auth_user.roles.contains(&"admin".to_string()) {
+        return Err(ServerError::Forbidden("Admin role required".to_string()));
+    }
+
+    // Parse pagination parameters
+    let page = params
+        .get("page")
+        .and_then(|p| p.parse::<usize>().ok())
+        .unwrap_or(1)
+        .max(1);
+    
+    let page_size = params
+        .get("page_size")
+        .and_then(|p| p.parse::<usize>().ok())
+        .unwrap_or(50)
+        .min(100)  // Max 100 items per page
+        .max(1);   // Min 1 item per page
+
+    // Calculate offset
+    let offset = (page - 1) * page_size;
+
+    // Get user repository
+    let user_repo = repositories.users.clone();
+
+    // Fetch users from database with pagination
+    let users_models = user_repo
+        .list(page_size as i64, offset as i64)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?;
+
+    // Convert to response models
+    let users: Vec<UserResponse> = users_models
+        .into_iter()
+        .map(|user_model| UserResponse {
+            id: user_model.id,
+            email: user_model.email,
+            name: user_model.name,
+            organization_id: user_model.organization_id,
+            roles: user_model.roles.unwrap_or_else(|| vec!["user".to_string()]),
+            created_at: user_model.created_at.timestamp(),
+        })
+        .collect();
+
+    // Get total count (approximate for now)
+    // Note: In production, you might want to add a count() method to the repository
+    let total = users.len();
+
+    let response = UsersListResponse {
+        users,
+        total,
+        page,
+        page_size,
+    };
+
+    Ok(Json(response))
 }

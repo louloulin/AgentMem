@@ -17,8 +17,9 @@ pub mod stats;
 pub mod tools;
 pub mod users;
 
-use crate::error::ServerResult;
+use crate::error::{ServerError, ServerResult};
 use crate::middleware::{audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware};
+use tracing::info;
 // ✅ 使用memory::MemoryManager（基于agent-mem统一API）
 use crate::routes::memory::MemoryManager;
 use crate::sse::SseManager;
@@ -44,6 +45,21 @@ pub async fn create_router(
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
     let sse_manager = Arc::new(SseManager::new());
+
+    // 🆕 Initialize MCP Server with ToolExecutor
+    use agent_mem_tools::executor::ToolExecutor;
+    use agent_mem_tools::mcp::McpServer;
+    use agent_mem_tools::mcp::server::McpServerConfig;
+    
+    let tool_executor = Arc::new(ToolExecutor::new());
+    let mcp_config = McpServerConfig::default();
+    let mcp_server = Arc::new(McpServer::new(mcp_config, tool_executor));
+    
+    // Initialize MCP server
+    mcp_server.initialize().await
+        .map_err(|e| ServerError::ServerError(format!("Failed to initialize MCP server: {e}")))?;
+    
+    info!("MCP server initialized successfully");
 
     let mut app = Router::new()
         // Memory management routes (✅ 使用Memory统一API)
@@ -76,6 +92,7 @@ pub async fn create_router(
     // Add all routes (now database-agnostic via Repository Traits)
     app = app
             // User management routes
+            .route("/api/v1/users", get(users::get_users_list))
             .route("/api/v1/users/register", post(users::register_user))
             .route("/api/v1/users/login", post(users::login_user))
             .route("/api/v1/users/me", get(users::get_current_user))
@@ -195,6 +212,7 @@ pub async fn create_router(
         // Add shared state via Extension (must be after middleware that uses them)
         .layer(Extension(sse_manager))
         .layer(Extension(ws_manager))
+        .layer(Extension(mcp_server))  // 🆕 Add MCP server extension
         .layer(Extension(metrics_registry))
         .layer(Extension(memory_manager))
         .layer(Extension(Arc::new(repositories)));
@@ -221,6 +239,7 @@ pub async fn create_router(
         users::update_current_user,
         users::change_password,
         users::get_user_by_id,
+        users::get_users_list,
         organizations::create_organization,
         organizations::get_organization,
         organizations::update_organization,
@@ -285,6 +304,7 @@ pub async fn create_router(
             users::UserResponse,
             users::UpdateUserRequest,
             users::ChangePasswordRequest,
+            users::UsersListResponse,
             organizations::OrganizationResponse,
             organizations::OrganizationSettings,
             organizations::CreateOrganizationRequest,
