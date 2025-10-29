@@ -2,7 +2,7 @@
  * Agent Activity Chart Component
  * 
  * Displays agent activity statistics using Recharts
- * ✅ Now supports real-time data from metrics API
+ * ✅ 100% Real Data from Stats API
  */
 
 'use client';
@@ -11,130 +11,123 @@ import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bot, RefreshCw } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, type AgentActivityResponse } from '@/lib/api-client';
 
 interface AgentActivityChartProps {
-  data?: Array<{
-    agent: string;
-    memories: number;
-    interactions: number;
-  }>;
   autoRefresh?: boolean;
   refreshInterval?: number;
 }
 
-// Fallback data for when API is not available
-const fallbackData = [
-  { agent: 'Core', memories: 156, interactions: 89 },
-  { agent: 'Episodic', memories: 234, interactions: 145 },
-  { agent: 'Semantic', memories: 189, interactions: 98 },
-  { agent: 'Procedural', memories: 145, interactions: 67 },
-  { agent: 'Working', memories: 298, interactions: 234 },
-];
-
 export function AgentActivityChart({ 
-  data: propData,
   autoRefresh = true,
   refreshInterval = 30000
 }: AgentActivityChartProps) {
-  const [chartData, setChartData] = useState(propData || fallbackData);
+  const [activityData, setActivityData] = useState<AgentActivityResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isUsingRealData, setIsUsingRealData] = useState(!!propData);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load real data from metrics API and agents
+  // ✅ Load real data from new Stats API
   const loadData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Try to get data from metrics API first
-      const metrics = await apiClient.getMetrics();
-      
-      if (metrics.agent_activity && metrics.agent_activity.length > 0) {
-        setChartData(metrics.agent_activity);
-        setIsUsingRealData(true);
-      } else {
-        // Fallback: get real agents and compute stats
-        const agents = await apiClient.getAgents();
-        
-        if (agents.length > 0) {
-          const activityData = await Promise.all(
-            agents.map(async (agent) => {
-              try {
-                const memories = await apiClient.getMemories(agent.id);
-                const messages = await apiClient.getChatHistory(agent.id);
-                
-                return {
-                  agent: agent.name || agent.id.slice(0, 8),
-                  memories: memories.length,
-                  interactions: messages.length
-                };
-              } catch (error) {
-                console.error(`Failed to get data for agent ${agent.id}:`, error);
-                return {
-                  agent: agent.name || agent.id.slice(0, 8),
-                  memories: 0,
-                  interactions: 0
-                };
-              }
-            })
-          );
-          
-          setChartData(activityData.filter(d => d.memories > 0 || d.interactions > 0));
-          setIsUsingRealData(true);
-        } else {
-          setIsUsingRealData(false);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load agent activity data:', error);
-      setIsUsingRealData(false);
+      // Use new dedicated Agent Activity API
+      const response = await apiClient.getAgentActivity();
+      setActivityData(response);
+    } catch (err) {
+      console.error('Failed to load agent activity data:', err);
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!propData) {
-      loadData();
-    }
+    // Load data on mount
+    loadData();
 
-    if (autoRefresh && !propData) {
+    // Set up auto-refresh
+    if (autoRefresh) {
       const interval = setInterval(loadData, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [propData, autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval]);
+
+  // Prepare chart data from API response
+  const chartData = activityData?.agents.map(agent => ({
+    agent: agent.agent_name,
+    memories: agent.total_memories,
+    interactions: agent.total_interactions,
+  })) || [];
 
   const totalMemories = chartData.reduce((sum, item) => sum + item.memories, 0);
   const totalInteractions = chartData.reduce((sum, item) => sum + item.interactions, 0);
+
+  if (error) {
+    return (
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold flex items-center gap-2 text-red-600">
+            <Bot className="w-5 h-5" />
+            Agent Activity Statistics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-gray-500 py-8">{error}</p>
+          <button
+            onClick={loadData}
+            className="mx-auto block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading && !activityData) {
+    return (
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <Bot className="w-5 h-5 text-green-600" />
+            Agent Activity Statistics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-green-600" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Bot className="w-5 h-5 text-green-600" />
-          Agent 活动统计
-          {!isUsingRealData && (
-            <span className="text-xs text-gray-500 font-normal">(示例数据)</span>
-          )}
+          Agent Activity Statistics
+          <span className="text-xs text-green-600 font-normal">✅ Live Data</span>
         </CardTitle>
-        {!propData && (
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-            title="刷新数据"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        )}
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+          title="Refresh data"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (
           <div className="h-[300px] flex items-center justify-center text-gray-500">
             <div className="text-center">
               <Bot className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>暂无Agent数据</p>
-              <p className="text-sm mt-1">创建Agent后数据将显示在这里</p>
+              <p>No Agent data available yet</p>
+              <p className="text-sm mt-1">Create some agents to see activity</p>
             </div>
           </div>
         ) : (
@@ -157,6 +150,11 @@ export function AgentActivityChart({
                     padding: '8px 12px',
                   }}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'memories') return [value, 'Memories'];
+                    if (name === 'interactions') return [value, 'Interactions'];
+                    return [value, name];
+                  }}
                 />
                 <Legend 
                   wrapperStyle={{ 
@@ -164,22 +162,28 @@ export function AgentActivityChart({
                     fontSize: '14px',
                   }}
                 />
-                <Bar dataKey="memories" fill="#3ECF8E" radius={[4, 4, 0, 0]} name="记忆数" />
-                <Bar dataKey="interactions" fill="#2CB574" radius={[4, 4, 0, 0]} name="交互次数" />
+                <Bar dataKey="memories" fill="#3ECF8E" radius={[4, 4, 0, 0]} name="Memories" />
+                <Bar dataKey="interactions" fill="#2CB574" radius={[4, 4, 0, 0]} name="Interactions" />
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-4 flex justify-around text-sm text-gray-600 dark:text-gray-400">
-              <div>
-                <p className="font-semibold text-green-600 dark:text-green-400">
-                  {totalMemories}
+            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Total Agents</p>
+                <p className="font-semibold text-purple-600 dark:text-purple-400 text-lg">
+                  {activityData?.total_agents || 0}
                 </p>
-                <p>总记忆数</p>
               </div>
-              <div>
-                <p className="font-semibold text-green-600 dark:text-green-400">
-                  {totalInteractions}
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Total Memories</p>
+                <p className="font-semibold text-green-600 dark:text-green-400 text-lg">
+                  {totalMemories.toLocaleString()}
                 </p>
-                <p>总交互次数</p>
+              </div>
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400">Total Interactions</p>
+                <p className="font-semibold text-blue-600 dark:text-blue-400 text-lg">
+                  {totalInteractions.toLocaleString()}
+                </p>
               </div>
             </div>
           </>
