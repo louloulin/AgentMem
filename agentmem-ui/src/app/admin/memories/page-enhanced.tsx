@@ -133,19 +133,23 @@ export default function MemoriesPageEnhanced() {
     try {
       setLoading(true);
       const agentsData = await apiClient.getAgents();
-      setAgents(agentsData);
+      setAgents(agentsData || []);
       
       // Load memories for first agent if available
-      if (agentsData.length > 0) {
+      if (agentsData && agentsData.length > 0) {
         const memoriesData = await apiClient.getMemories(agentsData[0].id);
-        setMemories(memoriesData);
+        setMemories(memoriesData || []);
+      } else {
+        setMemories([]);  // Set to empty array if no agents
       }
       
       toast({
         title: "Data loaded",
-        description: `Loaded ${agentsData.length} agents`,
+        description: `Loaded ${agentsData?.length || 0} agents`,
       });
     } catch (err) {
+      setAgents([]);  // Set to empty array on error
+      setMemories([]);  // Set to empty array on error
       toast({
         title: "Failed to load data",
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -161,20 +165,22 @@ export default function MemoriesPageEnhanced() {
     setCurrentPage(1);
     
     if (agentId === 'all') {
-      // Load all memories
+      // Load all memories - for now just clear the list
+      setMemories([]);
       return;
     }
     
     try {
       setLoading(true);
       const data = await apiClient.getMemories(agentId);
-      setMemories(data);
+      setMemories(data || []);
       
       toast({
         title: "Memories loaded",
-        description: `Found ${data.length} memories`,
+        description: `Found ${data?.length || 0} memories`,
       });
     } catch (err) {
+      setMemories([]);  // Set to empty array on error
       toast({
         title: "Failed to load memories",
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -197,13 +203,14 @@ export default function MemoriesPageEnhanced() {
         searchQuery,
         selectedAgentId !== 'all' ? selectedAgentId : undefined
       );
-      setMemories(data);
+      setMemories(data || []);
       
       toast({
         title: "Search completed",
-        description: `Found ${data.length} results`,
+        description: `Found ${data?.length || 0} results`,
       });
     } catch (err) {
+      setMemories([]);  // Set to empty array on error
       toast({
         title: "Search failed",
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -217,7 +224,7 @@ export default function MemoriesPageEnhanced() {
   const handleDeleteMemory = async (memoryId: string) => {
     try {
       await apiClient.deleteMemory(memoryId);
-      setMemories((prev) => prev.filter((m) => m.id !== memoryId));
+      setMemories((prev) => (prev || []).filter((m) => m.id !== memoryId));
       
       toast({
         title: "Memory deleted",
@@ -233,7 +240,7 @@ export default function MemoriesPageEnhanced() {
   };
   
   // Filter memories by type
-  const filteredMemories = memories.filter((memory) => {
+  const filteredMemories = (memories || []).filter((memory) => {
     if (selectedType && selectedType !== 'all') {
       return memory.memory_type === selectedType;
     }
@@ -301,9 +308,9 @@ export default function MemoriesPageEnhanced() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Agents</SelectItem>
-                  {agents.map((agent) => (
+                  {(agents || []).map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
+                      {agent.name || agent.id}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -404,7 +411,7 @@ export default function MemoriesPageEnhanced() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {agents.find((a) => a.id === memory.agent_id)?.name || 'Unknown'}
+                          {(agents || []).find((a) => a.id === memory.agent_id)?.name || 'Unknown'}
                         </TableCell>
                         <TableCell className="text-sm text-gray-600 dark:text-gray-400">
                           {formatDate(memory.created_at)}

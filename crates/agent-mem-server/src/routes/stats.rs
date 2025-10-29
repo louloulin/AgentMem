@@ -158,7 +158,7 @@ pub struct AgentActivityResponse {
     )
 )]
 pub async fn get_dashboard_stats(
-    Extension(repositories): Extension<Repositories>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<DashboardStats>> {
     // Get total counts (using list with large limits and counting)
@@ -178,11 +178,28 @@ pub async fn get_dashboard_stats(
         total_messages += agent_messages.len() as i64;
     }
     
-    // Get memory statistics from memory manager
-    let memory_stats = memory_manager.get_stats().await
-        .map_err(|e| ServerError::MemoryError(e.to_string()))?;
+    // Get memory statistics directly from repositories (避免使用向量搜索)
+    // 直接统计所有 agents 的 memories 总数
+    let mut total_memories = 0i64;
+    let mut memories_by_type_map: HashMap<String, usize> = HashMap::new();
     
-    let total_memories = memory_stats.total_memories as i64;
+    for agent in all_agents.iter().take(100) {  // Limit to avoid performance issues
+        // 使用 memory_manager 的 get_all_memories 方法（不使用向量搜索）
+        match memory_manager.get_all_memories(Some(agent.id.clone()), None, Some(10000)).await {
+            Ok(memories) => {
+                total_memories += memories.len() as i64;
+                // 统计 memory 类型
+                for memory in memories {
+                    let mem_type = format!("{:?}", memory.memory_type);
+                    *memories_by_type_map.entry(mem_type).or_insert(0) += 1;
+                }
+            },
+            Err(e) => {
+                // 如果获取失败，记录日志但不中断
+                tracing::warn!("Failed to get memories for agent {}: {}", agent.id, e);
+            }
+        }
+    }
     
     // Get active counts (entities with activity in last 24 hours)
     let cutoff_time = Utc::now() - Duration::hours(24);
@@ -230,7 +247,7 @@ pub async fn get_dashboard_stats(
     
     // Convert memory stats by type
     let mut memories_by_type: HashMap<String, i64> = HashMap::new();
-    for (mem_type, count) in memory_stats.memories_by_type {
+    for (mem_type, count) in memories_by_type_map {
         memories_by_type.insert(mem_type, count as i64);
     }
     
@@ -264,13 +281,30 @@ pub async fn get_dashboard_stats(
     )
 )]
 pub async fn get_memory_growth(
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<MemoryGrowthResponse>> {
-    // Get current memory stats
-    let memory_stats = memory_manager.get_stats().await
-        .map_err(|e| ServerError::MemoryError(e.to_string()))?;
+    // Get all agents to calculate total memories (避免使用向量搜索)
+    let all_agents = repositories.agents.list(100, 0).await
+        .map_err(|e| ServerError::Internal(e.to_string()))?;
     
-    let total_memories = memory_stats.total_memories as i64;
+    let mut total_memories = 0i64;
+    let mut memories_by_type_map: HashMap<String, usize> = HashMap::new();
+    
+    for agent in all_agents.iter() {
+        match memory_manager.get_all_memories(Some(agent.id.clone()), None, Some(10000)).await {
+            Ok(memories) => {
+                total_memories += memories.len() as i64;
+                for memory in memories {
+                    let mem_type = format!("{:?}", memory.memory_type);
+                    *memories_by_type_map.entry(mem_type).or_insert(0) += 1;
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to get memories for agent {}: {}", agent.id, e);
+            }
+        }
+    }
     
     // Generate time series data for the last 30 days
     // In a production system, this would query historical data from a time-series database
@@ -293,7 +327,7 @@ pub async fn get_memory_growth(
         };
         
         let mut by_type: HashMap<String, i64> = HashMap::new();
-        for (mem_type, count) in &memory_stats.memories_by_type {
+        for (mem_type, count) in &memories_by_type_map {
             by_type.insert(mem_type.clone(), (count * progress as usize) as i64);
         }
         
@@ -342,7 +376,7 @@ pub async fn get_memory_growth(
     )
 )]
 pub async fn get_agent_activity_stats(
-    Extension(repositories): Extension<Repositories>,
+    Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<AgentActivityResponse>> {
     // Get all agents (using list with large limit)

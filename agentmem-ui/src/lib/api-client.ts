@@ -548,12 +548,18 @@ class ApiClient {
    * Search memories
    */
   async searchMemories(query: string, agentId?: string): Promise<Memory[]> {
-    const params = new URLSearchParams({ query });
-    if (agentId) {
-      params.append('agent_id', agentId);
-    }
     const response = await this.request<ApiResponse<Memory[]>>(
-      `/api/v1/memories/search?${params}`
+      `/api/v1/memories/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          agent_id: agentId,
+        }),
+      }
     );
     return response.data;
   }
