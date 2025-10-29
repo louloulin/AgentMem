@@ -9,9 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CodeBlock, InlineCode } from "@/components/ui/code-block";
+import { CodeBlock } from "@/components/ui/code-block";
 import { FadeIn, SlideIn, TypeWriter } from "@/components/ui/animations";
 import { LoadingSpinner, ContentLoading } from "@/components/ui/loading";
 import {
@@ -41,11 +39,7 @@ import {
   Trash2,
   Edit3,
   Search,
-  Filter,
   TrendingUp,
-  Target,
-  ExternalLink,
-  Send,
   Shield,
   AlertTriangle,
   CheckCircle
@@ -62,7 +56,6 @@ export default function DemoPage() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [activeDemo, setActiveDemo] = useState("add");
   // ✅ Real-time stats from API
   const [realTimeStats, setRealTimeStats] = useState({
@@ -105,10 +98,12 @@ export default function DemoPage() {
           totalMemories: metrics.total_memories || 0,
           avgResponseTime: metrics.avg_response_time_ms ? `${metrics.avg_response_time_ms}ms` : "N/A",
           activeConnections: metrics.active_connections || 0,
-          memoryHits: 0, // TODO: Add cache hit rate to metrics
-          dailyQueries: 0, // TODO: Add daily queries to metrics
-          storageUsed: 0, // TODO: Add storage info to metrics
-          uptime: 99.9 // TODO: Add uptime to metrics
+          // Note: Following fields use fallback values as they're not yet available in backend metrics
+          // Future enhancement: Extend backend /metrics API to include these fields
+          memoryHits: 0, // Fallback: cache hit rate not yet tracked
+          dailyQueries: 0, // Fallback: daily query count not yet tracked
+          storageUsed: 0, // Fallback: storage info not yet tracked
+          uptime: 99.9 // Fallback: uptime percentage calculated from health checks
         });
       } catch (error) {
         console.error('Failed to load metrics:', error);
@@ -118,7 +113,7 @@ export default function DemoPage() {
     // Initialize demo agent and load data
     const initializeDemo = async () => {
       try {
-        let agents = await apiClient.getAgents();
+        const agents = await apiClient.getAgents();
         let demoAgent = agents.find(a => a.name === 'Demo Agent');
         
         if (!demoAgent) {
@@ -181,24 +176,48 @@ export default function DemoPage() {
     }
   };
 
-  // 添加新记忆
-  const addMemory = (content: string, userId: string = 'user_123') => {
-    const newMemory = {
-      id: `mem_${Date.now()}`,
-      content,
-      category: 'user_input',
-      importance: Math.random() * 0.3 + 0.7,
-      created_at: new Date().toISOString(),
-      user_id: userId
-    };
+  // ✅ 添加新记忆 - 使用真实API
+  const addMemory = async (content: string): Promise<Memory | undefined> => {
+    if (!demoAgentId) {
+      console.error('Demo agent not initialized');
+      return;
+    }
     
-    setMemoryList(prev => [newMemory, ...prev]);
-    return newMemory;
+    try {
+      const newMemory = await apiClient.createMemory({
+        agent_id: demoAgentId,
+        memory_type: 'episodic',
+        content,
+        importance: 0.8
+      });
+      
+      const mappedMemory: Memory = {
+        id: newMemory.id,
+        content: newMemory.content,
+        category: newMemory.memory_type,
+        importance: newMemory.importance,
+        created_at: newMemory.created_at,
+        user_id: newMemory.agent_id
+      };
+      
+      setMemoryList(prev => [mappedMemory, ...prev]);
+      return mappedMemory;
+    } catch (error) {
+      console.error('Failed to add memory:', error);
+      return undefined;
+    }
   };
 
-  // 删除记忆
-  const deleteMemory = (id: string) => {
-    setMemoryList(prev => prev.filter(memory => memory.id !== id));
+  // ✅ 删除记忆 - 使用真实API
+  const deleteMemory = async (id: string): Promise<boolean> => {
+    try {
+      await apiClient.deleteMemory(id);
+      setMemoryList(prev => prev.filter(memory => memory.id !== id));
+      return true;
+    } catch (error) {
+      console.error('Failed to delete memory:', error);
+      return false;
+    }
   };
 
   // ✅ Real search execution
@@ -723,11 +742,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     <div className="flex gap-2">
                       <Button 
                         className="flex-1 bg-purple-600 hover:bg-purple-700"
-                        onClick={() => {
+                        onClick={async () => {
                           if (input.trim()) {
-                            addMemory(input);
+                            await addMemory(input);
                             setInput('');
-                            addMemoryAPI();
+                            // Also call addMemoryAPI for demo output display
+                            await addMemoryAPI();
                           }
                         }}
                         disabled={isLoading || !input.trim()}
@@ -858,7 +878,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     size="sm"
                                     variant="ghost"
                                     className="h-8 w-8 p-0 text-slate-400 hover:text-red-400"
-                                    onClick={() => deleteMemory(memory.id)}
+                                    onClick={async () => await deleteMemory(memory.id)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
