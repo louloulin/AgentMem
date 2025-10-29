@@ -10,63 +10,33 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryGrowthChart } from '@/components/charts/memory-growth-chart';
 import { AgentActivityChart } from '@/components/charts/agent-activity-chart';
-import { Bot, Brain, Users, Activity, TrendingUp } from 'lucide-react';
+import { Bot, Brain, Users, Activity, TrendingUp, MessageSquare } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, type DashboardStats, type ActivityLog } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    totalAgents: 0,
-    totalMemories: 0,
-    activeUsers: 0,
-    systemStatus: 'Checking...',
-  });
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     loadDashboardStats();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadDashboardStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadDashboardStats = async () => {
     try {
       setLoading(true);
       
-      // ✅ Parallel fetch all data
-      const [agents, users, health, metrics] = await Promise.all([
-        apiClient.getAgents(),
-        apiClient.getUsers().catch(() => [] as any[]), // Fallback to empty array if fails
-        apiClient.getHealth(),
-        apiClient.getMetrics().catch(() => ({ total_memories: 0 }) as any), // Fallback
-      ]);
+      // ✅ Use new unified Stats API - 100% real data
+      const dashboardStats = await apiClient.getDashboardStats();
       
-      // Calculate total memories from agents or use metrics
-      let totalMemories = metrics.total_memories || 0;
-      
-      // If metrics doesn't provide memory count, calculate from agents
-      if (totalMemories === 0 && agents.length > 0) {
-        try {
-          const memoryCounts = await Promise.all(
-            agents.map(agent => 
-              apiClient.getMemories(agent.id)
-                .then(memories => memories.length)
-                .catch(() => 0)
-            )
-          );
-          totalMemories = memoryCounts.reduce((sum, count) => sum + count, 0);
-        } catch (error) {
-          console.error('Failed to calculate total memories:', error);
-        }
-      }
-      
-      setStats({
-        totalAgents: agents.length,
-        totalMemories: totalMemories, // ✅ Real data
-        activeUsers: users.length, // ✅ Real data
-        systemStatus: health.status === 'healthy' ? 'Healthy' : 'Issues',
-      });
+      setStats(dashboardStats);
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
       toast({
@@ -107,34 +77,35 @@ export default function AdminDashboard() {
         <p className="text-slate-400">Monitor your AI agents and system performance</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - ✅ 100% Real Data from Stats API */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Agents"
-          value={stats.totalAgents.toString()}
+          value={stats?.total_agents.toString() || '0'}
           icon={<Bot className="w-6 h-6" />}
           color="purple"
-          trend="+12%"
+          subtitle={`${stats?.active_agents || 0} active (24h)`}
         />
         <StatCard
           title="Total Memories"
-          value={stats.totalMemories > 0 ? stats.totalMemories.toLocaleString() : 'N/A'}
+          value={stats?.total_memories.toLocaleString() || '0'}
           icon={<Brain className="w-6 h-6" />}
           color="blue"
-          trend="+5%"
+          subtitle={`${Object.keys(stats?.memories_by_type || {}).length} types`}
         />
         <StatCard
-          title="Active Users"
-          value={stats.activeUsers.toString()}
+          title="Total Users"
+          value={stats?.total_users.toString() || '0'}
           icon={<Users className="w-6 h-6" />}
           color="green"
-          trend="+2%"
+          subtitle={`${stats?.active_users || 0} active (24h)`}
         />
         <StatCard
-          title="System Status"
-          value={stats.systemStatus}
-          icon={<Activity className="w-6 h-6" />}
-          color={stats.systemStatus === 'Healthy' ? 'green' : 'red'}
+          title="Total Messages"
+          value={stats?.total_messages.toLocaleString() || '0'}
+          icon={<MessageSquare className="w-6 h-6" />}
+          color="orange"
+          subtitle={`${stats?.avg_response_time_ms.toFixed(0)}ms avg`}
         />
       </div>
 
@@ -155,27 +126,28 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity - ✅ 100% Real Data from Stats API */}
       <Card className="p-6 mt-8 bg-slate-800/50 border-slate-700">
-        <h3 className="text-xl font-semibold text-white mb-4">
-          Recent Activity
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center justify-between">
+          <span>Recent Activity</span>
+          <span className="text-xs text-slate-500">
+            Last updated: {stats?.timestamp ? new Date(stats.timestamp).toLocaleTimeString() : 'N/A'}
+          </span>
         </h3>
         <div className="space-y-4">
-          <ActivityItem
-            title="New agent created"
-            description="Agent 'Customer Support Bot' was created"
-            time="2 minutes ago"
-          />
-          <ActivityItem
-            title="Memory updated"
-            description="Memory 'Product Knowledge' was updated"
-            time="5 minutes ago"
-          />
-          <ActivityItem
-            title="User joined"
-            description="New user 'john@example.com' joined"
-            time="10 minutes ago"
-          />
+          {stats?.recent_activities && stats.recent_activities.length > 0 ? (
+            stats.recent_activities.map((activity) => (
+              <ActivityItem
+                key={activity.id}
+                title={formatActivityTitle(activity.activity_type)}
+                description={activity.description}
+                time={formatTimeAgo(activity.timestamp)}
+                activityType={activity.activity_type}
+              />
+            ))
+          ) : (
+            <p className="text-slate-500 text-center py-8">No recent activity</p>
+          )}
         </div>
       </Card>
     </div>
@@ -186,11 +158,11 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
-  trend?: string;
+  subtitle?: string;
   color?: 'blue' | 'green' | 'purple' | 'orange' | 'red';
 }
 
-function StatCard({ title, value, icon, trend, color = 'purple' }: StatCardProps) {
+function StatCard({ title, value, icon, subtitle, color = 'purple' }: StatCardProps) {
   const colorClasses = {
     blue: 'bg-blue-500/20 text-blue-400',
     green: 'bg-green-500/20 text-green-400',
@@ -202,21 +174,18 @@ function StatCard({ title, value, icon, trend, color = 'purple' }: StatCardProps
   return (
     <Card className="p-6 bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-medium text-slate-400">
             {title}
           </p>
-          <div className="flex items-baseline gap-2">
-            <p className="text-2xl font-bold text-white mt-2">
-              {value}
+          <p className="text-2xl font-bold text-white mt-2">
+            {value}
+          </p>
+          {subtitle && (
+            <p className="text-xs text-slate-500 mt-1">
+              {subtitle}
             </p>
-            {trend && (
-              <span className="text-xs text-green-400 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                {trend}
-              </span>
-            )}
-          </div>
+          )}
         </div>
         <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
           {icon}
@@ -230,16 +199,56 @@ interface ActivityItemProps {
   title: string;
   description: string;
   time: string;
+  activityType: string;
 }
 
-function ActivityItem({ title, description, time }: ActivityItemProps) {
+function ActivityItem({ title, description, time, activityType }: ActivityItemProps) {
+  const getActivityIcon = (type: string) => {
+    if (type.includes('message')) return '💬';
+    if (type.includes('memory')) return '🧠';
+    if (type.includes('agent')) return '🤖';
+    if (type.includes('user')) return '👤';
+    return '📋';
+  };
+
   return (
-    <div className="flex items-start justify-between py-3 border-b border-slate-700 last:border-0">
-      <div>
-        <h4 className="text-sm font-medium text-white">{title}</h4>
-        <p className="text-sm text-slate-400 mt-1">{description}</p>
+    <div className="flex items-start justify-between py-3 border-b border-slate-700 last:border-0 hover:bg-slate-700/30 transition-colors px-2 rounded">
+      <div className="flex items-start gap-3">
+        <span className="text-lg mt-0.5">{getActivityIcon(activityType)}</span>
+        <div>
+          <h4 className="text-sm font-medium text-white">{title}</h4>
+          <p className="text-sm text-slate-400 mt-1">{description}</p>
+        </div>
       </div>
-      <span className="text-xs text-slate-500">{time}</span>
+      <span className="text-xs text-slate-500 whitespace-nowrap ml-4">{time}</span>
     </div>
   );
+}
+
+// ✅ Helper functions for real data formatting
+function formatActivityTitle(activityType: string): string {
+  const titles: Record<string, string> = {
+    'message_sent': 'New Message',
+    'memory_created': 'Memory Created',
+    'memory_updated': 'Memory Updated',
+    'agent_created': 'Agent Created',
+    'user_joined': 'User Joined',
+  };
+  return titles[activityType] || activityType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatTimeAgo(timestamp: string): string {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now.getTime() - then.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHour < 24) return `${diffHour}h ago`;
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return then.toLocaleDateString();
 }

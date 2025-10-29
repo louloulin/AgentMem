@@ -2,93 +2,64 @@
  * Memory Growth Chart Component
  * 
  * Displays memory growth trends using Recharts
- * ✅ Now supports real-time data from metrics API
+ * ✅ 100% Real Data from Stats API
  */
 
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, RefreshCw } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { Brain, RefreshCw, TrendingUp } from 'lucide-react';
+import { apiClient, type MemoryGrowthResponse } from '@/lib/api-client';
 
 interface MemoryGrowthChartProps {
-  data?: Array<{
-    date: string;
-    count: number;
-  }>;
   autoRefresh?: boolean;
   refreshInterval?: number; // in milliseconds
 }
 
-// Fallback data for when API is not available
-const fallbackData = [
-  { date: '2024-10-20', count: 120 },
-  { date: '2024-10-21', count: 245 },
-  { date: '2024-10-22', count: 386 },
-  { date: '2024-10-23', count: 524 },
-  { date: '2024-10-24', count: 688 },
-  { date: '2024-10-25', count: 892 },
-  { date: '2024-10-26', count: 1234 },
-];
-
 export function MemoryGrowthChart({ 
-  data: propData,
   autoRefresh = true,
   refreshInterval = 30000 // 30 seconds
 }: MemoryGrowthChartProps) {
-  const [chartData, setChartData] = useState(propData || fallbackData);
+  const [growthData, setGrowthData] = useState<MemoryGrowthResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isUsingRealData, setIsUsingRealData] = useState(!!propData);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load real data from metrics API
+  // ✅ Load real data from new Stats API
   const loadData = async () => {
     try {
       setLoading(true);
-      const metrics = await apiClient.getMetrics();
+      setError(null);
       
-      if (metrics.memory_growth && metrics.memory_growth.length > 0) {
-        setChartData(metrics.memory_growth);
-        setIsUsingRealData(true);
-      } else {
-        // If API doesn't return growth data, generate from current stats
-        const today = new Date();
-        const growth = Array.from({ length: 7 }, (_, i) => {
-          const date = new Date(today);
-          date.setDate(date.getDate() - (6 - i));
-          return {
-            date: date.toISOString().split('T')[0],
-            count: Math.floor((metrics.total_memories || 0) * (0.7 + (i * 0.05)))
-          };
-        });
-        setChartData(growth);
-        setIsUsingRealData(true);
-      }
-    } catch (error) {
-      console.error('Failed to load memory growth data:', error);
-      // Keep using fallback data on error
-      setIsUsingRealData(false);
+      // Use new dedicated Memory Growth API
+      const response = await apiClient.getMemoryGrowth();
+      setGrowthData(response);
+    } catch (err) {
+      console.error('Failed to load memory growth data:', err);
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Load data on mount if not provided via props
-    if (!propData) {
-      loadData();
-    }
+    // Load data on mount
+    loadData();
 
     // Set up auto-refresh
-    if (autoRefresh && !propData) {
+    if (autoRefresh) {
       const interval = setInterval(loadData, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [propData, autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval]);
 
-  const growth = chartData.length > 1 
-    ? chartData[chartData.length - 1].count - chartData[0].count 
+  // Calculate growth statistics
+  const chartData = growthData?.data || [];
+  const totalMemories = growthData?.total_memories || 0;
+  const growthRate = growthData?.growth_rate || 0;
+  const periodGrowth = chartData.length > 1 
+    ? chartData[chartData.length - 1].total - chartData[0].total 
     : 0;
 
   return (
