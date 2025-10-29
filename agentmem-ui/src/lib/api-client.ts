@@ -112,6 +112,60 @@ export interface User {
 }
 
 /**
+ * Statistics types
+ */
+export interface DashboardStats {
+  total_agents: number;
+  total_users: number;
+  total_memories: number;
+  total_messages: number;
+  active_agents: number;
+  active_users: number;
+  avg_response_time_ms: number;
+  recent_activities: ActivityLog[];
+  memories_by_type: Record<string, number>;
+  timestamp: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  activity_type: string;
+  agent_id?: string;
+  user_id?: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface MemoryGrowthResponse {
+  data: MemoryGrowthPoint[];
+  total_memories: number;
+  growth_rate: number;
+  timestamp: string;
+}
+
+export interface MemoryGrowthPoint {
+  date: string;
+  total: number;
+  new: number;
+  by_type: Record<string, number>;
+}
+
+export interface AgentActivityResponse {
+  agents: AgentActivityStats[];
+  total_agents: number;
+  timestamp: string;
+}
+
+export interface AgentActivityStats {
+  agent_id: string;
+  agent_name: string;
+  total_memories: number;
+  total_interactions: number;
+  last_active?: string;
+  avg_importance: number;
+}
+
+/**
  * API Client class
  */
 class ApiClient {
@@ -412,6 +466,47 @@ class ApiClient {
    */
   async getMetrics(): Promise<MetricsResponse> {
     const response = await this.request<MetricsResponse>('/metrics');
+    return response;
+  }
+
+  // ==================== Statistics APIs ====================
+
+  /**
+   * Get dashboard statistics
+   * 
+   * Returns comprehensive statistics for the admin dashboard including:
+   * - Total counts for agents, users, memories, messages
+   * - Active entity counts (last 24h)
+   * - Recent activity logs
+   * - Memory distribution by type
+   */
+  async getDashboardStats(): Promise<DashboardStats> {
+    const response = await this.request<DashboardStats>('/api/v1/stats/dashboard');
+    return response;
+  }
+
+  /**
+   * Get memory growth statistics
+   * 
+   * Returns time series data showing memory growth over the last 30 days.
+   * Data points include total memories, new memories, and breakdown by type.
+   */
+  async getMemoryGrowth(): Promise<MemoryGrowthResponse> {
+    const response = await this.request<MemoryGrowthResponse>('/api/v1/stats/memories/growth');
+    return response;
+  }
+
+  /**
+   * Get agent activity statistics
+   * 
+   * Returns activity statistics for all agents including:
+   * - Memory counts
+   * - Interaction counts (messages)
+   * - Last active timestamps
+   * - Average memory importance
+   */
+  async getAgentActivity(): Promise<AgentActivityResponse> {
+    const response = await this.request<AgentActivityResponse>('/api/v1/stats/agents/activity');
     return response;
   }
 }
