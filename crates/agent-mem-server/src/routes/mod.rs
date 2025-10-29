@@ -13,6 +13,7 @@ pub mod memory; // ✅ 统一API实现：基于agent-mem Memory API
 pub mod messages;
 pub mod metrics;
 pub mod organizations;
+pub mod stats;
 pub mod tools;
 pub mod users;
 
@@ -66,7 +67,11 @@ pub async fn create_router(
         .route("/health/live", get(health::liveness_check))
         .route("/health/ready", get(health::readiness_check))
         .route("/metrics", get(metrics::get_metrics))
-        .route("/metrics/prometheus", get(metrics::get_prometheus_metrics));
+        .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
+        // Dashboard statistics
+        .route("/api/v1/stats/dashboard", get(stats::get_dashboard_stats))
+        .route("/api/v1/stats/memories/growth", get(stats::get_memory_growth))
+        .route("/api/v1/stats/agents/activity", get(stats::get_agent_activity_stats));
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app
@@ -253,6 +258,9 @@ pub async fn create_router(
         health::readiness_check,
         metrics::get_metrics,
         metrics::get_prometheus_metrics,
+        stats::get_dashboard_stats,
+        stats::get_memory_growth,
+        stats::get_agent_activity_stats,
     ),
     components(
         schemas(
@@ -265,6 +273,11 @@ pub async fn create_router(
             crate::models::HealthResponse,
             crate::models::ComponentStatus,
             crate::models::MetricsResponse,
+            stats::DashboardStats,
+            stats::MemoryGrowthPoint,
+            stats::AgentActivity,
+            stats::ActivityItem,
+            stats::StatsQuery,
             users::RegisterRequest,
             users::LoginRequest,
             users::LoginResponse,
@@ -308,6 +321,7 @@ pub async fn create_router(
         (name = "mcp", description = "MCP (Model Context Protocol) server operations"),
         (name = "graph", description = "Knowledge graph visualization and querying operations"),
         (name = "health", description = "Health and monitoring"),
+        (name = "statistics", description = "Dashboard statistics and analytics"),
     ),
     info(
         title = "AgentMem API",
