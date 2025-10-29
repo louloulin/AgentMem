@@ -7,24 +7,91 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MemoryGrowthChart } from '@/components/charts/memory-growth-chart';
 import { AgentActivityChart } from '@/components/charts/agent-activity-chart';
-import { Bot, Brain, Users, Activity, TrendingUp, MessageSquare } from 'lucide-react';
+import { Bot, Brain, Users, Activity, TrendingUp, MessageSquare, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { apiClient, type DashboardStats, type ActivityLog } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocket, type WsMessage } from '@/hooks/use-websocket';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // ✅ WebSocket for real-time updates
+  const API_BASE_URL = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080')
+    : 'http://localhost:8080';
+    
+  const WS_URL = API_BASE_URL.replace(/^http/, 'ws') + '/api/v1/ws';
+  
+  const ws = useWebSocket(WS_URL, {
+    token: typeof window !== 'undefined' ? localStorage.getItem('auth_token') || undefined : undefined,
+    autoReconnect: true,
+    maxReconnectAttempts: 5,
+    heartbeatInterval: 30000,
+    debug: true, // Enable debug mode for development
+  });
+
+  // Handle WebSocket messages
+  const handleWebSocketMessage = useCallback((message: WsMessage) => {
+    console.log('[Dashboard] WebSocket message:', message);
+    
+    switch (message.type) {
+      case 'agent_update':
+        // Agent status changed
+        toast({
+          title: "Agent Updated",
+          description: `Agent ${message.data ? (message.data as { agent_id?: string }).agent_id : 'Unknown'} status changed`,
+        });
+        // Refresh dashboard stats
+        loadDashboardStats();
+        break;
+        
+      case 'memory_update':
+        // Memory added/updated/deleted
+        toast({
+          title: "Memory Updated",
+          description: "A memory has been updated",
+        });
+        // Refresh dashboard stats
+        loadDashboardStats();
+        break;
+        
+      case 'message':
+        // New chat message
+        toast({
+          title: "New Message",
+          description: "A new message has been received",
+        });
+        break;
+        
+      case 'error':
+        // Error notification
+        toast({
+          title: "Error",
+          description: message.data ? String(message.data) : "An error occurred",
+          variant: "destructive",
+        });
+        break;
+    }
+  }, [toast]);
+
+  // Subscribe to WebSocket messages
+  useEffect(() => {
+    const unsubscribe = ws.subscribe('*', handleWebSocketMessage);
+    return unsubscribe;
+  }, [ws, handleWebSocketMessage]);
+
   useEffect(() => {
     loadDashboardStats();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (as fallback if WebSocket is disconnected)
     const interval = setInterval(loadDashboardStats, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -71,10 +138,32 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h2>
-        <p className="text-slate-400">Monitor your AI agents and system performance</p>
+      {/* Page Header with WebSocket Status */}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h2>
+          <p className="text-slate-400">Monitor your AI agents and system performance</p>
+        </div>
+        
+        {/* ✅ WebSocket Connection Status Indicator */}
+        <div className="flex items-center gap-2">
+          {ws.isConnected ? (
+            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+              <Wifi className="w-3 h-3 mr-1" />
+              Live Updates
+            </Badge>
+          ) : ws.isReconnecting ? (
+            <Badge variant="secondary" className="bg-yellow-600 hover:bg-yellow-700">
+              <Activity className="w-3 h-3 mr-1 animate-pulse" />
+              Reconnecting... ({ws.reconnectAttempts}/{5})
+            </Badge>
+          ) : (
+            <Badge variant="destructive">
+              <WifiOff className="w-3 h-3 mr-1" />
+              Offline
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid - ✅ 100% Real Data from Stats API */}

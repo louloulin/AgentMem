@@ -6,19 +6,24 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, Bot, User, Loader2, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { apiClient, Agent } from '@/lib/api-client';
+import { useSSE } from '@/hooks/use-sse';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 interface Message {
   id: string;
   role: 'user' | 'agent';
   content: string;
   timestamp: Date;
+  isStreaming?: boolean; // 标识是否正在流式接收
 }
 
 export default function ChatPage() {
@@ -27,7 +32,16 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [useStreaming, setUseStreaming] = useState(true); // 是否启用流式响应
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize SSE connection with token
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const { connectionState } = useSSE(`${API_BASE_URL}/api/v1/sse`, {
+    token: token || undefined,
+    debug: true,
+  });
 
   // Load agents on mount
   useEffect(() => {
@@ -75,6 +89,114 @@ export default function ChatPage() {
     }
   };
 
+  // Handle streaming chat message via SSE
+  const handleStreamingMessage = useCallback(async (messageContent: string) => {
+    if (!selectedAgentId) return;
+
+    const agentMessageId = `agent-${Date.now()}`;
+    
+    // Add empty agent message with streaming flag
+    const agentMessage: Message = {
+      id: agentMessageId,
+      role: 'agent',
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+    setMessages((prev) => [...prev, agentMessage]);
+    setStreamingMessageId(agentMessageId);
+
+    try {
+      const url = `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/stream`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: messageContent,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let accumulatedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (!data || data === 'keep-alive') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.chunk_type === 'content' && parsed.content) {
+                accumulatedContent += parsed.content;
+                
+                // Update message content
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === agentMessageId
+                      ? { ...msg, content: accumulatedContent }
+                      : msg
+                  )
+                );
+              } else if (parsed.chunk_type === 'done') {
+                // Mark streaming as complete
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === agentMessageId
+                      ? { ...msg, isStreaming: false }
+                      : msg
+                  )
+                );
+                setStreamingMessageId(null);
+              } else if (parsed.chunk_type === 'error') {
+                throw new Error(parsed.content || 'Unknown error');
+              }
+            } catch (parseErr) {
+              console.error('Failed to parse SSE data:', parseErr);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Streaming error:', err);
+      
+      // Update with error message
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === agentMessageId
+            ? {
+                ...msg,
+                content: `Error: ${err instanceof Error ? err.message : 'Failed to stream response'}`,
+                isStreaming: false,
+              }
+            : msg
+        )
+      );
+      setStreamingMessageId(null);
+    }
+  }, [selectedAgentId, token]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !selectedAgentId || loading) return;
@@ -92,19 +214,24 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      // Call real Chat API
-      const response = await apiClient.sendChatMessage(selectedAgentId, {
-        message: messageContent,
-      });
+      if (useStreaming) {
+        // Use SSE streaming
+        await handleStreamingMessage(messageContent);
+      } else {
+        // Use regular API call
+        const response = await apiClient.sendChatMessage(selectedAgentId, {
+          message: messageContent,
+        });
 
-      const agentMessage: Message = {
-        id: response.message_id,
-        role: 'agent',
-        content: response.content,
-        timestamp: new Date(),
-      };
+        const agentMessage: Message = {
+          id: response.message_id,
+          role: 'agent',
+          content: response.content,
+          timestamp: new Date(),
+        };
 
-      setMessages((prev) => [...prev, agentMessage]);
+        setMessages((prev) => [...prev, agentMessage]);
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
 
