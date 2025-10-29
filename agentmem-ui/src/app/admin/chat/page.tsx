@@ -11,7 +11,6 @@ import { Send, Bot, User, Loader2, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { apiClient, Agent } from '@/lib/api-client';
 import { useSSE } from '@/hooks/use-sse';
@@ -33,12 +32,11 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true); // 是否启用流式响应
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize SSE connection with token
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const { connectionState } = useSSE(`${API_BASE_URL}/api/v1/sse`, {
+  const { isConnected: sseConnected } = useSSE(`${API_BASE_URL}/api/v1/sse`, {
     token: token || undefined,
     debug: true,
   });
@@ -46,6 +44,7 @@ export default function ChatPage() {
   // Load agents on mount
   useEffect(() => {
     loadAgents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load chat history when agent changes
@@ -53,6 +52,7 @@ export default function ChatPage() {
     if (selectedAgentId) {
       loadChatHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgentId]);
 
   // Auto-scroll to bottom when messages change
@@ -104,7 +104,6 @@ export default function ChatPage() {
       isStreaming: true,
     };
     setMessages((prev) => [...prev, agentMessage]);
-    setStreamingMessageId(agentMessageId);
 
     try {
       const url = `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/stream`;
@@ -168,7 +167,6 @@ export default function ChatPage() {
                       : msg
                   )
                 );
-                setStreamingMessageId(null);
               } else if (parsed.chunk_type === 'error') {
                 throw new Error(parsed.content || 'Unknown error');
               }
@@ -193,7 +191,6 @@ export default function ChatPage() {
             : msg
         )
       );
-      setStreamingMessageId(null);
     }
   }, [selectedAgentId, token]);
 
@@ -263,19 +260,44 @@ export default function ChatPage() {
             Interact with your agents
           </p>
         </div>
-        <div className="w-64">
-          <select
-            value={selectedAgentId}
-            onChange={(e) => setSelectedAgentId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        <div className="flex items-center space-x-4">
+          {/* SSE Connection Status */}
+          <Badge
+            variant={sseConnected ? 'default' : 'secondary'}
+            className="flex items-center space-x-1"
           >
-            <option value="">Select an agent...</option>
-            {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name || `Agent ${agent.id.slice(0, 8)}`}
-              </option>
-            ))}
-          </select>
+            <Zap className="w-3 h-3" />
+            <span>{sseConnected ? 'SSE Connected' : 'SSE Disconnected'}</span>
+          </Badge>
+
+          {/* Streaming Toggle */}
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useStreaming}
+              onChange={(e) => setUseStreaming(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Stream responses
+            </span>
+          </label>
+
+          {/* Agent Selector */}
+          <div className="w-64">
+            <select
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            >
+              <option value="">Select an agent...</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name || `Agent ${agent.id.slice(0, 8)}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -393,11 +415,32 @@ function MessageBubble({ message }: MessageBubbleProps) {
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
             }`}
           >
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <p className="text-sm whitespace-pre-wrap">
+              {message.content}
+              {message.isStreaming && (
+                <span className="inline-flex items-center ml-2">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                </span>
+              )}
+            </p>
+            {!message.content && message.isStreaming && (
+              <div className="flex items-center space-x-1 text-gray-500">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span className="text-xs">Streaming...</span>
+              </div>
+            )}
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
-            {message.timestamp.toLocaleTimeString()}
-          </p>
+          <div className="flex items-center space-x-2 mt-1 px-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {message.timestamp.toLocaleTimeString()}
+            </p>
+            {message.isStreaming && (
+              <Badge variant="secondary" className="text-xs px-1 py-0">
+                <Zap className="w-2 h-2 mr-1" />
+                Live
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -11,11 +11,12 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Brain, Search, Trash2, Filter, Plus, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Brain, Search, Trash2, Filter, Plus, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { 
   Table, 
   TableBody, 
@@ -34,6 +35,10 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient, Memory, Agent } from '@/lib/api-client';
+import { useWebSocket, WsMessage } from '@/hooks/use-websocket';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const WS_URL = API_BASE_URL.replace('http', 'ws') + '/api/v1/ws';
 
 // Pagination component
 interface PaginationProps {
@@ -84,13 +89,47 @@ export default function MemoriesPageEnhanced() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Initialize WebSocket connection with token
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const { isConnected: wsConnected, subscribe } = useWebSocket(WS_URL, {
+    token: token || undefined,
+    autoReconnect: true,
+    debug: true,
+  });
   
   // Load data on mount
   useEffect(() => {
     loadData();
   }, []);
+
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe('memory_update', async (message: WsMessage) => {
+      console.log('[Memories] Received memory_update:', message);
+      
+      // Show toast notification
+      const memoryData = message.data as { memory_id?: string; agent_id?: string; action?: string };
+      const action = memoryData?.action || 'updated';
+      
+      toast({
+        title: `Memory ${action}`,
+        description: `A memory was ${action}`,
+      });
+      
+      // Refresh memory list if viewing the affected agent
+      if (!memoryData?.agent_id || selectedAgentId === 'all' || selectedAgentId === memoryData.agent_id) {
+        if (selectedAgentId !== 'all') {
+          const data = await apiClient.getMemories(selectedAgentId);
+          setMemories(data);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribe, toast, selectedAgentId]);
   
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const agentsData = await apiClient.getAgents();
@@ -115,7 +154,7 @@ export default function MemoriesPageEnhanced() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
   
   const handleAgentChange = async (agentId: string) => {
     setSelectedAgentId(agentId);
@@ -226,7 +265,16 @@ export default function MemoriesPageEnhanced() {
             View and manage agent memories
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          {/* WebSocket Connection Status */}
+          <Badge
+            variant={wsConnected ? 'default' : 'secondary'}
+            className="flex items-center space-x-1"
+          >
+            {wsConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{wsConnected ? 'Live' : 'Disconnected'}</span>
+          </Badge>
+
           <Button onClick={loadData} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh

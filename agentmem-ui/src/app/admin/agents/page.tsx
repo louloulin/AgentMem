@@ -7,8 +7,8 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Bot, Plus, Trash2, Edit, Activity, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Bot, Plus, Trash2, Edit, Activity, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient, Agent } from '@/lib/api-client';
+import { useWebSocket, WsMessage } from '@/hooks/use-websocket';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const WS_URL = API_BASE_URL.replace('http', 'ws') + '/api/v1/ws';
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -27,12 +32,42 @@ export default function AgentsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { toast } = useToast();
 
+  // Initialize WebSocket connection with token
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const { isConnected: wsConnected, subscribe, lastMessage } = useWebSocket(WS_URL, {
+    token: token || undefined,
+    autoReconnect: true,
+    debug: true,
+  });
+
   // Load agents on mount
   useEffect(() => {
     loadAgents();
   }, []);
 
-  const loadAgents = async () => {
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe('agent_update', async (message: WsMessage) => {
+      console.log('[Agents] Received agent_update:', message);
+      
+      // Show toast notification
+      const agentData = message.data as { agent_id?: string; name?: string; action?: string };
+      const action = agentData?.action || 'updated';
+      const agentName = agentData?.name || 'Agent';
+      
+      toast({
+        title: `Agent ${action}`,
+        description: `${agentName} was ${action}`,
+      });
+      
+      // Refresh agent list
+      await loadAgents();
+    });
+
+    return unsubscribe;
+  }, [subscribe, toast]);
+
+  const loadAgents = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,7 +84,7 @@ export default function AgentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleCreateAgent = async (name: string, description: string) => {
     try {
@@ -104,10 +139,21 @@ export default function AgentsPage() {
             Manage your AI agents
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Agent
-        </Button>
+        <div className="flex items-center space-x-4">
+          {/* WebSocket Connection Status */}
+          <Badge
+            variant={wsConnected ? 'default' : 'secondary'}
+            className="flex items-center space-x-1"
+          >
+            {wsConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{wsConnected ? 'Live' : 'Disconnected'}</span>
+          </Badge>
+
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Agent
+          </Button>
+        </div>
       </div>
 
       {/* Error Message */}
