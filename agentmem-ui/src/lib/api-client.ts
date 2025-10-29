@@ -2,9 +2,34 @@
  * API Client for AgentMem Backend
  * 
  * Provides type-safe methods to interact with the AgentMem API.
+ * 
+ * Features:
+ * - Type-safe API methods
+ * - Automatic retries with exponential backoff
+ * - Client-side caching with TTL
+ * - Request deduplication
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+/**
+ * Cache entry with TTL
+ */
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+  timestamp: number;
+}
+
+/**
+ * Cache statistics for monitoring
+ */
+interface CacheStats {
+  hits: number;
+  misses: number;
+  size: number;
+  hitRate: number;
+}
 
 /**
  * API Response wrapper
@@ -171,9 +196,22 @@ export interface AgentActivityStats {
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
+  
+  // ==================== Cache System ====================
+  private cache: Map<string, CacheEntry<unknown>> = new Map();
+  private readonly DEFAULT_TTL = 30000; // 30 seconds
+  private cacheStats = {
+    hits: 0,
+    misses: 0
+  };
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+    
+    // Clean expired cache entries every minute
+    if (typeof window !== 'undefined') {
+      setInterval(() => this.cleanExpiredCache(), 60000);
+    }
   }
 
   /**
@@ -181,6 +219,85 @@ class ApiClient {
    */
   setToken(token: string) {
     this.token = token;
+  }
+
+  /**
+   * Get cached data if available and not expired
+   */
+  private getCached<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (!cached) {
+      this.cacheStats.misses++;
+      return null;
+    }
+
+    if (cached.expiry < Date.now()) {
+      this.cache.delete(key);
+      this.cacheStats.misses++;
+      return null;
+    }
+
+    this.cacheStats.hits++;
+    return cached.data as T;
+  }
+
+  /**
+   * Set data in cache with TTL
+   */
+  private setCache<T>(key: string, data: T, ttl: number = this.DEFAULT_TTL): void {
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + ttl,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Clear cache entries matching a pattern
+   */
+  private clearCache(pattern?: string): void {
+    if (!pattern) {
+      this.cache.clear();
+      return;
+    }
+
+    for (const key of Array.from(this.cache.keys())) {
+      if (key.startsWith(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Clean expired cache entries
+   */
+  private cleanExpiredCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expiry < now) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats(): CacheStats {
+    const total = this.cacheStats.hits + this.cacheStats.misses;
+    return {
+      hits: this.cacheStats.hits,
+      misses: this.cacheStats.misses,
+      size: this.cache.size,
+      hitRate: total > 0 ? (this.cacheStats.hits / total) * 100 : 0
+    };
+  }
+
+  /**
+   * Manually invalidate cache
+   */
+  invalidateCache(pattern?: string): void {
+    this.clearCache(pattern);
   }
 
   /**
@@ -251,10 +368,19 @@ class ApiClient {
   // ==================== Agent APIs ====================
 
   /**
-   * Get all agents
+   * Get all agents (cached for 30s)
    */
   async getAgents(): Promise<Agent[]> {
+    const cacheKey = 'agents:list';
+    const cached = this.getCached<Agent[]>(cacheKey);
+    if (cached) {
+      console.log('✅ Cache hit: agents:list');
+      return cached;
+    }
+
+    console.log('🔄 Cache miss: agents:list');
     const response = await this.request<ApiResponse<Agent[]>>('/api/v1/agents');
+    this.setCache(cacheKey, response.data, 30000); // 30s TTL
     return response.data;
   }
 
@@ -269,18 +395,23 @@ class ApiClient {
   }
 
   /**
-   * Create new agent
+   * Create new agent (invalidates agent cache)
    */
   async createAgent(data: CreateAgentRequest): Promise<Agent> {
     const response = await this.request<ApiResponse<Agent>>('/api/v1/agents', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Invalidate agents cache
+    this.clearCache('agents:');
+    console.log('🗑️  Cache cleared: agents:*');
+    
     return response.data;
   }
 
   /**
-   * Update agent
+   * Update agent (invalidates agent cache)
    */
   async updateAgent(agentId: string, data: Partial<Agent>): Promise<Agent> {
     const response = await this.request<ApiResponse<Agent>>(
@@ -290,16 +421,25 @@ class ApiClient {
         body: JSON.stringify(data),
       }
     );
+    
+    // Invalidate agents cache
+    this.clearCache('agents:');
+    console.log('🗑️  Cache cleared: agents:*');
+    
     return response.data;
   }
 
   /**
-   * Delete agent
+   * Delete agent (invalidates agent cache)
    */
   async deleteAgent(agentId: string): Promise<void> {
     await this.request(`/api/v1/agents/${agentId}`, {
       method: 'DELETE',
     });
+    
+    // Invalidate agents cache
+    this.clearCache('agents:');
+    console.log('🗑️  Cache cleared: agents:*');
   }
 
   /**
@@ -371,7 +511,7 @@ class ApiClient {
   }
 
   /**
-   * Create new memory
+   * Create new memory (invalidates memory and stats cache)
    */
   async createMemory(data: CreateMemoryRequest): Promise<Memory> {
     const response = await this.request<ApiResponse<Memory>>(
@@ -381,16 +521,27 @@ class ApiClient {
         body: JSON.stringify(data),
       }
     );
+    
+    // Invalidate related caches
+    this.clearCache('memories:');
+    this.clearCache('stats:');
+    console.log('🗑️  Cache cleared: memories:*, stats:*');
+    
     return response.data;
   }
 
   /**
-   * Delete memory
+   * Delete memory (invalidates memory and stats cache)
    */
   async deleteMemory(memoryId: string): Promise<void> {
     await this.request(`/api/v1/memories/${memoryId}`, {
       method: 'DELETE',
     });
+    
+    // Invalidate related caches
+    this.clearCache('memories:');
+    this.clearCache('stats:');
+    console.log('🗑️  Cache cleared: memories:*, stats:*');
   }
 
   /**
@@ -410,10 +561,19 @@ class ApiClient {
   // ==================== User APIs ====================
 
   /**
-   * Get all users
+   * Get all users (cached for 30s)
    */
   async getUsers(): Promise<User[]> {
+    const cacheKey = 'users:list';
+    const cached = this.getCached<User[]>(cacheKey);
+    if (cached) {
+      console.log('✅ Cache hit: users:list');
+      return cached;
+    }
+
+    console.log('🔄 Cache miss: users:list');
     const response = await this.request<ApiResponse<User[]>>('/api/v1/users');
+    this.setCache(cacheKey, response.data, 30000); // 30s TTL
     return response.data;
   }
 
