@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::task::JoinHandle;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 use super::cross_modal::{CrossModalAligner, CrossModalConfig, MultimodalFusionEngine};
 use super::unified_retrieval::UnifiedMultimodalRetrieval;
@@ -266,7 +266,7 @@ impl ParallelProcessingPipeline {
 
             let task = tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.map_err(|e| {
-                    AgentMemError::internal_error(&format!("Failed to acquire permit: {}", e))
+                    AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
                 })?;
 
                 // 检查缓存
@@ -291,7 +291,7 @@ impl ParallelProcessingPipeline {
         for task in tasks {
             let result = task
                 .await
-                .map_err(|e| AgentMemError::internal_error(&format!("Task join error: {}", e)))??;
+                .map_err(|e| AgentMemError::internal_error(format!("Task join error: {e}")))??;
             results.push(result);
         }
 

@@ -11,7 +11,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
 };
-use agent_mem_traits::{AgentMemError, Result, Session};
+use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use rand::{thread_rng, Rng};
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 /// Enterprise security configuration
@@ -72,7 +72,7 @@ impl Default for EnterpriseSecurityConfig {
             jwt_expiry_hours: 24,
             oauth2_client_id: String::new(),
             oauth2_client_secret: String::new(),
-            encryption_key: base64::encode(&[0u8; 32]), // Default key, should be changed
+            encryption_key: base64::encode([0u8; 32]), // Default key, should be changed
             max_failed_attempts: 5,
             lockout_duration_minutes: 30,
             session_timeout_minutes: 60,
@@ -322,7 +322,7 @@ impl EnterpriseSecurityManager {
 
         // Initialize encryption cipher
         let encryption_key = base64::decode(&config.encryption_key)
-            .map_err(|e| AgentMemError::config_error(&format!("Invalid encryption key: {}", e)))?;
+            .map_err(|e| AgentMemError::config_error(format!("Invalid encryption key: {e}")))?;
 
         if encryption_key.len() != 32 {
             return Err(AgentMemError::config_error(
@@ -469,14 +469,14 @@ impl EnterpriseSecurityManager {
     async fn hash_password(&self, password: &str) -> Result<String> {
         use bcrypt::{hash, DEFAULT_COST};
         hash(password, DEFAULT_COST)
-            .map_err(|e| AgentMemError::auth_error(&format!("Password hashing failed: {}", e)))
+            .map_err(|e| AgentMemError::auth_error(format!("Password hashing failed: {e}")))
     }
 
     /// Verify password against hash
     async fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
         use bcrypt::verify;
         verify(password, hash)
-            .map_err(|e| AgentMemError::auth_error(&format!("Password verification failed: {}", e)))
+            .map_err(|e| AgentMemError::auth_error(format!("Password verification failed: {e}")))
     }
 
     /// Authenticate user and create session
@@ -659,13 +659,13 @@ impl EnterpriseSecurityManager {
         };
 
         encode(&Header::default(), &claims, &self.jwt_encoding_key)
-            .map_err(|e| AgentMemError::auth_error(&format!("JWT generation failed: {}", e)))
+            .map_err(|e| AgentMemError::auth_error(format!("JWT generation failed: {e}")))
     }
 
     /// Validate JWT token
     pub async fn validate_token(&self, token: &str) -> Result<JwtClaims> {
         let token_data = decode::<JwtClaims>(token, &self.jwt_decoding_key, &Validation::default())
-            .map_err(|e| AgentMemError::auth_error(&format!("JWT validation failed: {}", e)))?;
+            .map_err(|e| AgentMemError::auth_error(format!("JWT validation failed: {e}")))?;
 
         let claims = token_data.claims;
 
@@ -723,7 +723,7 @@ impl EnterpriseSecurityManager {
         let ciphertext = self
             .cipher
             .encrypt(nonce, data.as_bytes())
-            .map_err(|e| AgentMemError::internal_error(&format!("Encryption failed: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Encryption failed: {e}")))?;
 
         // Combine nonce and ciphertext
         let mut result = nonce_bytes.to_vec();
@@ -739,7 +739,7 @@ impl EnterpriseSecurityManager {
         }
 
         let data = base64::decode(encrypted_data)
-            .map_err(|e| AgentMemError::internal_error(&format!("Base64 decode failed: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Base64 decode failed: {e}")))?;
 
         if data.len() < 12 {
             return Err(AgentMemError::validation_error("Invalid encrypted data"));
@@ -751,10 +751,10 @@ impl EnterpriseSecurityManager {
         let plaintext = self
             .cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|e| AgentMemError::internal_error(&format!("Decryption failed: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Decryption failed: {e}")))?;
 
         String::from_utf8(plaintext)
-            .map_err(|e| AgentMemError::internal_error(&format!("UTF-8 decode failed: {}", e)))
+            .map_err(|e| AgentMemError::internal_error(format!("UTF-8 decode failed: {e}")))
     }
 
     /// Mask sensitive data (PII protection)
@@ -767,28 +767,28 @@ impl EnterpriseSecurityManager {
 
         // Mask email addresses
         let email_regex = regex::Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
-            .map_err(|e| AgentMemError::internal_error(&format!("Regex error: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Regex error: {e}")))?;
         masked_data = email_regex
             .replace_all(&masked_data, "***@***.***")
             .to_string();
 
         // Mask phone numbers
         let phone_regex = regex::Regex::new(r"\b\d{3}-\d{3}-\d{4}\b")
-            .map_err(|e| AgentMemError::internal_error(&format!("Regex error: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Regex error: {e}")))?;
         masked_data = phone_regex
             .replace_all(&masked_data, "***-***-****")
             .to_string();
 
         // Mask credit card numbers
         let cc_regex = regex::Regex::new(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b")
-            .map_err(|e| AgentMemError::internal_error(&format!("Regex error: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Regex error: {e}")))?;
         masked_data = cc_regex
             .replace_all(&masked_data, "**** **** **** ****")
             .to_string();
 
         // Mask SSN
         let ssn_regex = regex::Regex::new(r"\b\d{3}-\d{2}-\d{4}\b")
-            .map_err(|e| AgentMemError::internal_error(&format!("Regex error: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("Regex error: {e}")))?;
         masked_data = ssn_regex
             .replace_all(&masked_data, "***-**-****")
             .to_string();

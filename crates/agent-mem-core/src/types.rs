@@ -610,8 +610,7 @@ mod tests {
             let description = memory_type.description();
             assert!(
                 !description.is_empty(),
-                "Memory type {:?} should have a description",
-                memory_type
+                "Memory type {memory_type:?} should have a description"
             );
         }
     }

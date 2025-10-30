@@ -1,7 +1,7 @@
 //! 嵌入模型工厂模式实现
 
 use crate::config::EmbeddingConfig;
-use crate::providers::{LocalEmbedder, OpenAIEmbedder};
+use crate::providers::OpenAIEmbedder;
 #[cfg(feature = "fastembed")]
 use crate::providers::FastEmbedProvider;
 use agent_mem_traits::{AgentMemError, Embedder, Result};
@@ -594,9 +594,8 @@ impl RealEmbeddingFactory {
                 return Err(AgentMemError::config_error("Embedder health check failed"));
             }
             Ok(Err(e)) => {
-                return Err(AgentMemError::config_error(&format!(
-                    "Embedder health check error: {}",
-                    e
+                return Err(AgentMemError::config_error(format!(
+                    "Embedder health check error: {e}"
                 )));
             }
             Err(_) => {
@@ -617,7 +616,7 @@ impl RealEmbeddingFactory {
                     ));
                 }
                 if embedding.len() != embedder.dimension() {
-                    return Err(AgentMemError::config_error(&format!(
+                    return Err(AgentMemError::config_error(format!(
                         "Embedding dimension mismatch: expected {}, got {}",
                         embedder.dimension(),
                         embedding.len()
@@ -626,9 +625,8 @@ impl RealEmbeddingFactory {
                 tracing::debug!("Embedder test embedding successful");
                 Ok(())
             }
-            Ok(Err(e)) => Err(AgentMemError::config_error(&format!(
-                "Embedder test embedding failed: {}",
-                e
+            Ok(Err(e)) => Err(AgentMemError::config_error(format!(
+                "Embedder test embedding failed: {e}"
             ))),
             Err(_) => Err(AgentMemError::config_error(
                 "Embedder test embedding timeout",

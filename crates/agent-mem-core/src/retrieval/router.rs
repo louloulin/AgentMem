@@ -610,11 +610,9 @@ mod tests {
 
     #[test]
     fn test_retrieval_strategy_ordering() {
-        let mut strategies = vec![
-            RetrievalStrategy::BM25,
+        let mut strategies = [RetrievalStrategy::BM25,
             RetrievalStrategy::Embedding,
-            RetrievalStrategy::StringMatch,
-        ];
+            RetrievalStrategy::StringMatch];
         strategies.sort();
 
         // 验证排序后的顺序

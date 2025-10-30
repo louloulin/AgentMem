@@ -1,9 +1,9 @@
 //! 文本相似度计算实现
 
-use agent_mem_traits::{AgentMemError, Result};
-use agent_mem_utils::text::{extract_keywords, jaccard_similarity};
+use agent_mem_traits::Result;
+use agent_mem_utils::text::extract_keywords;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// 文本相似度结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,7 +129,7 @@ impl TextualSimilarity {
 
         Ok(TextSimilarityResult {
             similarity,
-            similarity_type: format!("{}-gram", n),
+            similarity_type: format!("{n}-gram"),
             matched_keywords: matched_ngrams,
             total_keywords: total_ngrams,
             is_similar: similarity >= self.config.threshold,

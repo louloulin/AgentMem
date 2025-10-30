@@ -238,7 +238,7 @@ impl MemoryDecisionEngine {
         ).await?;
         let cleaned_json = self.extract_json_from_response(&response_text)?;
         let response: DecisionResponse = serde_json::from_str(&cleaned_json)
-            .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
+            .map_err(agent_mem_traits::AgentMemError::SerializationError)?;
 
         // 过滤低置信度的决策
         let mut filtered_decisions: Vec<MemoryDecision> = response
@@ -289,7 +289,7 @@ impl MemoryDecisionEngine {
             "conflict_detection",
         ).await?;
         let response: ConflictDetection = serde_json::from_str(&response_text)
-            .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
+            .map_err(agent_mem_traits::AgentMemError::SerializationError)?;
 
         Ok(response)
     }
@@ -1229,32 +1229,32 @@ impl MemoryDecisionEngine {
                     // UPDATE vs DELETE 冲突
                     if to_delete.contains(memory_id) {
                         has_conflict = true;
-                        conflict_reason = format!("记忆 {} 同时被UPDATE和DELETE", memory_id);
+                        conflict_reason = format!("记忆 {memory_id} 同时被UPDATE和DELETE");
                     }
                     // UPDATE vs MERGE 冲突
                     if to_merge.contains(memory_id) {
                         has_conflict = true;
-                        conflict_reason = format!("记忆 {} 同时被UPDATE和MERGE", memory_id);
+                        conflict_reason = format!("记忆 {memory_id} 同时被UPDATE和MERGE");
                     }
                 }
                 MemoryAction::Delete { memory_id, .. } => {
                     // DELETE vs MERGE 冲突
                     if to_merge.contains(memory_id) {
                         has_conflict = true;
-                        conflict_reason = format!("记忆 {} 同时被DELETE和MERGE", memory_id);
+                        conflict_reason = format!("记忆 {memory_id} 同时被DELETE和MERGE");
                     }
                 }
                 MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
                     // MERGE 内部冲突：主记忆被删除
                     if to_delete.contains(primary_memory_id) {
                         has_conflict = true;
-                        conflict_reason = format!("MERGE的主记忆 {} 被DELETE", primary_memory_id);
+                        conflict_reason = format!("MERGE的主记忆 {primary_memory_id} 被DELETE");
                     }
                     // MERGE 内部冲突：次要记忆被删除
                     for id in secondary_memory_ids {
                         if to_delete.contains(id) {
                             has_conflict = true;
-                            conflict_reason = format!("MERGE的次要记忆 {} 被DELETE", id);
+                            conflict_reason = format!("MERGE的次要记忆 {id} 被DELETE");
                             break;
                         }
                     }

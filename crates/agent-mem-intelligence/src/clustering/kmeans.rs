@@ -250,7 +250,7 @@ impl MemoryClusterer for KMeansClusterer {
                 .collect();
 
             if cluster_memory_ids.len() >= config.min_cluster_size {
-                let cluster_id = format!("kmeans_cluster_{}", cluster_idx);
+                let cluster_id = format!("kmeans_cluster_{cluster_idx}");
                 let mut cluster = MemoryCluster::new(
                     cluster_id,
                     cluster_memory_ids,

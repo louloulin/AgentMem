@@ -207,7 +207,7 @@ async fn test_memory_types() {
     ];
 
     for memory_type in memory_types {
-        let memory = create_test_memory(&format!("Test {:?} memory", memory_type), memory_type.clone(), Some(0.8));
+        let memory = create_test_memory(&format!("Test {memory_type:?} memory"), memory_type.clone(), Some(0.8));
         assert_eq!(memory.memory_type, memory_type);
     }
 

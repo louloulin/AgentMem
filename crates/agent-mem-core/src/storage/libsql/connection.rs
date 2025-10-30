@@ -207,7 +207,7 @@ mod tests {
         let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
         let result = manager.health_check().await;
         if let Err(e) = &result {
-            eprintln!("Health check failed: {:?}", e);
+            eprintln!("Health check failed: {e:?}");
         }
         assert!(result.is_ok());
     }

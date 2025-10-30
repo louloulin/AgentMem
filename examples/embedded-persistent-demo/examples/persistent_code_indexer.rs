@@ -58,7 +58,7 @@ impl CodeElement {
         );
         
         if let Some(doc) = &self.doc_comment {
-            content.push_str(&format!("Documentation: {}\n", doc));
+            content.push_str(&format!("Documentation: {doc}\n"));
         }
         
         content.push_str(&format!("\nSignature:\n{}\n", self.signature));
@@ -119,10 +119,10 @@ impl CodeScanner {
         }
         
         for entry in fs::read_dir(dir).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read dir: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read dir: {e}"))
         })? {
             let entry = entry.map_err(|e| {
-                agent_mem_traits::AgentMemError::internal_error(format!("Failed to read entry: {}", e))
+                agent_mem_traits::AgentMemError::internal_error(format!("Failed to read entry: {e}"))
             })?;
             let path = entry.path();
             
@@ -139,7 +139,7 @@ impl CodeScanner {
     /// 扫描 Rust 文件
     fn scan_rust_file(&mut self, file_path: &Path) -> Result<()> {
         let content = fs::read_to_string(file_path).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read file: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read file: {e}"))
         })?;
         
         let relative_path = file_path
@@ -297,7 +297,7 @@ async fn main() -> Result<()> {
     let crates_path = PathBuf::from("../../crates/agent-mem-core/src");
     
     if !crates_path.exists() {
-        println!("   ⚠️  路径不存在: {:?}", crates_path);
+        println!("   ⚠️  路径不存在: {crates_path:?}");
         println!("   使用当前目录的示例代码");
         return Ok(());
     }
@@ -313,7 +313,7 @@ async fn main() -> Result<()> {
     
     println!("\n   📊 代码元素统计:");
     for (elem_type, count) in type_stats.iter() {
-        println!("      - {}: {}", elem_type, count);
+        println!("      - {elem_type}: {count}");
     }
     
     // 3. 批量索引到 AgentMem (持久化存储)
@@ -340,9 +340,9 @@ async fn main() -> Result<()> {
     let ops_per_sec = indexed_count as f64 / duration.as_secs_f64();
 
     println!("\n   ✅ 索引完成:");
-    println!("      总数: {} 个代码元素", indexed_count);
-    println!("      耗时: {:.2?}", duration);
-    println!("      吞吐量: {:.0} ops/s", ops_per_sec);
+    println!("      总数: {indexed_count} 个代码元素");
+    println!("      耗时: {duration:.2?}");
+    println!("      吞吐量: {ops_per_sec:.0} ops/s");
 
     // 4. 验证持久化存储
     println!("\n📋 4. 验证持久化存储...");
@@ -351,10 +351,10 @@ async fn main() -> Result<()> {
     let db_path = PathBuf::from("./test-data/code-index.db");
     if db_path.exists() {
         let metadata = fs::metadata(&db_path).map_err(|e| {
-            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read metadata: {}", e))
+            agent_mem_traits::AgentMemError::internal_error(format!("Failed to read metadata: {e}"))
         })?;
         println!("   ✅ LibSQL 数据库文件已创建:");
-        println!("      路径: {:?}", db_path);
+        println!("      路径: {db_path:?}");
         println!("      大小: {} bytes", metadata.len());
     }
 
@@ -362,30 +362,28 @@ async fn main() -> Result<()> {
     let lance_path = PathBuf::from("./test-data/code-vectors.lance");
     if lance_path.exists() {
         println!("   ✅ LanceDB 向量存储已创建:");
-        println!("      路径: {:?}", lance_path);
+        println!("      路径: {lance_path:?}");
     }
 
     // 5. 语义搜索测试
     println!("\n🔍 5. 语义搜索测试 (真实向量搜索)...");
     println!("{}", "-".repeat(70));
 
-    let search_queries = vec![
-        ("如何创建 Agent？", "查找 Agent 创建相关的函数"),
+    let search_queries = [("如何创建 Agent？", "查找 Agent 创建相关的函数"),
         ("SimpleMemory 实现", "查找 SimpleMemory 的实现代码"),
         ("MemoryManager", "查找 MemoryManager 相关代码"),
         ("trait 定义", "查找 trait 定义"),
-        ("配置管理", "查找配置相关的代码"),
-    ];
+        ("配置管理", "查找配置相关的代码")];
 
     for (i, (query, description)) in search_queries.iter().enumerate() {
         println!("\n   查询 {}: \"{}\"", i + 1, query);
-        println!("   描述: {}", description);
+        println!("   描述: {description}");
 
         let start = Instant::now();
         let results = memory.search_with_limit(*query, 5).await?;
         let duration = start.elapsed();
 
-        println!("   ⏱️  搜索耗时: {:.2?}", duration);
+        println!("   ⏱️  搜索耗时: {duration:.2?}");
         println!("   📊 找到 {} 条结果", results.len());
 
         if !results.is_empty() {
@@ -411,8 +409,8 @@ async fn main() -> Result<()> {
     println!("✅ 持久化代码索引演示完成！");
     println!("\n📈 关键指标:");
     println!("   - 扫描文件: {} 个代码元素", scanner.elements.len());
-    println!("   - 索引元素: {} 个代码元素", indexed_count);
-    println!("   - 索引速度: {:.0} ops/s", ops_per_sec);
+    println!("   - 索引元素: {indexed_count} 个代码元素");
+    println!("   - 索引速度: {ops_per_sec:.0} ops/s");
     println!("   - 搜索查询: {} 次", search_queries.len());
     println!("   - 存储类型: LibSQL + LanceDB (持久化)");
 

@@ -3,19 +3,18 @@
 //! This module provides a sophisticated caching system with multiple levels,
 //! intelligent eviction policies, and cache warming capabilities.
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use dashmap::DashMap;
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock as AsyncRwLock;
-use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tokio::time::interval;
+use tracing::{debug, info};
 
 /// Cache configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

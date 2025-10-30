@@ -3,9 +3,7 @@
 //! 此文件用于验证所有向量服务是否正确实现了 VectorStore trait
 //! 这是编译时验证，确保所有向量服务都实现了必要的方法
 
-use agent_mem_storage::backends::*;
 use agent_mem_traits::{VectorStore, VectorData, VectorSearchResult};
-use std::collections::HashMap;
 
 /// 验证向量服务是否实现了 VectorStore trait
 /// 这是一个编译时检查，如果任何向量服务没有正确实现 trait，编译将失败
@@ -267,10 +265,10 @@ fn test_count_implemented_vector_stores() {
     }
 
     println!("\n📊 向量服务统计:");
-    println!("   已启用的向量服务数量: {}", count);
+    println!("   已启用的向量服务数量: {count}");
     println!("   已启用的向量服务列表:");
     for service in &services {
-        println!("   - {}", service);
+        println!("   - {service}");
     }
 
     // 验证至少有 Memory 和 LanceDB 两个服务

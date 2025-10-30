@@ -1,13 +1,12 @@
 //! Tests for Multi-Agent Coordination System
 
 use serde_json::json;
-use std::time::Duration;
 use tokio::sync::mpsc;
 
-use crate::agents::{AgentConfig, CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
+use crate::agents::{CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
 use crate::coordination::{
     AgentMessage, LoadBalancingStrategy, MessageType, MetaMemoryConfig, MetaMemoryManager,
-    TaskRequest, TaskResponse,
+    TaskRequest,
 };
 use crate::types::MemoryType;
 
@@ -59,7 +58,7 @@ async fn test_multiple_agent_registration() {
     // Register multiple agents
     for i in 0..3 {
         let (tx, _rx) = mpsc::unbounded_channel();
-        let agent_id = format!("agent_{}", i);
+        let agent_id = format!("agent_{i}");
         let memory_type = match i {
             0 => MemoryType::Episodic,
             1 => MemoryType::Semantic,
@@ -150,7 +149,7 @@ async fn test_load_balancing_strategies() {
         // Register multiple agents for the same memory type
         for i in 0..3 {
             let (tx, _rx) = mpsc::unbounded_channel();
-            let agent_id = format!("episodic_agent_{}", i);
+            let agent_id = format!("episodic_agent_{i}");
 
             manager
                 .register_agent(agent_id, vec![MemoryType::Episodic], 10, tx)

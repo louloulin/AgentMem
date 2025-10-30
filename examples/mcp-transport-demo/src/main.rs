@@ -74,16 +74,16 @@ async fn demo_http_transport() {
     });
 
     println!("  请求方法: list_tools");
-    println!("  请求参数: {}", request_params);
+    println!("  请求参数: {request_params}");
 
     if transport.is_connected() {
         match transport.send_request("list_tools", json!({})).await {
             Ok(response) => {
                 println!("  ✅ 请求成功");
-                println!("  响应: {}", response);
+                println!("  响应: {response}");
             }
             Err(e) => {
-                println!("  ⚠️  请求失败: {}", e);
+                println!("  ⚠️  请求失败: {e}");
                 println!("  （演示环境没有运行服务器）");
             }
         }
@@ -110,7 +110,7 @@ async fn demo_http_transport() {
             println!("  ❌ 不应该成功");
         }
         Err(e) => {
-            println!("  ✅ 正确返回错误: {}", e);
+            println!("  ✅ 正确返回错误: {e}");
         }
     }
 }
@@ -153,11 +153,11 @@ async fn demo_sse_transport() {
     if transport.is_connected() {
         match transport.send_request("test_method", json!({})).await {
             Ok(response) => {
-                println!("  ⚠️  返回模拟响应: {}", response);
+                println!("  ⚠️  返回模拟响应: {response}");
                 println!("  （SSE 不支持客户端到服务器的请求）");
             }
             Err(e) => {
-                println!("  ❌ 错误: {}", e);
+                println!("  ❌ 错误: {e}");
             }
         }
     } else {

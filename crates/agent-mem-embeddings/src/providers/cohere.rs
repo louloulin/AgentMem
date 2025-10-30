@@ -68,7 +68,7 @@ impl CohereEmbedder {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let embedder = Self {
@@ -108,7 +108,7 @@ impl CohereEmbedder {
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -117,13 +117,12 @@ impl CohereEmbedder {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::network_error(format!(
-                "Cohere API error {}: {}",
-                status, error_text
+                "Cohere API error {status}: {error_text}"
             )));
         }
 
         let embedding_response: CohereEmbeddingResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
         })?;
 
         Ok(embedding_response.embeddings)

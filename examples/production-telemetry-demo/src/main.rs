@@ -15,7 +15,6 @@ use agent_mem_core::{
 };
 use agent_mem_performance::telemetry::{ProductionTelemetryConfig, ProductionTelemetrySystem};
 use agent_mem_traits::{MemoryType, Session};
-use chrono::Utc;
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -82,7 +81,7 @@ async fn demonstrate_memory_operations(
 
         // Create a test memory
         let session = Session {
-            id: format!("session_{}", i),
+            id: format!("session_{i}"),
             user_id: Some(user_id.clone()),
             agent_id: Some("demo_agent".to_string()),
             run_id: None,
@@ -93,7 +92,7 @@ async fn demonstrate_memory_operations(
 
         let memory = Memory {
             id: Uuid::new_v4().to_string(),
-            content: format!("This is test message {} for telemetry demonstration", i),
+            content: format!("This is test message {i} for telemetry demonstration"),
             hash: None,
             metadata: HashMap::new(),
             score: None,
@@ -141,7 +140,7 @@ async fn demonstrate_memory_operations(
 
         let search_result = engine
             .search_memories(
-                &format!("test message {}", i),
+                &format!("test message {i}"),
                 Some(MemoryScope::Agent(user_id.clone())),
                 Some(10),
             )
@@ -221,7 +220,7 @@ async fn demonstrate_error_tracking(telemetry: &ProductionTelemetrySystem) -> Re
     // Simulate some errors
     for i in 0..3 {
         let start = Instant::now();
-        let user_id = format!("error_user_{}", i);
+        let user_id = format!("error_user_{i}");
 
         // Simulate a failed operation
         let duration = Duration::from_millis(50 + i * 10);

@@ -31,7 +31,7 @@ impl OpenAIVisionClient {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .build()
-            .map_err(|e| AgentMemError::internal_error(format!("创建 HTTP 客户端失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("创建 HTTP 客户端失败: {e}")))?;
 
         Ok(Self { client, config })
     }
@@ -98,13 +98,13 @@ impl OpenAIVisionClient {
         // 发送请求
         let response = self
             .client
-            .post(format!("{}/chat/completions", base_url))
-            .header("Authorization", format!("Bearer {}", api_key))
+            .post(format!("{base_url}/chat/completions"))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await
-            .map_err(|e| AgentMemError::internal_error(format!("发送请求失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("发送请求失败: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -114,15 +114,14 @@ impl OpenAIVisionClient {
                 .unwrap_or_else(|_| "无法读取错误响应".to_string());
             error!("OpenAI API 错误 ({}): {}", status, error_text);
             return Err(AgentMemError::internal_error(format!(
-                "OpenAI API 错误 ({}): {}",
-                status, error_text
+                "OpenAI API 错误 ({status}): {error_text}"
             )));
         }
 
         let api_response: OpenAIVisionResponse = response
             .json()
             .await
-            .map_err(|e| AgentMemError::internal_error(format!("解析响应失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("解析响应失败: {e}")))?;
 
         debug!("OpenAI Vision API 响应: {:?}", api_response);
 

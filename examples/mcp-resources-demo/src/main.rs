@@ -16,7 +16,6 @@ use agent_mem_tools::mcp::server::McpServerConfig;
 use agent_mem_tools::executor::ToolExecutor;
 use std::sync::Arc;
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

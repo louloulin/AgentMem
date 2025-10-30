@@ -263,8 +263,8 @@ impl ImportanceEvaluator {
         }
 
         // 基于交互次数的评分
-        let interaction_score = (memory.interaction_count as f32 / 10.0).min(1.0);
-        interaction_score
+        
+        (memory.interaction_count as f32 / 10.0).min(1.0)
     }
 
     /// 计算余弦相似度

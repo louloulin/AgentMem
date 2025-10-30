@@ -12,7 +12,7 @@ use agent_mem_traits::{Message, Result};
 use crate::fact_extraction::{ExtractedFact, StructuredFact};
 use crate::importance_evaluator::ImportanceEvaluation;
 use crate::timeout::{with_timeout, TimeoutConfig};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -111,7 +111,7 @@ impl BatchEntityExtractor {
             r#"Extract entities and relations from these facts. Return a JSON array.
 
 Facts:
-{}
+{facts_json}
 
 Return format (JSON array):
 [
@@ -128,8 +128,7 @@ Return format (JSON array):
   }}
 ]
 
-Extract all entities and their relationships."#,
-            facts_json
+Extract all entities and their relationships."#
         )
     }
 

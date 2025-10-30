@@ -1473,8 +1473,8 @@ mod tests {
 
         // 工作环境应该比娱乐环境重要性更高
         assert!(work_score > entertainment_score);
-        assert!(work_score >= 0.0 && work_score <= 1.0);
-        assert!(entertainment_score >= 0.0 && entertainment_score <= 1.0);
+        assert!((0.0..=1.0).contains(&work_score));
+        assert!((0.0..=1.0).contains(&entertainment_score));
     }
 
     #[test]

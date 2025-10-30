@@ -14,13 +14,13 @@ use crate::{
         ContextAwareSearchResult, ContextInfo, ContextLearningResult, ContextPattern,
     },
     enterprise_security::{
-        AuditEventType, EnterpriseSecurityConfig, EnterpriseSecurityManager, JwtClaims, Permission,
+        EnterpriseSecurityConfig, EnterpriseSecurityManager, JwtClaims, Permission,
         UserSession,
     },
     error::{Mem0Error, Result},
     graph_memory::{FusedMemory, GraphMemoryConfig, GraphMemoryManager},
     personalization::{
-        MemoryRecommendation, PersonalizationConfig, PersonalizationLearningResult,
+        MemoryRecommendation, PersonalizationConfig,
         PersonalizationManager, PersonalizedSearchRequest, PersonalizedSearchResult, UserBehavior,
         UserPreference, UserProfile,
     },
@@ -29,8 +29,7 @@ use crate::{
         TaskExecutionResult, Workflow, WorkflowExecution, WorkflowStep,
     },
     types::{
-        AddMemoryRequest, BatchAddResult, BatchDeleteItem, BatchDeleteRequest, BatchDeleteResult,
-        BatchUpdateItem, BatchUpdateRequest, BatchUpdateResult, ChangeType, DeleteMemoryResponse,
+        AddMemoryRequest, BatchAddResult, BatchDeleteRequest, BatchDeleteResult, BatchUpdateRequest, BatchUpdateResult, ChangeType, DeleteMemoryResponse,
         Memory, MemoryFilter, MemoryHistory, MemorySearchResult, MemorySearchResultItem,
         SearchMemoryRequest, SortField, SortOrder, UpdateMemoryRequest,
     },
@@ -310,7 +309,7 @@ impl Mem0Client {
         let enterprise_security = match EnterpriseSecurityManager::new(
             EnterpriseSecurityConfig::default(),
         ) {
-            Ok(mut manager) => {
+            Ok(manager) => {
                 if let Err(e) = manager.initialize_defaults().await {
                     warn!(
                         "Failed to initialize default security settings: {}, using basic security",
@@ -904,7 +903,7 @@ impl Mem0Client {
         debug!("Deleted {} memories for user: {}", deleted_count, user_id);
         Ok(DeleteMemoryResponse {
             success: true,
-            message: Some(format!("Deleted {} memories", deleted_count)),
+            message: Some(format!("Deleted {deleted_count} memories")),
         })
     }
 
@@ -1219,7 +1218,7 @@ impl Mem0Client {
                 }
                 Err(e) => {
                     failed += 1;
-                    errors.push(format!("Failed to add memory: {}", e));
+                    errors.push(format!("Failed to add memory: {e}"));
                 }
             }
         }
@@ -1415,7 +1414,7 @@ impl Mem0Client {
         // Then extract entities and relations to graph
         if let Some(ref graph_memory) = self.graph_memory {
             let session = Session {
-                id: format!("graph_extraction_{}", memory_id),
+                id: format!("graph_extraction_{memory_id}"),
                 user_id: Some(user_id.to_string()),
                 agent_id: Some("mem0_client".to_string()),
                 run_id: None,
@@ -1650,7 +1649,6 @@ impl Mem0Client {
             context_aware
                 .extract_context(content, session)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1667,7 +1665,6 @@ impl Mem0Client {
             context_aware
                 .search_with_context(request)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1684,7 +1681,6 @@ impl Mem0Client {
             context_aware
                 .learn_from_context(contexts)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1695,7 +1691,7 @@ impl Mem0Client {
     /// 获取学习到的上下文模式
     pub async fn get_context_patterns(&self) -> Result<Vec<ContextPattern>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware.get_patterns().await.map_err(|e| e.into())
+            context_aware.get_patterns().await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1709,7 +1705,6 @@ impl Mem0Client {
             context_aware
                 .get_context_history(limit)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1727,7 +1722,6 @@ impl Mem0Client {
             context_aware
                 .associate_contexts_with_memory(memory_id, contexts)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1741,7 +1735,6 @@ impl Mem0Client {
             context_aware
                 .get_memory_contexts(memory_id)
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1755,7 +1748,6 @@ impl Mem0Client {
             context_aware
                 .get_context_statistics()
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1769,7 +1761,6 @@ impl Mem0Client {
             context_aware
                 .clear_context_history()
                 .await
-                .map_err(|e| e.into())
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1929,7 +1920,7 @@ impl Mem0Client {
             security
                 .authenticate(username, password, ip_address, user_agent)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Authentication failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Authentication failed: {e}")))
         } else {
             Err(Mem0Error::FeatureNotEnabled(
                 "Enterprise security not enabled".to_string(),
@@ -1943,7 +1934,7 @@ impl Mem0Client {
             security
                 .validate_token(token)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Token validation failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Token validation failed: {e}")))
         } else {
             Err(Mem0Error::FeatureNotEnabled(
                 "Enterprise security not enabled".to_string(),
@@ -1957,7 +1948,7 @@ impl Mem0Client {
             security
                 .check_permission(user_id, permission)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Permission check failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Permission check failed: {e}")))
         } else {
             Ok(true) // If security is disabled, allow all operations
         }
@@ -1969,7 +1960,7 @@ impl Mem0Client {
             security
                 .encrypt_data(data)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Encryption failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Encryption failed: {e}")))
         } else {
             Ok(data.to_string()) // If security is disabled, return data as-is
         }
@@ -1981,7 +1972,7 @@ impl Mem0Client {
             security
                 .decrypt_data(encrypted_data)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Decryption failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Decryption failed: {e}")))
         } else {
             Ok(encrypted_data.to_string()) // If security is disabled, return data as-is
         }
@@ -1993,7 +1984,7 @@ impl Mem0Client {
             security
                 .mask_sensitive_data(data)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Data masking failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Data masking failed: {e}")))
         } else {
             Ok(data.to_string()) // If security is disabled, return data as-is
         }
@@ -2008,7 +1999,7 @@ impl Mem0Client {
             security
                 .get_audit_logs(limit)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Failed to get audit logs: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Failed to get audit logs: {e}")))
         } else {
             Err(Mem0Error::FeatureNotEnabled(
                 "Enterprise security not enabled".to_string(),
@@ -2028,7 +2019,7 @@ impl Mem0Client {
             security
                 .create_user(username, email, password, roles)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("User creation failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("User creation failed: {e}")))
         } else {
             Err(Mem0Error::FeatureNotEnabled(
                 "Enterprise security not enabled".to_string(),
@@ -2042,7 +2033,7 @@ impl Mem0Client {
             security
                 .logout(session_id)
                 .await
-                .map_err(|e| Mem0Error::SecurityError(format!("Logout failed: {}", e)))
+                .map_err(|e| Mem0Error::SecurityError(format!("Logout failed: {e}")))
         } else {
             Ok(()) // If security is disabled, logout is always successful
         }

@@ -57,7 +57,7 @@ impl HuggingFaceEmbedder {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         info!(
@@ -96,25 +96,24 @@ impl HuggingFaceEmbedder {
         // 如果有 API key，添加认证头
         if let Some(api_key) = &self.config.api_key {
             request_builder =
-                request_builder.header("Authorization", format!("Bearer {}", api_key));
+                request_builder.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = request_builder.send().await.map_err(|e| {
-            AgentMemError::network_error(&format!("HuggingFace API request failed: {}", e))
+            AgentMemError::network_error(format!("HuggingFace API request failed: {e}"))
         })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("HuggingFace API error {}: {}", status, error_text);
-            return Err(AgentMemError::network_error(&format!(
-                "HuggingFace API error {}: {}",
-                status, error_text
+            return Err(AgentMemError::network_error(format!(
+                "HuggingFace API error {status}: {error_text}"
             )));
         }
 
         let hf_response: HuggingFaceResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(&format!("Failed to parse HuggingFace response: {}", e))
+            AgentMemError::parsing_error(format!("Failed to parse HuggingFace response: {e}"))
         })?;
 
         if hf_response.0.is_empty() {

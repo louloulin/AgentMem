@@ -73,8 +73,8 @@ impl FastEmbedProvider {
             )
         })
         .await
-        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {}", e)))?
-        .map_err(|e| AgentMemError::embedding_error(format!("FastEmbed 初始化失败: {}", e)))?;
+        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
+        .map_err(|e| AgentMemError::embedding_error(format!("FastEmbed 初始化失败: {e}")))?;
         
         let dimension = Self::get_dimension(&embedding_model);
         
@@ -128,9 +128,8 @@ impl FastEmbedProvider {
                 Ok(EmbeddingModel::MultilingualE5Large)
             }
             
-            _ => Err(AgentMemError::config_error(&format!(
-                "不支持的 FastEmbed 模型: {}. 支持的模型: bge-small-en-v1.5, bge-base-en-v1.5, bge-large-en-v1.5, all-MiniLM-L6-v2, all-MiniLM-L12-v2, mxbai-embed-large-v1, nomic-embed-text-v1, nomic-embed-text-v1.5, multilingual-e5-small, multilingual-e5-base, multilingual-e5-large",
-                model
+            _ => Err(AgentMemError::config_error(format!(
+                "不支持的 FastEmbed 模型: {model}. 支持的模型: bge-small-en-v1.5, bge-base-en-v1.5, bge-large-en-v1.5, all-MiniLM-L6-v2, all-MiniLM-L12-v2, mxbai-embed-large-v1, nomic-embed-text-v1, nomic-embed-text-v1.5, multilingual-e5-small, multilingual-e5-base, multilingual-e5-large"
             ))),
         }
     }
@@ -168,8 +167,8 @@ impl Embedder for FastEmbedProvider {
             model.embed(vec![text], None)
         })
         .await
-        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {}", e)))?
-        .map_err(|e| AgentMemError::embedding_error(format!("嵌入生成失败: {}", e)))?;
+        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
+        .map_err(|e| AgentMemError::embedding_error(format!("嵌入生成失败: {e}")))?;
         
         embedding
             .into_iter()
@@ -194,8 +193,8 @@ impl Embedder for FastEmbedProvider {
             model.embed(texts, Some(batch_size))
         })
         .await
-        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {}", e)))?
-        .map_err(|e| AgentMemError::embedding_error(format!("批量嵌入失败: {}", e)))?;
+        .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
+        .map_err(|e| AgentMemError::embedding_error(format!("批量嵌入失败: {e}")))?;
         
         Ok(embeddings)
     }

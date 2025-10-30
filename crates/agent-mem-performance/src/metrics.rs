@@ -3,7 +3,7 @@
 //! This module provides comprehensive metrics collection for monitoring
 //! AgentMem performance and identifying bottlenecks.
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,8 +11,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-#[cfg(feature = "metrics")]
-use metrics::{counter, gauge, histogram, register_counter, register_gauge, register_histogram};
 
 /// Performance metrics collector
 pub struct MetricsCollector {

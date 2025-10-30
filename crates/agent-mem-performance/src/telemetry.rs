@@ -18,7 +18,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 #[cfg(feature = "jaeger")]
-use opentelemetry::{global, trace::Tracer, KeyValue};
+use opentelemetry::trace::Tracer;
 
 #[cfg(feature = "jaeger")]
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -371,7 +371,7 @@ impl PerformanceMonitor {
         if !success {
             metrics.error_rate = (metrics.error_rate * 0.9) + 0.1;
         } else {
-            metrics.error_rate = metrics.error_rate * 0.9;
+            metrics.error_rate *= 0.9;
         }
 
         debug!(
@@ -944,8 +944,7 @@ impl ProductionTelemetrySystem {
         let builder = PrometheusBuilder::new();
         builder.install().map_err(|e| {
             agent_mem_traits::AgentMemError::internal_error(format!(
-                "Failed to initialize Prometheus: {}",
-                e
+                "Failed to initialize Prometheus: {e}"
             ))
         })?;
 
@@ -976,7 +975,7 @@ impl ProductionTelemetrySystem {
     /// Initialize Jaeger tracing
     #[cfg(feature = "jaeger")]
     async fn initialize_jaeger(&self) -> Result<()> {
-        use opentelemetry::global;
+        
         use opentelemetry_jaeger::new_agent_pipeline;
         use tracing_subscriber::{layer::SubscriberExt, Registry};
 
@@ -985,8 +984,7 @@ impl ProductionTelemetrySystem {
             .install_simple()
             .map_err(|e| {
                 agent_mem_traits::AgentMemError::internal_error(format!(
-                    "Failed to initialize Jaeger: {}",
-                    e
+                    "Failed to initialize Jaeger: {e}"
                 ))
             })?;
 
@@ -994,7 +992,7 @@ impl ProductionTelemetrySystem {
         let subscriber = Registry::default().with(telemetry);
 
         // Try to set global default, but ignore error if already set
-        if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+        if tracing::subscriber::set_global_default(subscriber).is_err() {
             tracing::warn!("Tracing subscriber already initialized, skipping Jaeger setup");
         }
 

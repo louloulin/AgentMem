@@ -320,7 +320,7 @@ async fn test_cache_cleanup() {
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     // 清理缓存
-    let _ = system.cleanup_cache().await.unwrap();
+    system.cleanup_cache().await.unwrap();
 
     let stats = system.get_stats().await.unwrap();
     assert_eq!(stats.cache_size, 0);

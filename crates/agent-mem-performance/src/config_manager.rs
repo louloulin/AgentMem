@@ -4,10 +4,8 @@
 
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
@@ -51,11 +49,11 @@ impl ConfigSource for FileConfigSource {
 
         let config: AgentMemConfig = if self.file_path.ends_with(".json") {
             serde_json::from_str(&content).map_err(|e| {
-                AgentMemError::config_error(format!("Failed to parse JSON config: {}", e))
+                AgentMemError::config_error(format!("Failed to parse JSON config: {e}"))
             })?
         } else if self.file_path.ends_with(".yaml") || self.file_path.ends_with(".yml") {
             serde_yaml::from_str(&content).map_err(|e| {
-                AgentMemError::config_error(format!("Failed to parse YAML config: {}", e))
+                AgentMemError::config_error(format!("Failed to parse YAML config: {e}"))
             })?
         } else {
             return Err(AgentMemError::config_error(
@@ -74,7 +72,7 @@ impl ConfigSource for FileConfigSource {
     fn has_changed(&self) -> bool {
         if let Ok(metadata) = fs::metadata(&self.file_path) {
             if let Ok(modified) = metadata.modified() {
-                return self.last_modified.map_or(true, |last| modified > last);
+                return self.last_modified.is_none_or(|last| modified > last);
             }
         }
         false
@@ -217,7 +215,7 @@ impl UnifiedConfigManager {
                 interval.tick().await;
 
                 // 检查配置源是否有变化
-                let mut has_changes = false;
+                let has_changes = false;
                 for source_name in &sources {
                     // 这里需要实际的变化检测逻辑
                     // 简化实现，实际应该检查文件修改时间等
@@ -416,6 +414,7 @@ impl UnifiedConfigManager {
 
 // 配置结构定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AgentMemConfig {
     pub llm: LLMConfig,
     pub vector_store: VectorStoreConfig,
@@ -426,19 +425,6 @@ pub struct AgentMemConfig {
     pub performance: PerformanceConfig,
 }
 
-impl Default for AgentMemConfig {
-    fn default() -> Self {
-        Self {
-            llm: LLMConfig::default(),
-            vector_store: VectorStoreConfig::default(),
-            graph_store: None,
-            embedder: EmbedderConfig::default(),
-            intelligence: IntelligenceConfig::default(),
-            telemetry: TelemetryConfig::default(),
-            performance: PerformanceConfig::default(),
-        }
-    }
-}
 
 impl AgentMemConfig {
     /// 从环境变量加载配置

@@ -9,11 +9,11 @@
 
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::info;
 
 /// 存储优化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

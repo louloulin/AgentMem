@@ -6,6 +6,12 @@ use agent_mem_traits::Result;
 /// DBSCAN聚类器
 pub struct DBSCANClusterer;
 
+impl Default for DBSCANClusterer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DBSCANClusterer {
     pub fn new() -> Self {
         Self

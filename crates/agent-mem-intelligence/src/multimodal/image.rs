@@ -1,10 +1,9 @@
 //! 图像内容处理模块
 
-use super::{ContentType, MultimodalContent, MultimodalProcessor, ProcessingStatus};
+use super::{ContentType, MultimodalContent, MultimodalProcessor};
 use agent_mem_traits::{AgentMemError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// 图像处理器
 #[derive(Debug)]
@@ -57,7 +56,7 @@ impl ImageProcessor {
             if content
                 .mime_type
                 .as_ref()
-                .map_or(false, |m| m.starts_with("image/"))
+                .is_some_and(|m| m.starts_with("image/"))
             {
                 // 基于文件名和内容进行智能文本提取
                 let filename = content
@@ -87,8 +86,7 @@ impl ImageProcessor {
                 } else {
                     // 通用图像文本提取
                     format!(
-                        "Image text analysis: Detected text regions in {} byte image",
-                        file_size
+                        "Image text analysis: Detected text regions in {file_size} byte image"
                     )
                 };
 
@@ -285,7 +283,7 @@ impl ImageProcessor {
         // 添加 OCR 文本
         if let Ok(Some(ocr_text)) = self.perform_ocr(content).await {
             if !ocr_text.trim().is_empty() {
-                description_parts.push(format!("Text content: {}", ocr_text));
+                description_parts.push(format!("Text content: {ocr_text}"));
             }
         }
 
@@ -339,7 +337,7 @@ impl MultimodalProcessor for ImageProcessor {
         // 执行对象检测
         if let Ok(objects) = self.detect_objects(content).await {
             let objects_json = serde_json::to_value(objects).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize objects: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize objects: {e}"))
             })?;
             content.set_metadata("detected_objects".to_string(), objects_json);
         }
@@ -347,7 +345,7 @@ impl MultimodalProcessor for ImageProcessor {
         // 执行场景分析
         if let Ok(scene) = self.analyze_scene(content).await {
             let scene_json = serde_json::to_value(scene).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize scene: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize scene: {e}"))
             })?;
             content.set_metadata("scene_analysis".to_string(), scene_json);
         }

@@ -314,8 +314,7 @@ impl MemoryReasoner {
             // 低方差表示规律性
             Some(TemporalPattern {
                 description: format!(
-                    "Regular pattern with average interval of {:.1} hours",
-                    avg_interval
+                    "Regular pattern with average interval of {avg_interval:.1} hours"
                 ),
                 evidence: vec![
                     format!("Average interval: {:.1} hours", avg_interval),

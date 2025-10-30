@@ -22,7 +22,7 @@ async fn test_memory_search_basic() {
         println!("  {}. {}", i + 1, mem.content);
     }
 
-    assert!(results.len() >= 1, "Should find at least one memory about pizza");
+    assert!(!results.is_empty(), "Should find at least one memory about pizza");
     assert!(
         results.iter().any(|m| m.content.to_lowercase().contains("pizza")),
         "Results should contain pizza"
@@ -36,7 +36,7 @@ async fn test_memory_search_basic() {
         println!("  {}. {}", i + 1, mem.content);
     }
 
-    assert!(results.len() >= 1, "Should find at least one memory about food");
+    assert!(!results.is_empty(), "Should find at least one memory about food");
 
     println!("\n✅ Memory search tests passed!");
 }
@@ -59,7 +59,7 @@ async fn test_memory_search_relevance_scoring() {
         println!("  {}. {}", i + 1, mem.content);
     }
 
-    assert!(results.len() >= 1, "Should find at least 1 memory");
+    assert!(!results.is_empty(), "Should find at least 1 memory");
 
     // The first result should be the most relevant
     let first_content = results[0].content.to_lowercase();

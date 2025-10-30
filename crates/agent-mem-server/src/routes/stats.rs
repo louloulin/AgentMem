@@ -341,8 +341,9 @@ pub async fn get_memory_growth(
     
     // Calculate growth rate (memories per day)
     let growth_rate = if data_points.len() > 1 {
-        let first = data_points.first().unwrap().total as f64;
-        let last = data_points.last().unwrap().total as f64;
+        // Safe to unwrap: we just checked that len() > 1
+        let first = data_points.first().expect("data_points is not empty").total as f64;
+        let last = data_points.last().expect("data_points is not empty").total as f64;
         let days = data_points.len() as f64;
         (last - first) / days
     } else {

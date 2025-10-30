@@ -3,7 +3,7 @@
 //! 演示如何使用 OpenAI Vision 和 Whisper API 进行多模态内容处理
 
 use agent_mem_intelligence::multimodal::{
-    AIModelConfig, AIModelProvider, AudioFormat, AudioTranscriptionRequest, DetailLevel,
+    AIModelConfig, AudioFormat, AudioTranscriptionRequest, DetailLevel,
     ImageAnalysisRequest, ImageAnalysisTask, OpenAIVisionClient, OpenAIWhisperClient,
     VideoAnalysisRequest, VideoAnalyzer, VideoAnalyzerConfig,
 };

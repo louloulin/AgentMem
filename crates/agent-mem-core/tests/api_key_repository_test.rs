@@ -104,8 +104,8 @@ mod libsql_api_key_tests {
             let api_key = ApiKey::new(
                 org.id.clone(),
                 user.id.clone(),
-                format!("API Key {}", i),
-                format!("key_hash_{}", i),
+                format!("API Key {i}"),
+                format!("key_hash_{i}"),
                 None,
             );
             api_key_repo.create(&api_key).await.unwrap();
@@ -224,8 +224,8 @@ mod libsql_api_key_tests {
             let api_key = ApiKey::new(
                 org.id.clone(),
                 user.id.clone(),
-                format!("API Key {}", i),
-                format!("list_hash_{}", i),
+                format!("API Key {i}"),
+                format!("list_hash_{i}"),
                 None,
             );
             api_key_repo.create(&api_key).await.unwrap();

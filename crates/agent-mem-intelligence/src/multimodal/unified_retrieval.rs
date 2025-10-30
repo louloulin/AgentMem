@@ -216,7 +216,7 @@ impl UnifiedMultimodalRetrieval {
             for (content_id, embedding) in embeddings {
                 content_embeddings
                     .entry(content_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(MultimodalEmbedding {
                         embedding: embedding.clone(),
                         modality: modality.clone(),
@@ -311,7 +311,7 @@ impl UnifiedMultimodalRetrieval {
     /// * 重排序后的结果
     pub fn rerank_results(
         &self,
-        mut results: Vec<MultimodalRetrievalResult>,
+        results: Vec<MultimodalRetrievalResult>,
         rerank_strategy: RerankStrategy,
     ) -> Vec<MultimodalRetrievalResult> {
         match rerank_strategy {

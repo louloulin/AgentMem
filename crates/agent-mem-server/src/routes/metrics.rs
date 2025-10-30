@@ -77,7 +77,7 @@ pub async fn get_prometheus_metrics(
         .status(200)
         .header("Content-Type", "text/plain; version=0.0.4")
         .body(Body::from(metrics_text))
-        .unwrap()
+        .expect("Failed to build metrics response - this should never fail with valid headers")
 }
 
 #[cfg(test)]

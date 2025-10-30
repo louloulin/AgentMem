@@ -8,8 +8,7 @@
 //! - 多模态内容处理
 
 use agent_mem_llm::LLMProvider;
-use agent_mem_traits::{Message as TraitsMessage, Result};
-use chrono::{DateTime, Utc};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -377,8 +376,8 @@ impl FactExtractor {
         ];
 
         for (unknown_type, known_type) in entity_type_mappings.iter() {
-            let pattern = format!(r#""entity_type":\s*"{}""#, unknown_type);
-            let replacement = format!(r#""entity_type": "{}""#, known_type);
+            let pattern = format!(r#""entity_type":\s*"{unknown_type}""#);
+            let replacement = format!(r#""entity_type": "{known_type}""#);
             let re = regex::Regex::new(&pattern).unwrap();
             cleaned = re.replace_all(&cleaned, replacement.as_str()).to_string();
         }
@@ -414,7 +413,7 @@ impl FactExtractor {
             r#"Extract key facts from this conversation. Return JSON only.
 
 Conversation:
-{}
+{conversation}
 
 JSON format:
 {{
@@ -437,8 +436,7 @@ Rules:
 - Use confidence 0.3-1.0
 - Categories: Personal (name, age), Preference (likes/dislikes), Relationship (connections), Event (actions), Knowledge (facts), Procedural (how-to)
 - Include key entities mentioned
-- Keep content concise (max 50 words per fact)"#,
-            conversation
+- Keep content concise (max 50 words per fact)"#
         )
     }
 
@@ -448,7 +446,7 @@ Rules:
             r#"Extract structured facts from this conversation. You are a professional information extraction expert.
 
 Conversation:
-{}
+{conversation}
 
 Extract facts in these categories:
 1. Personal - personal info (name, age, job, contact)
@@ -506,8 +504,7 @@ Requirements:
 - Avoid duplicate or redundant information
 - Lower confidence for ambiguous information
 - Extract specific entities and temporal info
-- Preserve original semantic meaning"#,
-            conversation
+- Preserve original semantic meaning"#
         )
     }
 
@@ -683,7 +680,7 @@ Requirements:
                     category,
                     entities: vec![],
                     temporal_info: None,
-                    source_message_id: Some(format!("rule_extract_{}", idx)),
+                    source_message_id: Some(format!("rule_extract_{idx}")),
                     metadata: {
                         let mut map = HashMap::new();
                         map.insert(
@@ -819,7 +816,7 @@ Requirements:
         for keyword in location_keywords {
             if content.contains(keyword) {
                 return Some(Entity {
-                    id: format!("location_{}", keyword),
+                    id: format!("location_{keyword}"),
                     name: keyword.to_string(),
                     entity_type: EntityType::Location,
                     confidence: 0.7,
@@ -858,7 +855,7 @@ Requirements:
         for keyword in org_keywords {
             if content.contains(keyword) {
                 return Some(Entity {
-                    id: format!("org_{}", keyword),
+                    id: format!("org_{keyword}"),
                     name: keyword.to_string(),
                     entity_type: EntityType::Organization,
                     confidence: 0.7,
@@ -1072,7 +1069,7 @@ impl AdvancedFactExtractor {
                     source_messages: messages
                         .iter()
                         .enumerate()
-                        .map(|(i, _)| format!("msg_{}", i))
+                        .map(|(i, _)| format!("msg_{i}"))
                         .collect(),
                     metadata: HashMap::new(),
                 };
@@ -1094,7 +1091,7 @@ impl AdvancedFactExtractor {
                     source_messages: messages
                         .iter()
                         .enumerate()
-                        .map(|(i, _)| format!("msg_{}", i))
+                        .map(|(i, _)| format!("msg_{i}"))
                         .collect(),
                     metadata: HashMap::new(),
                 };
@@ -1116,12 +1113,12 @@ impl AdvancedFactExtractor {
 
             for (i, word) in words.iter().enumerate() {
                 // 简单的人名识别
-                if word.len() >= 2 && word.chars().all(|c| c.is_alphabetic()) {
-                    if i > 0
+                if word.len() >= 2 && word.chars().all(|c| c.is_alphabetic())
+                    && i > 0
                         && (words[i - 1] == "我叫" || words[i - 1] == "叫" || words[i - 1] == "是")
                     {
                         entities.push(Entity {
-                            id: format!("entity_{}", entity_id),
+                            id: format!("entity_{entity_id}"),
                             name: word.to_string(),
                             entity_type: EntityType::Person,
                             confidence: 0.8,
@@ -1129,12 +1126,11 @@ impl AdvancedFactExtractor {
                         });
                         entity_id += 1;
                     }
-                }
 
                 // 简单的地点识别
                 if word.ends_with("市") || word.ends_with("省") || word.ends_with("区") {
                     entities.push(Entity {
-                        id: format!("entity_{}", entity_id),
+                        id: format!("entity_{entity_id}"),
                         name: word.to_string(),
                         entity_type: EntityType::Location,
                         confidence: 0.7,
@@ -1147,7 +1143,7 @@ impl AdvancedFactExtractor {
                 if word.ends_with("公司") || word.ends_with("企业") || word.ends_with("机构")
                 {
                     entities.push(Entity {
-                        id: format!("entity_{}", entity_id),
+                        id: format!("entity_{entity_id}"),
                         name: word.to_string(),
                         entity_type: EntityType::Organization,
                         confidence: 0.7,

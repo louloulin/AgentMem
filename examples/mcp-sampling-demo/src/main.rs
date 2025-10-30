@@ -8,7 +8,6 @@ use agent_mem_tools::mcp::{
     CreateMessageRequest, StopReason,
 };
 use tracing::Level;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,7 +52,7 @@ async fn demo_disabled_sampling() -> Result<(), Box<dyn std::error::Error>> {
 
     match manager.create_message(request).await {
         Ok(_) => println!("  ✗ 意外成功"),
-        Err(e) => println!("  ✓ 预期失败: {}", e),
+        Err(e) => println!("  ✓ 预期失败: {e}"),
     }
 
     println!();
@@ -90,7 +89,7 @@ async fn demo_sampling_params() -> Result<(), Box<dyn std::error::Error>> {
     // 序列化为 JSON
     let json = serde_json::to_string_pretty(&custom_params)?;
     println!("\n✓ JSON 表示:");
-    println!("{}", json);
+    println!("{json}");
 
     println!();
     Ok(())
@@ -198,12 +197,12 @@ async fn demo_mock_sampling() -> Result<(), Box<dyn std::error::Error>> {
                     println!("  创建时间: {}", response.created_at);
                 }
                 Err(e) => {
-                    println!("\n  ⚠ 采样失败（预期，因为使用 Mock 配置）: {}", e);
+                    println!("\n  ⚠ 采样失败（预期，因为使用 Mock 配置）: {e}");
                 }
             }
         }
         Err(e) => {
-            println!("  ⚠ Sampling 管理器创建失败（预期，因为 Mock 提供商不存在）: {}", e);
+            println!("  ⚠ Sampling 管理器创建失败（预期，因为 Mock 提供商不存在）: {e}");
         }
     }
 

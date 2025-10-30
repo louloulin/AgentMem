@@ -3,7 +3,6 @@
 //! 集成真实的 AI 模型用于多模态内容处理
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// AI 模型提供商
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

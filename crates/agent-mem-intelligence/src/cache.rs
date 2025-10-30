@@ -2,7 +2,7 @@
 //!
 //! 为智能功能提供 LRU (Least Recently Used) 缓存，减少 LLM 调用
 
-use agent_mem_traits::{CacheStats, ExtractedFact, IntelligenceCache, MemoryDecision, Result};
+use agent_mem_traits::{CacheStats, ExtractedFact, IntelligenceCache, MemoryDecision};
 use async_trait::async_trait;
 use lru::LruCache;
 use std::num::NonZeroUsize;

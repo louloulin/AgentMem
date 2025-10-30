@@ -14,7 +14,6 @@ use agent_mem_traits::{VectorStore, VectorData};
 use std::collections::HashMap;
 use std::env;
 use std::time::Instant;
-use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let duration = start.elapsed();
 
     println!("✅ CoreAgent 创建成功");
-    println!("   耗时: {:?}", duration);
+    println!("   耗时: {duration:?}");
     println!("   数据库: ./test-data/full-test.db");
     println!("   存储类型: LibSQL (持久化)");
 
@@ -53,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = LanceDBStore::new(vector_path, "test_vectors").await?;
     
     println!("✅ LanceDB 存储创建成功");
-    println!("   路径: {}", vector_path);
+    println!("   路径: {vector_path}");
 
     // 插入测试向量
     println!("\n💾 插入测试向量...");
@@ -90,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ 向量插入成功");
     println!("   插入数量: {}", ids.len());
-    println!("   耗时: {:?}", duration);
+    println!("   耗时: {duration:?}");
     println!("   吞吐量: {:.2} ops/s", ids.len() as f64 / duration.as_secs_f64());
 
     // ========================================
@@ -106,13 +105,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let duration = start.elapsed();
 
     println!("✅ 向量搜索成功");
-    println!("   搜索耗时: {:?}", duration);
+    println!("   搜索耗时: {duration:?}");
     println!("   找到结果: {} 个", results.len());
     println!("\n   搜索结果:");
     for (i, result) in results.iter().enumerate() {
         println!("     {}. ID: {}, 相似度: {:.4}", i + 1, result.id, result.similarity);
         if let Some(text) = result.metadata.get("text") {
-            println!("        文本: {}", text);
+            println!("        文本: {text}");
         }
     }
 
@@ -138,14 +137,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ 向量更新成功");
     println!("   更新数量: 1");
-    println!("   耗时: {:?}", duration);
+    println!("   耗时: {duration:?}");
 
     // 验证更新
     if let Some(vector) = store.get_vector("vec_1").await? {
         let updated = vector.metadata.get("updated")
             .map(|v| v == "true")
             .unwrap_or(false);
-        println!("   验证: updated = {}", updated);
+        println!("   验证: updated = {updated}");
     }
 
     // ========================================
@@ -160,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ 向量删除成功");
     println!("   删除数量: 1");
-    println!("   耗时: {:?}", duration);
+    println!("   耗时: {duration:?}");
 
     // ========================================
     // 测试 6: 统计信息
@@ -183,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let health = store.health_check().await?;
     
-    println!("✅ 健康状态: {:?}", health);
+    println!("✅ 健康状态: {health:?}");
 
     // ========================================
     // 测试 8: 批量性能测试
@@ -195,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut batch_vectors = Vec::new();
     for i in 0..100 {
         batch_vectors.push(VectorData {
-            id: format!("batch_{}", i),
+            id: format!("batch_{i}"),
             vector: vec![i as f32 / 100.0; 1536],
             metadata: HashMap::from([
                 ("index".to_string(), i.to_string()),
@@ -210,7 +209,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ 批量插入完成");
     println!("   插入数量: {}", ids.len());
-    println!("   总耗时: {:?}", duration);
+    println!("   总耗时: {duration:?}");
     println!("   吞吐量: {:.2} ops/s", ids.len() as f64 / duration.as_secs_f64());
     println!("   平均延迟: {:.2} ms/op", duration.as_millis() as f64 / ids.len() as f64);
 
@@ -226,13 +225,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if Path::new(db_path).exists() {
         let metadata = std::fs::metadata(db_path)?;
         println!("✅ LibSQL 数据库文件存在");
-        println!("   路径: {}", db_path);
+        println!("   路径: {db_path}");
         println!("   大小: {} bytes", metadata.len());
     }
 
     if Path::new(vector_path).exists() {
         println!("✅ LanceDB 向量存储存在");
-        println!("   路径: {}", vector_path);
+        println!("   路径: {vector_path}");
         
         // 统计目录大小
         let mut total_size = 0u64;
@@ -243,13 +242,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        println!("   大小: {} bytes", total_size);
+        println!("   大小: {total_size} bytes");
     }
 
     // ========================================
     // 总结
     // ========================================
-    println!("{}", "\n".repeat(1));
+    println!("{}", "\n".to_string());
     println!("{}", "=".repeat(70));
     println!("🎉 所有测试完成");
     println!("{}", "=".repeat(70));
@@ -272,8 +271,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  生产可用: ✅ 推荐使用");
 
     println!("\n📁 数据文件:");
-    println!("  LibSQL: {}", db_path);
-    println!("  LanceDB: {}", vector_path);
+    println!("  LibSQL: {db_path}");
+    println!("  LanceDB: {vector_path}");
 
     println!("\n🧹 清理测试数据:");
     println!("  rm -rf test-data/");

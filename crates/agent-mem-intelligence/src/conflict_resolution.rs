@@ -6,13 +6,11 @@
 //! - 智能合并策略
 //! - 置信度评估
 
-use crate::fact_extraction::{Entity, Relation, StructuredFact};
 use crate::similarity::SemanticSimilarity;
 use agent_mem_core::Memory;
 use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{Message, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 

@@ -97,7 +97,7 @@ impl VideoProcessor {
         if content
             .mime_type
             .as_ref()
-            .map_or(false, |m| m.starts_with("video/"))
+            .is_some_and(|m| m.starts_with("video/"))
         {
             let filename = &content.id;
 
@@ -192,8 +192,7 @@ impl VideoProcessor {
         let bitrate = metadata
             .get("bitrate")
             .and_then(|v| v.as_u64())
-            .unwrap_or_else(|| self.estimate_bitrate_from_resolution(width, height))
-            as u64;
+            .unwrap_or_else(|| self.estimate_bitrate_from_resolution(width, height));
 
         let has_audio = self.detect_audio_from_filename(filename);
         let total_frames = (duration * fps) as u64;
@@ -230,11 +229,11 @@ impl VideoProcessor {
         let progress = timestamp / duration;
 
         if progress < 0.3 {
-            format!("Opening scene from {}", filename)
+            format!("Opening scene from {filename}")
         } else if progress < 0.7 {
-            format!("Middle section from {}", filename)
+            format!("Middle section from {filename}")
         } else {
-            format!("Ending scene from {}", filename)
+            format!("Ending scene from {filename}")
         }
     }
 
@@ -268,11 +267,11 @@ impl VideoProcessor {
         let filename_lower = filename.to_lowercase();
 
         if filename_lower.contains("speech") || filename_lower.contains("talk") {
-            format!("Speech content from {}", filename)
+            format!("Speech content from {filename}")
         } else if filename_lower.contains("music") || filename_lower.contains("song") {
-            format!("Music content from {}", filename)
+            format!("Music content from {filename}")
         } else if filename_lower.contains("interview") {
-            format!("Interview content from {}", filename)
+            format!("Interview content from {filename}")
         } else {
             String::new()
         }
@@ -314,8 +313,7 @@ impl VideoProcessor {
         end_time: f64,
     ) -> String {
         format!(
-            "{} scene from {:.1}s to {:.1}s",
-            scene_type, start_time, end_time
+            "{scene_type} scene from {start_time:.1}s to {end_time:.1}s"
         )
     }
 
@@ -406,7 +404,7 @@ impl MultimodalProcessor for VideoProcessor {
         // 提取关键帧
         if let Ok(keyframes) = self.extract_keyframes(content).await {
             let keyframes_json = serde_json::to_value(keyframes).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize keyframes: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize keyframes: {e}"))
             })?;
             content.set_metadata("keyframes".to_string(), keyframes_json);
         }
@@ -414,7 +412,7 @@ impl MultimodalProcessor for VideoProcessor {
         // 检测场景
         if let Ok(scenes) = self.detect_scenes(content).await {
             let scenes_json = serde_json::to_value(scenes).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize scenes: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize scenes: {e}"))
             })?;
             content.set_metadata("scenes".to_string(), scenes_json);
         }
@@ -422,7 +420,7 @@ impl MultimodalProcessor for VideoProcessor {
         // 分析视频特征
         if let Ok(analysis) = self.analyze_video(content).await {
             let analysis_json = serde_json::to_value(analysis).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize video analysis: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize video analysis: {e}"))
             })?;
             content.set_metadata("video_analysis".to_string(), analysis_json);
         }
@@ -444,7 +442,7 @@ impl MultimodalProcessor for VideoProcessor {
         summary_parts.push(format!("Video: {}", content.id));
 
         if let Some(text) = &content.extracted_text {
-            summary_parts.push(format!("Audio transcription: {}", text));
+            summary_parts.push(format!("Audio transcription: {text}"));
         }
 
         if let Some(analysis_value) = content.get_metadata("video_analysis") {

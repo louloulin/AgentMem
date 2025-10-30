@@ -31,7 +31,7 @@ impl OpenAIWhisperClient {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .build()
-            .map_err(|e| AgentMemError::internal_error(format!("创建 HTTP 客户端失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("创建 HTTP 客户端失败: {e}")))?;
 
         Ok(Self { client, config })
     }
@@ -56,16 +56,16 @@ impl OpenAIWhisperClient {
         // 解码 base64 音频数据
         let audio_bytes = general_purpose::STANDARD
             .decode(&request.audio_data)
-            .map_err(|e| AgentMemError::InvalidInput(format!("解码 base64 失败: {}", e)))?;
+            .map_err(|e| AgentMemError::InvalidInput(format!("解码 base64 失败: {e}")))?;
 
         // 构建 multipart 表单
         let file_extension = self.map_audio_format(&request.format);
-        let filename = format!("audio.{}", file_extension);
+        let filename = format!("audio.{file_extension}");
 
         let file_part = multipart::Part::bytes(audio_bytes)
             .file_name(filename)
-            .mime_str(&format!("audio/{}", file_extension))
-            .map_err(|e| AgentMemError::internal_error(format!("创建文件部分失败: {}", e)))?;
+            .mime_str(&format!("audio/{file_extension}"))
+            .map_err(|e| AgentMemError::internal_error(format!("创建文件部分失败: {e}")))?;
 
         let mut form = multipart::Form::new()
             .part("file", file_part)
@@ -96,12 +96,12 @@ impl OpenAIWhisperClient {
         // 发送请求
         let response = self
             .client
-            .post(format!("{}/audio/transcriptions", base_url))
-            .header("Authorization", format!("Bearer {}", api_key))
+            .post(format!("{base_url}/audio/transcriptions"))
+            .header("Authorization", format!("Bearer {api_key}"))
             .multipart(form)
             .send()
             .await
-            .map_err(|e| AgentMemError::internal_error(format!("发送请求失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("发送请求失败: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -111,15 +111,14 @@ impl OpenAIWhisperClient {
                 .unwrap_or_else(|_| "无法读取错误响应".to_string());
             error!("OpenAI Whisper API 错误 ({}): {}", status, error_text);
             return Err(AgentMemError::internal_error(format!(
-                "OpenAI Whisper API 错误 ({}): {}",
-                status, error_text
+                "OpenAI Whisper API 错误 ({status}): {error_text}"
             )));
         }
 
         let api_response: WhisperResponse = response
             .json()
             .await
-            .map_err(|e| AgentMemError::internal_error(format!("解析响应失败: {}", e)))?;
+            .map_err(|e| AgentMemError::internal_error(format!("解析响应失败: {e}")))?;
 
         debug!("OpenAI Whisper API 响应: {:?}", api_response);
 

@@ -271,9 +271,9 @@ impl<'a> MemoryBlock<'a> {
     /// Convert to Bytes (immutable)
     pub fn freeze(mut self) -> Bytes {
         self.frozen = true;
-        let bytes = self.buffer.clone().freeze();
+        
         // Note: We can't return the buffer to pool after freeze
-        bytes
+        self.buffer.clone().freeze()
     }
 }
 

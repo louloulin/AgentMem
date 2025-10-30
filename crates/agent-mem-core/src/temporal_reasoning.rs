@@ -937,9 +937,9 @@ impl TemporalReasoningEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph_memory::{GraphMemoryEngine, GraphNode, NodeType};
-    use crate::types::{Memory, MemoryType};
-    use agent_mem_traits::Vector;
+    use crate::graph_memory::GraphMemoryEngine;
+    
+    
 
     #[tokio::test]
     async fn test_temporal_reasoning_config() {

@@ -3,10 +3,10 @@
 //! 使用真实的 AI 模型和 OCR 服务进行图像处理
 
 use super::{ContentType, MultimodalContent, MultimodalProcessor, ProcessingStatus};
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
 /// 真实图像处理器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,9 +88,9 @@ impl RealImageProcessor {
         } else if filename.to_lowercase().contains("photo")
             || filename.to_lowercase().contains("image")
         {
-            format!("Photographic content analysis: Natural image detected ({} bytes). May contain people, objects, scenes, and environmental elements.", file_size)
+            format!("Photographic content analysis: Natural image detected ({file_size} bytes). May contain people, objects, scenes, and environmental elements.")
         } else {
-            format!("General image analysis: Visual content detected ({} bytes). Requires detailed AI model analysis for complete understanding.", file_size)
+            format!("General image analysis: Visual content detected ({file_size} bytes). Requires detailed AI model analysis for complete understanding.")
         };
 
         Ok(analysis)
@@ -125,7 +125,7 @@ impl RealImageProcessor {
         {
             format!("OCR Result: Chart text extraction. Identified {} data labels, axis titles, and legend text from visualization.", file_size / 500)
         } else {
-            format!("OCR Result: General text extraction from image. Processed {} bytes of visual content for text recognition.", file_size)
+            format!("OCR Result: General text extraction from image. Processed {file_size} bytes of visual content for text recognition.")
         };
 
         Ok(extracted_text)
@@ -210,8 +210,7 @@ impl RealImageProcessor {
             )
         } else {
             format!(
-                "Image text analysis: Detected text regions in {} byte image",
-                file_size
+                "Image text analysis: Detected text regions in {file_size} byte image"
             )
         };
 

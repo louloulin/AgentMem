@@ -215,26 +215,27 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // 需要外部进程，可能导致测试挂起
     async fn test_add_duplicate_server() {
         let manager = McpClientManager::new();
-        
+
         let config1 = McpServerConfig::stdio(
             "test-server".to_string(),
             "echo".to_string(),
             vec![],
             None,
         );
-        
+
         let config2 = McpServerConfig::stdio(
             "test-server".to_string(),
             "echo".to_string(),
             vec![],
             None,
         );
-        
+
         // 第一次添加应该成功（如果 echo 命令可用）
         let _ = manager.add_server(config1).await;
-        
+
         // 第二次添加应该失败
         let result = manager.add_server(config2).await;
         assert!(result.is_err());

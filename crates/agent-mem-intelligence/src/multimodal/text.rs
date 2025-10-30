@@ -262,10 +262,10 @@ impl MultimodalProcessor for TextProcessor {
         } else if let Some(data) = &content.data {
             // 假设是 Base64 编码的文本
             let decoded = general_purpose::STANDARD.decode(data).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to decode text data: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to decode text data: {e}"))
             })?;
             String::from_utf8(decoded)
-                .map_err(|e| AgentMemError::ProcessingError(format!("Invalid UTF-8 text: {}", e)))?
+                .map_err(|e| AgentMemError::ProcessingError(format!("Invalid UTF-8 text: {e}")))?
         } else {
             return Err(AgentMemError::ProcessingError(
                 "No text content found".to_string(),
@@ -278,7 +278,7 @@ impl MultimodalProcessor for TextProcessor {
         // 提取关键词
         if let Ok(keywords) = self.extract_keywords(&text).await {
             let keywords_json = serde_json::to_value(keywords).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize keywords: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize keywords: {e}"))
             })?;
             content.set_metadata("keywords".to_string(), keywords_json);
         }
@@ -286,7 +286,7 @@ impl MultimodalProcessor for TextProcessor {
         // 分析情感
         if let Ok(sentiment) = self.analyze_sentiment(&text).await {
             let sentiment_json = serde_json::to_value(sentiment).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize sentiment: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize sentiment: {e}"))
             })?;
             content.set_metadata("sentiment".to_string(), sentiment_json);
         }
@@ -294,7 +294,7 @@ impl MultimodalProcessor for TextProcessor {
         // 检测语言
         if let Ok(language) = self.detect_language(&text).await {
             let language_json = serde_json::to_value(language).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize language: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize language: {e}"))
             })?;
             content.set_metadata("language".to_string(), language_json);
         }
@@ -302,7 +302,7 @@ impl MultimodalProcessor for TextProcessor {
         // 识别实体
         if let Ok(entities) = self.recognize_entities(&text).await {
             let entities_json = serde_json::to_value(entities).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize entities: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize entities: {e}"))
             })?;
             content.set_metadata("entities".to_string(), entities_json);
         }
@@ -323,7 +323,7 @@ impl MultimodalProcessor for TextProcessor {
             // 简化的摘要生成：取前100个字符（安全处理多字节字符）
             let summary = if text.chars().count() > 100 {
                 let truncated: String = text.chars().take(100).collect();
-                format!("{}...", truncated)
+                format!("{truncated}...")
             } else {
                 text.clone()
             };

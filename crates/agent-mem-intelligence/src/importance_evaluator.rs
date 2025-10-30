@@ -6,14 +6,14 @@
 //! - 时间衰减计算
 //! - 用户行为分析
 
-use crate::fact_extraction::{Entity, EntityType, Relation, RelationType, StructuredFact};
+use crate::fact_extraction::{EntityType, RelationType, StructuredFact};
 use agent_mem_core::Memory;
 use agent_mem_llm::LLMProvider;
-use agent_mem_traits::{Message, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::info;
 
 /// 重要性评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -312,10 +312,10 @@ impl ImportanceEvaluator {
         let age_days = (now - memory.created_at).num_days() as f32;
 
         // 应用时间衰减
-        let decay = self.config.time_decay_factor.powf(age_days);
+        
 
         // 最近的记忆更重要
-        decay
+        self.config.time_decay_factor.powf(age_days)
     }
 
     /// 分析用户交互
@@ -464,7 +464,7 @@ impl ImportanceEvaluator {
         }
 
         let reasoning = if reasons.is_empty() {
-            format!("综合评估分数: {:.2}", score)
+            format!("综合评估分数: {score:.2}")
         } else {
             format!("{}，综合评估分数: {:.2}", reasons.join("，"), score)
         };

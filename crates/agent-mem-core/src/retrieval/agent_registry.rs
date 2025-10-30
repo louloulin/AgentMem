@@ -228,11 +228,11 @@ mod tests {
     #[tokio::test]
     #[ignore] // Disabled: requires real Store implementation
     async fn test_agent_registry_basic() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
 
         // 创建一个 agent with real store
         // let store = Arc::new(/* create real store */);
-        let mut agent = CoreAgent::new("test-agent".to_string());
+        let agent = CoreAgent::new("test-agent".to_string());
         // agent.set_store(store);
         let agent_arc = Arc::new(RwLock::new(agent));
 
@@ -251,11 +251,11 @@ mod tests {
     #[tokio::test]
     #[ignore] // Disabled: requires real Store implementation
     async fn test_agent_registry_multiple_agents() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
 
         // 注册多个 agents
         // let core_store = Arc::new(/* create real store */);
-        let mut core_agent = CoreAgent::new("core-agent".to_string());
+        let core_agent = CoreAgent::new("core-agent".to_string());
         // core_agent.set_store(core_store);
         // registry
         //     .register_core_agent(Arc::new(RwLock::new(core_agent)))

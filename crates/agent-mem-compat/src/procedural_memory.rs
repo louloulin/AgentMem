@@ -399,7 +399,7 @@ impl ProceduralMemoryManager {
         };
 
         let workflow = workflow.ok_or_else(|| {
-            AgentMemError::NotFound(format!("Workflow not found: {}", workflow_id))
+            AgentMemError::NotFound(format!("Workflow not found: {workflow_id}"))
         })?;
 
         let execution_id = Uuid::new_v4().to_string();
@@ -439,7 +439,7 @@ impl ProceduralMemoryManager {
     pub async fn execute_next_step(&self, execution_id: &str) -> Result<StepExecutionResult> {
         let mut executions = self.executions.write().await;
         let execution = executions.get_mut(execution_id).ok_or_else(|| {
-            AgentMemError::NotFound(format!("Execution not found: {}", execution_id))
+            AgentMemError::NotFound(format!("Execution not found: {execution_id}"))
         })?;
 
         if execution.status != ExecutionStatus::Running
@@ -1022,7 +1022,7 @@ impl ProceduralMemoryManager {
     pub async fn execute_next_task(&self, chain_id: &str) -> Result<TaskExecutionResult> {
         let mut task_chains = self.task_chains.write().await;
         let task_chain = task_chains.get_mut(chain_id).ok_or_else(|| {
-            AgentMemError::NotFound(format!("Task chain not found: {}", chain_id))
+            AgentMemError::NotFound(format!("Task chain not found: {chain_id}"))
         })?;
 
         if task_chain.status != ChainStatus::Running && task_chain.status != ChainStatus::Pending {
@@ -1215,7 +1215,7 @@ impl ProceduralMemoryManager {
     pub async fn pause_task_chain(&self, chain_id: &str) -> Result<()> {
         let mut task_chains = self.task_chains.write().await;
         let task_chain = task_chains.get_mut(chain_id).ok_or_else(|| {
-            AgentMemError::NotFound(format!("Task chain not found: {}", chain_id))
+            AgentMemError::NotFound(format!("Task chain not found: {chain_id}"))
         })?;
 
         if task_chain.status == ChainStatus::Running {
@@ -1231,7 +1231,7 @@ impl ProceduralMemoryManager {
     pub async fn resume_task_chain(&self, chain_id: &str) -> Result<()> {
         let mut task_chains = self.task_chains.write().await;
         let task_chain = task_chains.get_mut(chain_id).ok_or_else(|| {
-            AgentMemError::NotFound(format!("Task chain not found: {}", chain_id))
+            AgentMemError::NotFound(format!("Task chain not found: {chain_id}"))
         })?;
 
         if task_chain.status == ChainStatus::Paused {

@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         metadata.insert("index".to_string(), i.to_string());
 
         test_vectors.push(VectorData {
-            id: format!("perf_test_{}", i),
+            id: format!("perf_test_{i}"),
             vector: (0..128).map(|j| (i + j) as f32 / 1000.0).collect(),
             metadata,
         });
@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let random_access_start = Instant::now();
 
     for i in (0..100).step_by(10) {
-        let id = format!("perf_test_{}", i);
+        let id = format!("perf_test_{i}");
         let _vector = cached_store.get_vector(&id).await?;
     }
 
@@ -137,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let repeat_access_start = Instant::now();
 
     for i in (0..100).step_by(10) {
-        let id = format!("perf_test_{}", i);
+        let id = format!("perf_test_{i}");
         let _vector = cached_store.get_vector(&id).await?;
     }
 

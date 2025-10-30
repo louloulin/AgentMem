@@ -904,11 +904,7 @@ mod vector_operator_tests {
                 let recovered_sim = op.distance_to_similarity(distance);
                 assert!(
                     (recovered_sim - sim).abs() < 0.01,
-                    "Roundtrip failed for {:?}: {} -> {} -> {}",
-                    op,
-                    sim,
-                    distance,
-                    recovered_sim
+                    "Roundtrip failed for {op:?}: {sim} -> {distance} -> {recovered_sim}"
                 );
             }
         }

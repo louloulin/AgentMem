@@ -63,7 +63,7 @@ impl ModelCache {
             .join("models");
 
         std::fs::create_dir_all(&cache_dir).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to create cache directory: {}", e))
+            AgentMemError::storage_error(format!("Failed to create cache directory: {e}"))
         })?;
 
         Ok(Self {
@@ -73,7 +73,7 @@ impl ModelCache {
     }
 
     async fn download_model(&mut self, model_name: &str, url: &str) -> Result<PathBuf> {
-        let model_path = self.cache_dir.join(format!("{}.bin", model_name));
+        let model_path = self.cache_dir.join(format!("{model_name}.bin"));
 
         if model_path.exists() {
             info!("Model {} already cached at {:?}", model_name, model_path);
@@ -83,16 +83,16 @@ impl ModelCache {
         info!("Downloading model {} from {}", model_name, url);
 
         let response = reqwest::get(url).await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to download model: {}", e))
+            AgentMemError::network_error(format!("Failed to download model: {e}"))
         })?;
 
         let bytes = response.bytes().await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to read model data: {}", e))
+            AgentMemError::network_error(format!("Failed to read model data: {e}"))
         })?;
 
         tokio::fs::write(&model_path, &bytes)
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to save model: {}", e)))?;
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to save model: {e}")))?;
 
         info!(
             "Model {} downloaded and cached at {:?}",
@@ -269,26 +269,26 @@ impl LocalEmbedder {
 
         // 加载分词器
         let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| {
-            AgentMemError::embedding_error(format!("Failed to load tokenizer: {}", e))
+            AgentMemError::embedding_error(format!("Failed to load tokenizer: {e}"))
         })?;
 
         // 加载 ONNX 模型
         // 注意：ort 2.0.0-rc API 仍在变化中，这里使用简化的加载方式
         let session = Session::builder()
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to create ONNX session builder: {}", e))
+                AgentMemError::embedding_error(format!("Failed to create ONNX session builder: {e}"))
             })?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to set optimization level: {}", e))
+                AgentMemError::embedding_error(format!("Failed to set optimization level: {e}"))
             })?
             .with_intra_threads(4)
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to set intra threads: {}", e))
+                AgentMemError::embedding_error(format!("Failed to set intra threads: {e}"))
             })?
             .commit_from_file(model_path)
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to load ONNX model from {:?}: {}", model_path, e))
+                AgentMemError::embedding_error(format!("Failed to load ONNX model from {model_path:?}: {e}"))
             })?;
 
         self.onnx_session = Some(Arc::new(Mutex::new(session)));
@@ -488,7 +488,7 @@ impl LocalEmbedder {
         if let (Some(session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
             // 1. 分词
             let encoding = tokenizer.encode(text, true).map_err(|e| {
-                AgentMemError::embedding_error(format!("Tokenization failed: {}", e))
+                AgentMemError::embedding_error(format!("Tokenization failed: {e}"))
             })?;
 
             let input_ids = encoding.get_ids();
@@ -506,16 +506,14 @@ impl LocalEmbedder {
             let input_ids_tensor = Tensor::from_array((vec![1_usize, seq_len], input_ids_i64))
                 .map_err(|e| {
                     AgentMemError::embedding_error(format!(
-                        "Failed to create input_ids tensor: {}",
-                        e
+                        "Failed to create input_ids tensor: {e}"
                     ))
                 })?;
 
             let attention_mask_tensor =
                 Tensor::from_array((vec![1_usize, seq_len], attention_mask_i64)).map_err(|e| {
                     AgentMemError::embedding_error(format!(
-                        "Failed to create attention_mask tensor: {}",
-                        e
+                        "Failed to create attention_mask tensor: {e}"
                     ))
                 })?;
 
@@ -524,7 +522,7 @@ impl LocalEmbedder {
             let outputs = session_guard
                 .run(ort::inputs![input_ids_tensor, attention_mask_tensor])
                 .map_err(|e| {
-                    AgentMemError::embedding_error(format!("ONNX inference failed: {}", e))
+                    AgentMemError::embedding_error(format!("ONNX inference failed: {e}"))
                 })?;
 
             // 4. 提取输出张量
@@ -542,8 +540,7 @@ impl LocalEmbedder {
                 .try_extract_tensor::<f32>()
                 .map_err(|e| {
                     AgentMemError::embedding_error(format!(
-                        "Failed to extract output tensor: {}",
-                        e
+                        "Failed to extract output tensor: {e}"
                     ))
                 })?;
             debug!("Output tensor shape: {:?}", shape);
@@ -560,8 +557,7 @@ impl LocalEmbedder {
                 data[0..hidden_size].to_vec()
             } else {
                 return Err(AgentMemError::embedding_error(format!(
-                    "Unexpected output tensor shape: {:?}",
-                    shape
+                    "Unexpected output tensor shape: {shape:?}"
                 )));
             };
 
@@ -595,7 +591,7 @@ impl LocalEmbedder {
                 .iter()
                 .map(|text| {
                     tokenizer.encode(text.as_str(), true).map_err(|e| {
-                        AgentMemError::embedding_error(format!("Tokenization failed: {}", e))
+                        AgentMemError::embedding_error(format!("Tokenization failed: {e}"))
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -633,8 +629,7 @@ impl LocalEmbedder {
             let input_ids_tensor =
                 Tensor::from_array((vec![batch_size, max_len], input_ids_batch)).map_err(|e| {
                     AgentMemError::embedding_error(format!(
-                        "Failed to create batch input_ids tensor: {}",
-                        e
+                        "Failed to create batch input_ids tensor: {e}"
                     ))
                 })?;
 
@@ -642,8 +637,7 @@ impl LocalEmbedder {
                 Tensor::from_array((vec![batch_size, max_len], attention_mask_batch)).map_err(
                     |e| {
                         AgentMemError::embedding_error(format!(
-                            "Failed to create batch attention_mask tensor: {}",
-                            e
+                            "Failed to create batch attention_mask tensor: {e}"
                         ))
                     },
                 )?;
@@ -653,7 +647,7 @@ impl LocalEmbedder {
             let outputs = session_guard
                 .run(ort::inputs![input_ids_tensor, attention_mask_tensor])
                 .map_err(|e| {
-                    AgentMemError::embedding_error(format!("Batch ONNX inference failed: {}", e))
+                    AgentMemError::embedding_error(format!("Batch ONNX inference failed: {e}"))
                 })?;
 
             // 5. 提取输出张量
@@ -669,8 +663,7 @@ impl LocalEmbedder {
                 .try_extract_tensor::<f32>()
                 .map_err(|e| {
                     AgentMemError::embedding_error(format!(
-                        "Failed to extract batch output tensor: {}",
-                        e
+                        "Failed to extract batch output tensor: {e}"
                     ))
                 })?;
             debug!("Batch output tensor shape: {:?}", shape);
@@ -718,8 +711,7 @@ impl LocalEmbedder {
                 }
             } else {
                 return Err(AgentMemError::embedding_error(format!(
-                    "Unexpected batch output tensor shape: {:?}",
-                    shape
+                    "Unexpected batch output tensor shape: {shape:?}"
                 )));
             }
 

@@ -540,7 +540,7 @@ mod storage_factory_tests {
     async fn test_storage_factory_embedded_with_custom_config() {
         use tempfile::TempDir;
         use agent_mem_config::EmbeddedModeConfig;
-        use std::path::PathBuf;
+        
 
         let temp_dir = TempDir::new().unwrap();
 

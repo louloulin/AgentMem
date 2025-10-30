@@ -57,23 +57,22 @@ pub struct MemorySearchResult {
 
 /// Sort order for memory operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum SortOrder {
     /// Ascending order
     Asc,
     /// Descending order
+    #[default]
     Desc,
 }
 
-impl Default for SortOrder {
-    fn default() -> Self {
-        SortOrder::Desc
-    }
-}
 
 /// Sort field for memory operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum SortField {
     /// Sort by creation date
+    #[default]
     CreatedAt,
     /// Sort by update date
     UpdatedAt,
@@ -85,11 +84,6 @@ pub enum SortField {
     Metadata(String),
 }
 
-impl Default for SortField {
-    fn default() -> Self {
-        SortField::CreatedAt
-    }
-}
 
 /// Complex filter operations
 #[derive(Debug, Clone, Serialize, Deserialize)]

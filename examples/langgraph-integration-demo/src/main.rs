@@ -1,6 +1,6 @@
 //! LangGraph 集成演示
 
-use agent_mem_core::client::{AgentMemClient, Messages};
+use agent_mem_core::client::AgentMemClient;
 use agent_mem_traits::Result;
 use colored::*;
 use serde::{Deserialize, Serialize};

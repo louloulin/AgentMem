@@ -322,17 +322,17 @@ mod tests {
         async fn load_data(&self, keys: Vec<CacheKey>) -> Result<HashMap<CacheKey, Vec<u8>>> {
             let mut data = HashMap::new();
             for key in keys {
-                data.insert(key.clone(), format!("value_{}", key).into_bytes());
+                data.insert(key.clone(), format!("value_{key}").into_bytes());
             }
             Ok(data)
         }
         
         async fn get_frequent_keys(&self, limit: usize) -> Result<Vec<CacheKey>> {
-            Ok((0..limit).map(|i| format!("key_{}", i)).collect())
+            Ok((0..limit).map(|i| format!("key_{i}")).collect())
         }
         
         async fn get_all_keys(&self, limit: usize) -> Result<Vec<CacheKey>> {
-            Ok((0..limit).map(|i| format!("key_{}", i)).collect())
+            Ok((0..limit).map(|i| format!("key_{i}")).collect())
         }
     }
     

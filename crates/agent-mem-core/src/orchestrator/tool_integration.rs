@@ -251,7 +251,7 @@ mod tests {
         let config = ToolIntegratorConfig::default();
         assert_eq!(config.max_tool_rounds, 5);
         assert_eq!(config.tool_timeout_seconds, 30);
-        assert_eq!(config.allow_parallel_execution, false);
+        assert!(!config.allow_parallel_execution);
     }
 
     #[test]

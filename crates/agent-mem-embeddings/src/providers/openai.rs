@@ -65,7 +65,7 @@ impl OpenAIEmbedder {
             .timeout(Duration::from_secs(config.timeout_seconds))
             .build()
             .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to create HTTP client: {}", e))
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -108,8 +108,7 @@ impl OpenAIEmbedder {
                         let embedding_response: OpenAIEmbeddingResponse =
                             resp.json().await.map_err(|e| {
                                 AgentMemError::parsing_error(format!(
-                                    "Failed to parse response: {}",
-                                    e
+                                    "Failed to parse response: {e}"
                                 ))
                             })?;
 
@@ -145,8 +144,7 @@ impl OpenAIEmbedder {
                         }
 
                         return Err(AgentMemError::llm_error(format!(
-                            "OpenAI API error {}: {}",
-                            status, error_text
+                            "OpenAI API error {status}: {error_text}"
                         )));
                     }
                 }
@@ -159,8 +157,7 @@ impl OpenAIEmbedder {
                     }
 
                     return Err(AgentMemError::network_error(format!(
-                        "Request failed: {}",
-                        e
+                        "Request failed: {e}"
                     )));
                 }
             }

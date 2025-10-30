@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
-use tokio::time::{interval, sleep};
+use tokio::time::sleep;
 use tracing::info;
 
 /// Concurrency configuration

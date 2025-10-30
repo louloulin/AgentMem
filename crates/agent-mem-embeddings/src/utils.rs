@@ -181,7 +181,7 @@ impl EmbeddingUtils {
     /// 估算文本的token数量（简单实现）
     fn estimate_tokens(text: &str) -> usize {
         // 简单估算：平均每4个字符一个token
-        (text.len() + 3) / 4
+        text.len().div_ceil(4)
     }
 
     /// 创建零嵌入向量

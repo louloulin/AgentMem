@@ -11,12 +11,11 @@ use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::{Mutex, RwLock};
+use std::time::Duration;
+use tokio::sync::RwLock;
 use tokio::time::interval;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 
 /// 企业监控管理器
 pub struct EnterpriseMonitoringManager {
@@ -992,9 +991,8 @@ impl BackupManager {
             tokio::fs::create_dir_all(&config.backup_directory)
                 .await
                 .map_err(|e| {
-                    AgentMemError::storage_error(&format!(
-                        "Failed to create backup directory: {}",
-                        e
+                    AgentMemError::storage_error(format!(
+                        "Failed to create backup directory: {e}"
                     ))
                 })?;
         }
@@ -1116,7 +1114,7 @@ impl BackupManager {
         };
 
         let backup_info = backup_info
-            .ok_or_else(|| AgentMemError::not_found(&format!("Backup not found: {}", backup_id)))?;
+            .ok_or_else(|| AgentMemError::not_found(format!("Backup not found: {backup_id}")))?;
 
         // 执行恢复逻辑
         self.perform_restore(&backup_info).await
@@ -1448,8 +1446,7 @@ impl ClusterManager {
 
         let message = if self.config.enabled {
             format!(
-                "Cluster enabled, {}/{} nodes healthy",
-                active_nodes, total_nodes
+                "Cluster enabled, {active_nodes}/{total_nodes} nodes healthy"
             )
         } else {
             "Cluster disabled".to_string()
@@ -1968,9 +1965,8 @@ impl EnterpriseMonitoringManager {
             alert.acknowledged_at = Some(Utc::now());
             info!("Alert {} acknowledged", alert_id);
         } else {
-            return Err(AgentMemError::not_found(&format!(
-                "Alert not found: {}",
-                alert_id
+            return Err(AgentMemError::not_found(format!(
+                "Alert not found: {alert_id}"
             )));
         }
 

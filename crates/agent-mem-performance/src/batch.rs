@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock, Semaphore};
-use tokio::time::{interval, timeout};
-use tracing::{debug, error, info, warn};
+use tokio::time::interval;
+use tracing::{debug, info};
 
 /// Batch processing configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,7 +209,7 @@ impl<T: BatchItem> BatchItem for GenericBatchItem<T> {
                 // Serialize the output - simplified for demo
                 Ok(format!("{:?}", std::any::type_name::<T::Output>()).into_bytes())
             }
-            Err(e) => Err(AgentMemError::memory_error(&e.to_string())),
+            Err(e) => Err(AgentMemError::memory_error(e.to_string())),
         }
     }
 
@@ -361,9 +361,8 @@ impl BatchWorker {
                 Err(e) => {
                     attempts += 1;
                     if attempts >= self.config.retry_attempts {
-                        return Err(AgentMemError::memory_error(&format!(
-                            "Failed after {} attempts: {}",
-                            attempts, e
+                        return Err(AgentMemError::memory_error(format!(
+                            "Failed after {attempts} attempts: {e}"
                         )));
                     }
 

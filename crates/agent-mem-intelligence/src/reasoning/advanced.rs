@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::{MemoryData, ReasoningResult};
+use super::MemoryData;
 
 /// 多跳因果推理结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -334,7 +334,7 @@ impl AdvancedReasoner {
         let current_memory = all_memories
             .iter()
             .find(|m| m.id == memory_id)
-            .ok_or_else(|| AgentMemError::not_found(format!("Memory {} not found", memory_id)))?;
+            .ok_or_else(|| AgentMemError::not_found(format!("Memory {memory_id} not found")))?;
 
         let mut related = Vec::new();
 
@@ -385,12 +385,12 @@ impl AdvancedReasoner {
             let cause = all_memories
                 .iter()
                 .find(|m| &m.id == cause_id)
-                .ok_or_else(|| AgentMemError::not_found(format!("Memory {} not found", cause_id)))?;
+                .ok_or_else(|| AgentMemError::not_found(format!("Memory {cause_id} not found")))?;
 
             let effect = all_memories
                 .iter()
                 .find(|m| &m.id == effect_id)
-                .ok_or_else(|| AgentMemError::not_found(format!("Memory {} not found", effect_id)))?;
+                .ok_or_else(|| AgentMemError::not_found(format!("Memory {effect_id} not found")))?;
 
             let confidence = self.calculate_causal_confidence(cause, effect)?;
             let relation_type = self.determine_causal_type(cause, effect)?;
@@ -523,11 +523,10 @@ impl AdvancedReasoner {
             }
 
             // 如果记忆在目标之后创建，且内容相关，则可能依赖于目标
-            if memory.created_at > target.created_at {
-                if self.has_causal_relationship(target, memory)? {
+            if memory.created_at > target.created_at
+                && self.has_causal_relationship(target, memory)? {
                     dependent.push(memory.clone());
                 }
-            }
         }
 
         Ok(dependent)
@@ -609,7 +608,7 @@ impl AdvancedReasoner {
         for (i, memory) in memories.iter().enumerate() {
             let keywords = self.extract_keywords(&memory.content);
             features.insert(
-                format!("entity_{}", i),
+                format!("entity_{i}"),
                 keywords.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
             );
         }
@@ -620,9 +619,9 @@ impl AdvancedReasoner {
             for j in i + 1..memories.len() {
                 if self.has_causal_relationship(&memories[i], &memories[j])? {
                     relations.push((
-                        format!("entity_{}", i),
+                        format!("entity_{i}"),
                         "related_to".to_string(),
-                        format!("entity_{}", j),
+                        format!("entity_{j}"),
                     ));
                 }
             }

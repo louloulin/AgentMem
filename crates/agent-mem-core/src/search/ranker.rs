@@ -210,7 +210,7 @@ mod tests {
     fn create_test_result(id: &str, score: f32) -> SearchResult {
         SearchResult {
             id: id.to_string(),
-            content: format!("content-{}", id),
+            content: format!("content-{id}"),
             score,
             vector_score: None,
             fulltext_score: None,

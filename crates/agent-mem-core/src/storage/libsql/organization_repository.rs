@@ -265,7 +265,7 @@ mod tests {
 
         // List (includes default organization from migrations)
         let orgs = repo.list(10, 0).await.unwrap();
-        assert!(orgs.len() >= 1, "Should have at least 1 organization (created + default)");
+        assert!(!orgs.is_empty(), "Should have at least 1 organization (created + default)");
 
         // Delete
         repo.delete(&created.id).await.unwrap();

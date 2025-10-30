@@ -10,12 +10,12 @@
 //! - **批处理**: 智能批处理和流水线
 //! - **预计算**: 常用查询结果预计算
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 /// 计算优化管理器
 pub struct ComputeOptimizationManager {
@@ -473,7 +473,7 @@ impl SIMDOptimizer {
 
         // 记录指令集使用情况
         for instruction_set in &self.config.instruction_sets {
-            let key = format!("{:?}", instruction_set);
+            let key = format!("{instruction_set:?}");
             *stats.instruction_set_usage.entry(key).or_insert(0) += 1;
         }
 

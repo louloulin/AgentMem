@@ -3,13 +3,13 @@
 //! This module provides intelligent query optimization capabilities
 //! to improve search performance and reduce resource usage.
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Query optimizer
 pub struct QueryOptimizer {
@@ -336,7 +336,7 @@ impl QueryOptimizer {
 
     fn hash_query(&self, query: &QueryRequest) -> String {
         // Simplified query hashing
-        format!("{:?}", query)
+        format!("{query:?}")
     }
 
     async fn get_cached_plan(&self, query_hash: &str) -> Option<CachedQueryPlan> {
@@ -427,7 +427,7 @@ impl QueryRequest {
         // Simplified frequency detection
         self.metadata
             .get("frequency")
-            .map_or(false, |f| f == "high")
+            .is_some_and(|f| f == "high")
     }
 
     pub fn is_expensive(&self) -> bool {

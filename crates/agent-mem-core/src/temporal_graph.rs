@@ -584,7 +584,7 @@ mod tests {
     use super::*;
     use crate::graph_memory::NodeType;
     use crate::types::{Memory, MemoryType};
-    use agent_mem_traits::{Session, Vector};
+    use agent_mem_traits::Vector;
 
     #[tokio::test]
     async fn test_time_range() {

@@ -3,10 +3,10 @@
 //! 使用真实的 ASR (自动语音识别) 服务进行音频处理
 
 use super::{ContentType, MultimodalContent, MultimodalProcessor, ProcessingStatus};
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
 /// 真实音频处理器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

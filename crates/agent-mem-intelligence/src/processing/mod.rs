@@ -12,9 +12,8 @@ pub use consolidation::*;
 pub use importance::*;
 
 use agent_mem_core::Memory;
-use agent_mem_traits::{MemoryType, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Memory processing configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +56,7 @@ impl Default for ProcessingConfig {
 
 /// Memory processing statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ProcessingStats {
     /// Number of memories processed
     pub processed_count: usize,
@@ -77,18 +77,6 @@ pub struct ProcessingStats {
     pub processing_time_ms: u64,
 }
 
-impl Default for ProcessingStats {
-    fn default() -> Self {
-        Self {
-            processed_count: 0,
-            consolidated_count: 0,
-            importance_updated_count: 0,
-            archived_count: 0,
-            deleted_count: 0,
-            processing_time_ms: 0,
-        }
-    }
-}
 
 /// Main memory processing engine
 pub struct MemoryProcessor {

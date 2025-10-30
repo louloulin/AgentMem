@@ -53,8 +53,7 @@ where
                 operation_name, timeout_secs
             );
             Err(agent_mem_traits::AgentMemError::internal_error(format!(
-                "Operation '{}' timed out after {} seconds",
-                operation_name, timeout_secs
+                "Operation '{operation_name}' timed out after {timeout_secs} seconds"
             )))
         }
     }
@@ -99,8 +98,7 @@ where
                     max_retries + 1
                 );
                 last_error = Some(agent_mem_traits::AgentMemError::internal_error(format!(
-                    "Operation timed out after {} seconds",
-                    timeout_secs
+                    "Operation timed out after {timeout_secs} seconds"
                 )));
                 attempts += 1;
             }
@@ -114,8 +112,7 @@ where
 
     Err(last_error.unwrap_or_else(|| {
         agent_mem_traits::AgentMemError::internal_error(format!(
-            "Operation '{}' failed after {} retries",
-            operation_name, max_retries
+            "Operation '{operation_name}' failed after {max_retries} retries"
         ))
     }))
 }

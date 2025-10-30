@@ -385,7 +385,7 @@ mod tests {
             organization_id: "org1".to_string(),
             user_id: "user1".to_string(),
             agent_id: "agent1".to_string(),
-            content: format!("Test memory content {}", id),
+            content: format!("Test memory content {id}"),
             hash: Some("hash123".to_string()),
             metadata: json!({"key": "value"}),
             score: Some(0.95),

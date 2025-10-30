@@ -6,10 +6,8 @@ use agent_mem_performance::{
     BatchConfig, BenchmarkSuite, CacheConfig, ConcurrencyConfig, OptimizationEngine,
     PerformanceConfig, PerformanceManager, PoolConfig, QueryOptimizer, TelemetryConfig,
 };
-use anyhow::Context;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

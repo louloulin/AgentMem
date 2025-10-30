@@ -615,6 +615,23 @@ impl SecuritySystem {
     }
 }
 
+impl Clone for SecuritySystem {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            roles: Arc::clone(&self.roles),
+            users: Arc::clone(&self.users),
+            sessions: Arc::clone(&self.sessions),
+            access_control: Arc::clone(&self.access_control),
+            threat_rules: Arc::clone(&self.threat_rules),
+            threat_incidents: Arc::clone(&self.threat_incidents),
+            ip_whitelist: Arc::clone(&self.ip_whitelist),
+            ip_blacklist: Arc::clone(&self.ip_blacklist),
+            rate_limits: Arc::clone(&self.rate_limits),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -719,22 +736,5 @@ mod tests {
         let incidents = security.get_threat_incidents().await;
         assert!(!incidents.is_empty());
         assert_eq!(incidents[0].severity, ThreatSeverity::Medium);
-    }
-}
-
-impl Clone for SecuritySystem {
-    fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            roles: Arc::clone(&self.roles),
-            users: Arc::clone(&self.users),
-            sessions: Arc::clone(&self.sessions),
-            access_control: Arc::clone(&self.access_control),
-            threat_rules: Arc::clone(&self.threat_rules),
-            threat_incidents: Arc::clone(&self.threat_incidents),
-            ip_whitelist: Arc::clone(&self.ip_whitelist),
-            ip_blacklist: Arc::clone(&self.ip_blacklist),
-            rate_limits: Arc::clone(&self.rate_limits),
-        }
     }
 }

@@ -24,7 +24,6 @@ use agent_mem_core::SimpleMemory;
 use anyhow::Result;
 use std::collections::HashMap;
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {

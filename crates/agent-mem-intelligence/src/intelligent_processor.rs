@@ -20,11 +20,10 @@ use crate::importance_evaluator::{
 use agent_mem_core::Memory;
 use agent_mem_llm::{factory::RealLLMFactory, LLMProvider};
 use agent_mem_traits::{LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::info;
 
 // MockLLMProvider 已移除，使用真实的 LLM 提供商
 
@@ -514,8 +513,7 @@ impl IntelligentMemoryProcessor {
         let low_confidence_decisions = decisions.iter().filter(|d| d.confidence < 0.6).count();
         if low_confidence_decisions > 0 {
             recommendations.push(format!(
-                "{} decisions have low confidence. Manual review recommended.",
-                low_confidence_decisions
+                "{low_confidence_decisions} decisions have low confidence. Manual review recommended."
             ));
         }
 
@@ -801,13 +799,13 @@ impl EnhancedIntelligentProcessor {
         let _facts_map: HashMap<String, Vec<StructuredFact>> = structured_facts
             .iter()
             .enumerate()
-            .map(|(i, fact)| (format!("temp_memory_{}", i), vec![fact.clone()]))
+            .map(|(i, fact)| (format!("temp_memory_{i}"), vec![fact.clone()]))
             .collect();
 
         // 为每个事实创建临时记忆进行评估
         for (i, fact) in structured_facts.iter().enumerate() {
             let temp_memory = Memory {
-                id: format!("temp_memory_{}", i),
+                id: format!("temp_memory_{i}"),
                 content: fact.description.clone(),
                 hash: None,
                 metadata: HashMap::new(),
@@ -869,7 +867,7 @@ impl EnhancedIntelligentProcessor {
             .iter()
             .enumerate()
             .map(|(i, fact)| Memory {
-                id: format!("temp_memory_{}", i),
+                id: format!("temp_memory_{i}"),
                 content: fact.description.clone(),
                 hash: None,
                 metadata: HashMap::new(),

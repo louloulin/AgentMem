@@ -3,10 +3,9 @@
 //! 演示多种认证方式和权限控制
 
 use agent_mem_tools::mcp::{
-    AuthManager, AuthContext, AuthMethod, Permission, Role, Credentials,
+    AuthManager, AuthMethod, Permission, Role, Credentials,
     AuditLogger, AuditEvent, AuditEventType, JwtConfig, OAuth2Config,
 };
-use chrono::Duration;
 use tracing::error;
 
 #[tokio::main]
@@ -99,7 +98,7 @@ async fn demo_api_key_auth() {
         }
         Err(e) => {
             println!("  ✅ 认证失败（预期行为）");
-            println!("  错误: {}", e);
+            println!("  错误: {e}");
         }
     }
 
@@ -149,7 +148,7 @@ async fn demo_jwt_auth() {
             println!("  角色: {:?}", context.role);
             println!("  认证时间: {}", context.authenticated_at);
             if let Some(expires_at) = context.expires_at {
-                println!("  过期时间: {}", expires_at);
+                println!("  过期时间: {expires_at}");
             }
         }
         Err(e) => {
@@ -173,7 +172,7 @@ async fn demo_jwt_auth() {
         }
         Err(e) => {
             println!("  ✅ 认证失败（预期行为）");
-            println!("  错误: {}", e);
+            println!("  错误: {e}");
         }
     }
 }
@@ -278,7 +277,7 @@ async fn demo_permission_control() {
     ];
 
     for user_id in &["admin", "developer", "user", "readonly"] {
-        println!("\n  用户: {}", user_id);
+        println!("\n  用户: {user_id}");
         for permission in &permissions_to_check {
             let has_perm = manager.check_permission(user_id, permission).await.unwrap();
             println!(
@@ -300,7 +299,7 @@ async fn demo_permission_control() {
         .check_permission("user", &Permission::CallTool("special_tool".to_string()))
         .await
         .unwrap();
-    println!("    ✅ 权限已授予: {}", has_perm);
+    println!("    ✅ 权限已授予: {has_perm}");
 
     println!("\n  撤销权限:");
     manager
@@ -419,10 +418,10 @@ async fn demo_audit_logging() {
         println!("    时间: {}", event.timestamp);
         println!("    结果: {}", if event.success { "成功" } else { "失败" });
         if let Some(resource) = &event.resource {
-            println!("    资源: {}", resource);
+            println!("    资源: {resource}");
         }
         if let Some(ip) = &event.ip_address {
-            println!("    IP: {}", ip);
+            println!("    IP: {ip}");
         }
         if !event.details.is_empty() {
             println!("    详情: {:?}", event.details);

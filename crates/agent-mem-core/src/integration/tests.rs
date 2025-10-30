@@ -185,7 +185,7 @@ mod tests {
 
         // 存储一些测试数据
         for i in 0..5 {
-            let memory = create_test_memory(MemoryType::Core, &format!("测试记忆 {}", i));
+            let memory = create_test_memory(MemoryType::Core, &format!("测试记忆 {i}"));
             system_manager.store_memory(memory).await.unwrap();
         }
 
@@ -361,7 +361,7 @@ mod tests {
         for i in 0..10 {
             let manager = Arc::clone(&system_manager);
             let handle = tokio::spawn(async move {
-                let memory = create_test_memory(MemoryType::Core, &format!("并发测试记忆 {}", i));
+                let memory = create_test_memory(MemoryType::Core, &format!("并发测试记忆 {i}"));
                 manager.store_memory(memory).await
             });
             handles.push(handle);

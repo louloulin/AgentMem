@@ -541,7 +541,7 @@ impl PersonalizationManager {
                     memory
                         .metadata
                         .get("content_type")
-                        .map_or(false, |ct| ct == &pref.value)
+                        .is_some_and(|ct| ct == &pref.value)
                 }
                 _ => false,
             };
@@ -566,9 +566,9 @@ impl PersonalizationManager {
                 PreferenceType::SearchPattern => format!("您经常搜索 '{}'", pref.value),
                 PreferenceType::Topic => format!("您对 '{}' 主题感兴趣", pref.value),
                 PreferenceType::ContentType => format!("您偏好 '{}' 类型的内容", pref.value),
-                PreferenceType::Importance => format!("符合您的重要性偏好"),
-                PreferenceType::Temporal => format!("符合您的时间偏好"),
-                PreferenceType::InteractionStyle => format!("符合您的交互方式偏好"),
+                PreferenceType::Importance => "符合您的重要性偏好".to_string(),
+                PreferenceType::Temporal => "符合您的时间偏好".to_string(),
+                PreferenceType::InteractionStyle => "符合您的交互方式偏好".to_string(),
             };
             reasons.push(reason);
         }
@@ -726,7 +726,7 @@ impl PersonalizationManager {
             .collect();
 
         // 计算最活跃时间段
-        let mut hour_counts = vec![0u32; 24];
+        let mut hour_counts = [0u32; 24];
         for behavior in behaviors {
             let hour = behavior.timestamp.hour() as usize;
             hour_counts[hour] += 1;
@@ -767,7 +767,7 @@ impl PersonalizationManager {
         let behavior_history = self.behavior_history.read().await;
         let user_behaviors = behavior_history.get(user_id).cloned().unwrap_or_default();
 
-        let mut hour_counts = vec![0u32; 24];
+        let mut hour_counts = [0u32; 24];
         for behavior in user_behaviors.iter() {
             let hour = behavior.timestamp.hour() as usize;
             hour_counts[hour] += 1;

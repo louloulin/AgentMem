@@ -3,7 +3,7 @@
 //! 提供全面的性能基准测试功能
 
 use agent_mem_traits::Result;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tracing::{debug, info};
 
 /// 基准测试套件
@@ -106,8 +106,8 @@ impl BenchmarkSuite {
 
         for i in 0..self.iterations {
             // 真实的添加操作基准测试
-            let key = format!("key_{}", i);
-            let value = format!("value_{}", i);
+            let key = format!("key_{i}");
+            let value = format!("value_{i}");
             data_store.insert(key, value);
 
             if i % 100 == 0 {
@@ -128,7 +128,7 @@ impl BenchmarkSuite {
 
         // 预填充数据
         for i in 0..1000 {
-            data_store.insert(format!("key_{}", i), format!("value_{}", i));
+            data_store.insert(format!("key_{i}"), format!("value_{i}"));
         }
 
         for i in 0..self.iterations {
@@ -154,13 +154,13 @@ impl BenchmarkSuite {
 
         // 预填充数据
         for i in 0..1000 {
-            data_store.insert(format!("key_{}", i), format!("value_{}", i));
+            data_store.insert(format!("key_{i}"), format!("value_{i}"));
         }
 
         for i in 0..self.iterations {
             // 真实的更新操作基准测试
             let key = format!("key_{}", i % 1000);
-            let new_value = format!("updated_value_{}", i);
+            let new_value = format!("updated_value_{i}");
             data_store.insert(key, new_value);
 
             if i % 100 == 0 {
@@ -181,12 +181,12 @@ impl BenchmarkSuite {
 
         // 预填充数据
         for i in 0..self.iterations {
-            data_store.insert(format!("key_{}", i), format!("value_{}", i));
+            data_store.insert(format!("key_{i}"), format!("value_{i}"));
         }
 
         for i in 0..self.iterations {
             // 真实的删除操作基准测试
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             data_store.remove(&key);
 
             if i % 100 == 0 {

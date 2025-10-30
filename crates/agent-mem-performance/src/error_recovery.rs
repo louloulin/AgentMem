@@ -492,8 +492,7 @@ impl ProductionErrorHandler {
             }
         } else {
             Err(AgentMemError::internal_error(format!(
-                "No fallback strategy for {}",
-                operation_name
+                "No fallback strategy for {operation_name}"
             )))
         }
     }

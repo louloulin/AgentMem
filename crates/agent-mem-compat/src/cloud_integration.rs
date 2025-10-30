@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// 云服务提供商类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -341,19 +341,19 @@ impl CloudIntegrationManager {
             CloudProvider::AWS => Ok(self
                 .aws_integrator
                 .as_ref()
-                .and_then(|i| i.s3_client().map(|c| c.clone()))),
+                .and_then(|i| i.s3_client().cloned())),
             CloudProvider::Azure => Ok(self
                 .azure_integrator
                 .as_ref()
-                .and_then(|i| i.blob_client().map(|c| c.clone()))),
+                .and_then(|i| i.blob_client().cloned())),
             CloudProvider::GCP => Ok(self
                 .gcp_integrator
                 .as_ref()
-                .and_then(|i| i.cloud_storage_client().map(|c| c.clone()))),
+                .and_then(|i| i.cloud_storage_client().cloned())),
             CloudProvider::Alibaba => Ok(self
                 .alibaba_integrator
                 .as_ref()
-                .and_then(|i| i.oss_client().map(|c| c.clone()))),
+                .and_then(|i| i.oss_client().cloned())),
         }
     }
 
@@ -366,19 +366,19 @@ impl CloudIntegrationManager {
             CloudProvider::AWS => Ok(self
                 .aws_integrator
                 .as_ref()
-                .and_then(|i| i.rds_client().map(|c| c.clone()))),
+                .and_then(|i| i.rds_client().cloned())),
             CloudProvider::Azure => Ok(self
                 .azure_integrator
                 .as_ref()
-                .and_then(|i| i.cosmos_client().map(|c| c.clone()))),
+                .and_then(|i| i.cosmos_client().cloned())),
             CloudProvider::GCP => Ok(self
                 .gcp_integrator
                 .as_ref()
-                .and_then(|i| i.cloud_sql_client().map(|c| c.clone()))),
+                .and_then(|i| i.cloud_sql_client().cloned())),
             CloudProvider::Alibaba => Ok(self
                 .alibaba_integrator
                 .as_ref()
-                .and_then(|i| i.rds_client().map(|c| c.clone()))),
+                .and_then(|i| i.rds_client().cloned())),
         }
     }
 
@@ -391,16 +391,16 @@ impl CloudIntegrationManager {
             CloudProvider::AWS => Ok(self
                 .aws_integrator
                 .as_ref()
-                .and_then(|i| i.elasticache_client().map(|c| c.clone()))),
+                .and_then(|i| i.elasticache_client().cloned())),
             CloudProvider::Azure => Ok(self
                 .azure_integrator
                 .as_ref()
-                .and_then(|i| i.redis_client().map(|c| c.clone()))),
+                .and_then(|i| i.redis_client().cloned())),
             CloudProvider::GCP => Err(AgentMemError::unsupported_operation("GCP 不支持缓存服务")),
             CloudProvider::Alibaba => Ok(self
                 .alibaba_integrator
                 .as_ref()
-                .and_then(|i| i.redis_client().map(|c| c.clone()))),
+                .and_then(|i| i.redis_client().cloned())),
         }
     }
 
@@ -419,7 +419,7 @@ impl CloudIntegrationManager {
             CloudProvider::GCP => Ok(self
                 .gcp_integrator
                 .as_ref()
-                .and_then(|i| i.bigquery_client().map(|c| c.clone()))),
+                .and_then(|i| i.bigquery_client().cloned())),
             CloudProvider::Alibaba => Err(AgentMemError::unsupported_operation(
                 "阿里云不支持 BigQuery 服务",
             )),
@@ -1574,8 +1574,8 @@ impl MultiCloudSyncer {
         info!("启动多云同步: {:?} -> {:?}", source, target);
         let task_id = format!(
             "sync_{}_{}",
-            format!("{:?}", source).to_lowercase(),
-            format!("{:?}", target).to_lowercase()
+            format!("{source:?}").to_lowercase(),
+            format!("{target:?}").to_lowercase()
         );
 
         let task = SyncTask {

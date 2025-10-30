@@ -46,7 +46,7 @@ impl AudioProcessor {
         if content
             .mime_type
             .as_ref()
-            .map_or(false, |m| m.starts_with("audio/"))
+            .is_some_and(|m| m.starts_with("audio/"))
         {
             // 从文件名提取可能的文本信息
             let filename_text = self.extract_text_from_filename(&content.id);
@@ -245,7 +245,7 @@ impl MultimodalProcessor for AudioProcessor {
         // 分析音频特征
         if let Ok(analysis) = self.analyze_audio(content).await {
             let analysis_json = serde_json::to_value(analysis).map_err(|e| {
-                AgentMemError::ProcessingError(format!("Failed to serialize audio analysis: {}", e))
+                AgentMemError::ProcessingError(format!("Failed to serialize audio analysis: {e}"))
             })?;
             content.set_metadata("audio_analysis".to_string(), analysis_json);
         }
@@ -267,7 +267,7 @@ impl MultimodalProcessor for AudioProcessor {
         summary_parts.push(format!("Audio: {}", content.id));
 
         if let Some(text) = &content.extracted_text {
-            summary_parts.push(format!("Transcription: {}", text));
+            summary_parts.push(format!("Transcription: {text}"));
         }
 
         if let Some(analysis_value) = content.get_metadata("audio_analysis") {

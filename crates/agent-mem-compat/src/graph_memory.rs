@@ -69,8 +69,7 @@ impl GraphMemoryManager {
             }
             provider => {
                 return Err(AgentMemError::config_error(format!(
-                    "Unsupported graph store provider: {}",
-                    provider
+                    "Unsupported graph store provider: {provider}"
                 )));
             }
         };
@@ -129,7 +128,7 @@ impl GraphMemoryManager {
             for word in words {
                 if content.contains(word) {
                     let entity = Entity {
-                        id: format!("{}_{}", entity_type, word),
+                        id: format!("{entity_type}_{word}"),
                         name: word.to_string(),
                         entity_type: entity_type.to_string(),
                         attributes: HashMap::from([

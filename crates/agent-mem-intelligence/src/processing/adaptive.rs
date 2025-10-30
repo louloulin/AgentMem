@@ -238,7 +238,7 @@ impl AdaptiveMemoryManager {
 
         // Check for deletion conditions
         if age > self.thresholds.delete_age_threshold
-            || (memory.score.unwrap_or(0.5) < self.thresholds.min_importance as f32
+            || (memory.score.unwrap_or(0.5) < self.thresholds.min_importance
                 && self.get_access_count(memory) < self.thresholds.min_access_count)
         {
             return Ok(LifecycleAction::Delete);

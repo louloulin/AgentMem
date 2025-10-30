@@ -9,7 +9,6 @@ use agent_mem_performance::{
 };
 use agent_mem_traits::AgentMemError;
 use anyhow::Context;
-use serde_json;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
