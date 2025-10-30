@@ -54,6 +54,11 @@ impl Tool for AddMemoryTool {
                 PropertySchema::string("记忆类型：episodic, semantic, procedural, core, working, resource, declarative, contextual"),
                 false,
             )
+            .add_parameter(
+                "metadata",
+                PropertySchema::string("额外的元数据（JSON 字符串，可选）"),
+                false,
+            )
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
@@ -255,6 +260,11 @@ impl Tool for ChatTool {
                 "user_id",
                 PropertySchema::string("用户 ID"),
                 true,
+            )
+            .add_parameter(
+                "agent_id",
+                PropertySchema::string("Agent ID（可选，默认使用环境变量配置）"),
+                false,
             )
             .add_parameter(
                 "session_id",
