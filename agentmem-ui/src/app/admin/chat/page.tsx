@@ -83,6 +83,10 @@ export default function ChatPage() {
         content: msg.content || '',
         timestamp: new Date(msg.created_at),
       }));
+      
+      // ✅ 按时间戳排序（从旧到新）
+      loadedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
       setMessages(loadedMessages);
     } catch (err) {
       console.error('Failed to load chat history:', err);
