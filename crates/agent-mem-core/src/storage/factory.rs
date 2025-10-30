@@ -206,7 +206,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: true,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -233,7 +233,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: true,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -272,7 +272,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -299,7 +299,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: "test.db".to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -316,7 +316,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::Postgres,
             url: "postgresql://localhost/test".to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -334,7 +334,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::Postgres,
             url: "postgresql://localhost/agentmem".to_string(),
-            pool: DbPoolConfig::default(),
+            pool: PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
