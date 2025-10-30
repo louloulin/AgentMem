@@ -58,9 +58,12 @@ impl MemoryServer {
 
         info!("Database repositories initialized");
 
-        // Create memory manager (✅ 使用异步new()方法)
+        // Create memory manager (✅ 使用异步new()方法 + Embedder配置)
         let memory_manager = Arc::new(
-            MemoryManager::new()
+            MemoryManager::new(
+                config.embedder_provider.clone(),
+                config.embedder_model.clone(),
+            )
                 .await
                 .map_err(|e| ServerError::ServerError(format!("Failed to create memory manager: {e}")))?
         );

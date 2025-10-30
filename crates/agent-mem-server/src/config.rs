@@ -34,6 +34,10 @@ pub struct ServerConfig {
     pub rate_limit_requests_per_minute: u32,
     /// Database URL
     pub database_url: String,
+    /// Embedder provider (e.g., "fastembed", "openai")
+    pub embedder_provider: Option<String>,
+    /// Embedder model name
+    pub embedder_model: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -87,6 +91,8 @@ impl Default for ServerConfig {
                 // Default to LibSQL local file database (auto-detected by server.rs logic)
                 "file:./data/agentmem.db".to_string()
             }),
+            embedder_provider: env::var("EMBEDDER_PROVIDER").ok(),
+            embedder_model: env::var("EMBEDDER_MODEL").ok(),
         }
     }
 }
@@ -158,6 +164,12 @@ impl ServerConfig {
         }
         if let Ok(db_url) = env::var("DATABASE_URL") {
             self.database_url = db_url;
+        }
+        if let Ok(provider) = env::var("EMBEDDER_PROVIDER") {
+            self.embedder_provider = Some(provider);
+        }
+        if let Ok(model) = env::var("EMBEDDER_MODEL") {
+            self.embedder_model = Some(model);
         }
         
         self

@@ -25,16 +25,31 @@ pub struct MemoryManager {
 }
 
 impl MemoryManager {
-    /// 创建新的MemoryManager（使用Memory API + LibSQL持久化）
-    pub async fn new() -> ServerResult<Self> {
+    /// 创建新的MemoryManager（使用Memory API + LibSQL持久化 + Embedder配置）
+    pub async fn new(
+        embedder_provider: Option<String>,
+        embedder_model: Option<String>,
+    ) -> ServerResult<Self> {
         // 🔧 修复：使用builder模式显式指定LibSQL存储，而不是默认的内存存储
         let db_path = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
         
         info!("Initializing Memory with LibSQL storage: {}", db_path);
         
-        let memory = Memory::builder()
-            .with_storage(&db_path)  // 🔑 关键修复：显式指定使用LibSQL
+        let mut builder = Memory::builder()
+            .with_storage(&db_path);  // 🔑 关键修复：显式指定使用LibSQL
+        
+        // 🔑 关键修复 #2：配置Embedder（P0问题）
+        if let (Some(provider), Some(model)) = (embedder_provider, embedder_model) {
+            info!("Configuring embedder: provider={}, model={}", provider, model);
+            builder = builder.with_embedder(provider, model);
+        } else {
+            // 使用默认FastEmbed配置
+            info!("No embedder config provided, using default FastEmbed");
+            builder = builder.with_embedder("fastembed", "BAAI/bge-small-en-v1.5");
+        }
+        
+        let memory = builder
             .build()
             .await
             .map_err(|e| ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e)))?;
@@ -739,7 +754,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_memory_manager_creation() {
-        let result = MemoryManager::new().await;
+        let result = MemoryManager::new(Some("fastembed".to_string()), Some("BAAI/bge-small-en-v1.5".to_string())).await;
         // 可能因为配置问题失败，但应该能创建
         println!("MemoryManager creation: {:?}", result.is_ok());
     }

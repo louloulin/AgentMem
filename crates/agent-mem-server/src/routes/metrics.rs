@@ -87,8 +87,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_metrics() {
-        // MemoryManager::new() is now async
-        if let Ok(memory_manager) = MemoryManager::new().await {
+        // MemoryManager::new() is now async and requires embedder config
+        if let Ok(memory_manager) = MemoryManager::new(None, None).await {
             let result = get_metrics(Extension(Arc::new(memory_manager))).await;
             if let Ok(response) = result {
                 assert!(response.0.metrics.contains_key("total_memories"));
