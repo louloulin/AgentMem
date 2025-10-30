@@ -260,16 +260,16 @@ impl MemoryEngine {
                     
                     // 计算相关性分数
                     let score = self.calculate_relevance_score(&memory, query);
-                    info!("Memory scoring - query:'{}' content:'{}' score:{:.3}", 
-                          &query[..query.len().min(20)], 
-                          &memory.content[..memory.content.len().min(40)], 
-                          score);
+                    // ✅ 安全截取字符串（避免UTF-8边界问题）
+                    let query_preview: String = query.chars().take(20).collect();
+                    let content_preview: String = memory.content.chars().take(40).collect();
+                    info!("🔍 Memory scoring - query:'{}' content:'{}' score:{:.3}", 
+                          query_preview, content_preview, score);
                     (memory, score)
                 })
-                // ✅ 暂时移除过滤，返回所有记忆以便调试
                 .collect();
             
-            info!("Before filtering: {} memories with scores", scored_memories.len());
+            info!("📊 Collected {} memories with scores", scored_memories.len());
             
             // 按分数排序
             scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {

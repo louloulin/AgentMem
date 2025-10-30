@@ -152,12 +152,21 @@ impl MemoryIntegrator {
 
     /// 过滤低相关性记忆
     pub fn filter_by_relevance(&self, memories: Vec<Memory>) -> Vec<Memory> {
-        memories
+        info!("🔍 filter_by_relevance: input={} memories, threshold={}", 
+              memories.len(), self.config.relevance_threshold);
+        
+        let filtered: Vec<Memory> = memories
             .into_iter()
             .filter(|m| {
-                m.importance >= self.config.relevance_threshold
+                let keep = m.importance >= self.config.relevance_threshold;
+                info!("  Memory importance={:.3}, threshold={:.3}, keep={}", 
+                      m.importance, self.config.relevance_threshold, keep);
+                keep
             })
-            .collect()
+            .collect();
+        
+        info!("🔍 filter_by_relevance: output={} memories", filtered.len());
+        filtered
     }
 }
 

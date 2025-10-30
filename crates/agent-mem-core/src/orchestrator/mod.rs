@@ -267,7 +267,8 @@ impl AgentOrchestrator {
 
         // 2. 检索相关记忆
         let memories = self.retrieve_memories(&request).await?;
-        info!("Retrieved {} memories", memories.len());
+        let memories_retrieved_count = memories.len();
+        info!("Retrieved {} memories", memories_retrieved_count);
 
         // 3. 构建 prompt（注入记忆）
         let messages = self.build_messages_with_memories(&request, &memories).await?;
@@ -291,19 +292,19 @@ impl AgentOrchestrator {
         debug!("Created assistant message: {}", assistant_message_id);
 
         // 7. 提取和更新记忆
-        let memories_count = if self.config.auto_extract_memories {
+        let memories_extracted = if self.config.auto_extract_memories {
             self.extract_and_update_memories(&request, &messages).await?
         } else {
             0
         };
-        info!("Extracted and updated {} memories", memories_count);
+        info!("Extracted and updated {} new memories", memories_extracted);
 
-        // 8. 返回响应
+        // 8. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）
         Ok(ChatResponse {
             message_id: assistant_message_id,
             content: final_response,
-            memories_updated: memories_count > 0,
-            memories_count,
+            memories_updated: memories_extracted > 0,
+            memories_count: memories_retrieved_count,  // ✅ 使用检索到的记忆数量
             tool_calls: if tool_calls_info.is_empty() {
                 None
             } else {
