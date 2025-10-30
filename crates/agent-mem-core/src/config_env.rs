@@ -347,7 +347,11 @@ mod tests {
 
         let config = get_storage_config_from_env().unwrap();
         assert_eq!(config.backend, StorageBackend::LibSQL);
-        assert!(config.connection.contains("agentmem.db"));
+        // Connection should be "file:agentmem.db" by default
+        assert!(config.connection.contains("agentmem.db"),
+                "Expected connection to contain 'agentmem.db', got: {}", config.connection);
+        assert!(config.connection.starts_with("file:") || config.connection.ends_with(".db"),
+                "Expected connection to start with 'file:' or end with '.db', got: {}", config.connection);
     }
 
     #[test]
