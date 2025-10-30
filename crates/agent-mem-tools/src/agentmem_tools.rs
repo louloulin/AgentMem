@@ -9,6 +9,11 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
+/// Get AgentMem API URL from environment or use default
+fn get_api_url() -> String {
+    std::env::var("AGENTMEM_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+}
+
 /// 添加记忆工具
 pub struct AddMemoryTool;
 
@@ -55,25 +60,57 @@ impl Tool for AddMemoryTool {
         let content = args["content"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("content is required".to_string()))?;
-        
+
         let user_id = args["user_id"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        let agent_id = args["agent_id"].as_str();
-        let session_id = args["session_id"].as_str();
-        let memory_type = args["memory_type"].as_str().unwrap_or("episodic");
+        let agent_id = args["agent_id"].as_str().unwrap_or("default-agent");
+        let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
 
-        // 这里应该调用 AgentMem 客户端添加记忆
-        // 由于当前 AgentMemClient 的 API 可能不完全匹配，我们返回一个模拟响应
-        Ok(json!({
-            "success": true,
-            "message": "记忆已添加",
-            "memory_id": format!("mem_{}", uuid::Uuid::new_v4()),
+        // 调用 AgentMem Backend API
+        let api_url = get_api_url();
+        let client = reqwest::Client::new();
+
+        let request_body = json!({
             "content": content,
             "user_id": user_id,
             "agent_id": agent_id,
-            "session_id": session_id,
+            "memory_type": memory_type,
+            "importance": 0.5
+        });
+
+        let response = client
+            .post(format!("{}/api/v1/memories", api_url))
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(crate::error::ToolError::ExecutionFailed(
+                format!("API returned error {}: {}", status, error_text)
+            ));
+        }
+
+        let api_response: Value = response.json().await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+
+        // 提取 memory_id 从响应中
+        let memory_id = api_response["data"]["memory_id"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
+
+        Ok(json!({
+            "success": true,
+            "message": "记忆已添加",
+            "memory_id": memory_id,
+            "content": content,
+            "user_id": user_id,
+            "agent_id": agent_id,
             "memory_type": memory_type,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
@@ -121,34 +158,58 @@ impl Tool for SearchMemoriesTool {
         let query = args["query"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("query is required".to_string()))?;
-        
-        let user_id = args["user_id"].as_str();
-        let limit = args["limit"].as_i64().unwrap_or(10);
-        let memory_type = args["memory_type"].as_str();
 
-        // 这里应该调用 AgentMem 客户端搜索记忆
-        // 返回模拟响应
+        let limit = args["limit"].as_i64().unwrap_or(10) as usize;
+
+        // 调用 AgentMem Backend API
+        let api_url = get_api_url();
+        let client = reqwest::Client::new();
+
+        let request_body = json!({
+            "query": query,
+            "limit": limit
+        });
+
+        let response = client
+            .post(format!("{}/api/v1/memories/search", api_url))
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(crate::error::ToolError::ExecutionFailed(
+                format!("API returned error {}: {}", status, error_text)
+            ));
+        }
+
+        let api_response: Value = response.json().await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+
+        // 提取搜索结果
+        let memories = api_response["data"]["memories"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        let results: Vec<Value> = memories.iter().map(|mem| {
+            json!({
+                "memory_id": mem["id"].as_str().unwrap_or("unknown"),
+                "content": mem["content"].as_str().unwrap_or(""),
+                "relevance_score": mem["score"].as_f64().unwrap_or(0.0),
+                "memory_type": mem["memory_type"].as_str().unwrap_or("Episodic"),
+                "timestamp": mem["created_at"].as_str().unwrap_or("")
+            })
+        }).collect();
+
         Ok(json!({
             "success": true,
             "query": query,
-            "user_id": user_id,
             "limit": limit,
-            "memory_type": memory_type,
-            "results": [
-                {
-                    "memory_id": "mem_001",
-                    "content": format!("与 '{}' 相关的记忆 1", query),
-                    "relevance_score": 0.95,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                },
-                {
-                    "memory_id": "mem_002",
-                    "content": format!("与 '{}' 相关的记忆 2", query),
-                    "relevance_score": 0.87,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                }
-            ],
-            "total_results": 2
+            "results": results,
+            "total_results": results.len()
         }))
     }
 }
@@ -194,24 +255,57 @@ impl Tool for ChatTool {
         let message = args["message"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("message is required".to_string()))?;
-        
+
         let user_id = args["user_id"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        let session_id = args["session_id"].as_str();
-        let use_memory = args["use_memory"].as_bool().unwrap_or(true);
+        let agent_id = "default-agent"; // 使用默认 agent
 
-        // 这里应该调用 AgentMem 客户端进行对话
-        // 返回模拟响应
+        // 调用 AgentMem Backend API
+        let api_url = get_api_url();
+        let client = reqwest::Client::new();
+
+        let request_body = json!({
+            "message": message,
+            "user_id": user_id,
+            "stream": false
+        });
+
+        let response = client
+            .post(format!("{}/api/v1/agents/{}/chat", api_url, agent_id))
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(crate::error::ToolError::ExecutionFailed(
+                format!("API returned error {}: {}", status, error_text)
+            ));
+        }
+
+        let api_response: Value = response.json().await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+
+        // 提取响应内容
+        let response_content = api_response["data"]["content"]
+            .as_str()
+            .unwrap_or("No response")
+            .to_string();
+
+        let memories_count = api_response["data"]["memories_count"]
+            .as_u64()
+            .unwrap_or(0);
+
         Ok(json!({
             "success": true,
             "message": message,
             "user_id": user_id,
-            "session_id": session_id,
-            "use_memory": use_memory,
-            "response": format!("基于您的记忆，我理解您说的是：{}。让我为您提供相关的回复...", message),
-            "memory_context_used": 3,
+            "response": response_content,
+            "memory_context_used": memories_count,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
     }
@@ -249,24 +343,71 @@ impl Tool for GetSystemPromptTool {
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        let context = args["context"].as_str();
+        let context = args["context"].as_str().unwrap_or("");
 
-        // 这里应该调用 AgentMem 客户端获取系统提示
-        // 返回模拟响应
+        // 调用 AgentMem Backend API 搜索用户记忆
+        let api_url = get_api_url();
+        let client = reqwest::Client::new();
+
+        let search_query = if !context.is_empty() {
+            format!("用户偏好和背景信息 {}", context)
+        } else {
+            "用户偏好和背景信息".to_string()
+        };
+
+        let request_body = json!({
+            "query": search_query,
+            "limit": 10
+        });
+
+        let response = client
+            .post(format!("{}/api/v1/memories/search", api_url))
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(crate::error::ToolError::ExecutionFailed(
+                format!("API returned error {}: {}", status, error_text)
+            ));
+        }
+
+        let api_response: Value = response.json().await
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+
+        // 提取记忆内容
+        let memories = api_response["data"]["memories"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        let memory_count = memories.len();
+
+        // 构建系统提示
+        let mut system_prompt = format!("你是一个智能助手，正在为用户 {} 提供服务。\n", user_id);
+
+        if memory_count > 0 {
+            system_prompt.push_str("\n基于用户的历史记忆，你了解到：\n");
+            for (i, mem) in memories.iter().take(5).enumerate() {
+                if let Some(content) = mem["content"].as_str() {
+                    system_prompt.push_str(&format!("{}. {}\n", i + 1, content));
+                }
+            }
+        } else {
+            system_prompt.push_str("\n这是你与该用户的首次交互。\n");
+        }
+
+        system_prompt.push_str("\n请根据这些信息提供个性化的帮助。");
+
         Ok(json!({
             "success": true,
             "user_id": user_id,
             "context": context,
-            "system_prompt": format!(
-                "你是一个智能助手，正在为用户 {} 提供服务。\n\
-                基于用户的历史记忆，你了解到：\n\
-                - 用户偏好使用 Rust 编程语言\n\
-                - 用户关注系统性能和安全性\n\
-                - 用户最近在研究 MCP 协议\n\n\
-                请根据这些信息提供个性化的帮助。",
-                user_id
-            ),
-            "memory_count": 15,
+            "system_prompt": system_prompt,
+            "memory_count": memory_count,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
     }
