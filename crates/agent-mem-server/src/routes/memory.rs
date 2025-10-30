@@ -75,32 +75,46 @@ impl MemoryManager {
             .map_err(|e| e.to_string())
     }
 
-    /// 获取记忆
+    /// 获取记忆（直接数据库查询）
     pub async fn get_memory(&self, id: &str) -> Result<Option<serde_json::Value>, String> {
-        match self.memory.get(id).await {
-            Ok(memory) => {
-                let json = serde_json::json!({
-                    "id": memory.id,
-                    "agent_id": memory.agent_id,
-                    "user_id": memory.user_id,
-                    "content": memory.content,
-                    "memory_type": memory.memory_type,
-                    "importance": memory.importance,
-                    "created_at": memory.created_at,
-                    "last_accessed_at": memory.last_accessed_at,
-                    "access_count": memory.access_count,
-                    "metadata": memory.metadata,
-                    "hash": memory.hash,
-                });
-                Ok(Some(json))
-            }
-            Err(e) => {
-                if e.to_string().contains("not found") {
-                    Ok(None)
-                } else {
-                    Err(e.to_string())
-                }
-            }
+        use libsql::{Builder, params};
+        
+        let db_path = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "data/agentmem.db".to_string());
+        
+        let db = Builder::new_local(&db_path).build().await
+            .map_err(|e| format!("Failed to open database: {}", e))?;
+        
+        let conn = db.connect()
+            .map_err(|e| format!("Failed to connect: {}", e))?;
+        
+        let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                     created_at, last_accessed, access_count, metadata_, hash \
+                     FROM memories WHERE id = ? AND is_deleted = 0 LIMIT 1";
+        
+        let mut stmt = conn.prepare(query).await
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+        
+        let mut rows = stmt.query(params![id]).await
+            .map_err(|e| format!("Failed to query: {}", e))?;
+        
+        if let Some(row) = rows.next().await.map_err(|e| format!("Failed to fetch row: {}", e))? {
+            let json = serde_json::json!({
+                "id": row.get::<String>(0).unwrap_or_default(),
+                "agent_id": row.get::<String>(1).unwrap_or_default(),
+                "user_id": row.get::<String>(2).unwrap_or_default(),
+                "content": row.get::<String>(3).unwrap_or_default(),
+                "memory_type": row.get::<Option<String>>(4).ok().flatten(),
+                "importance": row.get::<Option<f64>>(5).ok().flatten(),
+                "created_at": row.get::<Option<i64>>(6).ok().flatten(),
+                "last_accessed_at": row.get::<Option<i64>>(7).ok().flatten(),
+                "access_count": row.get::<Option<i64>>(8).ok().flatten(),
+                "metadata": row.get::<Option<String>>(9).ok().flatten(),
+                "hash": row.get::<Option<String>>(10).ok().flatten(),
+            });
+            Ok(Some(json))
+        } else {
+            Ok(None)
         }
     }
 
@@ -254,7 +268,7 @@ use tracing::{error, info};
 pub async fn add_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<crate::models::MemoryRequest>,
-) -> ServerResult<(StatusCode, Json<crate::models::MemoryResponse>)> {
+) -> ServerResult<(StatusCode, Json<crate::models::ApiResponse<crate::models::MemoryResponse>>)> {
     info!(
         "Adding new memory for agent_id: {:?}, user_id: {:?}",
         request.agent_id, request.user_id
@@ -280,7 +294,7 @@ pub async fn add_memory(
         message: "Memory added successfully".to_string(),
     };
 
-    Ok((StatusCode::CREATED, Json(response)))
+    Ok((StatusCode::CREATED, Json(crate::models::ApiResponse::success(response))))
 }
 
 /// 获取记忆
@@ -300,7 +314,7 @@ pub async fn add_memory(
 pub async fn get_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
-) -> ServerResult<Json<serde_json::Value>> {
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
     info!("Getting memory with ID: {}", id);
 
     let memory = memory_manager.get_memory(&id).await.map_err(|e| {
@@ -309,7 +323,7 @@ pub async fn get_memory(
     })?;
 
     match memory {
-        Some(mem) => Ok(Json(mem)),
+        Some(mem) => Ok(Json(crate::models::ApiResponse::success(mem))),
         None => Err(ServerError::NotFound("Memory not found".to_string())),
     }
 }
@@ -333,7 +347,7 @@ pub async fn update_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
     Json(request): Json<crate::models::UpdateMemoryRequest>,
-) -> ServerResult<Json<crate::models::MemoryResponse>> {
+) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
     info!("Updating memory with ID: {}", id);
 
     memory_manager
@@ -349,7 +363,7 @@ pub async fn update_memory(
         message: "Memory updated successfully".to_string(),
     };
 
-    Ok(Json(response))
+    Ok(Json(crate::models::ApiResponse::success(response)))
 }
 
 /// 删除记忆
@@ -369,7 +383,7 @@ pub async fn update_memory(
 pub async fn delete_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
-) -> ServerResult<Json<crate::models::MemoryResponse>> {
+) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
     info!("Deleting memory with ID: {}", id);
 
     memory_manager.delete_memory(&id).await.map_err(|e| {
@@ -382,7 +396,7 @@ pub async fn delete_memory(
         message: "Memory deleted successfully".to_string(),
     };
 
-    Ok(Json(response))
+    Ok(Json(crate::models::ApiResponse::success(response)))
 }
 
 /// 搜索记忆
@@ -400,7 +414,7 @@ pub async fn delete_memory(
 pub async fn search_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<crate::models::SearchRequest>,
-) -> ServerResult<Json<crate::models::SearchResponse>> {
+) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
     info!("Searching memories with query: {}", request.query);
 
     let results = memory_manager
@@ -417,37 +431,28 @@ pub async fn search_memories(
             ServerError::MemoryError(e.to_string())
         })?;
 
-    // 转换为JSON格式
+    // 转换为JSON格式，简化结构以匹配前端期望
     let json_results: Vec<serde_json::Value> = results
         .into_iter()
         .map(|item| {
             serde_json::json!({
-                "memory": {
-                    "id": item.id,
-                    "agent_id": item.agent_id,
-                    "user_id": item.user_id,
-                    "content": item.content,
-                    "memory_type": item.memory_type,
-                    "importance": item.importance,
-                    "created_at": item.created_at,
-                    "last_accessed_at": item.last_accessed_at,
-                    "access_count": item.access_count,
-                    "metadata": item.metadata,
-                    "hash": item.hash,
-                },
+                "id": item.id,
+                "agent_id": item.agent_id,
+                "user_id": item.user_id,
+                "content": item.content,
+                "memory_type": item.memory_type,
+                "importance": item.importance,
+                "created_at": item.created_at,
+                "last_accessed_at": item.last_accessed_at,
+                "access_count": item.access_count,
+                "metadata": item.metadata,
+                "hash": item.hash,
                 "score": 1.0,  // Memory API不返回score，默认为1.0
-                "match_type": "semantic",
             })
         })
         .collect();
 
-    let total = json_results.len();
-    let response = crate::models::SearchResponse {
-        results: json_results,
-        total,
-    };
-
-    Ok(Json(response))
+    Ok(Json(crate::models::ApiResponse::success(json_results)))
 }
 
 /// 获取记忆历史
@@ -604,7 +609,7 @@ pub async fn batch_delete_memories(
 pub async fn get_agent_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(agent_id): Path<String>,
-) -> ServerResult<Json<Vec<serde_json::Value>>> {
+) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
     info!("Getting all memories for agent_id: {}", agent_id);
 
     // ===== 真实实现：直接数据库查询（绕过embedder）=====
@@ -653,7 +658,7 @@ pub async fn get_agent_memories(
     }
     
     info!("Returning {} real memories from database", memories_json.len());
-    Ok(Json(memories_json))
+    Ok(Json(crate::models::ApiResponse::success(memories_json)))
 }
 
 #[cfg(test)]
