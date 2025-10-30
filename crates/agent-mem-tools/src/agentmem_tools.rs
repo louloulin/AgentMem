@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 /// Get AgentMem API URL from environment or use default
 fn get_api_url() -> String {
-    std::env::var("AGENTMEM_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+    std::env::var("AGENTMEM_API_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
 }
 
 /// 添加记忆工具
