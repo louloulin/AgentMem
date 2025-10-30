@@ -476,6 +476,109 @@ export default function MemoriesPageEnhanced() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Add Memory Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Memory</DialogTitle>
+            <DialogDescription>
+              Create a new memory for an agent. This memory will be used in future conversations.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            {/* Agent Selection */}
+            <div className="grid gap-2">
+              <Label htmlFor="agent">Agent *</Label>
+              <Select
+                value={newMemory.agent_id}
+                onValueChange={(value) => setNewMemory({ ...newMemory, agent_id: value })}
+              >
+                <SelectTrigger id="agent">
+                  <SelectValue placeholder="Select an agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.name || `Agent ${agent.id.slice(0, 8)}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Memory Type */}
+            <div className="grid gap-2">
+              <Label htmlFor="type">Memory Type</Label>
+              <Select
+                value={newMemory.memory_type}
+                onValueChange={(value) => setNewMemory({ ...newMemory, memory_type: value })}
+              >
+                <SelectTrigger id="type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Episodic">Episodic (事件记忆)</SelectItem>
+                  <SelectItem value="Semantic">Semantic (语义记忆)</SelectItem>
+                  <SelectItem value="Procedural">Procedural (程序记忆)</SelectItem>
+                  <SelectItem value="Working">Working (工作记忆)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Importance */}
+            <div className="grid gap-2">
+              <Label htmlFor="importance">
+                Importance: {newMemory.importance.toFixed(2)}
+              </Label>
+              <input
+                id="importance"
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={newMemory.importance}
+                onChange={(e) => setNewMemory({ ...newMemory, importance: parseFloat(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+            
+            {/* Content */}
+            <div className="grid gap-2">
+              <Label htmlFor="content">Memory Content *</Label>
+              <Textarea
+                id="content"
+                placeholder="Enter the memory content..."
+                value={newMemory.content}
+                onChange={(e) => setNewMemory({ ...newMemory, content: e.target.value })}
+                className="min-h-[150px]"
+              />
+              <p className="text-sm text-gray-500">
+                {newMemory.content.length} characters
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddDialogOpen(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAddMemory}
+              disabled={submitting || !newMemory.agent_id || !newMemory.content.trim()}
+            >
+              {submitting ? 'Adding...' : 'Add Memory'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
