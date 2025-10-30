@@ -172,7 +172,7 @@ impl MemoryManager {
             .map_err(|e| format!("Failed to connect: {}", e))?;
         
         let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
-                     created_at, last_accessed, access_count, metadata_, hash \
+                     created_at, last_accessed, access_count, metadata, hash \
                      FROM memories WHERE id = ? AND is_deleted = 0 LIMIT 1";
         
         let mut stmt = conn.prepare(query).await
@@ -715,7 +715,7 @@ pub async fn get_agent_memories(
         .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
     
     let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
-                 created_at, last_accessed, access_count, metadata_, hash \
+                 created_at, last_accessed, access_count, metadata, hash \
                  FROM memories WHERE agent_id = ? AND is_deleted = 0 LIMIT 100";
     
     let mut stmt = conn.prepare(query).await
