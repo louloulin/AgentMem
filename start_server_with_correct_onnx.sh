@@ -38,9 +38,16 @@ export DYLD_LIBRARY_PATH="$LIB_DIR:$TARGET_DEBUG_DIR:$DYLD_LIBRARY_PATH"
 export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
 export RUST_BACKTRACE=1
 
+# 配置 LLM Provider (Zhipu AI)
+export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4-plus"
+
 echo "🌍 环境变量已设置:"
 echo "  DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
 echo "  ORT_DYLIB_PATH=$ORT_DYLIB_PATH"
+echo "  ZHIPU_API_KEY=99a311...*** (已设置)"
+echo "  LLM_PROVIDER=$LLM_PROVIDER"
 
 # 启动服务器
 echo ""
