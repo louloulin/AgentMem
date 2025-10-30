@@ -18,7 +18,6 @@ use agent_mem::{Memory, AddMemoryOptions, SearchOptions, GetAllOptions, DeleteAl
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {
@@ -26,11 +25,21 @@ pub struct MemoryManager {
 }
 
 impl MemoryManager {
-    /// 创建新的MemoryManager（使用Memory API）
+    /// 创建新的MemoryManager（使用Memory API + LibSQL持久化）
     pub async fn new() -> ServerResult<Self> {
-        let memory = Memory::new()
+        // 🔧 修复：使用builder模式显式指定LibSQL存储，而不是默认的内存存储
+        let db_path = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+        
+        info!("Initializing Memory with LibSQL storage: {}", db_path);
+        
+        let memory = Memory::builder()
+            .with_storage(&db_path)  // 🔑 关键修复：显式指定使用LibSQL
+            .build()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to create Memory: {}", e)))?;
+            .map_err(|e| ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e)))?;
+        
+        info!("Memory initialized successfully with LibSQL persistence");
         
         Ok(Self {
             memory: Arc::new(memory),
@@ -44,35 +53,94 @@ impl MemoryManager {
         }
     }
 
-    /// 添加记忆
+    /// 添加记忆（🔧 最佳方案：Memory API + LibSQL 双写）
+    /// 
+    /// Strategy:
+    /// 1. 使用Memory API生成向量嵌入（保留智能功能）
+    /// 2. 同时写入LibSQL确保持久化
+    /// 3. 向量搜索使用VectorStore，结构化查询使用LibSQL
     pub async fn add_memory(
         &self,
+        repositories: Arc<agent_mem_core::storage::factory::Repositories>,
         agent_id: String,
         user_id: Option<String>,
         content: String,
-        _memory_type: Option<agent_mem_traits::MemoryType>,  // Memory API自动处理
-        _importance: Option<f32>,  // Memory API自动评估
+        memory_type: Option<agent_mem_traits::MemoryType>,
+        importance: Option<f32>,
         metadata: Option<HashMap<String, String>>,
     ) -> Result<String, String> {
+        use agent_mem_utils::hash::compute_content_hash;
+        use chrono::Utc;
+        
+        // Step 1: 使用Memory API（生成向量嵌入）
         let options = AddMemoryOptions {
-            agent_id: Some(agent_id),
-            user_id,
-            infer: true,  // 启用智能推理
-            metadata: metadata.unwrap_or_default(),  // ✅ 解包Option
+            agent_id: Some(agent_id.clone()),
+            user_id: user_id.clone(),
+            infer: false,  // 简单模式，避免复杂推理
+            metadata: metadata.clone().unwrap_or_default(),
+            memory_type: memory_type.as_ref().map(|t| format!("{:?}", t)),
             ..Default::default()
         };
 
-        self.memory
-            .add_with_options(content, options)
+        let add_result = self.memory
+            .add_with_options(&content, options)
             .await
-            .map(|result| {
-                // 返回第一个记忆的ID（如果有多个，取第一个）
-                result.results
-                    .first()
-                    .map(|r| r.id.clone())
-                    .unwrap_or_else(|| "".to_string())
-            })
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        let memory_id = add_result.results
+            .first()
+            .map(|r| r.id.clone())
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        
+        // Step 2: 写入LibSQL Repository（持久化）
+        let user_id_val = user_id.unwrap_or_else(|| "default".to_string());
+        let content_hash = compute_content_hash(&content);
+        let now = Utc::now();
+        
+        // 构建metadata JSON
+        let mut full_metadata = metadata.unwrap_or_default();
+        full_metadata.insert("agent_id".to_string(), agent_id.clone());
+        full_metadata.insert("user_id".to_string(), user_id_val.clone());
+        full_metadata.insert("data".to_string(), content.clone());
+        full_metadata.insert("hash".to_string(), content_hash.clone());
+        
+        let metadata_json: serde_json::Value = full_metadata
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::String(v)))
+            .collect();
+        
+        // Step 2.5: 确保Agent存在（获取其organization_id和user_id）
+        let agent = repositories.agents.find_by_id(&agent_id).await
+            .map_err(|e| format!("Failed to query agent: {}", e))?
+            .ok_or_else(|| format!("Agent not found: {}", agent_id))?;
+        
+        let memory = agent_mem_core::storage::models::Memory {
+            id: memory_id.clone(),
+            organization_id: agent.organization_id.clone(),  // 使用Agent的organization_id
+            user_id: "default-user".to_string(),  // 使用默认user (TODO: 应该从auth获取实际user)
+            agent_id: agent_id.clone(),
+            content,
+            hash: Some(content_hash),
+            metadata: metadata_json,
+            score: None,
+            memory_type: format!("{:?}", memory_type.unwrap_or(agent_mem_traits::MemoryType::Semantic)),
+            scope: "agent".to_string(),
+            level: "normal".to_string(),
+            importance: importance.unwrap_or(0.5),
+            access_count: 0,
+            last_accessed: Some(now),
+            created_at: now,
+            updated_at: now,
+            is_deleted: false,
+            created_by_id: None,
+            last_updated_by_id: None,
+        };
+        
+        repositories.memories.create(&memory).await
+            .map_err(|e| format!("Failed to persist to LibSQL: {}", e))?;
+        
+        info!("✅ Memory persisted: VectorStore + LibSQL (ID: {})", memory_id);
+        Ok(memory_id)
     }
 
     /// 获取记忆（直接数据库查询）
@@ -253,7 +321,7 @@ use axum::{
 };
 use tracing::{error, info};
 
-/// 添加新记忆
+/// 添加新记忆（🔧 使用双写策略）
 #[utoipa::path(
     post,
     path = "/api/v1/memories",
@@ -266,6 +334,7 @@ use tracing::{error, info};
     )
 )]
 pub async fn add_memory(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<crate::models::MemoryRequest>,
 ) -> ServerResult<(StatusCode, Json<crate::models::ApiResponse<crate::models::MemoryResponse>>)> {
@@ -276,6 +345,7 @@ pub async fn add_memory(
 
     let memory_id = memory_manager
         .add_memory(
+            repositories,  // 传递repositories用于LibSQL持久化
             request.agent_id,
             request.user_id,
             request.content,
@@ -291,7 +361,7 @@ pub async fn add_memory(
 
     let response = crate::models::MemoryResponse {
         id: memory_id,
-        message: "Memory added successfully".to_string(),
+        message: "Memory added successfully (VectorStore + LibSQL)".to_string(),
     };
 
     Ok((StatusCode::CREATED, Json(crate::models::ApiResponse::success(response))))
@@ -507,7 +577,7 @@ pub async fn get_memory_history(
     Ok(Json(response))
 }
 
-/// 批量添加记忆
+/// 批量添加记忆（🔧 使用双写策略）
 #[utoipa::path(
     post,
     path = "/api/v1/memories/batch",
@@ -520,6 +590,7 @@ pub async fn get_memory_history(
     )
 )]
 pub async fn batch_add_memories(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<crate::models::BatchRequest>,
 ) -> ServerResult<(StatusCode, Json<crate::models::BatchResponse>)> {
@@ -531,6 +602,7 @@ pub async fn batch_add_memories(
     for memory_req in request.memories {
         match memory_manager
             .add_memory(
+                repositories.clone(),  // 传递repositories用于LibSQL持久化
                 memory_req.agent_id,
                 memory_req.user_id,
                 memory_req.content,
