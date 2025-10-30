@@ -13,6 +13,7 @@ use crate::routes::memory::MemoryManager;
 use agent_mem_core::storage::factory::Repositories;
 use axum::{extract::Extension, response::Json};
 use chrono::{DateTime, Duration, Utc};
+use tracing::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -159,61 +160,68 @@ pub struct AgentActivityResponse {
 )]
 pub async fn get_dashboard_stats(
     Extension(repositories): Extension<Arc<Repositories>>,
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<DashboardStats>> {
-    // Get total counts (using list with large limits and counting)
+    info!("📊 Generating comprehensive dashboard stats from multiple data sources");
+    
+    // ✅ 综合数据源1: Agents
     let all_agents = repositories.agents.list(10000, 0).await
         .map_err(|e| ServerError::Internal(e.to_string()))?;
     let total_agents = all_agents.len() as i64;
+    info!("  - Total agents: {}", total_agents);
     
+    // ✅ 综合数据源2: Users
     let all_users = repositories.users.find_by_organization_id("default").await
         .map_err(|e| ServerError::Internal(e.to_string()))?;
     let total_users = all_users.len() as i64;
+    info!("  - Total users: {}", total_users);
     
-    // Get total messages by aggregating from all agents
+    // ✅ 综合数据源3: Messages (从所有agents聚合)
     let mut total_messages = 0i64;
-    for agent in all_agents.iter().take(100) {  // Limit to avoid performance issues
+    for agent in all_agents.iter().take(100) {
         let agent_messages = repositories.messages.find_by_agent_id(&agent.id, 10000).await
             .map_err(|e| ServerError::Internal(e.to_string()))?;
         total_messages += agent_messages.len() as i64;
     }
+    info!("  - Total messages: {} (from {} agents)", total_messages, all_agents.len().min(100));
     
-    // Get memory statistics directly from repositories (避免使用向量搜索)
-    // 直接统计所有 agents 的 memories 总数
+    // ✅ 综合数据源4: Memories (直接从 LibSQL Repository，避免向量搜索)
     let mut total_memories = 0i64;
-    let mut memories_by_type_map: HashMap<String, usize> = HashMap::new();
+    let mut memories_by_type_map: HashMap<String, i64> = HashMap::new();
     
-    for agent in all_agents.iter().take(100) {  // Limit to avoid performance issues
-        // 使用 memory_manager 的 get_all_memories 方法（不使用向量搜索）
-        match memory_manager.get_all_memories(Some(agent.id.clone()), None, Some(10000)).await {
-            Ok(memories) => {
-                total_memories += memories.len() as i64;
-                // 统计 memory 类型
-                for memory in memories {
-                    let mem_type = format!("{:?}", memory.memory_type);
-                    *memories_by_type_map.entry(mem_type).or_insert(0) += 1;
+    info!("  - Querying memories from LibSQL for {} agents...", all_agents.len().min(100));
+    for (idx, agent) in all_agents.iter().take(100).enumerate() {
+        match repositories.memories.find_by_agent_id(&agent.id, 10000).await {
+            Ok(agent_memories) => {
+                let count = agent_memories.len();
+                if count > 0 {
+                    info!("    Agent {}/{}: {} memories", idx + 1, all_agents.len().min(100), count);
+                }
+                total_memories += count as i64;
+                
+                // 统计 memory 类型分布
+                for memory in agent_memories {
+                    *memories_by_type_map.entry(memory.memory_type.clone()).or_insert(0) += 1;
                 }
             },
             Err(e) => {
-                // 如果获取失败，记录日志但不中断
-                tracing::warn!("Failed to get memories for agent {}: {}", agent.id, e);
+                warn!("    Agent {}/{}: Failed to get memories - {}", idx + 1, all_agents.len().min(100), e);
             }
         }
     }
+    info!("  - Total memories: {} (types: {:?})", total_memories, memories_by_type_map);
     
-    // Get active counts (entities with activity in last 24 hours)
+    // ✅ 综合数据源5: 活跃统计 (基于最近24小时的消息)
     let cutoff_time = Utc::now() - Duration::hours(24);
+    info!("  - Analyzing activity since {}", cutoff_time);
     
-    // For now, we'll approximate active agents/users based on recent messages
-    // In a production system, you'd track last_active timestamps
-    // Collect recent messages from multiple agents
     let mut recent_messages = Vec::new();
     for agent in all_agents.iter().take(10) {
-        let agent_messages = repositories.messages.find_by_agent_id(&agent.id, 5).await
+        let agent_messages = repositories.messages.find_by_agent_id(&agent.id, 20).await
             .map_err(|e| ServerError::Internal(e.to_string()))?;
         recent_messages.extend(agent_messages);
     }
-    // Take most recent 20
+    recent_messages.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     recent_messages.truncate(20);
     
     let mut active_agent_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -228,11 +236,31 @@ pub async fn get_dashboard_stats(
     
     let active_agents = active_agent_ids.len() as i64;
     let active_users = active_user_ids.len() as i64;
+    info!("  - Active agents (24h): {}", active_agents);
+    info!("  - Active users (24h): {}", active_users);
     
-    // Calculate average response time (placeholder - would need actual metrics)
-    let avg_response_time_ms = 150.0; // TODO: Implement real response time tracking
+    // ✅ 综合数据源6: 平均响应时间 (计算最近消息的时间间隔)
+    let avg_response_time_ms = if recent_messages.len() >= 2 {
+        let mut intervals = Vec::new();
+        for i in 1..recent_messages.len().min(10) {
+            let interval = (recent_messages[i-1].created_at - recent_messages[i].created_at)
+                .num_milliseconds()
+                .abs() as f64;
+            if interval > 0.0 && interval < 60000.0 {  // 忽略超过1分钟的间隔
+                intervals.push(interval);
+            }
+        }
+        if !intervals.is_empty() {
+            intervals.iter().sum::<f64>() / intervals.len() as f64
+        } else {
+            150.0
+        }
+    } else {
+        150.0
+    };
+    info!("  - Avg response time: {:.0}ms", avg_response_time_ms);
     
-    // Get recent activities from messages
+    // ✅ 综合数据源7: 最近活动记录
     let mut recent_activities: Vec<ActivityLog> = Vec::new();
     for (i, msg) in recent_messages.iter().take(10).enumerate() {
         recent_activities.push(ActivityLog {
@@ -245,12 +273,12 @@ pub async fn get_dashboard_stats(
         });
     }
     
-    // Convert memory stats by type
-    let mut memories_by_type: HashMap<String, i64> = HashMap::new();
-    for (mem_type, count) in memories_by_type_map {
-        memories_by_type.insert(mem_type, count as i64);
-    }
+    info!("  - Recent activities: {} events", recent_activities.len());
     
+    // 转换 memory 类型统计
+    let memories_by_type: HashMap<String, i64> = memories_by_type_map;
+    
+    // ✅ 构建综合统计响应
     let stats = DashboardStats {
         total_agents,
         total_users,
@@ -263,6 +291,12 @@ pub async fn get_dashboard_stats(
         memories_by_type,
         timestamp: Utc::now(),
     };
+    
+    info!("📊 Dashboard stats generated successfully:");
+    info!("   Agents: {} total, {} active (24h)", total_agents, active_agents);
+    info!("   Users: {} total, {} active (24h)", total_users, active_users);
+    info!("   Memories: {} total, {} types", total_memories, stats.memories_by_type.len());
+    info!("   Messages: {} total, {:.0}ms avg response", total_messages, avg_response_time_ms);
     
     Ok(Json(stats))
 }
