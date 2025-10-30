@@ -193,7 +193,7 @@ impl RepositoryFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_config::{DatabaseBackend, DatabaseConfig, PoolConfig};
+    use agent_mem_config::{DatabaseBackend, DatabaseConfig};
 
     #[tokio::test]
     #[cfg(feature = "libsql")]
@@ -206,7 +206,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: PoolConfig::default(),
+            pool: agent_mem_config::database::PoolConfig::default(),
             auto_migrate: true,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -233,7 +233,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: PoolConfig::default(),
+            pool: agent_mem_config::database::PoolConfig::default(),
             auto_migrate: true,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -272,7 +272,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::LibSql,
             url: db_path.to_str().unwrap().to_string(),
-            pool: PoolConfig::default(),
+            pool: agent_mem_config::database::PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
@@ -316,7 +316,7 @@ mod tests {
         let config = DatabaseConfig {
             backend: DatabaseBackend::Postgres,
             url: "postgresql://localhost/test".to_string(),
-            pool: PoolConfig::default(),
+            pool: agent_mem_config::database::PoolConfig::default(),
             auto_migrate: false,
             log_queries: false,
             slow_query_threshold_ms: 1000,
