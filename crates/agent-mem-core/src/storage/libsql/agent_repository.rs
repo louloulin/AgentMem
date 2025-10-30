@@ -51,7 +51,7 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
         conn.execute(
             "INSERT INTO agents (
                 id, organization_id, agent_type, name, description, system, topic,
-                message_ids, metadata_, llm_config, embedding_config, tool_rules, mcp_tools,
+                message_ids, metadata, llm_config, embedding_config, tool_rules, mcp_tools,
                 state, last_active_at, error_message, created_at, updated_at, is_deleted,
                 created_by_id, last_updated_by_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -91,7 +91,7 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT id, organization_id, agent_type, name, description, system, topic,
-                        message_ids, metadata_, llm_config, embedding_config, tool_rules, mcp_tools,
+                        message_ids, metadata, llm_config, embedding_config, tool_rules, mcp_tools,
                         state, last_active_at, error_message, created_at, updated_at, is_deleted,
                         created_by_id, last_updated_by_id
                  FROM agents WHERE id = ? AND is_deleted = 0"
@@ -150,7 +150,7 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT id, organization_id, agent_type, name, description, system, topic,
-                        message_ids, metadata_, llm_config, embedding_config, tool_rules, mcp_tools,
+                        message_ids, metadata, llm_config, embedding_config, tool_rules, mcp_tools,
                         state, last_active_at, error_message, created_at, updated_at, is_deleted,
                         created_by_id, last_updated_by_id
                  FROM agents WHERE organization_id = ? AND is_deleted = 0 ORDER BY created_at DESC"
@@ -210,7 +210,7 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
         conn.execute(
             "UPDATE agents SET 
                 agent_type = ?, name = ?, description = ?, system = ?, topic = ?,
-                message_ids = ?, metadata_ = ?, llm_config = ?, embedding_config = ?,
+                message_ids = ?, metadata = ?, llm_config = ?, embedding_config = ?,
                 tool_rules = ?, mcp_tools = ?, state = ?, last_active_at = ?,
                 error_message = ?, updated_at = ?, last_updated_by_id = ?
              WHERE id = ? AND is_deleted = 0",
@@ -259,7 +259,7 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT id, organization_id, agent_type, name, description, system, topic,
-                        message_ids, metadata_, llm_config, embedding_config, tool_rules, mcp_tools,
+                        message_ids, metadata, llm_config, embedding_config, tool_rules, mcp_tools,
                         state, last_active_at, error_message, created_at, updated_at, is_deleted,
                         created_by_id, last_updated_by_id
                  FROM agents WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?"

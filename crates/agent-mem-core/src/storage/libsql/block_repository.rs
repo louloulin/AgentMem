@@ -81,7 +81,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         conn.execute(
             "INSERT INTO blocks (
                 id, organization_id, user_id, template_name, description, is_template,
-                label, value, \"limit\", metadata_, created_at, updated_at, is_deleted,
+                label, value, \"limit\", metadata, created_at, updated_at, is_deleted,
                 created_by_id, last_updated_by_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             libsql::params![
@@ -114,7 +114,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT id, organization_id, user_id, template_name, description, is_template,
-                        label, value, \"limit\", metadata_, created_at, updated_at, is_deleted,
+                        label, value, \"limit\", metadata, created_at, updated_at, is_deleted,
                         created_by_id, last_updated_by_id
                  FROM blocks WHERE id = ? AND is_deleted = 0"
             )
@@ -141,7 +141,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT b.id, b.organization_id, b.user_id, b.template_name, b.description,
-                        b.is_template, b.label, b.value, b.\"limit\", b.metadata_, b.created_at,
+                        b.is_template, b.label, b.value, b.\"limit\", b.metadata, b.created_at,
                         b.updated_at, b.is_deleted, b.created_by_id, b.last_updated_by_id
                  FROM blocks b
                  INNER JOIN blocks_agents ba ON b.id = ba.block_id
@@ -176,7 +176,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         conn.execute(
             "UPDATE blocks SET
                 organization_id = ?, user_id = ?, template_name = ?, description = ?,
-                is_template = ?, label = ?, value = ?, \"limit\" = ?, metadata_ = ?,
+                is_template = ?, label = ?, value = ?, \"limit\" = ?, metadata = ?,
                 updated_at = ?, last_updated_by_id = ?
              WHERE id = ? AND is_deleted = 0",
             libsql::params![
@@ -265,7 +265,7 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
         let mut stmt = conn
             .prepare(
                 "SELECT id, organization_id, user_id, template_name, description, is_template,
-                        label, value, \"limit\", metadata_, created_at, updated_at, is_deleted,
+                        label, value, \"limit\", metadata, created_at, updated_at, is_deleted,
                         created_by_id, last_updated_by_id
                  FROM blocks WHERE is_deleted = 0
                  ORDER BY created_at DESC LIMIT ? OFFSET ?"
