@@ -312,7 +312,7 @@ mod tests {
                 label TEXT NOT NULL,
                 value TEXT NOT NULL,
                 \"limit\" INTEGER NOT NULL,
-                metadata_ TEXT,
+                metadata TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 is_deleted INTEGER NOT NULL DEFAULT 0,
