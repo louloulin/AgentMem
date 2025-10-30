@@ -65,12 +65,18 @@ impl Tool for AddMemoryTool {
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        let agent_id = args["agent_id"].as_str().unwrap_or("default-agent");
+        // 如果没有提供 agent_id，使用环境变量或默认值
+        let default_agent = std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
+            .unwrap_or_else(|_| "agent-92070062-78bb-4553-9701-9a7a4a89d87a".to_string());
+        let agent_id = args["agent_id"].as_str().unwrap_or(&default_agent);
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
 
         // 调用 AgentMem Backend API
         let api_url = get_api_url();
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
         let request_body = json!({
             "content": content,
@@ -80,8 +86,13 @@ impl Tool for AddMemoryTool {
             "importance": 0.5
         });
 
+        let url = format!("{}/api/v1/memories", api_url);
+        tracing::debug!("Calling API: POST {}", url);
+        tracing::debug!("Request body: {}", serde_json::to_string(&request_body).unwrap_or_default());
+
         let response = client
-            .post(format!("{}/api/v1/memories", api_url))
+            .post(&url)
+            .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
             .await
@@ -163,15 +174,22 @@ impl Tool for SearchMemoriesTool {
 
         // 调用 AgentMem Backend API
         let api_url = get_api_url();
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
         let request_body = json!({
             "query": query,
             "limit": limit
         });
 
+        let url = format!("{}/api/v1/memories/search", api_url);
+        tracing::debug!("Calling API: POST {}", url);
+
         let response = client
-            .post(format!("{}/api/v1/memories/search", api_url))
+            .post(&url)
+            .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
             .await
@@ -260,11 +278,17 @@ impl Tool for ChatTool {
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        let agent_id = "default-agent"; // 使用默认 agent
+        // 使用环境变量或默认 agent ID
+        let default_agent = std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
+            .unwrap_or_else(|_| "agent-92070062-78bb-4553-9701-9a7a4a89d87a".to_string());
+        let agent_id = &default_agent;
 
         // 调用 AgentMem Backend API
         let api_url = get_api_url();
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
         let request_body = json!({
             "message": message,
@@ -272,8 +296,12 @@ impl Tool for ChatTool {
             "stream": false
         });
 
+        let url = format!("{}/api/v1/agents/{}/chat", api_url, agent_id);
+        tracing::debug!("Calling API: POST {}", url);
+
         let response = client
-            .post(format!("{}/api/v1/agents/{}/chat", api_url, agent_id))
+            .post(&url)
+            .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
             .await
@@ -347,7 +375,10 @@ impl Tool for GetSystemPromptTool {
 
         // 调用 AgentMem Backend API 搜索用户记忆
         let api_url = get_api_url();
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
         let search_query = if !context.is_empty() {
             format!("用户偏好和背景信息 {}", context)
@@ -360,8 +391,12 @@ impl Tool for GetSystemPromptTool {
             "limit": 10
         });
 
+        let url = format!("{}/api/v1/memories/search", api_url);
+        tracing::debug!("Calling API: POST {}", url);
+
         let response = client
-            .post(format!("{}/api/v1/memories/search", api_url))
+            .post(&url)
+            .header("Content-Type", "application/json")
             .json(&request_body)
             .send()
             .await
