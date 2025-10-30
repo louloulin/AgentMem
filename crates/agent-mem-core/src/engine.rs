@@ -72,6 +72,8 @@ pub struct MemoryEngine {
     hierarchy_manager: Arc<dyn HierarchyManager>,
     importance_scorer: Arc<dyn ImportanceScorer>,
     conflict_resolver: Arc<dyn ConflictResolver>,
+    /// Optional LibSQL memory repository for persistent storage
+    memory_repository: Option<Arc<dyn crate::storage::traits::MemoryRepositoryTrait>>,
 }
 
 impl MemoryEngine {
@@ -86,6 +88,25 @@ impl MemoryEngine {
             hierarchy_manager,
             importance_scorer,
             conflict_resolver,
+            memory_repository: None,
+        }
+    }
+
+    /// Create new memory engine with LibSQL repository for persistent storage
+    pub fn with_repository(
+        config: MemoryEngineConfig,
+        memory_repository: Arc<dyn crate::storage::traits::MemoryRepositoryTrait>,
+    ) -> Self {
+        let hierarchy_manager = Arc::new(DefaultHierarchyManager::new(config.hierarchy.clone()));
+        let importance_scorer = Arc::new(DefaultImportanceScorer::new(config.intelligence.clone()));
+        let conflict_resolver = Arc::new(DefaultConflictResolver::new(config.intelligence.clone()));
+
+        Self {
+            config,
+            hierarchy_manager,
+            importance_scorer,
+            conflict_resolver,
+            memory_repository: Some(memory_repository),
         }
     }
 
@@ -168,6 +189,106 @@ impl MemoryEngine {
     ) -> crate::CoreResult<Vec<Memory>> {
         info!("Searching memories: query='{}', scope={:?}, limit={:?}", query, scope, limit);
 
+        // ✅ 优先使用 LibSQL Repository（持久化存储）
+        if let Some(memory_repo) = &self.memory_repository {
+            info!("Using LibSQL memory repository for persistent search");
+            
+            // 从 LibSQL 读取记忆
+            let agent_id = match &scope {
+                Some(MemoryScope::Agent(id)) => Some(id.as_str()),
+                _ => None,
+            };
+            
+            let fetch_limit = limit.unwrap_or(100) as i64;
+            let db_memories = if let Some(aid) = agent_id {
+                memory_repo.find_by_agent_id(aid, fetch_limit).await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+            } else {
+                memory_repo.list(0, fetch_limit).await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+            };
+            
+            info!("Found {} memories from LibSQL", db_memories.len());
+            
+            // 转换为 Memory (MemoryItem) 类型并计算相关性
+            let mut scored_memories: Vec<(Memory, f64)> = db_memories
+                .into_iter()
+                .map(|db_mem| {
+                    use std::collections::HashMap;
+                    use chrono::Utc;
+                    
+                    // 解析 metadata JSON
+                    let metadata: HashMap<String, serde_json::Value> = if let serde_json::Value::Object(map) = &db_mem.metadata {
+                        map.iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .collect()
+                    } else {
+                        HashMap::new()
+                    };
+                    
+                    // 转换 storage::models::Memory -> MemoryItem
+                    let memory = Memory {
+                        id: db_mem.id.clone(),
+                        agent_id: db_mem.agent_id.clone(),
+                        user_id: Some(db_mem.user_id.clone()),
+                        content: db_mem.content.clone(),
+                        hash: db_mem.hash.clone(),
+                        metadata,
+                        score: db_mem.score,
+                        created_at: db_mem.created_at,
+                        updated_at: Some(db_mem.updated_at),
+                        memory_type: db_mem.memory_type.parse().unwrap_or(agent_mem_traits::MemoryType::Semantic),
+                        importance: db_mem.importance,
+                        // 默认值字段
+                        session: agent_mem_traits::Session {
+                            id: format!("session-{}", db_mem.id),
+                            user_id: Some(db_mem.user_id.clone()),
+                            agent_id: Some(db_mem.agent_id.clone()),
+                            run_id: None,
+                            actor_id: None,
+                            created_at: db_mem.created_at,
+                            metadata: HashMap::new(),
+                        },
+                        entities: vec![],
+                        relations: vec![],
+                        embedding: None,
+                        last_accessed_at: db_mem.last_accessed.unwrap_or_else(|| Utc::now()),
+                        access_count: db_mem.access_count as u32,
+                        expires_at: None,
+                        version: 1,
+                    };
+                    
+                    // 计算相关性分数
+                    let score = self.calculate_relevance_score(&memory, query);
+                    (memory, score)
+                })
+                .filter(|(_, score)| *score > 0.0)
+                .collect();
+            
+            // 按分数排序
+            scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
+                let combined_a = score_a + (mem_a.importance as f64 * 0.3);
+                let combined_b = score_b + (mem_b.importance as f64 * 0.3);
+                combined_b.partial_cmp(&combined_a).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            
+            // 应用限制并设置分数
+            let final_memories: Vec<Memory> = scored_memories
+                .into_iter()
+                .take(limit.unwrap_or(10))
+                .map(|(mut mem, score)| {
+                    mem.score = Some(score as f32);
+                    mem
+                })
+                .collect();
+            
+            info!("Returning {} memories from LibSQL (after ranking and limit)", final_memories.len());
+            return Ok(final_memories);
+        }
+
+        // ⚠️ Fallback: 使用内存层级管理器（当没有repository时）
+        warn!("No LibSQL repository available, falling back to hierarchy_manager (may be empty!)");
+        
         // Get all memories from hierarchy based on scope
         let mut all_memories = Vec::new();
 

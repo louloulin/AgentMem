@@ -77,10 +77,14 @@ pub async fn create_orchestrator(
     );
     debug!("Created LLMClient with provider: {}", llm_config.provider);
     
-    // 3. 创建 MemoryEngine
+    // 3. 创建 MemoryEngine（注入 LibSQL memory_repository 以支持持久化搜索）
     let memory_engine_config = MemoryEngineConfig::default();
-    let memory_engine = Arc::new(MemoryEngine::new(memory_engine_config));
-    debug!("Created MemoryEngine");
+    let memory_repository = repositories.memories.clone();
+    let memory_engine = Arc::new(MemoryEngine::with_repository(
+        memory_engine_config,
+        memory_repository,
+    ));
+    info!("Created MemoryEngine with LibSQL repository for persistent memory search");
     
     // 4. 获取 MessageRepository
     let message_repo = repositories.messages.clone();
