@@ -92,7 +92,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
 
         conn.execute(
             "INSERT INTO memories (
-                id, organization_id, user_id, agent_id, content, hash, metadata_,
+                id, organization_id, user_id, agent_id, content, hash, metadata,
                 score, memory_type, scope, level, importance, access_count, last_accessed,
                 created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -247,9 +247,9 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize metadata: {e}")))?;
 
         conn.execute(
-            "UPDATE memories SET 
+            "UPDATE memories SET
                 organization_id = ?, user_id = ?, agent_id = ?, content = ?, hash = ?,
-                metadata_ = ?, score = ?, memory_type = ?, scope = ?, level = ?,
+                metadata = ?, score = ?, memory_type = ?, scope = ?, level = ?,
                 importance = ?, access_count = ?, last_accessed = ?, updated_at = ?,
                 last_updated_by_id = ?
              WHERE id = ? AND is_deleted = 0",

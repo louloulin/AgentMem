@@ -266,7 +266,7 @@ async fn create_memories_table(conn: &Connection) -> Result<()> {
             agent_id TEXT NOT NULL,
             content TEXT NOT NULL,
             hash TEXT,
-            metadata_ TEXT,
+            metadata TEXT,
             score REAL,
             memory_type TEXT NOT NULL,
             scope TEXT NOT NULL,
