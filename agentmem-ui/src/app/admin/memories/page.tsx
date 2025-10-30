@@ -31,6 +31,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient, Memory, Agent } from '@/lib/api-client';
@@ -84,6 +94,16 @@ export default function MemoriesPageEnhanced() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // Add Memory Dialog state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newMemory, setNewMemory] = useState({
+    agent_id: '',
+    content: '',
+    memory_type: 'Semantic',
+    importance: 0.8,
+  });
+  const [submitting, setSubmitting] = useState(false);
   
   // Load data on mount
   useEffect(() => {
@@ -148,6 +168,64 @@ export default function MemoriesPageEnhanced() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handleAddMemory = async () => {
+    if (!newMemory.agent_id) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an agent",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!newMemory.content.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Memory content cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      await apiClient.createMemory({
+        agent_id: newMemory.agent_id,
+        content: newMemory.content,
+        memory_type: newMemory.memory_type,
+        importance: newMemory.importance,
+      });
+      
+      toast({
+        title: "Memory Added",
+        description: "Memory has been created successfully",
+      });
+      
+      // Close dialog and reset form
+      setAddDialogOpen(false);
+      setNewMemory({
+        agent_id: '',
+        content: '',
+        memory_type: 'Semantic',
+        importance: 0.8,
+      });
+      
+      // Reload memories if currently viewing the same agent
+      if (selectedAgentId === newMemory.agent_id) {
+        await handleAgentChange(newMemory.agent_id);
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to add memory",
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
   
@@ -237,7 +315,10 @@ export default function MemoriesPageEnhanced() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button size="sm">
+          <Button 
+            size="sm"
+            onClick={() => setAddDialogOpen(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Memory
           </Button>

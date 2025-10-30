@@ -24,7 +24,7 @@ impl Default for MemoryIntegratorConfig {
     fn default() -> Self {
         Self {
             max_memories: 10,
-            relevance_threshold: 0.5,
+            relevance_threshold: 0.1,  // ✅ 降低阈值以支持更宽泛的匹配
             include_timestamp: true,
             sort_by_importance: true,
         }
