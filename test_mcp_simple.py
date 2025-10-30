@@ -122,7 +122,7 @@ def main():
     add_params = {
         "content": "MCP 工具测试：这是一条通过 MCP 添加的测试记忆 " + str(int(time.time())),
         "user_id": "mcp-test-user",
-        "agent_id": "default-agent",
+        "agent_id": "agent-92070062-78bb-4553-9701-9a7a4a89d87a",
         "memory_type": "Episodic"
     }
     

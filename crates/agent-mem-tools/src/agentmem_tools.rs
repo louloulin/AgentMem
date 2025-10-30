@@ -71,14 +71,9 @@ impl Tool for AddMemoryTool {
         let agent_id = args["agent_id"].as_str().unwrap_or(&default_agent);
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
 
-        // 调用 AgentMem Backend API
+        // 调用 AgentMem Backend API (使用同步 HTTP 客户端避免 stdio 冲突)
         let api_url = get_api_url();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .pool_max_idle_per_host(0)  // 禁用连接池
-            .http1_only()  // 只使用 HTTP/1.1
-            .build()
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
+        let url = format!("{}/api/v1/memories", api_url);
 
         let request_body = json!({
             "content": content,
@@ -88,32 +83,35 @@ impl Tool for AddMemoryTool {
             "importance": 0.5
         });
 
-        let url = format!("{}/api/v1/memories", api_url);
         tracing::debug!("Calling API: POST {}", url);
         tracing::debug!("Request body: {}", serde_json::to_string(&request_body).unwrap_or_default());
 
-        let response = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+        // 使用 spawn_blocking 运行同步 HTTP 请求
+        let api_response = tokio::task::spawn_blocking(move || {
+            let response = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .send_json(&request_body);
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(crate::error::ToolError::ExecutionFailed(
-                format!("API returned error {}: {}", status, error_text)
-            ));
-        }
-
-        let api_response: Value = response.json().await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+            match response {
+                Ok(resp) => {
+                    resp.into_json::<Value>()
+                        .map_err(|e| format!("Failed to parse response: {}", e))
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    Err(format!("API returned error {}: {}", code, text))
+                }
+                Err(e) => Err(format!("HTTP request failed: {}", e))
+            }
+        })
+        .await
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
 
         // 提取 memory_id 从响应中
-        let memory_id = api_response["data"]["memory_id"]
+        let memory_id = api_response["data"]["id"]
             .as_str()
+            .or_else(|| api_response["data"]["memory_id"].as_str())
             .unwrap_or("unknown")
             .to_string();
 
@@ -174,41 +172,38 @@ impl Tool for SearchMemoriesTool {
 
         let limit = args["limit"].as_i64().unwrap_or(10) as usize;
 
-        // 调用 AgentMem Backend API
+        // 调用 AgentMem Backend API (使用同步 HTTP 客户端)
         let api_url = get_api_url();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .pool_max_idle_per_host(0)
-            .http1_only()
-            .build()
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
+        let url = format!("{}/api/v1/memories/search", api_url);
 
         let request_body = json!({
             "query": query,
             "limit": limit
         });
 
-        let url = format!("{}/api/v1/memories/search", api_url);
         tracing::debug!("Calling API: POST {}", url);
 
-        let response = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+        // 使用 spawn_blocking 运行同步 HTTP 请求
+        let api_response = tokio::task::spawn_blocking(move || {
+            let response = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .send_json(&request_body);
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(crate::error::ToolError::ExecutionFailed(
-                format!("API returned error {}: {}", status, error_text)
-            ));
-        }
-
-        let api_response: Value = response.json().await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+            match response {
+                Ok(resp) => {
+                    resp.into_json::<Value>()
+                        .map_err(|e| format!("Failed to parse response: {}", e))
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    Err(format!("API returned error {}: {}", code, text))
+                }
+                Err(e) => Err(format!("HTTP request failed: {}", e))
+            }
+        })
+        .await
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
 
         // 提取搜索结果
         let memories = api_response["data"]["memories"]
@@ -287,14 +282,9 @@ impl Tool for ChatTool {
             .unwrap_or_else(|_| "agent-92070062-78bb-4553-9701-9a7a4a89d87a".to_string());
         let agent_id = &default_agent;
 
-        // 调用 AgentMem Backend API
+        // 调用 AgentMem Backend API (使用同步 HTTP 客户端)
         let api_url = get_api_url();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .pool_max_idle_per_host(0)
-            .http1_only()
-            .build()
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
+        let url = format!("{}/api/v1/agents/{}/chat", api_url, agent_id);
 
         let request_body = json!({
             "message": message,
@@ -302,27 +292,29 @@ impl Tool for ChatTool {
             "stream": false
         });
 
-        let url = format!("{}/api/v1/agents/{}/chat", api_url, agent_id);
         tracing::debug!("Calling API: POST {}", url);
 
-        let response = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+        // 使用 spawn_blocking 运行同步 HTTP 请求
+        let api_response = tokio::task::spawn_blocking(move || {
+            let response = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .send_json(&request_body);
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(crate::error::ToolError::ExecutionFailed(
-                format!("API returned error {}: {}", status, error_text)
-            ));
-        }
-
-        let api_response: Value = response.json().await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+            match response {
+                Ok(resp) => {
+                    resp.into_json::<Value>()
+                        .map_err(|e| format!("Failed to parse response: {}", e))
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    Err(format!("API returned error {}: {}", code, text))
+                }
+                Err(e) => Err(format!("HTTP request failed: {}", e))
+            }
+        })
+        .await
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
 
         // 提取响应内容
         let response_content = api_response["data"]["content"]
@@ -379,14 +371,9 @@ impl Tool for GetSystemPromptTool {
 
         let context = args["context"].as_str().unwrap_or("");
 
-        // 调用 AgentMem Backend API 搜索用户记忆
+        // 调用 AgentMem Backend API 搜索用户记忆 (使用同步 HTTP 客户端)
         let api_url = get_api_url();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .pool_max_idle_per_host(0)
-            .http1_only()
-            .build()
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
+        let url = format!("{}/api/v1/memories/search", api_url);
 
         let search_query = if !context.is_empty() {
             format!("用户偏好和背景信息 {}", context)
@@ -399,27 +386,29 @@ impl Tool for GetSystemPromptTool {
             "limit": 10
         });
 
-        let url = format!("{}/api/v1/memories/search", api_url);
         tracing::debug!("Calling API: POST {}", url);
 
-        let response = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to call API: {}", e)))?;
+        // 使用 spawn_blocking 运行同步 HTTP 请求
+        let api_response = tokio::task::spawn_blocking(move || {
+            let response = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .send_json(&request_body);
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(crate::error::ToolError::ExecutionFailed(
-                format!("API returned error {}: {}", status, error_text)
-            ));
-        }
-
-        let api_response: Value = response.json().await
-            .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to parse response: {}", e)))?;
+            match response {
+                Ok(resp) => {
+                    resp.into_json::<Value>()
+                        .map_err(|e| format!("Failed to parse response: {}", e))
+                }
+                Err(ureq::Error::Status(code, resp)) => {
+                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    Err(format!("API returned error {}: {}", code, text))
+                }
+                Err(e) => Err(format!("HTTP request failed: {}", e))
+            }
+        })
+        .await
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
 
         // 提取记忆内容
         let memories = api_response["data"]["memories"]
