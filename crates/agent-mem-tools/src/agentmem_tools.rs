@@ -75,6 +75,8 @@ impl Tool for AddMemoryTool {
         let api_url = get_api_url();
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(0)  // 禁用连接池
+            .http1_only()  // 只使用 HTTP/1.1
             .build()
             .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
@@ -176,6 +178,8 @@ impl Tool for SearchMemoriesTool {
         let api_url = get_api_url();
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(0)
+            .http1_only()
             .build()
             .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
@@ -287,6 +291,8 @@ impl Tool for ChatTool {
         let api_url = get_api_url();
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(0)
+            .http1_only()
             .build()
             .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 
@@ -377,6 +383,8 @@ impl Tool for GetSystemPromptTool {
         let api_url = get_api_url();
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(0)
+            .http1_only()
             .build()
             .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Failed to create HTTP client: {}", e)))?;
 

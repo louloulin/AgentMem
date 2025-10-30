@@ -1599,7 +1599,66 @@ curl http://localhost:8080/health
 
 ---
 
-## 13. 下一步行动计划
+## 13. P1-3 修复进展 (2025-10-30 18:55)
+
+### 修复内容
+
+已完成 MCP 工具的真实 API 集成代码修改：
+
+1. **修改文件**: `crates/agent-mem-tools/src/agentmem_tools.rs`
+   - 添加 `get_api_url()` 函数，从环境变量读取 API URL（默认 http://localhost:8080）
+   - 修改 `AddMemoryTool::execute()` - 调用 `POST /api/v1/memories`
+   - 修改 `SearchMemoriesTool::execute()` - 调用 `POST /api/v1/memories/search`
+   - 修改 `ChatTool::execute()` - 调用 `POST /api/v1/agents/{agent_id}/chat`
+   - 修改 `GetSystemPromptTool::execute()` - 调用 `POST /api/v1/memories/search` 获取用户记忆
+
+2. **HTTP 客户端配置**:
+   - 使用 `reqwest::Client::builder()` 创建客户端
+   - 设置 30 秒超时
+   - 显式设置 `Content-Type: application/json` 头
+   - 添加 tracing::debug 日志
+
+3. **Agent ID 处理**:
+   - 支持环境变量 `AGENTMEM_DEFAULT_AGENT_ID`
+   - 默认使用 `agent-92070062-78bb-4553-9701-9a7a4a89d87a`（从数据库查询的真实 agent）
+
+### 遇到的问题
+
+**问题**: MCP 工具调用 Backend API 时出现 "connection closed before message completed" 错误
+
+**验证结果**:
+- ✅ Backend API 正常运行（端口 8080）
+- ✅ curl 可以成功调用 API 并添加记忆
+- ✅ Python requests 库可以成功调用 API
+- ❌ MCP server 中的 reqwest 调用失败
+
+**错误信息**:
+```
+Tool execution error: MCP tool 'agentmem_add_memory' execution error:
+Execution failed: Failed to call API: error sending request for url
+(http://localhost:8080/api/v1/memories): connection closed before message completed
+```
+
+**可能原因**:
+1. MCP server 使用 stdio 进行 JSON-RPC 通信，可能与 reqwest 的异步 I/O 冲突
+2. Tokio runtime 配置问题
+3. HTTP/1.1 连接复用问题
+
+**下一步调试方向**:
+1. 尝试禁用 HTTP 连接池：`.pool_max_idle_per_host(0)`
+2. 尝试使用 HTTP/1.0：`.http1_only()`
+3. 检查 MCP server 的 Tokio runtime 是否正确配置
+4. 考虑使用其他 HTTP 客户端（如 `ureq` 同步客户端）
+
+### 代码变更统计
+
+- 修改文件: 1 个
+- 新增代码: ~100 行
+- 删除模拟代码: ~50 行
+- 编译状态: ✅ 成功
+- 测试状态: ❌ Runtime 错误
+
+## 14. 下一步行动计划
 
 ### 13.1 立即行动（P1问题修复）
 
