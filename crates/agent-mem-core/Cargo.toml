@@ -66,3 +66,7 @@ harness = false
 [[bench]]
 name = "graph_reasoning"
 harness = false
+
+[[bench]]
+name = "adaptive_search_benchmark"
+harness = false
