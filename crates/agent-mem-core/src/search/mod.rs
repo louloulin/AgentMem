@@ -11,6 +11,8 @@
 
 pub mod adaptive;
 pub mod bm25;
+#[cfg(feature = "redis-cache")]
+pub mod cached_vector_search;
 pub mod learning;
 #[cfg(feature = "postgres")]
 pub mod enhanced_hybrid;
@@ -23,6 +25,8 @@ pub mod ranker;
 pub mod vector_search;
 
 pub use adaptive::{AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor};
+#[cfg(feature = "redis-cache")]
+pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
 pub use learning::{
     FeedbackRecord, LearningConfig, LearningEngine, OptimizationReport, 
     PatternImprovement, QueryPattern,
