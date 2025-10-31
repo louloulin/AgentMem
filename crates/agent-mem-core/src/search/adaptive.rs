@@ -86,7 +86,7 @@ impl QueryFeatures {
 }
 
 /// 搜索权重
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SearchWeights {
     /// 向量搜索权重
     pub vector_weight: f32,

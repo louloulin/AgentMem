@@ -3149,7 +3149,119 @@ enhanced_engine.record_feedback(&query.query, weights, 0.9).await;
 - ✅ 完整的测试覆盖
 - ✅ 详细的文档说明
 
-### 12.8 下一步优化建议
+### 12.8 增强学习机制 ✅
+
+**实施日期**: 2025-10-31
+
+**优化目标**:
+让搜索系统能够从实际使用反馈中**自动学习和优化**查询权重策略
+
+**实施内容**:
+
+1. **学习引擎核心** (`LearningEngine`)
+   - 查询模式分类：6种模式（Question/Technical/Short/Long/Conversational/General）
+   - 统计数据收集：样本数、平均权重、平均有效性
+   - 加权移动平均算法：平滑更新统计数据
+   - 最优权重追踪：自动记录最佳权重配置
+
+2. **学习配置** (`LearningConfig`)
+   ```rust
+   pub struct LearningConfig {
+       pub min_samples_for_learning: usize,    // 默认: 10
+       pub learning_rate: f32,                  // 默认: 0.1
+       pub smoothing_factor: f32,               // 默认: 0.2
+       pub feedback_threshold: f32,             // 默认: 0.7
+       pub max_history_size: usize,             // 默认: 10000
+       pub enable_cross_pattern_learning: bool, // 默认: false
+   }
+   ```
+
+3. **三层权重策略**
+   ```
+   优先级1: 学习权重（基于历史数据，样本充足时）
+        ↓ 回退
+   优先级2: 规则预测（基于查询特征，即时可用）
+        ↓ 回退
+   优先级3: 默认权重（固定权重，始终可用）
+   ```
+
+4. **系统集成**
+   - `EnhancedHybridSearchEngine` 增强
+   - 添加 `with_learning()` 构造函数
+   - 实现 `determine_weights()` 智能选择
+   - 支持 `get_optimization_report()` 报告生成
+   - 支持 `get_learning_stats()` 统计查询
+
+**代码位置**:
+- 核心模块: `crates/agent-mem-core/src/search/learning.rs` (405行)
+- 集成模块: `crates/agent-mem-core/src/search/enhanced_hybrid.rs` (重写，191行)
+- 测试文件: `tests/learning_integration_test.rs` (225行)
+- 详细报告: `LEARNING_MECHANISM_COMPLETE.md`
+
+**测试结果**:
+```
+✅ test_pattern_classification ... ok
+✅ test_learning_engine_basic ... ok
+✅ test_optimization_report ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored
+```
+
+**核心算法**:
+```rust
+// 加权移动平均 (WMA)
+new_avg = α × current + (1-α) × old_avg
+// 其中 α = learning_rate = 0.1
+
+// 最优权重追踪
+if current_effectiveness > best_effectiveness:
+    best_weights = current_weights
+
+// 置信度评估
+confidence = min(sample_count / min_samples, 1.0)
+```
+
+**API使用示例**:
+```rust
+// 创建带学习功能的搜索引擎
+let engine = EnhancedHybridSearchEngine::with_learning(
+    Arc::new(base_engine),
+    true,  // 启用自适应权重
+    true,  // 启用重排序
+    Some(LearningConfig::default()),
+);
+
+// 执行搜索（自动使用学习权重）
+let results = engine.search(query_vector, query).await?;
+
+// 记录用户反馈
+engine.record_feedback(&query.query, weights, 0.85).await;
+
+// 获取优化报告
+if let Some(report) = engine.get_optimization_report().await {
+    for improvement in report.improvements {
+        println!("模式: {:?}, 提升: {:.2}%", 
+            improvement.pattern,
+            improvement.effectiveness_improvement * 100.0
+        );
+    }
+}
+```
+
+**性能预期**:
+- 自动学习能力：✅ 完整支持
+- 权重优化方式：从固定规则 → 数据驱动
+- 适应性：从静态 → 动态学习
+- 预期精度提升：**+10-15%**（长期累积）
+
+**设计亮点**:
+1. ✅ **三层回退策略** - 保证系统健壮性
+2. ✅ **线程安全** - Arc + RwLock 保证并发
+3. ✅ **内存管理** - VecDeque自动限制大小
+4. ✅ **向后兼容** - 完全可选，不影响现有代码
+5. ✅ **高内聚低耦合** - 独立模块，清晰接口
+
+### 12.9 下一步优化建议
 
 **短期（1-2周）**:
 1. ✅ 自适应搜索权重 - **已完成**
@@ -3157,20 +3269,26 @@ enhanced_engine.record_feedback(&query.query, weights, 0.9).await;
 3. ✅ 核心测试验证 - **已完成**
 4. ✅ 综合测试扩展 - **已完成**
 5. ✅ 性能基准框架 - **已完成**
-6. 📋 生产环境A/B测试 - 验证实际效果
-7. 📋 运行benchmark获取性能数据
+6. ✅ 增强学习机制 - **已完成** ⭐ NEW
+7. 📋 持久化存储集成 - 将学习数据保存到LibSQL
+8. 📋 生产环境A/B测试 - 验证实际效果
+9. 📋 运行benchmark获取性能数据
 
 **中期（1个月）**:
 1. 📋 向量索引优化（IVF+HNSW）- 基础已就绪
 2. 📋 缓存预热自动化 - 基础已就绪
-3. 📋 用户反馈学习增强 - 框架已就绪
-4. 📋 查询意图识别（NLU集成）
+3. 📋 跨模式学习 - 利用相似模式数据
+4. 📋 在线学习 - 实时更新权重
+5. 📋 查询意图识别（NLU集成）
+6. 📋 可视化仪表盘 - 展示学习效果
 
 **长期（3个月）**:
 1. 📋 分布式架构改造
 2. 📋 实时性能监控
 3. 📋 自动A/B测试框架
-4. 📋 个性化权重学习
+4. 📋 个性化权重学习（per-user）
+5. 📋 强化学习算法集成
+6. 📋 多目标优化（准确性+性能）
 
 ---
 

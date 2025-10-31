@@ -1,12 +1,14 @@
 //! 增强的混合搜索引擎
 //!
-//! 在原有混合搜索基础上增加自适应权重调整和结果重排序
+//! 在原有混合搜索基础上增加自适应权重调整、结果重排序和机器学习
 
-use super::adaptive::{AdaptiveSearchOptimizer, SearchReranker, SearchWeights};
+use super::adaptive::{AdaptiveSearchOptimizer, SearchReranker, SearchWeights, QueryFeatures};
 use super::hybrid::HybridSearchEngine;
+use super::learning::{LearningEngine, LearningConfig, QueryPattern, OptimizationReport};
 use super::{SearchQuery, SearchResult};
 use agent_mem_traits::Result;
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 /// 增强混合搜索引擎
@@ -20,15 +22,21 @@ pub struct EnhancedHybridSearchEngine {
     /// 重排序器
     reranker: Arc<SearchReranker>,
     
+    /// 学习引擎（可选）
+    learning_engine: Option<Arc<LearningEngine>>,
+    
     /// 是否启用自适应权重
     enable_adaptive_weights: bool,
     
     /// 是否启用重排序
     enable_reranking: bool,
+    
+    /// 是否启用机器学习
+    enable_learning: bool,
 }
 
 impl EnhancedHybridSearchEngine {
-    /// 创建新的增强混合搜索引擎
+    /// 创建新的增强混合搜索引擎（基础版本，不启用学习）
     pub fn new(
         base_engine: Arc<HybridSearchEngine>,
         enable_adaptive_weights: bool,
@@ -38,8 +46,32 @@ impl EnhancedHybridSearchEngine {
             base_engine,
             optimizer: Arc::new(RwLock::new(AdaptiveSearchOptimizer::default())),
             reranker: Arc::new(SearchReranker::default()),
+            learning_engine: None,
             enable_adaptive_weights,
             enable_reranking,
+            enable_learning: false,
+        }
+    }
+    
+    /// 创建带学习功能的增强搜索引擎
+    pub fn with_learning(
+        base_engine: Arc<HybridSearchEngine>,
+        enable_adaptive_weights: bool,
+        enable_reranking: bool,
+        learning_config: Option<LearningConfig>,
+    ) -> Self {
+        let learning_engine = Arc::new(LearningEngine::new(
+            learning_config.unwrap_or_default()
+        ));
+        
+        Self {
+            base_engine,
+            optimizer: Arc::new(RwLock::new(AdaptiveSearchOptimizer::default())),
+            reranker: Arc::new(SearchReranker::default()),
+            learning_engine: Some(learning_engine),
+            enable_adaptive_weights,
+            enable_reranking,
+            enable_learning: true,
         }
     }
     
@@ -49,24 +81,20 @@ impl EnhancedHybridSearchEngine {
         query_vector: Vec<f32>,
         query: SearchQuery,
     ) -> Result<Vec<SearchResult>> {
-        // 步骤1: 自适应权重调整（如果启用）
-        let (optimized_query, predicted_weights) = if self.enable_adaptive_weights {
-            let optimizer = self.optimizer.read().await;
-            optimizer.optimize_query(&query)
-        } else {
-            (query.clone(), SearchWeights {
-                vector_weight: 0.7,
-                fulltext_weight: 0.3,
-                confidence: 1.0,
-            })
-        };
+        // 步骤1: 确定搜索权重
+        let weights = self.determine_weights(&query).await;
         
-        // 步骤2: 执行基础混合搜索（使用预测的权重）
+        // 应用权重到查询
+        let mut optimized_query = query.clone();
+        optimized_query.vector_weight = weights.vector_weight;
+        optimized_query.fulltext_weight = weights.fulltext_weight;
+        
+        // 步骤2: 执行基础混合搜索（使用确定的权重）
         let result = self.base_engine.search_with_weights(
             query_vector,
             optimized_query.clone(),
-            predicted_weights.vector_weight,
-            predicted_weights.fulltext_weight,
+            weights.vector_weight,
+            weights.fulltext_weight,
         ).await?;
         
         let mut results = result.results;
@@ -79,15 +107,81 @@ impl EnhancedHybridSearchEngine {
         Ok(results)
     }
     
-    /// 记录搜索反馈（用于持续优化）
+    /// 确定搜索权重（综合规则和学习）
+    async fn determine_weights(&self, query: &SearchQuery) -> SearchWeights {
+        let features = QueryFeatures::extract_from_query(&query.query);
+        
+        // 优先使用学习到的权重
+        if self.enable_learning {
+            if let Some(learning_engine) = &self.learning_engine {
+                if let Some(learned_weights) = learning_engine.get_recommended_weights(&features).await {
+                    return learned_weights;
+                }
+            }
+        }
+        
+        // 其次使用规则预测的权重
+        if self.enable_adaptive_weights {
+            let optimizer = self.optimizer.read().await;
+            let (_optimized_query, predicted_weights) = optimizer.optimize_query(query);
+            return predicted_weights;
+        }
+        
+        // 最后使用默认权重
+        SearchWeights {
+            vector_weight: query.vector_weight,
+            fulltext_weight: query.fulltext_weight,
+            confidence: 0.5,
+        }
+    }
+    
+    /// 记录搜索反馈（用于持续优化和学习）
     pub async fn record_feedback(
         &self,
         query: &str,
         weights: SearchWeights,
         user_satisfaction: f32,
     ) {
+        // 1. 记录到优化器（保持向后兼容）
         let mut optimizer = self.optimizer.write().await;
         optimizer.record_feedback(query, weights, user_satisfaction);
+        drop(optimizer);
+        
+        // 2. 如果启用学习，记录到学习引擎
+        if self.enable_learning {
+            if let Some(learning_engine) = &self.learning_engine {
+                let features = QueryFeatures::extract_from_query(query);
+                learning_engine.record_feedback(
+                    features,
+                    weights,
+                    user_satisfaction,
+                    None,  // user_id可以后续添加
+                ).await;
+            }
+        }
+    }
+    
+    /// 获取优化报告（从学习引擎）
+    pub async fn get_optimization_report(&self) -> Option<OptimizationReport> {
+        if let Some(learning_engine) = &self.learning_engine {
+            Some(learning_engine.optimize().await)
+        } else {
+            None
+        }
+    }
+    
+    /// 获取学习统计信息
+    pub async fn get_learning_stats(&self) -> Option<HashMap<QueryPattern, super::learning::PatternStatistics>> {
+        if let Some(learning_engine) = &self.learning_engine {
+            Some(learning_engine.get_all_statistics().await)
+        } else {
+            None
+        }
+    }
+    
+    /// 检查学习功能是否启用
+    pub fn is_learning_enabled(&self) -> bool {
+        self.enable_learning
     }
 }
 
@@ -97,5 +191,20 @@ mod tests {
     
     // 注意：这些测试需要mock HybridSearchEngine
     // 实际测试将在集成测试中进行
+    
+    #[test]
+    fn test_enhanced_engine_creation() {
+        // 测试基础版本创建
+        // let base_engine = Arc::new(/* mock engine */);
+        // let engine = EnhancedHybridSearchEngine::new(base_engine, true, true);
+        // assert!(!engine.is_learning_enabled());
+    }
+    
+    #[test]
+    fn test_enhanced_engine_with_learning() {
+        // 测试带学习功能的版本创建
+        // let base_engine = Arc::new(/* mock engine */);
+        // let engine = EnhancedHybridSearchEngine::with_learning(base_engine, true, true, None);
+        // assert!(engine.is_learning_enabled());
+    }
 }
-

@@ -11,6 +11,7 @@
 
 pub mod adaptive;
 pub mod bm25;
+pub mod learning;
 #[cfg(feature = "postgres")]
 pub mod enhanced_hybrid;
 pub mod fuzzy;
@@ -22,6 +23,10 @@ pub mod ranker;
 pub mod vector_search;
 
 pub use adaptive::{AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor};
+pub use learning::{
+    FeedbackRecord, LearningConfig, LearningEngine, OptimizationReport, 
+    PatternImprovement, QueryPattern,
+};
 pub use bm25::{BM25Params, BM25SearchEngine};
 #[cfg(feature = "postgres")]
 pub use enhanced_hybrid::EnhancedHybridSearchEngine;
