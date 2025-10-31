@@ -116,6 +116,10 @@ pub struct LearningEngine {
     
     /// 最大历史记录数
     max_history_size: usize,
+    
+    /// 持久化仓库（可选）
+    #[cfg(feature = "libsql")]
+    repository: Option<Arc<dyn crate::storage::libsql::LearningRepositoryTrait>>,
 }
 
 impl LearningEngine {
@@ -126,7 +130,45 @@ impl LearningEngine {
             pattern_stats: Arc::new(RwLock::new(HashMap::new())),
             feedback_history: Arc::new(RwLock::new(Vec::new())),
             max_history_size: 1000,  // 内存中最多保留1000条
+            #[cfg(feature = "libsql")]
+            repository: None,
         }
+    }
+    
+    /// 创建带持久化的学习引擎
+    #[cfg(feature = "libsql")]
+    pub fn with_persistence(
+        config: LearningConfig,
+        repository: Arc<dyn crate::storage::libsql::LearningRepositoryTrait>,
+    ) -> Self {
+        Self {
+            config,
+            pattern_stats: Arc::new(RwLock::new(HashMap::new())),
+            feedback_history: Arc::new(RwLock::new(Vec::new())),
+            max_history_size: 1000,
+            repository: Some(repository),
+        }
+    }
+    
+    /// 从存储加载历史数据
+    #[cfg(feature = "libsql")]
+    pub async fn load_from_storage(&self) -> agent_mem_traits::Result<()> {
+        if let Some(repo) = &self.repository {
+            // 加载最近的反馈记录
+            let records = repo.get_recent_feedback(self.max_history_size).await?;
+            
+            // 加载到内存
+            let mut history = self.feedback_history.write().await;
+            *history = records.clone();
+            drop(history);
+            
+            // 重建统计数据
+            for record in records {
+                let pattern = QueryPattern::from_features(&record.features);
+                self.update_statistics(pattern, record).await;
+            }
+        }
+        Ok(())
     }
     
     /// 记录反馈
@@ -148,6 +190,13 @@ impl LearningEngine {
             user_id,
         };
         
+        // 保存到数据库（如果启用持久化）
+        #[cfg(feature = "libsql")]
+        if let Some(repo) = &self.repository {
+            // 异步保存，忽略错误（不阻塞主流程）
+            let _ = repo.create_feedback(&record).await;
+        }
+        
         // 添加到历史记录
         let mut history = self.feedback_history.write().await;
         history.push(record.clone());
@@ -168,8 +217,7 @@ impl LearningEngine {
         let pattern_stat = stats.entry(pattern).or_insert_with(PatternStatistics::default);
         
         // 增量更新统计
-        let n = pattern_stat.total_queries as f32;
-        let new_n = n + 1.0;
+        let _n = pattern_stat.total_queries as f32;
         
         // 加权移动平均更新平均效果
         if pattern_stat.total_queries == 0 {

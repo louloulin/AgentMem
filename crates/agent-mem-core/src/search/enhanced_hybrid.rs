@@ -75,6 +75,34 @@ impl EnhancedHybridSearchEngine {
         }
     }
     
+    /// 创建带学习和持久化功能的增强搜索引擎
+    #[cfg(feature = "libsql")]
+    pub async fn with_learning_and_persistence(
+        base_engine: Arc<HybridSearchEngine>,
+        enable_adaptive_weights: bool,
+        enable_reranking: bool,
+        learning_config: Option<LearningConfig>,
+        repository: Arc<dyn crate::storage::libsql::LearningRepositoryTrait>,
+    ) -> Result<Self> {
+        let learning_engine = Arc::new(LearningEngine::with_persistence(
+            learning_config.unwrap_or_default(),
+            repository,
+        ));
+        
+        // 从存储加载历史数据
+        learning_engine.load_from_storage().await?;
+        
+        Ok(Self {
+            base_engine,
+            optimizer: Arc::new(RwLock::new(AdaptiveSearchOptimizer::default())),
+            reranker: Arc::new(SearchReranker::default()),
+            learning_engine: Some(learning_engine),
+            enable_adaptive_weights,
+            enable_reranking,
+            enable_learning: true,
+        })
+    }
+    
     /// 执行增强搜索
     pub async fn search(
         &self,

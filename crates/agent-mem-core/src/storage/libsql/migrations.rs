@@ -26,6 +26,7 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
     run_migration(&conn_guard, 9, "create_junction_tables", create_junction_tables(&conn_guard)).await?;
     run_migration(&conn_guard, 10, "create_memory_associations", create_memory_associations_table(&conn_guard)).await?;
     run_migration(&conn_guard, 11, "create_indexes", create_indexes(&conn_guard)).await?;
+    run_migration(&conn_guard, 12, "create_learning_feedback", create_learning_feedback_table(&conn_guard)).await?;
 
     // Initialize default data (idempotent - safe to run multiple times)
     init_default_data(&conn_guard).await?;
@@ -437,6 +438,40 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Create learning_feedback table for storing search optimization feedback
+async fn create_learning_feedback_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE learning_feedback (
+            id TEXT PRIMARY KEY,
+            query_pattern TEXT NOT NULL,
+            features TEXT NOT NULL,
+            vector_weight REAL NOT NULL,
+            fulltext_weight REAL NOT NULL,
+            effectiveness REAL NOT NULL,
+            timestamp INTEGER NOT NULL,
+            user_id TEXT
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create learning_feedback table: {e}")))?;
+
+    // Create indexes for learning_feedback table
+    let indexes = vec![
+        "CREATE INDEX IF NOT EXISTS idx_learning_feedback_pattern ON learning_feedback(query_pattern)",
+        "CREATE INDEX IF NOT EXISTS idx_learning_feedback_timestamp ON learning_feedback(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_learning_feedback_user_id ON learning_feedback(user_id)",
+    ];
+
+    for index_sql in indexes {
+        conn.execute(index_sql, ())
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create learning_feedback index: {e}")))?;
+    }
+
+    Ok(())
+}
+
 /// Initialize default data (organizations, users)
 /// This is idempotent - safe to run multiple times
 async fn init_default_data(conn: &Connection) -> Result<()> {
@@ -503,7 +538,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 11); // 11 migrations
+        assert_eq!(count, 12); // 12 migrations (including learning_feedback)
     }
 
     #[tokio::test]
@@ -517,7 +552,7 @@ mod tests {
         let result = run_migrations(conn.clone()).await;
         assert!(result.is_ok());
 
-        // Should still have 11 migrations
+        // Should still have 12 migrations
         let conn_guard = conn.lock().await;
         let mut rows = conn_guard
             .query("SELECT COUNT(*) FROM _migrations", ())
@@ -526,7 +561,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 11);
+        assert_eq!(count, 12); // 12 migrations (including learning_feedback)
     }
 }
 
