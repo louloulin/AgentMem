@@ -6,10 +6,12 @@
 //! - Cache warming (preload frequently accessed data)
 //! - Cache invalidation strategies (TTL, LRU, manual)
 
+pub mod learning_warmer;
 pub mod memory_cache;
 pub mod multi_level;
 pub mod warming;
 
+pub use learning_warmer::{LearningBasedCacheWarmer, LearningWarmingConfig};
 pub use memory_cache::{MemoryCache, MemoryCacheConfig, MemoryCacheStats};
 pub use multi_level::{CacheLevel, MultiLevelCache, MultiLevelCacheConfig};
 pub use warming::{CacheWarmer, CacheWarmingConfig, DataLoader, WarmingStats, WarmingStrategy};

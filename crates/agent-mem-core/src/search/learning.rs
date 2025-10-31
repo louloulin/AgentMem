@@ -261,6 +261,11 @@ impl LearningEngine {
         None
     }
     
+    /// 获取所有模式的统计数据（用于缓存预热）
+    pub async fn get_all_pattern_stats(&self) -> HashMap<QueryPattern, PatternStatistics> {
+        self.pattern_stats.read().await.clone()
+    }
+    
     /// 获取所有模式的统计信息
     pub async fn get_all_statistics(&self) -> HashMap<QueryPattern, PatternStatistics> {
         self.pattern_stats.read().await.clone()
