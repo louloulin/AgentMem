@@ -93,6 +93,54 @@ impl HybridSearchEngine {
         )
     }
 
+    /// 使用自定义权重执行混合搜索
+    ///
+    /// # Arguments
+    ///
+    /// * `query_vector` - 查询向量
+    /// * `query` - 搜索查询
+    /// * `vector_weight` - 向量搜索权重
+    /// * `fulltext_weight` - 全文搜索权重
+    pub async fn search_with_weights(
+        &self,
+        query_vector: Vec<f32>,
+        query: SearchQuery,
+        vector_weight: f32,
+        fulltext_weight: f32,
+    ) -> Result<HybridSearchResult> {
+        let start = Instant::now();
+        
+        // 并行或串行搜索
+        let (vector_results, fulltext_results) = if self.config.enable_parallel {
+            self.parallel_search(query_vector, &query).await?
+        } else {
+            self.sequential_search(query_vector, &query).await?
+        };
+        
+        // RRF 融合（使用自定义权重）
+        let fused_results = self.ranker.fuse_with_weights(
+            vector_results,
+            fulltext_results,
+            vector_weight,
+            fulltext_weight,
+        )?;
+        
+        let total_time = start.elapsed().as_millis() as u64;
+        
+        Ok(HybridSearchResult {
+            results: fused_results,
+            stats: SearchStats {
+                total_time_ms: total_time,
+                vector_search_time_ms: 0,
+                fulltext_search_time_ms: 0,
+                fusion_time_ms: 0,
+                vector_results_count: 0,
+                fulltext_results_count: 0,
+                final_results_count: 0,
+            },
+        })
+    }
+    
     /// 执行混合搜索
     ///
     /// # Arguments

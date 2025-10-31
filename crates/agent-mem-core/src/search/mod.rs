@@ -9,7 +9,10 @@
 //! - 搜索结果重排序
 //! - 搜索性能优化
 
+pub mod adaptive;
 pub mod bm25;
+#[cfg(feature = "postgres")]
+pub mod enhanced_hybrid;
 pub mod fuzzy;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
@@ -18,7 +21,10 @@ pub mod hybrid;
 pub mod ranker;
 pub mod vector_search;
 
+pub use adaptive::{AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor};
 pub use bm25::{BM25Params, BM25SearchEngine};
+#[cfg(feature = "postgres")]
+pub use enhanced_hybrid::EnhancedHybridSearchEngine;
 pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
 #[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;

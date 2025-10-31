@@ -62,6 +62,31 @@ impl RRFRanker {
     fn calculate_rrf_score(&self, rank: usize) -> f32 {
         1.0 / (self.k + rank as f32)
     }
+    
+    /// 使用自定义权重融合两个结果列表
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_results` - 向量搜索结果
+    /// * `fulltext_results` - 全文搜索结果
+    /// * `vector_weight` - 向量搜索权重
+    /// * `fulltext_weight` - 全文搜索权重
+    ///
+    /// # Returns
+    ///
+    /// 返回融合后的搜索结果列表
+    pub fn fuse_with_weights(
+        &self,
+        vector_results: Vec<SearchResult>,
+        fulltext_results: Vec<SearchResult>,
+        vector_weight: f32,
+        fulltext_weight: f32,
+    ) -> Result<Vec<SearchResult>> {
+        self.fuse(
+            vec![vector_results, fulltext_results],
+            vec![vector_weight, fulltext_weight]
+        )
+    }
 }
 
 impl SearchResultRanker for RRFRanker {
