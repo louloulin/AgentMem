@@ -182,6 +182,19 @@ impl MemoryManager {
             .map_err(|e| format!("Failed to query: {}", e))?;
         
         if let Some(row) = rows.next().await.map_err(|e| format!("Failed to fetch row: {}", e))? {
+            // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
+            use chrono::{DateTime, Utc};
+            
+            let created_at_ts: Option<i64> = row.get(6).ok();
+            let created_at_str = created_at_ts
+                .and_then(|ts| DateTime::from_timestamp(ts, 0))
+                .map(|dt| dt.to_rfc3339());
+            
+            let last_accessed_ts: Option<i64> = row.get(7).ok();
+            let last_accessed_str = last_accessed_ts
+                .and_then(|ts| DateTime::from_timestamp(ts, 0))
+                .map(|dt| dt.to_rfc3339());
+            
             let json = serde_json::json!({
                 "id": row.get::<String>(0).unwrap_or_default(),
                 "agent_id": row.get::<String>(1).unwrap_or_default(),
@@ -189,8 +202,8 @@ impl MemoryManager {
                 "content": row.get::<String>(3).unwrap_or_default(),
                 "memory_type": row.get::<Option<String>>(4).ok().flatten(),
                 "importance": row.get::<Option<f64>>(5).ok().flatten(),
-                "created_at": row.get::<Option<i64>>(6).ok().flatten(),
-                "last_accessed_at": row.get::<Option<i64>>(7).ok().flatten(),
+                "created_at": created_at_str,
+                "last_accessed_at": last_accessed_str,
                 "access_count": row.get::<Option<i64>>(8).ok().flatten(),
                 "metadata": row.get::<Option<String>>(9).ok().flatten(),
                 "hash": row.get::<Option<String>>(10).ok().flatten(),
@@ -729,6 +742,19 @@ pub async fn get_agent_memories(
     while let Some(row) = rows.next().await
         .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
         
+        // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
+        use chrono::{DateTime, Utc};
+        
+        let created_at_ts: Option<i64> = row.get(6).ok();
+        let created_at_str = created_at_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339());
+        
+        let last_accessed_ts: Option<i64> = row.get(7).ok();
+        let last_accessed_str = last_accessed_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339());
+        
         memories_json.push(serde_json::json!({
             "id": row.get::<String>(0).unwrap_or_default(),
             "agent_id": row.get::<String>(1).unwrap_or_default(),
@@ -736,8 +762,8 @@ pub async fn get_agent_memories(
             "content": row.get::<String>(3).unwrap_or_default(),
             "memory_type": row.get::<Option<String>>(4).ok().flatten(),
             "importance": row.get::<Option<f64>>(5).ok().flatten(),
-            "created_at": row.get::<Option<i64>>(6).ok().flatten(),
-            "last_accessed": row.get::<Option<i64>>(7).ok().flatten(),
+            "created_at": created_at_str,
+            "last_accessed": last_accessed_str,
             "access_count": row.get::<Option<i64>>(8).ok().flatten(),
             "metadata": row.get::<Option<String>>(9).ok().flatten(),
             "hash": row.get::<Option<String>>(10).ok().flatten(),

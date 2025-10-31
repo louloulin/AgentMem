@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://gitcode.com/louloulin/agentmem)
 
-**AgentMem** 是一个基于 Rust 开发的智能记忆管理平台，为 AI 代理提供先进的记忆处理能力。项目包含完整的模块化架构、智能推理引擎和 Mem0 兼容层。
+**AgentMem** 是一个基于 Rust +Cangjie 开发的智能记忆管理平台，为 AI 代理提供先进的记忆处理能力。项目包含完整的模块化架构、智能推理引擎和 Mem0 兼容层。
 
 ## 🎯 项目状态
 
