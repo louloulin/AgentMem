@@ -5,6 +5,7 @@ resolver = "2"
 # These can be fixed later without impacting production readiness
 exclude = [
     "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
+    "examples/batch-embedding-optimization-demo",  # 独立示例，不需要workspace集成
 ]
 
 members = [
