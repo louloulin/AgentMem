@@ -282,7 +282,7 @@ impl MemoryManager {
             .map_err(|e| e.to_string())
     }
 
-    /// 搜索记忆 (🆕 Fix 2: 集成QueryOptimizer优化查询参数)
+    /// 搜索记忆 (🆕 Fix 2: 集成QueryOptimizer和Reranker)
     pub async fn search_memories(
         &self,
         query: String,
@@ -319,16 +319,105 @@ impl MemoryManager {
         };
         
         let options = SearchOptions {
-            user_id,
+            user_id: user_id.clone(),
             limit: Some(fetch_limit),
             threshold: Some(0.7),
             ..Default::default()
         };
 
-        self.memory
-            .search_with_options(query, options)
+        // 执行搜索
+        let raw_results = self.memory
+            .search_with_options(query.clone(), options)
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        // 🆕 Phase 3-D: 如果需要重排序且有结果，使用Reranker优化
+        if optimized_plan.should_rerank && !raw_results.is_empty() && raw_results.len() > base_limit {
+            // 保存结果数量用于日志
+            let raw_count = raw_results.len();
+            
+            match self.apply_reranking(&query, &search_query, raw_results, base_limit).await {
+                Ok(reranked) => {
+                    info!("✨ Reranking applied successfully: {} → {} final results", raw_count, reranked.len());
+                    return Ok(reranked);
+                }
+                Err(e) => {
+                    // Reranking失败时降级：重新执行搜索，使用base_limit
+                    warn!("⚠️  Reranking failed ({}), falling back to direct search with base_limit", e);
+                    let fallback_options = SearchOptions {
+                        user_id,
+                        limit: Some(base_limit),
+                        threshold: Some(0.7),
+                        ..Default::default()
+                    };
+                    return self.memory
+                        .search_with_options(query, fallback_options)
+                        .await
+                        .map_err(|e| e.to_string());
+                }
+            }
+        }
+
+        // 不需要重排序或结果不足，直接返回（可能需要截断）
+        Ok(raw_results.into_iter().take(base_limit).collect())
+    }
+
+    /// 🆕 应用Reranker重排序
+    ///
+    /// 将MemoryItem转换为SearchResult，调用Reranker，再转换回来
+    async fn apply_reranking(
+        &self,
+        query: &str,
+        search_query: &agent_mem_core::search::SearchQuery,
+        raw_results: Vec<MemoryItem>,
+        final_limit: usize,
+    ) -> Result<Vec<MemoryItem>, String> {
+        use agent_mem_core::search::SearchResult;
+
+        // 1. 生成query vector
+        let query_vector = self.memory
+            .generate_query_vector(query)
+            .await
+            .map_err(|e| format!("Failed to generate query vector: {}", e))?;
+
+        // 2. 转换MemoryItem → SearchResult
+        let candidates: Vec<SearchResult> = raw_results
+            .iter()
+            .map(|item| SearchResult {
+                id: item.id.clone(),
+                content: item.content.clone(),
+                score: item.score.unwrap_or(0.5),
+                vector_score: item.score,
+                fulltext_score: None,
+                metadata: Some(serde_json::to_value(&item.metadata).unwrap_or(serde_json::json!({}))),
+            })
+            .collect();
+
+        // 3. 调用Reranker
+        let reranked_results = self.reranker
+            .rerank(candidates, &query_vector, search_query)
+            .await
+            .map_err(|e| format!("Reranker execution failed: {}", e))?;
+
+        // 4. 转换回MemoryItem（保持原始MemoryItem数据，只更新顺序和score）
+        let mut result_map: std::collections::HashMap<String, MemoryItem> = raw_results
+            .into_iter()
+            .map(|item| (item.id.clone(), item))
+            .collect();
+
+        let final_results: Vec<MemoryItem> = reranked_results
+            .into_iter()
+            .take(final_limit)
+            .filter_map(|reranked| {
+                result_map.get_mut(&reranked.id).map(|item| {
+                    // 更新score为重排序后的分数
+                    item.score = Some(reranked.score);
+                    item.clone()
+                })
+            })
+            .collect();
+
+        Ok(final_results)
     }
 
     /// 获取所有记忆
@@ -402,7 +491,7 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// 添加新记忆（🔧 使用双写策略）
 #[utoipa::path(

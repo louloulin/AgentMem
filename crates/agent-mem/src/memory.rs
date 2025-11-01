@@ -851,6 +851,39 @@ impl Memory {
         Ok(warmed_count)
     }
 
+    /// 🆕 生成查询向量（用于Reranker和高级搜索）
+    ///
+    /// 为给定的查询文本生成embedding向量，供ResultReranker等高级功能使用。
+    ///
+    /// # 参数
+    ///
+    /// - `query`: 查询字符串
+    ///
+    /// # 返回
+    ///
+    /// 返回查询的embedding向量
+    ///
+    /// # 错误
+    ///
+    /// 如果embedding服务未配置或生成失败，返回错误
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let vector = mem.generate_query_vector("What is my favorite food?").await?;
+    /// println!("Generated vector with {} dimensions", vector.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn generate_query_vector(&self, query: &str) -> Result<Vec<f32>> {
+        debug!("生成查询向量: {}", query);
+        let orchestrator = self.orchestrator.read().await;
+        orchestrator.generate_query_embedding(query).await
+    }
+
     /// 获取性能统计 (Phase 4.4)
     ///
     /// 返回内存引擎的性能指标

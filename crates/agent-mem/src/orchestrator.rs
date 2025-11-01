@@ -2903,7 +2903,9 @@ impl MemoryOrchestrator {
     /// P0优化 #21: 修复零向量降级问题
     /// 
     /// 零向量对搜索无意义，应该返回错误而非降级
-    async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
+    /// 
+    /// 🆕 Phase 3-D: 改为pub以支持Memory.generate_query_vector()和Reranker集成
+    pub async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
         if let Some(embedder) = &self.embedder {
             // 使用 Embedder 生成嵌入向量
             match embedder.embed(query).await {
