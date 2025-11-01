@@ -807,9 +807,23 @@ impl MemoryOrchestrator {
     ) -> Result<Option<Arc<crate::history::HistoryManager>>> {
         info!("Phase 6: 创建历史记录管理器");
 
-        let history_path = "./data/history.db";
+        // 🆕 Fix 3: 使用正确的 SQLite URL 格式（绝对路径）
+        use std::env;
+        use std::path::PathBuf;
+        
+        let current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let data_dir = current_dir.join("data");
+        
+        // 确保数据目录存在
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            warn!("创建 data 目录失败: {}, 历史记录功能将不可用", e);
+            return Ok(None);
+        }
+        
+        let db_file = data_dir.join("history.db");
+        let history_path = format!("sqlite://{}", db_file.display());
 
-        match crate::history::HistoryManager::new(history_path).await {
+        match crate::history::HistoryManager::new(&history_path).await {
             Ok(manager) => {
                 info!("✅ HistoryManager 创建成功: {}", history_path);
                 Ok(Some(Arc::new(manager)))

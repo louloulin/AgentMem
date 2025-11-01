@@ -63,7 +63,8 @@ pub async fn create_router(
 
     let mut app = Router::new()
         // Memory management routes (✅ 使用Memory统一API)
-        .route("/api/v1/memories", post(memory::add_memory))
+        // 🆕 Fix 1: 添加GET方法支持全局列表查询
+        .route("/api/v1/memories", get(memory::list_all_memories).post(memory::add_memory))
         .route("/api/v1/memories/:id", get(memory::get_memory))
         .route("/api/v1/memories/:id", put(memory::update_memory))
         .route("/api/v1/memories/:id", delete(memory::delete_memory))
@@ -225,6 +226,7 @@ pub async fn create_router(
 #[openapi(
     paths(
         memory::add_memory,
+        memory::list_all_memories,
         memory::get_memory,
         memory::update_memory,
         memory::delete_memory,

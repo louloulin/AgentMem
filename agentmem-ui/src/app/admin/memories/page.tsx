@@ -113,20 +113,19 @@ export default function MemoriesPageEnhanced() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const agentsData = await apiClient.getAgents();
-      setAgents(agentsData || []);
       
-      // Load memories for first agent if available
-      if (agentsData && agentsData.length > 0) {
-        const memoriesData = await apiClient.getMemories(agentsData[0].id);
-        setMemories(memoriesData || []);
-      } else {
-        setMemories([]);
-      }
+      // 🆕 Fix 1: 并行加载agents和全局memories，不再依赖Agent
+      const [agentsData, memoriesResponse] = await Promise.all([
+        apiClient.getAgents(),
+        apiClient.getAllMemories(currentPage, itemsPerPage),
+      ]);
+      
+      setAgents(agentsData || []);
+      setMemories(memoriesResponse?.memories || []);
       
       toast({
         title: "Data loaded",
-        description: `Loaded ${agentsData?.length || 0} agents`,
+        description: `Loaded ${agentsData?.length || 0} agents and ${memoriesResponse?.memories?.length || 0} memories`,
       });
     } catch (err) {
       setAgents([]);
@@ -145,19 +144,19 @@ export default function MemoriesPageEnhanced() {
     setSelectedAgentId(agentId);
     setCurrentPage(1);
     
-    if (agentId === 'all') {
-      setMemories([]);
-      return;
-    }
-    
     try {
       setLoading(true);
-      const data = await apiClient.getMemories(agentId);
-      setMemories(data || []);
+      // 🆕 Fix 1: 使用新的getAllMemories API，支持可选的agent过滤
+      const memoriesResponse = await apiClient.getAllMemories(
+        0, 
+        itemsPerPage, 
+        agentId === 'all' ? undefined : agentId
+      );
+      setMemories(memoriesResponse?.memories || []);
       
       toast({
         title: "Memories loaded",
-        description: `Found ${data?.length || 0} memories`,
+        description: `Found ${memoriesResponse?.memories?.length || 0} memories`,
       });
     } catch (err) {
       setMemories([]);

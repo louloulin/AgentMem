@@ -22,6 +22,10 @@ use std::sync::Arc;
 /// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {
     memory: Arc<Memory>,
+    /// 🆕 Fix 2: 查询优化器
+    query_optimizer: Arc<agent_mem_core::search::QueryOptimizer>,
+    /// 🆕 Fix 2: 结果重排序器
+    reranker: Arc<agent_mem_core::search::ResultReranker>,
 }
 
 impl MemoryManager {
@@ -56,15 +60,39 @@ impl MemoryManager {
         
         info!("Memory initialized successfully with LibSQL persistence");
         
+        // 🆕 Fix 2: 初始化QueryOptimizer和Reranker
+        let query_optimizer = {
+            use std::sync::RwLock;
+            let stats = Arc::new(RwLock::new(agent_mem_core::search::IndexStatistics::default()));
+            agent_mem_core::search::QueryOptimizer::with_default_config(stats)
+        };
+        
+        let reranker = agent_mem_core::search::ResultReranker::with_default_config();
+        
+        info!("✅ QueryOptimizer and Reranker initialized");
+        
         Ok(Self {
             memory: Arc::new(memory),
+            query_optimizer: Arc::new(query_optimizer),
+            reranker: Arc::new(reranker),
         })
     }
 
     /// 使用自定义配置创建
     pub async fn with_config(memory: Memory) -> Self {
+        // 🆕 Fix 2: 初始化QueryOptimizer和Reranker
+        let query_optimizer = {
+            use std::sync::RwLock;
+            let stats = Arc::new(RwLock::new(agent_mem_core::search::IndexStatistics::default()));
+            agent_mem_core::search::QueryOptimizer::with_default_config(stats)
+        };
+        
+        let reranker = agent_mem_core::search::ResultReranker::with_default_config();
+        
         Self {
             memory: Arc::new(memory),
+            query_optimizer: Arc::new(query_optimizer),
+            reranker: Arc::new(reranker),
         }
     }
 
@@ -254,7 +282,7 @@ impl MemoryManager {
             .map_err(|e| e.to_string())
     }
 
-    /// 搜索记忆
+    /// 搜索记忆 (🆕 Fix 2: 集成QueryOptimizer优化查询参数)
     pub async fn search_memories(
         &self,
         query: String,
@@ -263,9 +291,36 @@ impl MemoryManager {
         limit: Option<usize>,
         _memory_type: Option<agent_mem_traits::MemoryType>,
     ) -> Result<Vec<MemoryItem>, String> {
+        // 🆕 Fix 2: 使用QueryOptimizer优化查询
+        use agent_mem_core::search::SearchQuery;
+        let search_query = SearchQuery {
+            query: query.clone(),
+            limit: limit.unwrap_or(10),
+            threshold: Some(0.7),
+            vector_weight: 0.7,
+            fulltext_weight: 0.3,
+            filters: None,
+        };
+        
+        let optimized_plan = self.query_optimizer
+            .optimize_query(&search_query)
+            .map_err(|e| format!("Query optimization failed: {}", e))?;
+        
+        info!("🚀 Query optimized: strategy={:?}, should_rerank={}, rerank_factor={}, estimated_latency={}ms", 
+            optimized_plan.strategy, optimized_plan.should_rerank, optimized_plan.rerank_factor, 
+            optimized_plan.estimated_latency_ms);
+        
+        // 🆕 Fix 2: 使用优化后的参数 - 如果需要重排序，增加候选数量
+        let base_limit = limit.unwrap_or(10);
+        let fetch_limit = if optimized_plan.should_rerank {
+            base_limit * optimized_plan.rerank_factor
+        } else {
+            base_limit
+        };
+        
         let options = SearchOptions {
             user_id,
-            limit,
+            limit: Some(fetch_limit),
             threshold: Some(0.7),
             ..Default::default()
         };
@@ -343,7 +398,7 @@ impl MemoryManager {
 // 以下是实际的HTTP路由处理器函数
 
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query},
     http::StatusCode,
     response::Json,
 };
@@ -772,6 +827,204 @@ pub async fn get_agent_memories(
     
     info!("Returning {} real memories from database", memories_json.len());
     Ok(Json(crate::models::ApiResponse::success(memories_json)))
+}
+
+/// List all memories with pagination and filtering
+/// 
+/// 🆕 Fix 1: 全局memories列表API - 不依赖Agent
+#[utoipa::path(
+    get,
+    path = "/api/v1/memories",
+    params(
+        ("page" = Option<usize>, Query, description = "Page number (0-based)"),
+        ("limit" = Option<usize>, Query, description = "Items per page (default: 20, max: 100)"),
+        ("agent_id" = Option<String>, Query, description = "Filter by agent ID"),
+        ("memory_type" = Option<String>, Query, description = "Filter by memory type"),
+        ("sort_by" = Option<String>, Query, description = "Sort by field (default: created_at)"),
+        ("order" = Option<String>, Query, description = "Sort order: ASC or DESC (default: DESC)"),
+    ),
+    responses(
+        (status = 200, description = "Memories retrieved successfully"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "memory"
+)]
+pub async fn list_all_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    use libsql::{Builder, params as sql_params};
+    use chrono::{DateTime, Utc};
+    
+    // 解析参数
+    let page = params.get("page").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+    let limit = params.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20).min(100);
+    let agent_id = params.get("agent_id");
+    let memory_type = params.get("memory_type");
+    let sort_by = params.get("sort_by").map(|s| s.as_str()).unwrap_or("created_at");
+    let order = params.get("order").map(|s| s.as_str()).unwrap_or("DESC");
+    let offset = page * limit;
+    
+    info!("📋 List all memories: page={}, limit={}, agent_id={:?}", page, limit, agent_id);
+    
+    // 连接数据库
+    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+    let db = Builder::new_local(&db_path).build().await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    let conn = db.connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    // 构建查询并执行
+    use libsql::params;
+    let mut rows = match (agent_id, memory_type) {
+        (None, None) => {
+            let query = format!(
+                "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                 created_at, last_accessed, access_count, metadata, hash \
+                 FROM memories WHERE is_deleted = 0 ORDER BY {} {} LIMIT ? OFFSET ?",
+                sort_by, order
+            );
+            let mut stmt = conn.prepare(&query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+            stmt.query(params![limit as i64, offset as i64]).await
+                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+        },
+        (Some(aid), None) => {
+            let query = format!(
+                "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                 created_at, last_accessed, access_count, metadata, hash \
+                 FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY {} {} LIMIT ? OFFSET ?",
+                sort_by, order
+            );
+            let mut stmt = conn.prepare(&query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+            stmt.query(params![aid.clone(), limit as i64, offset as i64]).await
+                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+        },
+        (None, Some(mt)) => {
+            let query = format!(
+                "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                 created_at, last_accessed, access_count, metadata, hash \
+                 FROM memories WHERE is_deleted = 0 AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
+                sort_by, order
+            );
+            let mut stmt = conn.prepare(&query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+            stmt.query(params![mt.clone(), limit as i64, offset as i64]).await
+                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+        },
+        (Some(aid), Some(mt)) => {
+            let query = format!(
+                "SELECT id, agent_id, user_id, content, memory_type, importance, \
+                 created_at, last_accessed, access_count, metadata, hash \
+                 FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
+                sort_by, order
+            );
+            let mut stmt = conn.prepare(&query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+            stmt.query(params![aid.clone(), mt.clone(), limit as i64, offset as i64]).await
+                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+        },
+    };
+    
+    let mut memories_json: Vec<serde_json::Value> = vec![];
+    while let Some(row) = rows.next().await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
+        
+        let created_at_ts: Option<i64> = row.get(6).ok();
+        let created_at_str = created_at_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        
+        let last_accessed_ts: Option<i64> = row.get(7).ok();
+        let last_accessed_str = last_accessed_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339());
+        
+        let metadata_str: Option<String> = row.get(9).ok();
+        let metadata_value: serde_json::Value = metadata_str
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or(serde_json::json!({}));
+        
+        memories_json.push(serde_json::json!({
+            "id": row.get::<String>(0).ok(),
+            "agent_id": row.get::<String>(1).ok(),
+            "user_id": row.get::<Option<String>>(2).ok().flatten(),
+            "content": row.get::<String>(3).ok(),
+            "memory_type": row.get::<String>(4).ok(),
+            "importance": row.get::<f64>(5).ok(),
+            "created_at": created_at_str,
+            "last_accessed": last_accessed_str,
+            "access_count": row.get::<i64>(8).ok(),
+            "metadata": metadata_value,
+            "hash": row.get::<String>(10).ok(),
+        }));
+    }
+    
+    // 获取总数
+    let total_count = match (agent_id, memory_type) {
+        (None, None) => {
+            let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0";
+            let mut stmt = conn.prepare(query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+            if let Some(count_row) = stmt.query(params![]).await.ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+                count_row.get::<i64>(0).unwrap_or(0)
+            } else {
+                0
+            }
+        },
+        (Some(aid), None) => {
+            let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ?";
+            let mut stmt = conn.prepare(query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+            if let Some(count_row) = stmt.query(params![aid.clone()]).await.ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+                count_row.get::<i64>(0).unwrap_or(0)
+            } else {
+                0
+            }
+        },
+        (None, Some(mt)) => {
+            let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND memory_type = ?";
+            let mut stmt = conn.prepare(query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+            if let Some(count_row) = stmt.query(params![mt.clone()]).await.ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+                count_row.get::<i64>(0).unwrap_or(0)
+            } else {
+                0
+            }
+        },
+        (Some(aid), Some(mt)) => {
+            let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ?";
+            let mut stmt = conn.prepare(query).await
+                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+            if let Some(count_row) = stmt.query(params![aid.clone(), mt.clone()]).await.ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+                count_row.get::<i64>(0).unwrap_or(0)
+            } else {
+                0
+            }
+        },
+    };
+    
+    info!("✅ Retrieved {} memories (total: {})", memories_json.len(), total_count);
+    
+    Ok(Json(crate::models::ApiResponse {
+        data: serde_json::json!({
+            "memories": memories_json,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "total_pages": (total_count as usize + limit - 1) / limit,
+            }
+        }),
+        success: true,
+        message: None,
+    }))
 }
 
 #[cfg(test)]
