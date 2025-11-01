@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiClient, Agent } from '@/lib/api-client';
 import { useSSE } from '@/hooks/use-sse';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
 interface Message {
   id: string;
