@@ -16,6 +16,7 @@ pub mod organizations;
 pub mod stats;
 pub mod tools;
 pub mod users;
+pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait
 
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::{audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware};
@@ -175,7 +176,13 @@ pub async fn create_router(
         .route("/api/v1/mcp/tools", get(mcp::list_tools))
         .route("/api/v1/mcp/tools/call", post(mcp::call_tool))
         .route("/api/v1/mcp/tools/:tool_name", get(mcp::get_tool))
-        .route("/api/v1/mcp/health", get(mcp::health_check));
+        .route("/api/v1/mcp/health", get(mcp::health_check))
+        // Working Memory routes (session-based temporary context)
+        .route("/api/v1/working-memory", post(working_memory::add_working_memory))
+        .route("/api/v1/working-memory", get(working_memory::get_working_memory))
+        .route("/api/v1/working-memory/:item_id", delete(working_memory::delete_working_memory_item))
+        .route("/api/v1/working-memory/sessions/:session_id", delete(working_memory::clear_working_memory))
+        .route("/api/v1/working-memory/cleanup", post(working_memory::cleanup_expired));
 
     // Graph visualization routes (PostgreSQL only)
     #[cfg(feature = "postgres")]
@@ -195,14 +202,13 @@ pub async fn create_router(
         .route("/api/v1/ws", get(crate::websocket::websocket_handler))
         // SSE endpoints
         .route("/api/v1/sse", get(crate::sse::sse_handler))
-        .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response));
+        .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response))
+        // Add OpenAPI documentation
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
 
-    // Add OpenAPI documentation and middleware (always included)
+    // Add middleware and shared state (order matters: last added = first executed)
     let app = app
-        // OpenAPI documentation
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Add middleware (order matters: last added = first executed)
-        // These middleware layers execute BEFORE the Extension layers below
+        // Add middleware (these middleware layers execute BEFORE the Extension layers below)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .layer(axum_middleware::from_fn(quota_middleware))
@@ -273,6 +279,11 @@ pub async fn create_router(
         mcp::call_tool,
         mcp::get_tool,
         mcp::health_check,
+        working_memory::add_working_memory,
+        working_memory::get_working_memory,
+        working_memory::delete_working_memory_item,
+        working_memory::clear_working_memory,
+        working_memory::cleanup_expired,
         // Note: graph routes are only available with postgres feature
         health::health_check,
         health::liveness_check,
@@ -329,6 +340,10 @@ pub async fn create_router(
             tools::ToolResponse,
             tools::ExecuteToolRequest,
             tools::ToolExecutionResponse,
+            working_memory::AddWorkingMemoryRequest,
+            working_memory::AddWorkingMemoryResponse,
+            working_memory::ClearWorkingMemoryResponse,
+            working_memory::CleanupResponse,
             // Note: graph schemas are only available with postgres feature
         )
     ),
@@ -342,6 +357,7 @@ pub async fn create_router(
         (name = "messages", description = "Message management operations"),
         (name = "tools", description = "Tool management and execution operations"),
         (name = "mcp", description = "MCP (Model Context Protocol) server operations"),
+        (name = "working-memory", description = "Working Memory operations for session-based temporary context"),
         (name = "graph", description = "Knowledge graph visualization and querying operations"),
         (name = "health", description = "Health and monitoring"),
         (name = "statistics", description = "Dashboard statistics and analytics"),
