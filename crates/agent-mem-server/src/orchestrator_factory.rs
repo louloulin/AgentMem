@@ -22,7 +22,7 @@ pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
     let llm_config_value = agent.llm_config.clone()
         .ok_or_else(|| ServerError::bad_request("Agent LLM config not set"))?;
 
-    let llm_config: LLMConfig = serde_json::from_value(llm_config_value)
+    let mut llm_config: LLMConfig = serde_json::from_value(llm_config_value)
         .map_err(|e| {
             ServerError::internal_error(format!("Failed to parse LLM config: {}", e))
         })?;
@@ -36,9 +36,22 @@ pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
         return Err(ServerError::bad_request("LLM model not configured"));
     }
 
+    // 🔧 从环境变量读取API key（如果配置中没有）
+    if llm_config.api_key.is_none() {
+        let env_var_name = format!("{}_API_KEY", llm_config.provider.to_uppercase());
+        if let Ok(api_key) = std::env::var(&env_var_name) {
+            debug!("Loaded API key from environment variable: {}", env_var_name);
+            llm_config.api_key = Some(api_key);
+        } else {
+            debug!("No API key found in environment variable: {}", env_var_name);
+        }
+    }
+
     debug!(
-        "Parsed LLM config: provider={}, model={}",
-        llm_config.provider, llm_config.model
+        "Parsed LLM config: provider={}, model={}, has_api_key={}",
+        llm_config.provider,
+        llm_config.model,
+        llm_config.api_key.is_some()
     );
 
     Ok(llm_config)

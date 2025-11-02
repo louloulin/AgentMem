@@ -58,6 +58,11 @@ export interface Agent {
 export interface CreateAgentRequest {
   name?: string;
   description?: string;
+  llm_config?: {
+    provider: string;
+    model: string;
+    api_key?: string;
+  };
 }
 
 export interface UpdateAgentStateRequest {

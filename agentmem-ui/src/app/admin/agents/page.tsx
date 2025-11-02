@@ -86,13 +86,23 @@ export default function AgentsPage() {
     }
   }, [toast]);
 
-  const handleCreateAgent = async (name: string, description: string) => {
+  const handleCreateAgent = async (
+    name: string,
+    description: string,
+    llmProvider?: string,
+    llmModel?: string
+  ) => {
     try {
-      await apiClient.createAgent({ name, description });
+      const llm_config = llmProvider && llmModel ? {
+        provider: llmProvider,
+        model: llmModel,
+      } : undefined;
+
+      await apiClient.createAgent({ name, description, llm_config });
       setShowCreateDialog(false);
       toast({
         title: 'Agent created',
-        description: `Successfully created agent "${name}"`,
+        description: `Successfully created agent "${name}"${llm_config ? ` with ${llmProvider}/${llmModel}` : ''}`,
       });
       await loadAgents();
     } catch (err) {
@@ -293,30 +303,34 @@ function AgentCard({ agent, onDelete }: AgentCardProps) {
 
 /**
  * Create Agent Dialog Component
+ * Enhanced with LLM configuration
  */
 interface CreateAgentDialogProps {
   onClose: () => void;
-  onCreate: (name: string, description: string) => void;
+  onCreate: (name: string, description: string, llmProvider?: string, llmModel?: string) => void;
 }
 
 function CreateAgentDialog({ onClose, onCreate }: CreateAgentDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [llmProvider, setLlmProvider] = useState('zhipu');
+  const [llmModel, setLlmModel] = useState('glm-4-plus');
+  const [showAdvanced, setShowAdvanced] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onCreate(name, description);
+    onCreate(name, description, showAdvanced ? llmProvider : undefined, showAdvanced ? llmModel : undefined);
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md p-6">
+      <Card className="w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
           Create New Agent
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">Name *</Label>
             <Input
               id="name"
               value={name}
@@ -335,11 +349,68 @@ function CreateAgentDialog({ onClose, onCreate }: CreateAgentDialogProps) {
               rows={3}
             />
           </div>
-          <div className="flex justify-end space-x-3">
+          
+          {/* LLM Configuration Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-base font-semibold">LLM Configuration</Label>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {showAdvanced ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            
+            {showAdvanced && (
+              <div className="space-y-3 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                <div>
+                  <Label htmlFor="llmProvider" className="text-sm">
+                    Provider
+                  </Label>
+                  <select
+                    id="llmProvider"
+                    value={llmProvider}
+                    onChange={(e) => setLlmProvider(e.target.value)}
+                    className="w-full mt-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="zhipu">Zhipu AI (智谱)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="deepseek">DeepSeek</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="llmModel" className="text-sm">
+                    Model
+                  </Label>
+                  <Input
+                    id="llmModel"
+                    value={llmModel}
+                    onChange={(e) => setLlmModel(e.target.value)}
+                    placeholder="e.g., glm-4-plus"
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {llmProvider === 'zhipu' && 'Recommended: glm-4-plus, glm-4'}
+                    {llmProvider === 'openai' && 'Recommended: gpt-4, gpt-3.5-turbo'}
+                    {llmProvider === 'anthropic' && 'Recommended: claude-3-opus, claude-3-sonnet'}
+                    {llmProvider === 'deepseek' && 'Recommended: deepseek-chat'}
+                  </p>
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                  <strong>Note:</strong> API keys are configured via environment variables (e.g., ZHIPU_API_KEY)
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Create</Button>
+            <Button type="submit">Create Agent</Button>
           </div>
         </form>
       </Card>
