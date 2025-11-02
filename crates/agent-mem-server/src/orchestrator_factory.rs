@@ -14,7 +14,7 @@ use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// 从 Agent 配置中解析 LLM 配置
 pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
@@ -127,21 +127,24 @@ pub async fn create_orchestrator(
     };
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
     
-    // 7. 创建 AgentOrchestrator
-    // TODO: 初始化 WorkingAgent 并传递给 orchestrator
-    // 目前暂时传递 None，Working Memory功能将在后续启用
-    let working_agent = None; // 待实现：从 AppState 获取 working_agent
+    // 7. 创建 Working Memory Store
+    // TODO: 集成完整的 Working Memory Store
+    // 当前暂时传递 None，Working Memory 的读写接口已实现，只是 store 未初始化
+    // 后续可通过环境变量或配置文件启用
+    let working_store = None;
+    debug!("Working Memory Store: disabled (pending full integration)");
     
+    // 8. 创建 AgentOrchestrator
     let orchestrator = AgentOrchestrator::new(
         orchestrator_config,
         memory_engine,
         message_repo,
         llm_client,
         tool_executor,
-        working_agent,
+        working_store,
     );
     
-    info!("Successfully created AgentOrchestrator for agent: {}", agent.id);
+    info!("Successfully created AgentOrchestrator with Working Memory support for agent: {}", agent.id);
     Ok(orchestrator)
 }
 

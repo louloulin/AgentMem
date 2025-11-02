@@ -266,12 +266,47 @@ impl AgentOrchestrator {
 
     /// 从Working Memory获取会话上下文
     ///
-    /// 这个方法从WorkingAgent获取当前会话的临时上下文
+    /// 这个方法从WorkingMemoryStore获取当前会话的临时上下文
     async fn get_working_context(&self, session_id: &str) -> Result<String> {
-        // Working Memory 暂时未集成，返回空上下文
-        // TODO: 完整集成 WorkingAgent 和 WorkingMemoryStore
-        debug!("Working Memory integration pending, session_id: {}", session_id);
-        Ok(String::new())
+        if let Some(ref store) = self.working_store {
+            match store.get_session_items(session_id).await {
+                Ok(items) => {
+                    if items.is_empty() {
+                        debug!("No working memory items found for session: {}", session_id);
+                        return Ok(String::new());
+                    }
+                    
+                    // 按优先级和时间排序（已在store中完成）
+                    // 格式化为对话上下文
+                    let context_lines: Vec<String> = items
+                        .iter()
+                        .map(|item| {
+                            format!(
+                                "[{}] {}",
+                                item.created_at.format("%H:%M:%S"),
+                                item.content
+                            )
+                        })
+                        .collect();
+                    
+                    let context = context_lines.join("\n");
+                    debug!(
+                        "Retrieved {} working memory items for session {}: {} chars",
+                        items.len(),
+                        session_id,
+                        context.len()
+                    );
+                    Ok(context)
+                }
+                Err(e) => {
+                    warn!("Failed to get working context for session {}: {}", session_id, e);
+                    Ok(String::new()) // 失败时返回空，不影响对话
+                }
+            }
+        } else {
+            debug!("Working Memory store not configured, session_id: {}", session_id);
+            Ok(String::new())
+        }
     }
 
     /// 更新Working Memory
@@ -285,9 +320,42 @@ impl AgentOrchestrator {
         user_message: &str,
         assistant_response: &str,
     ) -> Result<()> {
-        // Working Memory 暂时未集成，跳过更新
-        // TODO: 完整集成 WorkingAgent 和 WorkingMemoryStore
-        debug!("Working Memory update pending, session_id: {}", session_id);
+        if let Some(ref store) = self.working_store {
+            use agent_mem_traits::WorkingMemoryItem;
+            use chrono::Utc;
+            
+            // 格式化对话对
+            let conversation_pair = format!(
+                "User: {}\nAssistant: {}",
+                user_message, assistant_response
+            );
+            
+            // 创建工作记忆项
+            let item = WorkingMemoryItem {
+                id: Uuid::new_v4().to_string(),
+                user_id: user_id.to_string(),
+                agent_id: agent_id.to_string(),
+                session_id: session_id.to_string(),
+                content: conversation_pair,
+                priority: 1, // 默认优先级
+                expires_at: Some(Utc::now() + chrono::Duration::hours(24)), // 24小时后过期
+                metadata: serde_json::json!({}),
+                created_at: Utc::now(),
+            };
+            
+            match store.add_item(item).await {
+                Ok(_) => {
+                    debug!("Successfully added working memory item for session: {}", session_id);
+                }
+                Err(e) => {
+                    warn!("Failed to add working memory item for session {}: {}", session_id, e);
+                    // 不返回错误，避免影响对话流程
+                }
+            }
+        } else {
+            debug!("Working Memory store not configured, skipping update for session: {}", session_id);
+        }
+        
         Ok(())
     }
 
