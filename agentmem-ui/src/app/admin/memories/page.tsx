@@ -245,7 +245,7 @@ export default function MemoriesPageEnhanced() {
     
     try {
       setLoading(true);
-      setCurrentPage(1);
+      setCurrentPage(0);  // 🔧 Fix: Reset to page 0
       const data = await apiClient.searchMemories(
         searchQuery,
         selectedAgentId !== 'all' ? selectedAgentId : undefined
@@ -297,8 +297,8 @@ export default function MemoriesPageEnhanced() {
   // Paginate filtered memories
   const totalPages = Math.ceil(filteredMemories.length / itemsPerPage);
   const paginatedMemories = filteredMemories.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,  // 🔧 Fix: 0-based pagination
+    (currentPage + 1) * itemsPerPage
   );
   
   // Format date
