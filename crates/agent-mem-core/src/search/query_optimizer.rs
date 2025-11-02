@@ -372,3 +372,56 @@ mod tests {
     }
 }
 
+/// 结果重排序器
+/// 
+/// 用于在初始检索后对结果进行精确重排序，提高最终结果的质量
+#[derive(Debug, Clone)]
+pub struct ResultReranker {
+    config: RerankerConfig,
+}
+
+/// 重排序器配置
+#[derive(Debug, Clone)]
+pub struct RerankerConfig {
+    /// 时间衰减因子（0.0-1.0，越大时间影响越大）
+    pub time_decay_factor: f32,
+    /// 重要性权重（0.0-1.0）
+    pub importance_weight: f32,
+    /// 内容长度惩罚因子
+    pub length_penalty_factor: f32,
+}
+
+impl Default for RerankerConfig {
+    fn default() -> Self {
+        Self {
+            time_decay_factor: 0.1,
+            importance_weight: 0.2,
+            length_penalty_factor: 0.05,
+        }
+    }
+}
+
+impl ResultReranker {
+    /// 创建新的重排序器
+    pub fn new(config: RerankerConfig) -> Self {
+        Self { config }
+    }
+    
+    /// 使用默认配置创建
+    pub fn with_default_config() -> Self {
+        Self::new(RerankerConfig::default())
+    }
+}
+
+#[cfg(test)]
+mod reranker_tests {
+    use super::*;
+    
+    #[test]
+    fn test_result_reranker_creation() {
+        let reranker = ResultReranker::with_default_config();
+        assert_eq!(reranker.config.time_decay_factor, 0.1);
+        assert_eq!(reranker.config.importance_weight, 0.2);
+    }
+}
+

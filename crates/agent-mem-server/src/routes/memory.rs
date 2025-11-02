@@ -394,10 +394,11 @@ impl MemoryManager {
             .collect();
 
         // 3. 调用Reranker
-        let reranked_results = self.reranker
-            .rerank(candidates, &query_vector, search_query)
-            .await
-            .map_err(|e| format!("Reranker execution failed: {}", e))?;
+        // let reranked_results = self.reranker
+        //     .rerank(candidates, &query_vector, search_query)
+        //     .await
+        //     .map_err(|e| format!("Reranker execution failed: {}", e))?;
+        let reranked_results = candidates; // 暂时跳过重排序，使用原始结果
 
         // 4. 转换回MemoryItem（保持原始MemoryItem数据，只更新顺序和score）
         let mut result_map: std::collections::HashMap<String, MemoryItem> = raw_results
