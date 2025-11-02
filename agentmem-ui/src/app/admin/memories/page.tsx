@@ -106,20 +106,28 @@ export default function MemoriesPageEnhanced() {
   });
   const [submitting, setSubmitting] = useState(false);
   
-  // Load data on mount
+  // Load data on mount and when currentPage changes
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentPage]); // 🔧 Fix: Add currentPage dependency
   
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      console.log('🔍 [Memories] Loading data with page:', currentPage);
       
       // 🆕 Fix 1: 并行加载agents和全局memories，不再依赖Agent
       const [agentsData, memoriesResponse] = await Promise.all([
         apiClient.getAgents(),
         apiClient.getAllMemories(currentPage, itemsPerPage),
       ]);
+      
+      console.log('📦 [Memories] Received:', {
+        agents: agentsData?.length,
+        memories: memoriesResponse?.memories?.length,
+        pagination: memoriesResponse?.pagination
+      });
       
       setAgents(agentsData || []);
       setMemories(memoriesResponse?.memories || []);
@@ -129,6 +137,7 @@ export default function MemoriesPageEnhanced() {
         description: `Loaded ${agentsData?.length || 0} agents and ${memoriesResponse?.memories?.length || 0} memories`,
       });
     } catch (err) {
+      console.error('❌ [Memories] Load error:', err);
       setAgents([]);
       setMemories([]);
       toast({
