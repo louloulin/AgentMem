@@ -132,6 +132,38 @@ export interface CreateMemoryRequest {
 }
 
 /**
+ * Working Memory types
+ */
+export interface WorkingMemoryItem {
+  id: string;
+  user_id: string;
+  agent_id: string;
+  session_id: string;
+  content: string;
+  priority: number;
+  expires_at?: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AddWorkingMemoryRequest {
+  session_id: string;
+  content: string;
+  priority?: number;
+  expires_in_seconds?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ClearWorkingMemoryResponse {
+  deleted_count: number;
+  session_id: string;
+}
+
+export interface CleanupWorkingMemoryResponse {
+  cleaned_count: number;
+}
+
+/**
  * User types
  */
 export interface User {
@@ -725,6 +757,109 @@ class ApiClient {
   async getAgentActivity(): Promise<AgentActivityResponse> {
     const response = await this.request<AgentActivityResponse>('/api/v1/stats/agents/activity');
     return response;
+  }
+
+  // ==================== Working Memory APIs ====================
+
+  /**
+   * Add a working memory item
+   */
+  async addWorkingMemory(data: AddWorkingMemoryRequest): Promise<WorkingMemoryItem> {
+    const response = await this.request<ApiResponse<{ id: string; session_id: string; content: string; created_at: string }>>(
+      '/api/v1/working-memory',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    
+    // Invalidate working memory cache
+    this.clearCache('working-memory:');
+    console.log('🗑️  Cache cleared: working-memory:*');
+    
+    // Return full item (API returns partial, we'll construct it)
+    return {
+      id: response.data.id,
+      user_id: 'default-user',
+      agent_id: 'default-agent',
+      session_id: response.data.session_id,
+      content: response.data.content,
+      priority: data.priority || 1,
+      expires_at: data.expires_in_seconds ? new Date(Date.now() + data.expires_in_seconds * 1000).toISOString() : null,
+      metadata: data.metadata || {},
+      created_at: response.data.created_at,
+    };
+  }
+
+  /**
+   * Get working memory items for a session
+   */
+  async getWorkingMemory(sessionId: string, minPriority?: number): Promise<WorkingMemoryItem[]> {
+    const cacheKey = `working-memory:session:${sessionId}:${minPriority || 'all'}`;
+    const cached = this.getCached<WorkingMemoryItem[]>(cacheKey);
+    if (cached) {
+      console.log(`✅ Cache hit: ${cacheKey}`);
+      return cached;
+    }
+
+    console.log(`🔄 Cache miss: ${cacheKey}`);
+    let url = `/api/v1/working-memory?session_id=${sessionId}`;
+    if (minPriority !== undefined) {
+      url += `&min_priority=${minPriority}`;
+    }
+    
+    const response = await this.request<ApiResponse<WorkingMemoryItem[]>>(url);
+    this.setCache(cacheKey, response.data, 10000); // 10s TTL (working memory changes frequently)
+    return response.data;
+  }
+
+  /**
+   * Delete a working memory item
+   */
+  async deleteWorkingMemoryItem(itemId: string): Promise<void> {
+    await this.request(`/api/v1/working-memory/${itemId}`, {
+      method: 'DELETE',
+    });
+    
+    // Invalidate working memory cache
+    this.clearCache('working-memory:');
+    console.log('🗑️  Cache cleared: working-memory:*');
+  }
+
+  /**
+   * Clear all working memory items for a session
+   */
+  async clearWorkingMemory(sessionId: string): Promise<ClearWorkingMemoryResponse> {
+    const response = await this.request<ApiResponse<ClearWorkingMemoryResponse>>(
+      `/api/v1/working-memory/sessions/${sessionId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    
+    // Invalidate working memory cache
+    this.clearCache('working-memory:');
+    console.log('🗑️  Cache cleared: working-memory:*');
+    
+    return response.data;
+  }
+
+  /**
+   * Cleanup expired working memory items
+   */
+  async cleanupExpiredWorkingMemory(): Promise<CleanupWorkingMemoryResponse> {
+    const response = await this.request<ApiResponse<CleanupWorkingMemoryResponse>>(
+      '/api/v1/working-memory/cleanup',
+      {
+        method: 'POST',
+      }
+    );
+    
+    // Invalidate working memory cache
+    this.clearCache('working-memory:');
+    console.log('🗑️  Cache cleared: working-memory:*');
+    
+    return response.data;
   }
 }
 
