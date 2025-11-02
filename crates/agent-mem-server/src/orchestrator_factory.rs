@@ -128,12 +128,17 @@ pub async fn create_orchestrator(
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
     
     // 7. 创建 AgentOrchestrator
+    // TODO: 初始化 WorkingAgent 并传递给 orchestrator
+    // 目前暂时传递 None，Working Memory功能将在后续启用
+    let working_agent = None; // 待实现：从 AppState 获取 working_agent
+    
     let orchestrator = AgentOrchestrator::new(
         orchestrator_config,
         memory_engine,
         message_repo,
         llm_client,
         tool_executor,
+        working_agent,
     );
     
     info!("Successfully created AgentOrchestrator for agent: {}", agent.id);

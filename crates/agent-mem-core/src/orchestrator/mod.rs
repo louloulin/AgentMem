@@ -44,6 +44,9 @@ pub struct ChatRequest {
     #[serde(default = "default_organization_id")]
     pub organization_id: String,
 
+    /// 会话 ID - 用于Working Memory隔离
+    pub session_id: String,
+
     /// 是否流式响应
     pub stream: bool,
 
@@ -120,6 +123,20 @@ impl ChatRequest {
         if self.max_memories > 1000 {
             return Err(AgentMemError::ValidationError(
                 format!("max_memories too large: {} (max 1000)", self.max_memories),
+            ));
+        }
+
+        // 验证 session_id 不为空
+        if self.session_id.trim().is_empty() {
+            return Err(AgentMemError::ValidationError(
+                "Session ID cannot be empty".to_string(),
+            ));
+        }
+
+        // 验证 session_id 长度（最大 255 字符）
+        if self.session_id.len() > 255 {
+            return Err(AgentMemError::ValidationError(
+                format!("Session ID too long: {} characters (max 255)", self.session_id.len()),
             ));
         }
 
@@ -203,6 +220,8 @@ pub struct AgentOrchestrator {
     memory_integrator: MemoryIntegrator,
     memory_extractor: MemoryExtractor,
     tool_integrator: ToolIntegrator,
+    /// Working Memory Agent - 用于会话级临时上下文
+    working_agent: Option<Arc<tokio::sync::RwLock<crate::agents::WorkingAgent>>>,
 }
 
 impl AgentOrchestrator {
@@ -213,6 +232,7 @@ impl AgentOrchestrator {
         message_repo: Arc<dyn MessageRepositoryTrait>,
         llm_client: Arc<LLMClient>,
         tool_executor: Arc<ToolExecutor>,
+        working_agent: Option<Arc<tokio::sync::RwLock<crate::agents::WorkingAgent>>>,
     ) -> Self {
         // 创建记忆集成器
         let memory_integrator = MemoryIntegrator::with_default_config(memory_engine.clone());
@@ -240,26 +260,62 @@ impl AgentOrchestrator {
             memory_integrator,
             memory_extractor,
             tool_integrator,
+            working_agent,
         }
+    }
+
+    /// 从Working Memory获取会话上下文
+    ///
+    /// 这个方法从WorkingAgent获取当前会话的临时上下文
+    async fn get_working_context(&self, session_id: &str) -> Result<String> {
+        // Working Memory 暂时未集成，返回空上下文
+        // TODO: 完整集成 WorkingAgent 和 WorkingMemoryStore
+        debug!("Working Memory integration pending, session_id: {}", session_id);
+        Ok(String::new())
+    }
+
+    /// 更新Working Memory
+    ///
+    /// 保存当前对话轮次到工作记忆
+    async fn update_working_memory(
+        &self,
+        session_id: &str,
+        user_id: &str,
+        agent_id: &str,
+        user_message: &str,
+        assistant_response: &str,
+    ) -> Result<()> {
+        // Working Memory 暂时未集成，跳过更新
+        // TODO: 完整集成 WorkingAgent 和 WorkingMemoryStore
+        debug!("Working Memory update pending, session_id: {}", session_id);
+        Ok(())
     }
 
     /// 执行完整的对话循环
     ///
     /// 这是核心方法，参考 MIRIX 的 AgentWrapper.step() 实现：
+    /// 0. 获取Working Memory会话上下文
     /// 1. 创建用户消息
     /// 2. 检索相关记忆
-    /// 3. 构建 prompt（注入记忆）
+    /// 3. 构建 prompt（注入会话上下文和长期记忆）
     /// 4. 调用 LLM
     /// 5. 处理工具调用（如果有）- TODO: 待实现
     /// 6. 保存 assistant 消息
-    /// 7. 提取和更新记忆
-    /// 8. 返回响应
+    /// 7. 更新 Working Memory
+    /// 8. 提取和更新记忆
+    /// 9. 返回响应
     pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
         // ✅ 验证请求参数
         request.validate()?;
 
-        info!("Starting conversation step for agent_id={}, user_id={}",
-              request.agent_id, request.user_id);
+        info!("Starting conversation step for agent_id={}, user_id={}, session_id={}",
+              request.agent_id, request.user_id, request.session_id);
+
+        // 0. 获取Working Memory会话上下文
+        let working_context = self.get_working_context(&request.session_id).await?;
+        if !working_context.is_empty() {
+            debug!("Retrieved working context: {} chars", working_context.len());
+        }
 
         // 1. 创建用户消息
         let user_message_id = self.create_user_message(&request).await?;
@@ -270,9 +326,9 @@ impl AgentOrchestrator {
         let memories_retrieved_count = memories.len();
         info!("Retrieved {} memories", memories_retrieved_count);
 
-        // 3. 构建 prompt（注入记忆）
-        let messages = self.build_messages_with_memories(&request, &memories).await?;
-        debug!("Built {} messages with memories", messages.len());
+        // 3. 构建 prompt（注入会话上下文和长期记忆）
+        let messages = self.build_messages_with_context(&request, &working_context, &memories).await?;
+        debug!("Built {} messages with working context and memories", messages.len());
 
         // 4. 调用 LLM（可能需要多轮工具调用）
         let (final_response, tool_calls_info) = self.execute_with_tools(
@@ -290,6 +346,16 @@ impl AgentOrchestrator {
             &final_response,
         ).await?;
         debug!("Created assistant message: {}", assistant_message_id);
+
+        // 6. 更新Working Memory
+        self.update_working_memory(
+            &request.session_id,
+            &request.user_id,
+            &request.agent_id,
+            &request.message,
+            &final_response,
+        ).await?;
+        debug!("Updated working memory for session {}", request.session_id);
 
         // 7. 提取和更新记忆
         let memories_extracted = if self.config.auto_extract_memories {
@@ -539,7 +605,45 @@ impl AgentOrchestrator {
         Ok(memories)
     }
 
-    /// 构建包含记忆的消息列表
+    /// 构建包含会话上下文和记忆的消息列表（新版本，集成Working Memory）
+    async fn build_messages_with_context(
+        &self,
+        request: &ChatRequest,
+        working_context: &str,
+        memories: &[Memory],
+    ) -> Result<Vec<Message>> {
+        let mut messages = Vec::new();
+
+        // 构建系统消息，优先级：Working Context > 长期记忆
+        let mut system_message_parts = Vec::new();
+
+        // 1. 添加会话上下文（优先级最高）
+        if !working_context.is_empty() {
+            system_message_parts.push(format!(
+                "## Current Session Context\n\nThe following is the recent conversation history in this session:\n\n{}",
+                working_context
+            ));
+        }
+
+        // 2. 添加长期记忆
+        if !memories.is_empty() {
+            let memory_context = self.memory_integrator.inject_memories_to_prompt(memories);
+            system_message_parts.push(memory_context);
+        }
+
+        // 如果有任何上下文信息，添加系统消息
+        if !system_message_parts.is_empty() {
+            let system_content = system_message_parts.join("\n\n");
+            messages.push(Message::system(&system_content));
+        }
+
+        // 添加用户消息
+        messages.push(Message::user(&request.message));
+
+        Ok(messages)
+    }
+
+    /// 构建包含记忆的消息列表（保留旧版本以兼容）
     async fn build_messages_with_memories(
         &self,
         request: &ChatRequest,

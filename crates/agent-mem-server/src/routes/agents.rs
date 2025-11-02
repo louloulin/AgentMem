@@ -530,11 +530,13 @@ pub async fn send_message_to_agent(
 
     // ✅ 构建 OrchestratorChatRequest
     let user_id = req.user_id.clone().unwrap_or_else(|| auth_user.user_id.clone());
+    let session_id = format!("{}_{}", user_id, uuid::Uuid::new_v4());
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
         agent_id: id.clone(),
         user_id: user_id.clone(),
         organization_id: auth_user.org_id.clone(),
+        session_id,
         stream: false,
         max_memories: 10,
     };

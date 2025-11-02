@@ -35,6 +35,7 @@ use std::convert::Infallible;
 use std::time::Instant;
 use tracing::{debug, error, info};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 /// Request to send a chat message
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -43,6 +44,8 @@ pub struct ChatMessageRequest {
     pub message: String,
     /// User ID (optional, defaults to authenticated user)
     pub user_id: Option<String>,
+    /// Session ID (optional, auto-generated if not provided)
+    pub session_id: Option<String>,
     /// Whether to stream the response (TODO)
     #[serde(default)]
     pub stream: bool,
@@ -171,11 +174,19 @@ pub async fn send_chat_message(
 
     // ✅ 构建 OrchestratorChatRequest
     let user_id = req.user_id.unwrap_or_else(|| auth_user.user_id.clone());
+    
+    // ✅ 生成或使用提供的session_id
+    let session_id = req.session_id.unwrap_or_else(|| {
+        format!("{}_{}", user_id, Uuid::new_v4())
+    });
+    debug!("Using session_id: {}", session_id);
+    
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
         organization_id: auth_user.org_id.clone(),
+        session_id,
         stream: req.stream,
         max_memories: 10,
     };
@@ -294,11 +305,15 @@ pub async fn send_chat_message_stream(
         })?;
 
     // Create orchestrator request
+    let session_id_for_stream = req.session_id.clone().unwrap_or_else(|| {
+        format!("{}_{}", user_id, Uuid::new_v4())
+    });
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
         agent_id: agent_id.clone(),
         user_id: user_id.clone(),
         organization_id: auth_user.org_id.clone(),
+        session_id: session_id_for_stream,
         stream: true,
         max_memories: 10,
     };
