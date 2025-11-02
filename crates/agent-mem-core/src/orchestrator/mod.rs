@@ -220,8 +220,8 @@ pub struct AgentOrchestrator {
     memory_integrator: MemoryIntegrator,
     memory_extractor: MemoryExtractor,
     tool_integrator: ToolIntegrator,
-    /// Working Memory Agent - 用于会话级临时上下文
-    working_agent: Option<Arc<tokio::sync::RwLock<crate::agents::WorkingAgent>>>,
+    /// Working Memory Store - 用于会话级临时上下文（最小改动方案：直接使用Store而非Agent）
+    working_store: Option<Arc<dyn agent_mem_traits::WorkingMemoryStore>>,
 }
 
 impl AgentOrchestrator {
@@ -232,7 +232,7 @@ impl AgentOrchestrator {
         message_repo: Arc<dyn MessageRepositoryTrait>,
         llm_client: Arc<LLMClient>,
         tool_executor: Arc<ToolExecutor>,
-        working_agent: Option<Arc<tokio::sync::RwLock<crate::agents::WorkingAgent>>>,
+        working_store: Option<Arc<dyn agent_mem_traits::WorkingMemoryStore>>,
     ) -> Self {
         // 创建记忆集成器
         let memory_integrator = MemoryIntegrator::with_default_config(memory_engine.clone());
@@ -260,7 +260,7 @@ impl AgentOrchestrator {
             memory_integrator,
             memory_extractor,
             tool_integrator,
-            working_agent,
+            working_store,
         }
     }
 
