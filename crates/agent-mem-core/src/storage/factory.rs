@@ -51,8 +51,12 @@ pub struct Repositories {
     /// API Key repository
     pub api_keys: Arc<dyn ApiKeyRepositoryTrait>,
 
-    /// Memory repository
+    /// Memory repository (long-term memories)
     pub memories: Arc<dyn MemoryRepositoryTrait>,
+
+    /// Working Memory store (session-based temporary context)
+    /// Uses the same memories table with memory_type='working'
+    pub working_memory: Arc<dyn agent_mem_traits::WorkingMemoryStore>,
 
     /// Block repository
     pub blocks: Arc<dyn BlockRepositoryTrait>,
@@ -126,6 +130,7 @@ impl RepositoryFactory {
         }
 
         // Create repository instances
+        // Note: All repositories share the same connection pool for consistency
         Ok(Repositories {
             users: Arc::new(LibSqlUserRepository::new(conn.clone())),
             organizations: Arc::new(LibSqlOrganizationRepository::new(conn.clone())),
@@ -134,6 +139,12 @@ impl RepositoryFactory {
             tools: Arc::new(LibSqlToolRepository::new(conn.clone())),
             api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
             memories: Arc::new(LibSqlMemoryRepository::new(conn.clone())),
+            working_memory: {
+                // ✅ WorkingMemory uses the unified memories table internally
+                // This is an implementation detail hidden behind the trait
+                use agent_mem_storage::backends::LibSqlWorkingStore;
+                Arc::new(LibSqlWorkingStore::new(conn.clone()))
+            },
             blocks: Arc::new(LibSqlBlockRepository::new(conn.clone())),
             associations: Arc::new(LibSqlAssociationRepository::new(conn.clone())),
         })
@@ -449,6 +460,10 @@ impl StorageFactory {
             tools: Arc::new(LibSqlToolRepository::new(conn.clone())),
             api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
             memories: Arc::new(LibSqlMemoryRepository::new(conn.clone())),
+            working_memory: {
+                use agent_mem_storage::backends::LibSqlWorkingStore;
+                Arc::new(LibSqlWorkingStore::new(conn.clone()))
+            },
             blocks: Arc::new(LibSqlBlockRepository::new(conn.clone())),
             associations: Arc::new(LibSqlAssociationRepository::new(conn.clone())),
         })

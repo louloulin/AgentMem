@@ -127,12 +127,10 @@ pub async fn create_orchestrator(
     };
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
     
-    // 7. 创建 Working Memory Store
-    // TODO: 集成完整的 Working Memory Store
-    // 当前暂时传递 None，Working Memory 的读写接口已实现，只是 store 未初始化
-    // 后续可通过环境变量或配置文件启用
-    let working_store = None;
-    debug!("Working Memory Store: disabled (pending full integration)");
+    // 7. 获取 Working Memory Store（统一抽象，与其他 repositories 平级）
+    // ✅ 直接从 repositories 获取，保持抽象层次一致
+    let working_store = Some(repositories.working_memory.clone());
+    debug!("✅ Got WorkingMemoryStore from repositories (uses unified memories table)");
     
     // 8. 创建 AgentOrchestrator
     let orchestrator = AgentOrchestrator::new(
