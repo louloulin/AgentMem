@@ -295,15 +295,28 @@ async fn create_memories_table(conn: &Connection) -> Result<()> {
             updated_at INTEGER NOT NULL,
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_by_id TEXT,
-            last_updated_by_id TEXT,
-            FOREIGN KEY (organization_id) REFERENCES organizations(id),
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (agent_id) REFERENCES agents(id)
+            last_updated_by_id TEXT
         )",
         (),
     )
     .await
     .map_err(|e| AgentMemError::StorageError(format!("Failed to create memories table: {e}")))?;
+
+    // 创建索引但不强制外键约束
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memories_organization ON memories(organization_id)",
+        (),
+    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)",
+        (),
+    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent_id)",
+        (),
+    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
 
     Ok(())
 }
