@@ -27,6 +27,7 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
     run_migration(&conn_guard, 10, "create_memory_associations", create_memory_associations_table(&conn_guard)).await?;
     run_migration(&conn_guard, 11, "create_indexes", create_indexes(&conn_guard)).await?;
     run_migration(&conn_guard, 12, "create_learning_feedback", create_learning_feedback_table(&conn_guard)).await?;
+    run_migration(&conn_guard, 13, "add_session_id_to_memories", add_session_id_to_memories(&conn_guard)).await?;
 
     // Initialize default data (idempotent - safe to run multiple times)
     init_default_data(&conn_guard).await?;
@@ -498,6 +499,36 @@ async fn create_learning_feedback_table(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Add session_id column to memories table for Working Memory support
+/// This migration enables unified memory model where Working Memory uses the same table
+async fn add_session_id_to_memories(conn: &Connection) -> Result<()> {
+    // Add session_id column (SQLite allows adding columns to existing tables)
+    conn.execute(
+        "ALTER TABLE memories ADD COLUMN session_id TEXT",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to add session_id column: {e}")))?;
+
+    // Create index on session_id for fast session-based queries
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id)",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create session_id index: {e}")))?;
+
+    // Create composite index for Working Memory queries (session_id + memory_type)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memories_session_type ON memories(session_id, memory_type)",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create composite index: {e}")))?;
+
+    Ok(())
+}
+
 /// Initialize default data (organizations, users)
 /// This is idempotent - safe to run multiple times
 async fn init_default_data(conn: &Connection) -> Result<()> {
@@ -587,7 +618,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 12); // 12 migrations (including learning_feedback)
+        assert_eq!(count, 13); // 13 migrations (including session_id)
     }
 }
 
