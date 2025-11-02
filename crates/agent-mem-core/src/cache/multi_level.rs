@@ -65,6 +65,8 @@ impl Default for MultiLevelCacheConfig {
             l2_default_ttl: Duration::from_secs(30 * 60), // 30 minutes
             promote_on_hit: true,
             write_through: true,
+            enable_monitoring: false,
+            monitor_config: None,
         }
     }
 }
@@ -79,13 +81,16 @@ pub struct MultiLevelCache {
     
     /// Configuration
     config: MultiLevelCacheConfig,
+    
+    /// Performance monitor (optional)
+    monitor: Option<Arc<CacheMonitor>>,
 }
 
 impl MultiLevelCache {
     /// Create a new multi-level cache
     pub fn new(config: MultiLevelCacheConfig) -> Self {
-        info!("Creating multi-level cache (L1: {}, L2: {})", 
-              config.enable_l1, config.enable_l2);
+        info!("Creating multi-level cache (L1: {}, L2: {}, Monitoring: {})", 
+              config.enable_l1, config.enable_l2, config.enable_monitoring);
         
         let l1 = Arc::new(MemoryCache::new(config.l1_config.clone()));
         
@@ -93,15 +98,36 @@ impl MultiLevelCache {
         // For now, we'll leave it as None
         let l2 = None;
         
-        Self { l1, l2, config }
+        // Initialize monitor if enabled
+        let monitor = if config.enable_monitoring {
+            let monitor_config = config.monitor_config.clone()
+                .unwrap_or_else(MonitorConfig::default);
+            Some(Arc::new(CacheMonitor::new(monitor_config)))
+        } else {
+            None
+        };
+        
+        Self { l1, l2, config, monitor }
     }
     
     /// Get from L1, fallback to L2
     async fn get_multi_level(&self, key: &CacheKey) -> Result<Option<Vec<u8>>> {
+        let start = Instant::now();
+        let mut hit = false;
+        let mut cache_level = None;
+        
         // Try L1 first
         if self.config.enable_l1 {
             if let Some(value) = self.l1.get(key).await? {
                 debug!("Multi-level cache hit (L1): {}", key);
+                hit = true;
+                cache_level = Some(CacheLevel::L1);
+                
+                // Record performance
+                if let Some(monitor) = &self.monitor {
+                    monitor.record_operation(start.elapsed(), hit, cache_level).await;
+                }
+                
                 return Ok(Some(value));
             }
         }
@@ -111,6 +137,8 @@ impl MultiLevelCache {
             if let Some(l2) = &self.l2 {
                 if let Some(value) = l2.get(key).await? {
                     debug!("Multi-level cache hit (L2): {}", key);
+                    hit = true;
+                    cache_level = Some(CacheLevel::L2);
                     
                     // Promote to L1 if configured
                     if self.config.promote_on_hit && self.config.enable_l1 {
@@ -121,12 +149,23 @@ impl MultiLevelCache {
                         }
                     }
                     
+                    // Record performance
+                    if let Some(monitor) = &self.monitor {
+                        monitor.record_operation(start.elapsed(), hit, cache_level).await;
+                    }
+                    
                     return Ok(Some(value));
                 }
             }
         }
         
         debug!("Multi-level cache miss: {}", key);
+        
+        // Record miss
+        if let Some(monitor) = &self.monitor {
+            monitor.record_operation(start.elapsed(), false, None).await;
+        }
+        
         Ok(None)
     }
     
@@ -202,6 +241,48 @@ impl MultiLevelCache {
     /// Check if L2 is enabled and available
     pub fn has_l2(&self) -> bool {
         self.config.enable_l2 && self.l2.is_some()
+    }
+    
+    /// Get monitor reference
+    pub fn monitor(&self) -> Option<Arc<CacheMonitor>> {
+        self.monitor.clone()
+    }
+    
+    /// Generate performance snapshot
+    pub async fn performance_snapshot(&self) -> Result<Option<super::PerformanceSnapshot>> {
+        if let Some(monitor) = &self.monitor {
+            let l1_stats = if self.config.enable_l1 {
+                Some(self.l1.stats().await?)
+            } else {
+                None
+            };
+            
+            let l2_stats = if self.config.enable_l2 {
+                if let Some(l2) = &self.l2 {
+                    l2.stats().await.ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            
+            let combined_stats = self.combined_stats().await?;
+            
+            let snapshot = monitor.create_snapshot(l1_stats, l2_stats, combined_stats).await;
+            Ok(Some(snapshot))
+        } else {
+            Ok(None)
+        }
+    }
+    
+    /// Generate performance report
+    pub async fn performance_report(&self) -> Result<Option<super::PerformanceReport>> {
+        if let Some(monitor) = &self.monitor {
+            Ok(monitor.generate_report().await)
+        } else {
+            Ok(None)
+        }
     }
 }
 
