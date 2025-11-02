@@ -4,13 +4,14 @@
 //! - L1: Fast in-memory cache
 //! - L2: Distributed Redis cache (optional)
 //! - Automatic promotion/demotion between levels
+//! - Performance monitoring
 //! - Unified interface
 
-use super::{Cache, CacheKey, CacheStats, MemoryCache, MemoryCacheConfig};
+use super::{Cache, CacheKey, CacheStats, CacheMonitor, MemoryCache, MemoryCacheConfig, MonitorConfig};
 use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
 /// Cache level
@@ -46,6 +47,12 @@ pub struct MultiLevelCacheConfig {
     
     /// Write-through to L2
     pub write_through: bool,
+    
+    /// Enable performance monitoring
+    pub enable_monitoring: bool,
+    
+    /// Monitor configuration
+    pub monitor_config: Option<MonitorConfig>,
 }
 
 impl Default for MultiLevelCacheConfig {

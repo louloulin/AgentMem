@@ -8,11 +8,13 @@
 
 pub mod learning_warmer;
 pub mod memory_cache;
+pub mod monitor;
 pub mod multi_level;
 pub mod warming;
 
 pub use learning_warmer::{LearningBasedCacheWarmer, LearningWarmingConfig};
 pub use memory_cache::{MemoryCache, MemoryCacheConfig, MemoryCacheStats};
+pub use monitor::{CacheMonitor, MonitorConfig, PerformanceReport, PerformanceSnapshot};
 pub use multi_level::{CacheLevel, MultiLevelCache, MultiLevelCacheConfig};
 pub use warming::{CacheWarmer, CacheWarmingConfig, DataLoader, WarmingStats, WarmingStrategy};
 
