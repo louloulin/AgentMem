@@ -356,6 +356,8 @@ class ApiClient {
     return this.withRetry(async () => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        'X-User-ID': 'default-user',  // 🔧 Added: Required for backend auth
+        'X-Organization-ID': 'default-org',  // 🔧 Added: Required for backend auth
         ...(options.headers as Record<string, string>),
       };
 

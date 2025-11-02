@@ -57,14 +57,14 @@ function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) 
   return (
     <div className="flex items-center justify-between px-2 py-4">
       <div className="text-sm text-gray-700 dark:text-gray-300">
-        Page {currentPage} of {totalPages}
+        Page {currentPage + 1} of {totalPages}
       </div>
       <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage <= 1}
+          disabled={currentPage <= 0}
         >
           Previous
         </Button>
@@ -72,7 +72,7 @@ function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) 
           variant="outline"
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages}
+          disabled={currentPage >= totalPages - 1}
         >
           Next
         </Button>
@@ -92,8 +92,8 @@ export default function MemoriesPageEnhanced() {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  // Pagination state (🔧 Fix: API uses 0-based pagination)
+  const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerPage] = useState(10);
   
   // Add Memory Dialog state
@@ -143,7 +143,7 @@ export default function MemoriesPageEnhanced() {
   
   const handleAgentChange = async (agentId: string) => {
     setSelectedAgentId(agentId);
-    setCurrentPage(1);
+    setCurrentPage(0);  // 🔧 Fix: Reset to page 0
     
     try {
       setLoading(true);
