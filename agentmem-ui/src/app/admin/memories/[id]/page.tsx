@@ -41,9 +41,8 @@ export default function MemoryDetailPage() {
       setLoading(true);
       setError(null);
 
-      // Load memory details (using search as a workaround)
-      const allMemories = await apiClient.searchMemories(memoryId);
-      const foundMemory = allMemories.find(m => m.id === memoryId);
+      // Load memory details using getMemory API
+      const foundMemory = await apiClient.getMemory(memoryId);
 
       if (foundMemory) {
         setMemory(foundMemory);

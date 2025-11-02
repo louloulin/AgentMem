@@ -578,7 +578,7 @@ class ApiClient {
   /**
    * Search memories
    */
-  async searchMemories(query: string, agentId?: string): Promise<Memory[]> {
+  async searchMemories(query: string, agentId?: string, userId?: string): Promise<Memory[]> {
     const response = await this.request<ApiResponse<Memory[]>>(
       `/api/v1/memories/search`,
       {
@@ -589,6 +589,7 @@ class ApiClient {
         body: JSON.stringify({
           query,
           agent_id: agentId,
+          user_id: userId || 'default', // Use 'default' as fallback
         }),
       }
     );

@@ -12,7 +12,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Brain, Search, Trash2, Filter, Plus, RefreshCw } from 'lucide-react';
+import { Brain, Search, Trash2, Filter, Plus, RefreshCw, Eye } from 'lucide-react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -448,14 +449,27 @@ export default function MemoriesPageEnhanced() {
                           {formatDate(memory.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteMemory(memory.id)}
-                            className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/admin/memories/${memory.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                                title="View details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteMemory(memory.id)}
+                              className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                              title="Delete memory"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

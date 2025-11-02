@@ -21,9 +21,7 @@ pub mod fuzzy;
 pub mod fulltext_search;
 #[cfg(feature = "postgres")]
 pub mod hybrid;
-pub mod query_optimizer;
 pub mod ranker;
-pub mod reranker;
 pub mod vector_search;
 
 pub use adaptive::{AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor};
@@ -41,12 +39,7 @@ pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
 pub use fulltext_search::FullTextSearchEngine;
 #[cfg(feature = "postgres")]
 pub use hybrid::{HybridSearchConfig, HybridSearchEngine, HybridSearchResult};
-pub use query_optimizer::{
-    IndexStatistics, IndexType, OptimizedSearchPlan, QueryOptimizer, 
-    QueryOptimizerConfig, SearchStrategy,
-};
 pub use ranker::{RRFRanker, SearchResultRanker};
-pub use reranker::{cosine_similarity_exact, RerankConfig, ResultReranker};
 pub use vector_search::{
     build_hybrid_vector_search_sql, build_vector_search_sql, VectorDistanceOperator,
     VectorSearchEngine,

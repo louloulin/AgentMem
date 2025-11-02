@@ -119,6 +119,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: messageContent,
+          user_id: 'default', // Add user_id for tenant isolation
           stream: true,
         }),
       });
@@ -222,6 +223,7 @@ export default function ChatPage() {
         // Use regular API call
         const response = await apiClient.sendChatMessage(selectedAgentId, {
           message: messageContent,
+          user_id: 'default', // Add user_id for tenant isolation
         });
 
         const agentMessage: Message = {
