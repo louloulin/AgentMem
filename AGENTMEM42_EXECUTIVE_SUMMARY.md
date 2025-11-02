@@ -121,6 +121,7 @@
 ### 3. 真正缺失的部分 ❌
 
 ```
+❌ Working Memory对话集成 (需75行) ⭐⭐⭐ 最关键！
 ❌ Working Memory API endpoints (需138行)
 ❌ Working Memory UI界面 (需283行)
 ❌ 监控告警系统 (部分实现，需完善)
@@ -129,49 +130,90 @@
 ❌ CI/CD配置 (完全缺失)
 ```
 
+### 🔥 关键发现：对话系统未使用Working Memory！
+
+**问题**: 当前对话功能完全未集成Working Memory，导致：
+
+```
+❌ 每次对话都从长期记忆检索（慢）
+❌ 无法维护会话内的临时上下文
+❌ 对话历史只存储到messages表（无session隔离）
+❌ 无法实现"忘记当前对话"功能
+❌ 无法支持多会话并行
+```
+
+**影响**: 这比缺少API routes更严重，因为它影响**核心对话体验**！
+
 ---
 
 ## 📋 最小改造方案（2周达95%）
 
 ### Week 1: Working Memory集成
 
-#### Day 1-3: API集成 (138行代码)
+#### Day 1-3: 对话集成 (75行代码) ⭐最优先！
+```rust
+// 修改文件1: orchestrator/mod.rs
+pub struct ChatRequest {
+    // ... 现有字段 ...
+    pub session_id: String,  // ✅ 新增
+}
+
+pub struct AgentOrchestrator {
+    // ... 现有字段 ...
+    working_agent: Option<Arc<RwLock<WorkingAgent>>>,  // ✅ 新增
+}
+
+impl AgentOrchestrator {
+    async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
+        // ✅ 1. 从Working Memory获取会话上下文
+        let working_context = self.get_working_context(&request.session_id).await?;
+        
+        // ✅ 2. 合并到prompt
+        let full_prompt = format!("{}\n{}", working_context, request.message);
+        
+        // 3. 调用LLM...
+        
+        // ✅ 4. 更新Working Memory
+        self.working_agent.add_item(WorkingMemoryItem {...}).await?;
+    }
+}  // +75行修改
+
+// 修改文件2: routes/chat.rs
+pub struct ChatMessageRequest {
+    pub session_id: Option<String>,  // ✅ 新增
+}  // +5行修改
+```
+
+**工作量**: 80行代码，2-3天  
+**影响**: 🔥 对话体验核心提升！
+
+#### Day 4-5: API集成 (138行代码)
 ```rust
 // 新增文件
 crates/agent-mem-server/src/routes/working_memory.rs  (~110行)
-  ├─ add_working_memory()           // POST endpoint
-  ├─ get_working_memory()           // GET endpoint
-  ├─ delete_working_memory_item()   // DELETE endpoint
-  └─ clear_working_memory()         // DELETE (clear session)
+  ├─ add_working_memory()
+  ├─ get_working_memory()
+  ├─ delete_working_memory_item()
+  └─ clear_working_memory()
 
 // 修改文件
-crates/agent-mem-server/src/routes/mod.rs  (~17行)
-  └─ 注册4个新路由
-
-crates/agent-mem-server/src/state.rs  (~11行)
-  └─ 初始化WorkingAgent
+routes/mod.rs + state.rs  (~28行)
 ```
 
-**工作量**: 138行代码，2-3天
+**工作量**: 138行代码，1-2天
 
-#### Day 4-5: UI集成 (283行代码)
+#### Day 6: UI集成 (280行代码)
 ```typescript
-// 新增文件
+// 新增：管理页面
 agentmem-ui/src/app/admin/working-memory/page.tsx  (~250行)
-  ├─ 表格展示working memory
-  ├─ session过滤
-  ├─ 实时刷新
-  └─ CRUD操作
 
-// 修改文件
-agentmem-ui/src/lib/api-client.ts  (~30行)
-  └─ Working Memory API方法
-
-agentmem-ui/src/app/admin/layout.tsx  (~3行)
-  └─ 导航链接
+// 修改：Chat UI
+agentmem-ui/src/app/admin/chat/page.tsx  (~30行)
+  ├─ 显示session_id
+  └─ "清空会话"按钮
 ```
 
-**工作量**: 283行代码，1-2天
+**工作量**: 280行代码，1天
 
 ### Week 2: 完善和验证
 
@@ -218,38 +260,48 @@ Day 4-5: 性能验证
 
 ## 🎯 立即可执行的任务
 
-### 今天下午（4小时）
+### 今天下午（4小时）⭐ 对话集成优先！
 
 ```bash
 □ 1. 验证WorkingAgent存在 (5分钟)
   cat crates/agent-mem-core/src/agents/working_agent.rs | wc -l
   # 预期: 394行
 
-□ 2. 创建working_memory.rs (2小时)
-  cp crates/agent-mem-server/src/routes/memory.rs \
-     crates/agent-mem-server/src/routes/working_memory.rs
-  # 修改为Working Memory特定逻辑
+□ 2. 修改ChatRequest添加session_id (1.5小时)
+  # 编辑 crates/agent-mem-core/src/orchestrator/mod.rs
+  # 添加 pub session_id: String
+  # 添加验证逻辑
 
-□ 3. 实现add_working_memory (1小时)
-  # 调用WorkingAgent的handle_insert
+□ 3. 修改AgentOrchestrator添加working_agent字段 (1小时)
+  # 添加 working_agent: Option<Arc<RwLock<WorkingAgent>>>
+  # 修改 new() 构造函数
 
-□ 4. 编写测试脚本 (1小时)
-  # 创建test_working_memory.sh
+□ 4. 实现get_working_context()方法 (1.5小时)
+  # 添加获取会话上下文的方法
 ```
 
-### 明天（8小时）
+### 明天（8小时）⭐ 完成对话集成
 
 ```bash
-□ 5. 实现剩余3个API endpoints (4小时)
-□ 6. 修改routes/mod.rs和state.rs (2小时)
-□ 7. 集成测试 (2小时)
+□ 5. 修改step()方法集成Working Memory (4小时)
+  # 获取working context
+  # 合并到prompt
+  # 更新working memory
+
+□ 6. 修改Chat路由传递session_id (2小时)
+  # 修改 routes/chat.rs
+  # 添加 session_id 字段和生成逻辑
+
+□ 7. 对话集成测试 (2小时)
+  # 测试session隔离
+  # 验证context维护
 ```
 
 ### 后天（8小时）
 
 ```bash
-□ 8. 创建UI页面 (6小时)
-□ 9. UI测试和调试 (2小时)
+□ 8. 创建Working Memory API routes (4小时)
+□ 9. 创建UI管理页面 (4小时)
 ```
 
 ---
