@@ -24,6 +24,7 @@ pub mod context;
 pub mod coordination;
 /// Core Memory system with Block management, template engine, and auto-rewriter
 pub mod core_memory;
+pub mod embeddings_batch;
 pub mod engine;
 /// Entity and relation extraction for knowledge graph construction
 pub mod extraction;

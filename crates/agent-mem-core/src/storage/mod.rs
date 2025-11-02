@@ -22,6 +22,8 @@ pub mod api_key_repository;
 #[cfg(feature = "postgres")]
 pub mod batch;
 #[cfg(feature = "postgres")]
+pub mod batch_optimized;
+#[cfg(feature = "postgres")]
 pub mod block_repository;
 #[cfg(all(feature = "postgres", feature = "redis-cache"))]
 pub mod hybrid_manager;
