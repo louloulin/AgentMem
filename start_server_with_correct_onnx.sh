@@ -14,10 +14,10 @@ echo "🔧 配置 ONNX Runtime 库路径"
 
 # 获取绝对路径
 LIB_DIR="$(pwd)/lib"
-TARGET_DEBUG_DIR="$(pwd)/target/debug"
+TARGET_RELEASE_DIR="$(pwd)/target/release"
 
 echo "库目录: $LIB_DIR"
-echo "二进制目录: $TARGET_DEBUG_DIR"
+echo "二进制目录: $TARGET_RELEASE_DIR"
 
 # 检查库文件是否存在
 if [ ! -f "$LIB_DIR/libonnxruntime.1.22.0.dylib" ]; then
@@ -34,9 +34,13 @@ pkill -f "agent-mem-server" 2>/dev/null || true
 sleep 2
 
 # 设置环境变量
-export DYLD_LIBRARY_PATH="$LIB_DIR:$TARGET_DEBUG_DIR:$DYLD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="$LIB_DIR:$TARGET_RELEASE_DIR:$DYLD_LIBRARY_PATH"
 export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
 export RUST_BACKTRACE=1
+
+# 配置 Embedder (使用 FastEmbed)
+export EMBEDDER_PROVIDER="fastembed"
+export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 
 # 配置 LLM Provider (Zhipu AI)
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
@@ -48,6 +52,8 @@ echo "  DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
 echo "  ORT_DYLIB_PATH=$ORT_DYLIB_PATH"
 echo "  ZHIPU_API_KEY=99a311...*** (已设置)"
 echo "  LLM_PROVIDER=$LLM_PROVIDER"
+echo "  EMBEDDER_PROVIDER=$EMBEDDER_PROVIDER"
+echo "  EMBEDDER_MODEL=$EMBEDDER_MODEL"
 
 # 启动服务器
 echo ""
@@ -55,7 +61,7 @@ echo "🚀 启动 AgentMem 服务器..."
 echo "日志文件: $(pwd)/backend-onnx-fixed.log"
 echo ""
 
-nohup ./target/debug/agent-mem-server > backend-onnx-fixed.log 2>&1 &
+nohup ./target/release/agent-mem-server > backend-onnx-fixed.log 2>&1 &
 SERVER_PID=$!
 
 echo "✅ 服务器已启动 (PID: $SERVER_PID)"
