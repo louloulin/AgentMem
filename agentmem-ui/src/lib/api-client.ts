@@ -227,6 +227,23 @@ export interface AgentActivityResponse {
   timestamp: string;
 }
 
+export interface MemoryTypeStats {
+  type_name: string;
+  count: number;
+  percentage: number;
+  avg_importance: number;
+}
+
+export interface MemoryQualityResponse {
+  avg_importance: number;
+  high_quality_ratio: number;
+  importance_distribution: Record<string, number>;
+  type_distribution: MemoryTypeStats[];
+  total_memories: number;
+  access_stats: Record<string, number>;
+  timestamp: string;
+}
+
 export interface AgentActivityStats {
   agent_id: string;
   agent_name: string;
@@ -759,6 +776,20 @@ class ApiClient {
    */
   async getAgentActivity(): Promise<AgentActivityResponse> {
     const response = await this.request<AgentActivityResponse>('/api/v1/stats/agents/activity');
+    return response;
+  }
+
+  /**
+   * Get memory quality statistics
+   * 
+   * Returns comprehensive memory quality metrics including:
+   * - Average importance
+   * - High-quality memory ratio
+   * - Importance distribution
+   * - Memory type distribution
+   */
+  async getMemoryQuality(): Promise<MemoryQualityResponse> {
+    const response = await this.request<MemoryQualityResponse>('/api/v1/stats/memory/quality');
     return response;
   }
 

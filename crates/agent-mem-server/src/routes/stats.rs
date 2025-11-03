@@ -142,6 +142,47 @@ pub struct AgentActivityResponse {
     pub timestamp: DateTime<Utc>,
 }
 
+/// Memory quality statistics
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MemoryQualityStats {
+    /// Average importance across all memories
+    pub avg_importance: f64,
+    
+    /// Percentage of high-quality memories (importance > 0.7)
+    pub high_quality_ratio: f64,
+    
+    /// Importance distribution by ranges
+    pub importance_distribution: HashMap<String, i64>,
+    
+    /// Memory type distribution with counts and percentages
+    pub type_distribution: Vec<MemoryTypeStats>,
+    
+    /// Total number of memories
+    pub total_memories: i64,
+    
+    /// Most accessed memory types (placeholder for future)
+    pub access_stats: HashMap<String, i64>,
+    
+    /// Timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
+/// Memory type statistics
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MemoryTypeStats {
+    /// Memory type name
+    pub type_name: String,
+    
+    /// Count of memories of this type
+    pub count: i64,
+    
+    /// Percentage of total memories
+    pub percentage: f64,
+    
+    /// Average importance for this type
+    pub avg_importance: f64,
+}
+
 /// Get dashboard statistics
 ///
 /// Returns comprehensive statistics for the admin dashboard including:
@@ -501,6 +542,154 @@ pub async fn get_agent_activity_stats(
     let response = AgentActivityResponse {
         agents: agent_stats,
         total_agents,
+        timestamp: Utc::now(),
+    };
+    
+    Ok(Json(response))
+}
+
+/// Get memory quality statistics
+///
+/// Returns comprehensive memory quality metrics including:
+/// - Importance distribution
+/// - Memory type distribution
+/// - High-quality memory ratio
+/// - Average importance by type
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats/memory/quality",
+    tag = "statistics",
+    responses(
+        (status = 200, description = "Memory quality statistics retrieved successfully", body = MemoryQualityStats),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_memory_quality_stats(
+    Extension(repositories): Extension<Arc<Repositories>>,
+) -> ServerResult<Json<MemoryQualityStats>> {
+    use libsql::{Builder, params};
+    
+    // ✅ Connect to database for direct queries
+    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+    let db = Builder::new_local(&db_path).build().await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    let conn = db.connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    // Query total memories and average importance
+    let basic_query = "SELECT COUNT(*), AVG(importance) 
+                       FROM memories 
+                       WHERE is_deleted = 0";
+    
+    let mut stmt = conn.prepare(basic_query).await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare basic query: {}", e)))?;
+    
+    let mut rows = stmt.query(params![]).await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute basic query: {}", e)))?;
+    
+    let (total_memories, avg_importance) = if let Some(row) = rows.next().await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch basic row: {}", e)))? {
+        let count: i64 = row.get(0).unwrap_or(0);
+        let avg: Option<f64> = row.get(1).ok();
+        (count, avg.unwrap_or(0.0))
+    } else {
+        (0, 0.0)
+    };
+    
+    // Query high-quality memory ratio (importance > 0.7)
+    let high_quality_query = "SELECT COUNT(*) * 100.0 / ? 
+                              FROM memories 
+                              WHERE is_deleted = 0 AND importance > 0.7";
+    
+    let mut stmt2 = conn.prepare(high_quality_query).await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare quality query: {}", e)))?;
+    
+    let high_quality_ratio = if total_memories > 0 {
+        let mut rows2 = stmt2.query(params![total_memories]).await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute quality query: {}", e)))?;
+        
+        if let Some(row) = rows2.next().await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch quality row: {}", e)))? {
+            row.get::<f64>(0).unwrap_or(0.0)
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    
+    // Query importance distribution
+    let mut importance_distribution = HashMap::new();
+    
+    let dist_queries = vec![
+        ("0.0-0.3", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND importance >= 0.0 AND importance < 0.3"),
+        ("0.3-0.7", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND importance >= 0.3 AND importance < 0.7"),
+        ("0.7-1.0", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND importance >= 0.7 AND importance <= 1.0"),
+    ];
+    
+    for (range, query) in dist_queries {
+        let mut stmt3 = conn.prepare(query).await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare dist query: {}", e)))?;
+        
+        let mut rows3 = stmt3.query(params![]).await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute dist query: {}", e)))?;
+        
+        if let Some(row) = rows3.next().await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch dist row: {}", e)))? {
+            let count: i64 = row.get(0).unwrap_or(0);
+            importance_distribution.insert(range.to_string(), count);
+        }
+    }
+    
+    // Query memory type distribution
+    let type_query = "SELECT memory_type, COUNT(*), AVG(importance) 
+                      FROM memories 
+                      WHERE is_deleted = 0 
+                      GROUP BY memory_type
+                      ORDER BY COUNT(*) DESC";
+    
+    let mut stmt4 = conn.prepare(type_query).await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare type query: {}", e)))?;
+    
+    let mut rows4 = stmt4.query(params![]).await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute type query: {}", e)))?;
+    
+    let mut type_distribution = Vec::new();
+    
+    while let Some(row) = rows4.next().await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch type row: {}", e)))? {
+        
+        let type_name: String = row.get(0).unwrap_or_else(|_| "Unknown".to_string());
+        let count: i64 = row.get(1).unwrap_or(0);
+        let type_avg_importance: Option<f64> = row.get(2).ok();
+        
+        let percentage = if total_memories > 0 {
+            (count as f64 / total_memories as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        type_distribution.push(MemoryTypeStats {
+            type_name,
+            count,
+            percentage,
+            avg_importance: type_avg_importance.unwrap_or(0.0),
+        });
+    }
+    
+    // Placeholder access stats (for future implementation)
+    let access_stats = HashMap::new();
+    
+    tracing::info!("📊 Memory quality: total={}, avg_importance={:.2}, high_quality={:.1}%, types={}", 
+                   total_memories, avg_importance, high_quality_ratio, type_distribution.len());
+    
+    let response = MemoryQualityStats {
+        avg_importance,
+        high_quality_ratio,
+        importance_distribution,
+        type_distribution,
+        total_memories,
+        access_stats,
         timestamp: Utc::now(),
     };
     

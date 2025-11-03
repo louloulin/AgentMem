@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MemoryGrowthChart } from '@/components/charts/memory-growth-chart';
 import { AgentActivityChart } from '@/components/charts/agent-activity-chart';
+import { MemoryQualityCard } from '@/components/stats/MemoryQualityCard';
 import { Bot, Brain, Users, Activity, TrendingUp, MessageSquare, Wifi, WifiOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -213,6 +214,11 @@ export default function AdminDashboard() {
           </h3>
           <AgentActivityChart />
         </Card>
+      </div>
+
+      {/* Memory Quality Metrics - 🆕 New Feature */}
+      <div className="mt-8">
+        <MemoryQualityCard />
       </div>
 
       {/* Recent Activity - ✅ 100% Real Data from Stats API */}

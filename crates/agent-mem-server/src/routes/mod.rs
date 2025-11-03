@@ -89,7 +89,8 @@ pub async fn create_router(
         // Dashboard statistics
         .route("/api/v1/stats/dashboard", get(stats::get_dashboard_stats))
         .route("/api/v1/stats/memories/growth", get(stats::get_memory_growth))
-        .route("/api/v1/stats/agents/activity", get(stats::get_agent_activity_stats));
+        .route("/api/v1/stats/agents/activity", get(stats::get_agent_activity_stats))
+        .route("/api/v1/stats/memory/quality", get(stats::get_memory_quality_stats));
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app
@@ -293,6 +294,7 @@ pub async fn create_router(
         stats::get_dashboard_stats,
         stats::get_memory_growth,
         stats::get_agent_activity_stats,
+        stats::get_memory_quality_stats,
     ),
     components(
         schemas(
