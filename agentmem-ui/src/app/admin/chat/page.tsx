@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Send, Bot, User, Loader2, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const searchParams = useSearchParams();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -40,6 +42,15 @@ export default function ChatPage() {
     token: token || undefined,
     debug: true,
   });
+
+  // ✅ Get agent_id from URL parameters
+  useEffect(() => {
+    const agentIdFromUrl = searchParams.get('agent_id');
+    if (agentIdFromUrl) {
+      console.log('[Chat] Setting agent from URL:', agentIdFromUrl);
+      setSelectedAgentId(agentIdFromUrl);
+    }
+  }, [searchParams]);
 
   // Load agents on mount
   useEffect(() => {
@@ -64,8 +75,19 @@ export default function ChatPage() {
     try {
       const data = await apiClient.getAgents();
       setAgents(data);
+      
+      // ✅ Only auto-select first agent if no agent is already selected (e.g., from URL)
       if (data.length > 0 && !selectedAgentId) {
-        setSelectedAgentId(data[0].id);
+        const agentIdFromUrl = searchParams.get('agent_id');
+        if (agentIdFromUrl && data.some(agent => agent.id === agentIdFromUrl)) {
+          // Agent from URL exists in the list
+          setSelectedAgentId(agentIdFromUrl);
+          console.log('[Chat] Agent from URL found in list:', agentIdFromUrl);
+        } else if (!agentIdFromUrl) {
+          // No URL parameter, select first agent
+          setSelectedAgentId(data[0].id);
+          console.log('[Chat] Auto-selected first agent:', data[0].id);
+        }
       }
     } catch (err) {
       console.error('Failed to load agents:', err);
