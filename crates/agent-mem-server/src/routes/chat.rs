@@ -380,7 +380,8 @@ pub async fn send_chat_message_stream(
                     // Stream content in small chunks for typewriter effect
                     const CHUNK_SIZE: usize = 5; // Send 5 chars at a time
                     
-                    if char_index >= content.len() {
+                    let char_count = content.chars().count();
+                    if char_index >= char_count {
                         // All content sent, send done chunk
                         let done_chunk = StreamChunk {
                             chunk_type: "done".to_string(),
@@ -395,9 +396,10 @@ pub async fn send_chat_message_stream(
                             None
                         }
                     } else {
-                        // Send next chunk of content
-                        let end_index = std::cmp::min(char_index + CHUNK_SIZE, content.len());
-                        let chunk_content = content[char_index..end_index].to_string();
+                        // Send next chunk of content (using character-based indexing for UTF-8 safety)
+                        let chars: Vec<char> = content.chars().collect();
+                        let end_index = std::cmp::min(char_index + CHUNK_SIZE, chars.len());
+                        let chunk_content: String = chars[char_index..end_index].iter().collect();
                         
                         let content_chunk = StreamChunk {
                             chunk_type: "content".to_string(),

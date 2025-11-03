@@ -688,15 +688,25 @@ impl AgentOrchestrator {
         // 1. 添加会话上下文（优先级最高）
         if !working_context.is_empty() {
             system_message_parts.push(format!(
-                "## Current Session Context\n\nThe following is the recent conversation history in this session:\n\n{}",
+                "## ⚠️ CURRENT SESSION CONTEXT (HIGHEST PRIORITY)\n\n\
+                **IMPORTANT**: The following is the CURRENT conversation in THIS session. \
+                This information has the HIGHEST priority and should OVERRIDE any conflicting information from past memories.\n\n\
+                **Current Session History:**\n{}",
                 working_context
             ));
         }
 
-        // 2. 添加长期记忆
+        // 2. 添加长期记忆（仅供参考）
         if !memories.is_empty() {
             let memory_context = self.memory_integrator.inject_memories_to_prompt(memories);
-            system_message_parts.push(memory_context);
+            system_message_parts.push(format!(
+                "## 📚 PAST MEMORIES (For Reference Only)\n\n\
+                **Note**: The following are memories from PAST conversations. \
+                If there is any conflict between these past memories and the current session context above, \
+                ALWAYS prioritize the current session information.\n\n\
+                {}",
+                memory_context
+            ));
         }
 
         // 如果有任何上下文信息，添加系统消息
