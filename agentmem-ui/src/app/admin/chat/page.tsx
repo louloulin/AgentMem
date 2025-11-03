@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { apiClient, Agent } from '@/lib/api-client';
 import { useSSE } from '@/hooks/use-sse';
+import { DEFAULT_USER_ID } from '@/lib/constants';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -147,7 +148,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: messageContent,
-          user_id: 'default-user', // ✅ 修复: 使用 'default-user' 以匹配长期记忆
+          user_id: DEFAULT_USER_ID, // ✅ 使用常量以匹配长期记忆
           session_id: sessionId, // ✅ 传递session_id
           stream: true,
         }),
@@ -252,7 +253,7 @@ export default function ChatPage() {
         // Use regular API call
         const response = await apiClient.sendChatMessage(selectedAgentId, {
           message: messageContent,
-          user_id: 'default-user', // ✅ 修复: 使用 'default-user' 以匹配长期记忆
+          user_id: DEFAULT_USER_ID, // ✅ 使用常量以匹配长期记忆
           session_id: sessionId, // ✅ 传递session_id
         });
 

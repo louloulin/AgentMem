@@ -1,14 +1,16 @@
 /**
  * API Client for AgentMem Backend
- * 
+ *
  * Provides type-safe methods to interact with the AgentMem API.
- * 
+ *
  * Features:
  * - Type-safe API methods
  * - Automatic retries with exponential backoff
  * - Client-side caching with TTL
  * - Request deduplication
  */
+
+import { DEFAULT_USER_ID, DEFAULT_ORG_ID, normalizeUserId } from './constants';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -405,8 +407,8 @@ class ApiClient {
     return this.withRetry(async () => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'X-User-ID': 'default-user',  // 🔧 Added: Required for backend auth
-        'X-Organization-ID': 'default-org',  // 🔧 Added: Required for backend auth
+        'X-User-ID': DEFAULT_USER_ID,  // 🔧 Added: Required for backend auth
+        'X-Organization-ID': DEFAULT_ORG_ID,  // 🔧 Added: Required for backend auth
         ...(options.headers as Record<string, string>),
       };
 
@@ -648,7 +650,7 @@ class ApiClient {
         body: JSON.stringify({
           query,
           agent_id: agentId,
-          user_id: userId || 'default', // Use 'default' as fallback
+          user_id: normalizeUserId(userId), // ✅ 修复: 使用 normalizeUserId 统一处理
         }),
       }
     );
@@ -814,7 +816,7 @@ class ApiClient {
     // Return full item (API returns partial, we'll construct it)
     return {
       id: response.data.id,
-      user_id: 'default-user',
+      user_id: DEFAULT_USER_ID,  // ✅ 使用常量
       agent_id: 'default-agent',
       session_id: response.data.session_id,
       content: response.data.content,
