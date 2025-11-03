@@ -147,7 +147,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: messageContent,
-          user_id: 'default', // Add user_id for tenant isolation
+          user_id: 'default-user', // ✅ 修复: 使用 'default-user' 以匹配长期记忆
           session_id: sessionId, // ✅ 传递session_id
           stream: true,
         }),
@@ -252,7 +252,7 @@ export default function ChatPage() {
         // Use regular API call
         const response = await apiClient.sendChatMessage(selectedAgentId, {
           message: messageContent,
-          user_id: 'default', // Add user_id for tenant isolation
+          user_id: 'default-user', // ✅ 修复: 使用 'default-user' 以匹配长期记忆
           session_id: sessionId, // ✅ 传递session_id
         });
 
