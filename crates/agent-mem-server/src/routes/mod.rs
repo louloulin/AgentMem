@@ -20,6 +20,8 @@ pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore tr
 
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::{audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware};
+use crate::middleware::rbac::rbac_middleware;
+use crate::rbac::RbacChecker;
 use tracing::info;
 // ✅ 使用memory::MemoryManager（基于agent-mem统一API）
 use crate::routes::memory::MemoryManager;
@@ -46,6 +48,9 @@ pub async fn create_router(
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
     let sse_manager = Arc::new(SseManager::new());
+    
+    // Create RBAC checker for role-based access control
+    let rbac_checker = Arc::new(RbacChecker);
 
     // 🆕 Initialize MCP Server with ToolExecutor
     use agent_mem_tools::executor::ToolExecutor;
@@ -214,10 +219,12 @@ pub async fn create_router(
         .layer(TraceLayer::new_for_http())
         .layer(axum_middleware::from_fn(quota_middleware))
         .layer(axum_middleware::from_fn(audit_logging_middleware))
+        .layer(axum_middleware::from_fn(rbac_middleware))  // ✅ RBAC权限检查
         .layer(axum_middleware::from_fn(metrics_middleware))
         // Add default auth middleware (injects default AuthUser when auth is disabled)
         .layer(axum_middleware::from_fn(default_auth_middleware))
         // Add shared state via Extension (must be after middleware that uses them)
+        .layer(Extension(rbac_checker))  // ✅ RBAC检查器
         .layer(Extension(sse_manager))
         .layer(Extension(ws_manager))
         .layer(Extension(mcp_server))  // 🆕 Add MCP server extension

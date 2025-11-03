@@ -10,6 +10,7 @@ pub mod error;
 pub mod middleware;
 pub mod models;
 pub mod orchestrator_factory;
+pub mod rbac;
 pub mod routes;
 pub mod server;
 pub mod sse;

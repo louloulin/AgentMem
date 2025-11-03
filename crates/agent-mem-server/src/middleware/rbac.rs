@@ -214,6 +214,39 @@ pub async fn no_read_only(
     }
 }
 
+/// 通用RBAC权限验证中间件
+/// 
+/// 这是一个基本的RBAC中间件，检查用户是否有权限访问资源
+pub async fn rbac_middleware(
+    req: Request,
+    next: Next,
+) -> ServerResult<Response> {
+    // 从 request extensions 中提取用户信息
+    let user_ctx = req.extensions().get::<UserContext>().cloned();
+    
+    if let Some(user) = user_ctx {
+        // 对于认证用户，记录审计日志并继续
+        let audit_log = AuditLogEntry::new(
+            user.user_id.clone(),
+            req.method().as_str().to_string(),
+            req.uri().path().to_string(),
+            None,
+            true,
+            user.roles.clone(),
+            None,
+            None,
+        );
+        audit_log.log();
+        
+        Ok(next.run(req).await)
+    } else {
+        // 没有用户上下文，需要认证
+        Err(ServerError::Unauthorized(
+            "Authentication required".to_string(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

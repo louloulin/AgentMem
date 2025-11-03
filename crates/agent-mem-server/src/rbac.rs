@@ -160,8 +160,10 @@ impl RbacChecker {
             (Resource::User, Action::Read) => Permission::ReadUser,
             (Resource::User, Action::Write) => Permission::WriteUser,
             (Resource::User, Action::Delete) => Permission::DeleteUser,
-            (Resource::System, Action::Manage) => Permission::ManageSystem,
             (Resource::System, Action::Read) => Permission::ViewMetrics,
+            (Resource::System, Action::Write) => Permission::ManageSystem,
+            (Resource::System, Action::Delete) => Permission::ManageSystem,
+            (Resource::System, Action::Manage) => Permission::ManageSystem,
             _ => {
                 return Err(ServerError::BadRequest(format!(
                     "Invalid resource-action combination: {:?} {:?}",
