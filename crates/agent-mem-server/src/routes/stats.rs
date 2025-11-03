@@ -318,71 +318,91 @@ pub async fn get_memory_growth(
     Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<MemoryGrowthResponse>> {
-    // Get all agents to calculate total memories (避免使用向量搜索)
-    let all_agents = repositories.agents.list(100, 0).await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+    use libsql::{Builder, params};
+    use chrono::DateTime as ChronoDateTime;
     
-    let mut total_memories = 0i64;
-    let mut memories_by_type_map: HashMap<String, usize> = HashMap::new();
+    // ✅ Connect to database to query historical stats
+    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+    let db = Builder::new_local(&db_path).build().await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    let conn = db.connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
     
-    for agent in all_agents.iter() {
-        match memory_manager.get_all_memories(Some(agent.id.clone()), None, Some(10000)).await {
-            Ok(memories) => {
-                total_memories += memories.len() as i64;
-                for memory in memories {
-                    let mem_type = format!("{:?}", memory.memory_type);
-                    *memories_by_type_map.entry(mem_type).or_insert(0) += 1;
-                }
-            },
-            Err(e) => {
-                tracing::warn!("Failed to get memories for agent {}: {}", agent.id, e);
-            }
-        }
-    }
+    // ✅ Query historical daily stats (last 30 days)
+    // Note: Using simple date comparison instead of date() function for LibSQL compatibility
+    let thirty_days_ago = (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string();
+    let query = "SELECT date, total_memories, new_memories, memories_by_type, avg_importance 
+                 FROM memory_stats_daily 
+                 WHERE date >= ?
+                 ORDER BY date ASC";
     
-    // Generate time series data for the last 30 days
-    // In a production system, this would query historical data from a time-series database
+    let mut stmt = conn.prepare(query).await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+    let mut rows = stmt.query(params![thirty_days_ago]).await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+    
     let mut data_points: Vec<MemoryGrowthPoint> = Vec::new();
-    let now = Utc::now();
+    let mut total_memories = 0i64;
     
-    // For demonstration, we'll create a simulated growth curve
-    // TODO: Replace with actual historical data queries
-    for i in (0..30).rev() {
-        let date = now - Duration::days(i);
-        let date_str = date.format("%Y-%m-%d").to_string();
+    while let Some(row) = rows.next().await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
         
-        // Simulate historical data (in production, query from database)
-        let progress = (30 - i) as f64 / 30.0;
-        let total = (total_memories as f64 * progress) as i64;
-        let new = if i == 30 {
-            total
-        } else {
-            (total_memories as f64 * 0.033) as i64 // ~3.3% per day
-        };
+        let date: String = row.get(0).unwrap_or_default();
+        let total: i64 = row.get(1).unwrap_or(0);
+        let new: i64 = row.get(2).unwrap_or(0);
+        let by_type_json: Option<String> = row.get(3).ok();
         
-        let mut by_type: HashMap<String, i64> = HashMap::new();
-        for (mem_type, count) in &memories_by_type_map {
-            by_type.insert(mem_type.clone(), (count * progress as usize) as i64);
-        }
+        let by_type: HashMap<String, i64> = by_type_json
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default();
         
         data_points.push(MemoryGrowthPoint {
-            date: date_str,
+            date,
             total,
             new,
             by_type,
         });
+        
+        total_memories = total;  // Update to latest
     }
     
-    // Calculate growth rate (memories per day)
+    // ✅ If no historical data exists, generate current data point
+    if data_points.is_empty() {
+        // Get current count from memories table
+        let count_query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0";
+        let mut count_stmt = conn.prepare(count_query).await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+        
+        if let Some(count_row) = count_stmt.query(params![]).await.ok()
+            .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+            total_memories = count_row.get::<i64>(0).unwrap_or(0);
+        }
+        
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        data_points.push(MemoryGrowthPoint {
+            date: today,
+            total: total_memories,
+            new: total_memories,
+            by_type: HashMap::new(),
+        });
+    }
+    
+    // ✅ Calculate real growth rate
     let growth_rate = if data_points.len() > 1 {
-        // Safe to unwrap: we just checked that len() > 1
         let first = data_points.first().expect("data_points is not empty").total as f64;
         let last = data_points.last().expect("data_points is not empty").total as f64;
         let days = data_points.len() as f64;
-        (last - first) / days
+        if days > 0.0 {
+            (last - first) / days
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
+    
+    tracing::info!("📊 Memory growth: {} data points, total={}, growth_rate={:.2}/day", 
+                   data_points.len(), total_memories, growth_rate);
     
     let response = MemoryGrowthResponse {
         data: data_points,
