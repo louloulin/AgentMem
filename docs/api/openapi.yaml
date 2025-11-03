@@ -1,0 +1,716 @@
+openapi: 3.0.3
+info:
+  title: AgentMem API
+  description: |
+    AgentMem是一个企业级AI Agent记忆管理平台，提供完整的记忆管理、Agent管理和工具集成功能。
+    
+    ## 核心特性
+    - 🧠 8种认知记忆类型
+    - 🔄 分层记忆架构 (Global → Agent → User → Session)
+    - 🔍 多种搜索引擎 (向量、BM25、混合)
+    - 📊 实时监控和统计
+    - 🔌 MCP工具集成
+    - 🌐 WebSocket/SSE实时通信
+    
+    ## 认证
+    所有API需要JWT token或API Key认证（除health和metrics端点）。
+    
+    在请求头中添加：
+    ```
+    Authorization: Bearer <your-token>
+    ```
+    
+    或使用API Key：
+    ```
+    X-API-Key: <your-api-key>
+    ```
+  version: 2.0.0
+  contact:
+    name: AgentMem Team
+    email: support@agentmem.io
+    url: https://agentmem.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: 本地开发服务器
+  - url: https://api.agentmem.io
+    description: 生产服务器
+
+tags:
+  - name: Memory
+    description: 记忆管理API
+  - name: Agents
+    description: Agent管理API
+  - name: Users
+    description: 用户管理API
+  - name: Chat
+    description: 聊天API
+  - name: Health
+    description: 健康检查
+  - name: Metrics
+    description: 监控指标
+  - name: Stats
+    description: 统计数据
+  - name: Tools
+    description: MCP工具
+  - name: Graph
+    description: 图记忆API
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Memory:
+      type: object
+      required:
+        - content
+        - memory_type
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 记忆ID
+        content:
+          type: string
+          description: 记忆内容
+        memory_type:
+          type: string
+          enum: [episodic, semantic, procedural, working, core, resource, knowledge, contextual]
+          description: 记忆类型
+        agent_id:
+          type: string
+          description: 所属Agent ID
+        user_id:
+          type: string
+          description: 所属用户ID
+        session_id:
+          type: string
+          description: 所属会话ID
+        importance:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: 重要性评分 (0-1)
+        metadata:
+          type: object
+          additionalProperties: true
+          description: 元数据
+        embedding:
+          type: array
+          items:
+            type: number
+          description: 向量嵌入
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Agent:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Agent名称
+        description:
+          type: string
+          description: Agent描述
+        llm_provider:
+          type: string
+          description: LLM提供商
+        model:
+          type: string
+          description: 模型名称
+        system_prompt:
+          type: string
+          description: 系统提示词
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: 搜索查询
+        limit:
+          type: integer
+          default: 10
+          description: 返回结果数量
+        search_type:
+          type: string
+          enum: [vector, bm25, hybrid, fuzzy]
+          default: hybrid
+          description: 搜索类型
+        agent_id:
+          type: string
+          description: 过滤Agent
+        user_id:
+          type: string
+          description: 过滤用户
+        session_id:
+          type: string
+          description: 过滤会话
+        memory_type:
+          type: string
+          description: 过滤记忆类型
+
+    SearchResult:
+      type: object
+      properties:
+        memories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Memory'
+        total:
+          type: integer
+          description: 总结果数
+        took_ms:
+          type: number
+          description: 搜索耗时(毫秒)
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              message:
+                type: string
+              last_check:
+                type: string
+                format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            suggestion:
+              type: string
+            retryable:
+              type: boolean
+        trace_id:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+security:
+  - bearerAuth: []
+  - apiKey: []
+
+paths:
+  # Health Checks
+  /health:
+    get:
+      tags: [Health]
+      summary: 全面健康检查
+      description: 检查服务及各组件的健康状态
+      security: []
+      responses:
+        '200':
+          description: 服务健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: 服务不健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness探针
+      description: Kubernetes liveness probe
+      security: []
+      responses:
+        '200':
+          description: 服务存活
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness探针
+      description: Kubernetes readiness probe
+      security: []
+      responses:
+        '200':
+          description: 服务就绪
+        '503':
+          description: 服务未就绪
+
+  # Memory APIs
+  /api/v1/memories:
+    get:
+      tags: [Memory]
+      summary: 列出所有记忆
+      description: 获取记忆列表（支持分页和过滤）
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: memory_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+                  total:
+                    type: integer
+
+    post:
+      tags: [Memory]
+      summary: 创建记忆
+      description: 添加新的记忆
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Memory'
+            example:
+              content: "用户喜欢喝咖啡"
+              memory_type: "semantic"
+              agent_id: "agent-1"
+              user_id: "user-1"
+              importance: 0.8
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '400':
+          description: 请求错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/memories/{id}:
+    get:
+      tags: [Memory]
+      summary: 获取记忆详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Memory'
+        '404':
+          description: 记忆不存在
+
+    put:
+      tags: [Memory]
+      summary: 更新记忆
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Memory'
+      responses:
+        '200':
+          description: 更新成功
+        '404':
+          description: 记忆不存在
+
+    delete:
+      tags: [Memory]
+      summary: 删除记忆
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+        '404':
+          description: 记忆不存在
+
+  /api/v1/memories/search:
+    post:
+      tags: [Memory]
+      summary: 搜索记忆
+      description: 使用多种搜索引擎搜索记忆
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+            example:
+              query: "咖啡"
+              limit: 10
+              search_type: "hybrid"
+              agent_id: "agent-1"
+      responses:
+        '200':
+          description: 搜索成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+
+  /api/v1/memories/batch:
+    post:
+      tags: [Memory]
+      summary: 批量创建记忆
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                memories:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Memory'
+      responses:
+        '201':
+          description: 批量创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ids:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+
+  # Agents APIs
+  /api/v1/agents:
+    get:
+      tags: [Agents]
+      summary: 列出所有Agent
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Agent'
+
+    post:
+      tags: [Agents]
+      summary: 创建Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Agent'
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/v1/agents/{id}:
+    get:
+      tags: [Agents]
+      summary: 获取Agent详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+
+    put:
+      tags: [Agents]
+      summary: 更新Agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Agent'
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags: [Agents]
+      summary: 删除Agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  # Chat APIs
+  /api/v1/chat:
+    post:
+      tags: [Chat]
+      summary: 发送聊天消息
+      description: 发送消息给Agent，返回AI回复
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - agent_id
+                - message
+              properties:
+                agent_id:
+                  type: string
+                user_id:
+                  type: string
+                session_id:
+                  type: string
+                message:
+                  type: string
+                stream:
+                  type: boolean
+                  default: false
+            example:
+              agent_id: "agent-1"
+              user_id: "user-1"
+              session_id: "session-abc"
+              message: "你好"
+              stream: false
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  memory_ids:
+                    type: array
+                    items:
+                      type: string
+
+  # Metrics APIs
+  /metrics:
+    get:
+      tags: [Metrics]
+      summary: 获取系统指标
+      description: 获取系统和应用指标（JSON格式）
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  system:
+                    type: object
+                  application:
+                    type: object
+
+  /metrics/prometheus:
+    get:
+      tags: [Metrics]
+      summary: Prometheus指标
+      description: Prometheus格式的指标
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # Stats APIs
+  /api/v1/stats/dashboard:
+    get:
+      tags: [Stats]
+      summary: Dashboard统计
+      description: 获取Dashboard概览统计
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_memories:
+                    type: integer
+                  total_agents:
+                    type: integer
+                  total_users:
+                    type: integer
+                  total_sessions:
+                    type: integer
+                  memory_growth:
+                    type: array
+                    items:
+                      type: object
+
+  /api/v1/stats/memories/growth:
+    get:
+      tags: [Stats]
+      summary: 记忆增长统计
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/stats/memory/quality:
+    get:
+      tags: [Stats]
+      summary: 记忆质量统计
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avg_importance:
+                    type: number
+                  quality_distribution:
+                    type: object
+
+externalDocs:
+  description: 完整文档
+  url: https://docs.agentmem.io
+
