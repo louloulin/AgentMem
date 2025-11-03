@@ -222,6 +222,7 @@ pub async fn rbac_middleware(
     next: Next,
 ) -> ServerResult<Response> {
     // 从 request extensions 中提取用户信息
+    // 尝试获取 UserContext，如果没有则尝试 AuthUser
     let user_ctx = req.extensions().get::<UserContext>().cloned();
     
     if let Some(user) = user_ctx {
@@ -240,10 +241,31 @@ pub async fn rbac_middleware(
         
         Ok(next.run(req).await)
     } else {
-        // 没有用户上下文，需要认证
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        // 尝试从 AuthUser 获取（用于开发模式）
+        use crate::middleware::AuthUser;
+        let auth_user = req.extensions().get::<AuthUser>().cloned();
+        
+        if let Some(user) = auth_user {
+            // 对于默认认证用户，记录审计日志并继续
+            let audit_log = AuditLogEntry::new(
+                user.user_id.clone(),
+                req.method().as_str().to_string(),
+                req.uri().path().to_string(),
+                None,
+                true,
+                user.roles.clone(),
+                None,
+                None,
+            );
+            audit_log.log();
+            
+            Ok(next.run(req).await)
+        } else {
+            // 没有任何用户上下文，需要认证
+            Err(ServerError::Unauthorized(
+                "Authentication required".to_string(),
+            ))
+        }
     }
 }
 

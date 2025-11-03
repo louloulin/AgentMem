@@ -30,6 +30,7 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>(''); // ✅ 添加session_id管理
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,9 +59,14 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load chat history when agent changes
+  // Load chat history and generate new session when agent changes
   useEffect(() => {
     if (selectedAgentId) {
+      // ✅ 生成新的session_id
+      const newSessionId = `default_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      setSessionId(newSessionId);
+      console.log('[Chat] Generated new session_id:', newSessionId);
+      
       loadChatHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,6 +148,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: messageContent,
           user_id: 'default', // Add user_id for tenant isolation
+          session_id: sessionId, // ✅ 传递session_id
           stream: true,
         }),
       });
@@ -219,7 +226,7 @@ export default function ChatPage() {
         )
       );
     }
-  }, [selectedAgentId, token]);
+  }, [selectedAgentId, sessionId, token]); // ✅ 添加sessionId依赖
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,6 +253,7 @@ export default function ChatPage() {
         const response = await apiClient.sendChatMessage(selectedAgentId, {
           message: messageContent,
           user_id: 'default', // Add user_id for tenant isolation
+          session_id: sessionId, // ✅ 传递session_id
         });
 
         const agentMessage: Message = {
@@ -274,6 +282,20 @@ export default function ChatPage() {
     }
   };
 
+  // ✅ 添加"新对话"功能
+  const handleNewConversation = () => {
+    if (!selectedAgentId) return;
+    
+    // 生成新的session_id
+    const newSessionId = `default_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    setSessionId(newSessionId);
+    
+    // 清空消息历史
+    setMessages([]);
+    
+    console.log('[Chat] Started new conversation with session_id:', newSessionId);
+  };
+
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   return (
@@ -289,6 +311,17 @@ export default function ChatPage() {
           </p>
         </div>
         <div className="flex items-center space-x-4">
+          {/* ✅ 新对话按钮 */}
+          <Button
+            onClick={handleNewConversation}
+            disabled={!selectedAgentId}
+            variant="outline"
+            size="sm"
+            className="flex items-center space-x-1"
+          >
+            <span>🆕 新对话</span>
+          </Button>
+
           {/* SSE Connection Status */}
           <Badge
             variant={sseConnected ? 'default' : 'secondary'}
