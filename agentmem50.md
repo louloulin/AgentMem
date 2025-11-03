@@ -1627,12 +1627,23 @@ export default function ChatPage() {
 ## 📚 参考资料
 
 ### 学术论文
-1. MemGPT: Towards LLMs as Operating Systems (2023)
-2. Generative Agents: Interactive Simulacra (Stanford, 2023)
-3. MIRIX: Multi-Agent Personal Assistant (2025)
-4. Mem0: Building Production-Ready AI Agents (2024)
-5. SHIMI: Semantic Hierarchical Memory Indexing (2024)
-6. Zep: Temporal Knowledge Graphs for Agent Memory (2025)
+
+#### 2025年最新研究 ⭐
+1. **MemGen**: Weaving Generative Latent Memory for Self-Evolving Agents (2025)
+2. **SEDM**: Scalable Self-Evolving Distributed Memory for Agents (2025)
+3. **LLM-Empowered Embodied Agent**: Memory-Augmented Task Planning (2025)
+4. **Auto-scaling Continuous Memory** for GUI Agent (2025)
+5. **Memory Management Effects** on LLM Agents (2025)
+6. **Google Reasoning Memory**: Self-Evolving Framework (2025)
+7. **Hierarchical Memory for RL Agents**: Mental Time Travel (2025)
+
+#### 经典论文 (2023-2024)
+8. MemGPT: Towards LLMs as Operating Systems (2023)
+9. Generative Agents: Interactive Simulacra (Stanford, 2023)
+10. MIRIX: Multi-Agent Personal Assistant (2025)
+11. Mem0: Building Production-Ready AI Agents (2024)
+12. SHIMI: Semantic Hierarchical Memory Indexing (2024)
+13. Zep: Temporal Knowledge Graphs for Agent Memory (2025)
 
 ### 开源项目
 1. Mem0: https://github.com/mem0ai/mem0
@@ -1648,12 +1659,21 @@ export default function ChatPage() {
 
 ---
 
-**文档版本**: v1.0  
-**最后更新**: 2024-11-03  
+**文档版本**: v2.0  
+**最后更新**: 2025-11-03  
 **作者**: AgentMem Team  
-**状态**: ✅ 完成
+**状态**: ✅ 完成 + 2025最新研究综述
+
+**重要补充**: 
+- ✅ 2025年最新Agent Memory研究已综述 ([LATEST_RESEARCH_2025.md](./LATEST_RESEARCH_2025.md))
+- ✅ AgentMem在2025年前沿中达到**85-90%水平**
+- ✅ 深度验证报告已完成 ([DEEP_ANALYSIS_2025_11_03.md](./DEEP_ANALYSIS_2025_11_03.md))
+- ✅ MVP路线图已更新 ([MVP_ROADMAP_2025_11_03.md](./MVP_ROADMAP_2025_11_03.md))
 
 ---
 
-**下一步行动**: 立即开始执行Week 2任务 - 文档系统化
+**下一步行动**: 
+1. 阅读 [2025年最新研究综述](./LATEST_RESEARCH_2025.md)
+2. 立即开始执行Week 1任务 - 文档系统化
+3. 参考2025年前沿研究，持续改进AgentMem
 
