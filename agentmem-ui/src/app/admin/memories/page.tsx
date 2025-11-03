@@ -92,9 +92,11 @@ export default function MemoriesPageEnhanced() {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   
-  // Pagination state (🔧 Fix: API uses 0-based pagination)
+  // Pagination state (✅ Backend pagination)
   const [currentPage, setCurrentPage] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);  // ✅ 与后端默认值一致
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   
   // Add Memory Dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -106,21 +108,26 @@ export default function MemoriesPageEnhanced() {
   });
   const [submitting, setSubmitting] = useState(false);
   
-  // Load data on mount and when currentPage changes
+  // ✅ Load data when page, agent, or type changes
   useEffect(() => {
     loadData();
-  }, [currentPage]); // 🔧 Fix: Add currentPage dependency
+  }, [currentPage, selectedAgentId, selectedType]);
   
   const loadData = async () => {
     try {
       setLoading(true);
       
-      console.log('🔍 [Memories] Loading data with page:', currentPage);
+      console.log('🔍 [Memories] Loading data with page:', currentPage, 'type:', selectedType);
       
-      // 🆕 Fix 1: 并行加载agents和全局memories，不再依赖Agent
+      // ✅ 并行加载agents和memories，支持agent和type过滤
       const [agentsData, memoriesResponse] = await Promise.all([
         apiClient.getAgents(),
-        apiClient.getAllMemories(currentPage, itemsPerPage),
+        apiClient.getAllMemories(
+          currentPage, 
+          itemsPerPage,
+          selectedAgentId !== 'all' ? selectedAgentId : undefined,
+          selectedType !== 'all' ? selectedType : undefined
+        ),
       ]);
       
       console.log('📦 [Memories] Received:', {
@@ -131,6 +138,12 @@ export default function MemoriesPageEnhanced() {
       
       setAgents(agentsData || []);
       setMemories(memoriesResponse?.memories || []);
+      
+      // ✅ 设置分页信息
+      if (memoriesResponse?.pagination) {
+        setTotalPages(memoriesResponse.pagination.total_pages);
+        setTotalCount(memoriesResponse.pagination.total);
+      }
       
       toast({
         title: "Data loaded",
@@ -152,17 +165,24 @@ export default function MemoriesPageEnhanced() {
   
   const handleAgentChange = async (agentId: string) => {
     setSelectedAgentId(agentId);
-    setCurrentPage(0);  // 🔧 Fix: Reset to page 0
+    setCurrentPage(0);  // ✅ Reset to page 0
     
     try {
       setLoading(true);
-      // 🆕 Fix 1: 使用新的getAllMemories API，支持可选的agent过滤
+      // ✅ 使用后端分页API（包含type过滤）
       const memoriesResponse = await apiClient.getAllMemories(
         0, 
         itemsPerPage, 
-        agentId === 'all' ? undefined : agentId
+        agentId === 'all' ? undefined : agentId,
+        selectedType !== 'all' ? selectedType : undefined
       );
       setMemories(memoriesResponse?.memories || []);
+      
+      // ✅ 更新分页信息
+      if (memoriesResponse?.pagination) {
+        setTotalPages(memoriesResponse.pagination.total_pages);
+        setTotalCount(memoriesResponse.pagination.total);
+      }
       
       toast({
         title: "Memories loaded",
@@ -286,20 +306,8 @@ export default function MemoriesPageEnhanced() {
     }
   };
   
-  // Filter memories by type
-  const filteredMemories = (memories || []).filter((memory) => {
-    if (selectedType && selectedType !== 'all') {
-      return memory.memory_type === selectedType;
-    }
-    return true;
-  });
-  
-  // Paginate filtered memories
-  const totalPages = Math.ceil(filteredMemories.length / itemsPerPage);
-  const paginatedMemories = filteredMemories.slice(
-    currentPage * itemsPerPage,  // 🔧 Fix: 0-based pagination
-    (currentPage + 1) * itemsPerPage
-  );
+  // ✅ 后端已经处理了过滤和分页，直接显示
+  const displayMemories = memories || [];
   
   // Format date
   const formatDate = (dateString: string) => {
@@ -363,7 +371,13 @@ export default function MemoriesPageEnhanced() {
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Memory Type
               </label>
-              <Select value={selectedType} onValueChange={setSelectedType}>
+              <Select 
+                value={selectedType} 
+                onValueChange={(value) => {
+                  setSelectedType(value);
+                  setCurrentPage(0); // ✅ Reset to page 0
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -402,7 +416,7 @@ export default function MemoriesPageEnhanced() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold">
-            {filteredMemories.length} Memories
+            {totalCount > 0 ? `${totalCount} Total Memories` : `${displayMemories.length} Memories`}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -413,7 +427,7 @@ export default function MemoriesPageEnhanced() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : filteredMemories.length === 0 ? (
+          ) : displayMemories.length === 0 ? (
             // Empty state
             <div className="text-center py-12">
               <Brain className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -439,7 +453,7 @@ export default function MemoriesPageEnhanced() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMemories.map((memory) => (
+                    {displayMemories.map((memory) => (
                       <TableRow key={memory.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <TableCell className="font-medium">
                           <div className="max-w-md truncate" title={memory.content}>
@@ -488,11 +502,16 @@ export default function MemoriesPageEnhanced() {
               
               {/* Pagination */}
               {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                />
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                  <div className="text-center text-sm text-gray-500 mt-2">
+                    Showing {displayMemories.length} of {totalCount} memories
+                  </div>
+                </div>
               )}
             </>
           )}

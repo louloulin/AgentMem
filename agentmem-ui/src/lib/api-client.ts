@@ -561,8 +561,8 @@ class ApiClient {
   /**
    * Get all memories with pagination (🆕 Fix 1: Global memories list API)
    */
-  async getAllMemories(page: number = 0, limit: number = 20, agentId?: string): Promise<{ memories: Memory[], pagination: { page: number, limit: number, total: number, total_pages: number } }> {
-    const cacheKey = `memories:all:${page}:${limit}:${agentId || 'all'}`;
+  async getAllMemories(page: number = 0, limit: number = 20, agentId?: string, memoryType?: string): Promise<{ memories: Memory[], pagination: { page: number, limit: number, total: number, total_pages: number } }> {
+    const cacheKey = `memories:all:${page}:${limit}:${agentId || 'all'}:${memoryType || 'all'}`;
     const cached = this.getCached<{ memories: Memory[], pagination: any }>(cacheKey);
     if (cached) {
       console.log(`✅ Cache hit: ${cacheKey}`);
@@ -573,6 +573,9 @@ class ApiClient {
     let url = `/api/v1/memories?page=${page}&limit=${limit}`;
     if (agentId) {
       url += `&agent_id=${agentId}`;
+    }
+    if (memoryType && memoryType !== 'all') {
+      url += `&memory_type=${memoryType}`;
     }
     
     const response = await this.request<ApiResponse<{ memories: Memory[], pagination: any }>>(url);
