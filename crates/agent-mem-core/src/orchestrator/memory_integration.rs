@@ -51,24 +51,54 @@ impl MemoryIntegrator {
         Self::new(memory_engine, MemoryIntegratorConfig::default())
     }
 
-    /// 从对话中检索相关记忆
+    /// 从对话中检索相关记忆（支持session隔离）
     ///
-    /// 参考 MIRIX 的 _retrieve_memories 方法
+    /// 参考 MIRIX 的 _retrieve_memories 方法，增加session_id支持
     pub async fn retrieve_relevant_memories(
         &self,
         query: &str,
         agent_id: &str,
         max_count: usize,
     ) -> Result<Vec<Memory>> {
-        debug!("Retrieving memories for agent_id={}, query={}", agent_id, query);
+        self.retrieve_relevant_memories_with_session(query, agent_id, None, None, max_count).await
+    }
+
+    /// 检索相关记忆（支持session和user过滤）
+    pub async fn retrieve_relevant_memories_with_session(
+        &self,
+        query: &str,
+        agent_id: &str,
+        user_id: Option<&str>,
+        session_id: Option<&str>,
+        max_count: usize,
+    ) -> Result<Vec<Memory>> {
+        debug!("Retrieving memories for agent_id={}, user_id={:?}, session_id={:?}, query={}", 
+               agent_id, user_id, session_id, query);
 
         // 使用 MemoryEngine 的搜索功能
         use crate::hierarchy::MemoryScope;
 
-        // 创建 Agent 级别的 scope
-        let scope = Some(MemoryScope::Agent(agent_id.to_string()));
+        // 根据参数创建最精确的 scope
+        let scope = if let (Some(uid), Some(sid)) = (user_id, session_id) {
+            // 最高优先级：Session scope（会话级别）
+            Some(MemoryScope::Session {
+                agent_id: agent_id.to_string(),
+                user_id: uid.to_string(),
+                session_id: sid.to_string(),
+            })
+        } else if let Some(uid) = user_id {
+            // 中优先级：User scope（用户级别）
+            Some(MemoryScope::User {
+                agent_id: agent_id.to_string(),
+                user_id: uid.to_string(),
+            })
+        } else {
+            // 低优先级：Agent scope（仅按agent过滤）
+            Some(MemoryScope::Agent(agent_id.to_string()))
+        };
 
         // 调用 MemoryEngine 进行搜索
+        let scope_str = format!("{:?}", scope);  // Clone scope info for logging
         let memories = self.memory_engine
             .search_memories(query, scope, Some(max_count))
             .await
@@ -82,7 +112,8 @@ impl MemoryIntegrator {
             })
             .collect();
 
-        info!("Retrieved {} relevant memories (filtered from search results)", filtered_memories.len());
+        info!("Retrieved {} relevant memories (filtered from search results, scope={})", 
+              filtered_memories.len(), scope_str);
         Ok(filtered_memories)
     }
 

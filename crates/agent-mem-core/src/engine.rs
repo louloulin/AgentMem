@@ -180,7 +180,7 @@ impl MemoryEngine {
         Ok(removed)
     }
 
-    /// Search memories with intelligent ranking
+    /// Search memories with intelligent ranking (session-aware with temporal decay)
     pub async fn search_memories(
         &self,
         query: &str,
@@ -193,14 +193,27 @@ impl MemoryEngine {
         if let Some(memory_repo) = &self.memory_repository {
             info!("Using LibSQL memory repository for persistent search");
             
-            // 从 LibSQL 读取记忆
-            let agent_id = match &scope {
-                Some(MemoryScope::Agent(id)) => Some(id.as_str()),
-                _ => None,
+            // 提取scope信息用于过滤和加权
+            let (agent_id, target_user_id, target_session_id) = match &scope {
+                Some(MemoryScope::Agent(id)) => (Some(id.as_str()), None, None),
+                Some(MemoryScope::User { agent_id, user_id }) => {
+                    (Some(agent_id.as_str()), Some(user_id.as_str()), None)
+                }
+                Some(MemoryScope::Session { agent_id, user_id, session_id }) => {
+                    (Some(agent_id.as_str()), Some(user_id.as_str()), Some(session_id.as_str()))
+                }
+                _ => (None, None, None),
             };
             
             let fetch_limit = limit.unwrap_or(100) as i64;
-            let db_memories = if let Some(aid) = agent_id {
+            
+            // 根据scope获取记忆
+            let db_memories = if let Some(uid) = target_user_id {
+                // 优先按user_id过滤（同一用户的记忆）
+                memory_repo.find_by_user_id(uid, fetch_limit).await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+            } else if let Some(aid) = agent_id {
+                // 回退到agent_id过滤
                 memory_repo.find_by_agent_id(aid, fetch_limit).await
                     .map_err(|e| crate::CoreError::Storage(e.to_string()))?
             } else {
@@ -208,7 +221,8 @@ impl MemoryEngine {
                     .map_err(|e| crate::CoreError::Storage(e.to_string()))?
             };
             
-            info!("Found {} memories from LibSQL", db_memories.len());
+            info!("Found {} memories from LibSQL (agent={:?}, user={:?}, session={:?})", 
+                  db_memories.len(), agent_id, target_user_id, target_session_id);
             
             // 转换为 Memory (MemoryItem) 类型并计算相关性
             let mut scored_memories: Vec<(Memory, f64)> = db_memories
@@ -258,24 +272,58 @@ impl MemoryEngine {
                         version: 1,
                     };
                     
-                    // 计算相关性分数
-                    let score = self.calculate_relevance_score(&memory, query);
-                    // ✅ 安全截取字符串（避免UTF-8边界问题）
+                    // 计算内容相关性分数
+                    let relevance_score = self.calculate_relevance_score(&memory, query);
+                    
+                    // ✅ 计算时间衰减权重（指数衰减，半衰期24小时）
+                    let now = chrono::Utc::now();
+                    let age_hours = (now - memory.created_at).num_hours() as f64;
+                    let time_decay = if memory.memory_type == agent_mem_traits::MemoryType::Working {
+                        1.0  // Working memory不衰减
+                    } else {
+                        (-age_hours / 24.0).exp()  // 长期记忆：e^(-t/24)
+                    };
+                    
+                    // ✅ 计算用户匹配权重
+                    let user_match_boost = if let Some(ref mem_user_id) = memory.user_id {
+                        if let Some(target_uid) = target_user_id {
+                            if mem_user_id == target_uid {
+                                2.0  // 同一用户：加倍权重
+                            } else {
+                                0.3  // 不同用户：大幅降权
+                            }
+                        } else {
+                            1.0  // 无user_id过滤：保持原权重
+                        }
+                    } else {
+                        1.0
+                    };
+                    
+                    // ✅ 综合权重计算
+                    let final_score = relevance_score * time_decay * user_match_boost * (0.5 + 0.5 * memory.importance as f64);
+                    
+                    // 日志（安全截取字符串）
                     let query_preview: String = query.chars().take(20).collect();
-                    let content_preview: String = memory.content.chars().take(40).collect();
-                    info!("🔍 Memory scoring - query:'{}' content:'{}' score:{:.3}", 
-                          query_preview, content_preview, score);
-                    (memory, score)
+                    let content_preview: String = memory.content.chars().take(30).collect();
+                    info!("🔍 Memory: user={:?} age={}h relevance={:.2} decay={:.2} user_boost={:.1} importance={:.2} → final={:.3} | '{}'", 
+                          memory.user_id.as_ref().map(|s| s.chars().take(8).collect::<String>()), 
+                          age_hours,
+                          relevance_score,
+                          time_decay,
+                          user_match_boost,
+                          memory.importance,
+                          final_score,
+                          content_preview);
+                    
+                    (memory, final_score)
                 })
                 .collect();
             
-            info!("📊 Collected {} memories with scores", scored_memories.len());
+            info!("📊 Collected {} memories with weighted scores", scored_memories.len());
             
-            // 按分数排序
-            scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
-                let combined_a = score_a + (mem_a.importance as f64 * 0.3);
-                let combined_b = score_b + (mem_b.importance as f64 * 0.3);
-                combined_b.partial_cmp(&combined_a).unwrap_or(std::cmp::Ordering::Equal)
+            // 按最终分数排序
+            scored_memories.sort_by(|(_, score_a), (_, score_b)| {
+                score_b.partial_cmp(score_a).unwrap_or(std::cmp::Ordering::Equal)
             });
             
             // 应用限制并设置分数

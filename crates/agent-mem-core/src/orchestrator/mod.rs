@@ -660,11 +660,22 @@ impl AgentOrchestrator {
 
     /// 检索相关记忆
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
-        // 使用 MemoryIntegrator 检索记忆
+        // ✅ 使用 MemoryIntegrator 检索记忆（带session隔离）
         let max_count = self.config.max_memories;
+        
+        // 使用session_id和user_id进行精确过滤
         let memories = self.memory_integrator
-            .retrieve_relevant_memories(&request.message, &request.agent_id, max_count)
+            .retrieve_relevant_memories_with_session(
+                &request.message, 
+                &request.agent_id,
+                Some(&request.user_id),
+                Some(&request.session_id),
+                max_count
+            )
             .await?;
+
+        info!("📋 Retrieved {} memories for session={}, user={}", 
+              memories.len(), request.session_id, request.user_id);
 
         // 过滤和排序
         let memories = self.memory_integrator.filter_by_relevance(memories);
