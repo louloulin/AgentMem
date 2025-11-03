@@ -1,0 +1,186 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # 每天UTC 0点运行
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      compare_with:
+        description: 'Baseline to compare with'
+        required: false
+        default: 'main'
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史用于对比
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+      
+      - name: Run benchmark suite
+        run: |
+          chmod +x scripts/run_benchmarks.sh
+          ./scripts/run_benchmarks.sh
+        continue-on-error: true
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: |
+            target/benchmark-reports/
+            target/criterion/
+          retention-days: 30
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'target/benchmark-reports/benchmark_*.md';
+            // 查找最新的报告文件
+            const reportFiles = require('glob').sync(reportPath);
+            if (reportFiles.length > 0) {
+              const report = fs.readFileSync(reportFiles[0], 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '## 📊 性能基准测试结果\n\n' + report
+              });
+            }
+
+  regression:
+    name: Performance Regression Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Fetch baseline from main
+        run: |
+          git fetch origin main:main
+          git checkout main
+          cargo bench -- --save-baseline main || true
+          git checkout -
+      
+      - name: Run regression test
+        run: |
+          chmod +x scripts/performance_regression_test.sh
+          ./scripts/performance_regression_test.sh
+      
+      - name: Upload regression report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-report-${{ github.sha }}
+          path: target/regression-report.md
+          retention-days: 30
+      
+      - name: Fail if regression detected
+        if: failure()
+        run: |
+          echo "::error::Performance regression detected!"
+          cat target/regression-report.md
+          exit 1
+
+  continuous-profiling:
+    name: Continuous Profiling
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install flamegraph
+        run: cargo install flamegraph
+      
+      - name: Run profiling
+        run: |
+          # 运行核心操作的profiling
+          cargo build --release
+          # 这里可以添加flamegraph命令
+      
+      - name: Upload flamegraph
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flamegraph-${{ github.sha }}
+          path: flamegraph.svg
+          retention-days: 30
+
+  publish-results:
+    name: Publish Results to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [benchmark]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: docs/performance/
+      
+      - name: Generate performance dashboard
+        run: |
+          # 这里可以添加生成性能趋势图表的脚本
+          echo "Performance dashboard generation"
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/performance
+          destination_dir: performance
+
