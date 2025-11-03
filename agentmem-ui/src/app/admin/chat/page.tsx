@@ -277,15 +277,29 @@ export default function ChatPage() {
           </Badge>
 
           {/* Streaming Toggle */}
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useStreaming}
-              onChange={(e) => setUseStreaming(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Stream responses
+          <label className="flex items-center space-x-2 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={useStreaming}
+                onChange={(e) => setUseStreaming(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`w-11 h-6 rounded-full transition-colors ${
+                useStreaming 
+                  ? 'bg-purple-600' 
+                  : 'bg-gray-300 dark:bg-gray-600'
+              }`}></div>
+              <div className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                useStreaming ? 'transform translate-x-5' : ''
+              }`}>
+                {useStreaming && (
+                  <Zap className="w-3 h-3 text-purple-600 absolute inset-0.5" />
+                )}
+              </div>
+            </div>
+            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+              {useStreaming ? '✨ 流式响应' : '💬 标准响应'}
             </span>
           </label>
 
@@ -343,19 +357,23 @@ export default function ChatPage() {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
               {messages.length === 0 && (
-                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  No messages yet. Start a conversation!
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8 animate-fadeIn">
+                  <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">开始新的对话</p>
+                  <p className="text-sm mt-2">
+                    {useStreaming ? '✨ 流式响应已启用' : '💬 标准响应模式'}
+                  </p>
                 </div>
               )}
               {messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
-              {loading && (
-                <div className="flex items-center space-x-2 text-gray-500">
+              {loading && !useStreaming && (
+                <div className="flex items-center space-x-2 text-gray-500 animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Agent is thinking...</span>
+                  <span className="text-sm">Agent正在思考...</span>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -384,7 +402,7 @@ export default function ChatPage() {
 }
 
 /**
- * Message Bubble Component
+ * Message Bubble Component with Streaming Animation
  */
 interface MessageBubbleProps {
   message: Message;
@@ -394,7 +412,12 @@ function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div 
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+      style={{
+        animation: 'fadeIn 0.3s ease-in'
+      }}
+    >
       <div
         className={`flex items-start space-x-2 max-w-[70%] ${
           isUser ? 'flex-row-reverse space-x-reverse' : ''
@@ -405,34 +428,41 @@ function MessageBubble({ message }: MessageBubbleProps) {
             isUser
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-          }`}
+          } ${message.isStreaming ? 'animate-pulse' : ''}`}
         >
           {isUser ? (
             <User className="w-4 h-4" />
           ) : (
-            <Bot className="w-4 h-4" />
+            <Bot className={`w-4 h-4 ${message.isStreaming ? 'animate-bounce' : ''}`} />
           )}
         </div>
-        <div>
+        <div className="flex-1">
           <div
-            className={`rounded-lg px-4 py-2 ${
+            className={`rounded-lg px-4 py-2 transition-all duration-200 ${
               isUser
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-            }`}
+            } ${message.isStreaming ? 'shadow-lg' : ''}`}
           >
-            <p className="text-sm whitespace-pre-wrap">
-              {message.content}
-              {message.isStreaming && (
-                <span className="inline-flex items-center ml-2">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                </span>
-              )}
-            </p>
-            {!message.content && message.isStreaming && (
-              <div className="flex items-center space-x-1 text-gray-500">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="text-xs">Streaming...</span>
+            {!message.content && message.isStreaming ? (
+              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">正在思考...</span>
+                <span className="animate-pulse">●</span>
+                <span className="animate-pulse animation-delay-200">●</span>
+                <span className="animate-pulse animation-delay-400">●</span>
+              </div>
+            ) : (
+              <div className="text-sm whitespace-pre-wrap">
+                {message.content}
+                {message.isStreaming && (
+                  <span 
+                    className="inline-block w-2 h-4 ml-1 bg-current animate-blink"
+                    style={{
+                      animation: 'blink 1s step-end infinite'
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -441,14 +471,42 @@ function MessageBubble({ message }: MessageBubbleProps) {
               {message.timestamp.toLocaleTimeString()}
             </p>
             {message.isStreaming && (
-              <Badge variant="secondary" className="text-xs px-1 py-0">
+              <Badge 
+                variant="secondary" 
+                className="text-xs px-2 py-0.5 animate-pulse"
+              >
                 <Zap className="w-2 h-2 mr-1" />
-                Live
+                实时响应
               </Badge>
             )}
           </div>
         </div>
       </div>
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes blink {
+          0%, 50% { opacity: 1; }
+          51%, 100% { opacity: 0; }
+        }
+        
+        .animation-delay-200 {
+          animation-delay: 200ms;
+        }
+        
+        .animation-delay-400 {
+          animation-delay: 400ms;
+        }
+      `}</style>
     </div>
   );
 }
