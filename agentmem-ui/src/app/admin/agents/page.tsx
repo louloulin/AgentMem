@@ -8,7 +8,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bot, Plus, Trash2, Edit, Activity, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Bot, Plus, Trash2, Edit, Activity, AlertCircle, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -233,6 +234,7 @@ export default function AgentsPage() {
 
 /**
  * Agent Card Component
+ * Enhanced with click-to-chat functionality
  */
 interface AgentCardProps {
   agent: Agent;
@@ -240,6 +242,8 @@ interface AgentCardProps {
 }
 
 function AgentCard({ agent, onDelete }: AgentCardProps) {
+  const router = useRouter();
+
   const getStateColor = (state: string | null) => {
     switch (state) {
       case 'idle':
@@ -257,15 +261,34 @@ function AgentCard({ agent, onDelete }: AgentCardProps) {
     }
   };
 
+  const handleCardClick = () => {
+    router.push(`/admin/chat?agent_id=${agent.id}`);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click when clicking delete
+    onDelete();
+  };
+
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
-      <div className="flex items-start justify-between mb-4">
+    <Card 
+      className="p-6 hover:shadow-lg hover:border-purple-500/50 transition-all duration-300 cursor-pointer group relative"
+      onClick={handleCardClick}
+    >
+      {/* Hover overlay with chat icon */}
+      <div className="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none flex items-center justify-center">
+        <div className="bg-purple-500 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all transform scale-75 group-hover:scale-100">
+          <MessageSquare className="w-6 h-6" />
+        </div>
+      </div>
+
+      <div className="flex items-start justify-between mb-4 relative z-10">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-            <Bot className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+          <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg group-hover:bg-purple-200 dark:group-hover:bg-purple-800 transition-colors">
+            <Bot className="w-6 h-6 text-purple-600 dark:text-purple-300" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">
+            <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
               {agent.name || 'Unnamed Agent'}
             </h3>
             <span
@@ -278,24 +301,33 @@ function AgentCard({ agent, onDelete }: AgentCardProps) {
           </div>
         </div>
         <button
-          onClick={onDelete}
-          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          onClick={handleDeleteClick}
+          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors relative z-20"
+          title="Delete agent"
         >
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 relative z-10">
         {agent.description || 'No description'}
       </p>
 
-      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 relative z-10">
         <span>ID: {agent.id.slice(0, 8)}...</span>
         {agent.last_active_at && (
           <span>
             Active: {new Date(agent.last_active_at).toLocaleDateString()}
           </span>
         )}
+      </div>
+
+      {/* Click to chat hint */}
+      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="text-xs text-purple-600 dark:text-purple-400 font-medium flex items-center gap-1">
+          <MessageSquare className="w-3 h-3" />
+          Click to chat
+        </span>
       </div>
     </Card>
   );
