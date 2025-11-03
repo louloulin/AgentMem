@@ -432,8 +432,17 @@ pub async fn get_memory_growth(
 )]
 pub async fn get_agent_activity_stats(
     Extension(repositories): Extension<Arc<Repositories>>,
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<AgentActivityResponse>> {
+    use libsql::{Builder, params};
+    
+    // ✅ Connect to database for direct queries (avoid vector search)
+    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+    let db = Builder::new_local(&db_path).build().await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    let conn = db.connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
     // Get all agents (using list with large limit)
     let all_agents = repositories.agents.list(1000, 0).await
         .map_err(|e| ServerError::Internal(e.to_string()))?;
@@ -444,19 +453,24 @@ pub async fn get_agent_activity_stats(
     let mut agent_stats: Vec<AgentActivityStats> = Vec::new();
     
     for agent in all_agents.iter().take(20) {  // Limit to 20 for performance
-        // Get memories for this agent
-        let memories = memory_manager.get_all_memories(Some(agent.id.clone()), None, Some(1000)).await
-            .map_err(|e| ServerError::MemoryError(e))?;
+        // ✅ Query memory count and avg importance directly from database
+        let memory_query = "SELECT COUNT(*), AVG(importance) 
+                            FROM memories 
+                            WHERE agent_id = ? AND is_deleted = 0";
         
-        let total_memories = memories.len() as i64;
+        let mut stmt = conn.prepare(memory_query).await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare memory query: {}", e)))?;
         
-        // Calculate average importance
-        let avg_importance = if !memories.is_empty() {
-            memories.iter()
-                .map(|m| m.importance as f64)
-                .sum::<f64>() / memories.len() as f64
+        let mut rows = stmt.query(params![agent.id.as_str()]).await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute memory query: {}", e)))?;
+        
+        let (total_memories, avg_importance) = if let Some(row) = rows.next().await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch memory row: {}", e)))? {
+            let count: i64 = row.get(0).unwrap_or(0);
+            let avg: Option<f64> = row.get(1).ok();
+            (count, avg.unwrap_or(0.0))
         } else {
-            0.0
+            (0, 0.0)
         };
         
         // Get message count for this agent
@@ -480,6 +494,9 @@ pub async fn get_agent_activity_stats(
     
     // Sort by total_interactions descending
     agent_stats.sort_by(|a, b| b.total_interactions.cmp(&a.total_interactions));
+    
+    tracing::info!("📊 Agent activity: {} agents, top agent has {} interactions", 
+                   total_agents, agent_stats.first().map(|a| a.total_interactions).unwrap_or(0));
     
     let response = AgentActivityResponse {
         agents: agent_stats,
