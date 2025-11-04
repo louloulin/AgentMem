@@ -344,3 +344,274 @@ env:
     @echo "EMBEDDER_MODEL: $EMBEDDER_MODEL"
     @echo "DYLD_LIBRARY_PATH: $DYLD_LIBRARY_PATH"
 
+# ============================================================================
+# 演示相关（按照 x.md 演示计划）
+# ============================================================================
+
+# 演示环境变量
+export DEMO_API_URL := "http://localhost:8080"
+export DEMO_UI_URL := "http://localhost:3001"
+export DEMO_USER_ID := "default"
+export DEMO_ORG_ID := "default-org"
+
+# 演示准备：清理并重置演示环境
+demo-prepare:
+    @echo "🧹 准备演示环境..."
+    @echo "=========================================="
+    @echo "1. 停止现有服务..."
+    @just stop
+    @echo ""
+    @echo "2. 清理数据库（可选，谨慎使用）..."
+    @echo "⚠️  跳过数据库清理（保留现有数据）"
+    @echo ""
+    @echo "3. 初始化数据库..."
+    @just db-init
+    @echo ""
+    @echo "✅ 演示环境准备完成"
+
+# 创建演示数据（30条记忆，按照 x.md 计划）
+demo-create-data:
+    @echo "📝 创建演示数据..."
+    @echo "=========================================="
+    @bash scripts/create_demo_memories_from_plan.sh
+    @echo ""
+    @echo "✅ 演示数据创建完成"
+
+# 验证演示数据
+demo-verify-data:
+    @echo "🔍 验证演示数据..."
+    @echo "=========================================="
+    @echo "检查记忆数量..."
+    @curl -s "$(DEMO_API_URL)/api/v1/memories?page=0&limit=1" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" | \
+        jq -r '.data.memories | length as $count | "找到 \($count) 条记忆"' || echo "查询失败"
+    @echo ""
+    @echo "检查 Agent..."
+    @curl -s "$(DEMO_API_URL)/api/v1/agents" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" | \
+        jq -r '.data | length as $count | "找到 \($count) 个 Agent"' || echo "查询失败"
+
+# 验证 UI 功能（按照 x.md 测试用例）
+demo-verify-ui:
+    @echo "🧪 验证 UI 功能..."
+    @echo "=========================================="
+    @bash scripts/verify_ui_functionality.sh
+
+# 启动演示服务（后端 + 前端）
+demo-start:
+    @echo "🚀 启动演示服务..."
+    @echo "=========================================="
+    @bash start_full_stack.sh
+    @echo ""
+    @echo "✅ 服务启动完成"
+    @echo ""
+    @echo "🌐 访问地址:"
+    @echo "  前端 UI: $(DEMO_UI_URL)"
+    @echo "  后端 API: $(DEMO_API_URL)"
+    @echo "  API 文档: $(DEMO_API_URL)/swagger-ui/"
+
+# 打开浏览器验证页面
+demo-open-browser:
+    @echo "🌐 打开浏览器验证页面..."
+    @echo "=========================================="
+    @echo "正在打开以下页面..."
+    @open $(DEMO_UI_URL)/admin/memories || echo "请手动访问: $(DEMO_UI_URL)/admin/memories"
+    @sleep 1
+    @open $(DEMO_UI_URL)/admin/agents || echo "请手动访问: $(DEMO_UI_URL)/admin/agents"
+    @sleep 1
+    @open $(DEMO_UI_URL)/admin/graph || echo "请手动访问: $(DEMO_UI_URL)/admin/graph"
+    @echo ""
+    @echo "✅ 浏览器页面已打开"
+    @echo ""
+    @echo "📋 验证清单（按照 x.md 计划）:"
+    @echo "  1. 搜索功能测试（7个测试用例）"
+    @echo "     - 王总、张总、AI产品、融资、会议、技术相关的工作、陈副总"
+    @echo "  2. 记忆类型过滤（Semantic、Episodic）"
+    @echo "  3. 分页功能验证"
+    @echo "  4. 记忆详情查看"
+
+# 演示搜索测试（7个测试用例）
+demo-test-search:
+    @echo "🔍 演示搜索测试（7个测试用例）..."
+    @echo "=========================================="
+    @echo ""
+    @echo "测试用例1: 基础信息检索 - '王总'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"王总","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例2: 关系网络查询 - '张总'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"张总","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例3: 项目状态查询 - 'AI产品'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"AI产品","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例4: 历史对话查询 - '融资'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"融资","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例5: 个性化建议 - '会议'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"会议","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例6: 语义搜索 - '技术相关的工作'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"技术相关的工作","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "测试用例7: 团队成员查询 - '陈副总'"
+    @curl -s -X POST "$(DEMO_API_URL)/api/v1/memories/search" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"陈副总","limit":10}' | \
+        jq -r '.data | length as $count | "✅ 找到 \($count) 条结果"' || echo "❌ 测试失败"
+    @echo ""
+    @echo "✅ 搜索测试完成"
+
+# 完整演示流程：准备 + 创建数据 + 启动服务 + 验证
+demo-full:
+    @echo "🎬 完整演示流程"
+    @echo "=========================================="
+    @echo ""
+    @echo "步骤1: 构建项目..."
+    @just build-release
+    @echo ""
+    @echo "步骤2: 启动服务..."
+    @just demo-start
+    @echo ""
+    @echo "步骤3: 创建演示数据..."
+    @just demo-create-data
+    @echo ""
+    @echo "步骤4: 验证数据..."
+    @just demo-verify-data
+    @echo ""
+    @echo "步骤5: 验证 UI 功能..."
+    @just demo-verify-ui
+    @echo ""
+    @echo "步骤6: 打开浏览器..."
+    @just demo-open-browser
+    @echo ""
+    @echo "=========================================="
+    @echo "✅ 演示准备完成！"
+    @echo "=========================================="
+    @echo ""
+    @echo "📋 下一步："
+    @echo "  1. 在浏览器中验证搜索功能（7个测试用例）"
+    @echo "  2. 验证记忆类型过滤"
+    @echo "  3. 验证分页功能"
+    @echo "  4. 按照 x.md 计划进行演示"
+    @echo ""
+    @echo "📝 详细指南: docs/BROWSER_VERIFICATION_GUIDE.md"
+
+# 快速演示：假设服务已运行，只创建数据和打开浏览器
+demo-quick:
+    @echo "⚡ 快速演示准备..."
+    @echo "=========================================="
+    @echo "步骤1: 创建演示数据..."
+    @just demo-create-data
+    @echo ""
+    @echo "步骤2: 验证数据..."
+    @just demo-verify-data
+    @echo ""
+    @echo "步骤3: 打开浏览器..."
+    @just demo-open-browser
+    @echo ""
+    @echo "✅ 快速演示准备完成"
+
+# 演示重置：清理数据并重新创建
+demo-reset:
+    @echo "🔄 重置演示数据..."
+    @echo "=========================================="
+    @echo "⚠️  警告：这将删除所有现有记忆"
+    @echo "按 Ctrl+C 取消，或等待 5 秒继续..."
+    @sleep 5
+    @echo ""
+    @echo "正在重置..."
+    @bash scripts/create_demo_memories_from_plan.sh
+    @echo ""
+    @echo "✅ 演示数据已重置"
+
+# 演示状态检查
+demo-status:
+    @echo "📊 演示环境状态"
+    @echo "=========================================="
+    @echo ""
+    @echo "后端服务:"
+    @curl -s $(DEMO_API_URL)/health | jq '.' 2>/dev/null || echo "❌ 后端未运行"
+    @echo ""
+    @echo "前端服务:"
+    @curl -s $(DEMO_UI_URL) > /dev/null 2>&1 && echo "✅ 前端运行中" || echo "❌ 前端未运行"
+    @echo ""
+    @echo "演示数据:"
+    @curl -s "$(DEMO_API_URL)/api/v1/memories?page=0&limit=1" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" | \
+        jq -r '.data.memories | length as $count | "记忆数量: \($count)"' 2>/dev/null || echo "❌ 无法查询"
+    @echo ""
+    @echo "Agent:"
+    @curl -s "$(DEMO_API_URL)/api/v1/agents" \
+        -H "X-User-ID: $(DEMO_USER_ID)" \
+        -H "X-Organization-ID: $(DEMO_ORG_ID)" | \
+        jq -r '.data | length as $count | "Agent数量: \($count)"' 2>/dev/null || echo "❌ 无法查询"
+
+# 演示帮助
+demo-help:
+    @echo "📖 演示命令帮助"
+    @echo "=========================================="
+    @echo ""
+    @echo "准备阶段:"
+    @echo "  just demo-prepare       - 准备演示环境（清理并初始化）"
+    @echo "  just demo-create-data   - 创建演示数据（30条记忆）"
+    @echo "  just demo-verify-data   - 验证演示数据"
+    @echo ""
+    @echo "启动服务:"
+    @echo "  just demo-start         - 启动演示服务（后端+前端）"
+    @echo "  just demo-quick         - 快速演示（假设服务已运行）"
+    @echo ""
+    @echo "验证测试:"
+    @echo "  just demo-verify-ui     - 验证 UI 功能（完整测试）"
+    @echo "  just demo-test-search   - 测试搜索功能（7个测试用例）"
+    @echo ""
+    @echo "浏览器:"
+    @echo "  just demo-open-browser  - 打开浏览器验证页面"
+    @echo ""
+    @echo "完整流程:"
+    @echo "  just demo-full          - 完整演示流程（构建+启动+数据+验证）"
+    @echo ""
+    @echo "其他:"
+    @echo "  just demo-status        - 检查演示环境状态"
+    @echo "  just demo-reset         - 重置演示数据"
+    @echo ""
+    @echo "📝 详细文档:"
+    @echo "  - 演示计划: x.md"
+    @echo "  - 浏览器验证指南: docs/BROWSER_VERIFICATION_GUIDE.md"
+    @echo "  - UI验证报告: docs/UI_FUNCTIONALITY_VERIFICATION_REPORT.md"
+
