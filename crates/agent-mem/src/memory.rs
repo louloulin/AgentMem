@@ -58,6 +58,9 @@ pub struct Memory {
     default_user_id: Option<String>,
     /// 默认 Agent ID
     default_agent_id: String,
+    /// 插件增强层（可选）
+    #[cfg(feature = "plugins")]
+    plugin_layer: Arc<RwLock<crate::plugin_integration::PluginEnhancedMemory>>,
 }
 
 impl Memory {
@@ -71,6 +74,8 @@ impl Memory {
             orchestrator: Arc::new(RwLock::new(orchestrator)),
             default_user_id,
             default_agent_id,
+            #[cfg(feature = "plugins")]
+            plugin_layer: Arc::new(RwLock::new(crate::plugin_integration::PluginEnhancedMemory::new())),
         }
     }
 
@@ -927,6 +932,103 @@ impl Memory {
 
         let orchestrator = self.orchestrator.read().await;
         orchestrator.get_history(&memory_id).await
+    }
+
+    // ==================== 插件管理方法 (Phase 2) ====================
+
+    /// 注册插件
+    ///
+    /// # 参数
+    ///
+    /// * `plugin` - 要注册的插件
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # #[cfg(feature = "plugins")]
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use agent_mem::Memory;
+    /// # use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
+    /// # use agent_mem::plugins::sdk::*;
+    /// # use chrono::Utc;
+    /// let mem = Memory::new().await?;
+    ///
+    /// let metadata = PluginMetadata {
+    ///     name: "my-plugin".to_string(),
+    ///     version: "1.0.0".to_string(),
+    ///     description: "My custom plugin".to_string(),
+    ///     author: "Me".to_string(),
+    ///     plugin_type: PluginType::MemoryProcessor,
+    ///     required_capabilities: vec![Capability::MemoryAccess],
+    ///     config_schema: None,
+    /// };
+    ///
+    /// let plugin = RegisteredPlugin {
+    ///     id: "my-plugin".to_string(),
+    ///     metadata,
+    ///     path: "my-plugin.wasm".to_string(),
+    ///     status: PluginStatus::Registered,
+    ///     config: PluginConfig::default(),
+    ///     registered_at: Utc::now(),
+    ///     last_loaded_at: None,
+    /// };
+    ///
+    /// mem.register_plugin(plugin).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "plugins")]
+    pub async fn register_plugin(&self, plugin: crate::plugins::RegisteredPlugin) -> Result<()> {
+        let mut plugin_layer = self.plugin_layer.write().await;
+        plugin_layer.register_plugin(plugin)
+    }
+
+    /// 列出已注册的插件
+    ///
+    /// # 返回
+    ///
+    /// 返回所有已注册插件的元数据列表
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # #[cfg(feature = "plugins")]
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use agent_mem::Memory;
+    /// let mem = Memory::new().await?;
+    ///
+    /// let plugins = mem.list_plugins().await;
+    /// for plugin in plugins {
+    ///     println!("Plugin: {} v{}", plugin.name, plugin.version);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "plugins")]
+    pub async fn list_plugins(&self) -> Vec<crate::plugins::sdk::PluginMetadata> {
+        let plugin_layer = self.plugin_layer.read().await;
+        plugin_layer
+            .plugin_registry()
+            .list()
+            .iter()
+            .map(|p| p.metadata.clone())
+            .collect()
+    }
+
+    /// 获取插件注册表的访问权限
+    ///
+    /// 用于高级插件管理操作
+    #[cfg(feature = "plugins")]
+    pub async fn plugin_registry(&self) -> tokio::sync::RwLockReadGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
+        self.plugin_layer.read().await
+    }
+
+    /// 获取插件注册表的可变访问权限
+    ///
+    /// 用于高级插件管理操作
+    #[cfg(feature = "plugins")]
+    pub async fn plugin_registry_mut(&self) -> tokio::sync::RwLockWriteGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
+        self.plugin_layer.write().await
     }
 }
 

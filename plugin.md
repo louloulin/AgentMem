@@ -4,10 +4,10 @@
 **日期**: 2025-11-04  
 **基于**: claude1.md 的 MCP 集成计划  
 **目标**: 构建基于 WASM 的高性能、安全、可扩展的插件体系  
-**状态**: ✅ **完整实现已完成并验证通过** + **已深度集成到AgentMem** (2025-11-04)
+**状态**: ✅ **完整实现已完成并验证通过** + **已深度集成到AgentMem核心** (2025-11-04)
 
 > 📊 **验证结果**: 
-> - **94/94 测试通过 (100%)** - **新增 6 个深度集成测试**
+> - **100/100 测试通过 (100%)** - **Phase 2 完成：Memory 核心集成**
 > - **4个 WASM 插件成功编译** + 天气、搜索、数据源插件示例
 > - 52个单元测试 (Registry, Loader, Permissions, Storage, Search, LLM, Network, Monitor, ResourceLimits)
 > - 7个网络集成测试 (HTTP GET/POST, 错误处理, 限流)
@@ -15,11 +15,12 @@
 > - 15个资源限制测试 (内存、CPU、I/O 限制强制执行)
 > - 12个监控测试 (指标收集、成功率、执行时间)
 > - **6个 AgentMem 集成测试** (插件钩子, 注册, 多插件, 类型)
+> - **6个 Memory 插件测试** (插件层, 注册, 多插件, 操作) - **NEW!**
 > - 4个原集成测试 + 1个 LLM 测试 + 1个 WASM 测试
 > - 性能基准测试完成 (216K calls/sec, 219MB/s throughput)
 > - 编译无警告, 代码格式规范  
 > 
-> 📄 详细报告: [PLUGIN_DEEP_INTEGRATION.md](PLUGIN_DEEP_INTEGRATION.md)
+> 📄 详细报告: [MEMORY_PLUGIN_INTEGRATION.md](MEMORY_PLUGIN_INTEGRATION.md)
 
 ## 🎉 实现进度
 
@@ -152,15 +153,21 @@
   - ResourceMonitor - 资源限制强制执行
   - 11个单元测试 + 15个集成测试通过
 
-- **✅ AgentMem 深度集成** - 已完成！
+- **✅ AgentMem Memory 核心集成 (Phase 2)** - 已完成！
   - 集成为可选 feature: `plugins`
   - 通过 `agent_mem::plugins` 导出插件系统
   - 通过 `agent_mem::plugin_integration` 导出集成层
+  - **Memory 结构集成**:
+    - `plugin_layer` 字段集成到 Memory 结构
+    - `register_plugin()` - 注册插件方法
+    - `list_plugins()` - 列出已注册插件
+    - `plugin_registry()` - 访问插件注册表
+    - `plugin_registry_mut()` - 可变访问插件注册表
   - **PluginEnhancedMemory** - 插件增强包装器
   - **PluginHooks** trait - 插件钩子接口
-  - 6个集成测试全部通过
+  - 12个集成测试全部通过 (6个集成层 + 6个 Memory)
   - 集成示例：`examples/plugin_deep_integration.rs`
-  - 完整集成指南：[PLUGIN_DEEP_INTEGRATION.md](PLUGIN_DEEP_INTEGRATION.md)
+  - 完整集成指南：[MEMORY_PLUGIN_INTEGRATION.md](MEMORY_PLUGIN_INTEGRATION.md)
 
 ### 🔄 待完成功能 (可选增强)
 
