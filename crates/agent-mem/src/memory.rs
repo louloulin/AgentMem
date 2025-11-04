@@ -491,11 +491,23 @@ impl Memory {
         query: impl Into<String>,
         options: SearchOptions,
     ) -> Result<Vec<MemoryItem>> {
-        let query = query.into();
+        let mut query = query.into();
         debug!("搜索记忆: {}", query);
 
+        // ===== Phase 3: 插件钩子 - before_search =====
+        #[cfg(feature = "plugins")]
+        {
+            use crate::plugin_integration::PluginHooks;
+            let plugin_layer = self.plugin_layer.read().await;
+            if let Err(e) = plugin_layer.before_search(&query) {
+                warn!("插件 before_search 钩子失败: {}", e);
+                // 继续执行，不阻止搜索
+            }
+        }
+
+        // 核心搜索操作
         let orchestrator = self.orchestrator.read().await;
-        orchestrator
+        let mut results = orchestrator
             .search_memories(
                 query,
                 self.default_agent_id.clone(),
@@ -503,7 +515,20 @@ impl Memory {
                 options.limit.unwrap_or(10),
                 None, // memory_type 已从 SearchOptions 移除
             )
-            .await
+            .await?;
+
+        // ===== Phase 3: 插件钩子 - after_search =====
+        #[cfg(feature = "plugins")]
+        {
+            use crate::plugin_integration::PluginHooks;
+            let plugin_layer = self.plugin_layer.read().await;
+            if let Err(e) = plugin_layer.after_search(&mut results) {
+                warn!("插件 after_search 钩子失败: {}", e);
+                // 继续返回结果，不阻止
+            }
+        }
+
+        Ok(results)
     }
 
     /// 获取记忆统计信息
