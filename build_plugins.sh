@@ -41,3 +41,10 @@ ls -lh "$TARGET_DIR"/*.wasm 2>/dev/null || true
 
 cd "$SCRIPT_DIR"
 
+
+# Build llm_plugin
+echo "📦 Building llm_plugin..."
+cd "$SCRIPT_DIR/crates/agent-mem-plugin-sdk/examples/llm_plugin"
+cargo build --target wasm32-wasip1 --release --quiet
+cp target/wasm32-wasip1/release/llm_plugin.wasm "$TARGET_DIR/"
+echo "   ✅ llm_plugin.wasm ($(du -h "$TARGET_DIR/llm_plugin.wasm" | cut -f1))"

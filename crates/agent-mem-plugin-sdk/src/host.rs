@@ -6,6 +6,35 @@
 
 use crate::types::Memory;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// HTTP method
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    PATCH,
+}
+
+/// HTTP request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpRequest {
+    pub url: String,
+    pub method: HttpMethod,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
+}
+
+/// HTTP response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpResponse {
+    pub status: u16,
+    pub headers: HashMap<String, String>,
+    pub body: String,
+}
 
 /// Add a memory to AgentMem
 /// Note: This is a placeholder. In a real implementation, this would call the host function.
@@ -52,6 +81,15 @@ pub fn log(level: &str, message: &str) -> Result<()> {
 /// Call LLM
 /// Note: This is a placeholder. In a real implementation, this would call the host function.
 pub fn call_llm(_prompt: &str, _model: Option<&str>) -> Result<String> {
+    // Placeholder implementation
+    Err(anyhow::anyhow!(
+        "Host function calls must be implemented in the plugin context"
+    ))
+}
+
+/// Make an HTTP request
+/// Note: This is a placeholder. In a real implementation, this would call the host function.
+pub fn http_request(_request: &HttpRequest) -> Result<HttpResponse> {
     // Placeholder implementation
     Err(anyhow::anyhow!(
         "Host function calls must be implemented in the plugin context"

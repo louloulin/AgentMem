@@ -92,11 +92,12 @@ impl LlmCapability {
 
     /// Generate a mock response for testing
     fn mock_response(&self, request: &LlmRequest) -> LlmResponse {
-        let text = if request.prompt.contains("summarize") {
+        let prompt_lower = request.prompt.to_lowercase();
+        let text = if prompt_lower.contains("summarize") || prompt_lower.contains("summary") {
             "This is a concise summary of the content.".to_string()
-        } else if request.prompt.contains("translate") {
+        } else if prompt_lower.contains("translate") || prompt_lower.contains("翻译") {
             "这是翻译后的文本。".to_string()
-        } else if request.prompt.contains("analyze") {
+        } else if prompt_lower.contains("analyze") || prompt_lower.contains("analysis") {
             "Analysis: The content contains key insights about the topic.".to_string()
         } else {
             format!("Response to: {}", request.prompt)
