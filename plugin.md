@@ -204,6 +204,20 @@
     - 链式调用测试
     - 无插件兼容性测试
 
+- **🔄 Server API 集成 (Phase 5)** - 进行中
+  - **HTTP API 端点** ✅:
+    - `GET /api/v1/plugins` - 列出所有插件
+    - `POST /api/v1/plugins` - 注册新插件
+    - `GET /api/v1/plugins/:id` - 获取插件详情
+  - **DTO 模型** ✅:
+    - PluginMetadataDto, PluginTypeDto, CapabilityDto
+    - RegisterPluginRequest, PluginResponse
+  - **OpenAPI 文档** ✅:
+    - utoipa 注解完整
+  - **待完成**:
+    - 修复路由器编译问题
+    - 集成测试
+
 ### 🔄 待完成功能 (可选增强)
 
 - **✅ Network 访问能力**: HTTP 客户端支持 - **已完成！**

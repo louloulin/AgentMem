@@ -13,6 +13,7 @@ pub mod memory; // ✅ 统一API实现：基于agent-mem Memory API
 pub mod messages;
 pub mod metrics;
 pub mod organizations;
+pub mod plugins; // 🆕 Plugin management API
 pub mod stats;
 pub mod tools;
 pub mod users;
@@ -188,7 +189,11 @@ pub async fn create_router(
         .route("/api/v1/working-memory", get(working_memory::get_working_memory))
         .route("/api/v1/working-memory/:item_id", delete(working_memory::delete_working_memory_item))
         .route("/api/v1/working-memory/sessions/:session_id", delete(working_memory::clear_working_memory))
-        .route("/api/v1/working-memory/cleanup", post(working_memory::cleanup_expired));
+        .route("/api/v1/working-memory/cleanup", post(working_memory::cleanup_expired))
+        // 🆕 Plugin management routes
+        .route("/api/v1/plugins", get(plugins::list_plugins))
+        .route("/api/v1/plugins", post(plugins::register_plugin))
+        .route("/api/v1/plugins/:id", get(plugins::get_plugin));
 
     // Graph visualization routes (PostgreSQL only)
     #[cfg(feature = "postgres")]
