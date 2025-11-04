@@ -76,8 +76,8 @@ pub fn extract_keywords(input: String) -> FnResult<String> {
     let memory: sdk::Memory = serde_json::from_str(&input)?;
     
     // Simple keyword extraction (top frequent words)
-    let words: Vec<&str> = memory.content
-        .to_lowercase()
+    let content_lower = memory.content.to_lowercase();
+    let words: Vec<&str> = content_lower
         .split_whitespace()
         .filter(|w| w.len() > 3) // Only words longer than 3 chars
         .collect();

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
 /// Plugin manager
+#[derive(Clone)]
 pub struct PluginManager {
     registry: Arc<RwLock<PluginRegistry>>,
     loader: Arc<PluginLoader>,

@@ -19,3 +19,7 @@ lru = "0.12"
 [dev-dependencies]
 tempfile = "3.0"
 
+[[bench]]
+name = "plugin_benchmark"
+harness = false
+
