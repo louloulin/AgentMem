@@ -15,10 +15,10 @@ pub fn analyze_code(input: String) -> FnResult<String> {
         "rust" => analyze_rust_code(&input.code)?,
         "python" => analyze_python_code(&input.code)?,
         _ => {
-            return Err(FnResult::Err(format!(
-                "Unsupported language: {}",
-                input.language
-            ).into()));
+            return Err(WithReturnCode::new(
+                anyhow::anyhow!("Unsupported language: {}", input.language),
+                1
+            ));
         }
     };
     
@@ -76,7 +76,7 @@ fn analyze_rust_code(code: &str) -> AnyhowResult<CodeAnalysis> {
 }
 
 /// Analyze Python code (simplified)
-fn analyze_python_code(code: &str) -> Result<CodeAnalysis, ExtismError> {
+fn analyze_python_code(code: &str) -> AnyhowResult<CodeAnalysis> {
     let mut functions = Vec::new();
     let mut imports = Vec::new();
     
