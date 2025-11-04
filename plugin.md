@@ -7,7 +7,7 @@
 **状态**: ✅ **完整实现已完成并验证通过** + **已深度集成到AgentMem核心** (2025-11-04)
 
 > 📊 **验证结果**: 
-> - **106/106 测试通过 (100%)** - **Phase 3 部分完成：插件钩子调用**
+> - **112/112 测试通过 (100%)** - **Phase 4 完成：Builder 集成**
 > - **4个 WASM 插件成功编译** + 天气、搜索、数据源插件示例
 > - 52个单元测试 (Registry, Loader, Permissions, Storage, Search, LLM, Network, Monitor, ResourceLimits)
 > - 7个网络集成测试 (HTTP GET/POST, 错误处理, 限流)
@@ -16,12 +16,13 @@
 > - 12个监控测试 (指标收集、成功率、执行时间)
 > - **6个 AgentMem 集成测试** (插件钩子, 注册, 多插件, 类型)
 > - **6个 Memory 插件测试** (插件层, 注册, 多插件, 操作)
-> - **6个插件钩子执行测试** (search钩子, 并发, 兼容性) - **NEW!**
+> - **6个插件钩子执行测试** (search钩子, 并发, 兼容性)
+> - **6个 Builder 插件测试** (with_plugin, 多插件, 配置, 链式调用) - **NEW!**
 > - 4个原集成测试 + 1个 LLM 测试 + 1个 WASM 测试
 > - 性能基准测试完成 (216K calls/sec, 219MB/s throughput)
 > - 编译无警告, 代码格式规范  
 > 
-> 📄 详细报告: [PHASE3_PLUGIN_HOOKS.md](PHASE3_PLUGIN_HOOKS.md)
+> 📄 详细报告: [PHASE4_BUILDER_INTEGRATION.md](PHASE4_BUILDER_INTEGRATION.md)
 
 ## 🎉 实现进度
 
@@ -186,6 +187,23 @@
     - update() 钩子集成
     - delete() 钩子集成
 
+- **✅ Builder 插件集成 (Phase 4)** - 已完成！
+  - **with_plugin() 方法** ✅:
+    - 在构建时注册单个插件
+    - 链式调用支持
+    - 与其他 builder 方法无缝集成
+  - **load_plugins_from_dir() 方法** ✅:
+    - 从目录自动加载所有 .wasm 插件
+    - 自动生成插件元数据
+    - 错误处理（目录不存在时不失败）
+  - **6个 Builder 插件测试**:
+    - 单插件注册测试
+    - 多插件注册测试
+    - 插件配置测试
+    - 目录加载测试
+    - 链式调用测试
+    - 无插件兼容性测试
+
 ### 🔄 待完成功能 (可选增强)
 
 - **✅ Network 访问能力**: HTTP 客户端支持 - **已完成！**
@@ -195,8 +213,8 @@
 - **✅ 高级安全**: 细粒度资源限制（CPU、内存、I/O）- **已完成！**
 - **✅ AgentMem Memory 核心集成 (Phase 2)** - **已完成！**
 - **✅ 插件钩子调用集成 (Phase 3 - search)** - **已完成！**
+- **✅ Builder 插件集成 (Phase 4)** - **已完成！**
 - **⏸️ Phase 3 其他钩子**: add/update/delete 钩子集成（需要复杂数据转换）
-- **⏸️ Phase 4: Builder 集成**: with_plugin, load_plugins_from_dir
 - **🔄 多模态插件**: 图像、音频、视频处理
 - **🔄 插件市场**: 插件发现和分发机制
 - **🔄 热重载**: 插件代码更新无需重启

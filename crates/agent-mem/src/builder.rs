@@ -32,6 +32,8 @@ pub struct MemoryBuilder {
     config: OrchestratorConfig,
     default_user_id: Option<String>,
     default_agent_id: String,
+    #[cfg(feature = "plugins")]
+    plugins: Vec<crate::plugins::RegisteredPlugin>,
 }
 
 impl MemoryBuilder {
@@ -41,6 +43,8 @@ impl MemoryBuilder {
             config: OrchestratorConfig::default(),
             default_user_id: None,
             default_agent_id: "default".to_string(),
+            #[cfg(feature = "plugins")]
+            plugins: Vec::new(),
         }
     }
 
@@ -226,6 +230,131 @@ impl MemoryBuilder {
         self
     }
 
+    /// 注册插件 (需要启用 `plugins` feature)
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # #[cfg(feature = "plugins")]
+    /// # use agent_mem::Memory;
+    /// # #[cfg(feature = "plugins")]
+    /// # use agent_mem::plugins::{RegisteredPlugin, PluginStatus};
+    /// # #[cfg(feature = "plugins")]
+    /// # use agent_mem::plugins::sdk::{PluginMetadata, PluginType, Capability, PluginConfig};
+    /// # #[cfg(feature = "plugins")]
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let plugin = RegisteredPlugin {
+    ///     id: "my-plugin".to_string(),
+    ///     metadata: PluginMetadata {
+    ///         name: "my-plugin".to_string(),
+    ///         version: "1.0.0".to_string(),
+    ///         description: "My custom plugin".to_string(),
+    ///         author: "Me".to_string(),
+    ///         plugin_type: PluginType::SearchAlgorithm,
+    ///         required_capabilities: vec![Capability::SearchAccess],
+    ///         config_schema: None,
+    ///     },
+    ///     path: "my-plugin.wasm".to_string(),
+    ///     status: PluginStatus::Registered,
+    ///     config: PluginConfig::default(),
+    ///     registered_at: chrono::Utc::now(),
+    ///     last_loaded_at: None,
+    /// };
+    /// 
+    /// let mem = Memory::builder()
+    ///     .with_storage("memory://")
+    ///     .with_plugin(plugin)
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "plugins")]
+    pub fn with_plugin(mut self, plugin: crate::plugins::RegisteredPlugin) -> Self {
+        self.plugins.push(plugin);
+        self
+    }
+
+    /// 从目录加载所有插件 (需要启用 `plugins` feature)
+    ///
+    /// 扫描指定目录下的所有 `.wasm` 文件并注册为插件。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # #[cfg(feature = "plugins")]
+    /// # use agent_mem::Memory;
+    /// # #[cfg(feature = "plugins")]
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_storage("memory://")
+    ///     .load_plugins_from_dir("./plugins")
+    ///     .await?
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "plugins")]
+    pub async fn load_plugins_from_dir(mut self, dir: impl AsRef<std::path::Path>) -> Result<Self> {
+        use tracing::{debug, warn};
+        use crate::plugins::{RegisteredPlugin, PluginStatus};
+        use crate::plugins::sdk::{PluginMetadata, PluginType, Capability, PluginConfig};
+        
+        let dir_path = dir.as_ref();
+        debug!("从目录加载插件: {:?}", dir_path);
+        
+        if !dir_path.exists() {
+            warn!("插件目录不存在: {:?}", dir_path);
+            return Ok(self);
+        }
+        
+        let entries = std::fs::read_dir(dir_path)
+            .map_err(|e| agent_mem_traits::AgentMemError::Other(anyhow::anyhow!("读取目录失败: {}", e)))?;
+        
+        for entry in entries {
+            let entry = entry.map_err(|e| {
+                agent_mem_traits::AgentMemError::Other(anyhow::anyhow!("读取目录项失败: {}", e))
+            })?;
+            let path = entry.path();
+            
+            // 只处理 .wasm 文件
+            if path.extension().and_then(|s| s.to_str()) != Some("wasm") {
+                continue;
+            }
+            
+            let file_name = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            
+            debug!("发现插件: {:?}", path);
+            
+            // 创建插件元数据（使用默认值）
+            let plugin = RegisteredPlugin {
+                id: file_name.to_string(),
+                metadata: PluginMetadata {
+                    name: file_name.to_string(),
+                    version: "1.0.0".to_string(),
+                    description: format!("Auto-loaded plugin from {}", file_name),
+                    author: "Unknown".to_string(),
+                    plugin_type: PluginType::Custom("auto-loaded".to_string()),
+                    required_capabilities: vec![],
+                    config_schema: None,
+                },
+                path: path.to_string_lossy().to_string(),
+                status: PluginStatus::Registered,
+                config: PluginConfig::default(),
+                registered_at: chrono::Utc::now(),
+                last_loaded_at: None,
+            };
+            
+            self.plugins.push(plugin);
+        }
+        
+        info!("从目录加载了 {} 个插件", self.plugins.len());
+        Ok(self)
+    }
+
     /// 构建 Memory 实例
     ///
     /// # 示例
@@ -246,11 +375,26 @@ impl MemoryBuilder {
 
         let orchestrator = MemoryOrchestrator::new_with_config(self.config).await?;
 
-        Ok(Memory::from_orchestrator(
+        let memory = Memory::from_orchestrator(
             orchestrator,
             self.default_user_id,
             self.default_agent_id,
-        ))
+        );
+        
+        // 注册所有插件 (如果启用了 plugins feature)
+        #[cfg(feature = "plugins")]
+        {
+            if !self.plugins.is_empty() {
+                info!("注册 {} 个插件", self.plugins.len());
+                for plugin in self.plugins {
+                    if let Err(e) = memory.register_plugin(plugin.clone()).await {
+                        tracing::warn!("注册插件 {} 失败: {}", plugin.id, e);
+                    }
+                }
+            }
+        }
+        
+        Ok(memory)
     }
 }
 
