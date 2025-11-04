@@ -6,6 +6,9 @@ resolver = "2"
 exclude = [
     "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
     "examples/batch-embedding-optimization-demo",  # 独立示例，不需要workspace集成
+    "crates/agent-mem-plugin-sdk/examples/hello_plugin",  # Plugin example - standalone
+    "crates/agent-mem-plugin-sdk/examples/memory_processor",  # Plugin example - standalone
+    "crates/agent-mem-plugin-sdk/examples/code_analyzer",  # Plugin example - standalone
 ]
 
 members = [

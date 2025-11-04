@@ -2,6 +2,7 @@
 
 use agent_mem_plugin_sdk::*;
 use extism_pdk::*;
+use anyhow::Result as AnyhowResult;
 
 /// Analyze code
 #[plugin_fn]
@@ -14,10 +15,10 @@ pub fn analyze_code(input: String) -> FnResult<String> {
         "rust" => analyze_rust_code(&input.code)?,
         "python" => analyze_python_code(&input.code)?,
         _ => {
-            return Err(ExtismError::msg(format!(
+            return Err(FnResult::Err(format!(
                 "Unsupported language: {}",
                 input.language
-            )));
+            ).into()));
         }
     };
     
@@ -32,7 +33,7 @@ pub fn analyze_code(input: String) -> FnResult<String> {
 }
 
 /// Analyze Rust code
-fn analyze_rust_code(code: &str) -> Result<CodeAnalysis, ExtismError> {
+fn analyze_rust_code(code: &str) -> AnyhowResult<CodeAnalysis> {
     let mut functions = Vec::new();
     let mut imports = Vec::new();
     let mut patterns = Vec::new();

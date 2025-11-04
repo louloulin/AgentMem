@@ -1,8 +1,8 @@
 //! Memory Processor Plugin Example
 
-use agent_mem_plugin_sdk::*;
+use agent_mem_plugin_sdk::{self as sdk, *};
 use extism_pdk::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Serialize)]
 struct ProcessedMemory {
@@ -18,7 +18,7 @@ struct ProcessedMemory {
 #[plugin_fn]
 pub fn process_memory(input: String) -> FnResult<String> {
     // Parse input
-    let memory: Memory = serde_json::from_str(&input)?;
+    let memory: sdk::Memory = serde_json::from_str(&input)?;
     
     // Process memory content
     let processed_content = clean_and_format(&memory.content);
