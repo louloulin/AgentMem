@@ -94,3 +94,12 @@ pub use agent_mem_core::{
     ContextualAgent, CoreAgent, EpisodicAgent, KnowledgeAgent, ProceduralAgent, ResourceAgent,
     SemanticAgent, WorkingAgent,
 };
+
+// 插件系统（可选功能）
+#[cfg(feature = "plugins")]
+pub use agent_mem_plugins as plugins;
+
+// 插件集成层
+pub mod plugin_integration;
+#[cfg(feature = "plugins")]
+pub use plugin_integration::{PluginEnhancedMemory, PluginHooks};

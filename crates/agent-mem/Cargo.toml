@@ -21,6 +21,7 @@ agent-mem-embeddings = { path = "../agent-mem-embeddings" }
 agent-mem-intelligence = { path = "../agent-mem-intelligence" }
 agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-utils = { path = "../agent-mem-utils" }
+agent-mem-plugins = { path = "../agent-mem-plugins", optional = true }
 
 # 异步运行时
 tokio.workspace = true
@@ -56,4 +57,5 @@ libsql = ["agent-mem-storage/libsql", "agent-mem-core/libsql"]
 postgres = ["agent-mem-storage/postgres", "agent-mem-core/postgres"]
 fastembed = ["agent-mem-embeddings/fastembed"]
 all-providers = ["agent-mem-llm/all-providers", "agent-mem-embeddings/all-providers"]
+plugins = ["agent-mem-plugins"]
 
