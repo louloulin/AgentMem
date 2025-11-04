@@ -1,0 +1,21 @@
+[package]
+name = "agent-mem-plugins"
+version = "0.1.0"
+edition = "2021"
+authors = ["AgentMem Team"]
+description = "Plugin manager for AgentMem - WebAssembly plugin system"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+agent-mem-plugin-sdk = { path = "../agent-mem-plugin-sdk" }
+extism = "1.3"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1.0", features = ["full"] }
+lru = "0.12"
+
+[dev-dependencies]
+tempfile = "3.0"
+

@@ -25,6 +25,8 @@ members = [
     "crates/agent-mem-distributed",
     "crates/agent-mem-compat",
     "crates/agent-mem-deployment",
+    "crates/agent-mem-plugin-sdk",  # Plugin SDK
+    "crates/agent-mem-plugins",     # Plugin Manager
     # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
     # "crates/agent-mem-intelligence",
