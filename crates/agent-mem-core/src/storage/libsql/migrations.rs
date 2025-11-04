@@ -556,7 +556,7 @@ async fn init_default_data(conn: &Connection) -> Result<()> {
         "INSERT OR IGNORE INTO users (id, organization_id, email, name, created_at, updated_at, is_deleted)
          VALUES (?, ?, ?, ?, ?, ?, ?)",
         libsql::params![
-            "default-user",
+            "default",
             "default-org",
             "default@agentmem.local",
             "Default User",

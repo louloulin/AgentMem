@@ -192,7 +192,7 @@ pub async fn default_auth_middleware(mut request: Request, next: Next) -> Respon
     if request.extensions().get::<AuthUser>().is_none() {
         // Inject a default AuthUser for development
         let default_user = AuthUser {
-            user_id: "default-user".to_string(),
+            user_id: "default".to_string(),
             org_id: "default-org".to_string(),
             roles: vec!["admin".to_string(), "user".to_string()],
         };

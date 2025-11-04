@@ -18,7 +18,7 @@ echo ""
 
 # 配置
 AGENT_ID="agent-a23bfd10-b1be-4848-8b4e-f3d34f4aae0e"  # 有 Semantic 记忆的 Agent
-USER_ID="default-user"  # ✅ 修复后的 user_id
+USER_ID="default"  # ✅ 统一使用 default 作为默认用户ID
 SESSION_ID="test-ltm-$(date +%s)"
 BASE_URL="http://localhost:8080"
 

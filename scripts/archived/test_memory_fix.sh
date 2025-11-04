@@ -69,7 +69,7 @@ CHAT_RESPONSE=$(curl -s -X POST ${BASE_URL}/agents/${AGENT_ID}/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "你知道我的名字和职业吗？",
-    "user_id": "default-user"
+    "user_id": "default"
   }')
 
 # 检查响应

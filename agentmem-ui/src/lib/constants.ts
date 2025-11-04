@@ -14,7 +14,7 @@
  * Used in development/testing environments when authentication is disabled.
  * In production, these should be replaced with actual authenticated user IDs.
  */
-export const DEFAULT_USER_ID = 'default-user';
+export const DEFAULT_USER_ID = 'default';
 export const DEFAULT_ORG_ID = 'default-org';
 export const DEFAULT_ROLES = ['admin', 'user'];
 
@@ -116,10 +116,10 @@ export function validateUserId(userId: string): boolean {
 /**
  * Normalize user_id (for backward compatibility)
  * 
- * Converts legacy 'default' to 'default-user'
+ * Converts legacy 'default-user' to 'default'
  */
 export function normalizeUserId(userId?: string): string {
-  if (!userId || userId === 'default') {
+  if (!userId || userId === 'default-user') {
     return DEFAULT_USER_ID;
   }
   return userId;

@@ -160,7 +160,7 @@ impl MemoryManager {
         let memory = agent_mem_core::storage::models::Memory {
             id: memory_id.clone(),
             organization_id: agent.organization_id.clone(),  // 使用Agent的organization_id
-            user_id: "default-user".to_string(),  // 使用默认user (TODO: 应该从auth获取实际user)
+            user_id: "default".to_string(),  // 使用默认user (TODO: 应该从auth获取实际user)
             agent_id: agent_id.clone(),
             content,
             hash: Some(content_hash),
