@@ -14,7 +14,7 @@ impl PermissionChecker {
             allowed_capabilities,
         }
     }
-    
+
     /// Check if a capability is allowed
     pub fn check(&self, required: &Capability) -> Result<()> {
         if self.allowed_capabilities.contains(required) {
@@ -23,7 +23,7 @@ impl PermissionChecker {
             Err(anyhow!("Permission denied: {:?} not allowed", required))
         }
     }
-    
+
     /// Check if all capabilities are allowed
     pub fn check_all(&self, required: &[Capability]) -> Result<()> {
         for cap in required {
@@ -36,33 +36,28 @@ impl PermissionChecker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_permission_check() {
-        let checker = PermissionChecker::new(vec![
-            Capability::MemoryAccess,
-            Capability::LoggingAccess,
-        ]);
-        
+        let checker =
+            PermissionChecker::new(vec![Capability::MemoryAccess, Capability::LoggingAccess]);
+
         assert!(checker.check(&Capability::MemoryAccess).is_ok());
         assert!(checker.check(&Capability::LoggingAccess).is_ok());
         assert!(checker.check(&Capability::NetworkAccess).is_err());
     }
-    
+
     #[test]
     fn test_permission_check_all() {
-        let checker = PermissionChecker::new(vec![
-            Capability::MemoryAccess,
-            Capability::LoggingAccess,
-        ]);
-        
+        let checker =
+            PermissionChecker::new(vec![Capability::MemoryAccess, Capability::LoggingAccess]);
+
         assert!(checker
             .check_all(&[Capability::MemoryAccess, Capability::LoggingAccess])
             .is_ok());
-        
+
         assert!(checker
             .check_all(&[Capability::MemoryAccess, Capability::NetworkAccess])
             .is_err());
     }
 }
-

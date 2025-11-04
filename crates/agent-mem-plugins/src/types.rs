@@ -33,4 +33,3 @@ pub struct LoadedPlugin {
     pub metadata: PluginMetadata,
     pub plugin: extism::Plugin,
 }
-

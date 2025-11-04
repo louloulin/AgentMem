@@ -1,8 +1,7 @@
 //! Host capabilities that plugins can access
 
-pub mod memory;
 pub mod logging;
+pub mod memory;
 
-pub use memory::*;
 pub use logging::*;
-
+pub use memory::*;

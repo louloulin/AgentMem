@@ -9,7 +9,7 @@ impl LoggingCapability {
     pub fn new() -> Self {
         Self {}
     }
-    
+
     /// Log a message
     pub fn log(&self, level: &str, message: &str) -> Result<()> {
         // Use standard logging
@@ -29,4 +29,3 @@ impl Default for LoggingCapability {
         Self::new()
     }
 }
-

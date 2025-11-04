@@ -38,4 +38,3 @@ macro_rules! error_response {
         $crate::PluginResponse::<()>::error($error.to_string())
     };
 }
-

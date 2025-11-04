@@ -8,22 +8,22 @@ use std::collections::HashMap;
 pub struct PluginMetadata {
     /// Plugin name
     pub name: String,
-    
+
     /// Plugin version
     pub version: String,
-    
+
     /// Plugin description
     pub description: String,
-    
+
     /// Plugin author
     pub author: String,
-    
+
     /// Plugin type
     pub plugin_type: PluginType,
-    
+
     /// Required capabilities
     pub required_capabilities: Vec<Capability>,
-    
+
     /// Configuration schema
     pub config_schema: Option<serde_json::Value>,
 }
@@ -93,7 +93,7 @@ impl<T> PluginResponse<T> {
             metadata: HashMap::new(),
         }
     }
-    
+
     pub fn error(error: String) -> Self {
         Self {
             success: false,
@@ -159,4 +159,3 @@ pub struct CodePattern {
     pub description: String,
     pub location: String,
 }
-

@@ -7,16 +7,16 @@ use agent_mem_plugin_sdk::Capability;
 pub struct SandboxConfig {
     /// Maximum memory in bytes
     pub max_memory_bytes: usize,
-    
+
     /// Maximum execution time in milliseconds
     pub max_execution_time_ms: u64,
-    
+
     /// Allowed capabilities
     pub allowed_capabilities: Vec<Capability>,
-    
+
     /// Allow network access
     pub allow_network: bool,
-    
+
     /// Allow filesystem access
     pub allow_filesystem: bool,
 }
@@ -32,4 +32,3 @@ impl Default for SandboxConfig {
         }
     }
 }
-
