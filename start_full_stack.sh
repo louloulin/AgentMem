@@ -19,7 +19,7 @@ if curl -s http://localhost:8080/health > /dev/null 2>&1; then
     echo "   状态: $BACKEND_STATUS"
 else
     echo "⚠️  后端未运行，正在启动..."
-    bash start_server_test.sh > /dev/null 2>&1 &
+    bash start_server_no_auth.sh > /dev/null 2>&1 &
     echo "   等待后端启动 (15秒)..."
     sleep 15
     

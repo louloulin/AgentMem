@@ -34,9 +34,10 @@ export DYLD_LIBRARY_PATH="$LIB_DIR:$TARGET_RELEASE_DIR:$DYLD_LIBRARY_PATH"
 export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
 export RUST_BACKTRACE=1
 
-# 配置 Embedder (使用 FastEmbed)
+# 配置 Embedder (使用 FastEmbed) - 关键修复
 export EMBEDDER_PROVIDER="fastembed"
 export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
+echo "✅ Embedder配置: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
 
 # 配置 LLM Provider (Zhipu AI)
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"

@@ -129,6 +129,8 @@ start-server:
     @echo "🚀 启动 HTTP API 服务器（无认证模式，前台）..."
     @export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="fastembed" && \
+    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
     ./target/release/agent-mem-server
 
 # 启动 HTTP API 服务器（带插件支持，前台运行）
@@ -139,6 +141,8 @@ start-server-with-plugins:
     @echo "   启动服务器..."
     @export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="fastembed" && \
+    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
     ./target/release/agent-mem-server
 
 # 启动 HTTP API 服务器（无认证模式，后台运行）
@@ -178,7 +182,11 @@ start-full-with-plugins:
     @cargo build --release --bin agent-mem-server --features agent-mem/plugins
     @echo "2️⃣  启动后端服务器（后台）..."
     @pkill -f agent-mem-server || true
-    @nohup ./target/release/agent-mem-server > backend-plugins.log 2>&1 &
+    @export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="fastembed" && \
+    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
+    nohup ./target/release/agent-mem-server > backend-plugins.log 2>&1 &
     @sleep 8
     @echo "3️⃣  检查后端健康状态..."
     @curl -s http://localhost:8080/health > /dev/null && echo "   ✅ 后端运行正常" || echo "   ⚠️  后端可能未就绪"
@@ -194,6 +202,7 @@ start-full-with-plugins:
     @echo "║  🔹 健康检查: http://localhost:8080/health            ║"
     @echo "║  🔹 插件API: http://localhost:8080/api/v1/plugins     ║"
     @echo "║  🔹 API文档: http://localhost:8080/swagger-ui/        ║"
+    @echo "║  🔹 Embedder: FastEmbed (BAAI/bge-small-en-v1.5)      ║"
     @echo "╚════════════════════════════════════════════════════════╝"
 
 # 停止所有服务
