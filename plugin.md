@@ -1,10 +1,10 @@
 # AgentMem WASM 插件体系设计
 
-**版本**: v2.3  
+**版本**: v2.4  
 **日期**: 2025-11-05  
 **基于**: claude1.md 的 MCP 集成计划  
 **目标**: 构建基于 WASM 的高性能、安全、可扩展的插件体系  
-**状态**: ✅ **完整实现已完成并验证通过** + **已深度集成到AgentMem核心** + **HTTP API 已实现** + **端到端 WASM 测试通过** + **全栈服务验证通过** 🎉 (2025-11-05)
+**状态**: ✅ **完整实现已完成并验证通过** + **已深度集成到AgentMem核心** + **HTTP API 已实现** + **端到端 WASM 测试通过** + **全栈服务验证通过** + **UI 插件管理完成** 🎉 (2025-11-05)
 
 > 📊 **验证结果**: 
 > - **108/108 测试通过 (100%)** - **Phase 1-5 全部完成 + 深度集成实现完成 + 端到端 WASM 测试通过**
@@ -2196,7 +2196,16 @@ criterion_main!(benches);
 
 ---
 
-**文档版本**: v2.3  
+## 📚 相关文档
+
+- [PLUGIN_UI_IMPLEMENTATION.md](./PLUGIN_UI_IMPLEMENTATION.md) - UI 实现详细文档
+- [PLUGIN_UI_FEATURES.md](./PLUGIN_UI_FEATURES.md) - UI 功能清单
+- [PLUGIN_UI_COMPLETE_SUMMARY.md](./PLUGIN_UI_COMPLETE_SUMMARY.md) - UI 完整总结
+- [scripts/test_plugin_ui.sh](./scripts/test_plugin_ui.sh) - UI 自动化测试脚本
+
+---
+
+**文档版本**: v2.4  
 **最后更新**: 2025-11-05  
 **文档状态**: ✅ 完成（深度集成 + E2E WASM 测试 + 全栈服务验证 - 108/108 测试通过 + HTTP API 验证通过） 🎉
 

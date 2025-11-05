@@ -582,7 +582,7 @@ class ApiClient {
    */
   async getAllMemories(page: number = 0, limit: number = 20, agentId?: string, memoryType?: string): Promise<{ memories: Memory[], pagination: { page: number, limit: number, total: number, total_pages: number } }> {
     const cacheKey = `memories:all:${page}:${limit}:${agentId || 'all'}:${memoryType || 'all'}`;
-    const cached = this.getCached<{ memories: Memory[], pagination: any }>(cacheKey);
+    const cached = this.getCached<{ memories: Memory[], pagination: { page: number, limit: number, total: number, total_pages: number } }>(cacheKey);
     if (cached) {
       console.log(`✅ Cache hit: ${cacheKey}`);
       return cached;
@@ -597,7 +597,7 @@ class ApiClient {
       url += `&memory_type=${memoryType}`;
     }
     
-    const response = await this.request<ApiResponse<{ memories: Memory[], pagination: any }>>(url);
+    const response = await this.request<ApiResponse<{ memories: Memory[], pagination: { page: number, limit: number, total: number, total_pages: number } }>>(url);
     this.setCache(cacheKey, response.data, 30000); // 30s TTL
     return response.data;
   }
@@ -897,6 +897,82 @@ class ApiClient {
     
     return response.data;
   }
+
+  // ==================== Plugin APIs ====================
+
+  /**
+   * Get all plugins (cached for 30s)
+   */
+  async getPlugins(): Promise<Plugin[]> {
+    const cacheKey = 'plugins:list';
+    const cached = this.getCached<Plugin[]>(cacheKey);
+    if (cached) {
+      console.log('✅ Cache hit: plugins:list');
+      return cached;
+    }
+
+    console.log('🔄 Cache miss: plugins:list');
+    const response = await this.request<Plugin[]>('/api/v1/plugins');
+    this.setCache(cacheKey, response, 30000); // 30s TTL
+    return response;
+  }
+
+  /**
+   * Get plugin by ID
+   */
+  async getPlugin(id: string): Promise<Plugin> {
+    const response = await this.request<Plugin>(
+      `/api/v1/plugins/${encodeURIComponent(id)}`
+    );
+    return response;
+  }
+
+  /**
+   * Register/Upload new plugin (invalidates plugin cache)
+   */
+  async registerPlugin(formData: PluginRegistrationRequest): Promise<Plugin> {
+    // Note: For WASM file upload, we need to send multipart/form-data
+    // But the current backend expects JSON with path, so we use JSON for now
+    const response = await this.request<Plugin>(
+      '/api/v1/plugins',
+      {
+        method: 'POST',
+        body: JSON.stringify(formData),
+      }
+    );
+    
+    // Invalidate plugins cache
+    this.clearCache('plugins:');
+    console.log('🗑️  Cache cleared: plugins:*');
+    
+    return response;
+  }
+
+  /**
+   * Upload WASM file (returns file path for registration)
+   */
+  async uploadWasmFile(file: File): Promise<{ path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Note: This endpoint might need to be implemented in the backend
+    // For now, we assume it exists at /api/v1/plugins/upload
+    const response = await fetch(`${this.baseUrl}/api/v1/plugins/upload`, {
+      method: 'POST',
+      headers: {
+        'X-User-ID': DEFAULT_USER_ID,
+        'X-Organization-ID': DEFAULT_ORG_ID,
+        ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 // ==================== Additional Types ====================
@@ -929,6 +1005,41 @@ export interface MetricsResponse {
     memories: number;
     interactions: number;
   }>;
+}
+
+/**
+ * Plugin types
+ */
+export interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  plugin_type: PluginType;
+  wasm_path: string;
+  config: Record<string, unknown>;
+  status: PluginStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PluginType = 
+  | 'memory_processor'
+  | 'code_analyzer'
+  | 'search_algorithm'
+  | 'data_source'
+  | 'multimodal'
+  | { custom: string };
+
+export type PluginStatus = 'registered' | 'active' | 'disabled' | 'error';
+
+export interface PluginRegistrationRequest {
+  name: string;
+  description: string;
+  version: string;
+  plugin_type: PluginType;
+  wasm_path: string;
+  config?: Record<string, unknown>;
 }
 
 // Export singleton instance

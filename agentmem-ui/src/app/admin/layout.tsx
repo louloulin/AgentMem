@@ -15,7 +15,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bot, Brain, Users, Settings, Home, MessageSquare, Network } from 'lucide-react';
+import { Bot, Brain, Users, Settings, Home, MessageSquare, Network, Puzzle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -57,6 +57,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </NavLink>
               <NavLink href="/admin/graph" icon={<Network className="w-5 h-5" />}>
                 Knowledge Graph
+              </NavLink>
+              <NavLink href="/admin/plugins" icon={<Puzzle className="w-5 h-5" />}>
+                Plugins
               </NavLink>
               <NavLink href="/admin/users" icon={<Users className="w-5 h-5" />}>
                 Users
