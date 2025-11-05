@@ -326,6 +326,223 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 解决的问题 */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-800/30">
+        <div className="max-w-7xl mx-auto">
+          <FadeIn>
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-white mb-4">
+                <GradientText>为什么需要 AI Agent 记忆系统？</GradientText>
+              </h2>
+              <p className="text-xl text-slate-300">传统 LLM 应用面临的核心挑战</p>
+            </div>
+          </FadeIn>
+
+          {/* 问题对比 */}
+          <div className="grid lg:grid-cols-2 gap-8 mb-16">
+            {/* 传统方案的问题 */}
+            <SlideIn direction="left" delay={100}>
+              <Card className="bg-red-900/20 border-red-500/30 h-full">
+                <CardHeader>
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mr-4">
+                      <X className="w-6 h-6 text-red-400" />
+                    </div>
+                    <CardTitle className="text-white text-2xl">传统 LLM 的局限</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">无状态交互</h4>
+                      <p className="text-slate-300 text-sm">每次对话都是全新开始，无法记住用户信息</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">上下文窗口限制</h4>
+                      <p className="text-slate-300 text-sm">受限于 4K-128K tokens，无法处理长期历史</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">成本高昂</h4>
+                      <p className="text-slate-300 text-sm">每次都要传输完整历史，Token 消耗巨大</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">缺乏个性化</h4>
+                      <p className="text-slate-300 text-sm">无法根据用户历史提供定制化服务</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">跨会话遗忘</h4>
+                      <p className="text-slate-300 text-sm">无法在不同会话间保持记忆连续性</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </SlideIn>
+
+            {/* AgentMem 解决方案 */}
+            <SlideIn direction="right" delay={100}>
+              <Card className="bg-green-900/20 border-green-500/30 h-full">
+                <CardHeader>
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mr-4">
+                      <CheckCircle className="w-6 h-6 text-green-400" />
+                    </div>
+                    <CardTitle className="text-white text-2xl">AgentMem 解决方案</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">持久化记忆</h4>
+                      <p className="text-slate-300 text-sm">跨会话保存用户信息和偏好，永不遗忘</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">无限容量</h4>
+                      <p className="text-slate-300 text-sm">支持千万级记忆存储，不受窗口限制</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">成本降低 99%</h4>
+                      <p className="text-slate-300 text-sm">智能检索相关记忆，仅传输必要信息</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">智能个性化</h4>
+                      <p className="text-slate-300 text-sm">基于历史记忆的定制化回答和推荐</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">毫秒级检索</h4>
+                      <p className="text-slate-300 text-sm">语义搜索响应时间 &lt; 100ms，准确率 95%+</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </SlideIn>
+          </div>
+
+          {/* 实际案例对比 */}
+          <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 rounded-2xl p-8 border border-slate-600">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-white mb-2">实际效果对比</h3>
+              <p className="text-slate-300">看看有无记忆系统的巨大差异</p>
+            </div>
+            
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* 无记忆系统 */}
+              <div className="bg-slate-900/50 rounded-lg p-6 border border-red-500/30">
+                <div className="flex items-center mb-4">
+                  <X className="w-5 h-5 text-red-400 mr-2" />
+                  <h4 className="text-white font-semibold">没有记忆系统</h4>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="bg-blue-900/30 p-3 rounded border-l-2 border-blue-400">
+                    <span className="text-slate-400">用户:</span>
+                    <span className="text-white ml-2">我叫张三，喜欢咖啡</span>
+                  </div>
+                  <div className="bg-purple-900/30 p-3 rounded border-l-2 border-purple-400">
+                    <span className="text-slate-400">AI:</span>
+                    <span className="text-white ml-2">好的，我记住了</span>
+                  </div>
+                  <div className="text-center text-slate-500 py-2">
+                    ⏰ 5分钟后...
+                  </div>
+                  <div className="bg-blue-900/30 p-3 rounded border-l-2 border-blue-400">
+                    <span className="text-slate-400">用户:</span>
+                    <span className="text-white ml-2">我喜欢什么饮品？</span>
+                  </div>
+                  <div className="bg-red-900/30 p-3 rounded border-l-2 border-red-400">
+                    <span className="text-slate-400">AI:</span>
+                    <span className="text-white ml-2">抱歉，我不记得您的偏好...</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 使用 AgentMem */}
+              <div className="bg-slate-900/50 rounded-lg p-6 border border-green-500/30">
+                <div className="flex items-center mb-4">
+                  <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
+                  <h4 className="text-white font-semibold">使用 AgentMem</h4>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="bg-blue-900/30 p-3 rounded border-l-2 border-blue-400">
+                    <span className="text-slate-400">用户:</span>
+                    <span className="text-white ml-2">我叫张三，喜欢咖啡</span>
+                  </div>
+                  <div className="bg-purple-900/30 p-3 rounded border-l-2 border-purple-400">
+                    <span className="text-slate-400">AI:</span>
+                    <span className="text-white ml-2">好的，我已记住：您的名字是张三，偏好饮品是咖啡</span>
+                  </div>
+                  <div className="text-center text-slate-500 py-2">
+                    ⏰ 一周后，新会话...
+                  </div>
+                  <div className="bg-blue-900/30 p-3 rounded border-l-2 border-blue-400">
+                    <span className="text-slate-400">用户:</span>
+                    <span className="text-white ml-2">我喜欢什么饮品？</span>
+                  </div>
+                  <div className="bg-green-900/30 p-3 rounded border-l-2 border-green-400">
+                    <span className="text-slate-400">AI:</span>
+                    <span className="text-white ml-2">根据您的偏好记录，您喜欢咖啡。需要我推荐一些咖啡店吗？</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 数据对比 */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-4 bg-slate-900/30 rounded-lg">
+                <div className="text-3xl font-bold text-green-400 mb-2">99%↓</div>
+                <div className="text-white font-semibold mb-1">成本降低</div>
+                <div className="text-slate-400 text-sm">无需每次传输全量历史</div>
+              </div>
+              <div className="text-center p-4 bg-slate-900/30 rounded-lg">
+                <div className="text-3xl font-bold text-purple-400 mb-2">20-50x</div>
+                <div className="text-white font-semibold mb-1">性能提升</div>
+                <div className="text-slate-400 text-sm">毫秒级智能检索</div>
+              </div>
+              <div className="text-center p-4 bg-slate-900/30 rounded-lg">
+                <div className="text-3xl font-bold text-blue-400 mb-2">40%+</div>
+                <div className="text-white font-semibold mb-1">满意度提升</div>
+                <div className="text-slate-400 text-sm">个性化服务体验</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 核心能力预览 */}
+          <div className="mt-16 text-center">
+            <SlideIn direction="up" delay={300}>
+              <div className="inline-flex items-center bg-purple-900/30 rounded-full px-6 py-3 border border-purple-500/30">
+                <Target className="w-5 h-5 text-purple-400 mr-2" />
+                <span className="text-white font-semibold">AgentMem 核心能力</span>
+                <ArrowRight className="w-5 h-5 text-purple-400 ml-2 animate-pulse" />
+              </div>
+            </SlideIn>
+          </div>
+        </div>
+      </section>
+
       {/* 核心特性 */}
       <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 relative">
         <div className="max-w-7xl mx-auto">
