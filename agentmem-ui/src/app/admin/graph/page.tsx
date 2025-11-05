@@ -12,7 +12,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Network, Brain, Filter, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Network, Brain, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,19 +52,22 @@ export default function GraphPage() {
     if (memories && memories.length > 0) {
       buildGraph();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memories, filterType]);
 
   useEffect(() => {
     if (nodes && nodes.length > 0) {
       drawGraph();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, zoom, selectedNode]);
 
   const loadMemories = async () => {
     try {
       setLoading(true);
-      const allMemories = await apiClient.searchMemories('');
-      setMemories(allMemories || []);
+      // Use getAllMemories instead of searchMemories for better reliability
+      const response = await apiClient.getAllMemories(0, 100);
+      setMemories(response?.memories || []);
     } catch (error) {
       setMemories([]);
       console.error('Failed to load memories:', error);
@@ -207,6 +210,42 @@ export default function GraphPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading knowledge graph...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no memories
+  if (!memories || memories.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+              <Network className="w-8 h-8 mr-3 text-blue-600" />
+              Knowledge Graph
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Visualize memory relationships and connections
+            </p>
+          </div>
+        </div>
+
+        {/* Empty State */}
+        <Card className="p-12">
+          <div className="text-center">
+            <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No Memories Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Create some memories first to see the knowledge graph visualization
+            </p>
+            <Button onClick={() => window.location.href = '/admin/memories'}>
+              Go to Memories
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
