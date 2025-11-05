@@ -109,7 +109,11 @@ async fn test_memory_processor_plugin_wasm() -> Result<(), Box<dyn std::error::E
         "id": "test-1",
         "content": "  This is a test memory\n\n  with extra whitespace  ",
         "memory_type": "Semantic",
-        "metadata": {}
+        "user_id": "test-user",
+        "agent_id": null,
+        "metadata": {},
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z"
     });
     
     let result = PluginLoader::call_plugin(
