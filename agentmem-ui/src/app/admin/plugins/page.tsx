@@ -14,10 +14,16 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Puzzle, 
   Upload, 
@@ -25,11 +31,10 @@ import {
   XCircle, 
   AlertCircle,
   Package,
-  Download,
-  Trash2,
   RefreshCw,
   Plus,
-  FileCode
+  FileCode,
+  Settings
 } from 'lucide-react';
 import { apiClient, type Plugin, type PluginType, type PluginRegistrationRequest } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +48,10 @@ export default function PluginsPage() {
 
   // Form state for plugin registration
   const [showUploadForm, setShowUploadForm] = useState(false);
+  
+  // Plugin details dialog state
+  const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [formData, setFormData] = useState<PluginRegistrationRequest>({
     name: '',
     description: '',
@@ -52,10 +61,6 @@ export default function PluginsPage() {
     config: {},
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    loadPlugins();
-  }, []);
 
   const loadPlugins = async () => {
     try {
@@ -72,6 +77,15 @@ export default function PluginsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadPlugins();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadPlugins, 30000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -312,7 +326,7 @@ export default function PluginsPage() {
               <select
                 id="plugin_type"
                 value={typeof formData.plugin_type === 'string' ? formData.plugin_type : 'custom'}
-                onChange={(e) => setFormData({ ...formData, plugin_type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, plugin_type: e.target.value as PluginType })}
                 required
                 className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-md px-3 py-2"
               >
@@ -444,10 +458,8 @@ export default function PluginsPage() {
                           variant="outline"
                           className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
                           onClick={() => {
-                            toast({
-                              title: "Plugin Details",
-                              description: `Viewing details for ${plugin.name}`,
-                            });
+                            setSelectedPlugin(plugin);
+                            setShowDetailsDialog(true);
                           }}
                         >
                           View Details
@@ -461,6 +473,151 @@ export default function PluginsPage() {
           )}
         </div>
       </Card>
+
+      {/* Plugin Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <Puzzle className="w-6 h-6 text-purple-400" />
+              Plugin Details
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Complete information about the selected plugin
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPlugin && (
+            <div className="space-y-6 mt-4">
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-lg font-semibold text-purple-400 mb-3 flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Basic Information
+                </h3>
+                <div className="space-y-3 bg-slate-900/50 p-4 rounded-lg">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Name:</span>
+                    <span className="col-span-2 font-semibold text-white">{selectedPlugin.name}</span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">ID:</span>
+                    <span className="col-span-2 font-mono text-sm text-slate-300">{selectedPlugin.id}</span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Version:</span>
+                    <span className="col-span-2">
+                      <Badge variant="outline" className="text-slate-300 border-slate-600">
+                        v{selectedPlugin.version}
+                      </Badge>
+                    </span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Description:</span>
+                    <span className="col-span-2 text-slate-300">{selectedPlugin.description}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Type */}
+              <div>
+                <h3 className="text-lg font-semibold text-purple-400 mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  Status & Type
+                </h3>
+                <div className="space-y-3 bg-slate-900/50 p-4 rounded-lg">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Status:</span>
+                    <span className="col-span-2 flex items-center gap-2">
+                      {getStatusIcon(selectedPlugin.status)}
+                      <Badge 
+                        variant={
+                          (selectedPlugin.status === 'active' || selectedPlugin.status === 'registered') ? 'default' :
+                          selectedPlugin.status === 'disabled' ? 'secondary' : 'destructive'
+                        }
+                        className="text-xs"
+                      >
+                        {selectedPlugin.status}
+                      </Badge>
+                    </span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Type:</span>
+                    <span className="col-span-2">
+                      <Badge 
+                        variant={getPluginTypeBadge(selectedPlugin.plugin_type).variant}
+                        className="text-xs"
+                      >
+                        {getPluginTypeBadge(selectedPlugin.plugin_type).label}
+                      </Badge>
+                    </span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">WASM Path:</span>
+                    <span className="col-span-2 font-mono text-xs text-slate-300 break-all">
+                      {selectedPlugin.wasm_path || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuration */}
+              {selectedPlugin.config && Object.keys(selectedPlugin.config).length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-400 mb-3 flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Configuration
+                  </h3>
+                  <div className="bg-slate-900/50 p-4 rounded-lg">
+                    <pre className="text-xs text-slate-300 overflow-x-auto">
+                      {JSON.stringify(selectedPlugin.config, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div>
+                <h3 className="text-lg font-semibold text-purple-400 mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  Timestamps
+                </h3>
+                <div className="space-y-3 bg-slate-900/50 p-4 rounded-lg">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Created:</span>
+                    <span className="col-span-2 text-slate-300 text-sm">
+                      {new Date(selectedPlugin.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-slate-400">Updated:</span>
+                    <span className="col-span-2 text-slate-300 text-sm">
+                      {new Date(selectedPlugin.updated_at).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDetailsDialog(false)}
+                  className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
