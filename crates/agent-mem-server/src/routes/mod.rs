@@ -45,7 +45,7 @@ pub async fn create_router(
     memory_manager: Arc<MemoryManager>,
     metrics_registry: Arc<MetricsRegistry>,
     repositories: Repositories,
-) -> ServerResult<Router> {
+) -> ServerResult<Router<()>> {
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
     let sse_manager = Arc::new(SseManager::new());
@@ -215,7 +215,9 @@ pub async fn create_router(
         .route("/api/v1/sse", get(crate::sse::sse_handler))
         .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response))
         // Add OpenAPI documentation
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // Add state for plugin routes
+        .with_state(memory_manager.clone());
 
     // Add middleware and shared state (order matters: last added = first executed)
     let app = app
