@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {
-    memory: Arc<Memory>,
+    pub memory: Arc<Memory>,
     /// 🆕 Fix 2: 查询优化器
     query_optimizer: Arc<agent_mem_core::search::QueryOptimizer>,
     /// 🆕 Fix 2: 结果重排序器

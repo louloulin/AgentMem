@@ -88,6 +88,7 @@ sha2.workspace = true
 
 [features]
 default = ["libsql"]
+plugins = ["agent-mem/plugins"]
 postgres = ["agent-mem-core/postgres"]
 libsql = ["agent-mem-core/libsql"]
 lancedb = ["agent-mem-storage/lancedb"]

@@ -131,6 +131,16 @@ start-server:
     export SERVER_ENABLE_AUTH="false" && \
     ./target/release/agent-mem-server
 
+# 启动 HTTP API 服务器（带插件支持，前台运行）
+start-server-with-plugins:
+    @echo "🚀 启动 HTTP API 服务器（插件支持，前台）..."
+    @echo "   编译带 plugins feature 的服务器..."
+    @cargo build --release --bin agent-mem-server --features agent-mem/plugins
+    @echo "   启动服务器..."
+    @export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    ./target/release/agent-mem-server
+
 # 启动 HTTP API 服务器（无认证模式，后台运行）
 start-server-no-auth:
     @echo "🚀 启动 HTTP API 服务器（无认证模式，后台）..."
@@ -160,6 +170,31 @@ start-ui:
 start-full:
     @echo "🚀 启动全栈服务..."
     @bash start_full_stack.sh
+
+# 启动全栈（带插件支持）
+start-full-with-plugins:
+    @echo "🚀 启动全栈服务（插件支持）..."
+    @echo "1️⃣  编译带插件的后端..."
+    @cargo build --release --bin agent-mem-server --features agent-mem/plugins
+    @echo "2️⃣  启动后端服务器（后台）..."
+    @pkill -f agent-mem-server || true
+    @nohup ./target/release/agent-mem-server > backend-plugins.log 2>&1 &
+    @sleep 8
+    @echo "3️⃣  检查后端健康状态..."
+    @curl -s http://localhost:8080/health > /dev/null && echo "   ✅ 后端运行正常" || echo "   ⚠️  后端可能未就绪"
+    @echo "4️⃣  启动前端 UI..."
+    @cd agentmem-ui && (pkill -f "next dev" || true) && nohup npm run dev > ../frontend.log 2>&1 &
+    @sleep 5
+    @echo ""
+    @echo "╔════════════════════════════════════════════════════════╗"
+    @echo "║  ✅ AgentMem 全栈服务已启动（插件支持）               ║"
+    @echo "╠════════════════════════════════════════════════════════╣"
+    @echo "║  🔹 后端API: http://localhost:8080                    ║"
+    @echo "║  🔹 前端UI:  http://localhost:3001                    ║"
+    @echo "║  🔹 健康检查: http://localhost:8080/health            ║"
+    @echo "║  🔹 插件API: http://localhost:8080/api/v1/plugins     ║"
+    @echo "║  🔹 API文档: http://localhost:8080/swagger-ui/        ║"
+    @echo "╚════════════════════════════════════════════════════════╝"
 
 # 停止所有服务
 stop:

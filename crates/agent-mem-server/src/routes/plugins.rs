@@ -125,31 +125,38 @@ pub async fn list_plugins(
 ) -> ServerResult<Json<Vec<PluginResponse>>> {
     info!("Listing all registered plugins");
     
-    let memory = memory_manager.memory();
-    let plugins = memory.list_plugins().await;
+    #[cfg(feature = "plugins")]
+    {
+        let plugins = memory_manager.memory.list_plugins().await;
+        
+        let response: Vec<PluginResponse> = plugins
+            .into_iter()
+            .map(|metadata| PluginResponse {
+                id: metadata.name.clone(), // 使用 name 作为 ID
+                name: metadata.name,
+                version: metadata.version,
+                description: metadata.description,
+                author: metadata.author,
+                plugin_type: convert_plugin_type(&metadata.plugin_type),
+                status: PluginStatusDto::Registered, // 默认状态
+                required_capabilities: metadata
+                    .required_capabilities
+                    .iter()
+                    .map(convert_capability)
+                    .collect(),
+                registered_at: chrono::Utc::now().to_rfc3339(),
+                last_loaded_at: None,
+            })
+            .collect();
+        
+        debug!("Found {} plugins", response.len());
+        Ok(Json(response))
+    }
     
-    let response: Vec<PluginResponse> = plugins
-        .into_iter()
-        .map(|metadata| PluginResponse {
-            id: metadata.name.clone(), // 使用 name 作为 ID
-            name: metadata.name,
-            version: metadata.version,
-            description: metadata.description,
-            author: metadata.author,
-            plugin_type: convert_plugin_type(&metadata.plugin_type),
-            status: PluginStatusDto::Registered, // 默认状态
-            required_capabilities: metadata
-                .required_capabilities
-                .iter()
-                .map(convert_capability)
-                .collect(),
-            registered_at: chrono::Utc::now().to_rfc3339(),
-            last_loaded_at: None,
-        })
-        .collect();
-    
-    debug!("Found {} plugins", response.len());
-    Ok(Json(response))
+    #[cfg(not(feature = "plugins"))]
+    {
+        Err(ServerError::internal("Plugins feature is not enabled"))
+    }
 }
 
 /// Register a new plugin
@@ -207,8 +214,7 @@ pub async fn register_plugin(
     };
     
     // Register the plugin
-    let memory = memory_manager.memory();
-    memory
+    memory_manager.memory
         .register_plugin(plugin)
         .await
         .map_err(|e| ServerError::ServerError(format!("Failed to register plugin: {}", e)))?;
@@ -259,8 +265,7 @@ pub async fn get_plugin(
 ) -> ServerResult<Json<PluginResponse>> {
     debug!("Getting plugin: {}", id);
     
-    let memory = memory_manager.memory();
-    let plugins = memory.list_plugins().await;
+    let plugins = memory_manager.memory.list_plugins().await;
     
     // Find plugin by name (using name as ID)
     let plugin = plugins
