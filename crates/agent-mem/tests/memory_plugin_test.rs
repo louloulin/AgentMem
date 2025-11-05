@@ -222,10 +222,9 @@ async fn test_plugin_registry_access() -> Result<()> {
 
     mem.register_plugin(plugin).await?;
 
-    // Access plugin registry
+    // List plugins
     {
-        let registry = mem.plugin_registry().await;
-        let plugins = registry.plugin_registry().list();
+        let plugins = mem.list_plugins().await;
         assert_eq!(plugins.len(), 1);
     }
 

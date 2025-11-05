@@ -13,11 +13,8 @@ use agent_mem_traits::{MemoryItem, Result};
 /// Provides plugin hooks for memory operations
 #[cfg(feature = "plugins")]
 pub struct PluginEnhancedMemory {
-    /// Plugin manager
-    manager: PluginManager,
-    
-    /// Plugin registry
-    registry: PluginRegistry,
+    /// Plugin manager (handles loading and caching)
+    manager: std::sync::Arc<PluginManager>,
 }
 
 #[cfg(feature = "plugins")]
@@ -25,15 +22,13 @@ impl PluginEnhancedMemory {
     /// Create new plugin-enhanced memory
     pub fn new() -> Self {
         Self {
-            manager: PluginManager::new(10), // LRU cache size 10
-            registry: PluginRegistry::new(),
+            manager: std::sync::Arc::new(PluginManager::new(10)), // LRU cache size 10
         }
     }
     
     /// Register a plugin
-    pub fn register_plugin(&mut self, plugin: RegisteredPlugin) -> Result<()> {
-        self.registry
-            .register(plugin)
+    pub async fn register_plugin(&mut self, plugin: RegisteredPlugin) -> Result<()> {
+        self.manager.register(plugin).await
             .map_err(|e| agent_mem_traits::AgentMemError::Other(e))
     }
     
@@ -45,15 +40,38 @@ impl PluginEnhancedMemory {
         memory: &mut MemoryItem,
     ) -> Result<()> {
         // Find memory processor plugins
-        let plugins = self.registry.list();
+        let plugins = self.manager.list_plugins().await;
         
         for plugin_info in plugins {
             if matches!(plugin_info.metadata.plugin_type, PluginType::MemoryProcessor) {
-                // TODO: Load and call plugin
                 tracing::debug!(
-                    "Would process memory with plugin: {}",
+                    "Processing memory with plugin: {}",
                     plugin_info.metadata.name
                 );
+                
+                // Serialize memory to JSON
+                let input = serde_json::to_string(memory)
+                    .map_err(|e| agent_mem_traits::AgentMemError::Other(e.into()))?;
+                
+                // Call plugin
+                match self.manager.call_plugin(&plugin_info.id, "process_memory", &input).await {
+                    Ok(output) => {
+                        // Try to deserialize the processed memory
+                        match serde_json::from_str::<MemoryItem>(&output) {
+                            Ok(processed_memory) => {
+                                *memory = processed_memory;
+                                tracing::debug!("Memory processed successfully by plugin: {}", plugin_info.metadata.name);
+                            }
+                            Err(e) => {
+                                tracing::warn!("Plugin {} returned invalid memory format: {}", plugin_info.metadata.name, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Plugin {} failed to process memory: {}", plugin_info.metadata.name, e);
+                        // Continue with other plugins
+                    }
+                }
             }
         }
         
@@ -63,11 +81,54 @@ impl PluginEnhancedMemory {
     /// Search using custom search algorithm plugin
     pub async fn search_with_plugin(
         &self,
-        _query: &str,
-        _memories: &[MemoryItem],
+        query: &str,
+        memories: &[MemoryItem],
     ) -> Result<Vec<MemoryItem>> {
-        // TODO: Implement plugin-based search
-        Ok(vec![])
+        // Find search algorithm plugins
+        let plugins = self.manager.list_plugins().await;
+        
+        for plugin_info in plugins {
+            if matches!(plugin_info.metadata.plugin_type, PluginType::SearchAlgorithm) {
+                tracing::debug!(
+                    "Searching with plugin: {}",
+                    plugin_info.metadata.name
+                );
+                
+                // Prepare search request
+                let request = serde_json::json!({
+                    "query": query,
+                    "memories": memories,
+                });
+                
+                let input = serde_json::to_string(&request)
+                    .map_err(|e| agent_mem_traits::AgentMemError::Other(e.into()))?;
+                
+                // Call plugin
+                match self.manager.call_plugin(&plugin_info.id, "search", &input).await {
+                    Ok(output) => {
+                        // Try to deserialize the search results
+                        match serde_json::from_str::<Vec<MemoryItem>>(&output) {
+                            Ok(results) => {
+                                tracing::debug!("Search completed by plugin: {}, found {} results", 
+                                    plugin_info.metadata.name, results.len());
+                                return Ok(results);
+                            }
+                            Err(e) => {
+                                tracing::warn!("Plugin {} returned invalid search results: {}", 
+                                    plugin_info.metadata.name, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Plugin {} failed to search: {}", plugin_info.metadata.name, e);
+                        // Try next plugin
+                    }
+                }
+            }
+        }
+        
+        // If no plugin succeeded, return original memories
+        Ok(memories.to_vec())
     }
     
     /// Get plugin manager
@@ -75,9 +136,9 @@ impl PluginEnhancedMemory {
         &self.manager
     }
     
-    /// Get plugin registry
-    pub fn plugin_registry(&self) -> &PluginRegistry {
-        &self.registry
+    /// List all registered plugins
+    pub async fn list_plugins(&self) -> Vec<RegisteredPlugin> {
+        self.manager.list_plugins().await
     }
 }
 
@@ -92,64 +153,136 @@ impl PluginEnhancedMemory {
 }
 
 /// Plugin hooks for memory operations
+#[async_trait::async_trait]
 pub trait PluginHooks {
     /// Called before memory is added
-    fn before_add_memory(&self, _memory: &mut MemoryItem) -> Result<()> {
+    async fn before_add_memory(&self, _memory: &mut MemoryItem) -> Result<()> {
         Ok(())
     }
     
     /// Called after memory is added
-    fn after_add_memory(&self, _memory: &MemoryItem) -> Result<()> {
+    async fn after_add_memory(&self, _memory: &MemoryItem) -> Result<()> {
         Ok(())
     }
     
     /// Called before search
-    fn before_search(&self, _query: &str) -> Result<()> {
+    async fn before_search(&self, _query: &str) -> Result<()> {
         Ok(())
     }
     
     /// Called after search, can modify results
-    fn after_search(&self, _results: &mut Vec<MemoryItem>) -> Result<()> {
+    async fn after_search(&self, _results: &mut Vec<MemoryItem>) -> Result<()> {
         Ok(())
     }
 }
 
 #[cfg(feature = "plugins")]
+#[async_trait::async_trait]
 impl PluginHooks for PluginEnhancedMemory {
-    fn before_add_memory(&self, memory: &mut MemoryItem) -> Result<()> {
+    async fn before_add_memory(&self, memory: &mut MemoryItem) -> Result<()> {
         tracing::debug!("Plugin hook: before_add_memory");
         
-        // Find and execute memory processor plugins
-        let plugins = self.registry.list();
-        for plugin_info in plugins {
-            if matches!(
-                plugin_info.metadata.plugin_type,
-                PluginType::MemoryProcessor
-            ) {
-                tracing::debug!("Processing with plugin: {}", plugin_info.metadata.name);
-                // TODO: Actually load and execute the plugin
-                // This would call the WASM module with the memory data
-            }
-        }
+        // Process memory through plugins
+        let manager = self.manager.clone();
+        let mut mem = memory.clone();
         
+        // Find and execute memory processor plugins
+        let plugins = manager.list_plugins().await;
+                for plugin_info in plugins {
+                    if matches!(
+                        plugin_info.metadata.plugin_type,
+                        PluginType::MemoryProcessor
+                    ) {
+                        tracing::debug!("Processing with plugin: {}", plugin_info.metadata.name);
+                        
+                        // Serialize memory to JSON
+                        let input = match serde_json::to_string(&mem) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                tracing::warn!("Failed to serialize memory: {}", e);
+                                continue;
+                            }
+                        };
+                        
+                    // Call plugin
+                    match manager.call_plugin(&plugin_info.id, "process_memory", &input).await {
+                        Ok(output) => {
+                            // Try to deserialize the processed memory
+                            match serde_json::from_str::<MemoryItem>(&output) {
+                                Ok(processed_memory) => {
+                                    mem = processed_memory;
+                                    tracing::debug!("Memory processed successfully by plugin: {}", plugin_info.metadata.name);
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Plugin {} returned invalid memory format: {}", plugin_info.metadata.name, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Plugin {} failed to process memory: {}", plugin_info.metadata.name, e);
+                        }
+                    }
+                }
+            }
+        
+        *memory = mem;
         Ok(())
     }
     
-    fn after_search(&self, results: &mut Vec<MemoryItem>) -> Result<()> {
+    async fn after_search(&self, results: &mut Vec<MemoryItem>) -> Result<()> {
         tracing::debug!("Plugin hook: after_search, {} results", results.len());
         
-        // Find and execute search algorithm plugins for reranking
-        let plugins = self.registry.list();
-        for plugin_info in plugins {
-            if matches!(
-                plugin_info.metadata.plugin_type,
-                PluginType::SearchAlgorithm
-            ) {
-                tracing::debug!("Reranking with plugin: {}", plugin_info.metadata.name);
-                // TODO: Actually load and execute the search plugin
-            }
+        if results.is_empty() {
+            return Ok(());
         }
         
+        // Find and execute search algorithm plugins for reranking
+        let manager = self.manager.clone();
+        let mut reranked_results = results.clone();
+        
+        let plugins = manager.list_plugins().await;
+                for plugin_info in plugins {
+                    if matches!(
+                        plugin_info.metadata.plugin_type,
+                        PluginType::SearchAlgorithm
+                    ) {
+                        tracing::debug!("Reranking with plugin: {}", plugin_info.metadata.name);
+                        
+                        // Prepare rerank request
+                        let request = serde_json::json!({
+                            "results": reranked_results,
+                        });
+                        
+                        let input = match serde_json::to_string(&request) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                tracing::warn!("Failed to serialize search results: {}", e);
+                                continue;
+                            }
+                        };
+                        
+                    // Call plugin
+                    match manager.call_plugin(&plugin_info.id, "rerank", &input).await {
+                        Ok(output) => {
+                            // Try to deserialize the reranked results
+                            match serde_json::from_str::<Vec<MemoryItem>>(&output) {
+                                Ok(reranked) => {
+                                    reranked_results = reranked;
+                                    tracing::debug!("Results reranked by plugin: {}", plugin_info.metadata.name);
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Plugin {} returned invalid rerank format: {}", plugin_info.metadata.name, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Plugin {} failed to rerank: {}", plugin_info.metadata.name, e);
+                        }
+                    }
+                }
+            }
+        
+        *results = reranked_results;
         Ok(())
     }
 }
@@ -191,7 +324,10 @@ mod tests {
             last_loaded_at: None,
         };
         
-        assert!(plugin_memory.register_plugin(plugin).is_ok());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            assert!(plugin_memory.register_plugin(plugin).await.is_ok());
+        });
     }
     
     #[cfg(feature = "plugins")]
@@ -199,6 +335,7 @@ mod tests {
     async fn test_plugin_hooks() {
         use agent_mem_traits::{MemoryType, Session};
         use std::collections::HashMap;
+        use crate::PluginHooks;
         
         let plugin_memory = PluginEnhancedMemory::new();
         
@@ -233,12 +370,12 @@ mod tests {
         };
         
         // Test hooks
-        assert!(plugin_memory.before_add_memory(&mut memory).is_ok());
-        assert!(plugin_memory.after_add_memory(&memory).is_ok());
-        assert!(plugin_memory.before_search("test query").is_ok());
+        assert!(plugin_memory.before_add_memory(&mut memory).await.is_ok());
+        assert!(plugin_memory.after_add_memory(&memory).await.is_ok());
+        assert!(plugin_memory.before_search("test query").await.is_ok());
         
         let mut results = vec![memory];
-        assert!(plugin_memory.after_search(&mut results).is_ok());
+        assert!(plugin_memory.after_search(&mut results).await.is_ok());
     }
 }
 

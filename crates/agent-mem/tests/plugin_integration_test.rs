@@ -68,12 +68,12 @@ async fn test_plugin_hooks_integration() -> Result<()> {
     };
 
     // Test all plugin hooks
-    plugin_memory.before_add_memory(&mut memory)?;
-    plugin_memory.after_add_memory(&memory)?;
-    plugin_memory.before_search("test query")?;
+    plugin_memory.before_add_memory(&mut memory).await?;
+    plugin_memory.after_add_memory(&memory).await?;
+    plugin_memory.before_search("test query").await?;
 
     let mut results = vec![memory];
-    plugin_memory.after_search(&mut results)?;
+    plugin_memory.after_search(&mut results).await?;
 
     Ok(())
 }
@@ -109,10 +109,10 @@ async fn test_plugin_registration() -> Result<()> {
     };
 
     // Should register successfully
-    plugin_memory.register_plugin(plugin)?;
+    plugin_memory.register_plugin(plugin).await?;
 
-    // Should appear in registry
-    let plugins = plugin_memory.plugin_registry().list();
+    // Should appear in plugin list
+    let plugins = plugin_memory.list_plugins().await;
     assert_eq!(plugins.len(), 1);
     assert_eq!(plugins[0].metadata.name, "test-plugin");
 
@@ -151,11 +151,11 @@ async fn test_multiple_plugin_registration() -> Result<()> {
             last_loaded_at: None,
         };
 
-        plugin_memory.register_plugin(plugin)?;
+        plugin_memory.register_plugin(plugin).await?;
     }
 
     // Should have all 3 plugins
-    let plugins = plugin_memory.plugin_registry().list();
+    let plugins = plugin_memory.list_plugins().await;
     assert_eq!(plugins.len(), 3);
 
     Ok(())
@@ -206,11 +206,11 @@ async fn test_plugin_types() -> Result<()> {
             last_loaded_at: None,
         };
 
-        plugin_memory.register_plugin(plugin)?;
+        plugin_memory.register_plugin(plugin).await?;
     }
 
     // Should have all plugins
-    let plugins = plugin_memory.plugin_registry().list();
+    let plugins = plugin_memory.list_plugins().await;
     assert_eq!(plugins.len(), 4);
 
     Ok(())

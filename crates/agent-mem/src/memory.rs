@@ -499,7 +499,7 @@ impl Memory {
         {
             use crate::plugin_integration::PluginHooks;
             let plugin_layer = self.plugin_layer.read().await;
-            if let Err(e) = plugin_layer.before_search(&query) {
+            if let Err(e) = plugin_layer.before_search(&query).await {
                 warn!("插件 before_search 钩子失败: {}", e);
                 // 继续执行，不阻止搜索
             }
@@ -522,7 +522,7 @@ impl Memory {
         {
             use crate::plugin_integration::PluginHooks;
             let plugin_layer = self.plugin_layer.read().await;
-            if let Err(e) = plugin_layer.after_search(&mut results) {
+            if let Err(e) = plugin_layer.after_search(&mut results).await {
                 warn!("插件 after_search 钩子失败: {}", e);
                 // 继续返回结果，不阻止
             }
@@ -1005,7 +1005,7 @@ impl Memory {
     #[cfg(feature = "plugins")]
     pub async fn register_plugin(&self, plugin: crate::plugins::RegisteredPlugin) -> Result<()> {
         let mut plugin_layer = self.plugin_layer.write().await;
-        plugin_layer.register_plugin(plugin)
+        plugin_layer.register_plugin(plugin).await
     }
 
     /// 列出已注册的插件
@@ -1033,8 +1033,8 @@ impl Memory {
     pub async fn list_plugins(&self) -> Vec<crate::plugins::sdk::PluginMetadata> {
         let plugin_layer = self.plugin_layer.read().await;
         plugin_layer
-            .plugin_registry()
-            .list()
+            .list_plugins()
+            .await
             .iter()
             .map(|p| p.metadata.clone())
             .collect()
