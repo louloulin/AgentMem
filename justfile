@@ -179,7 +179,7 @@ start-full:
 start-full-with-plugins:
     @echo "🚀 启动全栈服务（插件支持）..."
     @echo "1️⃣  编译带插件的后端..."
-    @cargo build --release --bin agent-mem-server --features agent-mem/plugins
+    @cargo build --release --bin agent-mem-server --features plugins
     @echo "2️⃣  启动后端服务器（后台）..."
     @pkill -f agent-mem-server || true
     @export ENABLE_AUTH="false" && \
