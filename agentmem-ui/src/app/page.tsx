@@ -138,6 +138,9 @@ export default function HomePage() {
               <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.solutions')}
               </Link>
+              <Link href="/comparison" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
+                竞品对比
+              </Link>
               <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 Admin
               </Link>
@@ -215,6 +218,13 @@ export default function HomePage() {
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {t('nav.solutions')}
+                </Link>
+                <Link 
+                  href="/comparison" 
+                  className="text-slate-300 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-slate-800"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  竞品对比
                 </Link>
                 <Link 
                   href="/demo" 
