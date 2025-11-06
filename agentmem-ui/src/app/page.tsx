@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { SearchDialog, GlobalSearch, SearchTrigger } from "@/components/ui/search";
+import { GlobalSearch, SearchTrigger } from "@/components/ui/search";
 import { LanguageSwitcher, CompactLanguageSwitcher } from "@/components/ui/language-switcher";
 import { FadeIn, SlideIn, FloatingCard, GradientText, TypeWriter } from "@/components/ui/animations";
 import { useLanguage } from "@/contexts/language-context";
@@ -118,10 +118,10 @@ export default function HomePage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       {/* 导航栏 */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
+          <div className="flex items-center h-16">
             {/* Logo区域 - 左侧固定 */}
-            <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center flex-shrink-0 min-w-[180px]">
               <Link href="/" className="flex items-center">
                 <Brain className="h-8 w-8 text-purple-400 animate-pulse-glow" />
                 <span className="ml-2 text-xl font-bold text-white">AgentMem</span>
@@ -129,38 +129,38 @@ export default function HomePage() {
             </div>
             
             {/* 中间菜单区域 */}
-            <div className="hidden lg:flex items-center justify-center flex-1 space-x-1 mx-8">
-              <Link href="#features" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+            <div className="hidden lg:flex items-center justify-center flex-1 space-x-1">
+              <Link href="#features" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 功能
               </Link>
-              <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 架构
               </Link>
-              <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.solutions')}
               </Link>
-              <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 Admin
               </Link>
-              <Link href="/demo" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/demo" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.demo')}
               </Link>
-              <Link href="/docs" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/docs" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.docs')}
               </Link>
-              <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.pricing')}
               </Link>
-              <Link href="/blog" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/blog" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.blog')}
               </Link>
-              <Link href="/support" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
+              <Link href="/support" className="text-slate-300 hover:text-white transition-colors px-4 py-2 rounded-md hover:bg-slate-800/50 text-sm whitespace-nowrap">
                 {t('nav.support')}
               </Link>
             </div>
             
             {/* 右侧工具栏 */}
-            <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
+            <div className="hidden lg:flex items-center space-x-3 flex-shrink-0 min-w-[240px] justify-end">
               <SearchTrigger />
               <LanguageSwitcher />
               <ThemeToggle />
