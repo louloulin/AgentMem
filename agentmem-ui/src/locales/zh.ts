@@ -30,6 +30,7 @@ export const zh: TranslationKeys = {
     docs: '文档',
     demo: '演示',
     about: '关于',
+    solutions: '解决方案',
     pricing: '定价',
     blog: '博客',
     support: '支持',

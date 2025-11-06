@@ -136,6 +136,9 @@ export default function HomePage() {
               <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
                 架构
               </Link>
+              <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+                {t('nav.solutions')}
+              </Link>
               <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
                 Admin
               </Link>
@@ -203,6 +206,13 @@ export default function HomePage() {
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   架构
+                </Link>
+                <Link 
+                  href="/solutions" 
+                  className="text-slate-300 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-slate-800"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {t('nav.solutions')}
                 </Link>
                 <Link 
                   href="/demo" 

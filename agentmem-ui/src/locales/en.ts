@@ -30,6 +30,7 @@ export const en: TranslationKeys = {
     docs: 'Docs',
     demo: 'Demo',
     about: 'About',
+    solutions: 'Solutions',
     pricing: 'Pricing',
     blog: 'Blog',
     support: 'Support',
