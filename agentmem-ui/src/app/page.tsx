@@ -8,11 +8,10 @@ import { GlobalSearch, SearchTrigger } from "@/components/ui/search";
 import { LanguageSwitcher, CompactLanguageSwitcher } from "@/components/ui/language-switcher";
 import { FadeIn, SlideIn, FloatingCard, GradientText, TypeWriter } from "@/components/ui/animations";
 import { useLanguage } from "@/contexts/language-context";
-import { Brain, Zap, Shield, Database, Cpu, Network, Code, Rocket, Github, Menu, X, Star, Users, TrendingUp, Award, CheckCircle, Quote, ArrowRight, Building, Globe, Search } from "lucide-react";
+import { Brain, Zap, Shield, Database, Cpu, Network, Code, Rocket, Github, Menu, X, Star, Users, TrendingUp, Award, CheckCircle, Quote, ArrowRight, Building, Globe } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { Badge } from "@/components/ui/badge";
 import { Target } from "lucide-react";
 
 /**

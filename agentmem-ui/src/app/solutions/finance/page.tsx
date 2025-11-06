@@ -19,22 +19,22 @@ export default function FinancePage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
       {/* 导航栏 */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo和返回按钮区域 - 左侧固定 */}
-            <div className="flex items-center space-x-6 flex-shrink-0">
+            <div className="flex items-center space-x-8 flex-shrink-0 min-w-[320px]">
               <Link href="/" className="flex items-center">
                 <Brain className="h-8 w-8 text-purple-400" />
-                <span className="ml-2 text-xl font-bold text-white">AgentMem</span>
+                <span className="ml-2 text-xl font-bold text-white whitespace-nowrap">AgentMem</span>
               </Link>
-              <Link href="/solutions" className="flex items-center text-slate-300 hover:text-white transition-colors text-sm">
+              <Link href="/solutions" className="flex items-center text-slate-300 hover:text-white transition-colors text-sm whitespace-nowrap">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 返回解决方案
               </Link>
             </div>
             
             {/* 右侧按钮区域 */}
-            <div className="flex items-center space-x-3 flex-shrink-0">
+            <div className="flex items-center space-x-4 flex-shrink-0">
               <Link href="/demo">
                 <Button variant="outline" size="sm" className="border-green-400 text-green-400 hover:bg-green-400 hover:text-white">
                   预约演示
