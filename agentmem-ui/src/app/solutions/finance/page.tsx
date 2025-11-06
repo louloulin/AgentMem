@@ -1,12 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Brain, Banknote, ArrowLeft, Shield, TrendingUp, Users, 
   Target, AlertCircle, CheckCircle2, BarChart3, Lock,
-  Activity, Zap, Database, LineChart, PieChart, FileSearch
+  Activity, Zap, Database, LineChart, FileSearch
 } from "lucide-react";
 import Link from "next/link";
 import { FadeIn, SlideIn, GradientText } from "@/components/ui/animations";
@@ -16,7 +16,7 @@ import { FadeIn, SlideIn, GradientText } from "@/components/ui/animations";
  */
 export default function FinancePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-amber-900 to-red-950 text-white">
       {/* 导航栏 */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
@@ -36,7 +36,7 @@ export default function FinancePage() {
             {/* 右侧按钮区域 */}
             <div className="flex items-center space-x-4 flex-shrink-0">
               <Link href="/demo">
-                <Button variant="outline" size="sm" className="border-green-400 text-green-400 hover:bg-green-400 hover:text-white">
+                <Button variant="outline" size="sm" className="border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-white">
                   预约演示
                 </Button>
               </Link>
@@ -51,13 +51,13 @@ export default function FinancePage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <FadeIn>
-                <Badge className="mb-4 bg-green-500/20 text-green-400 border-green-500/30">
+                <Badge className="mb-4 bg-amber-500/20 text-amber-400 border-amber-500/30">
                   ⭐ 企业级解决方案
                 </Badge>
                 <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
                   金融智能
                   <br />
-                  <GradientText className="bg-gradient-to-r from-green-400 to-emerald-400">
+                  <GradientText className="bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400">
                     风控决策平台
                   </GradientText>
                 </h1>
@@ -65,11 +65,11 @@ export default function FinancePage() {
                   为金融机构提供智能风控、客户画像、投资决策和合规管理的全流程AI赋能解决方案
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link href="/support">
-                    <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white">
-                      立即咨询
-                    </Button>
-                  </Link>
+                <Link href="/support">
+                  <Button size="lg" className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/50">
+                    立即咨询
+                  </Button>
+                </Link>
                   <Link href="/demo">
                     <Button size="lg" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
                       查看案例
@@ -81,20 +81,20 @@ export default function FinancePage() {
             
             <div className="relative">
               <SlideIn direction="right">
-                <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-8 border border-green-500/30">
+                <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-2xl p-8 border border-amber-500/30">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-                      <Users className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                      <Users className="w-8 h-8 text-amber-400 mx-auto mb-2" />
                       <div className="text-2xl font-bold text-white">100+</div>
                       <div className="text-slate-300 text-sm">金融机构</div>
                     </div>
                     <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-                      <Database className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                      <Database className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                       <div className="text-2xl font-bold text-white">1000亿+</div>
                       <div className="text-slate-300 text-sm">管理资产</div>
                     </div>
                     <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-                      <Shield className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                      <Shield className="w-8 h-8 text-orange-400 mx-auto mb-2" />
                       <div className="text-2xl font-bold text-white">95%+</div>
                       <div className="text-slate-300 text-sm">风险识别率</div>
                     </div>
@@ -442,35 +442,39 @@ export default function FinancePage() {
                 icon: Zap,
                 title: "实时处理",
                 desc: "毫秒级响应，支持百万级并发",
-                metric: "&lt;100ms"
+                metric: "&lt;100ms",
+                color: "amber"
               },
               {
                 icon: Shield,
                 title: "金融级安全",
                 desc: "端到端加密，SOC 2认证",
-                metric: "99.99%"
+                metric: "99.99%",
+                color: "orange"
               },
               {
                 icon: Database,
                 title: "海量数据",
                 desc: "PB级数据处理能力",
-                metric: "10亿+条"
+                metric: "10亿+条",
+                color: "yellow"
               },
               {
                 icon: BarChart3,
                 title: "精准决策",
                 desc: "AI驱动，准确率95%+",
-                metric: "95%+"
+                metric: "95%+",
+                color: "red"
               }
             ].map((item) => (
-              <Card key={item.title} className="bg-slate-800/50 border-slate-700 hover:border-green-500/50 transition-colors">
+              <Card key={item.title} className="bg-slate-800/50 border-slate-700 hover:border-amber-500/50 transition-colors">
                 <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <item.icon className="w-8 h-8 text-green-400" />
+                  <div className={`w-16 h-16 bg-${item.color}-500/20 rounded-full flex items-center justify-center mx-auto mb-4`}>
+                    <item.icon className={`w-8 h-8 text-${item.color}-400`} />
                   </div>
                   <h3 className="text-white font-semibold mb-2">{item.title}</h3>
                   <p className="text-slate-300 text-sm mb-3">{item.desc}</p>
-                  <div className="text-2xl font-bold text-green-400">{item.metric}</div>
+                  <div className={`text-2xl font-bold text-${item.color}-400`}>{item.metric}</div>
                 </CardContent>
               </Card>
             ))}
@@ -510,7 +514,7 @@ export default function FinancePage() {
             ].map((caseItem, index) => (
               <Card key={index} className="bg-slate-800/50 border-slate-700">
                 <CardHeader>
-                  <Badge className="mb-2 bg-green-500/20 text-green-400 w-fit">
+                  <Badge className="mb-2 bg-amber-500/20 text-amber-400 w-fit">
                     <Banknote className="w-3 h-3 mr-1" />
                     {caseItem.type}
                   </Badge>
@@ -544,7 +548,7 @@ export default function FinancePage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-green-900/30 to-emerald-900/30">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-amber-900/30 via-orange-900/30 to-red-900/30">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-6">
             开启金融智能化转型
@@ -554,7 +558,7 @@ export default function FinancePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/support">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white">
+              <Button size="lg" className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/50">
                 预约专家咨询
               </Button>
             </Link>
