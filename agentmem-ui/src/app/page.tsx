@@ -119,52 +119,55 @@ export default function HomePage() {
       {/* 导航栏 */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo区域 - 左侧固定 */}
+            <div className="flex items-center flex-shrink-0">
+              <Link href="/" className="flex items-center">
                 <Brain className="h-8 w-8 text-purple-400 animate-pulse-glow" />
                 <span className="ml-2 text-xl font-bold text-white">AgentMem</span>
-              </div>
-              <div className="hidden lg:block">
-                <SearchTrigger />
-              </div>
+              </Link>
             </div>
-            <div className="hidden lg:flex items-center space-x-3">
-              <Link href="#features" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+            
+            {/* 中间菜单区域 */}
+            <div className="hidden lg:flex items-center justify-center flex-1 space-x-1 mx-8">
+              <Link href="#features" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 功能
               </Link>
-              <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="#architecture" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 架构
               </Link>
-              <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/solutions" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.solutions')}
               </Link>
-              <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/admin" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 Admin
               </Link>
-              <Link href="/demo" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/demo" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.demo')}
               </Link>
-              <Link href="/docs" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/docs" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.docs')}
               </Link>
-              <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.pricing')}
               </Link>
-              <Link href="/blog" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/blog" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.blog')}
               </Link>
-              <Link href="/support" className="text-slate-300 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-800/50">
+              <Link href="/support" className="text-slate-300 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-slate-800/50 text-sm">
                 {t('nav.support')}
               </Link>
-              <div className="flex items-center space-x-2 ml-2">
-                <LanguageSwitcher />
-                <ThemeToggle />
-                <Button variant="outline" size="sm" className="border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white transition-all duration-300">
-                  <Github className="mr-1 h-3 w-3" />
-                  <span className="hidden xl:inline">{t('nav.github')}</span>
-                </Button>
-              </div>
+            </div>
+            
+            {/* 右侧工具栏 */}
+            <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
+              <SearchTrigger />
+              <LanguageSwitcher />
+              <ThemeToggle />
+              <Button variant="outline" size="sm" className="border-purple-400 text-purple-400 hover:bg-purple-400 hover:text-white transition-all duration-300">
+                <Github className="mr-1 h-3 w-3" />
+                <span className="hidden xl:inline">{t('nav.github')}</span>
+              </Button>
             </div>
             {/* 移动端菜单按钮 */}
             <div className="lg:hidden flex items-center space-x-2">

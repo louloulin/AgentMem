@@ -20,18 +20,21 @@ export default function FinancePage() {
       {/* 导航栏 */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo和返回按钮区域 - 左侧固定 */}
+            <div className="flex items-center space-x-6 flex-shrink-0">
               <Link href="/" className="flex items-center">
                 <Brain className="h-8 w-8 text-purple-400" />
                 <span className="ml-2 text-xl font-bold text-white">AgentMem</span>
               </Link>
-              <Link href="/solutions" className="flex items-center text-slate-300 hover:text-white transition-colors">
+              <Link href="/solutions" className="flex items-center text-slate-300 hover:text-white transition-colors text-sm">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 返回解决方案
               </Link>
             </div>
-            <div className="flex items-center space-x-4">
+            
+            {/* 右侧按钮区域 */}
+            <div className="flex items-center space-x-3 flex-shrink-0">
               <Link href="/demo">
                 <Button variant="outline" size="sm" className="border-green-400 text-green-400 hover:bg-green-400 hover:text-white">
                   预约演示
