@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,12 +25,12 @@ export default function BlogPage() {
       excerpt: '向量数据库市场预计2030年达到$100亿美元，AI记忆管理作为核心基础设施，将成为企业数字化转型的关键。本文深入分析市场规模、增长驱动力和投资机会。',
       content: '详细内容...',
       author: '张伟',
-      date: '2025-01-06',
+      date: '2025-11-06',
       readTime: '15 分钟',
       category: 'business',
       tags: ['市场分析', '商业机会', '投资'],
       featured: true,
-      image: 'https://via.placeholder.com/800x450/6366f1/ffffff?text=AI+Memory+Market+Analysis',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%236366f1" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E💰 市场分析%3C/text%3E%3C/svg%3E',
     },
     {
       id: 2,
@@ -42,7 +43,7 @@ export default function BlogPage() {
       category: 'research',
       tags: ['学术论文', 'AI Agent', '记忆系统'],
       featured: true,
-      image: 'https://via.placeholder.com/800x450/8b5cf6/ffffff?text=Research+Papers',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%238b5cf6" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E📚 学术研究%3C/text%3E%3C/svg%3E',
     },
     {
       id: 3,
@@ -55,7 +56,7 @@ export default function BlogPage() {
       category: 'business',
       tags: ['成本优化', 'ROI', '企业应用'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/10b981/ffffff?text=Cost+Reduction+99%',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%2310b981" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E💵 降低99%成本%3C/text%3E%3C/svg%3E',
     },
     {
       id: 4,
@@ -68,7 +69,7 @@ export default function BlogPage() {
       category: 'industry',
       tags: ['低空经济', '行业应用', '智能调度'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/3b82f6/ffffff?text=Low+Altitude+Economy',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%233b82f6" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🚁 低空经济%3C/text%3E%3C/svg%3E',
     },
     {
       id: 5,
@@ -81,7 +82,7 @@ export default function BlogPage() {
       category: 'industry',
       tags: ['金融科技', '风控', '客户画像'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/f59e0b/ffffff?text=FinTech+AI+Memory',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23f59e0b" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🏦 金融AI%3C/text%3E%3C/svg%3E',
     },
     {
       id: 6,
@@ -94,7 +95,7 @@ export default function BlogPage() {
       category: 'technical',
       tags: ['Rust', '性能优化', '技术选型'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/ef4444/ffffff?text=Rust+vs+Python',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23ef4444" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🦀 Rust vs Python%3C/text%3E%3C/svg%3E',
     },
     {
       id: 7,
@@ -107,7 +108,7 @@ export default function BlogPage() {
       category: 'research',
       tags: ['论文解读', '推荐系统', '性能优化'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/8b5cf6/ffffff?text=RecNMP+Paper',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%238b5cf6" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E📄 RecNMP论文%3C/text%3E%3C/svg%3E',
     },
     {
       id: 8,
@@ -120,7 +121,7 @@ export default function BlogPage() {
       category: 'future',
       tags: ['技术趋势', '多Agent', '未来展望'],
       featured: true,
-      image: 'https://via.placeholder.com/800x450/ec4899/ffffff?text=Future+of+AI+Memory',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23ec4899" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🔮 AI记忆未来%3C/text%3E%3C/svg%3E',
     },
     {
       id: 9,
@@ -133,7 +134,7 @@ export default function BlogPage() {
       category: 'case',
       tags: ['客户案例', '零售', 'ROI'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/06b6d4/ffffff?text=Retail+Case+Study',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%2306b6d4" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🛒 零售案例%3C/text%3E%3C/svg%3E',
     },
     {
       id: 10,
@@ -146,7 +147,7 @@ export default function BlogPage() {
       category: 'research',
       tags: ['论文解读', '协同过滤', '文本处理'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/8b5cf6/ffffff?text=LCMR+Paper',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%238b5cf6" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E📄 LCMR论文%3C/text%3E%3C/svg%3E',
     },
     {
       id: 11,
@@ -159,7 +160,7 @@ export default function BlogPage() {
       category: 'product',
       tags: ['发布', '产品更新', 'v1.0'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/6366f1/ffffff?text=AgentMem+v1.0',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%236366f1" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E🚀 AgentMem v1.0%3C/text%3E%3C/svg%3E',
     },
     {
       id: 12,
@@ -172,7 +173,7 @@ export default function BlogPage() {
       category: 'technical',
       tags: ['向量数据库', '技术选型', '对比分析'],
       featured: false,
-      image: 'https://via.placeholder.com/800x450/14b8a6/ffffff?text=Vector+Database+Guide',
+      image: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%2314b8a6" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="48" fill="%23ffffff"%3E📊 向量数据库%3C/text%3E%3C/svg%3E',
     },
   ];
 
@@ -263,52 +264,54 @@ export default function BlogPage() {
               <div className="grid md:grid-cols-2 gap-8">
                 {featuredPosts.map((post, index) => (
                   <SlideIn key={post.id} delay={index * 100} direction="up">
-                    <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group">
-                      <div className="aspect-video bg-gradient-to-r from-purple-600 to-pink-600 relative overflow-hidden">
-                        <img 
-                          src={post.image} 
-                          alt={post.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <Badge className="absolute top-4 left-4 bg-purple-600 text-white">
-                          特色
-                        </Badge>
-                      </div>
-                      <div className="p-6">
-                        <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>{post.author}</span>
+                    <Link href={`/blog/${post.id}`}>
+                      <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group cursor-pointer">
+                        <div className="aspect-video bg-gradient-to-r from-purple-600 to-pink-600 relative overflow-hidden">
+                          <img 
+                            src={post.image} 
+                            alt={post.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <Badge className="absolute top-4 left-4 bg-purple-600 text-white">
+                            特色
+                          </Badge>
+                        </div>
+                        <div className="p-6">
+                          <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              <span>{post.author}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{post.date}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{post.readTime}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{post.date}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{post.readTime}</span>
+                          <h3 className="text-xl font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors">
+                            {post.title}
+                          </h3>
+                          <p className="text-gray-300 mb-4">{post.excerpt}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap gap-2">
+                              {post.tags.slice(0, 2).map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs border-slate-600 text-gray-400">
+                                  <Tag className="w-3 h-3 mr-1" />
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                            <Button variant="ghost" size="sm" className="text-purple-400 hover:text-purple-300">
+                              阅读更多
+                              <ArrowRight className="w-4 h-4 ml-1" />
+                            </Button>
                           </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors">
-                          {post.title}
-                        </h3>
-                        <p className="text-gray-300 mb-4">{post.excerpt}</p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-wrap gap-2">
-                            {post.tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-xs border-slate-600 text-gray-400">
-                                <Tag className="w-3 h-3 mr-1" />
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                          <Button variant="ghost" size="sm" className="text-purple-400 hover:text-purple-300">
-                            阅读更多
-                            <ArrowRight className="w-4 h-4 ml-1" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
+                      </Card>
+                    </Link>
                   </SlideIn>
                 ))}
               </div>
@@ -331,46 +334,48 @@ export default function BlogPage() {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredPosts.map((post, index) => (
                   <SlideIn key={post.id} delay={index * 50} direction="up">
-                    <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group h-full flex flex-col">
-                      <div className="aspect-video bg-gradient-to-r from-purple-600 to-pink-600 relative overflow-hidden">
-                        <img 
-                          src={post.image} 
-                          alt={post.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {post.featured && (
-                          <Badge className="absolute top-4 left-4 bg-purple-600 text-white">
-                            特色
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="p-6 flex-1 flex flex-col">
-                        <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>{post.author}</span>
+                    <Link href={`/blog/${post.id}`}>
+                      <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group h-full flex flex-col cursor-pointer">
+                        <div className="aspect-video bg-gradient-to-r from-purple-600 to-pink-600 relative overflow-hidden">
+                          <img 
+                            src={post.image} 
+                            alt={post.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          {post.featured && (
+                            <Badge className="absolute top-4 left-4 bg-purple-600 text-white">
+                              特色
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="p-6 flex-1 flex flex-col">
+                          <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              <span>{post.author}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{post.date}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{post.date}</span>
+                          <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2">
+                            {post.title}
+                          </h3>
+                          <p className="text-gray-300 mb-4 flex-1 line-clamp-3">{post.excerpt}</p>
+                          <div className="flex items-center justify-between mt-auto">
+                            <div className="flex items-center gap-1 text-sm text-gray-400">
+                              <Clock className="w-4 h-4" />
+                              <span>{post.readTime}</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="text-purple-400 hover:text-purple-300">
+                              阅读
+                              <ArrowRight className="w-4 h-4 ml-1" />
+                            </Button>
                           </div>
                         </div>
-                        <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2">
-                          {post.title}
-                        </h3>
-                        <p className="text-gray-300 mb-4 flex-1 line-clamp-3">{post.excerpt}</p>
-                        <div className="flex items-center justify-between mt-auto">
-                          <div className="flex items-center gap-1 text-sm text-gray-400">
-                            <Clock className="w-4 h-4" />
-                            <span>{post.readTime}</span>
-                          </div>
-                          <Button variant="ghost" size="sm" className="text-purple-400 hover:text-purple-300">
-                            阅读
-                            <ArrowRight className="w-4 h-4 ml-1" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
+                      </Card>
+                    </Link>
                   </SlideIn>
                 ))}
               </div>
