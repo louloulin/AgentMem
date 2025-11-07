@@ -763,14 +763,14 @@ impl MemoryOrchestrator {
     }
 
     /// 创建向量存储 (Phase 6.4)
+    /// 
+    /// 🔧 修复: 支持配置的vector_store_url，使用StorageFactory
     async fn create_vector_store(
-        _config: &OrchestratorConfig,
+        config: &OrchestratorConfig,  // ✅ 移除下划线前缀，启用参数
         embedder: Option<&Arc<dyn agent_mem_traits::Embedder + Send + Sync>>,
     ) -> Result<Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>> {
         info!("Phase 6: 创建向量存储");
 
-        // 使用内存向量存储（开发模式，零配置）
-        use agent_mem_storage::backends::MemoryVectorStore;
         use agent_mem_traits::VectorStoreConfig;
 
         // 获取向量维度（从 Embedder 或使用默认值）
@@ -784,22 +784,89 @@ impl MemoryOrchestrator {
             default_dim
         };
 
-        let mut config = VectorStoreConfig::default();
-        config.dimension = Some(vector_dimension);
-
-        match MemoryVectorStore::new(config).await {
-            Ok(store) => {
-                info!(
-                    "✅ 向量存储创建成功（Memory 模式，维度: {}）",
-                    vector_dimension
-                );
-                Ok(Some(
-                    Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>
-                ))
+        // ✅ 检查是否配置了vector_store_url
+        if let Some(url) = &config.vector_store_url {
+            info!("使用配置的向量存储: {}", url);
+            
+            // 解析URL格式: "provider://path"
+            // 例如: "lancedb://./data/vectors.lance"
+            let (provider, path) = if let Some((prov, p)) = url.split_once("://") {
+                (prov, p)
+            } else {
+                warn!("向量存储URL格式无效: {}，使用内存存储", url);
+                ("memory", "")
+            };
+            
+            // ✅ 构建VectorStoreConfig
+            let mut store_config = VectorStoreConfig::default();
+            store_config.provider = provider.to_string();
+            store_config.dimension = Some(vector_dimension);
+            
+            // 根据provider设置path或url
+            match provider {
+                "lancedb" => {
+                    store_config.path = path.to_string();
+                    store_config.table_name = "memory_vectors".to_string();
+                    info!("配置LanceDB: path={}, table={}", path, store_config.table_name);
+                }
+                "memory" => {
+                    // 内存存储不需要额外配置
+                    info!("使用内存向量存储");
+                }
+                "chroma" | "qdrant" | "milvus" | "weaviate" => {
+                    store_config.url = Some(path.to_string());
+                    store_config.collection_name = Some("agent_mem".to_string());
+                    info!("配置 {}: url={}, collection=agent_mem", provider, path);
+                }
+                _ => {
+                    warn!("不支持的向量存储provider: {}，使用内存存储", provider);
+                    store_config.provider = "memory".to_string();
+                }
             }
-            Err(e) => {
-                warn!("创建向量存储失败: {}, 向量存储功能将不可用", e);
-                Ok(None)
+            
+            // ✅ 使用VectorStoreFactory创建向量存储
+            use agent_mem_storage::VectorStoreFactory;
+            match VectorStoreFactory::create_vector_store(&store_config).await {
+                Ok(store) => {
+                    info!("✅ 向量存储创建成功（{} 模式，维度: {}）", provider, vector_dimension);
+                    Ok(Some(store))
+                }
+                Err(e) => {
+                    warn!("创建向量存储失败: {}，降级到内存存储", e);
+                    // 降级到内存存储
+                    let mut fallback_config = VectorStoreConfig::default();
+                    fallback_config.dimension = Some(vector_dimension);
+                    
+                    use agent_mem_storage::backends::MemoryVectorStore;
+                    match MemoryVectorStore::new(fallback_config).await {
+                        Ok(fallback_store) => {
+                            info!("✅ 降级到内存向量存储成功（维度: {}）", vector_dimension);
+                            Ok(Some(Arc::new(fallback_store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>))
+                        }
+                        Err(e2) => {
+                            warn!("创建内存向量存储也失败: {}, 向量存储功能将不可用", e2);
+                            Ok(None)
+                        }
+                    }
+                }
+            }
+        } else {
+            // ✅ 没有配置时，使用内存存储（保持兼容性）
+            info!("未配置向量存储URL，使用内存存储");
+            
+            use agent_mem_storage::backends::MemoryVectorStore;
+            let mut config = VectorStoreConfig::default();
+            config.dimension = Some(vector_dimension);
+            
+            match MemoryVectorStore::new(config).await {
+                Ok(store) => {
+                    info!("✅ 向量存储创建成功（Memory 模式，维度: {}）", vector_dimension);
+                    Ok(Some(Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>))
+                }
+                Err(e) => {
+                    warn!("创建向量存储失败: {}, 向量存储功能将不可用", e);
+                    Ok(None)
+                }
             }
         }
     }

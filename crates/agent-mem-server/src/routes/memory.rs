@@ -55,6 +55,13 @@ impl MemoryManager {
             builder = builder.with_embedder("fastembed", "BAAI/bge-small-en-v1.5");
         }
 
+        // 🔑 关键修复 #3：配置VectorStore（向量持久化）
+        // 修复: 之前向量只在内存中，重启后丢失
+        // 注意: LanceDB需要协议前缀 "lancedb://"，路径需要以.lance结尾
+        let vector_store_url = "lancedb://./data/vectors.lance";
+        info!("Configuring vector store: {}", vector_store_url);
+        builder = builder.with_vector_store(vector_store_url);
+
         let memory = builder.build().await.map_err(|e| {
             ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e))
         })?;
