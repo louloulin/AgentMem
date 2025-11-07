@@ -18,6 +18,14 @@ pub struct MemoryIntegratorConfig {
     pub include_timestamp: bool,
     /// 是否按重要性排序
     pub sort_by_importance: bool,
+    
+    // 🆕 Phase 1.5: 认知架构权重配置（基于Adaptive Memory Framework）
+    /// Episodic Memory权重（Long-term Memory优先，理论依据: Atkinson-Shiffrin）
+    pub episodic_weight: f32,
+    /// Working Memory权重（补充上下文，理论依据: Working Memory容量7±2）
+    pub working_weight: f32,
+    /// Semantic Memory权重（备选，理论依据: HCAM分层检索）
+    pub semantic_weight: f32,
 }
 
 impl Default for MemoryIntegratorConfig {
@@ -27,6 +35,11 @@ impl Default for MemoryIntegratorConfig {
             relevance_threshold: 0.1, // ✅ 降低阈值以支持更宽泛的匹配
             include_timestamp: true,
             sort_by_importance: true,
+            
+            // 🆕 Phase 1.5: 基于Adaptive Memory Framework的权重配置
+            episodic_weight: 1.2,   // 提升Long-term Memory（主要来源）
+            working_weight: 1.0,    // 正常（新鲜且相关，补充上下文）
+            semantic_weight: 0.9,   // 降低（范围更广，备选）
         }
     }
 }
@@ -178,9 +191,9 @@ impl MemoryIntegrator {
                     let count = memories.len();
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            // 🎯 Episodic Memory 权重: 1.2 (基于Adaptive Framework)
+                            // 🎯 Episodic Memory 权重 (可配置，基于Adaptive Framework)
                             if let Some(score) = memory.score {
-                                memory.score = Some(score * 1.2);
+                                memory.score = Some(score * self.config.episodic_weight);
                             }
                             all_memories.push(memory);
                         }
@@ -247,9 +260,9 @@ impl MemoryIntegrator {
                     let mut added = 0;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            // 🎯 Semantic Memory 权重: 0.9（降低，因为范围更广）
+                            // 🎯 Semantic Memory 权重 (可配置，降低因为范围更广)
                             if let Some(score) = memory.score {
-                                memory.score = Some(score * 0.9);
+                                memory.score = Some(score * self.config.semantic_weight);
                             }
                             all_memories.push(memory);
                             added += 1;
