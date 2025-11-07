@@ -122,6 +122,182 @@ impl MemoryIntegrator {
         Ok(filtered_memories)
     }
 
+    /// 🆕 Phase 1: Episodic-first记忆检索（基于认知理论）
+    ///
+    /// ## 理论依据
+    /// - **Atkinson-Shiffrin模型**: Long-term Memory应该是主要检索源
+    /// - **HCAM**: 分层检索（粗略→精细）
+    /// - **Adaptive Framework**: 动态权重调整
+    ///
+    /// ## 检索策略（符合认知模型）
+    /// 1. **Priority 1**: Episodic Memory (Agent/User scope) - 主要来源（90%）
+    /// 2. **Priority 2**: Working Memory (Session scope) - 补充上下文（10%）
+    /// 3. **Priority 3**: Semantic Memory (Agent scope) - 备选
+    ///
+    /// ## 权重调整（基于Adaptive Framework）
+    /// - Episodic Memory: 权重 1.2（提升主要来源）
+    /// - Working Memory: 权重 1.0（正常，因为新鲜）
+    /// - Semantic Memory: 权重 0.9（降低，因为范围更广）
+    pub async fn retrieve_episodic_first(
+        &self,
+        query: &str,
+        agent_id: &str,
+        user_id: Option<&str>,
+        session_id: Option<&str>,
+        max_count: usize,
+    ) -> Result<Vec<Memory>> {
+        use crate::hierarchy::MemoryScope;
+        use std::collections::HashSet;
+        use tracing::warn;
+
+        let mut all_memories = Vec::new();
+        let mut seen_ids = HashSet::new();
+
+        info!(
+            "🧠 Episodic-first检索 (理论指导): agent={}, user={:?}, session={:?}, target={}",
+            agent_id, user_id, session_id, max_count
+        );
+
+        // ========== Priority 1: Episodic Memory (Agent/User Scope) ==========
+        // 理论依据: Atkinson-Shiffrin模型 - Long-term Memory是主要来源
+        if let Some(uid) = user_id {
+            let episodic_scope = MemoryScope::User {
+                agent_id: agent_id.to_string(),
+                user_id: uid.to_string(),
+            };
+
+            info!("📚 Priority 1: Querying Episodic Memory (Agent/User scope) - 主要来源");
+
+            // 查询更多数量（max_count * 2），因为这是主要来源
+            match self
+                .memory_engine
+                .search_memories(query, Some(episodic_scope), Some(max_count * 2))
+                .await
+            {
+                Ok(memories) => {
+                    let count = memories.len();
+                    for mut memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            // 🎯 Episodic Memory 权重: 1.2 (基于Adaptive Framework)
+                            if let Some(score) = memory.score {
+                                memory.score = Some(score * 1.2);
+                            }
+                            all_memories.push(memory);
+                        }
+                    }
+                    info!("📚 Episodic Memory returned {} memories", count);
+                }
+                Err(e) => {
+                    warn!("⚠️  Episodic Memory query failed: {}", e);
+                }
+            }
+        }
+
+        // ========== Priority 2: Working Memory (Session Scope) ==========
+        // 理论依据: Working Memory作为补充上下文（容量7±2项）
+        if let (Some(uid), Some(sid)) = (user_id, session_id) {
+            let working_scope = MemoryScope::Session {
+                agent_id: agent_id.to_string(),
+                user_id: uid.to_string(),
+                session_id: sid.to_string(),
+            };
+
+            info!("🔄 Priority 2: Querying Working Memory (Session scope) - 补充上下文");
+
+            // 只查询少量（max_count / 2），因为只是补充
+            match self
+                .memory_engine
+                .search_memories(query, Some(working_scope), Some(max_count / 2))
+                .await
+            {
+                Ok(memories) => {
+                    let mut added = 0;
+                    for memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            // 🎯 Working Memory 权重: 1.0（正常，因为新鲜且相关）
+                            all_memories.push(memory);
+                            added += 1;
+                        }
+                    }
+                    info!("🔄 Working Memory added {} memories as context", added);
+                }
+                Err(e) => {
+                    warn!("⚠️  Working Memory query failed: {}", e);
+                }
+            }
+        }
+
+        // ========== Priority 3: Semantic Memory (Agent Scope) ==========
+        // 理论依据: 备选，如果前面不够则查询更广范围
+        if all_memories.len() < max_count {
+            let semantic_scope = MemoryScope::Agent(agent_id.to_string());
+
+            let remaining = max_count.saturating_sub(all_memories.len());
+            info!(
+                "📖 Priority 3: Querying Semantic Memory (Agent scope) - 需要 {} 更多",
+                remaining
+            );
+
+            match self
+                .memory_engine
+                .search_memories(query, Some(semantic_scope), Some(remaining * 2))
+                .await
+            {
+                Ok(memories) => {
+                    let mut added = 0;
+                    for mut memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            // 🎯 Semantic Memory 权重: 0.9（降低，因为范围更广）
+                            if let Some(score) = memory.score {
+                                memory.score = Some(score * 0.9);
+                            }
+                            all_memories.push(memory);
+                            added += 1;
+                            if all_memories.len() >= max_count {
+                                break;
+                            }
+                        }
+                    }
+                    info!("📖 Semantic Memory added {} memories", added);
+                }
+                Err(e) => {
+                    warn!("⚠️  Semantic Memory query failed: {}", e);
+                }
+            }
+        }
+
+        // 最终结果统计（认知架构分类）
+        let final_count = all_memories.len();
+        let episodic_count = all_memories
+            .iter()
+            .filter(|m| {
+                // 简单判断：包含user_id但不包含session的是Episodic
+                m.metadata.contains_key("user_id") && !m.id.contains("session")
+            })
+            .count();
+        let working_count = all_memories
+            .iter()
+            .filter(|m| m.id.contains("session"))
+            .count();
+        let semantic_count = final_count - episodic_count - working_count;
+
+        info!(
+            "✅ 检索完成 (认知架构): {} memories (Episodic: {}, Working: {}, Semantic: {})",
+            final_count, episodic_count, working_count, semantic_count
+        );
+
+        // 按调整后的score排序
+        all_memories.sort_by(|a, b| {
+            b.score
+                .unwrap_or(0.0)
+                .partial_cmp(&a.score.unwrap_or(0.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 返回 top N（基于HCAM的两阶段检索结果）
+        Ok(all_memories.into_iter().take(max_count).collect())
+    }
+
     /// 将记忆注入到 prompt
     ///
     /// 参考 MIRIX 的记忆格式化方式

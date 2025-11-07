@@ -685,13 +685,17 @@ impl AgentOrchestrator {
 
     /// 检索相关记忆
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
-        // ✅ 使用 MemoryIntegrator 检索记忆（带session隔离）
+        // 🆕 Phase 1: 使用 Episodic-first检索（基于认知理论）
+        // 理论依据: Atkinson-Shiffrin模型 + HCAM分层检索
         let max_count = self.config.max_memories;
 
-        // 使用session_id和user_id进行精确过滤
+        // 使用新的 retrieve_episodic_first 方法
+        // Priority 1: Episodic Memory (Agent/User) - 主要来源
+        // Priority 2: Working Memory (Session) - 补充上下文
+        // Priority 3: Semantic Memory (Agent global) - 备选
         let memories = self
             .memory_integrator
-            .retrieve_relevant_memories_with_session(
+            .retrieve_episodic_first(
                 &request.message,
                 &request.agent_id,
                 Some(&request.user_id),
@@ -701,11 +705,14 @@ impl AgentOrchestrator {
             .await?;
 
         info!(
-            "📋 Retrieved {} memories for session={}, user={}",
+            "📋 Retrieved {} memories (Episodic-first) for user={}, agent={}",
             memories.len(),
-            request.session_id,
-            request.user_id
+            request.user_id,
+            request.agent_id
         );
+
+        // 🆕 认知架构验证: 日志已在 retrieve_episodic_first 中记录
+        debug!("Memory sources: Episodic (主要) + Working (补充) + Semantic (备选)");
 
         // 过滤和排序
         let memories = self.memory_integrator.filter_by_relevance(memories);
@@ -920,6 +927,7 @@ mod tests {
             message: "Hello, how are you?".to_string(),
             agent_id: "agent-123".to_string(),
             user_id: "user-456".to_string(),
+            session_id: "session-abc".to_string(),
             organization_id: "org-789".to_string(),
             stream: false,
             max_memories: 10,
@@ -928,6 +936,7 @@ mod tests {
         assert_eq!(request.message, "Hello, how are you?");
         assert_eq!(request.agent_id, "agent-123");
         assert_eq!(request.user_id, "user-456");
+        assert_eq!(request.session_id, "session-abc");
         assert_eq!(request.organization_id, "org-789");
         assert!(!request.stream);
         assert_eq!(request.max_memories, 10);
@@ -939,6 +948,7 @@ mod tests {
             message: "Test message".to_string(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            session_id: "session-1".to_string(),
             organization_id: "default".to_string(),
             stream: true,
             max_memories: 5,
@@ -949,6 +959,7 @@ mod tests {
 
         assert_eq!(request.message, deserialized.message);
         assert_eq!(request.stream, deserialized.stream);
+        assert_eq!(request.session_id, deserialized.session_id);
     }
 
     #[test]
@@ -1045,6 +1056,7 @@ mod tests {
             message: "".to_string(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            session_id: "session-empty".to_string(),
             organization_id: "default".to_string(),
             stream: false,
             max_memories: 5,
@@ -1060,6 +1072,7 @@ mod tests {
             message: long_message.clone(),
             agent_id: "agent-1".to_string(),
             user_id: "user-1".to_string(),
+            session_id: "session-long".to_string(),
             organization_id: "default".to_string(),
             stream: false,
             max_memories: 5,
