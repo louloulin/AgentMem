@@ -164,22 +164,34 @@ impl MemoryManager {
         full_metadata.insert("hash".to_string(), content_hash.clone());
 
         // 🆕 Phase 2 Server: 提取scope_type（如果没有则自动推断）
+        // ✅ 修复优先级：user_id优先于session_id（符合agentmem61.md设计）
         let scope_type = full_metadata
             .get("scope_type")
             .cloned()
             .unwrap_or_else(|| {
-                // 自动推断scope类型
-                if full_metadata.contains_key("run_id") {
-                    "run".to_string()
-                } else if full_metadata.contains_key("session_id") {
-                    "session".to_string()
-                } else if full_metadata.contains_key("org_id") {
-                    "organization".to_string()
-                } else if user_id_val != "default" && effective_agent_id != "default" {
+                // 自动推断scope类型 - 正确的优先级
+                // 1. 如果有user_id和agent_id（非默认），这是长期记忆（Agent scope）
+                if user_id_val != "default" && effective_agent_id.starts_with("agent-") && effective_agent_id != "default-agent" {
                     "agent".to_string()
-                } else if user_id_val != "default" {
+                } 
+                // 2. 如果只有user_id（非默认），这是用户记忆（User scope）
+                else if user_id_val != "default" {
                     "user".to_string()
-                } else {
+                }
+                // 3. 如果有session_id，这是工作记忆（Session scope）
+                else if full_metadata.contains_key("session_id") {
+                    "session".to_string()
+                }
+                // 4. 如果有run_id
+                else if full_metadata.contains_key("run_id") {
+                    "run".to_string()
+                }
+                // 5. 如果有org_id
+                else if full_metadata.contains_key("org_id") {
+                    "organization".to_string()
+                }
+                // 6. 默认为全局
+                else {
                     "global".to_string()
                 }
             });

@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { apiClient, Agent } from '@/lib/api-client';
 import { useSSE } from '@/hooks/use-sse';
 import { DEFAULT_USER_ID } from '@/lib/constants';
+import { MemoryPanel } from '@/components/MemoryPanel';
+import { useMemorySearch } from '@/hooks/use-memory-search';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -36,7 +38,15 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true); // 是否启用流式响应
+  const [showMemoryPanel, setShowMemoryPanel] = useState(true); // ✨ 记忆面板显示状态
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // ✨ Memory search hook
+  const { memories, loading: searchingMemories, searchMemories, clearMemories } = useMemorySearch({
+    agentId: selectedAgentId,
+    userId: DEFAULT_USER_ID,
+    enabled: showMemoryPanel,
+  });
 
   // Initialize SSE connection with token
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -245,6 +255,11 @@ export default function ChatPage() {
     setInput('');
     setLoading(true);
 
+    // ✨ Trigger memory search for user's message
+    if (showMemoryPanel) {
+      searchMemories(messageContent);
+    }
+
     try {
       if (useStreaming) {
         // Use SSE streaming
@@ -294,13 +309,18 @@ export default function ChatPage() {
     // 清空消息历史
     setMessages([]);
     
+    // ✨ 清空记忆搜索结果
+    clearMemories();
+    
     console.log('[Chat] Started new conversation with session_id:', newSessionId);
   };
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   return (
-    <div className="h-full flex flex-col space-y-6">
+    <div className="h-full flex gap-0">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -453,6 +473,15 @@ export default function ChatPage() {
           </>
         )}
       </Card>
+      </div>
+      
+      {/* ✨ Memory Panel */}
+      <MemoryPanel
+        visible={showMemoryPanel}
+        memories={memories}
+        loading={searchingMemories}
+        onToggle={() => setShowMemoryPanel(!showMemoryPanel)}
+      />
     </div>
   );
 }
