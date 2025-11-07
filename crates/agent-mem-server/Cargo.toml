@@ -87,7 +87,7 @@ argon2 = "0.5.3"
 sha2.workspace = true
 
 [features]
-default = ["libsql"]
+default = ["libsql", "lancedb"]  # ✅ 添加lancedb到默认features
 plugins = ["agent-mem/plugins"]
 postgres = ["agent-mem-core/postgres"]
 libsql = ["agent-mem-core/libsql"]
