@@ -12,5 +12,9 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "agentmem"
+  ],
+  "enableAllProjectMcpServers": true
 }

@@ -151,6 +151,17 @@ async fn handle_request(
                 error: None,
             }
         }
+        "ping" | "health" | "healthcheck" => {
+            // 健康检查支持（Claude Code需要）
+            JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request_id,
+                result: Some(serde_json::json!({
+                    "status": "ok"
+                })),
+                error: None,
+            }
+        }
         "tools/list" => {
             // 返回工具列表
             match server.list_tools().await {
