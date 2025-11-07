@@ -449,17 +449,172 @@ impl VectorStore for LanceDBStore {
 
     async fn search_with_filters(
         &self,
-        _query_vector: Vec<f32>,
-        _limit: usize,
+        query_vector: Vec<f32>,
+        limit: usize,
         filters: &HashMap<String, serde_json::Value>,
-        _threshold: Option<f32>,
+        threshold: Option<f32>,
     ) -> Result<Vec<VectorSearchResult>> {
-        debug!("Searching with filters: {:?}", filters);
+        debug!(
+            "Searching with filters: {:?}, limit: {}, threshold: {:?}",
+            filters, limit, threshold
+        );
 
-        // TODO: Implement filtered search
-        warn!("LanceDB search_with_filters is not fully implemented yet");
+        // 1. 获取表
+        let table = self.get_or_create_table().await?;
 
-        Ok(Vec::new())
+        // 2. 执行向量搜索（LanceDB会自动使用索引）
+        let batches = table
+            .query()
+            .nearest_to(query_vector.as_slice())
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create nearest_to query: {e}"))
+            })?
+            .limit(limit * 10) // ✅ 多取一些结果，然后在内存中过滤
+            .execute()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to collect results: {e}")))?;
+
+        // 3. 解析结果并应用过滤条件
+        let mut results = Vec::new();
+
+        for batch in batches {
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // 获取列数据
+            let id_array = batch
+                .column_by_name("id")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'id' column".to_string()))?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'id' column type".to_string())
+                })?;
+
+            let vector_array = batch
+                .column_by_name("vector")
+                .ok_or_else(|| AgentMemError::StorageError("Missing 'vector' column".to_string()))?
+                .as_any()
+                .downcast_ref::<FixedSizeListArray>()
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'vector' column type".to_string())
+                })?;
+
+            let metadata_array = batch
+                .column_by_name("metadata")
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Missing 'metadata' column".to_string())
+                })?
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'metadata' column type".to_string())
+                })?;
+
+            let distance_array = batch
+                .column_by_name("_distance")
+                .and_then(|col| col.as_any().downcast_ref::<Float32Array>());
+
+            // 处理每一行
+            for i in 0..num_rows {
+                let id = id_array.value(i).to_string();
+
+                // 提取向量
+                let vector_list = vector_array.value(i);
+                let vector_data = vector_list
+                    .as_any()
+                    .downcast_ref::<Float32Array>()
+                    .ok_or_else(|| {
+                        AgentMemError::StorageError("Invalid vector data type".to_string())
+                    })?;
+                let vector: Vec<f32> = vector_data.values().to_vec();
+
+                // 提取 metadata
+                let metadata_str = if metadata_array.is_null(i) {
+                    String::new()
+                } else {
+                    metadata_array.value(i).to_string()
+                };
+                let metadata: HashMap<String, String> = if metadata_str.is_empty() {
+                    HashMap::new()
+                } else {
+                    serde_json::from_str(&metadata_str).unwrap_or_default()
+                };
+
+                // ✅ 应用过滤条件
+                let mut passes_filter = true;
+                for (filter_key, filter_value) in filters {
+                    if let Some(metadata_value) = metadata.get(filter_key) {
+                        // 比较值（支持字符串比较）
+                        let filter_str = match filter_value {
+                            serde_json::Value::String(s) => s.as_str(),
+                            serde_json::Value::Number(n) => &n.to_string(),
+                            serde_json::Value::Bool(b) => if *b { "true" } else { "false" },
+                            _ => continue,
+                        };
+                        
+                        if metadata_value != filter_str {
+                            passes_filter = false;
+                            break;
+                        }
+                    } else {
+                        // metadata中没有这个key，不匹配
+                        passes_filter = false;
+                        break;
+                    }
+                }
+
+                if !passes_filter {
+                    continue;
+                }
+
+                // 计算距离和相似度
+                let distance = if let Some(dist_arr) = distance_array {
+                    dist_arr.value(i)
+                } else {
+                    let sum: f32 = query_vector
+                        .iter()
+                        .zip(vector.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum();
+                    sum.sqrt()
+                };
+
+                let similarity = 1.0 / (1.0 + distance);
+
+                // 应用相似度阈值
+                if let Some(threshold) = threshold {
+                    if similarity < threshold {
+                        continue;
+                    }
+                }
+
+                results.push(VectorSearchResult {
+                    id,
+                    vector,
+                    metadata,
+                    similarity,
+                    distance,
+                });
+
+                // 达到limit后停止
+                if results.len() >= limit {
+                    break;
+                }
+            }
+
+            if results.len() >= limit {
+                break;
+            }
+        }
+
+        info!("Found {} vectors matching filters", results.len());
+        Ok(results)
     }
 
     async fn delete_vectors(&self, ids: Vec<String>) -> Result<()> {
