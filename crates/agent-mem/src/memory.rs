@@ -1061,6 +1061,90 @@ impl Memory {
     ) -> tokio::sync::RwLockWriteGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
         self.plugin_layer.write().await
     }
+
+    // ========== 🆕 Phase 3: 便捷API（Scope友好） ==========
+
+    /// 🆕 添加用户级记忆（最简单）
+    /// 
+    /// 只需要user_id，适用于个人知识库场景
+    /// 
+    /// # 示例
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// mem.add_user_memory("I love pizza", "alice").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_user_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: None,  // 不指定agent
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+    
+    /// 🆕 添加Agent级记忆
+    /// 
+    /// 需要user_id和agent_id，适用于多Agent系统
+    /// 
+    /// # 示例
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// mem.add_agent_memory("Meeting at 2pm", "alice", "work_assistant").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_agent_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+        agent_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: Some(agent_id.into()),
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+    
+    /// 🆕 添加运行级记忆（临时会话）
+    /// 
+    /// 需要user_id和run_id，适用于临时对话场景
+    /// 
+    /// # 示例
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let run_id = uuid::Uuid::new_v4().to_string();
+    /// mem.add_run_memory("Temporary note", "alice", run_id).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_run_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+        run_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: None,
+            run_id: Some(run_id.into()),
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
 }
 
 /// 性能统计信息

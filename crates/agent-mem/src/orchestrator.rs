@@ -899,11 +899,13 @@ impl MemoryOrchestrator {
         );
 
         // 总是添加 user_id（使用 "default" 作为默认值）
-        full_metadata.insert(
-            "user_id".to_string(),
-            serde_json::json!(user_id.unwrap_or_else(|| "default".to_string())),
-        );
+        let actual_user_id = user_id.unwrap_or_else(|| "default".to_string());
+        full_metadata.insert("user_id".to_string(), serde_json::json!(actual_user_id));
         full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+        // 🆕 Phase 2: 自动推断和添加scope_type（复用Mem0策略）
+        let scope_type = infer_scope_type(&actual_user_id, &agent_id, &metadata);
+        full_metadata.insert("scope_type".to_string(), serde_json::json!(scope_type));
 
         // 合并自定义 metadata
         if let Some(custom_meta) = metadata {
@@ -3828,5 +3830,36 @@ impl MemoryOrchestrator {
             warn!("历史管理器未初始化，返回空历史");
             Ok(Vec::new())
         }
+    }
+}
+
+/// 🆕 Phase 2: 推断scope类型（Mem0风格）
+/// 
+/// 根据user_id, agent_id和metadata中的信息自动推断记忆作用域
+fn infer_scope_type(
+    user_id: &str,
+    agent_id: &str,
+    metadata: &Option<HashMap<String, serde_json::Value>>,
+) -> String {
+    // 检查metadata中是否有run_id或session_id
+    if let Some(meta) = metadata {
+        if meta.contains_key("run_id") {
+            return "run".to_string();
+        }
+        if meta.contains_key("session_id") {
+            return "session".to_string();
+        }
+        if meta.contains_key("org_id") {
+            return "organization".to_string();
+        }
+    }
+    
+    // 默认逻辑
+    if user_id != "default" && agent_id != "default" {
+        "agent".to_string()
+    } else if user_id != "default" {
+        "user".to_string()
+    } else {
+        "global".to_string()
     }
 }

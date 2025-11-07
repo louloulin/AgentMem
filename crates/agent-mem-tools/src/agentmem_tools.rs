@@ -50,6 +50,12 @@ impl Tool for AddMemoryTool {
                 PropertySchema::string("记忆内容"),
                 true,
             )
+            // 🆕 Phase 5: 新增scope_type参数（推荐）
+            .add_parameter(
+                "scope_type",
+                PropertySchema::string("作用域类型（可选）：user, agent, run, session, organization。如不指定则根据其他参数自动判断"),
+                false,
+            )
             .add_parameter(
                 "user_id",
                 PropertySchema::string("用户 ID"),
@@ -57,12 +63,24 @@ impl Tool for AddMemoryTool {
             )
             .add_parameter(
                 "agent_id",
-                PropertySchema::string("Agent ID（可选）"),
+                PropertySchema::string("Agent ID（可选，用于agent/run/session scope）"),
+                false,
+            )
+            // 🆕 Phase 5: 新增run_id参数
+            .add_parameter(
+                "run_id",
+                PropertySchema::string("Run ID（可选，用于run scope）"),
                 false,
             )
             .add_parameter(
                 "session_id",
-                PropertySchema::string("会话 ID（可选）"),
+                PropertySchema::string("会话 ID（可选，用于session scope）"),
+                false,
+            )
+            // 🆕 Phase 5: 新增组织相关参数
+            .add_parameter(
+                "org_id",
+                PropertySchema::string("Organization ID（可选，用于organization scope）"),
                 false,
             )
             .add_parameter(
@@ -99,19 +117,91 @@ impl Tool for AddMemoryTool {
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        // 🆕 智能Agent ID处理：使用user_id派生默认Agent ID（更合理）
-        let agent_id = args["agent_id"].as_str()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                // 从环境变量或user_id派生
-                std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
-                    .unwrap_or_else(|_| format!("agent-{}", user_id))
-            });
+        // 🆕 Phase 5: 提取scope相关参数
+        let scope_type = args["scope_type"].as_str().unwrap_or("auto");
+        let agent_id_arg = args["agent_id"].as_str();
+        let run_id = args["run_id"].as_str();
+        let session_id = args["session_id"].as_str();
+        let org_id = args["org_id"].as_str();
+        
+        // 🆕 Phase 5: 构建metadata（包含scope信息）
+        let mut metadata_map = std::collections::HashMap::new();
+        
+        // 根据scope_type或自动推断
+        let actual_scope_type = match scope_type {
+            "user" => {
+                metadata_map.insert("scope_type".to_string(), "user".to_string());
+                "user"
+            },
+            "agent" => {
+                metadata_map.insert("scope_type".to_string(), "agent".to_string());
+                "agent"
+            },
+            "run" => {
+                metadata_map.insert("scope_type".to_string(), "run".to_string());
+                if let Some(rid) = run_id {
+                    metadata_map.insert("run_id".to_string(), rid.to_string());
+                }
+                "run"
+            },
+            "session" => {
+                metadata_map.insert("scope_type".to_string(), "session".to_string());
+                if let Some(sid) = session_id {
+                    metadata_map.insert("session_id".to_string(), sid.to_string());
+                }
+                "session"
+            },
+            "organization" => {
+                metadata_map.insert("scope_type".to_string(), "organization".to_string());
+                if let Some(oid) = org_id {
+                    metadata_map.insert("org_id".to_string(), oid.to_string());
+                }
+                "organization"
+            },
+            "auto" | _ => {
+                // 自动推断（当前逻辑）
+                if let Some(rid) = run_id {
+                    metadata_map.insert("scope_type".to_string(), "run".to_string());
+                    metadata_map.insert("run_id".to_string(), rid.to_string());
+                    "run"
+                } else if let Some(sid) = session_id {
+                    metadata_map.insert("scope_type".to_string(), "session".to_string());
+                    metadata_map.insert("session_id".to_string(), sid.to_string());
+                    "session"
+                } else if agent_id_arg.is_some() {
+                    metadata_map.insert("scope_type".to_string(), "agent".to_string());
+                    "agent"
+                } else {
+                    metadata_map.insert("scope_type".to_string(), "user".to_string());
+                    "user"
+                }
+            }
+        };
+
+        // 🆕 智能Agent ID处理：根据scope决定是否需要agent_id
+        let agent_id = if actual_scope_type == "agent" || agent_id_arg.is_some() {
+            agent_id_arg.map(|s| s.to_string())
+                .unwrap_or_else(|| {
+                    std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
+                        .unwrap_or_else(|_| format!("agent-{}", user_id))
+                })
+        } else {
+            format!("default-agent-{}", user_id)
+        };
         
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
         
-        // 🆕 确保Agent存在（自动创建）
-        ensure_agent_exists(&api_url, &agent_id, user_id).await?;
+        // 合并用户提供的metadata
+        if let Some(user_metadata_str) = args["metadata"].as_str() {
+            if let Ok(user_metadata) = serde_json::from_str::<std::collections::HashMap<String, String>>(user_metadata_str) {
+                metadata_map.extend(user_metadata);
+            }
+        }
+        
+        // 🆕 确保Agent存在（自动创建）- 仅当需要agent时
+        if actual_scope_type == "agent" || agent_id_arg.is_some() {
+            ensure_agent_exists(&api_url, &agent_id, user_id).await?;
+        }
 
         // 调用 AgentMem Backend API (使用同步 HTTP 客户端避免 stdio 冲突)
         let api_url = get_api_url();
@@ -122,7 +212,8 @@ impl Tool for AddMemoryTool {
             "user_id": user_id,
             "agent_id": agent_id,
             "memory_type": memory_type,
-            "importance": 0.5
+            "importance": 0.5,
+            "metadata": metadata_map  // 🆕 Phase 5: 包含scope信息的metadata
         });
 
         tracing::debug!("Calling API: POST {}", url);
@@ -165,6 +256,7 @@ impl Tool for AddMemoryTool {
             "user_id": user_id,
             "agent_id": agent_id,
             "memory_type": memory_type,
+            "scope_type": actual_scope_type,  // 🆕 Phase 5: 返回scope信息
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
     }

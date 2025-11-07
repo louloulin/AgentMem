@@ -40,6 +40,47 @@ impl Default for AddMemoryOptions {
     }
 }
 
+impl AddMemoryOptions {
+    /// 🆕 Phase 1: 从options推断scope类型（不修改结构）
+    /// 
+    /// 根据提供的user_id, agent_id, run_id自动判断记忆作用域
+    pub fn infer_scope_type(&self) -> String {
+        // 优先级: Run > Agent > User > Global
+        if self.run_id.is_some() {
+            return "run".to_string();
+        }
+        if self.agent_id.is_some() && self.user_id.is_some() {
+            return "agent".to_string();
+        }
+        if self.user_id.is_some() {
+            return "user".to_string();
+        }
+        "global".to_string()
+    }
+    
+    /// 🆕 Phase 1: 构建带scope的metadata（复用现有逻辑）
+    /// 
+    /// 将options中的信息转换为metadata，包含scope_type
+    pub fn build_full_metadata(&self) -> HashMap<String, String> {
+        let mut full_metadata = self.metadata.clone();
+        
+        // 自动添加scope信息到metadata
+        full_metadata.insert("scope_type".to_string(), self.infer_scope_type());
+        
+        if let Some(ref user_id) = self.user_id {
+            full_metadata.insert("user_id".to_string(), user_id.clone());
+        }
+        if let Some(ref agent_id) = self.agent_id {
+            full_metadata.insert("agent_id".to_string(), agent_id.clone());
+        }
+        if let Some(ref run_id) = self.run_id {
+            full_metadata.insert("run_id".to_string(), run_id.clone());
+        }
+        
+        full_metadata
+    }
+}
+
 /// 添加操作的结果（mem0 兼容）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddResult {
