@@ -10,9 +10,9 @@ use validator::Validate;
 /// Request to add a new memory
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct MemoryRequest {
-    /// Agent ID
+    /// Agent ID (optional, defaults to "default-agent" or "default-agent-{user_id}")
     #[validate(length(min = 1, max = 255))]
-    pub agent_id: String,
+    pub agent_id: Option<String>,
 
     /// User ID (optional)
     #[validate(length(max = 255))]

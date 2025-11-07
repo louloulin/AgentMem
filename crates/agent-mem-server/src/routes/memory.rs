@@ -110,7 +110,7 @@ impl MemoryManager {
     pub async fn add_memory(
         &self,
         repositories: Arc<agent_mem_core::storage::factory::Repositories>,
-        agent_id: String,
+        agent_id: Option<String>,
         user_id: Option<String>,
         content: String,
         memory_type: Option<agent_mem_traits::MemoryType>,
@@ -120,9 +120,18 @@ impl MemoryManager {
         use agent_mem_utils::hash::compute_content_hash;
         use chrono::Utc;
 
+        // ✅ 生成有效的 agent_id (参考mem0设计)
+        let effective_agent_id = agent_id.unwrap_or_else(|| {
+            if let Some(uid) = &user_id {
+                format!("default-agent-{}", uid)
+            } else {
+                "default-agent".to_string()
+            }
+        });
+
         // Step 1: 使用Memory API（生成向量嵌入）
         let options = AddMemoryOptions {
-            agent_id: Some(agent_id.clone()),
+            agent_id: Some(effective_agent_id.clone()),
             user_id: user_id.clone(),
             infer: false, // 简单模式，避免复杂推理
             metadata: metadata.clone().unwrap_or_default(),
@@ -149,7 +158,7 @@ impl MemoryManager {
 
         // 构建metadata JSON
         let mut full_metadata = metadata.unwrap_or_default();
-        full_metadata.insert("agent_id".to_string(), agent_id.clone());
+        full_metadata.insert("agent_id".to_string(), effective_agent_id.clone());
         full_metadata.insert("user_id".to_string(), user_id_val.clone());
         full_metadata.insert("data".to_string(), content.clone());
         full_metadata.insert("hash".to_string(), content_hash.clone());
@@ -166,7 +175,7 @@ impl MemoryManager {
                     "session".to_string()
                 } else if full_metadata.contains_key("org_id") {
                     "organization".to_string()
-                } else if user_id_val != "default" && agent_id != "default" {
+                } else if user_id_val != "default" && effective_agent_id != "default" {
                     "agent".to_string()
                 } else if user_id_val != "default" {
                     "user".to_string()
@@ -181,18 +190,23 @@ impl MemoryManager {
             .collect();
 
         // Step 2.5: 确保Agent存在（获取其organization_id和user_id）
-        let agent = repositories
+        // ✅ 如果agent不存在，使用默认值（参考mem0设计）
+        let agent_opt = repositories
             .agents
-            .find_by_id(&agent_id)
+            .find_by_id(&effective_agent_id)
             .await
-            .map_err(|e| format!("Failed to query agent: {}", e))?
-            .ok_or_else(|| format!("Agent not found: {}", agent_id))?;
+            .map_err(|e| format!("Failed to query agent: {}", e))?;
+        
+        let organization_id = agent_opt
+            .as_ref()
+            .map(|a| a.organization_id.clone())
+            .unwrap_or_else(|| "default-org".to_string());
 
         let memory = agent_mem_core::storage::models::Memory {
             id: memory_id.clone(),
-            organization_id: agent.organization_id.clone(), // 使用Agent的organization_id
+            organization_id, // 使用Agent的organization_id或默认值
             user_id: "default".to_string(), // 使用默认user (TODO: 应该从auth获取实际user)
-            agent_id: agent_id.clone(),
+            agent_id: effective_agent_id.clone(),
             content,
             hash: Some(content_hash),
             metadata: metadata_json,
