@@ -2,6 +2,7 @@
 //!
 //! 这些工具提供 AgentMem 的核心功能，包括记忆管理、搜索、对话等
 
+use crate::config::get_api_url;
 use crate::error::ToolResult;
 use crate::executor::{ExecutionContext, Tool};
 use crate::schema::{PropertySchema, ToolSchema};
@@ -9,9 +10,24 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-/// Get AgentMem API URL from environment or use default
-fn get_api_url() -> String {
-    std::env::var("AGENTMEM_API_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
+/// 检查后端健康状态
+async fn check_backend_health(api_url: &str) -> Result<(), String> {
+    let url = format!("{}/health", api_url);
+    let timeout = std::time::Duration::from_secs(5);
+    
+    let result = tokio::task::spawn_blocking(move || {
+        ureq::get(&url)
+            .timeout(timeout)
+            .call()
+    })
+    .await
+    .map_err(|e| format!("Join error: {}", e))?;
+    
+    match result {
+        Ok(resp) if resp.status() == 200 => Ok(()),
+        Ok(resp) => Err(format!("Backend unhealthy: status {}", resp.status())),
+        Err(e) => Err(format!("Health check failed: {}", e)),
+    }
 }
 
 /// 添加记忆工具
@@ -62,6 +78,19 @@ impl Tool for AddMemoryTool {
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        // 🆕 健康检查
+        let api_url = get_api_url();
+        
+        if let Err(e) = check_backend_health(&api_url).await {
+            tracing::warn!("Backend health check failed: {}", e);
+            return Ok(json!({
+                "success": false,
+                "error": "backend_unavailable",
+                "message": "AgentMem backend is currently unavailable. Please check if the service is running.",
+                "details": e
+            }));
+        }
+        
         let content = args["content"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("content is required".to_string()))?;
@@ -171,6 +200,19 @@ impl Tool for SearchMemoriesTool {
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        // 🆕 健康检查
+        let api_url = get_api_url();
+        
+        if let Err(e) = check_backend_health(&api_url).await {
+            tracing::warn!("Backend health check failed: {}", e);
+            return Ok(json!({
+                "success": false,
+                "error": "backend_unavailable",
+                "message": "AgentMem backend is currently unavailable. Please check if the service is running.",
+                "details": e
+            }));
+        }
+        
         let query = args["query"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("query is required".to_string()))?;
@@ -183,9 +225,6 @@ impl Tool for SearchMemoriesTool {
             .unwrap_or("default");
 
         tracing::debug!("Searching memories: query='{}', user_id='{}', limit={}", query, user_id, limit);
-
-        // 调用 AgentMem Backend API (使用同步 HTTP 客户端)
-        let api_url = get_api_url();
         let url = format!("{}/api/v1/memories/search", api_url);
 
         let request_body = json!({
@@ -288,6 +327,19 @@ impl Tool for ChatTool {
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        // 🆕 健康检查
+        let api_url = get_api_url();
+        
+        if let Err(e) = check_backend_health(&api_url).await {
+            tracing::warn!("Backend health check failed: {}", e);
+            return Ok(json!({
+                "success": false,
+                "error": "backend_unavailable",
+                "message": "AgentMem backend is currently unavailable. Please check if the service is running.",
+                "details": e
+            }));
+        }
+        
         let message = args["message"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("message is required".to_string()))?;
@@ -384,14 +436,24 @@ impl Tool for GetSystemPromptTool {
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        // 🆕 健康检查
+        let api_url = get_api_url();
+        
+        if let Err(e) = check_backend_health(&api_url).await {
+            tracing::warn!("Backend health check failed: {}", e);
+            return Ok(json!({
+                "success": false,
+                "error": "backend_unavailable",
+                "message": "AgentMem backend is currently unavailable. Please check if the service is running.",
+                "details": e
+            }));
+        }
+        
         let user_id = args["user_id"]
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
         let context = args["context"].as_str().unwrap_or("");
-
-        // 调用 AgentMem Backend API 搜索用户记忆 (使用同步 HTTP 客户端)
-        let api_url = get_api_url();
         let url = format!("{}/api/v1/memories/search", api_url);
 
         let search_query = if !context.is_empty() {
@@ -470,6 +532,10 @@ pub async fn register_agentmem_tools(executor: &crate::executor::ToolExecutor) -
     executor.register_tool(Arc::new(SearchMemoriesTool)).await?;
     executor.register_tool(Arc::new(ChatTool)).await?;
     executor.register_tool(Arc::new(GetSystemPromptTool)).await?;
+    
+    // 🆕 注册Agent管理工具
+    executor.register_tool(Arc::new(crate::agent_tools::ListAgentsTool)).await?;
+    
     Ok(())
 }
 

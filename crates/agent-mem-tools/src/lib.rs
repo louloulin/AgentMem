@@ -135,6 +135,12 @@ pub mod mcp;
 /// AgentMem specific tools
 pub mod agentmem_tools;
 
+/// Configuration management
+pub mod config;
+
+/// Agent management tools
+pub mod agent_tools;
+
 // Re-export main types
 pub use agentmem_tools::register_agentmem_tools;
 pub use error::{ToolError, ToolResult};
