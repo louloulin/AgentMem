@@ -3,7 +3,7 @@
 //! 这些工具提供 AgentMem 的核心功能，包括记忆管理、搜索、对话等
 
 use crate::config::get_api_url;
-use crate::error::ToolResult;
+use crate::error::{ToolError, ToolResult};
 use crate::executor::{ExecutionContext, Tool};
 use crate::schema::{PropertySchema, ToolSchema};
 use async_trait::async_trait;
@@ -67,7 +67,7 @@ impl Tool for AddMemoryTool {
             )
             .add_parameter(
                 "memory_type",
-                PropertySchema::string("记忆类型：episodic, semantic, procedural, core, working, resource, declarative, contextual"),
+                PropertySchema::string("记忆类型（首字母必须大写）：Episodic, Semantic, Procedural, Factual, Core, Working, Resource, Knowledge, Contextual。默认：Episodic"),
                 false,
             )
             .add_parameter(
@@ -99,11 +99,19 @@ impl Tool for AddMemoryTool {
             .as_str()
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
 
-        // 如果没有提供 agent_id，使用环境变量或默认值
-        let default_agent = std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
-            .unwrap_or_else(|_| "agent-92070062-78bb-4553-9701-9a7a4a89d87a".to_string());
-        let agent_id = args["agent_id"].as_str().unwrap_or(&default_agent);
+        // 🆕 智能Agent ID处理：使用user_id派生默认Agent ID（更合理）
+        let agent_id = args["agent_id"].as_str()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                // 从环境变量或user_id派生
+                std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
+                    .unwrap_or_else(|_| format!("agent-{}", user_id))
+            });
+        
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
+        
+        // 🆕 确保Agent存在（自动创建）
+        ensure_agent_exists(&api_url, &agent_id, user_id).await?;
 
         // 调用 AgentMem Backend API (使用同步 HTTP 客户端避免 stdio 冲突)
         let api_url = get_api_url();
@@ -537,5 +545,69 @@ pub async fn register_agentmem_tools(executor: &crate::executor::ToolExecutor) -
     executor.register_tool(Arc::new(crate::agent_tools::ListAgentsTool)).await?;
     
     Ok(())
+}
+
+/// 🆕 确保Agent存在，如果不存在则自动创建
+async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> ToolResult<()> {
+    let check_url = format!("{}/api/v1/agents/{}", api_url, agent_id);
+    
+    // 1. 检查Agent是否存在
+    let exists = tokio::task::spawn_blocking({
+        let check_url = check_url.clone();
+        move || {
+            match ureq::get(&check_url).call() {
+                Ok(_) => true,
+                Err(ureq::Error::Status(404, _)) => false,
+                Err(e) => {
+                    tracing::warn!("Failed to check agent existence: {}", e);
+                    false
+                }
+            }
+        }
+    })
+    .await
+    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+    
+    if exists {
+        tracing::debug!("Agent {} already exists", agent_id);
+        return Ok(());
+    }
+    
+    // 2. Agent不存在，自动创建
+    tracing::info!("🤖 Agent {} 不存在，自动创建", agent_id);
+    
+    let create_url = format!("{}/api/v1/agents", api_url);
+    let create_body = json!({
+        "id": agent_id,
+        "name": format!("Auto Agent for {}", user_id),
+        "description": "Automatically created agent for memory management via MCP",
+        "user_id": user_id
+    });
+    
+    let result = tokio::task::spawn_blocking({
+        let create_url = create_url.clone();
+        let create_body = create_body.clone();
+        move || {
+            ureq::post(&create_url)
+                .set("Content-Type", "application/json")
+                .send_json(&create_body)
+        }
+    })
+    .await
+    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+    
+    match result {
+        Ok(_) => {
+            tracing::info!("✅ Agent {} 创建成功", agent_id);
+            Ok(())
+        }
+        Err(e) => {
+            tracing::error!("❌ Agent {} 创建失败: {}", agent_id, e);
+            Err(ToolError::ExecutionFailed(format!(
+                "Failed to create agent: {}",
+                e
+            )))
+        }
+    }
 }
 

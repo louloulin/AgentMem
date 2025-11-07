@@ -1,13 +1,3 @@
 {
-  "mcpServers": {
-    "agentmem": {
-      "type": "stdio",
-      "command": "/Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen/target/release/agentmem-mcp-server",
-      "args": [],
-      "env": {
-        "AGENTMEM_API_URL": "http://127.0.0.1:8080",
-        "RUST_LOG": "info"
-      }
-    }
-  }
+  "mcpServers": {}
 }

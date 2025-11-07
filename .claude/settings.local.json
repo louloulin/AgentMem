@@ -8,13 +8,17 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(cargo build:*)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "mcp__agentmem__agentmem_search_memories",
+      "mcp__serena__activate_project",
+      "mcp__agentmem__agentmem_add_memory",
+      "mcp__agentmem__agentmem_list_agents"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "agentmem"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
