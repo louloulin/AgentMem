@@ -1448,8 +1448,15 @@ impl MemoryOrchestrator {
         // 2. 向量搜索
         if let Some(vector_store) = &self.vector_store {
             // 构建过滤条件（将 filters 转换为 HashMap<String, Value>）
+            // 🔧 修复：不添加user_id过滤，因为global scope的记忆应该对所有用户可见
+            // 后续可以在结果中根据scope进行排序（user > global）
             let mut filter_map = HashMap::new();
-            filter_map.insert("user_id".to_string(), serde_json::json!(user_id));
+            // ❌ 移除user_id过滤，允许搜索global scope记忆
+            // filter_map.insert("user_id".to_string(), serde_json::json!(user_id));
+            
+            // 🎯 添加查询文本提示（用于混合检索中的文本匹配）
+            filter_map.insert("_query_hint".to_string(), serde_json::json!(query.to_lowercase()));
+            
             if let Some(filters) = filters {
                 for (k, v) in filters {
                     filter_map.insert(k, serde_json::json!(v));

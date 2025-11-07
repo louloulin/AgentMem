@@ -462,6 +462,14 @@ impl VectorStore for LanceDBStore {
         // 1. 获取表
         let table = self.get_or_create_table().await?;
 
+        // 🔧 提取查询文本提示（用于文本匹配）
+        let query_hint = filters.get("_query_hint")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_lowercase());
+        
+        // 🔧 动态调整检索数量：短查询需要更多候选
+        let fetch_multiplier = if filters.is_empty() { 50 } else { 10 };
+        
         // 2. 执行向量搜索（LanceDB会自动使用索引）
         let batches = table
             .query()
@@ -469,7 +477,7 @@ impl VectorStore for LanceDBStore {
             .map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to create nearest_to query: {e}"))
             })?
-            .limit(limit * 10) // ✅ 多取一些结果，然后在内存中过滤
+            .limit(limit * fetch_multiplier) // 🔧 多取候选，然后在内存中过滤
             .execute()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to execute query: {e}")))?
@@ -546,9 +554,14 @@ impl VectorStore for LanceDBStore {
                     serde_json::from_str(&metadata_str).unwrap_or_default()
                 };
 
-                // ✅ 应用过滤条件
+                // ✅ 应用过滤条件（跳过特殊hint字段）
                 let mut passes_filter = true;
                 for (filter_key, filter_value) in filters {
+                    // 🔧 跳过以_开头的特殊字段（如_query_hint）
+                    if filter_key.starts_with('_') {
+                        continue;
+                    }
+                    
                     if let Some(metadata_value) = metadata.get(filter_key) {
                         // 比较值（支持字符串比较）
                         let filter_str = match filter_value {
@@ -585,11 +598,33 @@ impl VectorStore for LanceDBStore {
                     sum.sqrt()
                 };
 
-                let similarity = 1.0 / (1.0 + distance);
+                let mut similarity = 1.0 / (1.0 + distance);
 
-                // 应用相似度阈值
+                // 🎯 混合检索策略：文本匹配boost
+                // 检查metadata中是否包含查询关键词（用于商品ID等精确查询）
+                let has_text_match = if let Some(ref hint) = query_hint {
+                    metadata.values().any(|v| v.to_lowercase().contains(hint))
+                } else {
+                    false
+                };
+                
+                if has_text_match {
+                    // 文本匹配：大幅提升相似度
+                    let old_sim = similarity;
+                    similarity = (similarity * 3.0).min(1.0);  // 3倍boost
+                    debug!("✅ Text match boost: id={}, old_sim={:.4}, new_sim={:.4}", 
+                        id, old_sim, similarity);
+                }
+
+                // 🔧 智能阈值：文本匹配的结果使用更低阈值
                 if let Some(threshold) = threshold {
-                    if similarity < threshold {
+                    let effective_threshold = if has_text_match {
+                        0.01  // 文本匹配：极低阈值，几乎不过滤
+                    } else {
+                        threshold
+                    };
+                    
+                    if similarity < effective_threshold {
                         continue;
                     }
                 }

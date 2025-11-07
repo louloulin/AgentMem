@@ -402,10 +402,20 @@ impl MemoryManager {
             base_limit
         };
 
+        // 🔧 动态调整阈值：短查询用低阈值，长查询用高阈值
+        let query_len = query.len();
+        let dynamic_threshold = if query_len < 20 {
+            0.3  // 短查询（如商品ID）用低阈值
+        } else if query_len < 50 {
+            0.5  // 中等长度查询
+        } else {
+            0.7  // 长查询用高阈值
+        };
+        
         let options = SearchOptions {
             user_id: user_id.clone(),
             limit: Some(fetch_limit),
-            threshold: Some(0.7),
+            threshold: Some(dynamic_threshold),
             ..Default::default()
         };
 
@@ -443,7 +453,7 @@ impl MemoryManager {
                     let fallback_options = SearchOptions {
                         user_id,
                         limit: Some(base_limit),
-                        threshold: Some(0.7),
+                        threshold: Some(dynamic_threshold),  // 使用动态阈值
                         ..Default::default()
                     };
                     return self
