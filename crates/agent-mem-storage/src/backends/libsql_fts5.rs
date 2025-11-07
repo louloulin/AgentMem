@@ -12,6 +12,12 @@ use tracing::{debug, info, warn};
 #[cfg(feature = "libsql")]
 use libsql::{Builder, Connection, Database};
 
+// Helper function to convert libsql errors to AgentMemError
+#[cfg(feature = "libsql")]
+fn convert_libsql_error(e: libsql::Error) -> AgentMemError {
+    AgentMemError::StorageError(format!("LibSQL error: {}", e))
+}
+
 /// FTS5搜索结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FTS5SearchResult {
@@ -415,7 +421,7 @@ impl LibSQLFTS5Store {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to get FTS stats: {e}")))?;
         
-        let indexed_memories = if let Some(row) = rows.next().await? {
+        let indexed_memories = if let Some(row) = rows.next().await.map_err(convert_libsql_error)? {
             row.get::<i64>(0).unwrap_or(0) as usize
         } else {
             0
