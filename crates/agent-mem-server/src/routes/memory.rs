@@ -154,6 +154,27 @@ impl MemoryManager {
         full_metadata.insert("data".to_string(), content.clone());
         full_metadata.insert("hash".to_string(), content_hash.clone());
 
+        // 🆕 Phase 2 Server: 提取scope_type（如果没有则自动推断）
+        let scope_type = full_metadata
+            .get("scope_type")
+            .cloned()
+            .unwrap_or_else(|| {
+                // 自动推断scope类型
+                if full_metadata.contains_key("run_id") {
+                    "run".to_string()
+                } else if full_metadata.contains_key("session_id") {
+                    "session".to_string()
+                } else if full_metadata.contains_key("org_id") {
+                    "organization".to_string()
+                } else if user_id_val != "default" && agent_id != "default" {
+                    "agent".to_string()
+                } else if user_id_val != "default" {
+                    "user".to_string()
+                } else {
+                    "global".to_string()
+                }
+            });
+
         let metadata_json: serde_json::Value = full_metadata
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -180,7 +201,7 @@ impl MemoryManager {
                 "{:?}",
                 memory_type.unwrap_or(agent_mem_traits::MemoryType::Semantic)
             ),
-            scope: "agent".to_string(),
+            scope: scope_type,  // 🆕 Phase 2 Server: 使用推断或提取的scope_type
             level: "normal".to_string(),
             importance: importance.unwrap_or(0.5),
             access_count: 0,
@@ -221,8 +242,9 @@ impl MemoryManager {
             .connect()
             .map_err(|e| format!("Failed to connect: {}", e))?;
 
+        // 🆕 Phase 2 Server: 查询中包含scope字段
         let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
-                     created_at, last_accessed, access_count, metadata, hash \
+                     created_at, last_accessed, access_count, metadata, hash, scope \
                      FROM memories WHERE id = ? AND is_deleted = 0 LIMIT 1";
 
         let mut stmt = conn
@@ -265,6 +287,7 @@ impl MemoryManager {
                 "access_count": row.get::<Option<i64>>(8).ok().flatten(),
                 "metadata": row.get::<Option<String>>(9).ok().flatten(),
                 "hash": row.get::<Option<String>>(10).ok().flatten(),
+                "scope": row.get::<Option<String>>(11).ok().flatten(),  // 🆕 Phase 2 Server: 返回scope字段
             });
             Ok(Some(json))
         } else {

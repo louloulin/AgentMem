@@ -107,7 +107,7 @@ echo "💔 测试4: 优雅降级（模拟后端停止）"
 echo "----------------------------------"
 
 print_info "临时修改API URL为不存在的端口..."
-export AGENTMEM_API_URL="http://127.0.0.1:9999"
+export AGENTMEM_API_URL="http://127.0.0.1:8080"
 
 # 测试搜索功能（应该返回友好错误）
 DEGRADED_RESPONSE=$(echo '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"agentmem_search_memories","arguments":{"query":"test","user_id":"test_user","limit":1}}}' | \
