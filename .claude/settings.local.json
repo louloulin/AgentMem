@@ -12,7 +12,9 @@
       "mcp__agentmem__agentmem_search_memories",
       "mcp__serena__activate_project",
       "mcp__agentmem__agentmem_add_memory",
-      "mcp__agentmem__agentmem_list_agents"
+      "mcp__agentmem__agentmem_list_agents",
+      "Bash(find:*)",
+      "mcp__agentmem__agentmem_chat"
     ],
     "deny": [],
     "ask": []
