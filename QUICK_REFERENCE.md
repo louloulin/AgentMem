@@ -1,115 +1,101 @@
-# 🚀 AgentMem 优化项目 - 快速参考
+# AgentMem + Claude Code 快速参考
 
-## 📊 完成度速览
+## 🚀 启动
 
-```
-🎉🎉🎉 100% 完成！ 🎉🎉🎉
+```bash
+# 1. 确保Backend运行
+curl http://127.0.0.1:8080/health
 
-P0 (稳定性)   ████████ 7/7   (100%) ✅
-P1 (性能)     ████████ 13/13 (100%) ✅
-P2 (功能完善) ████████ 9/9   (100%) ✅
-────────────────────────────────────
-总计          ████████ 29/29 (100%) ✅
+# 2. 启动Claude Code
+claude
 ```
 
----
+## ⚡ 常用命令
 
-## ⚡ 性能提升
-
-| 指标 | 提升 |
+| 命令 | 说明 |
 |------|------|
-| 添加延迟 | **5.6x** ⚡ (4100ms → 730ms) |
-| 搜索延迟 | **2.7x** ⚡ (680ms → 250ms) |
-| LLM调用 | **-80%** 💰 |
-| 数据库查询 | **-90%** 💰 |
-| CPU使用 | **-33%** 💰 |
+| `/mcp` | 查看MCP服务器连接状态 |
+| `/help` | 查看帮助 |
+| `/clear` | 清除当前对话 |
+
+## 📝 快速测试（复制使用）
+
+### 1️⃣ 验证连接
+```
+/mcp
+```
+
+### 2️⃣ User Scope - 个人记忆
+```
+帮我添加记忆：我喜欢喝咖啡看书。
+user_id是"alice"，scope_type是"user"
+```
+
+### 3️⃣ Agent Scope - 工作助手
+```
+帮我添加记忆：明天下午2点开会。
+user_id是"alice"，agent_id是"work_agent"，scope_type是"agent"
+```
+
+### 4️⃣ Run Scope - 临时笔记
+```
+帮我添加临时笔记：实验效果不错。
+user_id是"alice"，run_id是"exp-001"，scope_type是"run"
+```
+
+### 5️⃣ 搜索记忆
+```
+帮我搜索alice的记忆，关键词"咖啡"
+```
+
+### 6️⃣ 列出Agents
+```
+帮我列出所有agents
+```
+
+## 🎯 Scope类型速查
+
+| Scope | 用途 | 必需参数 |
+|-------|------|----------|
+| `user` | 个人知识库 | `user_id` |
+| `agent` | 多Agent系统 | `user_id`, `agent_id` |
+| `run` | 临时会话 | `user_id`, `run_id` |
+| `session` | 对话隔离 | `user_id`, `session_id` |
+| `organization` | 企业多租户 | `org_id` |
+
+## 📊 可用工具
+
+| 工具名称 | 功能 |
+|----------|------|
+| `agentmem_add_memory` | 添加记忆 |
+| `agentmem_search_memories` | 搜索记忆 |
+| `agentmem_chat` | 对话 |
+| `agentmem_list_agents` | 列出Agents |
+| `agentmem_get_system_prompt` | 获取系统提示 |
+
+## 🔧 故障排除
+
+### Backend未运行
+```bash
+cd /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen
+./start_server_no_auth.sh
+```
+
+### MCP未连接
+```bash
+# 检查配置
+cat ~/.claude.json | jq '.mcpServers.agentmem'
+
+# 重启Claude Code
+```
+
+## 📚 完整文档
+
+- **使用指南**: `CLAUDE_CODE_USAGE_GUIDE.md`
+- **测试提示词**: `claude_code_test_prompts.md`
+- **技术方案**: `agentmem60.md`
+- **实施报告**: `SCOPE_IMPLEMENTATION_COMPLETE.md`
 
 ---
 
-## 🛡️ 质量提升
-
-| 指标 | 提升 |
-|------|------|
-| 数据一致性 | 60% → 99.9% (+66%) |
-| 系统稳定性 | 80% → 99.9% (+25%) |
-| 搜索准确性 | 75% → 90% (+20%) |
-| 可调试性 | 60% → 90% (+50%) |
-
----
-
-## 🎯 核心优化
-
-### P0 (稳定性)
-- ✅ 超时控制 (全覆盖)
-- ✅ 事务支持 (ACID保证)
-- ✅ Prompt限制 (防溢出)
-- ✅ 降级机制 (容错)
-
-### P1 (性能)
-- ✅ LRU缓存 (60-80%命中)
-- ✅ 批量处理 (LLM -90%)
-- ✅ 并行优化 (效率 +50%)
-- ✅ 搜索优化 (延迟 -5x)
-
-### P2 (功能)
-- ✅ 决策一致性验证
-- ✅ 审计日志
-- ✅ 查询NLP增强 ✨
-- ✅ 动态阈值 ✨
-- ✅ RRF分数保留
-
----
-
-## 📚 关键文档
-
-1. **agentmem34.md** - 完整分析 (2000行)
-2. **ALL_OPTIMIZATIONS_COMPLETE.md** - 完成报告
-3. **P2_OPTIMIZATION_SUMMARY.md** - P2详解
-4. **OPTIMIZATION_COMPLETE_REPORT.md** - 实施报告
-
----
-
-## 🧪 测试
-
-- **测试文件**: 4个
-- **测试用例**: 40+
-- **覆盖率**: 100% ✅
-
----
-
-## 💻 代码变更
-
-- **新增**: 6个文件
-- **修改**: 10个文件
-- **代码量**: 2500+行
-
----
-
-## 🚀 部署建议
-
-**状态**: ✅✅✅ **生产就绪**
-
-**立即行动**:
-1. 准备生产配置
-2. 开始灰度发布
-3. 监控关键指标
-4. 验证优化效果
-
----
-
-## 🎊 最终结论
-
-### AgentMem v3.0
-
-**完成度**: 100% (29/29) ✅✅✅  
-**性能**: 5-6x提升 ⚡  
-**稳定性**: 99.9% 🛡️  
-**评级**: ⭐⭐⭐⭐⭐
-
-**系统状态**: **世界顶级水准！**
-
----
-
-**更新日期**: 2025-10-22  
-**项目状态**: 🎉 **完美完成**
-
+**开始使用**: 运行 `claude`，然后输入 `/mcp` 验证连接！ 🎉
