@@ -753,6 +753,74 @@ pub async fn delete_memory(
 }
 
 /// 搜索记忆
+// ========== 混合检索辅助函数 ==========
+
+/// 检测是否是精确查询（商品ID、SKU等）
+fn detect_exact_query(query: &str) -> bool {
+    // 商品ID格式：P + 6位数字
+    if let Ok(pattern) = regex::Regex::new(r"^P\d{6}$") {
+        if pattern.is_match(query) {
+            return true;
+        }
+    }
+    
+    // 其他精确ID格式（全字母数字，无空格，长度< 20）
+    query.len() < 20 
+        && !query.contains(' ') 
+        && query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+}
+
+/// 通过LibSQL精确查询（商品ID等）
+async fn search_by_libsql_exact(
+    repositories: &Arc<agent_mem_core::storage::factory::Repositories>,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<agent_mem_core::traits::MemoryItem>, String> {
+    use agent_mem_core::storage::RepositoryExt;
+    use tracing::{error, info};
+    
+    // 构建查询条件
+    let filters = vec![
+        format!("JSON_EXTRACT(metadata, '$.product_id') = '{}'", query),
+        format!("content LIKE '%{}%'", query),
+    ];
+    
+    let where_clause = filters.join(" OR ");
+    
+    // 执行查询
+    match repositories.memories
+        .find_by_custom_filter(&where_clause, Some(limit as i64))
+        .await
+    {
+        Ok(memories) => {
+            info!("📝 LibSQL查询成功: 找到 {} 条记忆", memories.len());
+            Ok(memories)
+        }
+        Err(e) => {
+            error!("❌ LibSQL查询失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 转换CoreMemoryItem为JSON
+fn convert_memory_to_json(item: agent_mem_core::traits::MemoryItem) -> serde_json::Value {
+    serde_json::json!({
+        "id": item.id,
+        "agent_id": item.agent_id,
+        "user_id": item.user_id,
+        "content": item.content,
+        "memory_type": item.memory_type,
+        "importance": item.importance,
+        "created_at": item.created_at,
+        "last_accessed_at": item.last_accessed_at,
+        "access_count": item.access_count,
+        "metadata": item.metadata,
+        "score": item.score,
+        "hash": item.hash,
+    })
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/memories/search",
@@ -766,10 +834,44 @@ pub async fn delete_memory(
 )]
 pub async fn search_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Json(request): Json<crate::models::SearchRequest>,
 ) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
-    info!("Searching memories with query: {}", request.query);
-
+    info!("🔍 搜索记忆: query={}", request.query);
+    
+    // 🎯 Phase 1: LibSQL精确查询（商品ID等）
+    let is_exact_query = detect_exact_query(&request.query);
+    
+    if is_exact_query {
+        info!("🎯 检测到精确查询，使用LibSQL: {}", request.query);
+        
+        // 尝试LibSQL精确匹配
+        match search_by_libsql_exact(&repositories, &request.query, request.limit).await {
+            Ok(exact_results) if !exact_results.is_empty() => {
+                info!("✅ LibSQL精确匹配找到 {} 条结果", exact_results.len());
+                
+                let json_results: Vec<serde_json::Value> = exact_results
+                    .into_iter()
+                    .map(convert_memory_to_json)
+                    .collect();
+                
+                return Ok(Json(crate::models::ApiResponse {
+                    success: true,
+                    data: json_results,
+                    error: None,
+                }));
+            }
+            Ok(_) => {
+                info!("⚠️  LibSQL未找到结果，降级到向量搜索");
+            }
+            Err(e) => {
+                warn!("⚠️  LibSQL查询失败: {}, 降级到向量搜索", e);
+            }
+        }
+    }
+    
+    // 🔍 Phase 2: 向量语义搜索（降级或默认）
+    info!("🔍 使用向量语义搜索: {}", request.query);
     let results = memory_manager
         .search_memories(
             request.query,

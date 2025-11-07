@@ -10,17 +10,20 @@
 //! - 搜索性能优化
 
 pub mod adaptive;
+pub mod adaptive_threshold;
 pub mod bm25;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
 #[cfg(feature = "postgres")]
 pub mod enhanced_hybrid;
+pub mod enhanced_hybrid_v2;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
 pub mod fuzzy;
 #[cfg(feature = "postgres")]
 pub mod hybrid;
 pub mod learning;
+pub mod query_classifier;
 pub mod query_optimizer;
 pub mod ranker;
 pub mod vector_search;
@@ -28,7 +31,20 @@ pub mod vector_search;
 pub use adaptive::{
     AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor,
 };
+pub use adaptive_threshold::{AdaptiveThresholdCalculator, AdaptiveThresholdConfig, ThresholdCalculation};
 pub use bm25::{BM25Params, BM25SearchEngine};
+pub use enhanced_hybrid_v2::{
+    EnhancedHybridSearchEngine as EnhancedHybridSearchEngineV2,
+    EnhancedHybridConfig,
+    EnhancedSearchResult,
+    EnhancedSearchStats,
+};
+pub use query_classifier::{
+    QueryClassifier,
+    QueryType,
+    SearchStrategy as QuerySearchStrategy,
+    QueryFeatures as QueryClassifierFeatures,
+};
 #[cfg(feature = "redis-cache")]
 pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
 #[cfg(feature = "postgres")]
