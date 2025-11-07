@@ -469,8 +469,15 @@ impl VectorStore for LanceDBStore {
         
         debug!("🔍 查询提示: {:?}, 过滤器: {:?}", query_hint, filters.keys().collect::<Vec<_>>());
         
-        // 🔧 动态调整检索数量：短查询需要更多候选
-        let fetch_multiplier = if filters.is_empty() { 50 } else { 10 };
+        // 🔧 动态调整检索数量：商品ID查询需要大量候选
+        let is_product_query = query_hint.as_ref().map_or(false, |h| h.starts_with("p") && h.len() < 10);
+        let fetch_multiplier = if is_product_query {
+            200  // 商品ID查询：取大量候选，因为向量相似度不可靠
+        } else if filters.is_empty() {
+            50
+        } else {
+            10
+        };
         
         // 2. 执行向量搜索（LanceDB会自动使用索引）
         let batches = table
@@ -605,7 +612,24 @@ impl VectorStore for LanceDBStore {
                 // 🎯 混合检索策略：文本匹配boost
                 // 检查metadata中是否包含查询关键词（用于商品ID等精确查询）
                 let has_text_match = if let Some(ref hint) = query_hint {
-                    metadata.values().any(|v| v.to_lowercase().contains(hint))
+                    let matches: Vec<_> = metadata.iter()
+                        .filter(|(k, v)| v.to_lowercase().contains(hint))
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    
+                    if !matches.is_empty() {
+                        debug!("🔍 Text match for id={}: hint='{}', matches={:?}", 
+                            id, hint, matches);
+                        true
+                    } else {
+                        // 临时：打印所有metadata看为什么没匹配
+                        if results.len() < 5 {  // 只打印前5个
+                            debug!("❌ No match for id={}: hint='{}', metadata_keys={:?}, first_value={:?}", 
+                                id, hint, metadata.keys().collect::<Vec<_>>(), 
+                                metadata.values().next());
+                        }
+                        false
+                    }
                 } else {
                     false
                 };

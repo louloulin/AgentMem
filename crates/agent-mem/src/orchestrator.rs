@@ -2993,26 +2993,35 @@ impl MemoryOrchestrator {
         let query_len = query.len();
         let word_count = query.split_whitespace().count();
 
-        // 规则1: 短查询（<10字符）提高阈值（更严格）
-        let len_adjustment = if query_len < 10 {
-            0.05 // 短查询提高阈值到0.75，避免误匹配
+        // 🔧 修复：检测精确查询模式（商品ID、SKU等）
+        let is_exact_query = query.chars().all(|c| c.is_alphanumeric()) 
+            && query_len < 20 
+            && word_count <= 1;
+
+        // 规则1: 精确查询（如P000001）大幅降低阈值
+        let len_adjustment = if is_exact_query {
+            -0.4 // 精确查询降到0.3，因为向量相似度本来就低
+        } else if query_len < 10 {
+            -0.2 // 短查询也降低阈值（修复错误逻辑）
         } else if query_len > 100 {
             -0.05 // 长查询降低阈值到0.65，提高召回率
         } else {
             0.0
         };
 
-        // 规则2: 单词数少提高阈值
-        let word_adjustment = if word_count == 1 {
-            0.05 // 单词查询更严格
+        // 规则2: 单词数少降低阈值（修复错误逻辑）
+        let word_adjustment = if is_exact_query {
+            0.0  // 精确查询已经在规则1处理
+        } else if word_count == 1 {
+            -0.1 // 单词查询降低阈值（修复错误）
         } else if word_count > 10 {
             -0.05 // 多词查询更宽松
         } else {
             0.0
         };
 
-        // 规则3: 包含特殊字符/数字，提高精确度要求
-        let has_special = query
+        // 规则3: 精确查询不需要特殊字符检查
+        let has_special = !is_exact_query && query
             .chars()
             .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
         let special_adjustment = if has_special { 0.05 } else { 0.0 };
@@ -3020,8 +3029,8 @@ impl MemoryOrchestrator {
         // 计算最终阈值
         let dynamic_threshold = base + len_adjustment + word_adjustment + special_adjustment;
 
-        // 限制在合理范围内 [0.5, 0.9]
-        let final_threshold = dynamic_threshold.max(0.5).min(0.9);
+        // 限制在合理范围内 [0.2, 0.9]（修复下限）
+        let final_threshold = dynamic_threshold.max(0.2).min(0.9);
 
         if final_threshold != base {
             debug!(
