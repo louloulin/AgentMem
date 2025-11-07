@@ -279,6 +279,46 @@ impl MemoryIntegrator {
             }
         }
 
+        // ========== Priority 4: Global Memory (Global Scope) ==========
+        // 理论依据: 全局知识库，包含通用知识、产品信息等
+        // 修复: 支持global scope的商品记忆等全局知识
+        if all_memories.len() < max_count {
+            let global_scope = MemoryScope::Global;
+
+            let remaining = max_count.saturating_sub(all_memories.len());
+            info!(
+                "🌍 Priority 4: Querying Global Memory (Global scope) - 需要 {} 更多",
+                remaining
+            );
+
+            match self
+                .memory_engine
+                .search_memories(query, Some(global_scope), Some(remaining * 2))
+                .await
+            {
+                Ok(memories) => {
+                    let mut added = 0;
+                    for mut memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            // 🎯 Global Memory 权重 (可配置，降低因为范围最广)
+                            if let Some(score) = memory.score {
+                                memory.score = Some(score * self.config.semantic_weight);
+                            }
+                            all_memories.push(memory);
+                            added += 1;
+                            if all_memories.len() >= max_count {
+                                break;
+                            }
+                        }
+                    }
+                    info!("🌍 Global Memory added {} memories", added);
+                }
+                Err(e) => {
+                    warn!("⚠️  Global Memory query failed: {}", e);
+                }
+            }
+        }
+
         // 最终结果统计（认知架构分类）
         let final_count = all_memories.len();
         let episodic_count = all_memories
