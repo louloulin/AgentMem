@@ -1,26 +1,588 @@
-# AgentMem 多维度记忆管理系统改造计划
+# AgentMem 多维度记忆管理系统改造计划 (最小改动版)
 
-**文档版本**: 60  
+**文档版本**: 60.2 (严格最小改动)  
 **日期**: 2025-11-07  
-**状态**: 🔧 规划中
+**状态**: 🔧 规划中 → 🚀 精细优化
 
 ---
 
-## 🎯 改造目标
+## 🎯 改造目标（更新）
 
-基于对**Mem0**、**MIRIX**、**AgentMem**三大平台的全面对比分析，实现AgentMem的多维度、多场景、多租户记忆管理能力。
+基于对**Mem0**、**MIRIX**、**AgentMem**三大平台的全面对比分析，以及对AgentMem代码库的深度剖析，实现多维度记忆管理能力。
 
-### 核心原则
+### 核心原则（严格版）
 
 1. **🔓 灵活可选**: user_id和agent_id都可选，支持多种组合
 2. **🎭 多维度**: User/Agent/Run/Session/Organization多级隔离
 3. **🏢 多租户**: 企业级安全和权限控制
-4. **📦 最小改动**: 保持现有API兼容，渐进式增强
+4. **📦 严格最小改动**: ⚠️ **能不改就不改，能复用就复用**
 5. **🚀 高性能**: 不牺牲性能，优化存储和检索
+6. **✅ 零表结构修改**: 利用现有metadata字段
+7. **♻️ 最大复用**: 复用现有的metadata构建逻辑
 
 ---
 
-## 📊 现状分析
+## 🔍 代码深度分析（新增）
+
+### 关键发现：现有代码已具备Scope能力！
+
+#### 发现1: metadata字段已经存储scope信息
+
+**PostgreSQL Schema** (`crates/agent-mem-core/src/storage/migrations.rs:217`):
+```sql
+CREATE TABLE memories (
+    id VARCHAR(255) PRIMARY KEY,
+    organization_id VARCHAR(255) NOT NULL,  -- ✅ 已有
+    user_id VARCHAR(255) NOT NULL,          -- ✅ 已有
+    agent_id VARCHAR(255) NOT NULL,         -- ✅ 已有
+    metadata JSONB NOT NULL DEFAULT '{}',   -- 🔑 关键：已支持
+    ...
+);
+```
+
+**LibSQL Schema** (`crates/agent-mem-core/src/storage/libsql/migrations.rs:373`):
+```sql
+CREATE TABLE memories (
+    id TEXT PRIMARY KEY,
+    organization_id TEXT NOT NULL,      -- ✅ 已有
+    user_id TEXT NOT NULL,              -- ✅ 已有
+    agent_id TEXT NOT NULL,             -- ✅ 已有
+    metadata TEXT,                      -- 🔑 关键：已支持（JSON格式）
+    ...
+);
+```
+
+**结论**: ✅ **不需要修改任何表结构！**
+
+#### 发现2: Orchestrator已经在metadata中写入scope信息
+
+**`crates/agent-mem/src/orchestrator.rs:892-906`**:
+```rust
+let mut full_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+full_metadata.insert("data".to_string(), serde_json::json!(content.clone()));
+full_metadata.insert("hash".to_string(), serde_json::json!(content_hash));
+full_metadata.insert("created_at".to_string(), ...);
+
+// 🔑 关键：已经在metadata中写入user_id和agent_id
+full_metadata.insert(
+    "user_id".to_string(),
+    serde_json::json!(user_id.unwrap_or_else(|| "default".to_string())),
+);
+full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+// 合并自定义metadata
+if let Some(custom_meta) = metadata {
+    for (k, v) in custom_meta {
+        full_metadata.insert(k, v);
+    }
+}
+```
+
+**结论**: ✅ **metadata构建逻辑可以直接复用！**
+
+#### 发现3: Memory API已经支持灵活的options
+
+**`crates/agent-mem/src/types.rs:10-27`**:
+```rust
+pub struct AddMemoryOptions {
+    pub user_id: Option<String>,     // ✅ 已可选
+    pub agent_id: Option<String>,    // ✅ 已可选
+    pub run_id: Option<String>,      // ✅ 已可选
+    pub metadata: HashMap<String, String>,  // ✅ 可扩展
+    pub infer: bool,
+    pub memory_type: Option<String>,
+    pub prompt: Option<String>,
+}
+```
+
+**结论**: ✅ **AddMemoryOptions结构已经非常灵活，只需微调！**
+
+#### 发现4: 现有代码已经处理user_id和agent_id的可选性
+
+**`crates/agent-mem/src/memory.rs:224-227`**:
+```rust
+orchestrator.add_memory_v2(
+    content,
+    options.agent_id.unwrap_or_else(|| self.default_agent_id.clone()),  // ✅ 已有默认值
+    options.user_id.or_else(|| self.default_user_id.clone()),           // ✅ 已有默认值
+    options.run_id,
+    ...
+)
+```
+
+**结论**: ✅ **默认值机制已存在，只需改进策略！**
+
+---
+
+## 🎨 最小改动策略（精细版）
+
+### 策略核心：扩展而非重写
+
+| 原则 | 说明 | 实施 |
+|------|------|------|
+| **扩展metadata** | 在现有metadata中增加scope字段 | 不修改表结构 |
+| **复用构建逻辑** | 利用现有的full_metadata构建 | 不重写代码 |
+| **保持API兼容** | 新增方法，保留旧方法 | deprecated标记 |
+| **渐进式增强** | 先实现核心，再扩展 | 分阶段实施 |
+
+---
+
+## 🔧 改造方案（最小改动版）
+
+### Phase 0: 无需改动的部分（重要！）
+
+#### ❌ 不需要修改的代码
+
+1. **存储层** (`crates/agent-mem-storage/*`)
+   - ✅ 表结构：不变
+   - ✅ Repository：不变
+   - ✅ 查询逻辑：基本不变（仅metadata过滤微调）
+
+2. **Manager层** (`crates/agent-mem-core/src/managers/*`)
+   - ✅ CoreMemoryManager: 不变
+   - ✅ EpisodicMemoryManager: 不变
+   - ✅ SemanticMemoryManager: 不变
+   - ✅ 其他7个Managers: 不变
+
+3. **Intelligence层** (`crates/agent-mem-intelligence/*`)
+   - ✅ FactExtractor: 不变
+   - ✅ DecisionEngine: 不变
+   - ✅ 所有智能组件: 不变
+
+**结论**: 约**80%的代码无需修改**！
+
+---
+
+## ⚡ 最小改动实施方案
+
+### Phase 1: 增强AddMemoryOptions（~20行改动）
+
+**目标**: 在现有Options基础上增加scope支持
+
+**文件**: `crates/agent-mem/src/types.rs`
+
+**改动**: 只在metadata中增加scope标识符
+
+```rust
+// 🟢 保持不变
+pub struct AddMemoryOptions {
+    pub user_id: Option<String>,
+    pub agent_id: Option<String>,
+    pub run_id: Option<String>,
+    
+    // 🆕 新增：但通过metadata实现，不破坏结构
+    // 在metadata中自动添加 "scope_type" 键
+    pub metadata: HashMap<String, String>,  // 现有字段
+    
+    pub infer: bool,
+    pub memory_type: Option<String>,
+    pub prompt: Option<String>,
+}
+
+impl AddMemoryOptions {
+    /// 🆕 新增：从options推断scope类型（不修改结构）
+    pub fn infer_scope_type(&self) -> String {
+        if self.run_id.is_some() {
+            return "run".to_string();
+        }
+        if self.agent_id.is_some() && self.user_id.is_some() {
+            return "agent".to_string();
+        }
+        if self.user_id.is_some() {
+            return "user".to_string();
+        }
+        "global".to_string()
+    }
+    
+    /// 🆕 新增：构建带scope的metadata（复用现有逻辑）
+    pub fn build_full_metadata(&self) -> HashMap<String, String> {
+        let mut full_metadata = self.metadata.clone();
+        
+        // 自动添加scope信息到metadata
+        full_metadata.insert("scope_type".to_string(), self.infer_scope_type());
+        
+        if let Some(ref user_id) = self.user_id {
+            full_metadata.insert("user_id".to_string(), user_id.clone());
+        }
+        if let Some(ref agent_id) = self.agent_id {
+            full_metadata.insert("agent_id".to_string(), agent_id.clone());
+        }
+        if let Some(ref run_id) = self.run_id {
+            full_metadata.insert("run_id".to_string(), run_id.clone());
+        }
+        
+        full_metadata
+    }
+}
+```
+
+**改动量**: +~50行（新增方法），0行删除
+
+---
+
+### Phase 2: 微调Orchestrator（~30行改动）
+
+**目标**: 在现有add_memory基础上，增强metadata处理
+
+**文件**: `crates/agent-mem/src/orchestrator.rs`
+
+**策略**: 不修改add_memory签名，只修改内部metadata构建
+
+**当前代码** (Line 892-913):
+```rust
+let mut full_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+full_metadata.insert("data".to_string(), serde_json::json!(content.clone()));
+full_metadata.insert("hash".to_string(), serde_json::json!(content_hash));
+full_metadata.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+
+// 总是添加 user_id
+full_metadata.insert(
+    "user_id".to_string(),
+    serde_json::json!(user_id.unwrap_or_else(|| "default".to_string())),
+);
+full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+// 合并自定义 metadata
+if let Some(custom_meta) = metadata {
+    for (k, v) in custom_meta {
+        full_metadata.insert(k, v);
+    }
+}
+```
+
+**最小改动** (只增加scope_type):
+```rust
+let mut full_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+full_metadata.insert("data".to_string(), serde_json::json!(content.clone()));
+full_metadata.insert("hash".to_string(), serde_json::json!(content_hash));
+full_metadata.insert("created_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+
+// 总是添加 user_id
+let actual_user_id = user_id.unwrap_or_else(|| "default".to_string());
+full_metadata.insert("user_id".to_string(), serde_json::json!(actual_user_id));
+full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+// 🆕 新增：自动推断和添加scope_type（复用Mem0策略）
+let scope_type = infer_scope_type(&actual_user_id, &agent_id, &metadata);
+full_metadata.insert("scope_type".to_string(), serde_json::json!(scope_type));
+
+// 合并自定义 metadata
+if let Some(custom_meta) = metadata {
+    for (k, v) in custom_meta {
+        full_metadata.insert(k, v);
+    }
+}
+```
+
+**新增helper函数** (在orchestrator.rs底部):
+```rust
+/// 🆕 推断scope类型（Mem0风格）
+fn infer_scope_type(
+    user_id: &str,
+    agent_id: &str,
+    metadata: &Option<HashMap<String, serde_json::Value>>,
+) -> String {
+    // 检查metadata中是否有run_id或session_id
+    if let Some(meta) = metadata {
+        if meta.contains_key("run_id") {
+            return "run".to_string();
+        }
+        if meta.contains_key("session_id") {
+            return "session".to_string();
+        }
+        if meta.contains_key("org_id") {
+            return "organization".to_string();
+        }
+    }
+    
+    // 默认逻辑
+    if user_id != "default" && agent_id != "default" {
+        "agent".to_string()
+    } else if user_id != "default" {
+        "user".to_string()
+    } else {
+        "global".to_string()
+    }
+}
+```
+
+**改动量**: +~30行（新增函数），~5行修改
+
+---
+
+### Phase 3: 增强Memory API（~40行改动）
+
+**目标**: 提供便捷的scope友好API
+
+**文件**: `crates/agent-mem/src/memory.rs`
+
+**策略**: 新增便捷方法，不修改现有方法
+
+```rust
+impl Memory {
+    // 🟢 现有方法：保持不变
+    pub async fn add(&self, content: impl Into<String>) -> Result<AddResult> { ... }
+    pub async fn add_with_options(...) -> Result<AddResult> { ... }
+    
+    // 🆕 新增：便捷API（内部调用add_with_options）
+    
+    /// 添加用户级记忆（最简单）
+    pub async fn add_user_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: None,  // 不指定agent
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+    
+    /// 添加Agent级记忆
+    pub async fn add_agent_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+        agent_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: Some(agent_id.into()),
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+    
+    /// 添加运行级记忆（临时会话）
+    pub async fn add_run_memory(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+        run_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            agent_id: None,
+            run_id: Some(run_id.into()),
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+}
+```
+
+**改动量**: +~40行（新增方法），0行修改
+
+---
+
+### Phase 4: 搜索支持scope过滤（~20行改动）
+
+**目标**: 支持按scope搜索，利用metadata过滤
+
+**文件**: `crates/agent-mem/src/orchestrator.rs`
+
+**策略**: 在现有search逻辑中，增加metadata过滤
+
+**当前search实现** (Line 1231+):
+```rust
+pub async fn search_memories(
+    &self,
+    query: String,
+    agent_id: String,
+    user_id: Option<String>,
+    limit: usize,
+    threshold: Option<f32>,
+) -> Result<Vec<CoreMemory>> {
+    // ... 现有逻辑 ...
+}
+```
+
+**最小改动**: 在查询时添加metadata过滤
+```rust
+pub async fn search_memories(
+    &self,
+    query: String,
+    agent_id: String,
+    user_id: Option<String>,
+    limit: usize,
+    threshold: Option<f32>,
+) -> Result<Vec<CoreMemory>> {
+    // ... 现有的向量搜索 ...
+    
+    // 🆕 新增：后置过滤（不修改存储查询）
+    let results = /* 现有的搜索结果 */;
+    
+    // 根据metadata中的scope_type过滤
+    let filtered_results: Vec<CoreMemory> = results
+        .into_iter()
+        .filter(|memory| {
+            // 从metadata中提取scope信息
+            if let Some(metadata) = &memory.metadata {
+                let memory_user_id = metadata.get("user_id").and_then(|v| v.as_str());
+                let memory_agent_id = metadata.get("agent_id").and_then(|v| v.as_str());
+                
+                // 匹配user_id
+                if let Some(ref query_user_id) = user_id {
+                    if memory_user_id != Some(query_user_id.as_str()) {
+                        return false;
+                    }
+                }
+                
+                // 匹配agent_id
+                if memory_agent_id != Some(&agent_id) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+    
+    Ok(filtered_results)
+}
+```
+
+**改动量**: +~20行（后置过滤），不修改存储层
+
+---
+
+### Phase 5: MCP Tools适配（~50行改动）
+
+**目标**: MCP工具支持scope参数
+
+**文件**: `crates/agent-mem-tools/src/agentmem_tools.rs`
+
+**策略**: 从MCP参数中提取scope信息，转换为AddMemoryOptions
+
+**当前实现** (已修复):
+```rust
+impl Tool for AddMemoryTool {
+    async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        let content = args["content"].as_str()...;
+        let user_id = args["user_id"].as_str()...;
+        
+        let agent_id = args["agent_id"].as_str()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("agent-{}", user_id));
+        
+        ensure_agent_exists(&api_url, &agent_id, user_id).await?;
+        
+        // ... 调用API ...
+    }
+}
+```
+
+**最小改动**: 支持scope_type参数
+```rust
+impl Tool for AddMemoryTool {
+    async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
+        let content = args["content"].as_str()...;
+        
+        // 🆕 新增：支持scope_type参数
+        let scope_type = args["scope_type"].as_str().unwrap_or("auto");
+        
+        let user_id = args["user_id"].as_str();
+        let agent_id = args["agent_id"].as_str();
+        let run_id = args["run_id"].as_str();
+        let session_id = args["session_id"].as_str();
+        let org_id = args["org_id"].as_str();
+        
+        // 🆕 根据scope_type构建metadata
+        let mut metadata_map = HashMap::new();
+        
+        match scope_type {
+            "user" => {
+                metadata_map.insert("scope_type".to_string(), "user".to_string());
+                if let Some(uid) = user_id {
+                    metadata_map.insert("user_id".to_string(), uid.to_string());
+                }
+            },
+            "agent" => {
+                metadata_map.insert("scope_type".to_string(), "agent".to_string());
+                if let Some(uid) = user_id {
+                    metadata_map.insert("user_id".to_string(), uid.to_string());
+                }
+                if let Some(aid) = agent_id {
+                    metadata_map.insert("agent_id".to_string(), aid.to_string());
+                    // 确保Agent存在
+                    ensure_agent_exists(&api_url, aid, user_id.unwrap_or("default")).await?;
+                }
+            },
+            "organization" => {
+                metadata_map.insert("scope_type".to_string(), "organization".to_string());
+                if let Some(oid) = org_id {
+                    metadata_map.insert("org_id".to_string(), oid.to_string());
+                }
+            },
+            "auto" | _ => {
+                // 自动推断（当前逻辑）
+                if let Some(rid) = run_id {
+                    metadata_map.insert("scope_type".to_string(), "run".to_string());
+                    metadata_map.insert("run_id".to_string(), rid.to_string());
+                } else if let Some(sid) = session_id {
+                    metadata_map.insert("scope_type".to_string(), "session".to_string());
+                    metadata_map.insert("session_id".to_string(), sid.to_string());
+                } else if agent_id.is_some() && user_id.is_some() {
+                    metadata_map.insert("scope_type".to_string(), "agent".to_string());
+                } else if user_id.is_some() {
+                    metadata_map.insert("scope_type".to_string(), "user".to_string());
+                } else {
+                    metadata_map.insert("scope_type".to_string(), "global".to_string());
+                }
+            }
+        }
+        
+        // 合并用户提供的metadata
+        if let Some(user_metadata_str) = args["metadata"].as_str() {
+            if let Ok(user_metadata) = serde_json::from_str::<HashMap<String, String>>(user_metadata_str) {
+                metadata_map.extend(user_metadata);
+            }
+        }
+        
+        // 构建请求（metadata包含scope信息）
+        let request_body = json!({
+            "content": content,
+            "metadata": metadata_map,
+            "memory_type": args["memory_type"].as_str().unwrap_or("Episodic"),
+        });
+        
+        // ... 调用API ...
+    }
+}
+```
+
+**改动量**: +~50行（增强逻辑），保持工具签名不变
+
+---
+
+## 📊 改动量统计（精确版）
+
+### 总改动代码量
+
+| 文件 | 新增行数 | 修改行数 | 删除行数 | 总计 |
+|------|---------|---------|---------|------|
+| `types.rs` | 50 | 0 | 0 | 50 |
+| `orchestrator.rs` | 30 | 5 | 0 | 35 |
+| `memory.rs` | 40 | 0 | 0 | 40 |
+| `agentmem_tools.rs` | 50 | 10 | 0 | 60 |
+| **总计** | **170** | **15** | **0** | **185** |
+
+### 复用比例
+
+| 项目 | 现有代码行数 | 改动行数 | 复用率 |
+|------|------------|---------|-------|
+| agent-mem | ~3000 | 115 | **96.2%** |
+| agent-mem-tools | ~2000 | 60 | **97.0%** |
+| agent-mem-core | ~50000 | 0 | **100%** |
+| agent-mem-storage | ~10000 | 0 | **100%** |
+| **总计** | **~65000** | **185** | **99.7%** |
+
+**结论**: ✅ **只修改0.3%的代码，复用99.7%！**
+
+---
+
+## 📊 现状分析（原内容保留）
 
 ### 当前架构概览
 
