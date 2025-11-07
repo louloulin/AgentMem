@@ -5,8 +5,8 @@
 use crate::error::{ObservabilityError, ObservabilityResult};
 use prometheus::{CounterVec, Gauge, HistogramOpts, HistogramVec, Opts, Registry};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 /// Metrics registry
 pub struct MetricsRegistry {
@@ -239,7 +239,9 @@ impl MetricsCollector {
         let collectors = self.collectors.read().await;
         collectors.system_memory_total_bytes.set(total_bytes as f64);
         collectors.system_memory_used_bytes.set(used_bytes as f64);
-        collectors.system_memory_available_bytes.set(available_bytes as f64);
+        collectors
+            .system_memory_available_bytes
+            .set(available_bytes as f64);
     }
 }
 
@@ -293,7 +295,10 @@ impl SystemMetricsMonitor {
     /// * `collector` - Metrics collector
     /// * `interval` - Collection interval (default: 5 seconds)
     pub fn new(collector: MetricsCollector, interval: Duration) -> Self {
-        Self { collector, interval }
+        Self {
+            collector,
+            interval,
+        }
     }
 
     /// Start monitoring system metrics

@@ -4,8 +4,8 @@
 //! (Episodic, Semantic, Procedural, Core, Working) to support the trait-based
 //! multi-backend architecture.
 
-use sqlx::PgPool;
 use crate::{CoreError, CoreResult};
+use sqlx::PgPool;
 
 /// Run all memory-specific table migrations
 pub async fn run_memory_migrations(pool: &PgPool) -> CoreResult<()> {
@@ -15,7 +15,7 @@ pub async fn run_memory_migrations(pool: &PgPool) -> CoreResult<()> {
     create_core_memory_table(pool).await?;
     create_working_memory_table(pool).await?;
     create_memory_indexes(pool).await?;
-    
+
     Ok(())
 }
 
@@ -52,13 +52,16 @@ async fn create_episodic_events_table(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await;
 
-    let _ = sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
-        .execute(pool)
-        .await;
+    let _ =
+        sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+            .execute(pool)
+            .await;
 
-    let _ = sqlx::query("ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE episodic_events ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1",
+    )
+    .execute(pool)
+    .await;
 
     Ok(())
 }
@@ -95,13 +98,16 @@ async fn create_semantic_memory_table(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await;
 
-    let _ = sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
-        .execute(pool)
-        .await;
+    let _ =
+        sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
+            .execute(pool)
+            .await;
 
-    let _ = sqlx::query("ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE semantic_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1",
+    )
+    .execute(pool)
+    .await;
 
     Ok(())
 }
@@ -138,13 +144,17 @@ async fn create_procedural_memory_table(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await;
 
-    let _ = sqlx::query("ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
+    )
+    .execute(pool)
+    .await;
 
-    let _ = sqlx::query("ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE procedural_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1",
+    )
+    .execute(pool)
+    .await;
 
     Ok(())
 }
@@ -184,9 +194,11 @@ async fn create_core_memory_table(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await;
 
-    let _ = sqlx::query("ALTER TABLE core_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE core_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1",
+    )
+    .execute(pool)
+    .await;
 
     Ok(())
 }
@@ -219,9 +231,11 @@ async fn create_working_memory_table(pool: &PgPool) -> CoreResult<()> {
         .execute(pool)
         .await;
 
-    let _ = sqlx::query("ALTER TABLE working_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "ALTER TABLE working_memory ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1",
+    )
+    .execute(pool)
+    .await;
 
     Ok(())
 }
@@ -239,10 +253,12 @@ async fn create_memory_indexes(pool: &PgPool) -> CoreResult<()> {
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_episodic_event_type ON episodic_events(event_type)")
-        .execute(pool)
-        .await
-        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_episodic_event_type ON episodic_events(event_type)",
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_episodic_importance ON episodic_events(importance_score DESC)")
         .execute(pool)
@@ -260,10 +276,12 @@ async fn create_memory_indexes(pool: &PgPool) -> CoreResult<()> {
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_semantic_tree_path ON semantic_memory USING GIN(tree_path)")
-        .execute(pool)
-        .await
-        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_semantic_tree_path ON semantic_memory USING GIN(tree_path)",
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
     // Procedural memory indexes
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_procedural_user_id ON procedural_memory(user_id)")
@@ -271,10 +289,12 @@ async fn create_memory_indexes(pool: &PgPool) -> CoreResult<()> {
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_procedural_skill_name ON procedural_memory(skill_name)")
-        .execute(pool)
-        .await
-        .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_procedural_skill_name ON procedural_memory(skill_name)",
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create index: {}", e)))?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_procedural_success_rate ON procedural_memory(success_rate DESC)")
         .execute(pool)
@@ -331,4 +351,3 @@ async fn create_memory_indexes(pool: &PgPool) -> CoreResult<()> {
 
     Ok(())
 }
-

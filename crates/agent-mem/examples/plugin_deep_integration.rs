@@ -45,10 +45,7 @@ async fn example_1_basic_plugin_hooks() -> Result<()> {
     info!("📝 Example 1: Basic Memory Operations with Plugin Hooks");
     info!("------------------------------------------------------");
 
-    let mem = Memory::builder()
-        .with_storage("memory://")
-        .build()
-        .await?;
+    let mem = Memory::builder().with_storage("memory://").build().await?;
 
     // Add memories - plugin hooks will be called if plugins are enabled
     info!("Adding memories...");
@@ -73,10 +70,10 @@ async fn example_1_basic_plugin_hooks() -> Result<()> {
 #[cfg(feature = "plugins")]
 async fn example_2_custom_search() -> Result<()> {
     use agent_mem::plugin_integration::PluginEnhancedMemory;
+    use agent_mem::plugins::sdk::PluginMetadata;
     use agent_mem::plugins::{
         Capability, PluginConfig, PluginStatus, PluginType, RegisteredPlugin,
     };
-    use agent_mem::plugins::sdk::PluginMetadata;
     use chrono::Utc;
 
     info!("🔍 Example 2: Custom Search Algorithm Plugin");
@@ -119,10 +116,10 @@ async fn example_2_custom_search() -> Result<()> {
 #[cfg(feature = "plugins")]
 async fn example_3_processing_pipeline() -> Result<()> {
     use agent_mem::plugin_integration::{PluginEnhancedMemory, PluginHooks};
+    use agent_mem::plugins::sdk::PluginMetadata;
     use agent_mem::plugins::{
         Capability, PluginConfig, PluginStatus, PluginType, RegisteredPlugin,
     };
-    use agent_mem::plugins::sdk::PluginMetadata;
     use agent_mem_traits::{MemoryItem, MemoryType};
     use chrono::Utc;
 
@@ -216,4 +213,3 @@ async fn example_4_plugin_metrics() -> Result<()> {
 
     Ok(())
 }
-

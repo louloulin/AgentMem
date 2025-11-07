@@ -69,17 +69,17 @@ pub enum Permission {
     ReadMemory,
     WriteMemory,
     DeleteMemory,
-    
+
     // Agent相关
     ReadAgent,
     WriteAgent,
     DeleteAgent,
-    
+
     // 用户相关
     ReadUser,
     WriteUser,
     DeleteUser,
-    
+
     // 系统管理
     ManageSystem,
     ViewMetrics,
@@ -134,7 +134,10 @@ impl RbacChecker {
         }
 
         // 检查是否有任一角色拥有该权限
-        if parsed_roles.iter().any(|role| role.has_permission(&permission)) {
+        if parsed_roles
+            .iter()
+            .any(|role| role.has_permission(&permission))
+        {
             Ok(())
         } else {
             Err(ServerError::Forbidden(format!(
@@ -189,8 +192,7 @@ impl RbacChecker {
             .filter_map(|r| Role::from_str(r).ok())
             .collect();
 
-        !parsed_roles.is_empty()
-            && parsed_roles.iter().all(|r| matches!(r, Role::ReadOnly))
+        !parsed_roles.is_empty() && parsed_roles.iter().all(|r| matches!(r, Role::ReadOnly))
     }
 }
 
@@ -323,8 +325,7 @@ mod tests {
         let user_roles = vec!["user".to_string()];
 
         assert!(
-            RbacChecker::check_resource_action(&user_roles, Resource::Memory, Action::Read)
-                .is_ok()
+            RbacChecker::check_resource_action(&user_roles, Resource::Memory, Action::Read).is_ok()
         );
         assert!(
             RbacChecker::check_resource_action(&user_roles, Resource::Memory, Action::Write)
@@ -367,4 +368,3 @@ mod tests {
         assert!(!log.allowed);
     }
 }
-

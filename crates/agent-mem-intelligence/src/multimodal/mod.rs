@@ -36,7 +36,9 @@ pub use openai_vision::OpenAIVisionClient;
 #[cfg(feature = "multimodal")]
 pub use openai_whisper::OpenAIWhisperClient;
 #[cfg(feature = "multimodal")]
-pub use video_analyzer::{VideoAnalyzer, VideoAnalyzerConfig, VideoAnalysisRequest, VideoAnalysisResponse};
+pub use video_analyzer::{
+    VideoAnalysisRequest, VideoAnalysisResponse, VideoAnalyzer, VideoAnalyzerConfig,
+};
 
 use agent_mem_traits::{AgentMemError, Result};
 use async_trait::async_trait;

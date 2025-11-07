@@ -125,11 +125,7 @@ pub struct ToolManager {
 
 impl ToolManager {
     /// 创建新的工具管理器
-    pub fn new(
-        config: ToolManagerConfig,
-        pool: Arc<PgPool>,
-        executor: Arc<ToolExecutor>,
-    ) -> Self {
+    pub fn new(config: ToolManagerConfig, pool: Arc<PgPool>, executor: Arc<ToolExecutor>) -> Self {
         let repository = Arc::new(ToolRepository::new((*pool).clone()));
         Self {
             config,
@@ -222,7 +218,10 @@ impl ToolManager {
             cache.insert(tool.id.clone(), tool.clone());
         }
 
-        info!("Tool '{}' created successfully with ID {}", request.name, tool.id);
+        info!(
+            "Tool '{}' created successfully with ID {}",
+            request.name, tool.id
+        );
         Ok(tool)
     }
 
@@ -285,7 +284,10 @@ impl ToolManager {
     ) -> CoreResult<Tool> {
         info!("Updating tool {}", tool_id);
 
-        let tool = self.repository.update_tool(tool_id, user_id, request).await?;
+        let tool = self
+            .repository
+            .update_tool(tool_id, user_id, request)
+            .await?;
 
         // 清除缓存
         if self.config.enable_cache {
@@ -352,4 +354,3 @@ impl ToolManager {
         info!("Tool cache cleared");
     }
 }
-

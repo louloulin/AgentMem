@@ -109,14 +109,14 @@ impl HybridSearchEngine {
         fulltext_weight: f32,
     ) -> Result<HybridSearchResult> {
         let start = Instant::now();
-        
+
         // 并行或串行搜索
         let (vector_results, fulltext_results) = if self.config.enable_parallel {
             self.parallel_search(query_vector, &query).await?
         } else {
             self.sequential_search(query_vector, &query).await?
         };
-        
+
         // RRF 融合（使用自定义权重）
         let fused_results = self.ranker.fuse_with_weights(
             vector_results,
@@ -124,9 +124,9 @@ impl HybridSearchEngine {
             vector_weight,
             fulltext_weight,
         )?;
-        
+
         let total_time = start.elapsed().as_millis() as u64;
-        
+
         Ok(HybridSearchResult {
             results: fused_results,
             stats: SearchStats {
@@ -140,7 +140,7 @@ impl HybridSearchEngine {
             },
         })
     }
-    
+
     /// 执行混合搜索
     ///
     /// # Arguments
@@ -194,7 +194,7 @@ impl HybridSearchEngine {
 
     /// 并行执行向量搜索和全文搜索
     /// P1 优化 #23: 并行搜索支持部分失败
-    /// 
+    ///
     /// 优化策略：允许某个搜索失败，仍能返回其他搜索的结果
     async fn parallel_search(
         &self,
@@ -202,7 +202,7 @@ impl HybridSearchEngine {
         query: &SearchQuery,
     ) -> Result<(Vec<SearchResult>, Vec<SearchResult>, u64, u64)> {
         use tracing::{debug, warn};
-        
+
         let vector_engine = self.vector_engine.clone();
         let fulltext_engine = self.fulltext_engine.clone();
         let query_clone = query.clone();
@@ -239,7 +239,7 @@ impl HybridSearchEngine {
         // P1 优化 #23: 即使一个搜索失败，只要有结果就继续
         if vector_results.is_empty() && fulltext_results.is_empty() {
             return Err(agent_mem_traits::AgentMemError::SearchError(
-                "Both vector and fulltext search failed or returned no results".to_string()
+                "Both vector and fulltext search failed or returned no results".to_string(),
             ));
         }
 

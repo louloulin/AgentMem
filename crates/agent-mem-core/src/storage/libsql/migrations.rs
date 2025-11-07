@@ -15,19 +15,97 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
     create_migrations_table(&conn_guard).await?;
 
     // Run migrations in order
-    run_migration(&conn_guard, 1, "create_organizations", create_organizations_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 2, "create_users", create_users_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 3, "create_agents", create_agents_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 4, "create_messages", create_messages_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 5, "create_blocks", create_blocks_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 6, "create_tools", create_tools_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 7, "create_memories", create_memories_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 8, "create_api_keys", create_api_keys_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 9, "create_junction_tables", create_junction_tables(&conn_guard)).await?;
-    run_migration(&conn_guard, 10, "create_memory_associations", create_memory_associations_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 11, "create_indexes", create_indexes(&conn_guard)).await?;
-    run_migration(&conn_guard, 12, "create_learning_feedback", create_learning_feedback_table(&conn_guard)).await?;
-    run_migration(&conn_guard, 13, "add_session_id_to_memories", add_session_id_to_memories(&conn_guard)).await?;
+    run_migration(
+        &conn_guard,
+        1,
+        "create_organizations",
+        create_organizations_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        2,
+        "create_users",
+        create_users_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        3,
+        "create_agents",
+        create_agents_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        4,
+        "create_messages",
+        create_messages_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        5,
+        "create_blocks",
+        create_blocks_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        6,
+        "create_tools",
+        create_tools_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        7,
+        "create_memories",
+        create_memories_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        8,
+        "create_api_keys",
+        create_api_keys_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        9,
+        "create_junction_tables",
+        create_junction_tables(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        10,
+        "create_memory_associations",
+        create_memory_associations_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        11,
+        "create_indexes",
+        create_indexes(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        12,
+        "create_learning_feedback",
+        create_learning_feedback_table(&conn_guard),
+    )
+    .await?;
+    run_migration(
+        &conn_guard,
+        13,
+        "add_session_id_to_memories",
+        add_session_id_to_memories(&conn_guard),
+    )
+    .await?;
 
     // Initialize default data (idempotent - safe to run multiple times)
     init_default_data(&conn_guard).await?;
@@ -60,11 +138,21 @@ async fn run_migration(
 ) -> Result<()> {
     // Check if migration already applied
     let mut rows = conn
-        .query("SELECT id FROM _migrations WHERE id = ?", libsql::params![version])
+        .query(
+            "SELECT id FROM _migrations WHERE id = ?",
+            libsql::params![version],
+        )
         .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to check migration status: {e}")))?;
+        .map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to check migration status: {e}"))
+        })?;
 
-    if rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))?.is_some() {
+    if rows
+        .next()
+        .await
+        .map_err(|e| AgentMemError::StorageError(e.to_string()))?
+        .is_some()
+    {
         return Ok(()); // Already applied
     }
 
@@ -95,7 +183,9 @@ async fn create_organizations_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create organizations table: {e}")))?;
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create organizations table: {e}"))
+    })?;
 
     Ok(())
 }
@@ -198,17 +288,23 @@ async fn create_messages_table(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_organization ON messages(organization_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-    
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-    
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_agent ON messages(agent_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
 
     Ok(())
 }
@@ -307,17 +403,23 @@ async fn create_memories_table(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_memories_organization ON memories(organization_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-    
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-    
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent_id)",
         (),
-    ).await.map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
 
     Ok(())
 }
@@ -362,7 +464,9 @@ async fn create_junction_tables(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create blocks_agents table: {e}")))?;
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create blocks_agents table: {e}"))
+    })?;
 
     // tools_agents junction table
     conn.execute(
@@ -377,7 +481,9 @@ async fn create_junction_tables(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create tools_agents table: {e}")))?;
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create tools_agents table: {e}"))
+    })?;
 
     Ok(())
 }
@@ -407,7 +513,9 @@ async fn create_memory_associations_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create memory_associations table: {e}")))?;
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create memory_associations table: {e}"))
+    })?;
 
     Ok(())
 }
@@ -418,39 +526,32 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
         // Organization indexes
         "CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name)",
         "CREATE INDEX IF NOT EXISTS idx_organizations_deleted ON organizations(is_deleted)",
-        
         // User indexes
         "CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(organization_id)",
         "CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)",
         "CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(is_deleted)",
-        
         // Agent indexes
         "CREATE INDEX IF NOT EXISTS idx_agents_org_id ON agents(organization_id)",
         "CREATE INDEX IF NOT EXISTS idx_agents_created_at ON agents(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_agents_deleted ON agents(is_deleted)",
-        
         // Message indexes
         "CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON messages(agent_id)",
         "CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_messages_deleted ON messages(is_deleted)",
-        
         // Tool indexes
         "CREATE INDEX IF NOT EXISTS idx_tools_org_id ON tools(organization_id)",
         "CREATE INDEX IF NOT EXISTS idx_tools_name ON tools(name)",
         "CREATE INDEX IF NOT EXISTS idx_tools_deleted ON tools(is_deleted)",
-        
         // Memory indexes
         "CREATE INDEX IF NOT EXISTS idx_memories_agent_id ON memories(agent_id)",
         "CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_memories_deleted ON memories(is_deleted)",
-        
         // API Key indexes
         "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
         "CREATE INDEX IF NOT EXISTS idx_api_keys_deleted ON api_keys(is_deleted)",
-        
         // Block indexes
         "CREATE INDEX IF NOT EXISTS idx_blocks_label ON blocks(label)",
         "CREATE INDEX IF NOT EXISTS idx_blocks_deleted ON blocks(is_deleted)",
@@ -481,7 +582,9 @@ async fn create_learning_feedback_table(conn: &Connection) -> Result<()> {
         (),
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to create learning_feedback table: {e}")))?;
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create learning_feedback table: {e}"))
+    })?;
 
     // Create indexes for learning_feedback table
     let indexes = vec![
@@ -491,9 +594,9 @@ async fn create_learning_feedback_table(conn: &Connection) -> Result<()> {
     ];
 
     for index_sql in indexes {
-        conn.execute(index_sql, ())
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create learning_feedback index: {e}")))?;
+        conn.execute(index_sql, ()).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to create learning_feedback index: {e}"))
+        })?;
     }
 
     Ok(())
@@ -503,12 +606,11 @@ async fn create_learning_feedback_table(conn: &Connection) -> Result<()> {
 /// This migration enables unified memory model where Working Memory uses the same table
 async fn add_session_id_to_memories(conn: &Connection) -> Result<()> {
     // Add session_id column (SQLite allows adding columns to existing tables)
-    conn.execute(
-        "ALTER TABLE memories ADD COLUMN session_id TEXT",
-        (),
-    )
-    .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to add session_id column: {e}")))?;
+    conn.execute("ALTER TABLE memories ADD COLUMN session_id TEXT", ())
+        .await
+        .map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to add session_id column: {e}"))
+        })?;
 
     // Create index on session_id for fast session-based queries
     conn.execute(
@@ -533,24 +635,20 @@ async fn add_session_id_to_memories(conn: &Connection) -> Result<()> {
 /// This is idempotent - safe to run multiple times
 async fn init_default_data(conn: &Connection) -> Result<()> {
     use chrono::Utc;
-    
+
     let now = Utc::now().timestamp();
-    
+
     // Insert default organization (if not exists)
     conn.execute(
         "INSERT OR IGNORE INTO organizations (id, name, created_at, updated_at, is_deleted)
          VALUES (?, ?, ?, ?, ?)",
-        libsql::params![
-            "default-org",
-            "Default Organization",
-            now,
-            now,
-            0
-        ],
+        libsql::params!["default-org", "Default Organization", now, now, 0],
     )
     .await
-    .map_err(|e| AgentMemError::StorageError(format!("Failed to insert default organization: {e}")))?;
-    
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to insert default organization: {e}"))
+    })?;
+
     // Insert default user (if not exists)
     conn.execute(
         "INSERT OR IGNORE INTO users (id, organization_id, email, name, created_at, updated_at, is_deleted)
@@ -567,7 +665,7 @@ async fn init_default_data(conn: &Connection) -> Result<()> {
     )
     .await
     .map_err(|e| AgentMemError::StorageError(format!("Failed to insert default user: {e}")))?;
-    
+
     Ok(())
 }
 
@@ -621,4 +719,3 @@ mod tests {
         assert_eq!(count, 13); // 13 migrations (including session_id)
     }
 }
-

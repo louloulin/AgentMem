@@ -3,8 +3,8 @@
 //! 演示多种认证方式和权限控制
 
 use agent_mem_tools::mcp::{
-    AuthManager, AuthMethod, Permission, Role, Credentials,
-    AuditLogger, AuditEvent, AuditEventType, JwtConfig, OAuth2Config,
+    AuditEvent, AuditEventType, AuditLogger, AuthManager, AuthMethod, Credentials, JwtConfig,
+    OAuth2Config, Permission, Role,
 };
 use tracing::error;
 
@@ -247,7 +247,10 @@ async fn demo_permission_control() {
         .register_api_key("dev-key".to_string(), "developer".to_string())
         .await
         .unwrap();
-    manager.update_role("developer", Role::Developer).await.unwrap();
+    manager
+        .update_role("developer", Role::Developer)
+        .await
+        .unwrap();
     println!("  ✅ 创建开发者用户: developer");
 
     // 普通用户
@@ -263,7 +266,10 @@ async fn demo_permission_control() {
         .register_api_key("readonly-key".to_string(), "readonly".to_string())
         .await
         .unwrap();
-    manager.update_role("readonly", Role::ReadOnly).await.unwrap();
+    manager
+        .update_role("readonly", Role::ReadOnly)
+        .await
+        .unwrap();
     println!("  ✅ 创建只读用户: readonly");
 
     // 2. 检查权限
@@ -403,7 +409,12 @@ async fn demo_audit_logging() {
 
     // 按事件类型查询
     let auth_events = logger
-        .query(None, Some(&AuditEventType::AuthenticationSuccess), None, None)
+        .query(
+            None,
+            Some(&AuditEventType::AuthenticationSuccess),
+            None,
+            None,
+        )
         .await;
     println!("  认证成功事件数: {}", auth_events.len());
 
@@ -428,4 +439,3 @@ async fn demo_audit_logging() {
         }
     }
 }
-

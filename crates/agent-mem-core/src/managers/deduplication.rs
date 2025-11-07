@@ -116,7 +116,10 @@ impl MemoryDeduplicator {
     }
 
     /// 去重记忆列表
-    pub fn deduplicate(&mut self, memories: Vec<MemoryItem>) -> Result<(DeduplicationResult, Vec<MemoryItem>)> {
+    pub fn deduplicate(
+        &mut self,
+        memories: Vec<MemoryItem>,
+    ) -> Result<(DeduplicationResult, Vec<MemoryItem>)> {
         let start_time = std::time::Instant::now();
         let original_count = memories.len();
 
@@ -199,7 +202,8 @@ impl MemoryDeduplicator {
                 }
 
                 // 检查时间窗口
-                let time_diff = (memory.created_at.timestamp() - candidate.created_at.timestamp()).abs();
+                let time_diff =
+                    (memory.created_at.timestamp() - candidate.created_at.timestamp()).abs();
                 if time_diff > self.config.time_window_seconds {
                     continue;
                 }
@@ -330,7 +334,9 @@ impl MemoryDeduplicator {
         let mut merged_metadata = base.metadata.clone();
         for memory in memories {
             for (key, value) in &memory.metadata {
-                merged_metadata.entry(key.clone()).or_insert_with(|| value.clone());
+                merged_metadata
+                    .entry(key.clone())
+                    .or_insert_with(|| value.clone());
             }
         }
 
@@ -347,8 +353,10 @@ impl MemoryDeduplicator {
     pub fn get_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
         stats.insert("total_processed".to_string(), self.total_processed);
-        stats.insert("total_duplicates_found".to_string(), self.total_duplicates_found);
+        stats.insert(
+            "total_duplicates_found".to_string(),
+            self.total_duplicates_found,
+        );
         stats
     }
 }
-

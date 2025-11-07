@@ -10,9 +10,9 @@ use agent_mem_traits::{
 use async_trait::async_trait;
 use std::sync::Arc;
 
+pub mod libsql;
 #[cfg(feature = "postgres")]
 pub mod postgres;
-pub mod libsql;
 
 /// Storage backend type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,15 +101,12 @@ pub async fn create_factory(config: StorageConfig) -> Result<Box<dyn StorageFact
             Ok(Box::new(factory))
         }
         #[cfg(not(feature = "postgres"))]
-        StorageBackend::PostgreSQL => {
-            Err(agent_mem_traits::AgentMemError::storage_error(
-                "PostgreSQL backend not enabled. Enable 'postgres' feature.",
-            ))
-        }
+        StorageBackend::PostgreSQL => Err(agent_mem_traits::AgentMemError::storage_error(
+            "PostgreSQL backend not enabled. Enable 'postgres' feature.",
+        )),
         StorageBackend::LibSQL => {
             let factory = libsql::LibSqlStorageFactory::new(&config.connection).await?;
             Ok(Box::new(factory))
         }
     }
 }
-

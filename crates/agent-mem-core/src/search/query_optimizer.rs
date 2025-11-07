@@ -2,9 +2,9 @@
 //
 // 根据查询特征和数据统计，动态选择最优搜索策略
 
-use std::sync::{Arc, RwLock};
-use agent_mem_traits::Result;
 use crate::search::SearchQuery;
+use agent_mem_traits::Result;
+use std::sync::{Arc, RwLock};
 
 /// 索引类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +65,7 @@ impl IndexStatistics {
             last_updated: std::time::Instant::now(),
         }
     }
-    
+
     /// 更新统计信息
     pub fn update(&mut self, total_vectors: usize) {
         self.total_vectors = total_vectors;
@@ -96,10 +96,7 @@ pub enum SearchStrategy {
         nprobe: usize,
     },
     /// 混合搜索（IVF + HNSW）
-    Hybrid {
-        nprobe: usize,
-        ef_search: usize,
-    },
+    Hybrid { nprobe: usize, ef_search: usize },
 }
 
 /// 优化后的搜索计划
@@ -163,26 +160,26 @@ impl QueryOptimizer {
     pub fn new(stats: Arc<RwLock<IndexStatistics>>, config: QueryOptimizerConfig) -> Self {
         Self { stats, config }
     }
-    
+
     /// 使用默认配置创建
     pub fn with_default_config(stats: Arc<RwLock<IndexStatistics>>) -> Self {
         Self::new(stats, QueryOptimizerConfig::default())
     }
-    
+
     /// 优化查询，生成最优搜索计划
     pub fn optimize_query(&self, query: &SearchQuery) -> Result<OptimizedSearchPlan> {
         let stats = self.stats.read().unwrap();
-        
+
         // 根据数据规模和查询要求选择策略
         let strategy = self.select_strategy(&stats, query);
-        
+
         // 判断是否需要重排序
         let should_rerank = stats.total_vectors >= self.config.rerank_threshold;
-        
+
         // 估算性能指标
         let estimated_latency_ms = self.estimate_latency(&stats, &strategy, should_rerank);
         let estimated_recall = self.estimate_recall(&strategy);
-        
+
         Ok(OptimizedSearchPlan {
             strategy,
             should_rerank,
@@ -191,18 +188,18 @@ impl QueryOptimizer {
             estimated_recall,
         })
     }
-    
+
     /// 选择搜索策略
     fn select_strategy(&self, stats: &IndexStatistics, query: &SearchQuery) -> SearchStrategy {
         // 小数据集：使用精确搜索
         if stats.total_vectors < self.config.small_dataset_threshold {
             return SearchStrategy::Exact;
         }
-        
+
         // 根据索引类型和查询要求选择
         match stats.index_type {
             IndexType::None | IndexType::Flat => SearchStrategy::Exact,
-            
+
             IndexType::HNSW => {
                 let ef_search = if query.threshold.is_some() || query.filters.is_some() {
                     // 有过滤条件，使用更高的ef_search
@@ -210,25 +207,21 @@ impl QueryOptimizer {
                 } else {
                     self.config.default_ef_search
                 };
-                
+
                 SearchStrategy::HNSW { ef_search }
+            }
+
+            IndexType::IVF => SearchStrategy::IVF {
+                nprobe: self.config.default_nprobe,
             },
-            
-            IndexType::IVF => {
-                SearchStrategy::IVF {
-                    nprobe: self.config.default_nprobe,
-                }
-            },
-            
-            IndexType::IVF_HNSW => {
-                SearchStrategy::Hybrid {
-                    nprobe: self.config.default_nprobe,
-                    ef_search: self.config.default_ef_search,
-                }
+
+            IndexType::IVF_HNSW => SearchStrategy::Hybrid {
+                nprobe: self.config.default_nprobe,
+                ef_search: self.config.default_ef_search,
             },
         }
     }
-    
+
     /// 估算查询延迟（毫秒）
     fn estimate_latency(
         &self,
@@ -240,28 +233,28 @@ impl QueryOptimizer {
             SearchStrategy::Exact => {
                 // 线性扫描：O(n)
                 (stats.total_vectors as f64 * 0.0001) as u64 // 每个向量0.1μs
-            },
+            }
             SearchStrategy::HNSW { .. } => {
                 // HNSW：O(log n)
                 ((stats.total_vectors as f64).ln() * 2.0) as u64
-            },
+            }
             SearchStrategy::IVF { nprobe } => {
                 // IVF：O(nprobe * cluster_size)
                 let cluster_size = stats.total_vectors / 100; // 假设100个聚类
                 (nprobe * cluster_size) as u64 / 10000
-            },
+            }
             SearchStrategy::Hybrid { .. } => {
                 // 混合：最快
                 ((stats.total_vectors as f64).ln() * 1.5) as u64
-            },
+            }
         };
-        
+
         // 重排序额外开销
         let rerank_overhead = if rerank { 5 } else { 0 };
-        
+
         base_latency + rerank_overhead
     }
-    
+
     /// 估算召回率
     fn estimate_recall(&self, strategy: &SearchStrategy) -> f32 {
         match strategy {
@@ -273,7 +266,7 @@ impl QueryOptimizer {
                 } else {
                     0.95 // 95%
                 }
-            },
+            }
             SearchStrategy::IVF { nprobe } => {
                 // nprobe越大，召回率越高
                 if *nprobe >= self.config.default_nprobe {
@@ -281,17 +274,17 @@ impl QueryOptimizer {
                 } else {
                     0.90 // 90%
                 }
-            },
+            }
             SearchStrategy::Hybrid { .. } => 0.95, // 95%
         }
     }
-    
+
     /// 更新统计信息
     pub fn update_statistics(&self, total_vectors: usize) {
         let mut stats = self.stats.write().unwrap();
         stats.update(total_vectors);
     }
-    
+
     /// 获取当前统计信息
     pub fn get_statistics(&self) -> IndexStatistics {
         self.stats.read().unwrap().clone()
@@ -301,7 +294,7 @@ impl QueryOptimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_index_statistics_creation() {
         let stats = IndexStatistics::new(5_000, 1536);
@@ -309,71 +302,71 @@ mod tests {
         assert_eq!(stats.dimension, 1536);
         assert_eq!(stats.index_type, IndexType::Flat);
     }
-    
+
     #[test]
     fn test_index_type_selection() {
         let mut stats = IndexStatistics::new(5_000, 1536);
         assert_eq!(stats.index_type, IndexType::Flat);
-        
+
         stats.update(50_000);
         assert_eq!(stats.index_type, IndexType::HNSW);
-        
+
         stats.update(150_000);
         assert_eq!(stats.index_type, IndexType::IVF_HNSW);
     }
-    
+
     #[test]
     fn test_query_optimizer_small_dataset() {
         let stats = Arc::new(RwLock::new(IndexStatistics::new(5_000, 1536)));
         let optimizer = QueryOptimizer::with_default_config(stats);
-        
+
         let query = SearchQuery {
             query: "test".to_string(),
             limit: 10,
             ..Default::default()
         };
-        
+
         let plan = optimizer.optimize_query(&query).unwrap();
         assert!(matches!(plan.strategy, SearchStrategy::Exact));
         assert!(!plan.should_rerank); // 小数据集不需要重排序
         assert_eq!(plan.estimated_recall, 1.0); // 精确搜索100%召回
     }
-    
+
     #[test]
     fn test_query_optimizer_large_dataset() {
         let stats = Arc::new(RwLock::new(IndexStatistics::new(50_000, 1536)));
         let optimizer = QueryOptimizer::with_default_config(stats);
-        
+
         let query = SearchQuery {
             query: "test".to_string(),
             limit: 10,
             ..Default::default()
         };
-        
+
         let plan = optimizer.optimize_query(&query).unwrap();
         assert!(matches!(plan.strategy, SearchStrategy::HNSW { .. }));
         assert!(plan.should_rerank); // 大数据集需要重排序
         assert!(plan.estimated_recall >= 0.95); // 高召回率
     }
-    
+
     #[test]
     fn test_latency_estimation() {
         let stats = Arc::new(RwLock::new(IndexStatistics::new(100_000, 1536)));
         let optimizer = QueryOptimizer::with_default_config(stats);
-        
+
         let query = SearchQuery {
             query: "test".to_string(),
             limit: 10,
             ..Default::default()
         };
-        
+
         let plan = optimizer.optimize_query(&query).unwrap();
         assert!(plan.estimated_latency_ms < 50); // 应该很快
     }
 }
 
 /// 结果重排序器
-/// 
+///
 /// 用于在初始检索后对结果进行精确重排序，提高最终结果的质量
 #[derive(Debug, Clone)]
 pub struct ResultReranker {
@@ -406,7 +399,7 @@ impl ResultReranker {
     pub fn new(config: RerankerConfig) -> Self {
         Self { config }
     }
-    
+
     /// 使用默认配置创建
     pub fn with_default_config() -> Self {
         Self::new(RerankerConfig::default())
@@ -416,7 +409,7 @@ impl ResultReranker {
 #[cfg(test)]
 mod reranker_tests {
     use super::*;
-    
+
     #[test]
     fn test_result_reranker_creation() {
         let reranker = ResultReranker::with_default_config();
@@ -424,4 +417,3 @@ mod reranker_tests {
         assert_eq!(reranker.config.importance_weight, 0.2);
     }
 }
-

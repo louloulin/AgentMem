@@ -16,10 +16,7 @@ fn test_entity_type_as_str() {
 
 #[test]
 fn test_entity_type_from_str() {
-    assert_eq!(
-        EntityType::from_str("person").unwrap(),
-        EntityType::Person
-    );
+    assert_eq!(EntityType::from_str("person").unwrap(), EntityType::Person);
     assert_eq!(
         EntityType::from_str("organization").unwrap(),
         EntityType::Organization
@@ -340,4 +337,3 @@ fn test_relation_type_coverage() {
 
 // 注意：数据库集成测试需要实际的数据库连接
 // 这些测试应该在集成测试中进行，而不是单元测试
-

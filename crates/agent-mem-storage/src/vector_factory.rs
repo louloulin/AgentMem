@@ -1,8 +1,8 @@
 //! 存储工厂模式实现
 
-use crate::backends::{ChromaStore, MemoryVectorStore};
 #[cfg(feature = "lancedb")]
 use crate::backends::LanceDBVectorStore as LanceDBStore;
+use crate::backends::{ChromaStore, MemoryVectorStore};
 use agent_mem_traits::{AgentMemError, Result, VectorStore, VectorStoreConfig};
 use async_trait::async_trait;
 use std::sync::Arc;

@@ -124,12 +124,7 @@ impl TestTracker {
             if let Some(subtest) = test.subtests.get_mut(index) {
                 subtest.status = TestStatus::Failed;
                 subtest.error = Some(error.to_string());
-                println!(
-                    "  {} {} - ERROR: {}",
-                    "❌".red(),
-                    subtest.name,
-                    error.red()
-                );
+                println!("  {} {} - ERROR: {}", "❌".red(), subtest.name, error.red());
             }
         }
     }
@@ -143,7 +138,12 @@ impl TestTracker {
             } else {
                 format!(" - {}", message)
             };
-            println!("{} PASSED: {}{}", "✅".green(), test.name.green().bold(), msg);
+            println!(
+                "{} PASSED: {}{}",
+                "✅".green(),
+                test.name.green().bold(),
+                msg
+            );
 
             self.tests.push(test.clone());
             self.current_test = None;
@@ -210,7 +210,9 @@ impl TestTracker {
         println!("\n{}", "═".repeat(70).blue());
         println!(
             "{}",
-            "                        📊 测试摘要                         ".blue().bold()
+            "                        📊 测试摘要                         "
+                .blue()
+                .bold()
         );
         println!("{}", "═".repeat(70).blue());
 
@@ -271,7 +273,11 @@ impl TestTracker {
                     println!("     Error: {}", error.red());
                 }
 
-                for subtest in test.subtests.iter().filter(|s| s.status == TestStatus::Failed) {
+                for subtest in test
+                    .subtests
+                    .iter()
+                    .filter(|s| s.status == TestStatus::Failed)
+                {
                     println!("    {} {}", "❌".red(), subtest.name);
                     if let Some(error) = &subtest.error {
                         println!("       Error: {}", error.red());
@@ -344,4 +350,3 @@ mod tests {
         assert_eq!(summary.failed_tests, 1);
     }
 }
-

@@ -185,4 +185,3 @@ fn test_network_different_http_methods() {
         assert!(result.is_ok(), "Method {:?} should succeed", method);
     }
 }
-

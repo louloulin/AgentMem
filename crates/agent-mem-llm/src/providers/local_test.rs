@@ -3,9 +3,7 @@
 //! 这个模块提供了一个本地测试 LLM 提供商，用于开发和测试环境。
 //! 它实现了确定性的响应生成，不依赖外部 API 服务。
 
-use agent_mem_traits::{
-    AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo, Result,
-};
+use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo, Result};
 use async_trait::async_trait;
 use futures::stream::{self};
 use serde::{Deserialize, Serialize};

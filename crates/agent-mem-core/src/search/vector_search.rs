@@ -119,7 +119,11 @@ impl VectorSearchEngine {
     /// * `vector_store` - 向量存储后端
     /// * `embedding_dimension` - 嵌入向量维度
     pub fn new(vector_store: Arc<dyn VectorStore>, embedding_dimension: usize) -> Self {
-        Self::with_config(vector_store, embedding_dimension, VectorSearchConfig::default())
+        Self::with_config(
+            vector_store,
+            embedding_dimension,
+            VectorSearchConfig::default(),
+        )
     }
 
     /// 使用配置创建向量搜索引擎
@@ -191,10 +195,7 @@ impl VectorSearchEngine {
             .into_iter()
             .map(|vr| SearchResult {
                 id: vr.id,
-                content: vr
-                    .metadata
-                    .get("content").cloned()
-                    .unwrap_or_default(),
+                content: vr.metadata.get("content").cloned().unwrap_or_default(),
                 score: vr.similarity,
                 vector_score: Some(vr.similarity),
                 fulltext_score: None,
@@ -209,7 +210,8 @@ impl VectorSearchEngine {
         // 更新缓存
         if self.config.enable_cache {
             let cache_key = self.generate_cache_key(&query_vector, query);
-            self.update_cache(cache_key, query_vector, results.clone()).await;
+            self.update_cache(cache_key, query_vector, results.clone())
+                .await;
         }
 
         // 更新统计
@@ -417,12 +419,9 @@ impl VectorSearchEngine {
         };
 
         // 执行索引创建
-        sqlx::query(&sql)
-            .execute(pool)
-            .await
-            .map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to create pgvector index: {}", e))
-            })?;
+        sqlx::query(&sql).execute(pool).await.map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create pgvector index: {}", e))
+        })?;
 
         log::info!("Successfully created pgvector index '{}'", index_name);
 
@@ -438,7 +437,10 @@ impl VectorSearchEngine {
         let now = Instant::now();
         cache.retain(|_, entry| now.duration_since(entry.cached_at).as_secs() < 300);
 
-        log::info!("Cleaned up expired cache entries. Current cache size: {}", cache.len());
+        log::info!(
+            "Cleaned up expired cache entries. Current cache size: {}",
+            cache.len()
+        );
 
         Ok(())
     }
@@ -535,10 +537,7 @@ mod tests {
 
         // 添加测试向量
         let mut metadata = HashMap::new();
-        metadata.insert(
-            "content".to_string(),
-            "test content".to_string(),
-        );
+        metadata.insert("content".to_string(), "test content".to_string());
 
         let vectors = vec![VectorData {
             id: "test-1".to_string(),
@@ -588,10 +587,7 @@ mod tests {
 
         // 添加向量
         let mut metadata = HashMap::new();
-        metadata.insert(
-            "content".to_string(),
-            "test".to_string(),
-        );
+        metadata.insert("content".to_string(), "test".to_string());
 
         let vectors = vec![VectorData {
             id: "test-1".to_string(),

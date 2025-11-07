@@ -568,9 +568,10 @@ impl KnowledgeVaultManager {
 
         // 检查读取权限
         if self.config.access_control_enabled
-            && !self.check_permission(user_id, &AccessPermission::Read, entry.sensitivity_level)? {
-                return Err(CoreError::InvalidInput("用户没有读取权限".to_string()));
-            }
+            && !self.check_permission(user_id, &AccessPermission::Read, entry.sensitivity_level)?
+        {
+            return Err(CoreError::InvalidInput("用户没有读取权限".to_string()));
+        }
 
         // 解密内容
         let content = self.decrypt_content(&entry.encrypted_content, &entry.nonce)?;
@@ -623,9 +624,10 @@ impl KnowledgeVaultManager {
 
         // 检查写入权限
         if self.config.access_control_enabled
-            && !self.check_permission(user_id, &AccessPermission::Write, entry.sensitivity_level)? {
-                return Err(CoreError::InvalidInput("用户没有更新权限".to_string()));
-            }
+            && !self.check_permission(user_id, &AccessPermission::Write, entry.sensitivity_level)?
+        {
+            return Err(CoreError::InvalidInput("用户没有更新权限".to_string()));
+        }
 
         // 更新字段
         if let Some(new_title) = title {
@@ -689,9 +691,10 @@ impl KnowledgeVaultManager {
                 user_id,
                 &AccessPermission::Delete,
                 entry.sensitivity_level,
-            )? {
-                return Err(CoreError::InvalidInput("用户没有删除权限".to_string()));
-            }
+            )?
+        {
+            return Err(CoreError::InvalidInput("用户没有删除权限".to_string()));
+        }
 
         entries.remove(knowledge_id);
         drop(entries);
@@ -740,9 +743,10 @@ impl KnowledgeVaultManager {
                     user_id,
                     &AccessPermission::Read,
                     entry.sensitivity_level,
-                )? {
-                    continue;
-                }
+                )?
+            {
+                continue;
+            }
 
             // 应用敏感度过滤器
             if let Some(filter_level) = sensitivity_filter {
@@ -1012,9 +1016,10 @@ impl KnowledgeVaultManager {
                     user_id,
                     &AccessPermission::Read,
                     entry.sensitivity_level,
-                )? {
-                    continue;
-                }
+                )?
+            {
+                continue;
+            }
 
             // 应用敏感度过滤器
             if let Some(filter_level) = sensitivity_filter {
@@ -1420,8 +1425,13 @@ mod tests {
     #[test]
     fn test_sensitivity_level_ordering() {
         assert!(SensitivityLevel::Public.level_value() < SensitivityLevel::Internal.level_value());
-        assert!(SensitivityLevel::Internal.level_value() < SensitivityLevel::Confidential.level_value());
-        assert!(SensitivityLevel::Confidential.level_value() < SensitivityLevel::TopSecret.level_value());
+        assert!(
+            SensitivityLevel::Internal.level_value() < SensitivityLevel::Confidential.level_value()
+        );
+        assert!(
+            SensitivityLevel::Confidential.level_value()
+                < SensitivityLevel::TopSecret.level_value()
+        );
     }
 
     #[test]
@@ -1491,7 +1501,10 @@ mod tests {
         let now = Utc::now();
 
         let mut metadata = HashMap::new();
-        metadata.insert("details".to_string(), "User accessed confidential document".to_string());
+        metadata.insert(
+            "details".to_string(),
+            "User accessed confidential document".to_string(),
+        );
 
         let log = AuditLogEntry {
             id: "log-1".to_string(),

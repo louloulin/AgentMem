@@ -2,8 +2,8 @@
 //!
 //! 参考 MIRIX 的记忆检索逻辑，实现智能记忆检索和 prompt 注入
 
-use crate::{Memory, engine::MemoryEngine};
-use agent_mem_traits::{Result, MemoryType};
+use crate::{engine::MemoryEngine, Memory};
+use agent_mem_traits::{MemoryType, Result};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -24,7 +24,7 @@ impl Default for MemoryIntegratorConfig {
     fn default() -> Self {
         Self {
             max_memories: 10,
-            relevance_threshold: 0.1,  // ✅ 降低阈值以支持更宽泛的匹配
+            relevance_threshold: 0.1, // ✅ 降低阈值以支持更宽泛的匹配
             include_timestamp: true,
             sort_by_importance: true,
         }
@@ -60,7 +60,8 @@ impl MemoryIntegrator {
         agent_id: &str,
         max_count: usize,
     ) -> Result<Vec<Memory>> {
-        self.retrieve_relevant_memories_with_session(query, agent_id, None, None, max_count).await
+        self.retrieve_relevant_memories_with_session(query, agent_id, None, None, max_count)
+            .await
     }
 
     /// 检索相关记忆（支持session和user过滤）
@@ -72,8 +73,10 @@ impl MemoryIntegrator {
         session_id: Option<&str>,
         max_count: usize,
     ) -> Result<Vec<Memory>> {
-        debug!("Retrieving memories for agent_id={}, user_id={:?}, session_id={:?}, query={}", 
-               agent_id, user_id, session_id, query);
+        debug!(
+            "Retrieving memories for agent_id={}, user_id={:?}, session_id={:?}, query={}",
+            agent_id, user_id, session_id, query
+        );
 
         // 使用 MemoryEngine 的搜索功能
         use crate::hierarchy::MemoryScope;
@@ -98,8 +101,9 @@ impl MemoryIntegrator {
         };
 
         // 调用 MemoryEngine 进行搜索
-        let scope_str = format!("{:?}", scope);  // Clone scope info for logging
-        let memories = self.memory_engine
+        let scope_str = format!("{:?}", scope); // Clone scope info for logging
+        let memories = self
+            .memory_engine
             .search_memories(query, scope, Some(max_count))
             .await
             .map_err(|e| agent_mem_traits::AgentMemError::storage_error(e.to_string()))?;
@@ -107,13 +111,14 @@ impl MemoryIntegrator {
         // 过滤低相关性记忆（基于 importance score）
         let filtered_memories: Vec<Memory> = memories
             .into_iter()
-            .filter(|m| {
-                m.score.unwrap_or(0.0) >= self.config.relevance_threshold
-            })
+            .filter(|m| m.score.unwrap_or(0.0) >= self.config.relevance_threshold)
             .collect();
 
-        info!("Retrieved {} relevant memories (filtered from search results, scope={})", 
-              filtered_memories.len(), scope_str);
+        info!(
+            "Retrieved {} relevant memories (filtered from search results, scope={})",
+            filtered_memories.len(),
+            scope_str
+        );
         Ok(filtered_memories)
     }
 
@@ -133,7 +138,10 @@ impl MemoryIntegrator {
             prompt.push_str(&format!("{}. ", i + 1));
 
             // 添加记忆类型标签
-            prompt.push_str(&format!("[{}] ", self.format_memory_type(&memory.memory_type)));
+            prompt.push_str(&format!(
+                "[{}] ",
+                self.format_memory_type(&memory.memory_type)
+            ));
 
             // 添加记忆内容
             prompt.push_str(&memory.content);
@@ -152,7 +160,9 @@ impl MemoryIntegrator {
             prompt.push('\n');
         }
 
-        prompt.push_str("\nPlease use these memories to provide more contextual and personalized responses.\n");
+        prompt.push_str(
+            "\nPlease use these memories to provide more contextual and personalized responses.\n",
+        );
         prompt
     }
 
@@ -175,7 +185,9 @@ impl MemoryIntegrator {
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
             memories.sort_by(|a, b| {
-                b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal)
+                b.importance
+                    .partial_cmp(&a.importance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
         memories
@@ -183,21 +195,25 @@ impl MemoryIntegrator {
 
     /// 过滤低相关性记忆
     pub fn filter_by_relevance(&self, memories: Vec<Memory>) -> Vec<Memory> {
-        info!("🔍 filter_by_relevance: input={} memories, threshold={}", 
-              memories.len(), self.config.relevance_threshold);
-        
+        info!(
+            "🔍 filter_by_relevance: input={} memories, threshold={}",
+            memories.len(),
+            self.config.relevance_threshold
+        );
+
         let filtered: Vec<Memory> = memories
             .into_iter()
             .filter(|m| {
                 let keep = m.importance >= self.config.relevance_threshold;
-                info!("  Memory importance={:.3}, threshold={:.3}, keep={}", 
-                      m.importance, self.config.relevance_threshold, keep);
+                info!(
+                    "  Memory importance={:.3}, threshold={:.3}, keep={}",
+                    m.importance, self.config.relevance_threshold, keep
+                );
                 keep
             })
             .collect();
-        
+
         info!("🔍 filter_by_relevance: output={} memories", filtered.len());
         filtered
     }
 }
-

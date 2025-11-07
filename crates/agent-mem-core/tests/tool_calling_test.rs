@@ -1,16 +1,14 @@
 //! 工具调用集成测试
 
-use agent_mem_core::orchestrator::{
-    AgentOrchestrator, ChatRequest, OrchestratorConfig,
-};
+use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest, OrchestratorConfig};
 use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     storage::message_repository::MessageRepository,
 };
 use agent_mem_llm::LLMClient;
-use agent_mem_tools::{Tool, ToolExecutor, ExecutionContext, ToolResult, ToolSchema};
+use agent_mem_tools::{ExecutionContext, Tool, ToolExecutor, ToolResult, ToolSchema};
 use agent_mem_traits::{
-    llm::{FunctionDefinition, FunctionCall, FunctionCallResponse},
+    llm::{FunctionCall, FunctionCallResponse, FunctionDefinition},
     LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result,
 };
 use async_trait::async_trait;
@@ -327,4 +325,3 @@ fn test_function_call_parsing() {
     assert_eq!(args["a"], 10);
     assert_eq!(args["b"], 20);
 }
-

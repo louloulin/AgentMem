@@ -13,9 +13,7 @@ mod libsql_organization_tests {
     async fn test_organization_create() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -31,9 +29,7 @@ mod libsql_organization_tests {
     async fn test_organization_find_by_id() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -54,9 +50,7 @@ mod libsql_organization_tests {
     async fn test_organization_find_by_name() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -75,9 +69,7 @@ mod libsql_organization_tests {
     async fn test_organization_update() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -101,9 +93,7 @@ mod libsql_organization_tests {
     async fn test_organization_delete() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -124,9 +114,7 @@ mod libsql_organization_tests {
     async fn test_organization_list() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -153,9 +141,7 @@ mod libsql_organization_tests {
     async fn test_organization_not_found() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let repo = LibSqlOrganizationRepository::new(conn);
@@ -168,4 +154,3 @@ mod libsql_organization_tests {
         assert!(found_by_name.is_none());
     }
 }
-

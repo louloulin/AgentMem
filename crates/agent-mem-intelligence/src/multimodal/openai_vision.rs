@@ -244,7 +244,10 @@ impl OpenAIVisionClient {
         if tasks.contains(&ImageAnalysisTask::LabelExtraction) {
             if let Some(labels) = json.get("labels").and_then(|v| v.as_array()) {
                 for label in labels {
-                    if let Some(name) = label.as_str().or_else(|| label.get("name").and_then(|v| v.as_str())) {
+                    if let Some(name) = label
+                        .as_str()
+                        .or_else(|| label.get("name").and_then(|v| v.as_str()))
+                    {
                         response.labels.push(Label {
                             name: name.to_string(),
                             confidence: 0.85,
@@ -301,4 +304,3 @@ struct Choice {
 struct MessageContent {
     content: Option<String>,
 }
-

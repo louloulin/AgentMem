@@ -667,9 +667,7 @@ async fn show_logs_analysis() -> Result<()> {
             "INFO" => level.green(),
             _ => level.normal(),
         };
-        println!(
-            "{level_colored:<6} {timestamp:<20} {message:<50} {service:<15}"
-        );
+        println!("{level_colored:<6} {timestamp:<20} {message:<50} {service:<15}");
     }
     println!();
 

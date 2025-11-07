@@ -129,10 +129,9 @@ impl ProceduralAgent {
                 updated_at: now,
             };
 
-            let created_item = store
-                .create_item(item)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create procedure: {e}")))?;
+            let created_item = store.create_item(item).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to create procedure: {e}"))
+            })?;
 
             let response = serde_json::json!({
                 "success": true,
@@ -141,7 +140,11 @@ impl ProceduralAgent {
                 "message": "Procedural memory inserted successfully"
             });
 
-            log::info!("Procedural agent: Inserted procedure '{}' with ID {}", created_item.skill_name, created_item.id);
+            log::info!(
+                "Procedural agent: Inserted procedure '{}' with ID {}",
+                created_item.skill_name,
+                created_item.id
+            );
             return Ok(response);
         }
 
@@ -178,15 +181,12 @@ impl ProceduralAgent {
                     .get("min_success_rate")
                     .and_then(|v| v.as_f64())
                     .map(|f| f as f32),
-                limit: parameters
-                    .get("limit")
-                    .and_then(|v| v.as_i64()),
+                limit: parameters.get("limit").and_then(|v| v.as_i64()),
             };
 
-            let items = store
-                .query_items(user_id, query)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query procedures: {e}")))?;
+            let items = store.query_items(user_id, query).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to query procedures: {e}"))
+            })?;
 
             let results: Vec<_> = items
                 .iter()
@@ -210,7 +210,11 @@ impl ProceduralAgent {
                 "total_count": items.len()
             });
 
-            log::info!("Procedural agent: Found {} procedures for user {}", items.len(), user_id);
+            log::info!(
+                "Procedural agent: Found {} procedures for user {}",
+                items.len(),
+                user_id
+            );
             return Ok(response);
         }
 
@@ -247,8 +251,12 @@ impl ProceduralAgent {
             let existing_item = store
                 .get_item(item_id, user_id)
                 .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get procedure: {e}")))?
-                .ok_or_else(|| AgentError::InternalError(format!("Procedure with ID '{item_id}' not found")))?;
+                .map_err(|e| {
+                    AgentError::TaskExecutionError(format!("Failed to get procedure: {e}"))
+                })?
+                .ok_or_else(|| {
+                    AgentError::InternalError(format!("Procedure with ID '{item_id}' not found"))
+                })?;
 
             // Update fields
             use agent_mem_traits::ProceduralMemoryItem;
@@ -288,10 +296,9 @@ impl ProceduralAgent {
                 updated_at: Utc::now(),
             };
 
-            let updated = store
-                .update_item(updated_item)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to update procedure: {e}")))?;
+            let updated = store.update_item(updated_item).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to update procedure: {e}"))
+            })?;
 
             if updated {
                 let response = serde_json::json!({
@@ -336,10 +343,9 @@ impl ProceduralAgent {
 
         // Use actual procedural memory store if available
         if let Some(store) = &self.procedural_store {
-            let deleted = store
-                .delete_item(item_id, user_id)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete procedure: {e}")))?;
+            let deleted = store.delete_item(item_id, user_id).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to delete procedure: {e}"))
+            })?;
 
             if deleted {
                 let response = serde_json::json!({
@@ -398,10 +404,7 @@ impl MemoryAgent for ProceduralAgent {
             // 使用 system 用户 ID 进行测试查询
             match store.query_items("system", query).await {
                 Ok(items) => {
-                    log::info!(
-                        "成功连接到程序记忆存储，发现 {} 个技能/程序",
-                        items.len()
-                    );
+                    log::info!("成功连接到程序记忆存储，发现 {} 个技能/程序", items.len());
 
                     // 更新统计信息
                     let mut context = self.context.write().await;

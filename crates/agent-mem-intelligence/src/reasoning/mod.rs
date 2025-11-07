@@ -3,8 +3,8 @@
 pub mod advanced;
 
 pub use advanced::{
-    AdvancedReasoner, AnalogyResult, CounterfactualResult, MultiHopCausalResult,
-    CausalStep, CausalRelationType, AnalogicalDomain, AnalogicalMapping, MappingType,
+    AdvancedReasoner, AnalogicalDomain, AnalogicalMapping, AnalogyResult, CausalRelationType,
+    CausalStep, CounterfactualResult, MappingType, MultiHopCausalResult,
 };
 
 use agent_mem_traits::{AgentMemError, Result};

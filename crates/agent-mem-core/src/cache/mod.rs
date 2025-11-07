@@ -35,19 +35,19 @@ impl<T: Clone + Send + Sync + 'static> CacheValue for T {}
 pub struct CacheMetadata {
     /// When the entry was created
     pub created_at: u64,
-    
+
     /// Time-to-live in seconds
     pub ttl_seconds: u64,
-    
+
     /// Access count
     pub access_count: u64,
-    
+
     /// Last accessed timestamp
     pub last_accessed: u64,
-    
+
     /// Entry size in bytes (approximate)
     pub size_bytes: usize,
-    
+
     /// Cache level where this entry resides
     pub level: CacheLevel,
 }
@@ -59,7 +59,7 @@ impl CacheMetadata {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         Self {
             created_at: now,
             ttl_seconds,
@@ -69,17 +69,17 @@ impl CacheMetadata {
             level,
         }
     }
-    
+
     /// Check if entry is expired
     pub fn is_expired(&self) -> bool {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         now - self.created_at > self.ttl_seconds
     }
-    
+
     /// Record an access
     pub fn record_access(&mut self) {
         self.access_count += 1;
@@ -95,25 +95,25 @@ impl CacheMetadata {
 pub struct CacheStats {
     /// Total number of get operations
     pub total_gets: u64,
-    
+
     /// Number of cache hits
     pub hits: u64,
-    
+
     /// Number of cache misses
     pub misses: u64,
-    
+
     /// Number of set operations
     pub total_sets: u64,
-    
+
     /// Number of evictions
     pub evictions: u64,
-    
+
     /// Number of invalidations
     pub invalidations: u64,
-    
+
     /// Total size in bytes
     pub total_size_bytes: usize,
-    
+
     /// Number of entries
     pub entry_count: usize,
 }
@@ -127,12 +127,12 @@ impl CacheStats {
             (self.hits as f64 / self.total_gets as f64) * 100.0
         }
     }
-    
+
     /// Calculate miss rate
     pub fn miss_rate(&self) -> f64 {
         100.0 - self.hit_rate()
     }
-    
+
     /// Merge stats from another source
     pub fn merge(&mut self, other: &CacheStats) {
         self.total_gets += other.total_gets;
@@ -151,16 +151,16 @@ impl CacheStats {
 pub enum InvalidationStrategy {
     /// Time-to-live based invalidation
     TTL(Duration),
-    
+
     /// Least Recently Used eviction
     LRU,
-    
+
     /// Least Frequently Used eviction
     LFU,
-    
+
     /// Manual invalidation only
     Manual,
-    
+
     /// Combination of strategies
     Hybrid {
         ttl: Duration,
@@ -173,13 +173,13 @@ pub enum InvalidationStrategy {
 pub enum EvictionPolicy {
     /// Least Recently Used
     LRU,
-    
+
     /// Least Frequently Used
     LFU,
-    
+
     /// First In First Out
     FIFO,
-    
+
     /// Random eviction
     Random,
 }
@@ -189,22 +189,22 @@ pub enum EvictionPolicy {
 pub trait Cache: Send + Sync {
     /// Get a value from the cache
     async fn get(&self, key: &CacheKey) -> Result<Option<Vec<u8>>>;
-    
+
     /// Set a value in the cache
     async fn set(&self, key: CacheKey, value: Vec<u8>, ttl: Option<Duration>) -> Result<()>;
-    
+
     /// Delete a value from the cache
     async fn delete(&self, key: &CacheKey) -> Result<bool>;
-    
+
     /// Check if a key exists
     async fn exists(&self, key: &CacheKey) -> Result<bool>;
-    
+
     /// Clear all entries
     async fn clear(&self) -> Result<()>;
-    
+
     /// Get cache statistics
     async fn stats(&self) -> Result<CacheStats>;
-    
+
     /// Get cache level
     fn level(&self) -> CacheLevel;
 }
@@ -214,31 +214,31 @@ pub trait Cache: Send + Sync {
 pub struct CacheConfig {
     /// Enable L1 (memory) cache
     pub enable_l1: bool,
-    
+
     /// Enable L2 (Redis) cache
     pub enable_l2: bool,
-    
+
     /// L1 cache max entries
     pub l1_max_entries: usize,
-    
+
     /// L1 cache max size in bytes
     pub l1_max_size_bytes: usize,
-    
+
     /// L1 default TTL
     pub l1_default_ttl: Duration,
-    
+
     /// L2 Redis URL
     pub l2_redis_url: Option<String>,
-    
+
     /// L2 default TTL
     pub l2_default_ttl: Duration,
-    
+
     /// Invalidation strategy
     pub invalidation_strategy: InvalidationStrategy,
-    
+
     /// Enable cache warming
     pub enable_warming: bool,
-    
+
     /// Enable statistics
     pub enable_stats: bool,
 }
@@ -282,14 +282,14 @@ impl CacheConfig {
             enable_stats: true,
         }
     }
-    
+
     /// Create development configuration
     pub fn development() -> Self {
         Self {
             enable_l1: true,
             enable_l2: false,
             l1_max_entries: 1000,
-            l1_max_size_bytes: 10 * 1024 * 1024, // 10 MB
+            l1_max_size_bytes: 10 * 1024 * 1024,         // 10 MB
             l1_default_ttl: Duration::from_secs(2 * 60), // 2 minutes
             l2_redis_url: None,
             l2_default_ttl: Duration::from_secs(10 * 60), // 10 minutes
@@ -299,4 +299,3 @@ impl CacheConfig {
         }
     }
 }
-

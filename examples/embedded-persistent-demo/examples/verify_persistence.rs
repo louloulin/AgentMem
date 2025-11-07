@@ -14,9 +14,7 @@ use tracing::{info, warn};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n🚀 AgentMem 嵌入式持久化存储验证\n");
     println!("{}", "=".repeat(60));
@@ -24,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 设置测试数据路径
     let test_db_path = "./test-data/persistent-test.db";
     env::set_var("AGENTMEM_DB_PATH", test_db_path);
-    
+
     println!("\n📁 配置信息:");
     println!("  数据库路径: {}", test_db_path);
     println!("  向量路径: ./data/vectors.lance (默认)");
@@ -40,14 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         info!("创建 CoreAgent 实例...");
         let agent = CoreAgent::from_env("test-agent".to_string()).await?;
-        
+
         println!("\n✅ CoreAgent 创建成功");
         println!("  Agent ID: test-agent");
         println!("  存储类型: LibSQL (持久化)");
 
         // 写入测试数据
         println!("\n💾 写入测试数据...");
-        
+
         let test_memories = vec![
             "我喜欢 Rust 编程语言",
             "AgentMem 是一个强大的记忆管理系统",
@@ -77,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 检查数据文件是否存在
     println!("\n📂 检查数据文件...");
-    
+
     if Path::new(test_db_path).exists() {
         let metadata = std::fs::metadata(test_db_path)?;
         println!("  ✅ LibSQL 数据库文件存在");
@@ -107,19 +105,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 重新创建 Agent 实例，验证数据仍然存在
     println!("\n🔄 重新创建 Agent 实例...");
-    
+
     {
         let agent = CoreAgent::from_env("test-agent".to_string()).await?;
-        
+
         println!("✅ Agent 重新创建成功");
-        
+
         // 读取数据
         println!("\n📖 读取数据...");
-        
+
         // 注意: 需要根据实际 API 调整
         // let memories = agent.retrieve_all_memories().await?;
         // println!("  找到记忆数: {}", memories.len());
-        
+
         println!("  ✅ 数据读取成功 (需要实现具体的读取逻辑)");
     }
 
@@ -148,4 +146,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

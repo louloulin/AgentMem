@@ -123,4 +123,3 @@ mod tests {
         assert!(Arc::strong_count(&stores.working) >= 1);
     }
 }
-

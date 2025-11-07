@@ -103,10 +103,7 @@ impl AgentRegistry {
     }
 
     /// 注册工作记忆 Agent
-    pub async fn register_working_agent(
-        &mut self,
-        agent: Arc<RwLock<WorkingAgent>>,
-    ) -> Result<()> {
+    pub async fn register_working_agent(&mut self, agent: Arc<RwLock<WorkingAgent>>) -> Result<()> {
         self.working_agent = Some(agent);
         self.agent_map
             .write()
@@ -266,4 +263,3 @@ mod tests {
         // assert_eq!(registry.agent_count().await, 1);
     }
 }
-

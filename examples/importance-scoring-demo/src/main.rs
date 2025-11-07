@@ -47,15 +47,18 @@ async fn demo_new_memory(
 
     let memory = create_test_memory(
         "新创建的记忆",
-        0,           // 0 次访问
-        Utc::now(),  // 刚创建
-        0.5,         // 基础重要性
+        0,          // 0 次访问
+        Utc::now(), // 刚创建
+        0.5,        // 基础重要性
     );
 
     let factors = scorer.calculate_importance(&memory).await?;
 
     println!("记忆内容: {}", memory.content);
-    println!("创建时间: {}", memory.created_at.format("%Y-%m-%d %H:%M:%S"));
+    println!(
+        "创建时间: {}",
+        memory.created_at.format("%Y-%m-%d %H:%M:%S")
+    );
     println!("访问次数: {}", memory.access_count);
     println!("\n重要性因子:");
     println!("  - 时效性评分: {:.3}", factors.recency_score);
@@ -77,15 +80,18 @@ async fn demo_frequently_accessed_memory(
 
     let memory = create_test_memory(
         "频繁访问的重要记忆",
-        100,                                // 100 次访问
-        Utc::now() - Duration::days(30),    // 30 天前创建
-        0.8,                                // 高重要性
+        100,                             // 100 次访问
+        Utc::now() - Duration::days(30), // 30 天前创建
+        0.8,                             // 高重要性
     );
 
     let factors = scorer.calculate_importance(&memory).await?;
 
     println!("记忆内容: {}", memory.content);
-    println!("创建时间: {}", memory.created_at.format("%Y-%m-%d %H:%M:%S"));
+    println!(
+        "创建时间: {}",
+        memory.created_at.format("%Y-%m-%d %H:%M:%S")
+    );
     println!("访问次数: {}", memory.access_count);
     println!("访问频率: {:.2} 次/天", memory.access_count as f64 / 30.0);
     println!("\n重要性因子:");
@@ -123,9 +129,9 @@ async fn demo_old_memory_decay(
     for (label, age) in ages {
         let memory = create_test_memory(
             &format!("{}的记忆", label),
-            10,                      // 固定访问次数
-            Utc::now() - age,        // 不同创建时间
-            0.5,                     // 固定基础重要性
+            10,               // 固定访问次数
+            Utc::now() - age, // 不同创建时间
+            0.5,              // 固定基础重要性
         );
 
         let factors = scorer.calculate_importance(&memory).await?;
@@ -219,4 +225,3 @@ fn create_test_memory(
         version: 1,
     }
 }
-

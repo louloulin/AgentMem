@@ -198,7 +198,10 @@ impl KnowledgeGraphManager {
         .await
         .map_err(|e| AgentMemError::storage_error(&format!("Failed to create entity: {}", e)))?;
 
-        info!("Created entity {} (type: {}, name: {})", entity_id, entity_type_str, name);
+        info!(
+            "Created entity {} (type: {}, name: {})",
+            entity_id, entity_type_str, name
+        );
 
         Ok(entity_id)
     }
@@ -292,7 +295,9 @@ impl KnowledgeGraphManager {
         .bind(type_str)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get entities by type: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get entities by type: {}", e))
+        })?;
 
         Ok(rows
             .into_iter()
@@ -364,4 +369,3 @@ impl KnowledgeGraphManager {
         entities
     }
 }
-

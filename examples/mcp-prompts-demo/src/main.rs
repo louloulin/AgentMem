@@ -7,23 +7,20 @@
 //! 4. 多内容类型提示词
 //! 5. MCP 服务器集成
 
-use agent_mem_tools::mcp::{
-    PromptManager, McpPrompt, PromptArgument, PromptContent,
-    McpServer, McpGetPromptRequest,
-};
-use agent_mem_tools::mcp::server::McpServerConfig;
 use agent_mem_tools::executor::ToolExecutor;
-use std::sync::Arc;
-use std::collections::HashMap;
-use tracing::{info, Level};
+use agent_mem_tools::mcp::server::McpServerConfig;
+use agent_mem_tools::mcp::{
+    McpGetPromptRequest, McpPrompt, McpServer, PromptArgument, PromptContent, PromptManager,
+};
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("🚀 MCP Prompts 功能演示");
     info!("{}", "=".repeat(60));
@@ -151,7 +148,11 @@ async fn demo_prompt_manager() -> anyhow::Result<()> {
     let prompts = manager.list_prompts().await?;
     info!("  找到 {} 个提示词:", prompts.len());
     for prompt in &prompts {
-        info!("    - {} (v{})", prompt.name, prompt.version.as_ref().unwrap_or(&"N/A".to_string()));
+        info!(
+            "    - {} (v{})",
+            prompt.name,
+            prompt.version.as_ref().unwrap_or(&"N/A".to_string())
+        );
         if let Some(desc) = &prompt.description {
             info!("      描述: {}", desc);
         }
@@ -163,7 +164,7 @@ async fn demo_prompt_manager() -> anyhow::Result<()> {
     // 5. 获取并渲染提示词
     info!("");
     info!("5️⃣ 获取并渲染提示词:");
-    
+
     // 渲染 greeting
     let mut args = HashMap::new();
     args.insert("name".to_string(), json!("Alice"));
@@ -178,7 +179,10 @@ async fn demo_prompt_manager() -> anyhow::Result<()> {
     // 渲染 code_analysis
     let mut args = HashMap::new();
     args.insert("language".to_string(), json!("Rust"));
-    args.insert("code".to_string(), json!("fn main() { println!(\"Hello\"); }"));
+    args.insert(
+        "code".to_string(),
+        json!("fn main() { println!(\"Hello\"); }"),
+    );
     args.insert("focus_areas".to_string(), json!("performance, safety"));
     let response = manager.get_prompt("code_analysis", args).await?;
     info!("");
@@ -239,11 +243,7 @@ async fn demo_mcp_server() -> anyhow::Result<()> {
         }],
     )
     .with_description("Text summarization prompt")
-    .with_argument(
-        PromptArgument::new("text")
-            .required()
-            .with_type("string"),
-    );
+    .with_argument(PromptArgument::new("text").required().with_type("string"));
 
     let prompt2 = McpPrompt::new(
         "translate",
@@ -291,13 +291,16 @@ async fn demo_mcp_server() -> anyhow::Result<()> {
     info!("");
     info!("4️⃣ 获取 MCP 提示词:");
     let mut args = HashMap::new();
-    args.insert("text".to_string(), json!("This is a long text that needs to be summarized..."));
-    
+    args.insert(
+        "text".to_string(),
+        json!("This is a long text that needs to be summarized..."),
+    );
+
     let request = McpGetPromptRequest {
         name: "summarize".to_string(),
         arguments: args,
     };
-    
+
     let response = server.get_prompt(request).await?;
     info!("  ✅ 成功获取提示词");
     info!("  内容:");
@@ -309,4 +312,3 @@ async fn demo_mcp_server() -> anyhow::Result<()> {
 
     Ok(())
 }
-

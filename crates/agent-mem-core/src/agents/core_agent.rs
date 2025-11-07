@@ -88,11 +88,7 @@ impl CoreAgent {
 
     /// Create with core memory store (trait-based, supports any backend)
     pub fn with_store(agent_id: String, store: Arc<dyn CoreMemoryStore>) -> Self {
-        let config = AgentConfig::new(
-            agent_id,
-            vec![MemoryType::Core],
-            5,
-        );
+        let config = AgentConfig::new(agent_id, vec![MemoryType::Core], 5);
 
         let base = BaseAgent::new(config);
         let context = base.context();
@@ -186,7 +182,11 @@ impl CoreAgent {
                 "message": "Core memory block created successfully"
             });
 
-            log::info!("Core agent: Created memory block '{}' with ID {}", label, created_item.id);
+            log::info!(
+                "Core agent: Created memory block '{}' with ID {}",
+                label,
+                created_item.id
+            );
             Ok(response)
         } else {
             // No store configured - return error instead of mock
@@ -466,10 +466,7 @@ impl CoreAgent {
             let mut total_chars = 0;
 
             for item in &items {
-                let block_text = format!(
-                    "[{}] {}: {}",
-                    item.category, item.key, item.value
-                );
+                let block_text = format!("[{}] {}: {}", item.category, item.key, item.value);
                 total_chars += block_text.len();
                 compiled_parts.push(block_text);
             }
@@ -524,10 +521,7 @@ impl MemoryAgent for CoreAgent {
             // 使用 system 用户 ID 进行测试查询
             match store.get_all("system").await {
                 Ok(items) => {
-                    log::info!(
-                        "成功连接到核心记忆存储，发现 {} 个记忆项",
-                        items.len()
-                    );
+                    log::info!("成功连接到核心记忆存储，发现 {} 个记忆项", items.len());
 
                     // 更新统计信息
                     let mut context = self.context.write().await;

@@ -75,10 +75,7 @@ mod libsql_tool_tests {
         }
 
         // Find by organization ID
-        let tools = tool_repo
-            .find_by_organization_id(&org.id)
-            .await
-            .unwrap();
+        let tools = tool_repo.find_by_organization_id(&org.id).await.unwrap();
         assert_eq!(tools.len(), 3);
     }
 
@@ -211,4 +208,3 @@ mod libsql_tool_tests {
         assert_eq!(found.description, Some("A Python tool".to_string()));
     }
 }
-

@@ -53,10 +53,9 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
-        let mut rows = stmt
-            .query(libsql::params![id])
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {e}")))?;
+        let mut rows = stmt.query(libsql::params![id]).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to query organization: {e}"))
+        })?;
 
         if let Some(row) = rows
             .next()
@@ -71,21 +70,26 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
                     .get::<String>(1)
                     .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(2).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(3).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row
-                    .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
-                    != 0,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(4).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
             };
             Ok(Some(org))
         } else {
@@ -101,10 +105,9 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
 
-        let mut rows = stmt
-            .query(libsql::params![name])
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organization: {e}")))?;
+        let mut rows = stmt.query(libsql::params![name]).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to query organization: {e}"))
+        })?;
 
         if let Some(row) = rows
             .next()
@@ -119,21 +122,26 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
                     .get::<String>(1)
                     .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(2).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(3).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row
-                    .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
-                    != 0,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(4).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
             };
             Ok(Some(org))
         } else {
@@ -146,11 +154,7 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
 
         conn.execute(
             "UPDATE organizations SET name = ?, updated_at = ? WHERE id = ? AND is_deleted = 0",
-            libsql::params![
-                org.name.clone(),
-                org.updated_at.timestamp(),
-                org.id.clone(),
-            ],
+            libsql::params![org.name.clone(), org.updated_at.timestamp(), org.id.clone(),],
         )
         .await
         .map_err(|e| AgentMemError::StorageError(format!("Failed to update organization: {e}")))?;
@@ -182,7 +186,9 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
         let mut rows = stmt
             .query(libsql::params![limit, offset])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query organizations: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to query organizations: {e}"))
+            })?;
 
         let mut organizations = Vec::new();
         while let Some(row) = rows
@@ -198,21 +204,26 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
                     .get::<String>(1)
                     .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(2)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(2).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(3)
-                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(3).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
                 )
-                .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row
-                    .get::<i64>(4)
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?
-                    != 0,
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(4).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
             };
             organizations.push(org);
         }
@@ -231,9 +242,7 @@ mod tests {
     async fn setup_test_db() -> (TempDir, Arc<Mutex<Connection>>) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
         (temp_dir, conn)
     }
@@ -265,7 +274,10 @@ mod tests {
 
         // List (includes default organization from migrations)
         let orgs = repo.list(10, 0).await.unwrap();
-        assert!(!orgs.is_empty(), "Should have at least 1 organization (created + default)");
+        assert!(
+            !orgs.is_empty(),
+            "Should have at least 1 organization (created + default)"
+        );
 
         // Delete
         repo.delete(&created.id).await.unwrap();
@@ -273,4 +285,3 @@ mod tests {
         assert!(deleted.is_none());
     }
 }
-

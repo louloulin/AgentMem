@@ -188,9 +188,10 @@ impl MistralProvider {
             })?;
 
         let status = response.status();
-        let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to read response: {e}"))
-        })?;
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {

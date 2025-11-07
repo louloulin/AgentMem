@@ -51,7 +51,9 @@ impl EpisodicMemoryStore for PostgresEpisodicStore {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create episodic event: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -70,12 +72,18 @@ impl EpisodicMemoryStore for PostgresEpisodicStore {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get episodic event: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
-    async fn query_events(&self, user_id: &str, query: EpisodicQuery) -> Result<Vec<EpisodicEvent>> {
+    async fn query_events(
+        &self,
+        user_id: &str,
+        query: EpisodicQuery,
+    ) -> Result<Vec<EpisodicEvent>> {
         info!("Querying episodic events for user: {}", user_id);
 
         let mut sql = String::from("SELECT * FROM episodic_events WHERE user_id = $1");
@@ -177,12 +185,19 @@ impl EpisodicMemoryStore for PostgresEpisodicStore {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete episodic event: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 
-    async fn update_importance(&self, event_id: &str, user_id: &str, importance_score: f32) -> Result<bool> {
+    async fn update_importance(
+        &self,
+        event_id: &str,
+        user_id: &str,
+        importance_score: f32,
+    ) -> Result<bool> {
         debug!("Updating importance for event: {}", event_id);
 
         let result = sqlx::query!(
@@ -198,7 +213,9 @@ impl EpisodicMemoryStore for PostgresEpisodicStore {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update importance: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update importance: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -239,7 +256,9 @@ impl EpisodicMemoryStore for PostgresEpisodicStore {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get recent events: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get recent events: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -282,4 +301,3 @@ impl From<EpisodicEventRow> for EpisodicEvent {
         }
     }
 }
-

@@ -162,9 +162,10 @@ impl WeaviateStore {
             request = request.header("Authorization", format!("Bearer {api_key}"));
         }
 
-        let response = request.send().await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to create schema: {e}"))
-        })?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to create schema: {e}")))?;
 
         if response.status().is_success() {
             info!("Weaviate schema initialized successfully");
@@ -235,9 +236,7 @@ impl EmbeddingVectorStore for WeaviateStore {
             .json(&object)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to store embedding: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to store embedding: {e}")))?;
 
         if response.status().is_success() {
             debug!("Successfully stored embedding for memory: {}", memory_id);
@@ -410,9 +409,7 @@ impl EmbeddingVectorStore for WeaviateStore {
             )
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to get embedding: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to get embedding: {e}")))?;
 
         if response.status().is_success() {
             let object: WeaviateObject = response.json().await.map_err(|e| {
@@ -457,9 +454,7 @@ impl EmbeddingVectorStore for WeaviateStore {
             .json(&query)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to list embeddings: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to list embeddings: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();

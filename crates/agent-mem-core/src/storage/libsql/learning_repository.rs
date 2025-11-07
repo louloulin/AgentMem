@@ -9,30 +9,30 @@ use libsql::Connection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::search::learning::FeedbackRecord;
 use crate::search::adaptive::{QueryFeatures, SearchWeights};
+use crate::search::learning::FeedbackRecord;
 
 /// Trait for learning repository operations
 #[async_trait]
 pub trait LearningRepositoryTrait: Send + Sync {
     /// Create a new feedback record
     async fn create_feedback(&self, record: &FeedbackRecord) -> Result<()>;
-    
+
     /// Get all feedback records
     async fn get_all_feedback(&self) -> Result<Vec<FeedbackRecord>>;
-    
+
     /// Get feedback by pattern
     async fn get_feedback_by_pattern(&self, pattern: &str) -> Result<Vec<FeedbackRecord>>;
-    
+
     /// Get recent feedback (last N records)
     async fn get_recent_feedback(&self, limit: usize) -> Result<Vec<FeedbackRecord>>;
-    
+
     /// Delete old feedback records (older than timestamp)
     async fn delete_old_feedback(&self, before_timestamp: DateTime<Utc>) -> Result<usize>;
-    
+
     /// Clear all feedback
     async fn clear_all_feedback(&self) -> Result<()>;
-    
+
     /// Get feedback count by pattern
     async fn get_feedback_count_by_pattern(&self, pattern: &str) -> Result<usize>;
 }
@@ -54,9 +54,9 @@ impl LibSqlLearningRepository {
         // 0: id, 1: query_pattern, 2: features, 3: vector_weight, 4: fulltext_weight,
         // 5: effectiveness, 6: timestamp, 7: user_id
 
-        let features_json: String = row.get(2).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get features: {e}"))
-        })?;
+        let features_json: String = row
+            .get(2)
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get features: {e}")))?;
         let features: QueryFeatures = serde_json::from_str(&features_json)
             .map_err(|e| AgentMemError::StorageError(format!("Failed to parse features: {e}")))?;
 
@@ -66,20 +66,24 @@ impl LibSqlLearningRepository {
         let fulltext_weight: f64 = row.get(4).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to get fulltext_weight: {e}"))
         })?;
-        
+
         let effectiveness: f64 = row.get(5).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to get effectiveness: {e}"))
         })?;
 
-        let timestamp_ts: i64 = row.get(6).map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get timestamp: {e}"))
-        })?;
+        let timestamp_ts: i64 = row
+            .get(6)
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get timestamp: {e}")))?;
         let timestamp = DateTime::from_timestamp(timestamp_ts, 0)
             .ok_or_else(|| AgentMemError::StorageError("Invalid timestamp".to_string()))?;
 
         Ok(FeedbackRecord {
-            id: row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
-            query_pattern: row.get(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get query_pattern: {e}")))?,
+            id: row
+                .get(0)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+            query_pattern: row.get(1).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get query_pattern: {e}"))
+            })?,
             features,
             weights: SearchWeights {
                 vector_weight: vector_weight as f32,
@@ -98,8 +102,9 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
     async fn create_feedback(&self, record: &FeedbackRecord) -> Result<()> {
         let conn = self.conn.lock().await;
 
-        let features_json = serde_json::to_string(&record.features)
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize features: {e}")))?;
+        let features_json = serde_json::to_string(&record.features).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to serialize features: {e}"))
+        })?;
 
         conn.execute(
             "INSERT INTO learning_feedback (
@@ -138,7 +143,11 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query feedback: {e}")))?;
 
         let mut records = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(e.to_string()))?
+        {
             records.push(Self::row_to_feedback(&row)?);
         }
 
@@ -158,10 +167,16 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
                 libsql::params![pattern],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query feedback by pattern: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to query feedback by pattern: {e}"))
+            })?;
 
         let mut records = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(e.to_string()))?
+        {
             records.push(Self::row_to_feedback(&row)?);
         }
 
@@ -181,10 +196,16 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
                 libsql::params![limit as i64],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to query recent feedback: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to query recent feedback: {e}"))
+            })?;
 
         let mut records = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(e.to_string()))?
+        {
             records.push(Self::row_to_feedback(&row)?);
         }
 
@@ -200,7 +221,9 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
                 libsql::params![before_timestamp.timestamp()],
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to delete old feedback: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to delete old feedback: {e}"))
+            })?;
 
         Ok(result as usize)
     }
@@ -226,8 +249,14 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to count feedback: {e}")))?;
 
-        if let Some(row) = rows.next().await.map_err(|e| AgentMemError::StorageError(e.to_string()))? {
-            let count: i64 = row.get(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {e}")))?;
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(e.to_string()))?
+        {
+            let count: i64 = row
+                .get(0)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get count: {e}")))?;
             Ok(count as usize)
         } else {
             Ok(0)
@@ -238,11 +267,14 @@ impl LearningRepositoryTrait for LibSqlLearningRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     async fn setup_test_db() -> Arc<Mutex<Connection>> {
-        let db = libsql::Builder::new_local(":memory:").build().await.unwrap();
+        let db = libsql::Builder::new_local(":memory:")
+            .build()
+            .await
+            .unwrap();
         let conn = db.connect().unwrap();
-        
+
         // Create learning_feedback table
         conn.execute(
             "CREATE TABLE learning_feedback (
@@ -259,7 +291,7 @@ mod tests {
         )
         .await
         .unwrap();
-        
+
         // Create index
         conn.execute(
             "CREATE INDEX idx_learning_feedback_pattern ON learning_feedback(query_pattern)",
@@ -267,15 +299,15 @@ mod tests {
         )
         .await
         .unwrap();
-        
+
         Arc::new(Mutex::new(conn))
     }
-    
+
     #[tokio::test]
     async fn test_create_and_get_feedback() {
         let conn = setup_test_db().await;
         let repo = LibSqlLearningRepository::new(conn);
-        
+
         let record = FeedbackRecord {
             id: "test-1".to_string(),
             query_pattern: "exact_match".to_string(),
@@ -296,29 +328,32 @@ mod tests {
             timestamp: Utc::now(),
             user_id: Some("user1".to_string()),
         };
-        
+
         // Create
         repo.create_feedback(&record).await.unwrap();
-        
+
         // Get all
         let all_feedback = repo.get_all_feedback().await.unwrap();
         assert_eq!(all_feedback.len(), 1);
         assert_eq!(all_feedback[0].id, "test-1");
-        
+
         // Get by pattern
         let pattern_feedback = repo.get_feedback_by_pattern("exact_match").await.unwrap();
         assert_eq!(pattern_feedback.len(), 1);
-        
+
         // Get count
-        let count = repo.get_feedback_count_by_pattern("exact_match").await.unwrap();
+        let count = repo
+            .get_feedback_count_by_pattern("exact_match")
+            .await
+            .unwrap();
         assert_eq!(count, 1);
     }
-    
+
     #[tokio::test]
     async fn test_delete_old_feedback() {
         let conn = setup_test_db().await;
         let repo = LibSqlLearningRepository::new(conn);
-        
+
         // Create old record
         let old_record = FeedbackRecord {
             id: "old-1".to_string(),
@@ -340,7 +375,7 @@ mod tests {
             timestamp: Utc::now() - chrono::Duration::days(30),
             user_id: None,
         };
-        
+
         // Create new record
         let new_record = FeedbackRecord {
             id: "new-1".to_string(),
@@ -362,22 +397,21 @@ mod tests {
             timestamp: Utc::now(),
             user_id: None,
         };
-        
+
         repo.create_feedback(&old_record).await.unwrap();
         repo.create_feedback(&new_record).await.unwrap();
-        
+
         // Delete old feedback (older than 7 days)
         let deleted_count = repo
             .delete_old_feedback(Utc::now() - chrono::Duration::days(7))
             .await
             .unwrap();
-        
+
         assert_eq!(deleted_count, 1);
-        
+
         // Verify only new record remains
         let remaining = repo.get_all_feedback().await.unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, "new-1");
     }
 }
-

@@ -168,7 +168,10 @@ async fn test_memory_vector_store_basic() {
     assert_eq!(results[0].id, "vec-1");
 
     // 测试删除
-    store.delete_vectors(vec!["vec-1".to_string()]).await.unwrap();
+    store
+        .delete_vectors(vec!["vec-1".to_string()])
+        .await
+        .unwrap();
     let count = store.count_vectors().await.unwrap();
     assert_eq!(count, 2);
 }
@@ -180,7 +183,7 @@ async fn test_memory_vector_store_search_with_filters() {
     // 创建带元数据的向量
     let mut metadata1 = HashMap::new();
     metadata1.insert("category".to_string(), "A".to_string());
-    
+
     let mut metadata2 = HashMap::new();
     metadata2.insert("category".to_string(), "B".to_string());
 
@@ -286,4 +289,3 @@ async fn test_libsql_clear() {
     let count = store.count().await.unwrap();
     assert_eq!(count, 0);
 }
-

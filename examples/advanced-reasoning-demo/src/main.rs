@@ -13,9 +13,7 @@ use tracing_subscriber;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化 tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     println!("=== 高级推理功能演示 ===\n");
 
@@ -88,12 +86,7 @@ async fn demo_multi_hop_causal_reasoning() -> Result<(), Box<dyn std::error::Err
             println!("  推理步骤:");
 
             for (j, step) in result.reasoning_chain.iter().enumerate() {
-                println!(
-                    "    步骤 {}: {} → {}",
-                    j + 1,
-                    step.cause_id,
-                    step.effect_id
-                );
+                println!("    步骤 {}: {} → {}", j + 1, step.cause_id, step.effect_id);
                 println!("      类型: {:?}", step.relation_type);
                 println!("      置信度: {:.2}", step.confidence);
                 if !step.evidence.is_empty() {
@@ -124,24 +117,9 @@ async fn demo_counterfactual_reasoning() -> Result<(), Box<dyn std::error::Error
             100,
             vec![1.0, 0.0, 0.0],
         ),
-        create_memory(
-            "skill1",
-            "学会了编程和算法",
-            80,
-            vec![0.9, 0.1, 0.0],
-        ),
-        create_memory(
-            "skill2",
-            "掌握了软件工程技能",
-            60,
-            vec![0.8, 0.2, 0.0],
-        ),
-        create_memory(
-            "career",
-            "成为了一名软件工程师",
-            10,
-            vec![0.7, 0.3, 0.0],
-        ),
+        create_memory("skill1", "学会了编程和算法", 80, vec![0.9, 0.1, 0.0]),
+        create_memory("skill2", "掌握了软件工程技能", 60, vec![0.8, 0.2, 0.0]),
+        create_memory("career", "成为了一名软件工程师", 10, vec![0.7, 0.3, 0.0]),
     ];
 
     println!("✓ 创建了 {} 个记忆", memories.len());
@@ -186,58 +164,23 @@ async fn demo_analogical_reasoning() -> Result<(), Box<dyn std::error::Error>> {
 
     // 源领域：学习编程
     let source_memories = vec![
-        create_memory(
-            "prog1",
-            "学习编程基础语法和概念",
-            100,
-            vec![1.0, 0.0, 0.0],
-        ),
-        create_memory(
-            "prog2",
-            "通过练习编程题目提高技能",
-            80,
-            vec![0.9, 0.1, 0.0],
-        ),
-        create_memory(
-            "prog3",
-            "构建实际项目应用所学知识",
-            60,
-            vec![0.8, 0.2, 0.0],
-        ),
-        create_memory(
-            "prog4",
-            "成为熟练的程序员",
-            40,
-            vec![0.7, 0.3, 0.0],
-        ),
+        create_memory("prog1", "学习编程基础语法和概念", 100, vec![1.0, 0.0, 0.0]),
+        create_memory("prog2", "通过练习编程题目提高技能", 80, vec![0.9, 0.1, 0.0]),
+        create_memory("prog3", "构建实际项目应用所学知识", 60, vec![0.8, 0.2, 0.0]),
+        create_memory("prog4", "成为熟练的程序员", 40, vec![0.7, 0.3, 0.0]),
     ];
 
     // 目标领域：学习音乐
     let target_memories = vec![
-        create_memory(
-            "music1",
-            "学习音乐理论基础和乐理",
-            50,
-            vec![0.0, 1.0, 0.0],
-        ),
+        create_memory("music1", "学习音乐理论基础和乐理", 50, vec![0.0, 1.0, 0.0]),
         create_memory(
             "music2",
             "通过练习音阶和练习曲提高技能",
             40,
             vec![0.1, 0.9, 0.0],
         ),
-        create_memory(
-            "music3",
-            "创作和演奏实际音乐作品",
-            30,
-            vec![0.2, 0.8, 0.0],
-        ),
-        create_memory(
-            "music4",
-            "成为熟练的音乐家",
-            20,
-            vec![0.3, 0.7, 0.0],
-        ),
+        create_memory("music3", "创作和演奏实际音乐作品", 30, vec![0.2, 0.8, 0.0]),
+        create_memory("music4", "成为熟练的音乐家", 20, vec![0.3, 0.7, 0.0]),
     ];
 
     println!("✓ 源领域（学习编程）包含 {} 个记忆:", source_memories.len());
@@ -245,7 +188,10 @@ async fn demo_analogical_reasoning() -> Result<(), Box<dyn std::error::Error>> {
         println!("  - {}", mem.content);
     }
 
-    println!("\n✓ 目标领域（学习音乐）包含 {} 个记忆:", target_memories.len());
+    println!(
+        "\n✓ 目标领域（学习音乐）包含 {} 个记忆:",
+        target_memories.len()
+    );
     for mem in &target_memories {
         println!("  - {}", mem.content);
     }
@@ -290,4 +236,3 @@ fn create_memory(id: &str, content: &str, hours_ago: i64, embedding: Vec<f32>) -
         embedding: Some(embedding),
     }
 }
-

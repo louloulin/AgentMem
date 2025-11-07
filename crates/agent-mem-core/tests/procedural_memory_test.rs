@@ -109,7 +109,11 @@ async fn test_get_items_by_type() {
 
     // 获取特定类型的项
     let result = manager.get_items_by_type("user-test", "workflow", 10).await;
-    assert!(result.is_ok(), "Failed to get items by type: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to get items by type: {:?}",
+        result.err()
+    );
 
     let items = result.unwrap();
     for item in items {
@@ -230,8 +234,7 @@ fn test_procedural_query_builder() {
     assert!(json.contains("workflow"));
 
     // 测试反序列化
-    let deserialized: ProceduralQuery =
-        serde_json::from_str(&json).expect("Failed to deserialize");
+    let deserialized: ProceduralQuery = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.entry_type, query.entry_type);
     assert_eq!(deserialized.limit, query.limit);
 }
@@ -277,4 +280,3 @@ fn test_metadata_structure() {
     assert_eq!(item.metadata["test"], true);
     assert_eq!(item.metadata["category"], "test");
 }
-

@@ -82,8 +82,8 @@ async fn test_plugin_hooks_integration() -> Result<()> {
 #[tokio::test]
 async fn test_plugin_registration() -> Result<()> {
     use agent_mem::plugin_integration::PluginEnhancedMemory;
-    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use chrono::Utc;
 
     let mut plugin_memory = PluginEnhancedMemory::new();
@@ -123,8 +123,8 @@ async fn test_plugin_registration() -> Result<()> {
 #[tokio::test]
 async fn test_multiple_plugin_registration() -> Result<()> {
     use agent_mem::plugin_integration::PluginEnhancedMemory;
-    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use chrono::Utc;
 
     let mut plugin_memory = PluginEnhancedMemory::new();
@@ -165,8 +165,8 @@ async fn test_multiple_plugin_registration() -> Result<()> {
 #[tokio::test]
 async fn test_plugin_types() -> Result<()> {
     use agent_mem::plugin_integration::PluginEnhancedMemory;
-    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+    use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
     use chrono::Utc;
 
     let mut plugin_memory = PluginEnhancedMemory::new();
@@ -174,10 +174,7 @@ async fn test_plugin_types() -> Result<()> {
     // Test different plugin types
     let types = vec![
         (PluginType::MemoryProcessor, vec![Capability::MemoryAccess]),
-        (
-            PluginType::SearchAlgorithm,
-            vec![Capability::SearchAccess],
-        ),
+        (PluginType::SearchAlgorithm, vec![Capability::SearchAccess]),
         (PluginType::CodeAnalyzer, vec![Capability::MemoryAccess]),
         (
             PluginType::DataSource,
@@ -215,4 +212,3 @@ async fn test_plugin_types() -> Result<()> {
 
     Ok(())
 }
-

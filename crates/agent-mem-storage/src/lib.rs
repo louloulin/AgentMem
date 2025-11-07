@@ -11,25 +11,25 @@
 
 pub mod backends;
 pub mod cache;
-pub mod factory;  // Memory store factory (factory/mod.rs)
-pub mod vector_factory;  // Vector store factory (vector_factory.rs)
+pub mod factory; // Memory store factory (factory/mod.rs)
 pub mod graph;
 pub mod optimizations;
 pub mod performance;
 pub mod utils;
 pub mod vector;
+pub mod vector_factory; // Vector store factory (vector_factory.rs)
 
 // Re-export memory store factory
 pub use factory::StorageFactory as MemoryStoreFactory;
-pub use factory::{StorageConfig, StorageBackend, AllStores, create_factory};
+pub use factory::{create_factory, AllStores, StorageBackend, StorageConfig};
 
 // Re-export vector store factory
 pub use vector_factory::StorageFactory as VectorStoreFactory;
 
 pub use graph::GraphStoreFactory;
-pub use optimizations::{QueryCache, QueryCacheConfig};
 #[cfg(feature = "optimizations")]
-pub use optimizations::{PoolConfig, QueryOptimizer, create_optimized_pool};
+pub use optimizations::{create_optimized_pool, PoolConfig, QueryOptimizer};
+pub use optimizations::{QueryCache, QueryCacheConfig};
 
 // 重新导出常用类型
 pub use agent_mem_traits::{AgentMemError, Result, VectorStore, VectorStoreConfig};

@@ -257,7 +257,9 @@ impl LifecycleManager {
             agent_id,
             memory_id,
             event_type,
-            old_state.map(|s| MemoryState::from_str(&s.current_state).ok()).flatten(),
+            old_state
+                .map(|s| MemoryState::from_str(&s.current_state).ok())
+                .flatten(),
             Some(new_state),
             serde_json::json!({}),
         )
@@ -532,4 +534,3 @@ impl LifecycleManager {
         Ok(result.rows_affected())
     }
 }
-

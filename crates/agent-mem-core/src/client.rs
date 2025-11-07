@@ -12,7 +12,7 @@ use futures::future;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Semaphore, RwLock};
+use tokio::sync::{RwLock, Semaphore};
 use uuid::Uuid;
 
 /// Memory type for client API
@@ -321,9 +321,8 @@ impl FilterBuilder {
 
     /// Add custom filter
     pub fn custom<T: Serialize>(mut self, key: String, value: T) -> Result<Self> {
-        let value = serde_json::to_value(value).map_err(|e| {
-            AgentMemError::validation_error(format!("Invalid filter value: {e}"))
-        })?;
+        let value = serde_json::to_value(value)
+            .map_err(|e| AgentMemError::validation_error(format!("Invalid filter value: {e}")))?;
         self.filters.insert(key, value);
         Ok(self)
     }
@@ -369,9 +368,8 @@ impl MetadataBuilder {
 
     /// Add custom metadata
     pub fn custom<T: Serialize>(mut self, key: String, value: T) -> Result<Self> {
-        let value = serde_json::to_value(value).map_err(|e| {
-            AgentMemError::validation_error(format!("Invalid metadata value: {e}"))
-        })?;
+        let value = serde_json::to_value(value)
+            .map_err(|e| AgentMemError::validation_error(format!("Invalid metadata value: {e}")))?;
         self.data.insert(key, value);
         Ok(self)
     }
@@ -510,7 +508,7 @@ pub struct AgentMemClient {
     config: AgentMemClientConfig,
     semaphore: Arc<Semaphore>,
     user_storage: Arc<RwLock<HashMap<String, User>>>, // 简化的内存存储
-    llm_client: Option<Arc<agent_mem_llm::LLMClient>>,  // LLM 客户端（可选）
+    llm_client: Option<Arc<agent_mem_llm::LLMClient>>, // LLM 客户端（可选）
 }
 
 impl AgentMemClient {
@@ -608,9 +606,10 @@ impl AgentMemClient {
         }
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Search using engine
         let memories = self
@@ -680,9 +679,10 @@ impl AgentMemClient {
         }
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Get from engine
         let memory_opt = self
@@ -715,9 +715,10 @@ impl AgentMemClient {
         }
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Get existing memory
         let mut memory = self
@@ -764,9 +765,10 @@ impl AgentMemClient {
         }
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Delete from engine
         let deleted = self
@@ -787,9 +789,10 @@ impl AgentMemClient {
         limit: Option<usize>,
     ) -> Result<Vec<MemorySearchResult>> {
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Get all memories from engine (using empty query to get all)
         let memories = self
@@ -887,11 +890,7 @@ impl AgentMemClient {
             match result {
                 Ok(Ok(add_result)) => final_results.push(add_result),
                 Ok(Err(e)) => return Err(e),
-                Err(e) => {
-                    return Err(AgentMemError::internal_error(format!(
-                        "Task failed: {e}"
-                    )))
-                }
+                Err(e) => return Err(AgentMemError::internal_error(format!("Task failed: {e}"))),
             }
         }
 
@@ -931,11 +930,7 @@ impl AgentMemClient {
             match result {
                 Ok(Ok(update_result)) => final_results.push(update_result),
                 Ok(Err(e)) => return Err(e),
-                Err(e) => {
-                    return Err(AgentMemError::internal_error(format!(
-                        "Task failed: {e}"
-                    )))
-                }
+                Err(e) => return Err(AgentMemError::internal_error(format!("Task failed: {e}"))),
             }
         }
 
@@ -988,9 +983,10 @@ impl AgentMemClient {
         request.messages.validate()?;
 
         // Acquire semaphore permit for concurrency control
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
-        })?;
+        let _permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                AgentMemError::internal_error(format!("Failed to acquire permit: {e}"))
+            })?;
 
         // Convert messages to memory content
         let messages = request.messages.to_message_list();
@@ -1230,9 +1226,7 @@ impl AgentMemClient {
             "You are a helpful AI assistant with access to the following memories:".to_string()
         });
 
-        Ok(format!(
-            "{prefix}\n\n{memory_context}\n\nUser: {message}"
-        ))
+        Ok(format!("{prefix}\n\n{memory_context}\n\nUser: {message}"))
     }
 
     // ==================== 清空功能 ====================
@@ -1465,11 +1459,12 @@ impl AgentMemClient {
             user_id,
             None, // agent_id
             run_id,
-            None, // metadata
+            None,  // metadata
             false, // infer
             memory_type,
             None, // prompt
-        ).await
+        )
+        .await
     }
 
     // ==================== 记忆可视化 API ====================
@@ -1551,9 +1546,14 @@ impl AgentMemClient {
 
         // 4. 构建摘要
         let summary = MemorySummary {
-            total_count: episodic.len() + semantic.len() + procedural.len() +
-                        core.len() + resource.len() + knowledge.len() +
-                        working.len() + contextual.len(),
+            total_count: episodic.len()
+                + semantic.len()
+                + procedural.len()
+                + core.len()
+                + resource.len()
+                + knowledge.len()
+                + working.len()
+                + contextual.len(),
             episodic_count: episodic.len(),
             semantic_count: semantic.len(),
             procedural_count: procedural.len(),

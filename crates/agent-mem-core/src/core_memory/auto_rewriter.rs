@@ -180,9 +180,7 @@ impl AutoRewriter {
             custom_prompt,
             content,
             target_length,
-            context
-                .map(|c| format!("Context: {c}"))
-                .unwrap_or_default()
+            context.map(|c| format!("Context: {c}")).unwrap_or_default()
         );
 
         // 调用 LLM

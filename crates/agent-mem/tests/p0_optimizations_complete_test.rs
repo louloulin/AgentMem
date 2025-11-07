@@ -37,9 +37,18 @@ mod p0_optimizations_complete_tests {
         let timeout_config = TimeoutConfig::default();
 
         println!("超时配置:");
-        println!("  - 事实提取超时: {}秒", timeout_config.fact_extraction_timeout_secs);
-        println!("  - 决策引擎超时: {}秒", timeout_config.decision_timeout_secs);
-        println!("  - 冲突检测超时: {}秒", timeout_config.conflict_detection_timeout_secs);
+        println!(
+            "  - 事实提取超时: {}秒",
+            timeout_config.fact_extraction_timeout_secs
+        );
+        println!(
+            "  - 决策引擎超时: {}秒",
+            timeout_config.decision_timeout_secs
+        );
+        println!(
+            "  - 冲突检测超时: {}秒",
+            timeout_config.conflict_detection_timeout_secs
+        );
 
         // 测试超时功能
         let result = with_timeout(
@@ -123,4 +132,3 @@ mod p0_optimizations_complete_tests {
         println!("\n✅ 所有 P0 优化已完成并验证！");
     }
 }
-

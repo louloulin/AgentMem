@@ -2,9 +2,7 @@
 //!
 //! 测试新增的内置工具功能
 
-use agent_mem_tools::builtin::{
-    FileReadTool, FileWriteTool, HttpRequestTool, SearchTool,
-};
+use agent_mem_tools::builtin::{FileReadTool, FileWriteTool, HttpRequestTool, SearchTool};
 use agent_mem_tools::executor::{ExecutionContext, Tool};
 use serde_json::json;
 use std::time::Duration;
@@ -94,8 +92,6 @@ async fn test_file_read_tool_basic() {
     assert!(schema.parameters.properties.contains_key("line_start"));
 }
 
-
-
 #[tokio::test]
 async fn test_file_read_tool_missing_filename() {
     let tool = FileReadTool;
@@ -145,8 +141,6 @@ async fn test_file_write_tool_basic() {
     assert!(schema.parameters.properties.contains_key("filename"));
     assert!(schema.parameters.properties.contains_key("content"));
 }
-
-
 
 #[tokio::test]
 async fn test_file_write_tool_missing_content() {
@@ -251,4 +245,3 @@ async fn test_http_request_tool_missing_url() {
     let result = tool.execute(args, &context).await;
     assert!(result.is_err());
 }
-

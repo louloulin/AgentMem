@@ -75,7 +75,9 @@ impl Memory {
             default_user_id,
             default_agent_id,
             #[cfg(feature = "plugins")]
-            plugin_layer: Arc::new(RwLock::new(crate::plugin_integration::PluginEnhancedMemory::new())),
+            plugin_layer: Arc::new(RwLock::new(
+                crate::plugin_integration::PluginEnhancedMemory::new(),
+            )),
         }
     }
 
@@ -1044,7 +1046,9 @@ impl Memory {
     ///
     /// 用于高级插件管理操作
     #[cfg(feature = "plugins")]
-    pub async fn plugin_registry(&self) -> tokio::sync::RwLockReadGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
+    pub async fn plugin_registry(
+        &self,
+    ) -> tokio::sync::RwLockReadGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
         self.plugin_layer.read().await
     }
 
@@ -1052,7 +1056,9 @@ impl Memory {
     ///
     /// 用于高级插件管理操作
     #[cfg(feature = "plugins")]
-    pub async fn plugin_registry_mut(&self) -> tokio::sync::RwLockWriteGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
+    pub async fn plugin_registry_mut(
+        &self,
+    ) -> tokio::sync::RwLockWriteGuard<'_, crate::plugin_integration::PluginEnhancedMemory> {
         self.plugin_layer.write().await
     }
 }

@@ -1,5 +1,5 @@
 //! 生产环境嵌入式模式示例
-//! 
+//!
 //! 展示如何在生产环境中使用 AgentMem 嵌入式模式：
 //! - 完整的错误处理
 //! - 数据持久化
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]),
         });
     }
-    
+
     store.add_vectors(vectors).await?;
     let duration = start.elapsed();
     println!("✅ 插入 1000 个向量完成");
@@ -59,7 +59,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   搜索耗时: {:?}", duration);
     println!("   前 3 个结果:");
     for (i, result) in results.iter().take(3).enumerate() {
-        println!("     {}. ID: {}, 相似度: {:.4}", i + 1, result.id, result.similarity);
+        println!(
+            "     {}. ID: {}, 相似度: {:.4}",
+            i + 1,
+            result.id,
+            result.similarity
+        );
     }
     println!();
 
@@ -88,7 +93,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 6. 验证更新
     println!("🔍 验证更新...");
     if let Some(vector) = store.get_vector("doc_0").await? {
-        let updated = vector.metadata.get("updated")
+        let updated = vector
+            .metadata
+            .get("updated")
             .map(|v| v == "true")
             .unwrap_or(false);
         println!("✅ 验证成功: doc_0 已更新 = {}\n", updated);
@@ -98,9 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🗑️  批量删除操作...");
     let start = Instant::now();
 
-    let delete_ids: Vec<String> = (900..1000)
-        .map(|i| format!("doc_{}", i))
-        .collect();
+    let delete_ids: Vec<String> = (900..1000).map(|i| format!("doc_{}", i)).collect();
 
     store.delete_vectors(delete_ids).await?;
     let duration = start.elapsed();
@@ -132,4 +137,3 @@ fn generate_random_vector(dimension: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     (0..dimension).map(|_| rng.gen::<f32>()).collect()
 }
-

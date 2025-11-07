@@ -93,12 +93,12 @@ async fn test_memory_vector_search() {
     // 测试向量搜索
     let query = vec![1.0, 0.0, 0.0];
     let results = store.search_vectors(query, 2, None).await.unwrap();
-    
+
     assert_eq!(results.len(), 2);
     // 第一个结果应该是 vec-1 (完全匹配)
     assert_eq!(results[0].id, "vec-1");
     assert!(results[0].similarity > 0.99);
-    
+
     // 第二个结果应该是 vec-2 (相似度次高)
     assert_eq!(results[1].id, "vec-2");
     assert!(results[1].similarity > 0.8);
@@ -131,7 +131,7 @@ async fn test_memory_vector_search_with_threshold() {
     // 使用阈值搜索
     let query = vec![1.0, 0.0, 0.0];
     let results = store.search_vectors(query, 10, Some(0.8)).await.unwrap();
-    
+
     // 只有相似度 >= 0.8 的结果
     assert!(results.len() <= 2);
     for result in &results {
@@ -147,11 +147,11 @@ async fn test_memory_vector_search_with_filters() {
     let mut metadata1 = HashMap::new();
     metadata1.insert("category".to_string(), "A".to_string());
     metadata1.insert("priority".to_string(), "high".to_string());
-    
+
     let mut metadata2 = HashMap::new();
     metadata2.insert("category".to_string(), "B".to_string());
     metadata2.insert("priority".to_string(), "low".to_string());
-    
+
     let mut metadata3 = HashMap::new();
     metadata3.insert("category".to_string(), "A".to_string());
     metadata3.insert("priority".to_string(), "low".to_string());
@@ -208,7 +208,7 @@ async fn test_memory_vector_update() {
     // 更新向量
     let mut new_metadata = HashMap::new();
     new_metadata.insert("updated".to_string(), "true".to_string());
-    
+
     let updated_vectors = vec![VectorData {
         id: "vec-1".to_string(),
         vector: vec![0.0, 1.0, 0.0],
@@ -243,7 +243,10 @@ async fn test_memory_vector_delete() {
     store.add_vectors(vectors).await.unwrap();
 
     // 删除一个向量
-    store.delete_vectors(vec!["vec-1".to_string()]).await.unwrap();
+    store
+        .delete_vectors(vec!["vec-1".to_string()])
+        .await
+        .unwrap();
 
     // 验证删除
     let count = store.count_vectors().await.unwrap();
@@ -300,10 +303,7 @@ async fn test_memory_vector_batch_operations() {
         metadata: HashMap::new(),
     }];
 
-    let results = store
-        .add_vectors_batch(vec![batch1, batch2])
-        .await
-        .unwrap();
+    let results = store.add_vectors_batch(vec![batch1, batch2]).await.unwrap();
 
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].len(), 1);
@@ -311,10 +311,7 @@ async fn test_memory_vector_batch_operations() {
 
     // 批量删除
     let delete_results = store
-        .delete_vectors_batch(vec![
-            vec!["vec-1".to_string()],
-            vec!["vec-2".to_string()],
-        ])
+        .delete_vectors_batch(vec![vec!["vec-1".to_string()], vec!["vec-2".to_string()]])
         .await
         .unwrap();
 
@@ -325,4 +322,3 @@ async fn test_memory_vector_batch_operations() {
     let count = store.count_vectors().await.unwrap();
     assert_eq!(count, 0);
 }
-

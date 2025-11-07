@@ -1,5 +1,5 @@
 //! 语义搜索示例
-//! 
+//!
 //! 展示如何使用 AgentMem 进行语义搜索：
 //! - 文档向量化
 //! - 相似度搜索
@@ -22,12 +22,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. 准备文档数据（模拟已向量化的文档）
     println!("📚 准备文档数据...");
     let documents = vec![
-        ("doc1", "Rust 是一种系统编程语言", vec![0.8, 0.2, 0.1, 0.9], "programming"),
-        ("doc2", "Python 是一种高级编程语言", vec![0.7, 0.3, 0.2, 0.8], "programming"),
-        ("doc3", "机器学习是人工智能的一个分支", vec![0.1, 0.9, 0.8, 0.2], "ai"),
-        ("doc4", "深度学习使用神经网络", vec![0.2, 0.8, 0.9, 0.1], "ai"),
-        ("doc5", "数据库用于存储数据", vec![0.6, 0.4, 0.3, 0.7], "database"),
-        ("doc6", "向量数据库支持相似度搜索", vec![0.5, 0.5, 0.6, 0.4], "database"),
+        (
+            "doc1",
+            "Rust 是一种系统编程语言",
+            vec![0.8, 0.2, 0.1, 0.9],
+            "programming",
+        ),
+        (
+            "doc2",
+            "Python 是一种高级编程语言",
+            vec![0.7, 0.3, 0.2, 0.8],
+            "programming",
+        ),
+        (
+            "doc3",
+            "机器学习是人工智能的一个分支",
+            vec![0.1, 0.9, 0.8, 0.2],
+            "ai",
+        ),
+        (
+            "doc4",
+            "深度学习使用神经网络",
+            vec![0.2, 0.8, 0.9, 0.1],
+            "ai",
+        ),
+        (
+            "doc5",
+            "数据库用于存储数据",
+            vec![0.6, 0.4, 0.3, 0.7],
+            "database",
+        ),
+        (
+            "doc6",
+            "向量数据库支持相似度搜索",
+            vec![0.5, 0.5, 0.6, 0.4],
+            "database",
+        ),
     ];
 
     let vectors: Vec<VectorData> = documents
@@ -38,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             for _ in 0..96 {
                 full_vector.extend_from_slice(vec);
             }
-            
+
             VectorData {
                 id: id.to_string(),
                 vector: full_vector,
@@ -61,14 +91,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for _ in 0..96 {
         query_vector1.extend_from_slice(&query1);
     }
-    
+
     let results = store.search_vectors(query_vector1, 3, None).await?;
     println!("找到 {} 个结果:", results.len());
     for (i, result) in results.iter().enumerate() {
-        let text = result.metadata.get("text").map(|s| s.as_str()).unwrap_or("");
-        let category = result.metadata.get("category").map(|s| s.as_str()).unwrap_or("");
-        println!("  {}. [{}] {} (相似度: {:.4})",
-            i + 1, category, text, result.similarity);
+        let text = result
+            .metadata
+            .get("text")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let category = result
+            .metadata
+            .get("category")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        println!(
+            "  {}. [{}] {} (相似度: {:.4})",
+            i + 1,
+            category,
+            text,
+            result.similarity
+        );
     }
     println!();
 
@@ -79,14 +122,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for _ in 0..96 {
         query_vector2.extend_from_slice(&query2);
     }
-    
+
     let results = store.search_vectors(query_vector2, 3, None).await?;
     println!("找到 {} 个结果:", results.len());
     for (i, result) in results.iter().enumerate() {
-        let text = result.metadata.get("text").map(|s| s.as_str()).unwrap_or("");
-        let category = result.metadata.get("category").map(|s| s.as_str()).unwrap_or("");
-        println!("  {}. [{}] {} (相似度: {:.4})",
-            i + 1, category, text, result.similarity);
+        let text = result
+            .metadata
+            .get("text")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let category = result
+            .metadata
+            .get("category")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        println!(
+            "  {}. [{}] {} (相似度: {:.4})",
+            i + 1,
+            category,
+            text,
+            result.similarity
+        );
     }
     println!();
 
@@ -97,14 +153,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for _ in 0..96 {
         query_vector3.extend_from_slice(&query3);
     }
-    
+
     let results = store.search_vectors(query_vector3, 3, None).await?;
     println!("找到 {} 个结果:", results.len());
     for (i, result) in results.iter().enumerate() {
-        let text = result.metadata.get("text").map(|s| s.as_str()).unwrap_or("");
-        let category = result.metadata.get("category").map(|s| s.as_str()).unwrap_or("");
-        println!("  {}. [{}] {} (相似度: {:.4})",
-            i + 1, category, text, result.similarity);
+        let text = result
+            .metadata
+            .get("text")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let category = result
+            .metadata
+            .get("category")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        println!(
+            "  {}. [{}] {} (相似度: {:.4})",
+            i + 1,
+            category,
+            text,
+            result.similarity
+        );
     }
     println!();
 
@@ -112,7 +181,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📄 获取特定文档 (doc3):");
     if let Some(doc) = store.get_vector("doc3").await? {
         let text = doc.metadata.get("text").map(|s| s.as_str()).unwrap_or("");
-        let category = doc.metadata.get("category").map(|s| s.as_str()).unwrap_or("");
+        let category = doc
+            .metadata
+            .get("category")
+            .map(|s| s.as_str())
+            .unwrap_or("");
         println!("  文本: {}", text);
         println!("  类别: {}", category);
         println!("  向量维度: {}", doc.vector.len());
@@ -131,4 +204,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

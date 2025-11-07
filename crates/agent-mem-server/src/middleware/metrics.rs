@@ -36,7 +36,9 @@ pub async fn metrics_middleware(
     collector.record_request(&method, &path, status).await;
 
     // Record request duration
-    collector.record_request_duration(&method, &path, duration).await;
+    collector
+        .record_request_duration(&method, &path, duration)
+        .await;
 
     // Record error if status >= 400
     if status >= 400 {
@@ -79,10 +81,7 @@ mod tests {
             .layer(middleware::from_fn(metrics_middleware))
             .layer(Extension(metrics.clone()));
 
-        let request = Request::builder()
-            .uri("/test")
-            .body(Body::empty())
-            .unwrap();
+        let request = Request::builder().uri("/test").body(Body::empty()).unwrap();
 
         let response = app.oneshot(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -90,4 +89,3 @@ mod tests {
         // Verify metrics were recorded (would need to check actual metrics values)
     }
 }
-

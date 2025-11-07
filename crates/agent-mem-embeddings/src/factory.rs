@@ -1,9 +1,9 @@
 //! 嵌入模型工厂模式实现
 
 use crate::config::EmbeddingConfig;
-use crate::providers::OpenAIEmbedder;
 #[cfg(feature = "fastembed")]
 use crate::providers::FastEmbedProvider;
+use crate::providers::OpenAIEmbedder;
 use agent_mem_traits::{AgentMemError, Embedder, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -229,7 +229,7 @@ impl EmbeddingFactory {
     pub async fn create_default() -> Result<Arc<dyn Embedder + Send + Sync>> {
         let config = EmbeddingConfig {
             provider: "fastembed".to_string(),
-            model: "multilingual-e5-small".to_string(),  // 使用多语言模型，支持中文
+            model: "multilingual-e5-small".to_string(), // 使用多语言模型，支持中文
             dimension: 384,
             batch_size: 256,
             ..Default::default()
@@ -253,12 +253,16 @@ impl EmbeddingFactory {
     ///   - "multilingual-e5-base" (768维，多语言)
     ///   - "multilingual-e5-large" (1024维，多语言)
     #[cfg(feature = "fastembed")]
-    pub async fn create_fastembed(
-        model: &str,
-    ) -> Result<Arc<dyn Embedder + Send + Sync>> {
+    pub async fn create_fastembed(model: &str) -> Result<Arc<dyn Embedder + Send + Sync>> {
         let dimension = match model {
-            "bge-small-en-v1.5" | "all-MiniLM-L6-v2" | "all-MiniLM-L12-v2" | "multilingual-e5-small" => 384,
-            "bge-base-en-v1.5" | "nomic-embed-text-v1" | "nomic-embed-text-v1.5" | "multilingual-e5-base" => 768,
+            "bge-small-en-v1.5"
+            | "all-MiniLM-L6-v2"
+            | "all-MiniLM-L12-v2"
+            | "multilingual-e5-small" => 384,
+            "bge-base-en-v1.5"
+            | "nomic-embed-text-v1"
+            | "nomic-embed-text-v1.5"
+            | "multilingual-e5-base" => 768,
             "bge-large-en-v1.5" | "mxbai-embed-large-v1" | "multilingual-e5-large" => 1024,
             _ => 768, // 默认维度
         };
@@ -372,7 +376,7 @@ impl EmbeddingFactory {
                 #[cfg(feature = "fastembed")]
                 {
                     let model = std::env::var("FASTEMBED_MODEL")
-                        .unwrap_or_else(|_| "bge-small-en-v1.5".to_string());  // 更稳定的默认模型
+                        .unwrap_or_else(|_| "bge-small-en-v1.5".to_string()); // 更稳定的默认模型
                     Self::create_fastembed(&model).await
                 }
                 #[cfg(not(feature = "fastembed"))]

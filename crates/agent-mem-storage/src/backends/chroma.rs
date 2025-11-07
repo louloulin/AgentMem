@@ -234,15 +234,17 @@ impl VectorStore for ChromaStore {
             )));
         }
 
-        let chroma_response: ChromaQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let chroma_response: ChromaQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         let mut results = Vec::new();
 
-        if let (Some(ids), Some(distances)) =
-            (chroma_response.ids.first(), chroma_response.distances.first())
-        {
+        if let (Some(ids), Some(distances)) = (
+            chroma_response.ids.first(),
+            chroma_response.distances.first(),
+        ) {
             for (i, (id, distance)) in ids.iter().zip(distances.iter()).enumerate() {
                 let vector = chroma_response
                     .embeddings
@@ -371,9 +373,10 @@ impl VectorStore for ChromaStore {
             )));
         }
 
-        let response_data: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let response_data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         // 解析响应并构建VectorData
         if let (Some(ids), Some(embeddings)) = (
@@ -425,9 +428,10 @@ impl VectorStore for ChromaStore {
             )));
         }
 
-        let count: usize = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let count: usize = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(count)
     }

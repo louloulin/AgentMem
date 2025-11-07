@@ -109,9 +109,8 @@ impl ServerConfig {
     pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read config file: {}", e))?;
-        
-        toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse config file: {}", e))
+
+        toml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
     }
 
     /// Load configuration with precedence: File < Env < CLI
@@ -127,10 +126,10 @@ impl ServerConfig {
             // Use default with env vars
             Self::default()
         };
-        
+
         // Override with environment variables (explicit, higher priority than file)
         config = config.override_from_env();
-        
+
         Ok(config)
     }
 
@@ -171,7 +170,7 @@ impl ServerConfig {
         if let Ok(model) = env::var("EMBEDDER_MODEL") {
             self.embedder_model = Some(model);
         }
-        
+
         self
     }
 

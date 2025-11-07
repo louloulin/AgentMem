@@ -102,8 +102,7 @@ struct HierarchicalIndex {
 }
 
 /// 索引层
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 struct IndexLayer {
     /// 节点连接图
     connections: HashMap<String, Vec<String>>,
@@ -121,7 +120,6 @@ impl Default for HierarchicalIndex {
         }
     }
 }
-
 
 /// FAISS 存储实现
 /// 增强的高性能内存实现，兼容 FAISS 的核心算法
@@ -206,9 +204,7 @@ impl FaissStore {
 
         fs::write(&self.config.metadata_path, content)
             .await
-            .map_err(|e| {
-                AgentMemError::storage_error(format!("Failed to write metadata: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to write metadata: {e}")))?;
 
         Ok(())
     }

@@ -152,9 +152,10 @@ impl GeminiProvider {
             .map_err(|e| AgentMemError::llm_error(format!("Request failed: {e}")))?;
 
         if response.status().is_success() {
-            let gemini_response: GeminiResponse = response.json().await.map_err(|e| {
-                AgentMemError::llm_error(format!("Failed to parse response: {e}"))
-            })?;
+            let gemini_response: GeminiResponse = response
+                .json()
+                .await
+                .map_err(|e| AgentMemError::llm_error(format!("Failed to parse response: {e}")))?;
 
             Ok(gemini_response)
         } else {
@@ -260,9 +261,7 @@ impl LLMProvider for GeminiProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Gemini API request failed: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Gemini API request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
@@ -308,9 +307,7 @@ impl LLMProvider for GeminiProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(format!(
-                        "Stream error: {e}"
-                    ))),
+                    Err(e) => Err(AgentMemError::network_error(format!("Stream error: {e}"))),
                 }
             })
             .filter(|result| {

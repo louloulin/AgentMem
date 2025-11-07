@@ -3,14 +3,14 @@
 //! 测试 MemoryIntegrator, MemoryExtractor, ToolIntegrator 等模块的单元功能
 
 use agent_mem_core::{
-    orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     engine::{MemoryEngine, MemoryEngineConfig},
+    orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     Memory, MemoryType,
 };
 use agent_mem_traits::Session;
 use chrono::Utc;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 // 辅助函数：创建测试用的 Memory
@@ -58,7 +58,10 @@ async fn test_memory_integrator_format_memories() {
 
     // 4. 验证格式化结果
     assert!(formatted.contains("Semantic"), "Should contain memory type");
-    assert!(formatted.contains("coffee"), "Should contain memory content");
+    assert!(
+        formatted.contains("coffee"),
+        "Should contain memory content"
+    );
     assert!(formatted.contains("Episodic"), "Should contain memory type");
     assert!(formatted.contains("John"), "Should contain memory content");
 
@@ -86,7 +89,11 @@ async fn test_memory_integrator_filter_by_relevance() {
     let filtered = integrator.filter_by_relevance(memories);
 
     // 4. 验证过滤结果（只保留 score >= 0.7 的记忆）
-    assert_eq!(filtered.len(), 2, "Should keep 2 memories with score >= 0.7");
+    assert_eq!(
+        filtered.len(),
+        2,
+        "Should keep 2 memories with score >= 0.7"
+    );
     assert!(
         filtered.iter().all(|m| m.score.unwrap_or(0.0) >= 0.7),
         "All filtered memories should have score >= 0.7"
@@ -114,9 +121,18 @@ async fn test_memory_integrator_sort_memories() {
 
     // 4. 验证排序结果（按分数降序）
     assert_eq!(sorted.len(), 3, "Should have 3 memories");
-    assert_eq!(sorted[0].content, "High score", "First should be highest score");
-    assert_eq!(sorted[1].content, "Medium score", "Second should be medium score");
-    assert_eq!(sorted[2].content, "Low score", "Third should be lowest score");
+    assert_eq!(
+        sorted[0].content, "High score",
+        "First should be highest score"
+    );
+    assert_eq!(
+        sorted[1].content, "Medium score",
+        "Second should be medium score"
+    );
+    assert_eq!(
+        sorted[2].content, "Low score",
+        "Third should be lowest score"
+    );
 
     println!("✅ test_memory_integrator_sort_memories passed");
 }
@@ -135,7 +151,10 @@ async fn test_memory_integrator_empty_memories() {
     let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证结果
-    assert!(formatted.is_empty() || formatted.contains("No memories"), "Should handle empty memories");
+    assert!(
+        formatted.is_empty() || formatted.contains("No memories"),
+        "Should handle empty memories"
+    );
 
     // 5. 过滤空记忆
     let filtered = integrator.filter_by_relevance(memories.clone());
@@ -159,15 +178,21 @@ async fn test_memory_integrator_no_score() {
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     // 2. 创建没有分数的记忆
-    let memories = vec![
-        create_test_memory("No score memory", MemoryType::Semantic, None),
-    ];
+    let memories = vec![create_test_memory(
+        "No score memory",
+        MemoryType::Semantic,
+        None,
+    )];
 
     // 3. 过滤记忆（没有分数的记忆应该被过滤掉）
     let filtered = integrator.filter_by_relevance(memories);
 
     // 4. 验证结果
-    assert_eq!(filtered.len(), 0, "Memories without score should be filtered out");
+    assert_eq!(
+        filtered.len(),
+        0,
+        "Memories without score should be filtered out"
+    );
 
     println!("✅ test_memory_integrator_no_score passed");
 }
@@ -176,8 +201,14 @@ async fn test_memory_integrator_no_score() {
 async fn test_memory_integrator_config() {
     // 1. 测试默认配置
     let default_config = MemoryIntegratorConfig::default();
-    assert_eq!(default_config.relevance_threshold, 0.5, "Default threshold should be 0.5");
-    assert_eq!(default_config.max_memories, 10, "Default max memories should be 10");
+    assert_eq!(
+        default_config.relevance_threshold, 0.5,
+        "Default threshold should be 0.5"
+    );
+    assert_eq!(
+        default_config.max_memories, 10,
+        "Default max memories should be 10"
+    );
 
     // 2. 测试自定义配置
     let custom_config = MemoryIntegratorConfig {
@@ -207,10 +238,13 @@ async fn test_memory_types() {
     ];
 
     for memory_type in memory_types {
-        let memory = create_test_memory(&format!("Test {memory_type:?} memory"), memory_type.clone(), Some(0.8));
+        let memory = create_test_memory(
+            &format!("Test {memory_type:?} memory"),
+            memory_type.clone(),
+            Some(0.8),
+        );
         assert_eq!(memory.memory_type, memory_type);
     }
 
     println!("✅ test_memory_types passed");
 }
-

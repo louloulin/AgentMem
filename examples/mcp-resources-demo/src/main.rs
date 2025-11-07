@@ -8,21 +8,19 @@
 //! 5. 通知资源变更
 //! 6. 缓存管理
 
-use agent_mem_tools::mcp::{
-    ResourceManager, ResourceChangeType, McpServer,
-    McpReadResourceRequest, McpSubscribeResourceRequest,
-};
-use agent_mem_tools::mcp::server::McpServerConfig;
 use agent_mem_tools::executor::ToolExecutor;
+use agent_mem_tools::mcp::server::McpServerConfig;
+use agent_mem_tools::mcp::{
+    McpReadResourceRequest, McpServer, McpSubscribeResourceRequest, ResourceChangeType,
+    ResourceManager,
+};
 use std::sync::Arc;
 use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("🚀 MCP Resources 功能演示");
     info!("{}", "=".repeat(60));
@@ -90,7 +88,10 @@ async fn demo_resource_manager() -> anyhow::Result<()> {
     let _ = manager.read_resource(uri).await?;
     let duration2 = start.elapsed();
     info!("  耗时: {:?}", duration2);
-    info!("  ✅ 缓存加速: {:.2}x", duration1.as_nanos() as f64 / duration2.as_nanos() as f64);
+    info!(
+        "  ✅ 缓存加速: {:.2}x",
+        duration1.as_nanos() as f64 / duration2.as_nanos() as f64
+    );
 
     // 4. 订阅资源
     info!("");
@@ -104,7 +105,9 @@ async fn demo_resource_manager() -> anyhow::Result<()> {
     // 5. 通知资源变更
     info!("");
     info!("5️⃣ 通知资源变更:");
-    manager.notify_resource_change(uri, ResourceChangeType::Updated).await?;
+    manager
+        .notify_resource_change(uri, ResourceChangeType::Updated)
+        .await?;
     info!("  ✅ 已通知资源更新");
 
     // 6. 列出所有订阅
@@ -198,16 +201,17 @@ async fn demo_mcp_server() -> anyhow::Result<()> {
     // 通知变更
     info!("");
     info!("6️⃣ 通知资源变更:");
-    server.notify_resource_change(
-        "agentmem://memory/semantic",
-        ResourceChangeType::Updated,
-    ).await?;
+    server
+        .notify_resource_change("agentmem://memory/semantic", ResourceChangeType::Updated)
+        .await?;
     info!("  ✅ 已通知变更");
 
     // 取消订阅
     info!("");
     info!("7️⃣ 取消订阅:");
-    server.unsubscribe_resource(&response.subscription_id).await?;
+    server
+        .unsubscribe_resource(&response.subscription_id)
+        .await?;
     info!("  ✅ 订阅已取消");
 
     // 获取资源管理器统计
@@ -219,4 +223,3 @@ async fn demo_mcp_server() -> anyhow::Result<()> {
 
     Ok(())
 }
-

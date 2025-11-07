@@ -183,7 +183,7 @@ pub async fn tenant_isolation_middleware(
 }
 
 /// Default authentication middleware (when auth is disabled)
-/// 
+///
 /// This middleware injects a default AuthUser for development/testing
 /// when authentication is disabled. In production, use jwt_auth_middleware
 /// or api_key_auth_middleware instead.
@@ -198,7 +198,7 @@ pub async fn default_auth_middleware(mut request: Request, next: Next) -> Respon
         };
         request.extensions_mut().insert(default_user);
     }
-    
+
     next.run(request).await
 }
 

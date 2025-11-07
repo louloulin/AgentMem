@@ -113,9 +113,7 @@ impl AzureProvider {
         let client = Client::builder()
             .timeout(Duration::from_secs(60)) // Azure 可能需要更长时间
             .build()
-            .map_err(|e| {
-                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::llm_error(format!("Failed to create HTTP client: {e}")))?;
 
         let api_version = "2024-02-01".to_string(); // 使用最新的稳定版本
 
@@ -340,9 +338,7 @@ impl LLMProvider for AzureProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(format!(
-                        "Stream error: {e}"
-                    ))),
+                    Err(e) => Err(AgentMemError::network_error(format!("Stream error: {e}"))),
                 }
             })
             .filter(|result| {

@@ -413,8 +413,7 @@ impl UnifiedConfigManager {
 }
 
 // 配置结构定义
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AgentMemConfig {
     pub llm: LLMConfig,
     pub vector_store: VectorStoreConfig,
@@ -424,7 +423,6 @@ pub struct AgentMemConfig {
     pub telemetry: TelemetryConfig,
     pub performance: PerformanceConfig,
 }
-
 
 impl AgentMemConfig {
     /// 从环境变量加载配置

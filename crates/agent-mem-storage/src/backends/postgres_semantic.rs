@@ -1,6 +1,8 @@
 //! PostgreSQL implementation of SemanticMemoryStore
 
-use agent_mem_traits::{AgentMemError, Result, SemanticMemoryItem, SemanticMemoryStore, SemanticQuery};
+use agent_mem_traits::{
+    AgentMemError, Result, SemanticMemoryItem, SemanticMemoryStore, SemanticQuery,
+};
 use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::PgPool;
@@ -50,7 +52,9 @@ impl SemanticMemoryStore for PostgresSemanticStore {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create semantic item: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -69,12 +73,18 @@ impl SemanticMemoryStore for PostgresSemanticStore {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get semantic item: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
-    async fn query_items(&self, user_id: &str, query: SemanticQuery) -> Result<Vec<SemanticMemoryItem>> {
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: SemanticQuery,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         info!("Querying semantic items for user: {}", user_id);
 
         let mut sql = String::from("SELECT * FROM semantic_memory WHERE user_id = $1");
@@ -171,7 +181,11 @@ impl SemanticMemoryStore for PostgresSemanticStore {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn search_by_tree_path(&self, user_id: &str, tree_path: Vec<String>) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_tree_path(
+        &self,
+        user_id: &str,
+        tree_path: Vec<String>,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let results = sqlx::query_as!(
             SemanticItemRow,
             r#"
@@ -184,12 +198,19 @@ impl SemanticMemoryStore for PostgresSemanticStore {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to search by tree path: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to search by tree path: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 
-    async fn search_by_name(&self, user_id: &str, name_pattern: &str, limit: i64) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_name(
+        &self,
+        user_id: &str,
+        name_pattern: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let results = sqlx::query_as!(
             SemanticItemRow,
             r#"
@@ -245,4 +266,3 @@ impl From<SemanticItemRow> for SemanticMemoryItem {
         }
     }
 }
-

@@ -425,9 +425,7 @@ impl QueryRequest {
 
     pub fn is_frequent(&self) -> bool {
         // Simplified frequency detection
-        self.metadata
-            .get("frequency")
-            .is_some_and(|f| f == "high")
+        self.metadata.get("frequency").is_some_and(|f| f == "high")
     }
 
     pub fn is_expensive(&self) -> bool {

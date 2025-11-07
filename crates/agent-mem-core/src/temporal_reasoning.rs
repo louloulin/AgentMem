@@ -16,9 +16,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::graph_memory::MemoryId;
-use crate::temporal_graph::{
-    TemporalGraphEngine, TemporalNode, TimeRange,
-};
+use crate::temporal_graph::{TemporalGraphEngine, TemporalNode, TimeRange};
 
 /// 时序推理类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -938,8 +936,6 @@ impl TemporalReasoningEngine {
 mod tests {
     use super::*;
     use crate::graph_memory::GraphMemoryEngine;
-    
-    
 
     #[tokio::test]
     async fn test_temporal_reasoning_config() {

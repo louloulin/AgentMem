@@ -30,7 +30,10 @@ async fn test_core_memory_table_exists() {
     .await;
 
     assert!(result.is_ok(), "Failed to query table: {:?}", result.err());
-    assert!(result.unwrap().is_some(), "Table core_memory_blocks does not exist");
+    assert!(
+        result.unwrap().is_some(),
+        "Table core_memory_blocks does not exist"
+    );
 }
 
 #[tokio::test]
@@ -148,9 +151,12 @@ async fn test_unique_block_per_agent_constraint() {
     assert!(result2.is_err(), "Should fail due to unique constraint");
 
     // 清理测试数据
-    let _ = sqlx::query!("DELETE FROM core_memory_blocks WHERE agent_id = $1", agent_id)
-        .execute(&pool)
-        .await;
+    let _ = sqlx::query!(
+        "DELETE FROM core_memory_blocks WHERE agent_id = $1",
+        agent_id
+    )
+    .execute(&pool)
+    .await;
 }
 
 #[test]
@@ -184,4 +190,3 @@ fn test_capacity_management() {
 
     assert!(current_size <= max_capacity);
 }
-

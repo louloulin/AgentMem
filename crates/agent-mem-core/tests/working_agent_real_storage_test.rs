@@ -31,7 +31,10 @@ impl WorkingMemoryStore for MockWorkingStore {
         &self,
         item: WorkingMemoryItem,
     ) -> agent_mem_traits::Result<WorkingMemoryItem> {
-        self.items.lock().await.insert(item.id.clone(), item.clone());
+        self.items
+            .lock()
+            .await
+            .insert(item.id.clone(), item.clone());
         Ok(item)
     }
 
@@ -243,4 +246,3 @@ async fn test_working_agent_delete_with_real_store() {
     let session_items = store.get_session_items("session456").await.unwrap();
     assert_eq!(session_items.len(), 0);
 }
-

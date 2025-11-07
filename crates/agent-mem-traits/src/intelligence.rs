@@ -2,7 +2,7 @@
 //!
 //! 定义智能记忆处理的接口，用于解耦 agent-mem-core 和 agent-mem-intelligence
 
-use crate::{Message, MemoryItem, Result};
+use crate::{MemoryItem, Message, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -88,4 +88,3 @@ pub trait IntelligentMemoryProcessor: Send + Sync {
         existing_memories: &[MemoryItem],
     ) -> Result<IntelligentProcessingResult>;
 }
-

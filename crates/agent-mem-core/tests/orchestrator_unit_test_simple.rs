@@ -3,14 +3,14 @@
 //! 测试 MemoryIntegrator 的核心功能
 
 use agent_mem_core::{
-    orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     engine::{MemoryEngine, MemoryEngineConfig},
+    orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     Memory, MemoryType,
 };
 use agent_mem_traits::Session;
 use chrono::Utc;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 // 辅助函数：创建测试用的 Memory
@@ -56,7 +56,10 @@ async fn test_memory_integrator_inject_memories() {
 
     // 4. 验证格式化结果
     assert!(formatted.contains("Semantic"), "Should contain memory type");
-    assert!(formatted.contains("coffee"), "Should contain memory content");
+    assert!(
+        formatted.contains("coffee"),
+        "Should contain memory content"
+    );
     assert!(formatted.contains("Episodic"), "Should contain memory type");
     assert!(formatted.contains("John"), "Should contain memory content");
 
@@ -86,9 +89,19 @@ async fn test_memory_integrator_filter_by_relevance() {
     let filtered = integrator.filter_by_relevance(memories.clone());
 
     // 4. 验证过滤结果
-    assert_eq!(filtered.len(), 2, "Should filter out low relevance memories");
-    assert!(filtered[0].importance >= 0.7, "All filtered memories should have importance >= 0.7");
-    assert!(filtered[1].importance >= 0.7, "All filtered memories should have importance >= 0.7");
+    assert_eq!(
+        filtered.len(),
+        2,
+        "Should filter out low relevance memories"
+    );
+    assert!(
+        filtered[0].importance >= 0.7,
+        "All filtered memories should have importance >= 0.7"
+    );
+    assert!(
+        filtered[1].importance >= 0.7,
+        "All filtered memories should have importance >= 0.7"
+    );
 
     println!("✅ test_memory_integrator_filter_by_relevance passed");
 }
@@ -112,10 +125,22 @@ async fn test_memory_integrator_sort_memories() {
 
     // 4. 验证排序结果（应该按 importance 降序）
     assert_eq!(sorted.len(), 3, "Should have all memories");
-    assert!(sorted[0].importance >= sorted[1].importance, "Should be sorted by importance descending");
-    assert!(sorted[1].importance >= sorted[2].importance, "Should be sorted by importance descending");
-    assert_eq!(sorted[0].content, "High score", "Highest importance should be first");
-    assert_eq!(sorted[2].content, "Low score", "Lowest importance should be last");
+    assert!(
+        sorted[0].importance >= sorted[1].importance,
+        "Should be sorted by importance descending"
+    );
+    assert!(
+        sorted[1].importance >= sorted[2].importance,
+        "Should be sorted by importance descending"
+    );
+    assert_eq!(
+        sorted[0].content, "High score",
+        "Highest importance should be first"
+    );
+    assert_eq!(
+        sorted[2].content, "Low score",
+        "Lowest importance should be last"
+    );
 
     println!("✅ test_memory_integrator_sort_memories passed");
 }
@@ -134,7 +159,10 @@ async fn test_memory_integrator_empty_memories() {
     let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证结果（应该返回空字符串或默认消息）
-    assert!(formatted.is_empty() || formatted.contains("No memories"), "Should handle empty memories gracefully");
+    assert!(
+        formatted.is_empty() || formatted.contains("No memories"),
+        "Should handle empty memories gracefully"
+    );
 
     println!("✅ test_memory_integrator_empty_memories passed");
 }
@@ -161,8 +189,15 @@ async fn test_memory_integrator_no_score() {
     let filtered = integrator.filter_by_relevance(memories.clone());
 
     // 4. 验证结果（importance < 0.7 的记忆应该被过滤掉）
-    assert_eq!(filtered.len(), 1, "Should filter out memories with low importance");
-    assert!(filtered[0].importance >= 0.7, "Filtered memories should have importance >= 0.7");
+    assert_eq!(
+        filtered.len(),
+        1,
+        "Should filter out memories with low importance"
+    );
+    assert!(
+        filtered[0].importance >= 0.7,
+        "Filtered memories should have importance >= 0.7"
+    );
 
     println!("✅ test_memory_integrator_no_score passed");
 }
@@ -171,10 +206,22 @@ async fn test_memory_integrator_no_score() {
 async fn test_memory_integrator_config() {
     // 1. 测试默认配置
     let default_config = MemoryIntegratorConfig::default();
-    assert_eq!(default_config.max_memories, 10, "Default max memories should be 10");
-    assert_eq!(default_config.relevance_threshold, 0.5, "Default threshold should be 0.5");
-    assert!(default_config.include_timestamp, "Default should include timestamp");
-    assert!(default_config.sort_by_importance, "Default should sort by importance");
+    assert_eq!(
+        default_config.max_memories, 10,
+        "Default max memories should be 10"
+    );
+    assert_eq!(
+        default_config.relevance_threshold, 0.5,
+        "Default threshold should be 0.5"
+    );
+    assert!(
+        default_config.include_timestamp,
+        "Default should include timestamp"
+    );
+    assert!(
+        default_config.sort_by_importance,
+        "Default should sort by importance"
+    );
 
     // 2. 测试自定义配置
     let custom_config = MemoryIntegratorConfig {
@@ -212,4 +259,3 @@ async fn test_memory_types() {
 
     println!("✅ test_memory_types passed");
 }
-

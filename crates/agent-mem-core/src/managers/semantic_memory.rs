@@ -68,8 +68,9 @@ impl SemanticMemoryManager {
     pub async fn create_item(&self, item: SemanticMemoryItem) -> Result<SemanticMemoryItem> {
         info!("Creating semantic memory item: {}", item.id);
 
-        let tree_path_json = serde_json::to_value(&item.tree_path)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+        let tree_path_json = serde_json::to_value(&item.tree_path).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+        })?;
 
         let result = sqlx::query_as!(
             SemanticMemoryItemRow,
@@ -97,13 +98,19 @@ impl SemanticMemoryManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create semantic item: {}", e))
+        })?;
 
         Ok(result.into())
     }
 
     /// 获取语义记忆项
-    pub async fn get_item(&self, item_id: &str, user_id: &str) -> Result<Option<SemanticMemoryItem>> {
+    pub async fn get_item(
+        &self,
+        item_id: &str,
+        user_id: &str,
+    ) -> Result<Option<SemanticMemoryItem>> {
         debug!("Getting semantic memory item: {}", item_id);
 
         let result = sqlx::query_as!(
@@ -117,13 +124,19 @@ impl SemanticMemoryManager {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get semantic item: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
     /// 查询语义记忆项
-    pub async fn query_items(&self, user_id: &str, query: SemanticQuery) -> Result<Vec<SemanticMemoryItem>> {
+    pub async fn query_items(
+        &self,
+        user_id: &str,
+        query: SemanticQuery,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         info!("Querying semantic memory items for user: {}", user_id);
 
         let mut sql = String::from("SELECT * FROM semantic_memory WHERE user_id = $1");
@@ -165,8 +178,9 @@ impl SemanticMemoryManager {
         }
 
         if let Some(tree_path_prefix) = query.tree_path_prefix {
-            let tree_path_json = serde_json::to_value(&tree_path_prefix)
-                .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+            let tree_path_json = serde_json::to_value(&tree_path_prefix).map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+            })?;
             query_builder = query_builder.bind(tree_path_json);
         }
 
@@ -177,7 +191,9 @@ impl SemanticMemoryManager {
         let results = query_builder
             .fetch_all(self.pool.as_ref())
             .await
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to query semantic items: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to query semantic items: {}", e))
+            })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -186,8 +202,9 @@ impl SemanticMemoryManager {
     pub async fn update_item(&self, item: SemanticMemoryItem) -> Result<bool> {
         info!("Updating semantic memory item: {}", item.id);
 
-        let tree_path_json = serde_json::to_value(&item.tree_path)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+        let tree_path_json = serde_json::to_value(&item.tree_path).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+        })?;
 
         let result = sqlx::query!(
             r#"
@@ -208,7 +225,9 @@ impl SemanticMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update semantic item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -227,13 +246,20 @@ impl SemanticMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete semantic item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete semantic item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 
     /// 搜索相似的语义记忆项（基于名称）
-    pub async fn search_by_name(&self, user_id: &str, name_query: &str, limit: i64) -> Result<Vec<SemanticMemoryItem>> {
+    pub async fn search_by_name(
+        &self,
+        user_id: &str,
+        name_query: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         debug!("Searching semantic items by name: {}", name_query);
 
         let results = sqlx::query_as!(
@@ -250,17 +276,24 @@ impl SemanticMemoryManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to search semantic items: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to search semantic items: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 
     /// 获取指定层级路径下的所有项
-    pub async fn get_items_by_tree_path(&self, user_id: &str, tree_path: &[String]) -> Result<Vec<SemanticMemoryItem>> {
+    pub async fn get_items_by_tree_path(
+        &self,
+        user_id: &str,
+        tree_path: &[String],
+    ) -> Result<Vec<SemanticMemoryItem>> {
         debug!("Getting semantic items by tree path: {:?}", tree_path);
 
-        let tree_path_json = serde_json::to_value(tree_path)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+        let tree_path_json = serde_json::to_value(tree_path).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+        })?;
 
         let results = sqlx::query_as!(
             SemanticMemoryItemRow,
@@ -274,7 +307,9 @@ impl SemanticMemoryManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get items by tree path: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get items by tree path: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -590,7 +625,10 @@ mod tests {
         assert_eq!(item.metadata["category"], "technology");
         assert_eq!(item.metadata["subcategories"].as_array().unwrap().len(), 3);
         assert_eq!(item.metadata["properties"]["difficulty"], "advanced");
-        assert_eq!(item.metadata["related_concepts"][0]["name"], "Neural Networks");
+        assert_eq!(
+            item.metadata["related_concepts"][0]["name"],
+            "Neural Networks"
+        );
     }
 
     #[test]
@@ -684,22 +722,15 @@ mod tests {
         assert!(long_name.name.len() > 20);
 
         // 特殊字符
-        let special_chars = create_test_item(
-            "item-3",
-            "C++ Programming",
-            vec!["programming".to_string()],
-        );
+        let special_chars =
+            create_test_item("item-3", "C++ Programming", vec!["programming".to_string()]);
         assert!(special_chars.name.contains('+'));
     }
 
     #[test]
     fn test_tree_path_single_vs_multiple() {
         // 单层路径
-        let single_level = create_test_item(
-            "item-1",
-            "Root Concept",
-            vec!["root".to_string()],
-        );
+        let single_level = create_test_item("item-1", "Root Concept", vec!["root".to_string()]);
         assert_eq!(single_level.tree_path.len(), 1);
 
         // 多层路径
@@ -797,4 +828,3 @@ mod tests {
         assert!(item.metadata["field"].is_string());
     }
 }
-

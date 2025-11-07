@@ -41,12 +41,9 @@ async fn demo_http_transport() {
     headers.insert("X-API-Key".to_string(), "demo-api-key".to_string());
     headers.insert("X-Client-Version".to_string(), "1.0.0".to_string());
 
-    let mut transport = HttpTransport::new(
-        "http://localhost:8080".to_string(),
-        Some(headers),
-    )
-    .with_timeout(Duration::from_secs(60))
-    .add_header("X-Custom-Header", "custom-value");
+    let mut transport = HttpTransport::new("http://localhost:8080".to_string(), Some(headers))
+        .with_timeout(Duration::from_secs(60))
+        .add_header("X-Custom-Header", "custom-value");
 
     println!("  ✅ HTTP 传输创建成功");
     println!("  URL: http://localhost:8080");
@@ -58,7 +55,14 @@ async fn demo_http_transport() {
     match transport.connect().await {
         Ok(_) => {
             println!("  ✅ 连接成功");
-            println!("  连接状态: {}", if transport.is_connected() { "已连接" } else { "未连接" });
+            println!(
+                "  连接状态: {}",
+                if transport.is_connected() {
+                    "已连接"
+                } else {
+                    "未连接"
+                }
+            );
         }
         Err(e) => {
             error!("  ❌ 连接失败: {}", e);
@@ -96,7 +100,14 @@ async fn demo_http_transport() {
     match transport.disconnect().await {
         Ok(_) => {
             println!("  ✅ 断开连接成功");
-            println!("  连接状态: {}", if transport.is_connected() { "已连接" } else { "未连接" });
+            println!(
+                "  连接状态: {}",
+                if transport.is_connected() {
+                    "已连接"
+                } else {
+                    "未连接"
+                }
+            );
         }
         Err(e) => {
             error!("  ❌ 断开连接失败: {}", e);
@@ -126,14 +137,28 @@ async fn demo_sse_transport() {
 
     println!("  ✅ SSE 传输创建成功");
     println!("  URL: http://localhost:8080/events");
-    println!("  连接状态: {}", if transport.is_connected() { "已连接" } else { "未连接" });
+    println!(
+        "  连接状态: {}",
+        if transport.is_connected() {
+            "已连接"
+        } else {
+            "未连接"
+        }
+    );
 
     // 2. 连接到服务器
     println!("\n2️⃣ 连接到 SSE 服务器:");
     match transport.connect().await {
         Ok(_) => {
             println!("  ✅ 连接成功");
-            println!("  连接状态: {}", if transport.is_connected() { "已连接" } else { "未连接" });
+            println!(
+                "  连接状态: {}",
+                if transport.is_connected() {
+                    "已连接"
+                } else {
+                    "未连接"
+                }
+            );
             println!("  事件监听: 已启动");
         }
         Err(e) => {
@@ -169,11 +194,17 @@ async fn demo_sse_transport() {
     match transport.disconnect().await {
         Ok(_) => {
             println!("  ✅ 断开连接成功");
-            println!("  连接状态: {}", if transport.is_connected() { "已连接" } else { "未连接" });
+            println!(
+                "  连接状态: {}",
+                if transport.is_connected() {
+                    "已连接"
+                } else {
+                    "未连接"
+                }
+            );
         }
         Err(e) => {
             error!("  ❌ 断开连接失败: {}", e);
         }
     }
 }
-

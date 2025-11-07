@@ -62,8 +62,9 @@ impl From<ProceduralMemoryItemRow> for ProceduralMemoryItem {
 #[async_trait]
 impl ProceduralMemoryStore for PostgresProceduralStore {
     async fn create_item(&self, item: ProceduralMemoryItem) -> Result<ProceduralMemoryItem> {
-        let steps_json = serde_json::to_value(&item.steps)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e)))?;
+        let steps_json = serde_json::to_value(&item.steps).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e))
+        })?;
 
         let result = sqlx::query_as::<_, ProceduralMemoryItemRow>(
             r#"
@@ -90,7 +91,9 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         .bind(item.updated_at)
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create procedural item: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -106,12 +109,18 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         .bind(user_id)
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get procedural item: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
-    async fn query_items(&self, user_id: &str, query: ProceduralQuery) -> Result<Vec<ProceduralMemoryItem>> {
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: ProceduralQuery,
+    ) -> Result<Vec<ProceduralMemoryItem>> {
         let mut sql = String::from("SELECT * FROM procedural_memory WHERE user_id = $1");
         let mut param_count = 1;
 
@@ -150,14 +159,17 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         let results = query_builder
             .fetch_all(self.pool.as_ref())
             .await
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to query procedural items: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to query procedural items: {}", e))
+            })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 
     async fn update_item(&self, item: ProceduralMemoryItem) -> Result<bool> {
-        let steps_json = serde_json::to_value(&item.steps)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e)))?;
+        let steps_json = serde_json::to_value(&item.steps).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e))
+        })?;
 
         let result = sqlx::query(
             r#"
@@ -178,7 +190,9 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         .bind(&item.user_id)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update procedural item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -194,7 +208,9 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         .bind(user_id)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete procedural item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -222,7 +238,9 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         .bind(success)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update execution stats: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update execution stats: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -245,4 +263,3 @@ impl ProceduralMemoryStore for PostgresProceduralStore {
         Ok(results.into_iter().map(Into::into).collect())
     }
 }
-

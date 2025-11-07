@@ -46,7 +46,10 @@ async fn main() -> anyhow::Result<()> {
     println!("   - ID: {}", memory_with_embedding.id);
     println!("   - 内容: {}", memory_with_embedding.content);
     println!("   - Embedding 维度: {}", embedding_vector.values.len());
-    println!("   - Embedding 前5个值: {:?}", &embedding_vector.values[..5.min(embedding_vector.values.len())]);
+    println!(
+        "   - Embedding 前5个值: {:?}",
+        &embedding_vector.values[..5.min(embedding_vector.values.len())]
+    );
     println!();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -71,8 +74,14 @@ async fn main() -> anyhow::Result<()> {
     println!("✅ 创建带有 expires_at 的工作记忆:");
     println!("   - ID: {}", working_memory.id);
     println!("   - 内容: {}", working_memory.content);
-    println!("   - 创建时间: {}", chrono::DateTime::from_timestamp(working_memory.created_at, 0).unwrap());
-    println!("   - 过期时间: {}", chrono::DateTime::from_timestamp(expires_at, 0).unwrap());
+    println!(
+        "   - 创建时间: {}",
+        chrono::DateTime::from_timestamp(working_memory.created_at, 0).unwrap()
+    );
+    println!(
+        "   - 过期时间: {}",
+        chrono::DateTime::from_timestamp(expires_at, 0).unwrap()
+    );
     println!("   - 是否已过期: {}", working_memory.is_expired());
     println!();
 
@@ -88,7 +97,10 @@ async fn main() -> anyhow::Result<()> {
 
     println!("✅ 测试已过期的记忆:");
     println!("   - ID: {}", expired_memory.id);
-    println!("   - 过期时间: {}", chrono::DateTime::from_timestamp(expired_memory.expires_at.unwrap(), 0).unwrap());
+    println!(
+        "   - 过期时间: {}",
+        chrono::DateTime::from_timestamp(expired_memory.expires_at.unwrap(), 0).unwrap()
+    );
     println!("   - 是否已过期: {} ⚠️", expired_memory.is_expired());
     println!();
 
@@ -162,11 +174,20 @@ async fn main() -> anyhow::Result<()> {
     println!("   - 类型: {:?}", comprehensive_memory.memory_type);
     println!("   - 内容: {}", comprehensive_memory.content);
     println!("   - 重要性: {}", comprehensive_memory.importance);
-    println!("   - Embedding: {:?} ({}维)", 
-        comprehensive_memory.embedding.as_ref().map(|e| &e.values[..3.min(e.values.len())]),
-        comprehensive_memory.embedding.as_ref().map(|e| e.values.len()).unwrap_or(0)
+    println!(
+        "   - Embedding: {:?} ({}维)",
+        comprehensive_memory
+            .embedding
+            .as_ref()
+            .map(|e| &e.values[..3.min(e.values.len())]),
+        comprehensive_memory
+            .embedding
+            .as_ref()
+            .map(|e| e.values.len())
+            .unwrap_or(0)
     );
-    println!("   - 过期时间: {}", 
+    println!(
+        "   - 过期时间: {}",
         chrono::DateTime::from_timestamp(comprehensive_memory.expires_at.unwrap(), 0).unwrap()
     );
     println!("   - 版本: {}", comprehensive_memory.version);
@@ -232,4 +253,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

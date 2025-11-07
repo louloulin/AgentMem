@@ -137,9 +137,10 @@ impl MemgraphStore {
             )));
         }
 
-        let result: MemgraphQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let result: MemgraphQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(
@@ -192,9 +193,10 @@ impl MemgraphStore {
             )));
         }
 
-        let result: MemgraphQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let result: MemgraphQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(

@@ -1159,7 +1159,10 @@ mod tests {
         let manager = ResourceMemoryManager::with_config(config).unwrap();
         let test_file = create_test_file(temp_dir.path(), "test.txt", b"content").await;
 
-        let resource_id = manager.store_resource(&test_file, None, None).await.unwrap();
+        let resource_id = manager
+            .store_resource(&test_file, None, None)
+            .await
+            .unwrap();
         let metadata = manager.get_resource_metadata(&resource_id).await.unwrap();
 
         assert!(metadata.is_some());
@@ -1209,10 +1212,17 @@ mod tests {
 
         // 存储带标签的资源
         let tags = vec!["important".to_string(), "project-a".to_string()];
-        let resource_id = manager.store_resource(&test_file, Some(tags.clone()), None).await.unwrap();
+        let resource_id = manager
+            .store_resource(&test_file, Some(tags.clone()), None)
+            .await
+            .unwrap();
 
         // 验证标签
-        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
+        let metadata = manager
+            .get_resource_metadata(&resource_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(metadata.tags.len(), 2);
         assert!(metadata.tags.contains(&"important".to_string()));
     }
@@ -1233,12 +1243,25 @@ mod tests {
         custom_meta.insert("author".to_string(), "John Doe".to_string());
         custom_meta.insert("version".to_string(), "1.0".to_string());
 
-        let resource_id = manager.store_resource(&test_file, None, Some(custom_meta.clone())).await.unwrap();
+        let resource_id = manager
+            .store_resource(&test_file, None, Some(custom_meta.clone()))
+            .await
+            .unwrap();
 
         // 验证自定义元数据
-        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
-        assert_eq!(metadata.custom_metadata.get("author"), Some(&"John Doe".to_string()));
-        assert_eq!(metadata.custom_metadata.get("version"), Some(&"1.0".to_string()));
+        let metadata = manager
+            .get_resource_metadata(&resource_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            metadata.custom_metadata.get("author"),
+            Some(&"John Doe".to_string())
+        );
+        assert_eq!(
+            metadata.custom_metadata.get("version"),
+            Some(&"1.0".to_string())
+        );
     }
 
     #[tokio::test]
@@ -1253,9 +1276,16 @@ mod tests {
         let empty_file = create_test_file(temp_dir.path(), "empty.txt", b"").await;
 
         // 存储空文件
-        let resource_id = manager.store_resource(&empty_file, None, None).await.unwrap();
+        let resource_id = manager
+            .store_resource(&empty_file, None, None)
+            .await
+            .unwrap();
 
-        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap().unwrap();
+        let metadata = manager
+            .get_resource_metadata(&resource_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(metadata.file_size, 0);
     }
 }

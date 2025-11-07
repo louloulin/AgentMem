@@ -13,9 +13,7 @@ mod libsql_agent_tests {
     async fn setup_test_db() -> (TempDir, LibSqlAgentRepository, LibSqlOrganizationRepository) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let agent_repo = LibSqlAgentRepository::new(conn.clone());
@@ -74,10 +72,7 @@ mod libsql_agent_tests {
         }
 
         // Find by organization ID
-        let agents = agent_repo
-            .find_by_organization_id(&org.id)
-            .await
-            .unwrap();
+        let agents = agent_repo.find_by_organization_id(&org.id).await.unwrap();
         assert_eq!(agents.len(), 3);
     }
 
@@ -194,4 +189,3 @@ mod libsql_agent_tests {
         assert!(found.is_none());
     }
 }
-

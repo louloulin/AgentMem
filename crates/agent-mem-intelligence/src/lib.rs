@@ -51,6 +51,8 @@ pub use reasoning::MemoryReasoner;
 pub use similarity::SemanticSimilarity;
 
 // 导出新的智能推理模块
+pub use batch_processing::{BatchConfig, BatchEntityExtractor, BatchImportanceEvaluator};
+pub use caching::{CacheConfig, CacheStats, LruCacheWrapper};
 pub use conflict_resolution::{
     ConflictDetection, ConflictResolution, ConflictResolver, ConflictType, ResolutionStrategy,
 };
@@ -70,5 +72,3 @@ pub use intelligent_processor::{
     IntelligentProcessingResult, MemoryHealthReport,
 };
 pub use timeout::{with_timeout, with_timeout_and_retry, TimeoutConfig};
-pub use caching::{CacheConfig, CacheStats, LruCacheWrapper};
-pub use batch_processing::{BatchConfig, BatchEntityExtractor, BatchImportanceEvaluator};

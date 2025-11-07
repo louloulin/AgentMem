@@ -126,14 +126,14 @@ fn test_audio_formats() {
 fn test_detail_levels() {
     assert_eq!(DetailLevel::Low, DetailLevel::Low);
     assert_ne!(DetailLevel::Low, DetailLevel::High);
-    
+
     let levels = vec![
         DetailLevel::Low,
         DetailLevel::Medium,
         DetailLevel::High,
         DetailLevel::Auto,
     ];
-    
+
     assert_eq!(levels.len(), 4);
 }
 
@@ -224,10 +224,7 @@ fn test_image_analysis_request_with_url() {
     };
 
     assert!(request.image_url.is_some());
-    assert_eq!(
-        request.image_url.unwrap(),
-        "https://example.com/image.jpg"
-    );
+    assert_eq!(request.image_url.unwrap(), "https://example.com/image.jpg");
 }
 
 #[test]
@@ -248,7 +245,7 @@ fn test_audio_transcription_with_speaker_diarization() {
 #[test]
 fn test_video_analyzer_config_defaults() {
     let config = VideoAnalyzerConfig::default();
-    
+
     assert!(config.vision_config.is_none());
     assert!(config.audio_config.is_none());
     assert!(config.enable_keyframe_extraction);
@@ -257,4 +254,3 @@ fn test_video_analyzer_config_defaults() {
     assert_eq!(config.keyframe_interval_seconds, 30.0);
     assert_eq!(config.scene_change_threshold, 0.3);
 }
-

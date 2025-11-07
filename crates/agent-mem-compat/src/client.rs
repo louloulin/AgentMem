@@ -14,23 +14,23 @@ use crate::{
         ContextAwareSearchResult, ContextInfo, ContextLearningResult, ContextPattern,
     },
     enterprise_security::{
-        EnterpriseSecurityConfig, EnterpriseSecurityManager, JwtClaims, Permission,
-        UserSession,
+        EnterpriseSecurityConfig, EnterpriseSecurityManager, JwtClaims, Permission, UserSession,
     },
     error::{Mem0Error, Result},
     graph_memory::{FusedMemory, GraphMemoryConfig, GraphMemoryManager},
     personalization::{
-        MemoryRecommendation, PersonalizationConfig,
-        PersonalizationManager, PersonalizedSearchRequest, PersonalizedSearchResult, UserBehavior,
-        UserPreference, UserProfile,
+        MemoryRecommendation, PersonalizationConfig, PersonalizationManager,
+        PersonalizedSearchRequest, PersonalizedSearchResult, UserBehavior, UserPreference,
+        UserProfile,
     },
     procedural_memory::{
         ProceduralMemoryConfig, ProceduralMemoryManager, StepExecutionResult, Task, TaskChain,
         TaskExecutionResult, Workflow, WorkflowExecution, WorkflowStep,
     },
     types::{
-        AddMemoryRequest, BatchAddResult, BatchDeleteRequest, BatchDeleteResult, BatchUpdateRequest, BatchUpdateResult, ChangeType, DeleteMemoryResponse,
-        Memory, MemoryFilter, MemoryHistory, MemorySearchResult, MemorySearchResultItem,
+        AddMemoryRequest, BatchAddResult, BatchDeleteRequest, BatchDeleteResult,
+        BatchUpdateRequest, BatchUpdateResult, ChangeType, DeleteMemoryResponse, Memory,
+        MemoryFilter, MemoryHistory, MemorySearchResult, MemorySearchResultItem,
         SearchMemoryRequest, SortField, SortOrder, UpdateMemoryRequest,
     },
     utils::{
@@ -1646,9 +1646,7 @@ impl Mem0Client {
         session: &Session,
     ) -> Result<Vec<ContextInfo>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .extract_context(content, session)
-                .await
+            context_aware.extract_context(content, session).await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1662,9 +1660,7 @@ impl Mem0Client {
         request: ContextAwareSearchRequest,
     ) -> Result<Vec<ContextAwareSearchResult>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .search_with_context(request)
-                .await
+            context_aware.search_with_context(request).await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1678,9 +1674,7 @@ impl Mem0Client {
         contexts: &[ContextInfo],
     ) -> Result<ContextLearningResult> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .learn_from_context(contexts)
-                .await
+            context_aware.learn_from_context(contexts).await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1702,9 +1696,7 @@ impl Mem0Client {
     /// 获取上下文历史
     pub async fn get_context_history(&self, limit: Option<usize>) -> Result<Vec<ContextInfo>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .get_context_history(limit)
-                .await
+            context_aware.get_context_history(limit).await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1732,9 +1724,7 @@ impl Mem0Client {
     /// 获取记忆关联的上下文
     pub async fn get_memory_contexts(&self, memory_id: &str) -> Result<Vec<ContextInfo>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .get_memory_contexts(memory_id)
-                .await
+            context_aware.get_memory_contexts(memory_id).await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1745,9 +1735,7 @@ impl Mem0Client {
     /// 获取上下文统计信息
     pub async fn get_context_statistics(&self) -> Result<HashMap<String, u32>> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .get_context_statistics()
-                .await
+            context_aware.get_context_statistics().await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),
@@ -1758,9 +1746,7 @@ impl Mem0Client {
     /// 清除上下文历史
     pub async fn clear_context_history(&self) -> Result<()> {
         if let Some(ref context_aware) = self.context_aware {
-            context_aware
-                .clear_context_history()
-                .await
+            context_aware.clear_context_history().await
         } else {
             Err(Mem0Error::ServiceUnavailable(
                 "Context-aware manager not available".to_string(),

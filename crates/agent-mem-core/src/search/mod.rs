@@ -13,34 +13,36 @@ pub mod adaptive;
 pub mod bm25;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
-pub mod learning;
-pub mod query_optimizer;
 #[cfg(feature = "postgres")]
 pub mod enhanced_hybrid;
-pub mod fuzzy;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
+pub mod fuzzy;
 #[cfg(feature = "postgres")]
 pub mod hybrid;
+pub mod learning;
+pub mod query_optimizer;
 pub mod ranker;
 pub mod vector_search;
 
-pub use adaptive::{AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor};
-#[cfg(feature = "redis-cache")]
-pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
-pub use query_optimizer::{IndexStatistics, QueryOptimizer, ResultReranker};
-pub use learning::{
-    FeedbackRecord, LearningConfig, LearningEngine, OptimizationReport, 
-    PatternImprovement, QueryPattern,
+pub use adaptive::{
+    AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor,
 };
 pub use bm25::{BM25Params, BM25SearchEngine};
+#[cfg(feature = "redis-cache")]
+pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
 #[cfg(feature = "postgres")]
 pub use enhanced_hybrid::EnhancedHybridSearchEngine;
-pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
 #[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;
+pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
 #[cfg(feature = "postgres")]
 pub use hybrid::{HybridSearchConfig, HybridSearchEngine, HybridSearchResult};
+pub use learning::{
+    FeedbackRecord, LearningConfig, LearningEngine, OptimizationReport, PatternImprovement,
+    QueryPattern,
+};
+pub use query_optimizer::{IndexStatistics, QueryOptimizer, ResultReranker};
 pub use ranker::{RRFRanker, SearchResultRanker};
 pub use vector_search::{
     build_hybrid_vector_search_sql, build_vector_search_sql, VectorDistanceOperator,

@@ -10,7 +10,7 @@
 
 use agent_mem_core::agents::CoreAgent;
 use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-use agent_mem_traits::{VectorStore, VectorData};
+use agent_mem_traits::{VectorData, VectorStore};
 use std::collections::HashMap;
 use std::env;
 use std::time::Instant;
@@ -18,9 +18,7 @@ use std::time::Instant;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n🚀 AgentMem 嵌入式模式完整功能测试\n");
     println!("{}", "=".repeat(70));
@@ -32,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "-".repeat(70));
 
     env::set_var("AGENTMEM_DB_PATH", "./test-data/full-test.db");
-    
+
     let start = Instant::now();
     let agent = CoreAgent::from_env("full-test-agent".to_string()).await?;
     let duration = start.elapsed();
@@ -50,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector_path = "./test-data/vectors.lance";
     let store = LanceDBStore::new(vector_path, "test_vectors").await?;
-    
+
     println!("✅ LanceDB 存储创建成功");
     println!("   路径: {vector_path}");
 
@@ -69,7 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             id: "vec_2".to_string(),
             vector: vec![0.2; 1536],
             metadata: HashMap::from([
-                ("text".to_string(), "AgentMem 支持多种向量数据库".to_string()),
+                (
+                    "text".to_string(),
+                    "AgentMem 支持多种向量数据库".to_string(),
+                ),
                 ("category".to_string(), "database".to_string()),
             ]),
         },
@@ -90,7 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 向量插入成功");
     println!("   插入数量: {}", ids.len());
     println!("   耗时: {duration:?}");
-    println!("   吞吐量: {:.2} ops/s", ids.len() as f64 / duration.as_secs_f64());
+    println!(
+        "   吞吐量: {:.2} ops/s",
+        ids.len() as f64 / duration.as_secs_f64()
+    );
 
     // ========================================
     // 测试 3: 向量搜索
@@ -99,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "-".repeat(70));
 
     let query_vector = vec![0.15; 1536];
-    
+
     let start = Instant::now();
     let results = store.search_vectors(query_vector, 3, None).await?;
     let duration = start.elapsed();
@@ -109,7 +113,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   找到结果: {} 个", results.len());
     println!("\n   搜索结果:");
     for (i, result) in results.iter().enumerate() {
-        println!("     {}. ID: {}, 相似度: {:.4}", i + 1, result.id, result.similarity);
+        println!(
+            "     {}. ID: {}, 相似度: {:.4}",
+            i + 1,
+            result.id,
+            result.similarity
+        );
         if let Some(text) = result.metadata.get("text") {
             println!("        文本: {text}");
         }
@@ -125,7 +134,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         id: "vec_1".to_string(),
         vector: vec![0.5; 1536],
         metadata: HashMap::from([
-            ("text".to_string(), "Rust 是最安全的系统编程语言".to_string()),
+            (
+                "text".to_string(),
+                "Rust 是最安全的系统编程语言".to_string(),
+            ),
             ("category".to_string(), "programming".to_string()),
             ("updated".to_string(), "true".to_string()),
         ]),
@@ -141,7 +153,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 验证更新
     if let Some(vector) = store.get_vector("vec_1").await? {
-        let updated = vector.metadata.get("updated")
+        let updated = vector
+            .metadata
+            .get("updated")
             .map(|v| v == "true")
             .unwrap_or(false);
         println!("   验证: updated = {updated}");
@@ -168,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "-".repeat(70));
 
     let stats = store.get_stats().await?;
-    
+
     println!("✅ 统计信息:");
     println!("   总向量数: {}", stats.total_vectors);
     println!("   向量维度: {}", stats.dimension);
@@ -181,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "-".repeat(70));
 
     let health = store.health_check().await?;
-    
+
     println!("✅ 健康状态: {health:?}");
 
     // ========================================
@@ -210,8 +224,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 批量插入完成");
     println!("   插入数量: {}", ids.len());
     println!("   总耗时: {duration:?}");
-    println!("   吞吐量: {:.2} ops/s", ids.len() as f64 / duration.as_secs_f64());
-    println!("   平均延迟: {:.2} ms/op", duration.as_millis() as f64 / ids.len() as f64);
+    println!(
+        "   吞吐量: {:.2} ops/s",
+        ids.len() as f64 / duration.as_secs_f64()
+    );
+    println!(
+        "   平均延迟: {:.2} ms/op",
+        duration.as_millis() as f64 / ids.len() as f64
+    );
 
     // ========================================
     // 测试 9: 数据持久化验证
@@ -232,7 +252,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if Path::new(vector_path).exists() {
         println!("✅ LanceDB 向量存储存在");
         println!("   路径: {vector_path}");
-        
+
         // 统计目录大小
         let mut total_size = 0u64;
         if let Ok(entries) = std::fs::read_dir(vector_path) {
@@ -279,4 +299,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

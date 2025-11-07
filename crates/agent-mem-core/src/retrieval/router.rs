@@ -563,9 +563,8 @@ impl RetrievalRouter {
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<serde_json::Value> {
         let stats = self.stats.read().await;
-        serde_json::to_value(&*stats).map_err(|e| {
-            AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}"))
-        })
+        serde_json::to_value(&*stats)
+            .map_err(|e| AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}")))
     }
 }
 
@@ -610,9 +609,11 @@ mod tests {
 
     #[test]
     fn test_retrieval_strategy_ordering() {
-        let mut strategies = [RetrievalStrategy::BM25,
+        let mut strategies = [
+            RetrievalStrategy::BM25,
             RetrievalStrategy::Embedding,
-            RetrievalStrategy::StringMatch];
+            RetrievalStrategy::StringMatch,
+        ];
         strategies.sort();
 
         // 验证排序后的顺序
@@ -678,7 +679,10 @@ mod tests {
         let json = serde_json::to_string(&decision).unwrap();
         let deserialized: RouteDecision = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(decision.selected_strategies, deserialized.selected_strategies);
+        assert_eq!(
+            decision.selected_strategies,
+            deserialized.selected_strategies
+        );
         assert_eq!(decision.confidence, deserialized.confidence);
     }
 
@@ -709,7 +713,10 @@ mod tests {
         let json = serde_json::to_string(&estimate).unwrap();
         let deserialized: PerformanceEstimate = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(estimate.estimated_response_time_ms, deserialized.estimated_response_time_ms);
+        assert_eq!(
+            estimate.estimated_response_time_ms,
+            deserialized.estimated_response_time_ms
+        );
         assert_eq!(estimate.estimated_accuracy, deserialized.estimated_accuracy);
     }
 
@@ -758,7 +765,9 @@ mod tests {
         };
 
         assert_eq!(decision.selected_strategies.len(), 4);
-        assert!(decision.selected_strategies.contains(&RetrievalStrategy::Embedding));
+        assert!(decision
+            .selected_strategies
+            .contains(&RetrievalStrategy::Embedding));
     }
 
     #[test]

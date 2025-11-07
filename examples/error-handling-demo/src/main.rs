@@ -13,9 +13,7 @@ use colored::*;
 #[tokio::main]
 async fn main() {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     eprintln!("Starting error handling demo...");
     println!("{}", "=== AgentMem 错误处理演示 ===".cyan().bold());
@@ -58,7 +56,10 @@ fn demo_error_severity() {
         ("LLM 错误", AgentMemError::llm_error("API 调用失败")),
         ("网络错误", AgentMemError::network_error("连接超时")),
         ("限流错误", AgentMemError::rate_limit_error("请求过于频繁")),
-        ("验证错误", AgentMemError::validation_error("参数格式不正确")),
+        (
+            "验证错误",
+            AgentMemError::validation_error("参数格式不正确"),
+        ),
         ("未找到", AgentMemError::not_found("记忆 ID 不存在")),
     ];
 
@@ -85,11 +86,27 @@ fn demo_error_retryability() {
     let errors = vec![
         ("网络错误", AgentMemError::network_error("连接超时"), true),
         ("超时错误", AgentMemError::timeout_error("操作超时"), true),
-        ("限流错误", AgentMemError::rate_limit_error("请求过于频繁"), true),
-        ("存储错误", AgentMemError::storage_error("数据库连接失败"), true),
-        ("验证错误", AgentMemError::validation_error("参数格式不正确"), false),
+        (
+            "限流错误",
+            AgentMemError::rate_limit_error("请求过于频繁"),
+            true,
+        ),
+        (
+            "存储错误",
+            AgentMemError::storage_error("数据库连接失败"),
+            true,
+        ),
+        (
+            "验证错误",
+            AgentMemError::validation_error("参数格式不正确"),
+            false,
+        ),
         ("未找到", AgentMemError::not_found("记忆 ID 不存在"), false),
-        ("配置错误", AgentMemError::config_error("缺少必需的配置项"), false),
+        (
+            "配置错误",
+            AgentMemError::config_error("缺少必需的配置项"),
+            false,
+        ),
     ];
 
     for (name, error, expected_retryable) in errors {
@@ -99,13 +116,13 @@ fn demo_error_retryability() {
         } else {
             "❌ 不可重试".red()
         };
-        
+
         let check = if is_retryable == expected_retryable {
             "✓".green()
         } else {
             "✗".red()
         };
-        
+
         println!("  {} {} - {}", check, status, name.bold());
     }
 
@@ -153,7 +170,10 @@ fn demo_recovery_suggestions() {
         ("配置错误", AgentMemError::config_error("缺少必需的配置项")),
         ("存储错误", AgentMemError::storage_error("数据库连接失败")),
         ("未找到", AgentMemError::not_found("记忆 ID 不存在")),
-        ("验证错误", AgentMemError::validation_error("参数格式不正确")),
+        (
+            "验证错误",
+            AgentMemError::validation_error("参数格式不正确"),
+        ),
     ];
 
     for (name, error) in errors {
@@ -204,4 +224,3 @@ fn demo_error_context() {
 
     println!("{}", "✅ 错误上下文信息正确".green());
 }
-

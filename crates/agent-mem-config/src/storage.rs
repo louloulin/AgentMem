@@ -1,42 +1,40 @@
 //! Storage configuration extensions
 
-use serde::{Deserialize, Serialize};
 use agent_mem_traits::VectorStoreConfig as BaseVectorStoreConfig;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Extended storage configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageConfig {
     /// Vector store configuration
     pub vector_store: VectorStoreConfig,
-    
+
     /// Graph store configuration (optional)
     pub graph_store: Option<GraphStoreConfig>,
-    
+
     /// Key-value store configuration
     pub kv_store: KeyValueStoreConfig,
-    
+
     /// History store configuration
     pub history_store: HistoryStoreConfig,
 }
-
 
 /// Extended vector store configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorStoreConfig {
     #[serde(flatten)]
     pub base: BaseVectorStoreConfig,
-    
+
     /// Connection timeout in seconds
     pub timeout_seconds: u64,
-    
+
     /// Maximum connections in pool
     pub max_connections: u32,
-    
+
     /// Enable connection pooling
     pub enable_pooling: bool,
-    
+
     /// Batch size for bulk operations
     pub batch_size: usize,
 }
@@ -365,10 +363,7 @@ impl VectorServiceType {
 
     /// 是否为云托管服务
     pub fn is_cloud_hosted(&self) -> bool {
-        matches!(
-            self,
-            Self::Pinecone | Self::Supabase | Self::AzureAISearch
-        )
+        matches!(self, Self::Pinecone | Self::Supabase | Self::AzureAISearch)
     }
 
     /// 是否支持嵌入式部署
@@ -598,7 +593,11 @@ impl DeploymentMode {
     ///     "memories".to_string(),
     /// );
     /// ```
-    pub fn server_with_qdrant(database_url: String, qdrant_url: String, collection: String) -> Self {
+    pub fn server_with_qdrant(
+        database_url: String,
+        qdrant_url: String,
+        collection: String,
+    ) -> Self {
         Self::Server(ServerModeConfig {
             database_url,
             pool_config: PoolConfig::default(),
@@ -672,7 +671,11 @@ impl DeploymentMode {
     ///     "memories".to_string(),
     /// );
     /// ```
-    pub fn server_with_milvus(database_url: String, milvus_url: String, collection: String) -> Self {
+    pub fn server_with_milvus(
+        database_url: String,
+        milvus_url: String,
+        collection: String,
+    ) -> Self {
         Self::Server(ServerModeConfig {
             database_url,
             pool_config: PoolConfig::default(),

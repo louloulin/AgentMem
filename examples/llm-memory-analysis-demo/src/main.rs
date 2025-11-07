@@ -8,13 +8,13 @@
 //! 5. 长期记忆效果追踪
 
 use agent_mem_llm::factory::RealLLMFactory;
-use agent_mem_traits::{LLMConfig, LLMProvider, Message, MessageRole, MemoryType};
+use agent_mem_traits::{LLMConfig, LLMProvider, MemoryType, Message, MessageRole};
 use chrono::Utc;
 use colored::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// 记忆分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +87,10 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter("info,agent_mem_core=debug")
         .init();
 
-    println!("{}", "=== AgentMem LLM 记忆效果全面分析 ===".bright_cyan().bold());
+    println!(
+        "{}",
+        "=== AgentMem LLM 记忆效果全面分析 ===".bright_cyan().bold()
+    );
     println!();
 
     // 创建 LLM 提供商
@@ -298,9 +301,17 @@ async fn demo_2_memory_quality_assessment(
     // 创建测试记忆
     let test_memories = vec![
         ("我喜欢吃披萨", 0.3, "低质量：信息过于简单"),
-        ("张三是一名30岁的软件工程师，在北京工作，主要从事 Rust 后端开发", 0.9, "高质量：信息丰富且具体"),
+        (
+            "张三是一名30岁的软件工程师，在北京工作，主要从事 Rust 后端开发",
+            0.9,
+            "高质量：信息丰富且具体",
+        ),
         ("今天天气不错", 0.2, "低质量：缺乏上下文"),
-        ("用户偏好使用 Rust 进行系统编程，因为它提供内存安全保证且性能优异", 0.8, "高质量：包含原因和细节"),
+        (
+            "用户偏好使用 Rust 进行系统编程，因为它提供内存安全保证且性能优异",
+            0.8,
+            "高质量：包含原因和细节",
+        ),
     ];
 
     println!("📝 评估 {} 条记忆的质量：\n", test_memories.len());
@@ -344,7 +355,9 @@ async fn demo_2_memory_quality_assessment(
 
         let quality_score = match serde_json::from_str::<serde_json::Value>(&cleaned_response) {
             Ok(json) => {
-                let score = json["quality_score"].as_f64().unwrap_or(*expected_score as f64) as f32;
+                let score = json["quality_score"]
+                    .as_f64()
+                    .unwrap_or(*expected_score as f64) as f32;
                 debug!("✅ 成功解析质量分数: {}", score);
                 score
             }
@@ -356,7 +369,10 @@ async fn demo_2_memory_quality_assessment(
                     if let Some(end) = response.rfind('}') {
                         let json_part = &response[start..=end];
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_part) {
-                            let score = json["quality_score"].as_f64().unwrap_or(*expected_score as f64) as f32;
+                            let score = json["quality_score"]
+                                .as_f64()
+                                .unwrap_or(*expected_score as f64)
+                                as f32;
                             debug!("✅ 从响应中成功提取质量分数: {}", score);
                             score
                         } else {
@@ -387,9 +403,21 @@ async fn demo_2_memory_quality_assessment(
 
     let avg_score = total_score / test_memories.len() as f32;
     println!("✅ 评估统计：");
-    println!("  • 平均质量分数: {:.2}", avg_score.to_string().bright_cyan());
-    println!("  • 高质量记忆数: {}/{}", high_quality_count.to_string().bright_green(), test_memories.len());
-    println!("  • 高质量比例: {:.1}%", (high_quality_count as f32 / test_memories.len() as f32 * 100.0).to_string().bright_cyan());
+    println!(
+        "  • 平均质量分数: {:.2}",
+        avg_score.to_string().bright_cyan()
+    );
+    println!(
+        "  • 高质量记忆数: {}/{}",
+        high_quality_count.to_string().bright_green(),
+        test_memories.len()
+    );
+    println!(
+        "  • 高质量比例: {:.1}%",
+        (high_quality_count as f32 / test_memories.len() as f32 * 100.0)
+            .to_string()
+            .bright_cyan()
+    );
 
     Ok(())
 }
@@ -468,7 +496,8 @@ async fn demo_3_retrieval_effectiveness(
         let retrieved_indices = match serde_json::from_str::<serde_json::Value>(&cleaned_response) {
             Ok(json) => {
                 if let Some(arr) = json["relevant_indices"].as_array() {
-                    let indices: Vec<usize> = arr.iter()
+                    let indices: Vec<usize> = arr
+                        .iter()
                         .filter_map(|v| v.as_u64().map(|n| n as usize))
                         .collect();
                     debug!("✅ 成功解析检索索引: {:?}", indices);
@@ -487,7 +516,8 @@ async fn demo_3_retrieval_effectiveness(
                         let json_part = &response[start..=end];
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_part) {
                             if let Some(arr) = json["relevant_indices"].as_array() {
-                                let indices: Vec<usize> = arr.iter()
+                                let indices: Vec<usize> = arr
+                                    .iter()
                                     .filter_map(|v| v.as_u64().map(|n| n as usize))
                                     .collect();
                                 debug!("✅ 从响应中成功提取检索索引: {:?}", indices);
@@ -521,13 +551,19 @@ async fn demo_3_retrieval_effectiveness(
 
         println!("    预期索引: {:?}", expected_indices);
         println!("    检索索引: {:?}", retrieved_indices);
-        println!("    准确率: {:.1}%", (accuracy * 100.0).to_string().bright_green());
+        println!(
+            "    准确率: {:.1}%",
+            (accuracy * 100.0).to_string().bright_green()
+        );
         println!();
     }
 
     let avg_accuracy = total_accuracy / queries.len() as f32;
     println!("✅ 检索统计：");
-    println!("  • 平均准确率: {:.1}%", (avg_accuracy * 100.0).to_string().bright_cyan());
+    println!(
+        "  • 平均准确率: {:.1}%",
+        (avg_accuracy * 100.0).to_string().bright_cyan()
+    );
     println!("  • 测试查询数: {}", queries.len());
 
     Ok(())
@@ -537,26 +573,21 @@ async fn demo_3_retrieval_effectiveness(
 async fn demo_4_memory_fusion(
     llm_provider: &Arc<dyn LLMProvider + Send + Sync>,
 ) -> anyhow::Result<()> {
-    println!("{}", "\n📊 演示 4: 记忆融合和冲突解决".bright_yellow().bold());
+    println!(
+        "{}",
+        "\n📊 演示 4: 记忆融合和冲突解决".bright_yellow().bold()
+    );
     println!("{}", "─".repeat(60).bright_black());
 
     // 创建冲突的记忆对
     let conflict_pairs = vec![
-        (
-            "张三今年30岁",
-            "张三今年31岁",
-            "年龄冲突",
-        ),
+        ("张三今年30岁", "张三今年31岁", "年龄冲突"),
         (
             "张三喜欢 Rust 编程",
             "张三是 Rust 专家，有5年经验",
             "信息补充",
         ),
-        (
-            "张三在北京工作",
-            "张三在上海工作",
-            "地点冲突",
-        ),
+        ("张三在北京工作", "张三在上海工作", "地点冲突"),
     ];
 
     println!("🔄 测试 {} 组记忆融合：\n", conflict_pairs.len());
@@ -607,7 +638,14 @@ async fn demo_4_memory_fusion(
                 let fused_memory = json["fused_memory"].as_str().unwrap_or("融合失败");
                 let reasoning = json["reasoning"].as_str().unwrap_or("无");
 
-                println!("    冲突检测: {}", if has_conflict { "是".bright_red() } else { "否".bright_green() });
+                println!(
+                    "    冲突检测: {}",
+                    if has_conflict {
+                        "是".bright_red()
+                    } else {
+                        "否".bright_green()
+                    }
+                );
                 println!("    融合结果: {}", fused_memory.bright_cyan());
                 println!("    融合理由: {}", reasoning.bright_black());
 
@@ -627,7 +665,14 @@ async fn demo_4_memory_fusion(
                             let fused_memory = json["fused_memory"].as_str().unwrap_or("融合失败");
                             let reasoning = json["reasoning"].as_str().unwrap_or("无");
 
-                            println!("    冲突检测: {}", if has_conflict { "是".bright_red() } else { "否".bright_green() });
+                            println!(
+                                "    冲突检测: {}",
+                                if has_conflict {
+                                    "是".bright_red()
+                                } else {
+                                    "否".bright_green()
+                                }
+                            );
                             println!("    融合结果: {}", fused_memory.bright_cyan());
                             println!("    融合理由: {}", reasoning.bright_black());
 
@@ -650,8 +695,15 @@ async fn demo_4_memory_fusion(
 
     let success_rate = fusion_success as f32 / conflict_pairs.len() as f32;
     println!("✅ 融合统计：");
-    println!("  • 融合成功率: {:.1}%", (success_rate * 100.0).to_string().bright_cyan());
-    println!("  • 成功融合数: {}/{}", fusion_success.to_string().bright_green(), conflict_pairs.len());
+    println!(
+        "  • 融合成功率: {:.1}%",
+        (success_rate * 100.0).to_string().bright_cyan()
+    );
+    println!(
+        "  • 成功融合数: {}/{}",
+        fusion_success.to_string().bright_green(),
+        conflict_pairs.len()
+    );
 
     Ok(())
 }
@@ -711,9 +763,19 @@ async fn demo_5_long_term_tracking(
             let decay_rate = json["decay_rate"].as_f64().unwrap_or(0.5);
             let should_retain = json["should_retain"].as_bool().unwrap_or(true);
 
-            println!("    当前重要性: {:.2}", importance.to_string().bright_cyan());
+            println!(
+                "    当前重要性: {:.2}",
+                importance.to_string().bright_cyan()
+            );
             println!("    衰减率: {:.2}", decay_rate.to_string().bright_yellow());
-            println!("    保留建议: {}", if should_retain { "保留".bright_green() } else { "删除".bright_red() });
+            println!(
+                "    保留建议: {}",
+                if should_retain {
+                    "保留".bright_green()
+                } else {
+                    "删除".bright_red()
+                }
+            );
         }
         println!();
     }
@@ -731,8 +793,18 @@ async fn demo_6_comprehensive_analysis(
     // 创建综合记忆集
     let comprehensive_memories = vec![
         ("张三是一名30岁的软件工程师", MemoryType::Semantic, 0.9, 15),
-        ("张三在2024年1月15日参加了技术会议", MemoryType::Episodic, 0.7, 3),
-        ("使用 Rust 开发时应该注意内存安全", MemoryType::Procedural, 0.8, 8),
+        (
+            "张三在2024年1月15日参加了技术会议",
+            MemoryType::Episodic,
+            0.7,
+            3,
+        ),
+        (
+            "使用 Rust 开发时应该注意内存安全",
+            MemoryType::Procedural,
+            0.8,
+            8,
+        ),
         ("张三喜欢阅读技术书籍", MemoryType::Semantic, 0.6, 5),
         ("张三昨天完成了项目里程碑", MemoryType::Episodic, 0.5, 1),
     ];
@@ -755,13 +827,27 @@ async fn demo_6_comprehensive_analysis(
     let avg_access = total_access as f32 / comprehensive_memories.len() as f32;
 
     println!("✅ 综合统计：");
-    println!("  • 总记忆数: {}", comprehensive_memories.len().to_string().bright_cyan());
-    println!("  • 平均重要性: {:.2}", avg_importance.to_string().bright_cyan());
-    println!("  • 平均访问次数: {:.1}", avg_access.to_string().bright_cyan());
+    println!(
+        "  • 总记忆数: {}",
+        comprehensive_memories.len().to_string().bright_cyan()
+    );
+    println!(
+        "  • 平均重要性: {:.2}",
+        avg_importance.to_string().bright_cyan()
+    );
+    println!(
+        "  • 平均访问次数: {:.1}",
+        avg_access.to_string().bright_cyan()
+    );
     println!("\n  记忆类型分布：");
     for (mem_type, count) in type_distribution.iter() {
         let percentage = (*count as f32 / comprehensive_memories.len() as f32) * 100.0;
-        println!("    • {}: {} ({:.1}%)", mem_type.bright_white(), count, percentage.to_string().bright_green());
+        println!(
+            "    • {}: {} ({:.1}%)",
+            mem_type.bright_white(),
+            count,
+            percentage.to_string().bright_green()
+        );
     }
 
     // 使用 LLM 进行综合评估
@@ -821,9 +907,19 @@ async fn demo_6_comprehensive_analysis(
         let distribution_quality = json["distribution_quality"].as_str().unwrap_or("良好");
         let redundancy = json["redundancy_detected"].as_bool().unwrap_or(false);
 
-        println!("  • 系统健康度: {:.2}", health_score.to_string().bright_cyan());
+        println!(
+            "  • 系统健康度: {:.2}",
+            health_score.to_string().bright_cyan()
+        );
         println!("  • 分布质量: {}", distribution_quality.bright_white());
-        println!("  • 冗余检测: {}", if redundancy { "发现冗余".bright_yellow() } else { "无冗余".bright_green() });
+        println!(
+            "  • 冗余检测: {}",
+            if redundancy {
+                "发现冗余".bright_yellow()
+            } else {
+                "无冗余".bright_green()
+            }
+        );
 
         if let Some(recommendations) = json["recommendations"].as_array() {
             println!("\n  改进建议：");
@@ -908,4 +1004,3 @@ async fn create_llm_provider() -> anyhow::Result<Arc<dyn LLMProvider + Send + Sy
          3. 设置 OPENAI_API_KEY 环境变量"
     ))
 }
-

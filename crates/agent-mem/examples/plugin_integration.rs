@@ -10,8 +10,8 @@
 #[cfg(feature = "plugins")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use agent_mem::plugins::{
-        PluginManager, PluginMetadata, PluginRegistry, PluginStatus, RegisteredPlugin, PluginType,
-        Capability, PluginConfig, ResourceLimits, ResourceMonitor, PluginMonitor,
+        Capability, PluginConfig, PluginManager, PluginMetadata, PluginMonitor, PluginRegistry,
+        PluginStatus, PluginType, RegisteredPlugin, ResourceLimits, ResourceMonitor,
     };
     use std::sync::Arc;
 
@@ -29,10 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         description: "Process and enhance memory content".to_string(),
         author: "AgentMem Team".to_string(),
         plugin_type: PluginType::MemoryProcessor,
-        required_capabilities: vec![
-            Capability::MemoryAccess,
-            Capability::LoggingAccess,
-        ],
+        required_capabilities: vec![Capability::MemoryAccess, Capability::LoggingAccess],
         config_schema: None,
     };
 
@@ -53,7 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n3. Listing registered plugins:");
     let plugins = registry.list();
     for p in plugins {
-        println!("   - {} v{} ({})", p.metadata.name, p.metadata.version, p.id);
+        println!(
+            "   - {} v{} ({})",
+            p.metadata.name, p.metadata.version, p.id
+        );
         println!("     Type: {:?}", p.metadata.plugin_type);
         println!("     Status: {:?}", p.status);
         println!("     Capabilities: {:?}", p.metadata.required_capabilities);
@@ -66,7 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let usage = monitor.usage();
 
     println!("   Resource Limits:");
-    println!("   - Memory: {} MB", limits.memory.max_heap_bytes / 1024 / 1024);
+    println!(
+        "   - Memory: {} MB",
+        limits.memory.max_heap_bytes / 1024 / 1024
+    );
     println!("   - CPU Time: {} ms", limits.cpu.max_execution_time_ms);
     println!("   - Network Requests: {}", limits.io.max_network_requests);
 
@@ -118,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. Network capability (mock mode)
     println!("\n6. Testing network capability...");
-    use agent_mem::plugins::capabilities::{NetworkCapability, HttpRequest, HttpMethod};
+    use agent_mem::plugins::capabilities::{HttpMethod, HttpRequest, NetworkCapability};
     use std::collections::HashMap;
 
     let network = NetworkCapability::new(true, 100); // mock mode, 100 requests max
@@ -162,4 +165,3 @@ fn main() {
     println!("Plugin support is not enabled!");
     println!("Run with: cargo run --example plugin_integration --features plugins");
 }
-

@@ -115,17 +115,19 @@ impl SemanticAgent {
 
     /// Handle semantic knowledge insertion
     async fn handle_insert(&self, parameters: Value) -> AgentResult<Value> {
-        
         {
             // Use actual semantic memory manager if available
             if let Some(manager) = &self.semantic_store {
                 // Parse item data
-                let item: SemanticMemoryItem = serde_json::from_value(parameters.clone())
-                    .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {e}")))?;
+                let item: SemanticMemoryItem =
+                    serde_json::from_value(parameters.clone()).map_err(|e| {
+                        AgentError::InvalidParameters(format!("Invalid item data: {e}"))
+                    })?;
 
                 // Create item using manager
-                let created_item = manager.create_item(item).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to create item: {e}")))?;
+                let created_item = manager.create_item(item).await.map_err(|e| {
+                    AgentError::TaskExecutionError(format!("Failed to create item: {e}"))
+                })?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -134,7 +136,10 @@ impl SemanticAgent {
                     "message": "Semantic knowledge inserted successfully"
                 });
 
-                log::info!("Semantic agent: Inserted knowledge item {}", created_item.id);
+                log::info!(
+                    "Semantic agent: Inserted knowledge item {}",
+                    created_item.id
+                );
                 return Ok(response);
             }
         }
@@ -155,27 +160,29 @@ impl SemanticAgent {
                 AgentError::InvalidParameters("Missing 'user_id' parameter".to_string())
             })?;
 
-        
         {
             // Use actual semantic memory manager if available
             if let Some(manager) = &self.semantic_store {
                 // Build query from parameters
                 let query = SemanticQuery {
-                    name_query: parameters.get("name_query")
+                    name_query: parameters
+                        .get("name_query")
                         .and_then(|v| v.as_str())
                         .map(|s| format!("%{s}%")),
-                    summary_query: parameters.get("summary_query")
+                    summary_query: parameters
+                        .get("summary_query")
                         .and_then(|v| v.as_str())
                         .map(|s| format!("%{s}%")),
-                    tree_path_prefix: parameters.get("tree_path_prefix")
+                    tree_path_prefix: parameters
+                        .get("tree_path_prefix")
                         .and_then(|v| serde_json::from_value(v.clone()).ok()),
-                    limit: parameters.get("limit")
-                        .and_then(|v| v.as_i64()),
+                    limit: parameters.get("limit").and_then(|v| v.as_i64()),
                 };
 
                 // Query items using manager
-                let items = manager.query_items(user_id, query).await
-                    .map_err(|e| AgentError::TaskExecutionError(format!("Failed to query items: {e}")))?;
+                let items = manager.query_items(user_id, query).await.map_err(|e| {
+                    AgentError::TaskExecutionError(format!("Failed to query items: {e}"))
+                })?;
 
                 let response = serde_json::json!({
                     "success": true,
@@ -183,7 +190,11 @@ impl SemanticAgent {
                     "total_count": items.len()
                 });
 
-                log::info!("Semantic agent: Found {} items for user {}", items.len(), user_id);
+                log::info!(
+                    "Semantic agent: Found {} items for user {}",
+                    items.len(),
+                    user_id
+                );
                 return Ok(response);
             }
         }
@@ -217,25 +228,35 @@ impl SemanticAgent {
                 })?;
 
             // Get the concept item
-            let item = store.get_item(concept_id, user_id).await
+            let item = store
+                .get_item(concept_id, user_id)
+                .await
                 .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get item: {e}")))?;
 
             if let Some(item) = item {
                 // Use tree_path to find related items (simplified relationship model)
-                let related_items = store.search_by_tree_path(user_id, item.tree_path.clone()).await
-                    .map_err(|e| AgentError::MemoryManagerError(format!("Failed to search by tree path: {e}")))?;
+                let related_items = store
+                    .search_by_tree_path(user_id, item.tree_path.clone())
+                    .await
+                    .map_err(|e| {
+                        AgentError::MemoryManagerError(format!(
+                            "Failed to search by tree path: {e}"
+                        ))
+                    })?;
 
                 // Filter out the concept itself
                 let relationships: Vec<_> = related_items
                     .into_iter()
                     .filter(|r| r.id != concept_id)
-                    .map(|r| serde_json::json!({
-                        "id": r.id,
-                        "name": r.name,
-                        "summary": r.summary,
-                        "tree_path": r.tree_path,
-                        "relationship_type": "tree_sibling" // Simplified relationship type
-                    }))
+                    .map(|r| {
+                        serde_json::json!({
+                            "id": r.id,
+                            "name": r.name,
+                            "summary": r.summary,
+                            "tree_path": r.tree_path,
+                            "relationship_type": "tree_sibling" // Simplified relationship type
+                        })
+                    })
                     .collect();
 
                 log::info!(
@@ -307,8 +328,9 @@ impl SemanticAgent {
                 .unwrap_or(3) as usize;
 
             // Get the starting concept
-            let start_item = store.get_item(start_concept, user_id).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to get start concept: {e}")))?;
+            let start_item = store.get_item(start_concept, user_id).await.map_err(|e| {
+                AgentError::MemoryManagerError(format!("Failed to get start concept: {e}"))
+            })?;
 
             if let Some(start_item) = start_item {
                 // Simplified traversal: explore tree path hierarchy
@@ -327,8 +349,12 @@ impl SemanticAgent {
                     if current_path.len() >= depth {
                         current_path.truncate(current_path.len() - depth + 1);
 
-                        let items = store.search_by_tree_path(user_id, current_path).await
-                            .map_err(|e| AgentError::MemoryManagerError(format!("Failed to traverse: {e}")))?;
+                        let items = store
+                            .search_by_tree_path(user_id, current_path)
+                            .await
+                            .map_err(|e| {
+                                AgentError::MemoryManagerError(format!("Failed to traverse: {e}"))
+                            })?;
 
                         for item in items {
                             if item.id != start_concept {
@@ -397,8 +423,9 @@ impl SemanticAgent {
                 .map_err(|e| AgentError::InvalidParameters(format!("Invalid item data: {e}")))?;
 
             // Update the item in the store
-            let updated = store.update_item(item.clone()).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to update item: {e}")))?;
+            let updated = store.update_item(item.clone()).await.map_err(|e| {
+                AgentError::MemoryManagerError(format!("Failed to update item: {e}"))
+            })?;
 
             if updated {
                 log::info!("Semantic agent: Updated item {} in real storage", item.id);
@@ -453,8 +480,9 @@ impl SemanticAgent {
                 })?;
 
             // Delete the item from the store
-            let deleted = store.delete_item(item_id, user_id).await
-                .map_err(|e| AgentError::MemoryManagerError(format!("Failed to delete item: {e}")))?;
+            let deleted = store.delete_item(item_id, user_id).await.map_err(|e| {
+                AgentError::MemoryManagerError(format!("Failed to delete item: {e}"))
+            })?;
 
             if deleted {
                 log::info!("Semantic agent: Deleted item {item_id} from real storage");
@@ -513,10 +541,7 @@ impl MemoryAgent for SemanticAgent {
             // 使用 system 用户 ID 进行测试查询
             match store.query_items("system", query).await {
                 Ok(items) => {
-                    log::info!(
-                        "成功连接到语义记忆存储，发现 {} 个知识项",
-                        items.len()
-                    );
+                    log::info!("成功连接到语义记忆存储，发现 {} 个知识项", items.len());
 
                     // 更新统计信息
                     let mut context = self.context.write().await;

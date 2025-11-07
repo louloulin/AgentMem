@@ -181,14 +181,13 @@ impl ClaudeProvider {
             .json(request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Claude API request failed: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Claude API request failed: {e}")))?;
 
         let status = response.status();
-        let response_text = response.text().await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to read response: {e}"))
-        })?;
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
 
         if status.is_success() {
             serde_json::from_str(&response_text).map_err(|e| {

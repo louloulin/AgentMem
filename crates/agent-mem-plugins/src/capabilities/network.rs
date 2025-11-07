@@ -117,8 +117,7 @@ impl NetworkCapability {
 
     /// Get request count
     pub fn get_request_count(&self) -> usize {
-        self.request_count
-            .load(std::sync::atomic::Ordering::SeqCst)
+        self.request_count.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Reset request count
@@ -271,7 +270,9 @@ mod tests {
 
         let result = network.http_request(request);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("URL cannot be empty"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("URL cannot be empty"));
     }
 }
-

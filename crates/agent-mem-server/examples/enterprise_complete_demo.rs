@@ -2,8 +2,8 @@
 //!
 //! 运行命令: cargo run --package agent-mem-server --example enterprise_complete_demo
 
-use agent_mem_server::auth::{AuthService, ApiKey, Role, Permission, PasswordService};
-use agent_mem_server::middleware::quota::{QuotaManager, QuotaLimits};
+use agent_mem_server::auth::{ApiKey, AuthService, PasswordService, Permission, Role};
+use agent_mem_server::middleware::quota::{QuotaLimits, QuotaManager};
 use std::collections::HashSet;
 
 #[tokio::main]
@@ -19,18 +19,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let auth = AuthService::new("super-secret-jwt-key-min-32-chars-production");
-    
+
     let token = auth.generate_token(
         "alice",
         "acme-corp".to_string(),
         vec!["user".to_string(), "admin".to_string()],
         Some("project-123".to_string()),
     )?;
-    
+
     println!("✅ JWT Token生成:");
     println!("   User: alice");
     println!("   Token: {}...", &token[..60]);
-    
+
     let claims = auth.validate_token(&token)?;
     println!("\n✅ Token验证成功:");
     println!("   User ID: {}", claims.sub);
@@ -43,12 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let password = "alice_secure_password_123!@#";
     let hash = PasswordService::hash_password(password)?;
-    
+
     println!("✅ 密码哈希: {}...", &hash[..50]);
-    
+
     let is_valid = PasswordService::verify_password(password, &hash)?;
     println!("✅ 正确密码验证: {}", is_valid);
-    
+
     let is_invalid = PasswordService::verify_password("wrong", &hash)?;
     println!("✅ 错误密码拒绝: {} (correctly rejected)", is_invalid);
 
@@ -70,7 +70,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ API Key: {}", api_key.key);
     println!("✅ Valid: {}", api_key.is_valid());
-    println!("✅ Has 'read:memories': {}", api_key.has_scope("read:memories"));
+    println!(
+        "✅ Has 'read:memories': {}",
+        api_key.has_scope("read:memories")
+    );
 
     // ========== Part 4: RBAC权限演示 ==========
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -82,16 +85,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let viewer = Role::viewer();
 
     println!("✅ Admin role: has ALL permissions");
-    println!("   ReadMemory: {}", admin.has_permission(&Permission::ReadMemory));
-    println!("   DeleteOrganization: {}", admin.has_permission(&Permission::DeleteOrganization));
-    
+    println!(
+        "   ReadMemory: {}",
+        admin.has_permission(&Permission::ReadMemory)
+    );
+    println!(
+        "   DeleteOrganization: {}",
+        admin.has_permission(&Permission::DeleteOrganization)
+    );
+
     println!("\n✅ User role: limited permissions");
-    println!("   ReadMemory: {}", user.has_permission(&Permission::ReadMemory));
-    println!("   DeleteOrganization: {}", user.has_permission(&Permission::DeleteOrganization));
-    
+    println!(
+        "   ReadMemory: {}",
+        user.has_permission(&Permission::ReadMemory)
+    );
+    println!(
+        "   DeleteOrganization: {}",
+        user.has_permission(&Permission::DeleteOrganization)
+    );
+
     println!("\n✅ Viewer role: read-only");
-    println!("   ReadMemory: {}", viewer.has_permission(&Permission::ReadMemory));
-    println!("   WriteMemory: {}", viewer.has_permission(&Permission::WriteMemory));
+    println!(
+        "   ReadMemory: {}",
+        viewer.has_permission(&Permission::ReadMemory)
+    );
+    println!(
+        "   WriteMemory: {}",
+        viewer.has_permission(&Permission::WriteMemory)
+    );
 
     // ========== Part 5: Rate Limiting演示 ==========
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -111,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     quota_manager.set_limits("acme-corp", limits).await;
-    
+
     println!("✅ Quota设置: max 5 requests/minute");
 
     for i in 1..=7 {
@@ -141,4 +162,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

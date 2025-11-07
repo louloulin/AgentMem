@@ -97,11 +97,7 @@ impl SemanticMemoryStore for MockSemanticStore {
         }
     }
 
-    async fn delete_item(
-        &self,
-        item_id: &str,
-        user_id: &str,
-    ) -> agent_mem_traits::Result<bool> {
+    async fn delete_item(&self, item_id: &str, user_id: &str) -> agent_mem_traits::Result<bool> {
         let key = Self::make_key(user_id, item_id);
         Ok(self.items.lock().await.remove(&key).is_some())
     }
@@ -370,7 +366,7 @@ async fn test_semantic_agent_delete_with_real_store() {
 
     let task_insert = TaskRequest {
         task_id: "task-insert".to_string(),
-        
+
         memory_type: MemoryType::Semantic,
         operation: "insert".to_string(),
         parameters: params_insert,
@@ -392,7 +388,7 @@ async fn test_semantic_agent_delete_with_real_store() {
 
     let task_delete = TaskRequest {
         task_id: "task-delete".to_string(),
-        
+
         memory_type: MemoryType::Semantic,
         operation: "delete".to_string(),
         parameters: params_delete,
@@ -439,7 +435,7 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
 
     let task_main = TaskRequest {
         task_id: "task-main".to_string(),
-        
+
         memory_type: MemoryType::Semantic,
         operation: "insert".to_string(),
         parameters: params_main,
@@ -469,7 +465,7 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
 
     let task_related = TaskRequest {
         task_id: "task-related".to_string(),
-        
+
         memory_type: MemoryType::Semantic,
         operation: "insert".to_string(),
         parameters: params_related,
@@ -537,7 +533,7 @@ async fn test_semantic_agent_graph_traversal_with_real_store() {
 
     let task_start = TaskRequest {
         task_id: "task-start".to_string(),
-        
+
         memory_type: MemoryType::Semantic,
         operation: "insert".to_string(),
         parameters: params_start,

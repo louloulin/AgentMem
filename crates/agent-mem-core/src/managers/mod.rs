@@ -70,8 +70,8 @@ pub use association_manager::{
 
 #[cfg(feature = "postgres")]
 pub use knowledge_graph_manager::{
-    Entity, EntityType, GraphPath, GraphQueryResult, KnowledgeGraphConfig,
-    KnowledgeGraphManager, Relation, RelationType,
+    Entity, EntityType, GraphPath, GraphQueryResult, KnowledgeGraphConfig, KnowledgeGraphManager,
+    Relation, RelationType,
 };
 
 #[cfg(feature = "postgres")]

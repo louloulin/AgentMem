@@ -13,9 +13,7 @@ use std::time::Instant;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════════╗");
     println!("║          AgentMem 实体和关系提取演示                                  ║");
@@ -32,8 +30,9 @@ async fn main() -> anyhow::Result<()> {
     println!("1️⃣  基础实体提取");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let text1 = "我叫张三，在北京的谷歌公司工作。我的邮箱是zhangsan@google.com，电话是13800138000。";
-    
+    let text1 =
+        "我叫张三，在北京的谷歌公司工作。我的邮箱是zhangsan@google.com，电话是13800138000。";
+
     let start = Instant::now();
     let entities = entity_extractor.extract_entities(text1).await?;
     let duration = start.elapsed();
@@ -41,11 +40,16 @@ async fn main() -> anyhow::Result<()> {
     println!("📝 输入文本:");
     println!("   {}", text1);
     println!();
-    println!("✅ 提取到 {} 个实体（耗时: {:?}）:", entities.len(), duration);
+    println!(
+        "✅ 提取到 {} 个实体（耗时: {:?}）:",
+        entities.len(),
+        duration
+    );
     for entity in &entities {
-        println!("   - {} [{}] (置信度: {:.2})", 
-            entity.name, 
-            entity.entity_type.as_str(), 
+        println!(
+            "   - {} [{}] (置信度: {:.2})",
+            entity.name,
+            entity.entity_type.as_str(),
             entity.confidence
         );
     }
@@ -59,16 +63,20 @@ async fn main() -> anyhow::Result<()> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let start = Instant::now();
-    let relations = relation_extractor.extract_relations(text1, &entities).await?;
+    let relations = relation_extractor
+        .extract_relations(text1, &entities)
+        .await?;
     let duration = start.elapsed();
 
-    println!("✅ 提取到 {} 个关系（耗时: {:?}）:", relations.len(), duration);
+    println!(
+        "✅ 提取到 {} 个关系（耗时: {:?}）:",
+        relations.len(),
+        duration
+    );
     for relation in &relations {
-        println!("   - {} [{}] {} (置信度: {:.2})", 
-            relation.subject, 
-            relation.predicate,
-            relation.object,
-            relation.confidence
+        println!(
+            "   - {} [{}] {} (置信度: {:.2})",
+            relation.subject, relation.predicate, relation.object, relation.confidence
         );
     }
     println!();
@@ -92,19 +100,23 @@ async fn main() -> anyhow::Result<()> {
 
     let start = Instant::now();
     let entities2 = entity_extractor.extract_entities(text2).await?;
-    let relations2 = relation_extractor.extract_relations(text2, &entities2).await?;
+    let relations2 = relation_extractor
+        .extract_relations(text2, &entities2)
+        .await?;
     let duration = start.elapsed();
 
     println!("✅ 提取结果（耗时: {:?}）:", duration);
     println!();
     println!("📊 实体统计:");
-    
+
     // 按类型统计实体
     let mut entity_counts = std::collections::HashMap::new();
     for entity in &entities2 {
-        *entity_counts.entry(entity.entity_type.as_str()).or_insert(0) += 1;
+        *entity_counts
+            .entry(entity.entity_type.as_str())
+            .or_insert(0) += 1;
     }
-    
+
     for (entity_type, count) in entity_counts.iter() {
         println!("   - {}: {} 个", entity_type, count);
     }
@@ -112,9 +124,10 @@ async fn main() -> anyhow::Result<()> {
 
     println!("📋 实体列表:");
     for entity in &entities2 {
-        println!("   - {} [{}] (置信度: {:.2})", 
-            entity.name, 
-            entity.entity_type.as_str(), 
+        println!(
+            "   - {} [{}] (置信度: {:.2})",
+            entity.name,
+            entity.entity_type.as_str(),
             entity.confidence
         );
     }
@@ -122,11 +135,9 @@ async fn main() -> anyhow::Result<()> {
 
     println!("🔗 关系列表:");
     for relation in &relations2 {
-        println!("   - {} --[{}]--> {} (置信度: {:.2})", 
-            relation.subject, 
-            relation.predicate,
-            relation.object,
-            relation.confidence
+        println!(
+            "   - {} --[{}]--> {} (置信度: {:.2})",
+            relation.subject, relation.predicate, relation.object, relation.confidence
         );
     }
     println!();
@@ -140,17 +151,25 @@ async fn main() -> anyhow::Result<()> {
 
     println!("🌐 知识图谱结构:");
     println!();
-    
+
     // 构建简单的图谱表示
     for relation in &relations2 {
         println!("   ┌─────────────────────────────────────┐");
-        println!("   │ {} ({})", relation.subject, get_entity_type(&entities2, &relation.subject_id));
+        println!(
+            "   │ {} ({})",
+            relation.subject,
+            get_entity_type(&entities2, &relation.subject_id)
+        );
         println!("   └─────────────────────────────────────┘");
         println!("                  │");
         println!("                  │ {}", relation.predicate);
         println!("                  ↓");
         println!("   ┌─────────────────────────────────────┐");
-        println!("   │ {} ({})", relation.object, get_entity_type(&entities2, &relation.object_id));
+        println!(
+            "   │ {} ({})",
+            relation.object,
+            get_entity_type(&entities2, &relation.object_id)
+        );
         println!("   └─────────────────────────────────────┘");
         println!();
     }
@@ -216,11 +235,13 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// 辅助函数：根据实体 ID 获取实体类型
-fn get_entity_type<'a>(entities: &'a [agent_mem_core::extraction::Entity], entity_id: &str) -> &'a str {
+fn get_entity_type<'a>(
+    entities: &'a [agent_mem_core::extraction::Entity],
+    entity_id: &str,
+) -> &'a str {
     entities
         .iter()
         .find(|e| e.id == entity_id)
         .map(|e| e.entity_type.as_str())
         .unwrap_or("Unknown")
 }
-

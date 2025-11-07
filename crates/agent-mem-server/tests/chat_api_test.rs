@@ -93,13 +93,13 @@ fn test_chat_response_serialization() {
 // async fn test_chat_api_end_to_end() {
 //     // 1. 启动测试服务器
 //     let app = create_test_app().await;
-//     
+//
 //     // 2. 创建测试用户
 //     let user = create_test_user(&app).await;
-//     
+//
 //     // 3. 创建测试 Agent
 //     let agent = create_test_agent(&app, &user).await;
-//     
+//
 //     // 4. 发送 Chat 请求
 //     let response = app
 //         .post(&format!("/api/v1/agents/{}/chat", agent.id))
@@ -109,11 +109,10 @@ fn test_chat_response_serialization() {
 //         .send()
 //         .await
 //         .unwrap();
-//     
+//
 //     // 5. 验证响应
 //     assert_eq!(response.status(), 200);
 //     let body: ChatMessageResponse = response.json().await.unwrap();
 //     assert!(!body.content.is_empty());
 //     assert!(!body.message_id.is_empty());
 // }
-

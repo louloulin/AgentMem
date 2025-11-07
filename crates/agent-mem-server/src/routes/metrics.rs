@@ -40,7 +40,10 @@ pub async fn get_metrics(
         metrics.insert(format!("{}_memories", memory_type), count as f64);
     }
 
-    metrics.insert("average_importance".to_string(), stats.average_importance as f64);
+    metrics.insert(
+        "average_importance".to_string(),
+        stats.average_importance as f64,
+    );
 
     // System metrics (would be expanded with actual system monitoring)
     metrics.insert("uptime_seconds".to_string(), 0.0); // Placeholder

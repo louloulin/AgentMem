@@ -266,10 +266,7 @@ fn test_agent_state_string_conversion() {
 
     // Test conversion from string
     assert_eq!(AgentState::from_str("idle"), Some(AgentState::Idle));
-    assert_eq!(
-        AgentState::from_str("thinking"),
-        Some(AgentState::Thinking)
-    );
+    assert_eq!(AgentState::from_str("thinking"), Some(AgentState::Thinking));
     assert_eq!(
         AgentState::from_str("executing"),
         Some(AgentState::Executing)
@@ -278,4 +275,3 @@ fn test_agent_state_string_conversion() {
     assert_eq!(AgentState::from_str("error"), Some(AgentState::Error));
     assert_eq!(AgentState::from_str("invalid"), None);
 }
-

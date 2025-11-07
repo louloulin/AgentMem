@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
 
     // 创建模拟的 ONNX 模型文件
     File::create(&model_path)?;
-    
+
     // 创建模拟的 tokenizer 文件（简化的 JSON 格式）
     let tokenizer_json = r###"{
         "version": "1.0",
@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
             }
         }
     }"###;
-    
+
     let mut tokenizer_file = File::create(&tokenizer_path)?;
     tokenizer_file.write_all(tokenizer_json.as_bytes())?;
 
@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
         "Second text for batch embedding".to_string(),
         "Third text for batch embedding".to_string(),
     ];
-    
+
     info!("   输入文本数量: {}", texts.len());
     for (i, text) in texts.iter().enumerate() {
         info!("   [{}] \"{}\"", i + 1, text);
@@ -104,7 +104,12 @@ async fn main() -> Result<()> {
     let embeddings = embedder.embed_batch(&texts).await?;
     info!("   ✅ 生成批量嵌入: {} 个向量", embeddings.len());
     for (i, emb) in embeddings.iter().enumerate() {
-        info!("   [{}] {} 维, 前 5 个值: {:?}", i + 1, emb.len(), &emb[..5.min(emb.len())]);
+        info!(
+            "   [{}] {} 维, 前 5 个值: {:?}",
+            i + 1,
+            emb.len(),
+            &emb[..5.min(emb.len())]
+        );
     }
     info!("");
 
@@ -146,4 +151,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

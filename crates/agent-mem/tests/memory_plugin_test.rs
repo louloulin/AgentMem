@@ -1,11 +1,11 @@
 //! Tests for Memory plugin integration
 
 #[cfg(feature = "plugins")]
-use agent_mem::Memory;
+use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
 #[cfg(feature = "plugins")]
 use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
 #[cfg(feature = "plugins")]
-use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+use agent_mem::Memory;
 #[cfg(feature = "plugins")]
 use anyhow::Result;
 #[cfg(feature = "plugins")]
@@ -246,4 +246,3 @@ async fn test_memory_without_plugins() {
     let result = mem.add("Test content").await.unwrap();
     assert!(!result.results.is_empty());
 }
-

@@ -1,11 +1,11 @@
 //! Tests for verifying plugin hooks are actually called during Memory operations
 
 #[cfg(feature = "plugins")]
-use agent_mem::Memory;
+use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
 #[cfg(feature = "plugins")]
 use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
 #[cfg(feature = "plugins")]
-use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+use agent_mem::Memory;
 #[cfg(feature = "plugins")]
 use anyhow::Result;
 #[cfg(feature = "plugins")]
@@ -89,7 +89,7 @@ async fn test_multiple_plugins_on_search() -> Result<()> {
 
     // Search with multiple plugins registered
     let results = mem.search("Test").await?;
-    
+
     // All plugins' hooks should be called (even if they don't modify results)
     assert!(!results.is_empty());
 
@@ -205,9 +205,7 @@ async fn test_concurrent_searches_with_plugins() -> Result<()> {
     let mut set = JoinSet::new();
     for _ in 0..10 {
         let mem_clone = mem.clone();
-        set.spawn(async move {
-            mem_clone.search("Test").await
-        });
+        set.spawn(async move { mem_clone.search("Test").await });
     }
 
     // All searches should succeed
@@ -240,4 +238,3 @@ async fn test_search_without_plugins_feature() {
 
     assert!(!results.is_empty());
 }
-

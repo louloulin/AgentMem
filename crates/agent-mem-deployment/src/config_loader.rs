@@ -224,26 +224,66 @@ pub struct FeaturesConfig {
 }
 
 // 默认值函数
-fn default_true() -> bool { true }
-fn default_cache_size() -> usize { 10240 }
-fn default_vector_service() -> String { "pgvector".to_string() }
-fn default_index_type() -> String { "ivfflat".to_string() }
-fn default_max_connections() -> u32 { 20 }
-fn default_min_connections() -> u32 { 5 }
-fn default_connect_timeout() -> u64 { 30 }
-fn default_idle_timeout() -> u64 { 600 }
-fn default_max_lifetime() -> u64 { 1800 }
-fn default_ivfflat_lists() -> u32 { 100 }
-fn default_hnsw_m() -> u32 { 16 }
-fn default_hnsw_ef_construction() -> u32 { 64 }
-fn default_log_level() -> String { "info".to_string() }
-fn default_log_format() -> String { "pretty".to_string() }
-fn default_log_output() -> String { "stdout".to_string() }
-fn default_slow_query_threshold() -> u64 { 1000 }
-fn default_backup_interval() -> u64 { 24 }
-fn default_backup_retention() -> u64 { 7 }
-fn default_cleanup_interval() -> u64 { 24 }
-fn default_memory_retention() -> u64 { 30 }
+fn default_true() -> bool {
+    true
+}
+fn default_cache_size() -> usize {
+    10240
+}
+fn default_vector_service() -> String {
+    "pgvector".to_string()
+}
+fn default_index_type() -> String {
+    "ivfflat".to_string()
+}
+fn default_max_connections() -> u32 {
+    20
+}
+fn default_min_connections() -> u32 {
+    5
+}
+fn default_connect_timeout() -> u64 {
+    30
+}
+fn default_idle_timeout() -> u64 {
+    600
+}
+fn default_max_lifetime() -> u64 {
+    1800
+}
+fn default_ivfflat_lists() -> u32 {
+    100
+}
+fn default_hnsw_m() -> u32 {
+    16
+}
+fn default_hnsw_ef_construction() -> u32 {
+    64
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}
+fn default_log_format() -> String {
+    "pretty".to_string()
+}
+fn default_log_output() -> String {
+    "stdout".to_string()
+}
+fn default_slow_query_threshold() -> u64 {
+    1000
+}
+fn default_backup_interval() -> u64 {
+    24
+}
+fn default_backup_retention() -> u64 {
+    7
+}
+fn default_cleanup_interval() -> u64 {
+    24
+}
+fn default_memory_retention() -> u64 {
+    30
+}
 
 /// 配置加载器
 pub struct ConfigLoader;
@@ -279,8 +319,9 @@ impl ConfigLoader {
     fn validate_and_convert(config: ConfigFile) -> Result<DeploymentMode> {
         match config.deployment.mode.as_str() {
             "embedded" => {
-                let embedded = config.embedded
-                    .ok_or_else(|| AgentMemError::ConfigError("Missing embedded configuration".to_string()))?;
+                let embedded = config.embedded.ok_or_else(|| {
+                    AgentMemError::ConfigError("Missing embedded configuration".to_string())
+                })?;
 
                 let mode_config = EmbeddedModeConfig {
                     database_path: PathBuf::from(embedded.database_path),
@@ -293,8 +334,9 @@ impl ConfigLoader {
                 Ok(DeploymentMode::Embedded(mode_config))
             }
             "server" => {
-                let server = config.server
-                    .ok_or_else(|| AgentMemError::ConfigError("Missing server configuration".to_string()))?;
+                let server = config.server.ok_or_else(|| {
+                    AgentMemError::ConfigError("Missing server configuration".to_string())
+                })?;
 
                 let vector_service = Self::parse_vector_service(&server.vector_service)?;
 
@@ -316,7 +358,9 @@ impl ConfigLoader {
 
                 Ok(DeploymentMode::Server(mode_config))
             }
-            mode => Err(AgentMemError::ConfigError(format!("Unknown deployment mode: {mode}"))),
+            mode => Err(AgentMemError::ConfigError(format!(
+                "Unknown deployment mode: {mode}"
+            ))),
         }
     }
 
@@ -337,8 +381,9 @@ impl ConfigLoader {
             "faiss" => Ok(VectorServiceType::FAISS),
             "azure_ai_search" => Ok(VectorServiceType::AzureAISearch),
             "memory" => Ok(VectorServiceType::Memory),
-            _ => Err(AgentMemError::ConfigError(format!("Unknown vector service: {service}"))),
+            _ => Err(AgentMemError::ConfigError(format!(
+                "Unknown vector service: {service}"
+            ))),
         }
     }
 }
-

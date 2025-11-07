@@ -9,9 +9,7 @@
 //! - delete() - 删除记忆
 //! - delete_all() - 删除所有记忆
 
-use agent_mem::{
-    AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions,
-};
+use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions};
 use anyhow::Result;
 use colored::*;
 use std::collections::HashMap;
@@ -20,9 +18,7 @@ use tracing::info;
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("{}", "🧠 mem0 API 兼容性演示".bright_blue().bold());
     println!("{}", "=".repeat(60).bright_blue());
@@ -50,16 +46,18 @@ async fn main() -> Result<()> {
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), "demo".to_string());
     metadata.insert("importance".to_string(), "0.8".to_string());
-    
+
     let options = AddMemoryOptions {
         user_id: Some("alice".to_string()),
         agent_id: Some("assistant-1".to_string()),
-        infer: true,  // 启用智能推理
+        infer: true, // 启用智能推理
         memory_type: Some("semantic_memory".to_string()),
         metadata,
         ..Default::default()
     };
-    let result2 = mem.add_with_options("I prefer morning meetings", options).await?;
+    let result2 = mem
+        .add_with_options("I prefer morning meetings", options)
+        .await?;
     println!("   ✓ 添加成功: {} 个记忆事件", result2.results.len());
     for event in &result2.results {
         println!("     - ID: {}", event.id);
@@ -79,7 +77,9 @@ async fn main() -> Result<()> {
         threshold: Some(0.5),
         ..Default::default()
     };
-    let search_results = mem.search_with_options("What do you know about me?", search_options).await?;
+    let search_results = mem
+        .search_with_options("What do you know about me?", search_options)
+        .await?;
     println!("   ✓ 找到 {} 条记忆", search_results.len());
     for (i, item) in search_results.iter().enumerate() {
         println!("     {}. {}", i + 1, item.content);
@@ -113,7 +113,10 @@ async fn main() -> Result<()> {
     // 7. 更新记忆（演示错误处理）
     println!("{}", "7️⃣  更新记忆".bright_green().bold());
     let mut update_data = HashMap::new();
-    update_data.insert("content".to_string(), serde_json::json!("I love pizza and pasta"));
+    update_data.insert(
+        "content".to_string(),
+        serde_json::json!("I love pizza and pasta"),
+    );
     match mem.update("non-existent-id", update_data).await {
         Ok(updated) => {
             println!("   ✓ 更新成功: {}", updated.content);
@@ -167,4 +170,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

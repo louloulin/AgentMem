@@ -395,4 +395,3 @@ async fn test_procedural_agent_delete_with_real_store() {
     let stored_item = store.get_item("proc1", "user123").await.unwrap();
     assert!(stored_item.is_none());
 }
-

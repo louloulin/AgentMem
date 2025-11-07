@@ -80,7 +80,7 @@ impl RuleBasedExtractor {
             for cap in pattern.captures_iter(text) {
                 if let Some(name_match) = cap.get(1) {
                     let name = name_match.as_str().to_string();
-                    
+
                     // 去重
                     if seen.contains_key(&name) {
                         continue;
@@ -112,7 +112,7 @@ impl RuleBasedExtractor {
             for cap in pattern.captures_iter(text) {
                 if let Some(org_match) = cap.get(1) {
                     let name = org_match.as_str().to_string();
-                    
+
                     // 去重
                     if seen.contains_key(&name) {
                         continue;
@@ -144,7 +144,7 @@ impl RuleBasedExtractor {
             for cap in pattern.captures_iter(text) {
                 if let Some(loc_match) = cap.get(1) {
                     let name = loc_match.as_str().to_string();
-                    
+
                     // 去重
                     if seen.contains_key(&name) {
                         continue;
@@ -235,7 +235,7 @@ impl RuleBasedExtractor {
         for pattern in &self.date_patterns {
             for date_match in pattern.find_iter(text) {
                 let date = date_match.as_str().to_string();
-                
+
                 // 去重
                 if seen.contains_key(&date) {
                     continue;
@@ -310,4 +310,3 @@ impl Default for RuleBasedExtractor {
         Self::new()
     }
 }
-

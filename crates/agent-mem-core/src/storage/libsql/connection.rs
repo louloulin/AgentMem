@@ -33,11 +33,9 @@ impl LibSqlConnectionManager {
     pub async fn new(path: &str) -> Result<Self> {
         // Ensure parent directory exists
         if let Some(parent) = Path::new(path).parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| {
-                    AgentMemError::StorageError(format!("Failed to create directory: {e}"))
-                })?;
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create directory: {e}"))
+            })?;
         }
 
         // Create or open database
@@ -50,9 +48,10 @@ impl LibSqlConnectionManager {
 
     /// Get a connection from the pool
     pub async fn get_connection(&self) -> Result<Arc<Mutex<Connection>>> {
-        let conn = self.db.connect().map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get connection: {e}"))
-        })?;
+        let conn = self
+            .db
+            .connect()
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get connection: {e}")))?;
 
         Ok(Arc::new(Mutex::new(conn)))
     }
@@ -84,37 +83,35 @@ impl LibSqlConnectionManager {
         let mut rows = conn_guard
             .query("PRAGMA page_count", ())
             .await
-            .map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get page count: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get page count: {e}")))?;
 
-        let page_count: i64 = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to read page count: {e}"))
-        })? {
-            row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to parse page count: {e}"))
-            })?
-        } else {
-            0
-        };
+        let page_count: i64 =
+            if let Some(row) = rows.next().await.map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to read page count: {e}"))
+            })? {
+                row.get(0).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to parse page count: {e}"))
+                })?
+            } else {
+                0
+            };
 
         // Get page size
         let mut rows = conn_guard
             .query("PRAGMA page_size", ())
             .await
-            .map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get page size: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get page size: {e}")))?;
 
-        let page_size: i64 = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to read page size: {e}"))
-        })? {
-            row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to parse page size: {e}"))
-            })?
-        } else {
-            4096
-        };
+        let page_size: i64 =
+            if let Some(row) = rows.next().await.map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to read page size: {e}"))
+            })? {
+                row.get(0).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to parse page size: {e}"))
+                })?
+            } else {
+                4096
+            };
 
         let size_bytes = page_count * page_size;
 
@@ -240,7 +237,10 @@ mod tests {
         let conn = conn.unwrap();
         let conn_guard = conn.lock().await;
         let result = conn_guard
-            .execute("CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)", ())
+            .execute(
+                "CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)",
+                (),
+            )
             .await;
         assert!(result.is_ok());
     }
@@ -261,4 +261,3 @@ mod tests {
         assert!(conn2.is_ok());
     }
 }
-

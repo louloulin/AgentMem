@@ -21,49 +21,49 @@ impl LibSqlCoreStore {
 
 /// Convert LibSQL row to CoreMemoryItem
 fn row_to_item(row: &Row) -> Result<CoreMemoryItem> {
-    let metadata_json: String = row.get(7).map_err(|e| {
-        AgentMemError::storage_error(format!("Failed to get metadata: {e}"))
-    })?;
+    let metadata_json: String = row
+        .get(7)
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to get metadata: {e}")))?;
     let metadata: serde_json::Value = serde_json::from_str(&metadata_json)
         .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
-    let created_at_str: String = row.get(8).map_err(|e| {
-        AgentMemError::storage_error(format!("Failed to get created_at: {e}"))
-    })?;
+    let created_at_str: String = row
+        .get(8)
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to get created_at: {e}")))?;
     let created_at = DateTime::parse_from_rfc3339(&created_at_str)
         .map_err(|e| AgentMemError::storage_error(format!("Failed to parse created_at: {e}")))?
         .with_timezone(&Utc);
 
-    let updated_at_str: String = row.get(9).map_err(|e| {
-        AgentMemError::storage_error(format!("Failed to get updated_at: {e}"))
-    })?;
+    let updated_at_str: String = row
+        .get(9)
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to get updated_at: {e}")))?;
     let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
         .map_err(|e| AgentMemError::storage_error(format!("Failed to parse updated_at: {e}")))?
         .with_timezone(&Utc);
 
-    let is_mutable_i64: i64 = row.get(6).map_err(|e| {
-        AgentMemError::storage_error(format!("Failed to get is_mutable: {e}"))
-    })?;
+    let is_mutable_i64: i64 = row
+        .get(6)
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to get is_mutable: {e}")))?;
 
     Ok(CoreMemoryItem {
-        id: row.get(0).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get id: {e}"))
-        })?,
-        user_id: row.get(1).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get user_id: {e}"))
-        })?,
-        agent_id: row.get(2).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get agent_id: {e}"))
-        })?,
-        key: row.get(3).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get key: {e}"))
-        })?,
-        value: row.get(4).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get value: {e}"))
-        })?,
-        category: row.get(5).map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to get category: {e}"))
-        })?,
+        id: row
+            .get(0)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get id: {e}")))?,
+        user_id: row
+            .get(1)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get user_id: {e}")))?,
+        agent_id: row
+            .get(2)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get agent_id: {e}")))?,
+        key: row
+            .get(3)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get key: {e}")))?,
+        value: row
+            .get(4)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get value: {e}")))?,
+        category: row
+            .get(5)
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to get category: {e}")))?,
         is_mutable: is_mutable_i64 != 0,
         metadata,
         created_at,
@@ -76,8 +76,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
     async fn set_value(&self, item: CoreMemoryItem) -> Result<CoreMemoryItem> {
         let conn = self.conn.lock().await;
 
-        let metadata_json = serde_json::to_string(&item.metadata)
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to serialize metadata: {e}")))?;
+        let metadata_json = serde_json::to_string(&item.metadata).map_err(|e| {
+            AgentMemError::storage_error(format!("Failed to serialize metadata: {e}"))
+        })?;
 
         // Use INSERT OR REPLACE for UPSERT behavior
         conn.execute(
@@ -102,7 +103,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
             ],
         )
         .await
-        .map_err(|e| AgentMemError::storage_error(format!("Failed to set core memory value: {e}")))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(format!("Failed to set core memory value: {e}"))
+        })?;
 
         Ok(item)
     }
@@ -113,16 +116,20 @@ impl CoreMemoryStore for LibSqlCoreStore {
         let mut stmt = conn
             .prepare("SELECT * FROM core_memory WHERE user_id = ? AND key = ?")
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(params![user_id, key])
             .await
             .map_err(|e| AgentMemError::storage_error(format!("Failed to execute query: {e}")))?;
 
-        if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to fetch row: {e}"))
-        })? {
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to fetch row: {e}")))?
+        {
             Ok(Some(row_to_item(&row)?))
         } else {
             Ok(None)
@@ -135,7 +142,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
         let mut stmt = conn
             .prepare("SELECT * FROM core_memory WHERE user_id = ? ORDER BY category, key")
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(params![user_id])
@@ -143,9 +152,11 @@ impl CoreMemoryStore for LibSqlCoreStore {
             .map_err(|e| AgentMemError::storage_error(format!("Failed to execute query: {e}")))?;
 
         let mut results = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to fetch row: {e}"))
-        })? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to fetch row: {e}")))?
+        {
             results.push(row_to_item(&row)?);
         }
 
@@ -158,7 +169,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
         let mut stmt = conn
             .prepare("SELECT * FROM core_memory WHERE user_id = ? AND category = ? ORDER BY key")
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(params![user_id, category])
@@ -166,9 +179,11 @@ impl CoreMemoryStore for LibSqlCoreStore {
             .map_err(|e| AgentMemError::storage_error(format!("Failed to execute query: {e}")))?;
 
         let mut results = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::storage_error(format!("Failed to fetch row: {e}"))
-        })? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to fetch row: {e}")))?
+        {
             results.push(row_to_item(&row)?);
         }
 
@@ -184,7 +199,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
                 params![user_id, key],
             )
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to delete core memory value: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(format!("Failed to delete core memory value: {e}"))
+            })?;
 
         Ok(result > 0)
     }
@@ -202,9 +219,10 @@ impl CoreMemoryStore for LibSqlCoreStore {
                 params![new_value, user_id, key],
             )
             .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to update core memory value: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(format!("Failed to update core memory value: {e}"))
+            })?;
 
         Ok(result > 0)
     }
 }
-

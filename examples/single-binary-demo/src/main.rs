@@ -2,20 +2,18 @@
 //!
 //! 演示如何使用 agent-mem-deployment 创建单二进制部署包
 
-use agent_mem_deployment::embedded::{EmbeddedConfig, EmbeddedDatabase, EmbeddedVectorStore};
-use agent_mem_deployment::embedded::database::EmbeddedDatabaseConfig;
-use agent_mem_deployment::embedded::vector_store::{EmbeddedVectorStoreConfig, DistanceMetric};
 use agent_mem_deployment::config_embed::{ConfigTemplate, EmbeddedConfigManager};
-use agent_mem_deployment::packaging::config::{PackageConfig, TargetPlatform, OptimizationLevel};
+use agent_mem_deployment::embedded::database::EmbeddedDatabaseConfig;
+use agent_mem_deployment::embedded::vector_store::{DistanceMetric, EmbeddedVectorStoreConfig};
+use agent_mem_deployment::embedded::{EmbeddedConfig, EmbeddedDatabase, EmbeddedVectorStore};
+use agent_mem_deployment::packaging::config::{OptimizationLevel, PackageConfig, TargetPlatform};
 use anyhow::Result;
 use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("=== AgentMem 单二进制打包演示 ===\n");
 
@@ -115,7 +113,10 @@ fn demo_config_management() -> Result<()> {
 
     // 列出所有可用的配置模板
     let templates = ConfigTemplate::all();
-    info!("✓ 可用配置模板: {:?}", templates.iter().map(|t| t.name()).collect::<Vec<_>>());
+    info!(
+        "✓ 可用配置模板: {:?}",
+        templates.iter().map(|t| t.name()).collect::<Vec<_>>()
+    );
 
     // 使用开发环境模板
     let manager = EmbeddedConfigManager::new(ConfigTemplate::Development);
@@ -184,4 +185,3 @@ async fn demo_full_embedded_config() -> Result<()> {
 
     Ok(())
 }
-

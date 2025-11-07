@@ -290,4 +290,3 @@ pub struct Speaker {
     /// 总发言时长（秒）
     pub total_duration: f64,
 }
-

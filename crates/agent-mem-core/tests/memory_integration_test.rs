@@ -1,9 +1,9 @@
 //! MemoryIntegrator 单元测试
 
-use agent_mem_core::orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig};
 use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
+use agent_mem_core::orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig};
 use agent_mem_core::Memory;
-use agent_mem_traits::{Message, MessageRole, MemoryType};
+use agent_mem_traits::{MemoryType, Message, MessageRole};
 use chrono::Utc;
 use std::sync::Arc;
 
@@ -48,7 +48,7 @@ async fn test_retrieve_memories_empty_query() {
 
 #[test]
 fn test_format_memory_for_prompt() {
-    use agent_mem_traits::{Session, Entity, Relation};
+    use agent_mem_traits::{Entity, Relation, Session};
     let memory = Memory {
         id: "mem-1".to_string(),
         user_id: Some("user-1".to_string()),
@@ -78,17 +78,21 @@ fn test_format_memory_for_prompt() {
 }
 
 // 辅助函数：格式化记忆
-fn format_memory_for_test(memory: &Memory, include_importance: bool, include_timestamp: bool) -> String {
+fn format_memory_for_test(
+    memory: &Memory,
+    include_importance: bool,
+    include_timestamp: bool,
+) -> String {
     let mut formatted = format!("[{:?}] {}", memory.memory_type, memory.content);
-    
+
     if include_importance {
         formatted.push_str(&format!(" (importance: {:.1})", memory.importance));
     }
-    
+
     if include_timestamp {
         formatted.push_str(&format!(" (created: {})", memory.created_at));
     }
-    
+
     formatted
 }
 
@@ -111,7 +115,7 @@ fn test_filter_by_relevance() {
 
 // 辅助函数：创建测试记忆
 fn create_test_memory(id: &str, content: &str, score: f32) -> Memory {
-    use agent_mem_traits::{Session, Entity, Relation};
+    use agent_mem_traits::{Entity, Relation, Session};
     Memory {
         id: id.to_string(),
         user_id: Some("user-1".to_string()),
@@ -237,7 +241,7 @@ fn test_max_memories_validation() {
 #[test]
 fn test_memory_metadata() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
-    
+
     assert!(memory.metadata.is_empty());
     assert_eq!(memory.version, 1);
     assert_eq!(memory.access_count, 0);
@@ -246,7 +250,7 @@ fn test_memory_metadata() {
 #[test]
 fn test_memory_timestamps() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
-    
+
     assert!(memory.created_at.timestamp() > 0);
     assert!(memory.last_accessed_at.timestamp() > 0);
     assert!(memory.expires_at.is_none());
@@ -254,17 +258,13 @@ fn test_memory_timestamps() {
 
 #[test]
 fn test_combine_memories_and_messages() {
-    let memories = vec![
-        create_test_memory("mem-1", "User likes Python", 0.8),
-    ];
+    let memories = vec![create_test_memory("mem-1", "User likes Python", 0.8)];
 
-    let messages = vec![
-        Message {
-            role: MessageRole::User,
-            content: "Tell me about Python".to_string(),
-            timestamp: Some(Utc::now()),
-        },
-    ];
+    let messages = vec![Message {
+        role: MessageRole::User,
+        content: "Tell me about Python".to_string(),
+        timestamp: Some(Utc::now()),
+    }];
 
     let memory_context = build_memory_context_for_test(&memories);
     assert!(!memory_context.is_empty());
@@ -288,8 +288,7 @@ fn test_memory_importance_range() {
 fn test_memory_score_optional() {
     let mut memory = create_test_memory("mem-1", "Test", 0.5);
     assert!(memory.score.is_some());
-    
+
     memory.score = None;
     assert!(memory.score.is_none());
 }
-

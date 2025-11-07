@@ -404,7 +404,7 @@ impl MemoryOrchestrator {
             // 创建各个 Intelligence 组件
             let fact_extractor = Some(Arc::new(FactExtractor::new(llm.clone())));
             let advanced_fact_extractor = Some(Arc::new(AdvancedFactExtractor::new(llm.clone())));
-            
+
             // P1 优化 #4,#6: 创建批量处理组件
             let batch_entity_extractor = Some(Arc::new(BatchEntityExtractor::new(
                 llm.clone(),
@@ -789,7 +789,10 @@ impl MemoryOrchestrator {
 
         match MemoryVectorStore::new(config).await {
             Ok(store) => {
-                info!("✅ 向量存储创建成功（Memory 模式，维度: {}）", vector_dimension);
+                info!(
+                    "✅ 向量存储创建成功（Memory 模式，维度: {}）",
+                    vector_dimension
+                );
                 Ok(Some(
                     Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>
                 ))
@@ -810,16 +813,16 @@ impl MemoryOrchestrator {
         // 🆕 Fix 3: 使用正确的 SQLite URL 格式（绝对路径）
         use std::env;
         use std::path::PathBuf;
-        
+
         let current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let data_dir = current_dir.join("data");
-        
+
         // 确保数据目录存在
         if let Err(e) = std::fs::create_dir_all(&data_dir) {
             warn!("创建 data 目录失败: {}, 历史记录功能将不可用", e);
             return Ok(None);
         }
-        
+
         let db_file = data_dir.join("history.db");
         let history_path = format!("sqlite://{}", db_file.display());
 
@@ -867,16 +870,17 @@ impl MemoryOrchestrator {
                 Err(e) => {
                     // P0修复: Embedder失败时返回错误而非零向量
                     error!("生成嵌入失败: {}, 中止操作", e);
-                    return Err(agent_mem_traits::AgentMemError::EmbeddingError(
-                        format!("Failed to generate embedding: {}", e)
-                    ));
+                    return Err(agent_mem_traits::AgentMemError::EmbeddingError(format!(
+                        "Failed to generate embedding: {}",
+                        e
+                    )));
                 }
             }
         } else {
             // P0修复: Embedder未初始化时返回错误
             error!("Embedder 未初始化，中止操作");
             return Err(agent_mem_traits::AgentMemError::embedding_error(
-                "Embedder not initialized"
+                "Embedder not initialized",
             ));
         };
 
@@ -897,7 +901,7 @@ impl MemoryOrchestrator {
         // 总是添加 user_id（使用 "default" 作为默认值）
         full_metadata.insert(
             "user_id".to_string(),
-            serde_json::json!(user_id.unwrap_or_else(|| "default".to_string()))
+            serde_json::json!(user_id.unwrap_or_else(|| "default".to_string())),
         );
         full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
 
@@ -912,14 +916,19 @@ impl MemoryOrchestrator {
         // P0修复: 记录每个成功的步骤，失败时回滚
         if let Some(core_manager) = &self.core_manager {
             info!("Commit Phase 1/3: 存储到 CoreMemoryManager");
-            match core_manager.create_persona_block(content.clone(), None).await {
+            match core_manager
+                .create_persona_block(content.clone(), None)
+                .await
+            {
                 Ok(_) => {
                     completed_steps.push("core_manager");
                     info!("✅ 已存储到 CoreMemoryManager");
                 }
                 Err(e) => {
                     error!("存储到 CoreMemoryManager 失败: {:?}", e);
-                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                    return self
+                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                        .await;
                 }
             }
         }
@@ -947,7 +956,9 @@ impl MemoryOrchestrator {
                 }
                 Err(e) => {
                     error!("存储到向量库失败: {}", e);
-                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                    return self
+                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                        .await;
                 }
             }
         } else {
@@ -978,7 +989,9 @@ impl MemoryOrchestrator {
                 }
                 Err(e) => {
                     error!("记录历史失败: {}", e);
-                    return self.rollback_add_memory(completed_steps, memory_id.clone(), e.to_string()).await;
+                    return self
+                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                        .await;
                 }
             }
         } else {
@@ -990,7 +1003,7 @@ impl MemoryOrchestrator {
     }
 
     /// 回滚add_memory操作
-    /// 
+    ///
     /// P0修复: 实现事务回滚机制
     async fn rollback_add_memory(
         &self,
@@ -999,7 +1012,7 @@ impl MemoryOrchestrator {
         error: String,
     ) -> Result<String> {
         warn!("事务失败，开始回滚。已完成步骤: {:?}", completed_steps);
-        
+
         // 逆序回滚已完成的步骤
         for step in completed_steps.iter().rev() {
             match *step {
@@ -1049,11 +1062,12 @@ impl MemoryOrchestrator {
                 }
             }
         }
-        
+
         error!("事务回滚完成，原因: {}", error);
-        Err(agent_mem_traits::AgentMemError::internal_error(
-            format!("Transaction failed: {}", error)
-        ))
+        Err(agent_mem_traits::AgentMemError::internal_error(format!(
+            "Transaction failed: {}",
+            error
+        )))
     }
 
     /// 智能添加记忆 (完整流水线)
@@ -1344,8 +1358,11 @@ impl MemoryOrchestrator {
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
         use chrono::Utc;
-        
-        info!("向量搜索（嵌入式模式）: query={}, user_id={}, limit={}", query, user_id, limit);
+
+        info!(
+            "向量搜索（嵌入式模式）: query={}, user_id={}, limit={}",
+            query, user_id, limit
+        );
 
         // P2优化 #26: 动态阈值调整
         let dynamic_threshold = Some(self.calculate_dynamic_threshold(&query, threshold));
@@ -1381,7 +1398,7 @@ impl MemoryOrchestrator {
                 .into_iter()
                 .map(|result| {
                     use agent_mem_traits::{Entity, Relation, Session};
-                    
+
                     let metadata_json: HashMap<String, serde_json::Value> = result
                         .metadata
                         .iter()
@@ -1390,7 +1407,9 @@ impl MemoryOrchestrator {
 
                     MemoryItem {
                         id: result.id.clone(),
-                        content: result.metadata.get("data")
+                        content: result
+                            .metadata
+                            .get("data")
                             .unwrap_or(&String::new())
                             .clone(),
                         hash: result.metadata.get("hash").cloned(),
@@ -1682,7 +1701,9 @@ impl MemoryOrchestrator {
             .or_else(|| data.get("data"))
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                agent_mem_traits::AgentMemError::InvalidInput("缺少 'content' 或 'data' 字段".to_string())
+                agent_mem_traits::AgentMemError::InvalidInput(
+                    "缺少 'content' 或 'data' 字段".to_string(),
+                )
             })?
             .to_string();
 
@@ -1699,7 +1720,7 @@ impl MemoryOrchestrator {
             metadata.insert("data".to_string(), new_content.clone());
             metadata.insert("hash".to_string(), new_hash.clone());
             metadata.insert("updated_at".to_string(), Utc::now().to_rfc3339());
-            
+
             // 添加其他字段（转换为 String）
             for (k, v) in &data {
                 if let Some(s) = v.as_str() {
@@ -1730,7 +1751,10 @@ impl MemoryOrchestrator {
                 created_at: Utc::now(),
                 updated_at: Some(Utc::now()),
                 is_deleted: false,
-                actor_id: data.get("actor_id").and_then(|v| v.as_str()).map(String::from),
+                actor_id: data
+                    .get("actor_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
                 role: data.get("role").and_then(|v| v.as_str()).map(String::from),
             };
 
@@ -1754,10 +1778,19 @@ impl MemoryOrchestrator {
             updated_at: Some(Utc::now()),
             session: Session {
                 id: "default".to_string(),
-                user_id: data.get("user_id").and_then(|v| v.as_str()).map(String::from),
-                agent_id: data.get("agent_id").and_then(|v| v.as_str()).map(String::from),
+                user_id: data
+                    .get("user_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                agent_id: data
+                    .get("agent_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
                 run_id: None,
-                actor_id: data.get("actor_id").and_then(|v| v.as_str()).map(String::from),
+                actor_id: data
+                    .get("actor_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
                 created_at: Utc::now(),
                 metadata: HashMap::new(),
             },
@@ -1769,7 +1802,10 @@ impl MemoryOrchestrator {
                 .and_then(|v| v.as_str())
                 .unwrap_or("default")
                 .to_string(),
-            user_id: data.get("user_id").and_then(|v| v.as_str()).map(String::from),
+            user_id: data
+                .get("user_id")
+                .and_then(|v| v.as_str())
+                .map(String::from),
             importance: 0.5,
             embedding: Some(new_embedding),
             last_accessed_at: Utc::now(),
@@ -2114,7 +2150,7 @@ impl MemoryOrchestrator {
 
     /// Step 5: 搜索相似记忆
     /// P1优化 #8: 相似记忆搜索优化
-    /// 
+    ///
     /// 优化策略：
     /// 1. 单次搜索而非多次独立搜索
     /// 2. 去重结果
@@ -2197,19 +2233,19 @@ impl MemoryOrchestrator {
                         } else {
                             seen_ids.insert(r.id.clone());
                             // 从 metadata 中获取内容
-                            let content = r.metadata.get("content")
+                            let content = r
+                                .metadata
+                                .get("content")
                                 .cloned()
                                 .unwrap_or_else(|| "No content".to_string());
-                            
+
                             Some(ExistingMemory {
                                 id: r.id,
                                 content,
                                 importance: r.similarity,
                                 created_at: chrono::Utc::now().to_rfc3339(),
                                 updated_at: None,
-                                metadata: r.metadata.into_iter()
-                                    .map(|(k, v)| (k, v))
-                                    .collect(),
+                                metadata: r.metadata.into_iter().map(|(k, v)| (k, v)).collect(),
                             })
                         }
                     })
@@ -2226,7 +2262,7 @@ impl MemoryOrchestrator {
     }
 
     /// P1优化 #9: 去重记忆项
-    /// 
+    ///
     /// 基于ID去重，保留第一次出现的项（通常相似度最高）
     fn deduplicate_memory_items(&self, items: Vec<MemoryItem>) -> Vec<MemoryItem> {
         let mut seen_ids = std::collections::HashSet::new();
@@ -2381,10 +2417,10 @@ impl MemoryOrchestrator {
 
     /// Step 8: 执行决策
     /// P0优化 #16: 带事务支持的决策执行
-    /// 
+    ///
     /// 确保所有决策要么全部成功，要么全部回滚
     /// P1优化 #15: 决策并行化执行
-    /// 
+    ///
     /// 优化策略：
     /// 1. 分类决策：可并行（ADD）vs 必须顺序（UPDATE/DELETE/MERGE）
     /// 2. 并行执行所有ADD操作
@@ -2397,8 +2433,11 @@ impl MemoryOrchestrator {
         user_id: Option<String>,
         _metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AddResult> {
-        info!("开始执行 {} 个决策（带事务支持和并行优化）", decisions.len());
-        
+        info!(
+            "开始执行 {} 个决策（带事务支持和并行优化）",
+            decisions.len()
+        );
+
         let mut all_results = Vec::new();
         let mut completed_operations: Vec<CompletedOperation> = Vec::new();
 
@@ -2424,22 +2463,29 @@ impl MemoryOrchestrator {
                 .map(|(idx, decision)| {
                     let agent_id = agent_id.clone();
                     let user_id = user_id.clone();
-                    
+
                     async move {
-                        if let MemoryAction::Add { content, importance, metadata } = decision.action {
+                        if let MemoryAction::Add {
+                            content,
+                            importance,
+                            metadata,
+                        } = decision.action
+                        {
                             // 将 HashMap<String, String> 转换为 HashMap<String, serde_json::Value>
                             let json_metadata: HashMap<String, serde_json::Value> = metadata
                                 .iter()
                                 .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
                                 .collect();
 
-                            let result = self.add_memory(
-                                content.clone(),
-                                agent_id.clone(),
-                                user_id.clone(),
-                                None,
-                                Some(json_metadata),
-                            ).await;
+                            let result = self
+                                .add_memory(
+                                    content.clone(),
+                                    agent_id.clone(),
+                                    user_id.clone(),
+                                    None,
+                                    Some(json_metadata),
+                                )
+                                .await;
 
                             (idx, content, importance, result)
                         } else {
@@ -2459,7 +2505,7 @@ impl MemoryOrchestrator {
                         completed_operations.push(CompletedOperation::Add {
                             memory_id: memory_id.clone(),
                         });
-                        
+
                         all_results.push(MemoryEvent {
                             id: memory_id,
                             memory: content,
@@ -2470,7 +2516,9 @@ impl MemoryOrchestrator {
                     }
                     Err(e) => {
                         error!("并行 ADD 操作 {} 失败: {}, 开始回滚", idx, e);
-                        return self.rollback_decisions(completed_operations, e.to_string()).await;
+                        return self
+                            .rollback_decisions(completed_operations, e.to_string())
+                            .await;
                     }
                 }
             }
@@ -2489,9 +2537,13 @@ impl MemoryOrchestrator {
                 } => {
                     info!(
                         "执行 UPDATE 决策 {}/{}: {} -> {} (reason: {})",
-                        idx + 1, other_decisions.len(), memory_id, new_content, change_reason
+                        idx + 1,
+                        other_decisions.len(),
+                        memory_id,
+                        new_content,
+                        change_reason
                     );
-                    
+
                     // ✅ MVP改造 Task 1: 调用已有的update_memory方法
                     let mut update_data = HashMap::new();
                     update_data.insert("content".to_string(), serde_json::json!(new_content));
@@ -2499,18 +2551,18 @@ impl MemoryOrchestrator {
                     if let Some(ref uid) = user_id {
                         update_data.insert("user_id".to_string(), serde_json::json!(uid));
                     }
-                    
+
                     // 调用已有方法执行实际更新
                     match self.update_memory(memory_id, update_data).await {
                         Ok(updated_item) => {
                             info!("✅ UPDATE 操作成功执行: {}", memory_id);
-                            
+
                             // 记录已完成的操作（用于回滚）
                             completed_operations.push(CompletedOperation::Update {
                                 memory_id: memory_id.clone(),
                                 old_content: updated_item.content.clone(), // 从更新结果获取
                             });
-                            
+
                             all_results.push(MemoryEvent {
                                 id: memory_id.clone(),
                                 memory: new_content.clone(),
@@ -2521,7 +2573,9 @@ impl MemoryOrchestrator {
                         }
                         Err(e) => {
                             error!("UPDATE 操作失败: {}, 开始回滚", e);
-                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                            return self
+                                .rollback_decisions(completed_operations, e.to_string())
+                                .await;
                         }
                     }
                 }
@@ -2529,9 +2583,14 @@ impl MemoryOrchestrator {
                     memory_id,
                     deletion_reason,
                 } => {
-                    info!("执行 DELETE 决策 {}/{}: {} (reason: {:?})", 
-                          idx + 1, other_decisions.len(), memory_id, deletion_reason);
-                    
+                    info!(
+                        "执行 DELETE 决策 {}/{}: {} (reason: {:?})",
+                        idx + 1,
+                        other_decisions.len(),
+                        memory_id,
+                        deletion_reason
+                    );
+
                     // ✅ MVP改造 Task 1: 先获取内容用于回滚
                     let deleted_content = if let Some(vector_store) = &self.vector_store {
                         vector_store
@@ -2544,18 +2603,18 @@ impl MemoryOrchestrator {
                     } else {
                         String::new()
                     };
-                    
+
                     // ✅ MVP改造 Task 1: 调用已有的delete_memory方法
                     match self.delete_memory(memory_id).await {
                         Ok(()) => {
                             info!("✅ DELETE 操作成功执行: {}", memory_id);
-                            
+
                             // 记录已完成的操作（用于回滚）
                             completed_operations.push(CompletedOperation::Delete {
                                 memory_id: memory_id.clone(),
                                 deleted_content,
                             });
-                            
+
                             all_results.push(MemoryEvent {
                                 id: memory_id.clone(),
                                 memory: String::new(),
@@ -2566,7 +2625,9 @@ impl MemoryOrchestrator {
                         }
                         Err(e) => {
                             error!("DELETE 操作失败: {}, 开始回滚", e);
-                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                            return self
+                                .rollback_decisions(completed_operations, e.to_string())
+                                .await;
                         }
                     }
                 }
@@ -2577,31 +2638,31 @@ impl MemoryOrchestrator {
                 } => {
                     info!(
                         "执行 MERGE 决策 {}/{}: {} + {:?} -> {}",
-                        idx + 1, other_decisions.len(), primary_memory_id, secondary_memory_ids, merged_content
+                        idx + 1,
+                        other_decisions.len(),
+                        primary_memory_id,
+                        secondary_memory_ids,
+                        merged_content
                     );
-                    
+
                     // ✅ MVP改造: 实现MERGE操作（基于现有方法的最小改动）
                     // Step 1: 保存原始内容用于回滚
                     let mut original_contents = HashMap::new();
-                    
+
                     // 保存主记忆的原始内容
                     if let Ok(primary_memory) = self.get_memory(primary_memory_id).await {
-                        original_contents.insert(
-                            primary_memory_id.clone(),
-                            primary_memory.content.clone()
-                        );
+                        original_contents
+                            .insert(primary_memory_id.clone(), primary_memory.content.clone());
                     }
-                    
+
                     // 保存次要记忆的内容
                     for secondary_id in secondary_memory_ids {
                         if let Ok(secondary_memory) = self.get_memory(secondary_id).await {
-                            original_contents.insert(
-                                secondary_id.clone(),
-                                secondary_memory.content.clone()
-                            );
+                            original_contents
+                                .insert(secondary_id.clone(), secondary_memory.content.clone());
                         }
                     }
-                    
+
                     // Step 2: 更新主记忆的内容（使用已有的update_memory）
                     let mut update_data = HashMap::new();
                     update_data.insert("content".to_string(), serde_json::json!(merged_content));
@@ -2609,11 +2670,11 @@ impl MemoryOrchestrator {
                     if let Some(ref uid) = user_id {
                         update_data.insert("user_id".to_string(), serde_json::json!(uid));
                     }
-                    
+
                     match self.update_memory(primary_memory_id, update_data).await {
                         Ok(_) => {
                             info!("✅ MERGE Step 1: 主记忆已更新");
-                            
+
                             // Step 3: 删除次要记忆（使用已有的delete_memory）
                             let mut all_deleted = true;
                             for secondary_id in secondary_memory_ids {
@@ -2627,20 +2688,20 @@ impl MemoryOrchestrator {
                                     }
                                 }
                             }
-                            
+
                             if all_deleted {
                                 info!("✅ MERGE 操作完全成功");
                             } else {
                                 warn!("⚠️ MERGE 操作部分成功（部分次要记忆删除失败）");
                             }
-                            
+
                             // 记录完成的操作（用于回滚）
                             completed_operations.push(CompletedOperation::Merge {
                                 primary_memory_id: primary_memory_id.clone(),
                                 secondary_memory_ids: secondary_memory_ids.clone(),
                                 original_contents, // ✅ 保存原始内容用于回滚
                             });
-                            
+
                             all_results.push(MemoryEvent {
                                 id: primary_memory_id.clone(),
                                 memory: merged_content.clone(),
@@ -2651,7 +2712,9 @@ impl MemoryOrchestrator {
                         }
                         Err(e) => {
                             error!("MERGE 操作失败（更新主记忆失败）: {}, 开始回滚", e);
-                            return self.rollback_decisions(completed_operations, e.to_string()).await;
+                            return self
+                                .rollback_decisions(completed_operations, e.to_string())
+                                .await;
                         }
                     }
                 }
@@ -2665,7 +2728,10 @@ impl MemoryOrchestrator {
             }
         }
 
-        info!("✅ 所有决策执行成功（事务提交）: {} 个操作", completed_operations.len());
+        info!(
+            "✅ 所有决策执行成功（事务提交）: {} 个操作",
+            completed_operations.len()
+        );
         Ok(AddResult {
             results: all_results,
             relations: None,
@@ -2673,28 +2739,31 @@ impl MemoryOrchestrator {
     }
 
     /// P0优化 #16: 回滚决策执行
-    /// 
+    ///
     /// 当某个决策失败时，回滚所有已完成的操作
     async fn rollback_decisions(
         &self,
         completed_operations: Vec<CompletedOperation>,
         error: String,
     ) -> Result<AddResult> {
-        warn!("决策执行失败，开始回滚 {} 个操作", completed_operations.len());
-        
+        warn!(
+            "决策执行失败，开始回滚 {} 个操作",
+            completed_operations.len()
+        );
+
         // 逆序回滚已完成的操作
         for operation in completed_operations.iter().rev() {
             match operation {
                 CompletedOperation::Add { memory_id } => {
                     info!("回滚 ADD 操作: {}", memory_id);
-                    
+
                     // 删除已添加的记忆（使用现有的删除逻辑）
                     if let Some(vector_store) = &self.vector_store {
                         if let Err(e) = vector_store.delete_vectors(vec![memory_id.clone()]).await {
                             warn!("回滚 ADD 操作时删除向量失败: {}", e);
                         }
                     }
-                    
+
                     if let Some(history) = &self.history_manager {
                         // 历史记录作为审计日志，不删除，而是添加回滚事件
                         let rollback_entry = crate::history::HistoryEntry {
@@ -2713,34 +2782,43 @@ impl MemoryOrchestrator {
                             warn!("记录 ADD 回滚事件失败: {}", e);
                         }
                     }
-                    
+
                     info!("✅ 已回滚 ADD 操作: {}", memory_id);
                 }
-                CompletedOperation::Update { memory_id, old_content } => {
+                CompletedOperation::Update {
+                    memory_id,
+                    old_content,
+                } => {
                     info!("回滚 UPDATE 操作: {} (恢复旧内容)", memory_id);
-                    
+
                     // ✅ MVP改造 Task 2: 使用update_memory恢复旧内容
                     let mut restore_data = HashMap::new();
                     restore_data.insert("content".to_string(), serde_json::json!(old_content));
-                    
+
                     if let Err(e) = self.update_memory(memory_id, restore_data).await {
                         warn!("UPDATE 回滚失败: {}", e);
                     } else {
                         info!("✅ 已回滚 UPDATE 操作: {}", memory_id);
                     }
                 }
-                CompletedOperation::Delete { memory_id, deleted_content } => {
+                CompletedOperation::Delete {
+                    memory_id,
+                    deleted_content,
+                } => {
                     info!("回滚 DELETE 操作: {} (恢复删除的内容)", memory_id);
-                    
+
                     // ✅ MVP改造 Task 2: 重新添加删除的内容
                     if !deleted_content.is_empty() {
-                        if let Err(e) = self.add_memory(
-                            deleted_content.clone(),
-                            "system".to_string(), // agent_id
-                            None, // user_id
-                            None, // infer
-                            None, // metadata
-                        ).await {
+                        if let Err(e) = self
+                            .add_memory(
+                                deleted_content.clone(),
+                                "system".to_string(), // agent_id
+                                None,                 // user_id
+                                None,                 // infer
+                                None,                 // metadata
+                            )
+                            .await
+                        {
                             warn!("DELETE 回滚失败: {}", e);
                         } else {
                             info!("✅ 已回滚 DELETE 操作: {}", memory_id);
@@ -2749,19 +2827,26 @@ impl MemoryOrchestrator {
                         warn!("DELETE 回滚跳过：删除的内容为空");
                     }
                 }
-                CompletedOperation::Merge { 
-                    primary_memory_id, 
+                CompletedOperation::Merge {
+                    primary_memory_id,
                     secondary_memory_ids,
                     original_contents,
                 } => {
-                    info!("回滚 MERGE 操作: {} + {:?}", primary_memory_id, secondary_memory_ids);
-                    
+                    info!(
+                        "回滚 MERGE 操作: {} + {:?}",
+                        primary_memory_id, secondary_memory_ids
+                    );
+
                     // ✅ MVP改造: 实现MERGE回滚（最小改动）
                     // Step 1: 恢复主记忆的原始内容
-                    if let Some(original_primary_content) = original_contents.get(primary_memory_id) {
+                    if let Some(original_primary_content) = original_contents.get(primary_memory_id)
+                    {
                         let mut restore_data = HashMap::new();
-                        restore_data.insert("content".to_string(), serde_json::json!(original_primary_content));
-                        
+                        restore_data.insert(
+                            "content".to_string(),
+                            serde_json::json!(original_primary_content),
+                        );
+
                         match self.update_memory(primary_memory_id, restore_data).await {
                             Ok(_) => info!("✅ MERGE回滚 Step 1: 主记忆内容已恢复"),
                             Err(e) => warn!("MERGE回滚失败（恢复主记忆）: {}", e),
@@ -2769,35 +2854,44 @@ impl MemoryOrchestrator {
                     } else {
                         warn!("MERGE回滚跳过：找不到主记忆的原始内容");
                     }
-                    
+
                     // Step 2: 重新添加被删除的次要记忆
                     for secondary_id in secondary_memory_ids {
                         if let Some(original_content) = original_contents.get(secondary_id) {
                             // 重新添加次要记忆
-                            match self.add_memory(
-                                original_content.clone(),
-                                "system".to_string(), // agent_id
-                                None, // user_id
-                                None, // infer
-                                None, // metadata
-                            ).await {
-                                Ok(_) => info!("✅ MERGE回滚 Step 2: 重新添加次要记忆 {}", secondary_id),
-                                Err(e) => warn!("MERGE回滚失败（重新添加次要记忆{}）: {}", secondary_id, e),
+                            match self
+                                .add_memory(
+                                    original_content.clone(),
+                                    "system".to_string(), // agent_id
+                                    None,                 // user_id
+                                    None,                 // infer
+                                    None,                 // metadata
+                                )
+                                .await
+                            {
+                                Ok(_) => {
+                                    info!("✅ MERGE回滚 Step 2: 重新添加次要记忆 {}", secondary_id)
+                                }
+                                Err(e) => warn!(
+                                    "MERGE回滚失败（重新添加次要记忆{}）: {}",
+                                    secondary_id, e
+                                ),
                             }
                         } else {
                             warn!("MERGE回滚跳过：找不到次要记忆{}的原始内容", secondary_id);
                         }
                     }
-                    
+
                     info!("✅ MERGE 回滚完成");
                 }
             }
         }
-        
+
         error!("决策回滚完成，原因: {}", error);
-        Err(agent_mem_traits::AgentMemError::internal_error(
-            format!("Transaction rollback completed: {}", error)
-        ))
+        Err(agent_mem_traits::AgentMemError::internal_error(format!(
+            "Transaction rollback completed: {}",
+            error
+        )))
     }
 
     // ========== 搜索辅助方法 (Phase 1 Step 1.3) ==========
@@ -2807,10 +2901,10 @@ impl MemoryOrchestrator {
     /// 根据查询特征动态调整搜索阈值
     fn calculate_dynamic_threshold(&self, query: &str, base_threshold: Option<f32>) -> f32 {
         let base = base_threshold.unwrap_or(0.7);
-        
+
         let query_len = query.len();
         let word_count = query.split_whitespace().count();
-        
+
         // 规则1: 短查询（<10字符）提高阈值（更严格）
         let len_adjustment = if query_len < 10 {
             0.05 // 短查询提高阈值到0.75，避免误匹配
@@ -2819,7 +2913,7 @@ impl MemoryOrchestrator {
         } else {
             0.0
         };
-        
+
         // 规则2: 单词数少提高阈值
         let word_adjustment = if word_count == 1 {
             0.05 // 单词查询更严格
@@ -2828,24 +2922,26 @@ impl MemoryOrchestrator {
         } else {
             0.0
         };
-        
+
         // 规则3: 包含特殊字符/数字，提高精确度要求
-        let has_special = query.chars().any(|c| !c.is_alphanumeric() && !c.is_whitespace());
+        let has_special = query
+            .chars()
+            .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
         let special_adjustment = if has_special { 0.05 } else { 0.0 };
-        
+
         // 计算最终阈值
         let dynamic_threshold = base + len_adjustment + word_adjustment + special_adjustment;
-        
+
         // 限制在合理范围内 [0.5, 0.9]
         let final_threshold = dynamic_threshold.max(0.5).min(0.9);
-        
+
         if final_threshold != base {
             debug!(
                 "动态阈值调整: {} -> {} (查询长度: {}, 词数: {}, 特殊字符: {})",
                 base, final_threshold, query_len, word_count, has_special
             );
         }
-        
+
         final_threshold
     }
 
@@ -2856,19 +2952,18 @@ impl MemoryOrchestrator {
     async fn preprocess_query(&self, query: &str) -> Result<String> {
         // Step 1: 基础清理
         let mut processed = query.trim().to_string();
-        
+
         // Step 2: P2优化 #19 - 移除常见停用词（中英文）
         let stopwords = [
             // 英文停用词
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-            "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
-            "been", "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "should", "could", "may", "might", "can",
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
+            "from", "as", "is", "was", "are", "were", "be", "been", "being", "have", "has", "had",
+            "do", "does", "did", "will", "would", "should", "could", "may", "might", "can",
             // 中文停用词
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都",
-            "一", "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会",
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个", "上",
+            "也", "很", "到", "说", "要", "去", "你", "会",
         ];
-        
+
         let words: Vec<&str> = processed.split_whitespace().collect();
         let filtered_words: Vec<&str> = words
             .into_iter()
@@ -2877,23 +2972,23 @@ impl MemoryOrchestrator {
                 !stopwords.contains(&lower.as_str())
             })
             .collect();
-        
+
         // Step 3: 重新组合（如果过滤后为空，保留原始查询）
         if !filtered_words.is_empty() {
             processed = filtered_words.join(" ");
         }
-        
+
         // Step 4: 转小写
         processed = processed.to_lowercase();
-        
+
         // Step 5: 移除多余空格
         processed = processed
             .split_whitespace()
             .collect::<Vec<&str>>()
             .join(" ");
-        
+
         debug!("查询预处理: '{}' -> '{}'", query, processed);
-        
+
         Ok(processed)
     }
 
@@ -2901,9 +2996,9 @@ impl MemoryOrchestrator {
     ///
     /// 使用 Embedder 生成查询的向量表示
     /// P0优化 #21: 修复零向量降级问题
-    /// 
+    ///
     /// 零向量对搜索无意义，应该返回错误而非降级
-    /// 
+    ///
     /// 🆕 Phase 3-D: 改为pub以支持Memory.generate_query_vector()和Reranker集成
     pub async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
         if let Some(embedder) = &self.embedder {
@@ -2920,16 +3015,18 @@ impl MemoryOrchestrator {
                 Err(e) => {
                     // P0优化 #21: 返回错误而非零向量
                     error!("生成查询嵌入向量失败: {}", e);
-                    Err(agent_mem_traits::AgentMemError::EmbeddingError(
-                        format!("Failed to generate query embedding: {}", e)
-                    ))
+                    Err(agent_mem_traits::AgentMemError::EmbeddingError(format!(
+                        "Failed to generate query embedding: {}",
+                        e
+                    )))
                 }
             }
         } else {
             // P0优化 #21: Embedder未配置时返回错误
             error!("Embedder 未配置，无法生成查询嵌入向量");
             Err(agent_mem_traits::AgentMemError::ConfigError(
-                "Embedder not configured. Cannot perform vector search without embedder.".to_string()
+                "Embedder not configured. Cannot perform vector search without embedder."
+                    .to_string(),
             ))
         }
     }
@@ -3534,7 +3631,7 @@ impl MemoryOrchestrator {
 
         // P1 优化 #27: 仅重排序top-k，减少LLM调用成本
         const RERANK_TOP_K: usize = 20;
-        
+
         let (to_rerank, unchanged): (Vec<_>, Vec<_>) = if memory_items.len() > RERANK_TOP_K {
             info!(
                 "✅ 优化：仅重排序前 {} 个结果，其余 {} 个保持原序",
@@ -3598,7 +3695,7 @@ impl MemoryOrchestrator {
         // P1 优化 #27: 合并重排序后的top-k和未改变的部分
         let mut final_results = reranked;
         final_results.extend(unchanged);
-        
+
         info!("重排序完成，最终结果: {} 个", final_results.len());
         Ok(final_results)
     }

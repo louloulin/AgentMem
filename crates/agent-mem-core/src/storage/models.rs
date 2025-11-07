@@ -38,7 +38,7 @@ pub struct User {
     pub email: String,
     pub password_hash: String,
     pub roles: Option<Vec<String>>, // JSON array of roles
-    pub status: String, // "active" or "inactive"
+    pub status: String,             // "active" or "inactive"
     pub timezone: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -70,9 +70,9 @@ pub struct Agent {
     pub tool_rules: Option<JsonValue>,
     #[cfg_attr(feature = "postgres", sqlx(json))]
     pub mcp_tools: Option<Vec<String>>, // MCP server names
-    pub state: Option<String>,          // Agent state: idle, thinking, executing, waiting, error
+    pub state: Option<String>, // Agent state: idle, thinking, executing, waiting, error
     pub last_active_at: Option<DateTime<Utc>>, // Last activity timestamp
-    pub error_message: Option<String>,  // Error message if state is error
+    pub error_message: Option<String>, // Error message if state is error
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub is_deleted: bool,
@@ -256,7 +256,13 @@ impl Organization {
 }
 
 impl User {
-    pub fn new(organization_id: String, name: String, email: String, password_hash: String, timezone: String) -> Self {
+    pub fn new(
+        organization_id: String,
+        name: String,
+        email: String,
+        password_hash: String,
+        timezone: String,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id: generate_id("user"),

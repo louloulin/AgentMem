@@ -10,19 +10,19 @@ use async_trait::async_trait;
 pub trait IntelligenceCache: Send + Sync {
     /// 获取缓存的事实提取结果
     async fn get_facts(&self, key: &str) -> Option<Vec<ExtractedFact>>;
-    
+
     /// 设置事实提取结果到缓存
     async fn set_facts(&self, key: &str, facts: Vec<ExtractedFact>);
-    
+
     /// 获取缓存的决策结果
     async fn get_decision(&self, key: &str) -> Option<MemoryDecision>;
-    
+
     /// 设置决策结果到缓存
     async fn set_decision(&self, key: &str, decision: MemoryDecision);
-    
+
     /// 清空缓存
     async fn clear(&self);
-    
+
     /// 获取缓存统计信息
     async fn stats(&self) -> CacheStats;
 }
@@ -45,7 +45,7 @@ impl CacheStats {
             hit_rate: 0.0,
         }
     }
-    
+
     pub fn calculate_hit_rate(&mut self) {
         let total = self.hits + self.misses;
         self.hit_rate = if total > 0 {
@@ -61,4 +61,3 @@ impl Default for CacheStats {
         Self::new()
     }
 }
-

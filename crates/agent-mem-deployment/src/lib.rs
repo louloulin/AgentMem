@@ -2,13 +2,12 @@
 //!
 //! 提供单二进制打包和嵌入式存储支持
 
-pub mod embedded;
-pub mod packaging;
 pub mod config_embed;
 pub mod config_loader;
+pub mod embedded;
+pub mod packaging;
 
-pub use embedded::{EmbeddedDatabase, EmbeddedVectorStore, EmbeddedConfig};
-pub use packaging::{PackageBuilder, PackageConfig, BinaryOptimizer};
-pub use config_embed::{EmbeddedConfigManager, ConfigTemplate};
-pub use config_loader::{ConfigLoader, ConfigFormat, ConfigFile};
-
+pub use config_embed::{ConfigTemplate, EmbeddedConfigManager};
+pub use config_loader::{ConfigFile, ConfigFormat, ConfigLoader};
+pub use embedded::{EmbeddedConfig, EmbeddedDatabase, EmbeddedVectorStore};
+pub use packaging::{BinaryOptimizer, PackageBuilder, PackageConfig};

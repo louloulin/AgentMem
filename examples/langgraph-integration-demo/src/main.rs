@@ -26,13 +26,13 @@ struct Message {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter("info").init();
-    
+
     println!("{}", "=== AgentMem LangGraph 集成演示 ===".cyan().bold());
-    
+
     let client = Arc::new(AgentMemClient::default());
     println!("{}", "✅ AgentMemClient 创建成功".green());
-    
+
     println!("{}", "=== 演示完成 ===".green().bold());
-    
+
     Ok(())
 }

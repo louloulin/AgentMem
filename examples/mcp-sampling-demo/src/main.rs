@@ -4,17 +4,14 @@
 
 use agent_mem_llm::LLMConfig;
 use agent_mem_tools::mcp::{
-    SamplingManager, SamplingMessage, SamplingParams,
-    CreateMessageRequest, StopReason,
+    CreateMessageRequest, SamplingManager, SamplingMessage, SamplingParams, StopReason,
 };
 use tracing::Level;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     println!("=== MCP Sampling 功能演示 ===\n");
 
@@ -117,9 +114,7 @@ async fn demo_message_creation() -> Result<(), Box<dyn std::error::Error>> {
 
     // 创建完整的对话请求
     let request = CreateMessageRequest {
-        messages: vec![
-            SamplingMessage::user("What is 2 + 2?"),
-        ],
+        messages: vec![SamplingMessage::user("What is 2 + 2?")],
         params: SamplingParams::new()
             .with_temperature(0.3)
             .with_max_tokens(100),
@@ -143,7 +138,7 @@ async fn demo_mock_sampling() -> Result<(), Box<dyn std::error::Error>> {
 
     // 注意：这里使用 Mock 配置，因为我们没有真实的 LLM API 密钥
     // 在实际使用中，需要配置真实的 LLM 提供商
-    
+
     println!("✓ 创建 Mock LLM 配置");
     let llm_config = LLMConfig {
         provider: "mock".to_string(),
@@ -164,35 +159,39 @@ async fn demo_mock_sampling() -> Result<(), Box<dyn std::error::Error>> {
             println!("✓ Sampling 管理器创建成功");
             println!("  启用状态: {}", manager.is_enabled());
             println!("  默认参数: {:?}", manager.default_params());
-            
+
             // 注意：由于使用 Mock 配置，实际调用会失败
             // 这里只是演示 API 的使用方式
             println!("\n✓ 采样请求示例:");
             let request = CreateMessageRequest {
-                messages: vec![
-                    SamplingMessage::user("Explain quantum computing in simple terms."),
-                ],
+                messages: vec![SamplingMessage::user(
+                    "Explain quantum computing in simple terms.",
+                )],
                 params: SamplingParams::new()
                     .with_temperature(0.7)
                     .with_max_tokens(500),
                 model: Some("mock-model".to_string()),
                 system_prompt: Some("You are a science educator.".to_string()),
             };
-            
+
             println!("  消息: {:?}", request.messages[0].content);
-            println!("  参数: temperature={:?}, max_tokens={:?}", 
-                request.params.temperature, request.params.max_tokens);
-            
+            println!(
+                "  参数: temperature={:?}, max_tokens={:?}",
+                request.params.temperature, request.params.max_tokens
+            );
+
             // 实际调用会失败，因为 Mock 提供商不存在
             match manager.create_message(request).await {
                 Ok(response) => {
                     println!("\n✓ 采样响应:");
                     println!("  消息: {}", response.message.content);
                     println!("  停止原因: {:?}", response.stop_reason);
-                    println!("  令牌使用: input={}, output={}, total={}",
+                    println!(
+                        "  令牌使用: input={}, output={}, total={}",
                         response.usage.input_tokens,
                         response.usage.output_tokens,
-                        response.usage.total_tokens);
+                        response.usage.total_tokens
+                    );
                     println!("  模型: {}", response.model);
                     println!("  创建时间: {}", response.created_at);
                 }
@@ -215,4 +214,3 @@ async fn demo_mock_sampling() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     Ok(())
 }
-

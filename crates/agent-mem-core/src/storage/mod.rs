@@ -30,6 +30,8 @@ pub mod hybrid_manager;
 #[cfg(feature = "postgres")]
 pub mod memory_repository;
 #[cfg(feature = "postgres")]
+pub mod memory_tables_migration;
+#[cfg(feature = "postgres")]
 pub mod message_repository;
 #[cfg(feature = "postgres")]
 pub mod migration;
@@ -37,8 +39,6 @@ pub mod migration;
 pub mod migration_manager;
 #[cfg(feature = "postgres")]
 pub mod migrations;
-#[cfg(feature = "postgres")]
-pub mod memory_tables_migration;
 #[cfg(feature = "postgres")]
 pub mod pool_manager;
 #[cfg(feature = "postgres")]
@@ -142,8 +142,7 @@ pub trait CacheBackend: Send + Sync {
 }
 
 /// Storage configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageConfig {
     /// PostgreSQL configuration
     #[cfg(feature = "postgres")]
@@ -263,7 +262,6 @@ pub struct HealthStatus {
     /// Last check timestamp
     pub last_check: DateTime<Utc>,
 }
-
 
 #[cfg(feature = "postgres")]
 impl Default for PostgresConfig {

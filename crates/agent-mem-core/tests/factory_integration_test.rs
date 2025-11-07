@@ -144,7 +144,11 @@ mod libsql_factory_tests {
         // Verify both instances can access the same database
         let users1 = repos1.users.list(10, 0).await.unwrap();
         let users2 = repos2.users.list(10, 0).await.unwrap();
-        assert_eq!(users1.len(), users2.len(), "Both instances should see the same data");
+        assert_eq!(
+            users1.len(),
+            users2.len(),
+            "Both instances should see the same data"
+        );
     }
 }
 
@@ -193,4 +197,3 @@ mod postgres_feature_disabled_tests {
         assert!(err_msg.contains("PostgreSQL support is not enabled"));
     }
 }
-

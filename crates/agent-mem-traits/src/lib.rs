@@ -21,9 +21,9 @@ pub use batch::{
     HealthCheckProvider, MemoryLifecycle, MemoryStats, MemoryUpdate, RetryableOperations,
     TelemetryProvider,
 };
+pub use cache::{CacheStats, IntelligenceCache};
 pub use embedder::Embedder;
 pub use error::{AgentMemError, ErrorContext, ErrorSeverity, Result};
-pub use cache::{CacheStats, IntelligenceCache};
 pub use intelligence::{
     DecisionEngine, ExtractedFact, FactExtractor, IntelligentMemoryProcessor,
     IntelligentProcessingResult, MemoryActionType, MemoryDecision,

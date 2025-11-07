@@ -35,5 +35,4 @@ pub mod types;
 
 pub use entity_extractor::{EntityExtractor, RuleBasedExtractor};
 pub use relation_extractor::{RelationExtractor, RuleBasedRelationExtractor};
-pub use types::{Entity, EntityType, Relation, RelationType, ExtractionResult};
-
+pub use types::{Entity, EntityType, ExtractionResult, Relation, RelationType};

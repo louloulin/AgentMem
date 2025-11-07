@@ -3,29 +3,22 @@
 //! 这是 AgentMem 的核心对话循环实现，参考 MIRIX 的 AgentWrapper.step() 设计
 //! 集成所有现有模块：MemoryEngine, LLMClient, ToolExecutor, MessageRepository
 
-use crate::{
-    engine::MemoryEngine,
-    Memory,
-    storage::traits::MessageRepositoryTrait,
-};
+use crate::{engine::MemoryEngine, storage::traits::MessageRepositoryTrait, Memory};
 
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
-use agent_mem_traits::{
-    llm::FunctionDefinition,
-    AgentMemError, Message, Result,
-};
+use agent_mem_traits::{llm::FunctionDefinition, AgentMemError, Message, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+pub mod memory_extraction;
 pub mod memory_integration;
 pub mod tool_integration;
-pub mod memory_extraction;
 
-use memory_integration::MemoryIntegrator;
 use memory_extraction::MemoryExtractor;
+use memory_integration::MemoryIntegrator;
 use tool_integration::{ToolIntegrator, ToolIntegratorConfig};
 
 /// 对话请求
@@ -66,9 +59,10 @@ impl ChatRequest {
 
         // 验证消息长度（最大 100KB）
         if self.message.len() > 100_000 {
-            return Err(AgentMemError::ValidationError(
-                format!("Message too long: {} bytes (max 100KB)", self.message.len()),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "Message too long: {} bytes (max 100KB)",
+                self.message.len()
+            )));
         }
 
         // 验证 agent_id 不为空
@@ -80,9 +74,10 @@ impl ChatRequest {
 
         // 验证 agent_id 长度（最大 255 字符）
         if self.agent_id.len() > 255 {
-            return Err(AgentMemError::ValidationError(
-                format!("Agent ID too long: {} characters (max 255)", self.agent_id.len()),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "Agent ID too long: {} characters (max 255)",
+                self.agent_id.len()
+            )));
         }
 
         // 验证 user_id 不为空
@@ -94,9 +89,10 @@ impl ChatRequest {
 
         // 验证 user_id 长度（最大 255 字符）
         if self.user_id.len() > 255 {
-            return Err(AgentMemError::ValidationError(
-                format!("User ID too long: {} characters (max 255)", self.user_id.len()),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "User ID too long: {} characters (max 255)",
+                self.user_id.len()
+            )));
         }
 
         // 验证 organization_id 不为空
@@ -108,9 +104,10 @@ impl ChatRequest {
 
         // 验证 organization_id 长度（最大 255 字符）
         if self.organization_id.len() > 255 {
-            return Err(AgentMemError::ValidationError(
-                format!("Organization ID too long: {} characters (max 255)", self.organization_id.len()),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "Organization ID too long: {} characters (max 255)",
+                self.organization_id.len()
+            )));
         }
 
         // 验证 max_memories 范围（1-1000）
@@ -121,9 +118,10 @@ impl ChatRequest {
         }
 
         if self.max_memories > 1000 {
-            return Err(AgentMemError::ValidationError(
-                format!("max_memories too large: {} (max 1000)", self.max_memories),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "max_memories too large: {} (max 1000)",
+                self.max_memories
+            )));
         }
 
         // 验证 session_id 不为空
@@ -135,9 +133,10 @@ impl ChatRequest {
 
         // 验证 session_id 长度（最大 255 字符）
         if self.session_id.len() > 255 {
-            return Err(AgentMemError::ValidationError(
-                format!("Session ID too long: {} characters (max 255)", self.session_id.len()),
-            ));
+            return Err(AgentMemError::ValidationError(format!(
+                "Session ID too long: {} characters (max 255)",
+                self.session_id.len()
+            )));
         }
 
         Ok(())
@@ -154,16 +153,16 @@ fn default_organization_id() -> String {
 pub struct ChatResponse {
     /// 消息 ID
     pub message_id: String,
-    
+
     /// Agent 响应内容
     pub content: String,
-    
+
     /// 是否更新了记忆
     pub memories_updated: bool,
-    
+
     /// 更新的记忆数量
     pub memories_count: usize,
-    
+
     /// 工具调用（如果有）
     pub tool_calls: Option<Vec<ToolCallInfo>>,
 }
@@ -238,10 +237,8 @@ impl AgentOrchestrator {
         let memory_integrator = MemoryIntegrator::with_default_config(memory_engine.clone());
 
         // 创建记忆提取器
-        let memory_extractor = MemoryExtractor::with_default_config(
-            llm_client.clone(),
-            memory_engine.clone(),
-        );
+        let memory_extractor =
+            MemoryExtractor::with_default_config(llm_client.clone(), memory_engine.clone());
 
         // 创建工具集成器
         let tool_config = ToolIntegratorConfig {
@@ -275,20 +272,16 @@ impl AgentOrchestrator {
                         debug!("No working memory items found for session: {}", session_id);
                         return Ok(String::new());
                     }
-                    
+
                     // 按优先级和时间排序（已在store中完成）
                     // 格式化为对话上下文
                     let context_lines: Vec<String> = items
                         .iter()
                         .map(|item| {
-                            format!(
-                                "[{}] {}",
-                                item.created_at.format("%H:%M:%S"),
-                                item.content
-                            )
+                            format!("[{}] {}", item.created_at.format("%H:%M:%S"), item.content)
                         })
                         .collect();
-                    
+
                     let context = context_lines.join("\n");
                     debug!(
                         "Retrieved {} working memory items for session {}: {} chars",
@@ -299,12 +292,18 @@ impl AgentOrchestrator {
                     Ok(context)
                 }
                 Err(e) => {
-                    warn!("Failed to get working context for session {}: {}", session_id, e);
+                    warn!(
+                        "Failed to get working context for session {}: {}",
+                        session_id, e
+                    );
                     Ok(String::new()) // 失败时返回空，不影响对话
                 }
             }
         } else {
-            debug!("Working Memory store not configured, session_id: {}", session_id);
+            debug!(
+                "Working Memory store not configured, session_id: {}",
+                session_id
+            );
             Ok(String::new())
         }
     }
@@ -323,13 +322,11 @@ impl AgentOrchestrator {
         if let Some(ref store) = self.working_store {
             use agent_mem_traits::WorkingMemoryItem;
             use chrono::Utc;
-            
+
             // 格式化对话对
-            let conversation_pair = format!(
-                "User: {}\nAssistant: {}",
-                user_message, assistant_response
-            );
-            
+            let conversation_pair =
+                format!("User: {}\nAssistant: {}", user_message, assistant_response);
+
             // 创建工作记忆项
             let item = WorkingMemoryItem {
                 id: Uuid::new_v4().to_string(),
@@ -337,25 +334,34 @@ impl AgentOrchestrator {
                 agent_id: agent_id.to_string(),
                 session_id: session_id.to_string(),
                 content: conversation_pair,
-                priority: 1, // 默认优先级
+                priority: 1,                                                // 默认优先级
                 expires_at: Some(Utc::now() + chrono::Duration::hours(24)), // 24小时后过期
                 metadata: serde_json::json!({}),
                 created_at: Utc::now(),
             };
-            
+
             match store.add_item(item).await {
                 Ok(_) => {
-                    debug!("Successfully added working memory item for session: {}", session_id);
+                    debug!(
+                        "Successfully added working memory item for session: {}",
+                        session_id
+                    );
                 }
                 Err(e) => {
-                    warn!("Failed to add working memory item for session {}: {}", session_id, e);
+                    warn!(
+                        "Failed to add working memory item for session {}: {}",
+                        session_id, e
+                    );
                     // 不返回错误，避免影响对话流程
                 }
             }
         } else {
-            debug!("Working Memory store not configured, skipping update for session: {}", session_id);
+            debug!(
+                "Working Memory store not configured, skipping update for session: {}",
+                session_id
+            );
         }
-        
+
         Ok(())
     }
 
@@ -376,8 +382,10 @@ impl AgentOrchestrator {
         // ✅ 验证请求参数
         request.validate()?;
 
-        info!("Starting conversation step for agent_id={}, user_id={}, session_id={}",
-              request.agent_id, request.user_id, request.session_id);
+        info!(
+            "Starting conversation step for agent_id={}, user_id={}, session_id={}",
+            request.agent_id, request.user_id, request.session_id
+        );
 
         // 0. 获取Working Memory会话上下文
         let working_context = self.get_working_context(&request.session_id).await?;
@@ -395,24 +403,32 @@ impl AgentOrchestrator {
         info!("Retrieved {} memories", memories_retrieved_count);
 
         // 3. 构建 prompt（注入会话上下文和长期记忆）
-        let messages = self.build_messages_with_context(&request, &working_context, &memories).await?;
-        debug!("Built {} messages with working context and memories", messages.len());
+        let messages = self
+            .build_messages_with_context(&request, &working_context, &memories)
+            .await?;
+        debug!(
+            "Built {} messages with working context and memories",
+            messages.len()
+        );
 
         // 4. 调用 LLM（可能需要多轮工具调用）
-        let (final_response, tool_calls_info) = self.execute_with_tools(
-            &messages,
-            &request.user_id,
-        ).await?;
-        debug!("Got final response: {} chars, {} tool calls",
-            final_response.len(), tool_calls_info.len());
+        let (final_response, tool_calls_info) =
+            self.execute_with_tools(&messages, &request.user_id).await?;
+        debug!(
+            "Got final response: {} chars, {} tool calls",
+            final_response.len(),
+            tool_calls_info.len()
+        );
 
         // 5. 保存 assistant 消息
-        let assistant_message_id = self.create_assistant_message(
-            &request.organization_id,
-            &request.agent_id,
-            &request.user_id,
-            &final_response,
-        ).await?;
+        let assistant_message_id = self
+            .create_assistant_message(
+                &request.organization_id,
+                &request.agent_id,
+                &request.user_id,
+                &final_response,
+            )
+            .await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
         // 6. 更新Working Memory
@@ -422,12 +438,14 @@ impl AgentOrchestrator {
             &request.agent_id,
             &request.message,
             &final_response,
-        ).await?;
+        )
+        .await?;
         debug!("Updated working memory for session {}", request.session_id);
 
         // 7. 提取和更新记忆
         let memories_extracted = if self.config.auto_extract_memories {
-            self.extract_and_update_memories(&request, &messages).await?
+            self.extract_and_update_memories(&request, &messages)
+                .await?
         } else {
             0
         };
@@ -438,7 +456,7 @@ impl AgentOrchestrator {
             message_id: assistant_message_id,
             content: final_response,
             memories_updated: memories_extracted > 0,
-            memories_count: memories_retrieved_count,  // ✅ 使用检索到的记忆数量
+            memories_count: memories_retrieved_count, // ✅ 使用检索到的记忆数量
             tool_calls: if tool_calls_info.is_empty() {
                 None
             } else {
@@ -480,7 +498,9 @@ impl AgentOrchestrator {
         info!("Retrieved {} memories", memories.len());
 
         // 3. 构建 prompt（注入记忆）
-        let mut messages = self.build_messages_with_memories(&request, &memories).await?;
+        let mut messages = self
+            .build_messages_with_memories(&request, &memories)
+            .await?;
         debug!("Built {} messages with memories", messages.len());
 
         let mut tool_calls_info = Vec::new();
@@ -491,7 +511,10 @@ impl AgentOrchestrator {
         loop {
             round += 1;
             if round > self.config.max_tool_rounds {
-                warn!("Reached max tool rounds ({}), stopping", self.config.max_tool_rounds);
+                warn!(
+                    "Reached max tool rounds ({}), stopping",
+                    self.config.max_tool_rounds
+                );
                 break;
             }
 
@@ -548,13 +571,19 @@ impl AgentOrchestrator {
 
         // 6. 保存 assistant 消息
         let assistant_message_id = self
-            .create_assistant_message(&request.organization_id, &request.agent_id, &request.user_id, &final_response)
+            .create_assistant_message(
+                &request.organization_id,
+                &request.agent_id,
+                &request.user_id,
+                &final_response,
+            )
             .await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
         // 7. 提取和更新记忆
         let memories_count = if self.config.auto_extract_memories {
-            self.extract_and_update_memories(&request, &messages).await?
+            self.extract_and_update_memories(&request, &messages)
+                .await?
         } else {
             0
         };
@@ -605,9 +634,7 @@ impl AgentOrchestrator {
         };
 
         // 保存到数据库
-        let created_message = self.message_repo
-            .create(&message)
-            .await?;
+        let created_message = self.message_repo.create(&message).await?;
 
         debug!("Created user message: {}", created_message.id);
         Ok(created_message.id)
@@ -650,9 +677,7 @@ impl AgentOrchestrator {
         };
 
         // 保存到数据库
-        let created_message = self.message_repo
-            .create(&message)
-            .await?;
+        let created_message = self.message_repo.create(&message).await?;
 
         debug!("Created assistant message: {}", created_message.id);
         Ok(created_message.id)
@@ -662,20 +687,25 @@ impl AgentOrchestrator {
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
         // ✅ 使用 MemoryIntegrator 检索记忆（带session隔离）
         let max_count = self.config.max_memories;
-        
+
         // 使用session_id和user_id进行精确过滤
-        let memories = self.memory_integrator
+        let memories = self
+            .memory_integrator
             .retrieve_relevant_memories_with_session(
-                &request.message, 
+                &request.message,
                 &request.agent_id,
                 Some(&request.user_id),
                 Some(&request.session_id),
-                max_count
+                max_count,
             )
             .await?;
 
-        info!("📋 Retrieved {} memories for session={}, user={}", 
-              memories.len(), request.session_id, request.user_id);
+        info!(
+            "📋 Retrieved {} memories for session={}, user={}",
+            memories.len(),
+            request.session_id,
+            request.user_id
+        );
 
         // 过滤和排序
         let memories = self.memory_integrator.filter_by_relevance(memories);
@@ -778,7 +808,8 @@ impl AgentOrchestrator {
             let available_tools = self.get_available_tools().await;
 
             // 调用 LLM（支持工具调用）
-            let llm_response = self.llm_client
+            let llm_response = self
+                .llm_client
                 .generate_with_functions(&current_messages, &available_tools)
                 .await?;
 
@@ -786,13 +817,21 @@ impl AgentOrchestrator {
             if llm_response.function_calls.is_empty() {
                 // 没有工具调用，返回文本响应
                 let text = llm_response.text.unwrap_or_default();
-                info!("LLM response without tool calls, {} total tool calls made", all_tool_calls.len());
+                info!(
+                    "LLM response without tool calls, {} total tool calls made",
+                    all_tool_calls.len()
+                );
                 return Ok((text, all_tool_calls));
             }
 
             // 执行工具调用
-            info!("Executing {} tool call(s) in round {}", llm_response.function_calls.len(), round);
-            let tool_results = self.tool_integrator
+            info!(
+                "Executing {} tool call(s) in round {}",
+                llm_response.function_calls.len(),
+                round
+            );
+            let tool_results = self
+                .tool_integrator
                 .execute_tool_calls(&llm_response.function_calls, user_id)
                 .await?;
 
@@ -800,7 +839,8 @@ impl AgentOrchestrator {
             for result in &tool_results {
                 all_tool_calls.push(ToolCallInfo {
                     tool_name: result.tool_name.clone(),
-                    arguments: serde_json::from_str(&result.arguments).unwrap_or(serde_json::json!({})),
+                    arguments: serde_json::from_str(&result.arguments)
+                        .unwrap_or(serde_json::json!({})),
                     result: if result.success {
                         Some(result.result.clone())
                     } else {
@@ -819,7 +859,14 @@ impl AgentOrchestrator {
                 let tool_message = if result.success {
                     format!("Tool '{}' result: {}", result.tool_name, result.result)
                 } else {
-                    format!("Tool '{}' error: {}", result.tool_name, result.error.as_ref().unwrap_or(&"Unknown error".to_string()))
+                    format!(
+                        "Tool '{}' error: {}",
+                        result.tool_name,
+                        result
+                            .error
+                            .as_ref()
+                            .unwrap_or(&"Unknown error".to_string())
+                    )
                 };
                 current_messages.push(Message::system(&tool_message));
             }
@@ -851,7 +898,8 @@ impl AgentOrchestrator {
         messages: &[Message],
     ) -> Result<usize> {
         // 使用 MemoryExtractor 提取记忆
-        let memories = self.memory_extractor
+        let memories = self
+            .memory_extractor
             .extract_from_conversation(messages, &request.agent_id, &request.user_id)
             .await?;
 
@@ -1058,4 +1106,3 @@ mod tests {
         // 需要 mock LLMClient, MemoryEngine, MessageRepository, ToolExecutor
     }
 }
-

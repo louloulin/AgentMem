@@ -110,9 +110,9 @@ pub async fn add_working_memory(
     }
 
     // Create working memory item
-    let expires_at = request.expires_in_seconds.map(|seconds| {
-        chrono::Utc::now() + chrono::Duration::seconds(seconds)
-    });
+    let expires_at = request
+        .expires_in_seconds
+        .map(|seconds| chrono::Utc::now() + chrono::Duration::seconds(seconds));
 
     let item = WorkingMemoryItem {
         id: uuid::Uuid::new_v4().to_string(),
@@ -131,7 +131,9 @@ pub async fn add_working_memory(
         .working_memory
         .add_item(item)
         .await
-        .map_err(|e| ServerError::internal_error(format!("Failed to add working memory item: {}", e)))?;
+        .map_err(|e| {
+            ServerError::internal_error(format!("Failed to add working memory item: {}", e))
+        })?;
 
     debug!("Working memory item added: id={}", added_item.id);
 
@@ -177,13 +179,17 @@ pub async fn get_working_memory(
             .working_memory
             .get_by_priority(&query.session_id, min_priority)
             .await
-            .map_err(|e| ServerError::internal_error(format!("Failed to get working memory items: {}", e)))?
+            .map_err(|e| {
+                ServerError::internal_error(format!("Failed to get working memory items: {}", e))
+            })?
     } else {
         repositories
             .working_memory
             .get_session_items(&query.session_id)
             .await
-            .map_err(|e| ServerError::internal_error(format!("Failed to get working memory items: {}", e)))?
+            .map_err(|e| {
+                ServerError::internal_error(format!("Failed to get working memory items: {}", e))
+            })?
     };
 
     debug!("Retrieved {} working memory items", items.len());
@@ -222,7 +228,9 @@ pub async fn delete_working_memory_item(
         .working_memory
         .remove_item(&item_id)
         .await
-        .map_err(|e| ServerError::internal_error(format!("Failed to delete working memory item: {}", e)))?;
+        .map_err(|e| {
+            ServerError::internal_error(format!("Failed to delete working memory item: {}", e))
+        })?;
 
     if deleted {
         debug!("Working memory item deleted: id={}", item_id);
@@ -266,9 +274,14 @@ pub async fn clear_working_memory(
         .working_memory
         .clear_session(&session_id)
         .await
-        .map_err(|e| ServerError::internal_error(format!("Failed to clear working memory: {}", e)))?;
+        .map_err(|e| {
+            ServerError::internal_error(format!("Failed to clear working memory: {}", e))
+        })?;
 
-    info!("Cleared {} working memory items for session {}", deleted_count, session_id);
+    info!(
+        "Cleared {} working memory items for session {}",
+        deleted_count, session_id
+    );
 
     Ok(Json(ClearWorkingMemoryResponse {
         deleted_count,
@@ -292,24 +305,26 @@ pub async fn cleanup_expired(
     axum::Extension(repositories): axum::Extension<Arc<Repositories>>,
     axum::Extension(auth_user): axum::Extension<AuthUser>,
 ) -> ServerResult<Json<CleanupResponse>> {
-    info!("Cleaning up expired working memory items (user={})", auth_user.user_id);
+    info!(
+        "Cleaning up expired working memory items (user={})",
+        auth_user.user_id
+    );
 
     // ✅ Use WorkingMemoryStore from Repositories
     let cleaned_count = repositories
         .working_memory
         .clear_expired()
         .await
-        .map_err(|e| ServerError::internal_error(format!("Failed to cleanup expired items: {}", e)))?;
+        .map_err(|e| {
+            ServerError::internal_error(format!("Failed to cleanup expired items: {}", e))
+        })?;
 
     info!("Cleaned up {} expired working memory items", cleaned_count);
 
-    Ok(Json(CleanupResponse {
-        cleaned_count,
-    }))
+    Ok(Json(CleanupResponse { cleaned_count }))
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CleanupResponse {
     pub cleaned_count: i64,
 }
-

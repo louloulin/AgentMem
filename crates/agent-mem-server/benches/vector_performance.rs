@@ -24,9 +24,9 @@ fn bench_lancedb_insert(c: &mut Criterion) {
     #[cfg(feature = "lancedb")]
     {
         use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-        use agent_mem_traits::{VectorStore, VectorData};
-        use tempfile::TempDir;
+        use agent_mem_traits::{VectorData, VectorStore};
         use std::collections::HashMap;
+        use tempfile::TempDir;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -42,11 +42,8 @@ fn bench_lancedb_insert(c: &mut Criterion) {
                         let temp_dir = TempDir::new().unwrap();
                         let store = rt
                             .block_on(async {
-                                LanceDBStore::new(
-                                    temp_dir.path().to_str().unwrap(),
-                                    "vectors",
-                                )
-                                .await
+                                LanceDBStore::new(temp_dir.path().to_str().unwrap(), "vectors")
+                                    .await
                             })
                             .unwrap();
 
@@ -64,10 +61,7 @@ fn bench_lancedb_insert(c: &mut Criterion) {
                     |(store, vectors, _temp_dir)| {
                         // Benchmark: 插入向量
                         rt.block_on(async {
-                            store
-                                .add_vectors(black_box(vectors))
-                                .await
-                                .unwrap();
+                            store.add_vectors(black_box(vectors)).await.unwrap();
                         });
                     },
                     criterion::BatchSize::SmallInput,
@@ -89,32 +83,31 @@ fn bench_lancedb_search(c: &mut Criterion) {
     #[cfg(feature = "lancedb")]
     {
         use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-        use agent_mem_traits::{VectorStore, VectorData};
-        use tempfile::TempDir;
+        use agent_mem_traits::{VectorData, VectorStore};
         use std::collections::HashMap;
+        use tempfile::TempDir;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         // 预先创建并填充数据
         let temp_dir = TempDir::new().unwrap();
-        let store = rt
-            .block_on(async {
-                let store = LanceDBStore::new(temp_dir.path().to_str().unwrap(), "vectors")
-                    .await
-                    .unwrap();
+        let store = rt.block_on(async {
+            let store = LanceDBStore::new(temp_dir.path().to_str().unwrap(), "vectors")
+                .await
+                .unwrap();
 
-                // 插入 10000 个向量
-                let vectors: Vec<VectorData> = (0..10000)
-                    .map(|i| VectorData {
-                        id: format!("vec_{}", i),
-                        vector: generate_random_vector(1536),
-                        metadata: HashMap::new(),
-                    })
-                    .collect();
-                store.add_vectors(vectors).await.unwrap();
+            // 插入 10000 个向量
+            let vectors: Vec<VectorData> = (0..10000)
+                .map(|i| VectorData {
+                    id: format!("vec_{}", i),
+                    vector: generate_random_vector(1536),
+                    metadata: HashMap::new(),
+                })
+                .collect();
+            store.add_vectors(vectors).await.unwrap();
 
-                store
-            });
+            store
+        });
 
         let mut group = c.benchmark_group("lancedb_search");
         group.measurement_time(Duration::from_secs(10));
@@ -152,9 +145,9 @@ fn bench_lancedb_delete(c: &mut Criterion) {
     #[cfg(feature = "lancedb")]
     {
         use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-        use agent_mem_traits::{VectorStore, VectorData};
-        use tempfile::TempDir;
+        use agent_mem_traits::{VectorData, VectorStore};
         use std::collections::HashMap;
+        use tempfile::TempDir;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -168,27 +161,24 @@ fn bench_lancedb_delete(c: &mut Criterion) {
                     || {
                         // Setup: 创建 store 并插入数据
                         let temp_dir = TempDir::new().unwrap();
-                        let store = rt
-                            .block_on(async {
-                                let store = LanceDBStore::new(
-                                    temp_dir.path().to_str().unwrap(),
-                                    "vectors",
-                                )
-                                .await
-                                .unwrap();
+                        let store = rt.block_on(async {
+                            let store =
+                                LanceDBStore::new(temp_dir.path().to_str().unwrap(), "vectors")
+                                    .await
+                                    .unwrap();
 
-                                // 插入向量
-                                let vectors: Vec<VectorData> = (0..size)
-                                    .map(|i| VectorData {
-                                        id: format!("vec_{}", i),
-                                        vector: generate_random_vector(1536),
-                                        metadata: HashMap::new(),
-                                    })
-                                    .collect();
-                                store.add_vectors(vectors).await.unwrap();
+                            // 插入向量
+                            let vectors: Vec<VectorData> = (0..size)
+                                .map(|i| VectorData {
+                                    id: format!("vec_{}", i),
+                                    vector: generate_random_vector(1536),
+                                    metadata: HashMap::new(),
+                                })
+                                .collect();
+                            store.add_vectors(vectors).await.unwrap();
 
-                                store
-                            });
+                            store
+                        });
 
                         let ids_to_delete: Vec<String> =
                             (0..size).map(|i| format!("vec_{}", i)).collect();
@@ -197,7 +187,10 @@ fn bench_lancedb_delete(c: &mut Criterion) {
                     |(store, ids_to_delete, _temp_dir)| {
                         // Benchmark: 删除向量
                         rt.block_on(async {
-                            store.delete_vectors(black_box(ids_to_delete)).await.unwrap();
+                            store
+                                .delete_vectors(black_box(ids_to_delete))
+                                .await
+                                .unwrap();
                         });
                     },
                     criterion::BatchSize::SmallInput,
@@ -229,11 +222,7 @@ fn bench_vector_similarity(c: &mut Criterion) {
 
                 b.iter(|| {
                     // 余弦相似度计算
-                    let dot_product: f32 = vec1
-                        .iter()
-                        .zip(vec2.iter())
-                        .map(|(a, b)| a * b)
-                        .sum();
+                    let dot_product: f32 = vec1.iter().zip(vec2.iter()).map(|(a, b)| a * b).sum();
                     let norm1: f32 = vec1.iter().map(|x| x * x).sum::<f32>().sqrt();
                     let norm2: f32 = vec2.iter().map(|x| x * x).sum::<f32>().sqrt();
                     black_box(dot_product / (norm1 * norm2));
@@ -293,4 +282,3 @@ criterion_group!(
     bench_batch_operations
 );
 criterion_main!(benches);
-

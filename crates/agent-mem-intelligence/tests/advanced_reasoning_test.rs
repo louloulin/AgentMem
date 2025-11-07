@@ -1,8 +1,6 @@
 //! 高级推理功能测试
 
-use agent_mem_intelligence::reasoning::{
-    AdvancedReasoner, CausalRelationType, MemoryData,
-};
+use agent_mem_intelligence::reasoning::{AdvancedReasoner, CausalRelationType, MemoryData};
 use chrono::{Duration, Utc};
 
 /// 创建测试记忆
@@ -16,7 +14,12 @@ fn create_test_memory(id: &str, content: &str, hours_ago: i64) -> MemoryData {
 }
 
 /// 创建带嵌入的测试记忆
-fn create_memory_with_embedding(id: &str, content: &str, hours_ago: i64, embedding: Vec<f32>) -> MemoryData {
+fn create_memory_with_embedding(
+    id: &str,
+    content: &str,
+    hours_ago: i64,
+    embedding: Vec<f32>,
+) -> MemoryData {
     MemoryData {
         id: id.to_string(),
         content: content.to_string(),
@@ -94,18 +97,8 @@ fn test_multi_hop_causal_reasoning_no_path() {
     let reasoner = AdvancedReasoner::default();
 
     // 创建不相关的记忆
-    let memory_a = create_memory_with_embedding(
-        "A",
-        "learning cooking",
-        10,
-        vec![1.0, 0.0, 0.0],
-    );
-    let memory_b = create_memory_with_embedding(
-        "B",
-        "studying physics",
-        5,
-        vec![0.0, 1.0, 0.0],
-    );
+    let memory_a = create_memory_with_embedding("A", "learning cooking", 10, vec![1.0, 0.0, 0.0]);
+    let memory_b = create_memory_with_embedding("B", "studying physics", 5, vec![0.0, 1.0, 0.0]);
 
     let all_memories = vec![memory_a.clone(), memory_b.clone()];
 
@@ -151,8 +144,14 @@ fn test_counterfactual_reasoning() {
         .unwrap();
 
     // 检查反事实推理结果
-    assert_eq!(result.original_scenario, "decided to study computer science");
-    assert_eq!(result.counterfactual_hypothesis, "decided to study medicine instead");
+    assert_eq!(
+        result.original_scenario,
+        "decided to study computer science"
+    );
+    assert_eq!(
+        result.counterfactual_hypothesis,
+        "decided to study medicine instead"
+    );
     assert!(!result.predicted_outcome.is_empty());
     assert!(result.confidence > 0.0);
     assert!(result.confidence <= 1.0);
@@ -169,11 +168,7 @@ fn test_counterfactual_reasoning_no_dependencies() {
     let all_memories = vec![target_memory.clone(), unrelated_memory];
 
     let result = reasoner
-        .counterfactual_reasoning(
-            &target_memory,
-            "skipped breakfast",
-            &all_memories,
-        )
+        .counterfactual_reasoning(&target_memory, "skipped breakfast", &all_memories)
         .unwrap();
 
     // 应该没有受影响的记忆
@@ -242,18 +237,9 @@ fn test_causal_step_structure() {
     // 测试因果步骤的结构
     let reasoner = AdvancedReasoner::default();
 
-    let memory_a = create_memory_with_embedding(
-        "A",
-        "started learning",
-        10,
-        vec![1.0, 0.0, 0.0],
-    );
-    let memory_b = create_memory_with_embedding(
-        "B",
-        "completed learning course",
-        5,
-        vec![0.9, 0.1, 0.0],
-    );
+    let memory_a = create_memory_with_embedding("A", "started learning", 10, vec![1.0, 0.0, 0.0]);
+    let memory_b =
+        create_memory_with_embedding("B", "completed learning course", 5, vec![0.9, 0.1, 0.0]);
 
     let all_memories = vec![memory_a.clone(), memory_b.clone()];
 
@@ -334,4 +320,3 @@ fn test_mapping_types() {
         }
     }
 }
-

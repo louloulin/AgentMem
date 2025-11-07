@@ -43,14 +43,14 @@ impl Embedder for CachedEmbedder {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         // P1 优化 #20: 检查缓存
         let cache_key = LruCacheWrapper::<Vec<f32>>::compute_key(text);
-        
+
         if let Some(cached_embedding) = self.cache.get(&cache_key) {
             debug!("✅ 嵌入向量缓存命中: {}", &cache_key[..16]);
             return Ok(cached_embedding);
         }
 
         debug!("缓存未命中，生成新的嵌入向量: {}", &cache_key[..16]);
-        
+
         // 调用实际的 embedder
         let embedding = self.inner.embed(text).await?;
 
@@ -69,7 +69,7 @@ impl Embedder for CachedEmbedder {
         // 检查哪些文本已缓存
         for (idx, text) in texts.iter().enumerate() {
             let cache_key = LruCacheWrapper::<Vec<f32>>::compute_key(text);
-            
+
             if let Some(cached_embedding) = self.cache.get(&cache_key) {
                 results.push((idx, cached_embedding));
             } else {
@@ -97,7 +97,7 @@ impl Embedder for CachedEmbedder {
 
         // 按原始顺序排序
         results.sort_by_key(|(idx, _)| *idx);
-        
+
         Ok(results.into_iter().map(|(_, emb)| emb).collect())
     }
 
@@ -215,11 +215,10 @@ mod tests {
 
         // 再次嵌入（应该全部命中缓存）
         let embeddings2 = cached_embedder.embed_batch(&texts).await.unwrap();
-        
+
         let stats = cached_embedder.cache_stats();
         assert_eq!(stats.hits, 3); // 第二次应该全部命中
 
         assert_eq!(embeddings1, embeddings2);
     }
 }
-

@@ -46,7 +46,7 @@ impl Default for MemoryLimits {
     fn default() -> Self {
         Self {
             max_heap_bytes: 100 * 1024 * 1024, // 100 MB
-            max_stack_bytes: 1 * 1024 * 1024,   // 1 MB
+            max_stack_bytes: 1 * 1024 * 1024,  // 1 MB
             max_total_allocations: 10_000,
         }
     }
@@ -68,9 +68,9 @@ pub struct CpuLimits {
 impl Default for CpuLimits {
     fn default() -> Self {
         Self {
-            max_execution_time_ms: 5000,    // 5 seconds
+            max_execution_time_ms: 5000,     // 5 seconds
             max_instructions: 1_000_000_000, // 1 billion
-            max_cpu_time_ms: 4000,          // 4 seconds
+            max_cpu_time_ms: 4000,           // 4 seconds
         }
     }
 }
@@ -396,34 +396,77 @@ impl std::fmt::Display for ResourceLimitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ResourceLimitError::MemoryLimitExceeded { used, limit } => {
-                write!(f, "Memory limit exceeded: used {} bytes, limit {} bytes", used, limit)
+                write!(
+                    f,
+                    "Memory limit exceeded: used {} bytes, limit {} bytes",
+                    used, limit
+                )
             }
             ResourceLimitError::AllocationLimitExceeded { count, limit } => {
-                write!(f, "Allocation limit exceeded: {} allocations, limit {}", count, limit)
+                write!(
+                    f,
+                    "Allocation limit exceeded: {} allocations, limit {}",
+                    count, limit
+                )
             }
-            ResourceLimitError::ExecutionTimeExceeded { elapsed_ms, limit_ms } => {
-                write!(f, "Execution time exceeded: {} ms, limit {} ms", elapsed_ms, limit_ms)
+            ResourceLimitError::ExecutionTimeExceeded {
+                elapsed_ms,
+                limit_ms,
+            } => {
+                write!(
+                    f,
+                    "Execution time exceeded: {} ms, limit {} ms",
+                    elapsed_ms, limit_ms
+                )
             }
             ResourceLimitError::InstructionLimitExceeded { count, limit } => {
-                write!(f, "Instruction limit exceeded: {} instructions, limit {}", count, limit)
+                write!(
+                    f,
+                    "Instruction limit exceeded: {} instructions, limit {}",
+                    count, limit
+                )
             }
             ResourceLimitError::CpuTimeLimitExceeded { used_ms, limit_ms } => {
-                write!(f, "CPU time limit exceeded: {} ms, limit {} ms", used_ms, limit_ms)
+                write!(
+                    f,
+                    "CPU time limit exceeded: {} ms, limit {} ms",
+                    used_ms, limit_ms
+                )
             }
             ResourceLimitError::NetworkRequestLimitExceeded { count, limit } => {
-                write!(f, "Network request limit exceeded: {} requests, limit {}", count, limit)
+                write!(
+                    f,
+                    "Network request limit exceeded: {} requests, limit {}",
+                    count, limit
+                )
             }
             ResourceLimitError::FileOperationLimitExceeded { count, limit } => {
-                write!(f, "File operation limit exceeded: {} operations, limit {}", count, limit)
+                write!(
+                    f,
+                    "File operation limit exceeded: {} operations, limit {}",
+                    count, limit
+                )
             }
             ResourceLimitError::ReadLimitExceeded { bytes, limit } => {
-                write!(f, "Read limit exceeded: {} bytes, limit {} bytes", bytes, limit)
+                write!(
+                    f,
+                    "Read limit exceeded: {} bytes, limit {} bytes",
+                    bytes, limit
+                )
             }
             ResourceLimitError::WriteLimitExceeded { bytes, limit } => {
-                write!(f, "Write limit exceeded: {} bytes, limit {} bytes", bytes, limit)
+                write!(
+                    f,
+                    "Write limit exceeded: {} bytes, limit {} bytes",
+                    bytes, limit
+                )
             }
             ResourceLimitError::ConnectionLimitExceeded { count, limit } => {
-                write!(f, "Connection limit exceeded: {} connections, limit {}", count, limit)
+                write!(
+                    f,
+                    "Connection limit exceeded: {} connections, limit {}",
+                    count, limit
+                )
             }
         }
     }
@@ -607,4 +650,3 @@ mod tests {
         assert_eq!(limits.io.max_network_requests, 100);
     }
 }
-

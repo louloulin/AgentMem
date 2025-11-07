@@ -289,8 +289,7 @@ impl From<Memory> for MemoryItem {
             hash: None, // TODO: Calculate hash if needed
             metadata,
             score: Some(memory.importance),
-            created_at: DateTime::from_timestamp(memory.created_at, 0)
-                .unwrap_or_else(Utc::now),
+            created_at: DateTime::from_timestamp(memory.created_at, 0).unwrap_or_else(Utc::now),
             updated_at: Some(
                 DateTime::from_timestamp(memory.last_accessed_at, 0).unwrap_or_else(Utc::now),
             ),

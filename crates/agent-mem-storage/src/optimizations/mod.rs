@@ -12,8 +12,7 @@ pub mod query_cache;
 pub mod query_optimizer;
 
 #[cfg(feature = "optimizations")]
-pub use pool::{PoolConfig, create_optimized_pool};
+pub use pool::{create_optimized_pool, PoolConfig};
 pub use query_cache::{QueryCache, QueryCacheConfig};
 #[cfg(feature = "optimizations")]
 pub use query_optimizer::{QueryOptimizer, QueryPlan};
-

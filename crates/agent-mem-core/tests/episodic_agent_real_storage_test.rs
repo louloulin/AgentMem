@@ -31,10 +31,7 @@ impl MockEpisodicStore {
 
 #[async_trait]
 impl EpisodicMemoryStore for MockEpisodicStore {
-    async fn create_event(
-        &self,
-        event: EpisodicEvent,
-    ) -> agent_mem_traits::Result<EpisodicEvent> {
+    async fn create_event(&self, event: EpisodicEvent) -> agent_mem_traits::Result<EpisodicEvent> {
         let key = Self::make_key(&event.user_id, &event.id);
         self.events.lock().await.insert(key, event.clone());
         Ok(event)
@@ -95,11 +92,7 @@ impl EpisodicMemoryStore for MockEpisodicStore {
         }
     }
 
-    async fn delete_event(
-        &self,
-        event_id: &str,
-        user_id: &str,
-    ) -> agent_mem_traits::Result<bool> {
+    async fn delete_event(&self, event_id: &str, user_id: &str) -> agent_mem_traits::Result<bool> {
         let key = Self::make_key(user_id, event_id);
         Ok(self.events.lock().await.remove(&key).is_some())
     }
@@ -341,4 +334,3 @@ async fn test_episodic_agent_update_with_real_store() {
     assert!(stored_event.is_some());
     assert_eq!(stored_event.unwrap().importance_score, 0.9);
 }
-

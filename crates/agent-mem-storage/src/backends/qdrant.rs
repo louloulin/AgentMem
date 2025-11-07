@@ -303,9 +303,10 @@ impl VectorStore for QdrantStore {
             )));
         }
 
-        let search_response: QdrantSearchResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let search_response: QdrantSearchResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         let results: Vec<VectorSearchResult> = search_response
             .result
@@ -385,9 +386,10 @@ impl VectorStore for QdrantStore {
             )));
         }
 
-        let point_response: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let point_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if let Some(result) = point_response.get("result") {
             if let (Some(vector), Some(payload)) = (
@@ -441,9 +443,10 @@ impl VectorStore for QdrantStore {
             )));
         }
 
-        let info: QdrantCollectionInfo = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let info: QdrantCollectionInfo = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(info.result.points_count)
     }

@@ -2,7 +2,7 @@
 //!
 //! 演示动态工具发现、加载和注册
 
-use agent_mem_tools::mcp::{ToolDiscovery, ToolMetadata, ToolType, HttpToolLoader, ToolLoader};
+use agent_mem_tools::mcp::{HttpToolLoader, ToolDiscovery, ToolLoader, ToolMetadata, ToolType};
 use std::collections::HashMap;
 use tracing::error;
 
@@ -125,7 +125,10 @@ async fn demo_tool_metadata_registration() {
     let all_metadata = discovery.list_metadata().await;
     println!("  找到 {} 个工具:", all_metadata.len());
     for metadata in &all_metadata {
-        println!("    - {} (v{}) - {:?}", metadata.name, metadata.version, metadata.tool_type);
+        println!(
+            "    - {} (v{}) - {:?}",
+            metadata.name, metadata.version, metadata.tool_type
+        );
     }
 }
 
@@ -311,7 +314,10 @@ async fn demo_tool_dependencies() {
         metadata: HashMap::new(),
     };
 
-    discovery.register_metadata(base_tool.clone()).await.unwrap();
+    discovery
+        .register_metadata(base_tool.clone())
+        .await
+        .unwrap();
     println!("  ✅ 基础工具注册成功: {}", base_tool.name);
 
     // 2. 注册依赖于基础工具的工具
@@ -373,4 +379,3 @@ async fn demo_tool_dependencies() {
         }
     }
 }
-

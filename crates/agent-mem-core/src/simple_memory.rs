@@ -27,15 +27,14 @@
 use crate::manager::MemoryManager;
 use crate::types::MemoryQuery;
 use agent_mem_config::memory::{
-    DecisionEngineConfig, DeduplicationConfig, FactExtractionConfig, IntelligenceConfig,
-    EmbedderConfig, PerformanceConfig, SessionConfig,
+    DecisionEngineConfig, DeduplicationConfig, EmbedderConfig, FactExtractionConfig,
+    IntelligenceConfig, PerformanceConfig, SessionConfig,
 };
 use agent_mem_config::MemoryConfig;
-use agent_mem_traits::{
-    DecisionEngine, FactExtractor, LLMConfig, MemoryItem, Result,
-    VectorStoreConfig,
-};
 use agent_mem_llm::LLMProvider;
+use agent_mem_traits::{
+    DecisionEngine, FactExtractor, LLMConfig, MemoryItem, Result, VectorStoreConfig,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -314,7 +313,7 @@ impl SimpleMemory {
         metadata: Option<HashMap<String, String>>,
     ) -> Result<String> {
         debug!("Adding memory with intelligent processing");
-        
+
         self.manager
             .add_memory(
                 self.default_agent_id.clone(),
@@ -435,7 +434,11 @@ impl SimpleMemory {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn update(&self, memory_id: impl Into<String>, content: impl Into<String>) -> Result<()> {
+    pub async fn update(
+        &self,
+        memory_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Result<()> {
         debug!("Updating memory");
 
         self.manager
@@ -507,9 +510,9 @@ impl SimpleMemory {
                 enable_conflict_detection: true,
                 enable_memory_summarization: true,
                 importance_scoring: true,
-                enable_intelligent_extraction: false,  // Disabled by default, enable via with_intelligence()
-                enable_decision_engine: false,         // Disabled by default, enable via with_intelligence()
-                enable_deduplication: false,          // Optional
+                enable_intelligent_extraction: false, // Disabled by default, enable via with_intelligence()
+                enable_decision_engine: false, // Disabled by default, enable via with_intelligence()
+                enable_deduplication: false,   // Optional
                 fact_extraction: FactExtractionConfig {
                     min_confidence: 0.7,
                     extract_entities: true,
@@ -540,4 +543,3 @@ impl Default for SimpleMemory {
         panic!("Use SimpleMemory::new().await instead of Default::default()")
     }
 }
-

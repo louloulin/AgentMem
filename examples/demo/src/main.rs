@@ -102,7 +102,7 @@ use agent_mem_storage::{
     VectorStoreFactory,
 };
 use agent_mem_traits::{LLMConfig, MemoryProvider, Message, Session, VectorStoreConfig};
-use agent_mem_utils::{clean_text, extract_json, compute_content_hash, Timer};
+use agent_mem_utils::{clean_text, compute_content_hash, extract_json, Timer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

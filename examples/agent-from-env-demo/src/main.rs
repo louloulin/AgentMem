@@ -16,15 +16,13 @@
 //! DATABASE_URL="postgresql://user:pass@localhost/agentmem" cargo run --example agent-from-env-demo
 //! ```
 
-use agent_mem_core::agents::{CoreAgent, EpisodicAgent, SemanticAgent, MemoryAgent};
-use tracing::{info, error};
+use agent_mem_core::agents::{CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     info!("🚀 Agent from Environment Demo");
     info!("================================");
@@ -56,7 +54,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Get stats
             let stats = agent.get_stats().await;
-            info!("   📊 Agent stats: {} total tasks, {} successful", stats.total_tasks, stats.successful_tasks);
+            info!(
+                "   📊 Agent stats: {} total tasks, {} successful",
+                stats.total_tasks, stats.successful_tasks
+            );
         }
         Err(e) => {
             error!("   ❌ Failed to create CoreAgent: {}", e);
@@ -124,4 +125,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

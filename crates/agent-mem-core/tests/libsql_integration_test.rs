@@ -7,7 +7,9 @@
 
 #[cfg(feature = "libsql")]
 mod libsql_tests {
-    use agent_mem_core::storage::libsql::{connection::create_libsql_pool, migrations::run_migrations};
+    use agent_mem_core::storage::libsql::{
+        connection::create_libsql_pool, migrations::run_migrations,
+    };
     use tempfile::TempDir;
 
     #[tokio::test]
@@ -30,7 +32,10 @@ mod libsql_tests {
         // Verify migrations table exists
         let conn_guard = conn.lock().await;
         let mut rows = conn_guard
-            .query("SELECT COUNT(*) as count FROM _migrations", libsql::params![])
+            .query(
+                "SELECT COUNT(*) as count FROM _migrations",
+                libsql::params![],
+            )
             .await
             .expect("Failed to query migrations table");
 
@@ -43,27 +48,45 @@ mod libsql_tests {
 
         // Verify organizations table exists
         let mut rows = conn_guard
-            .query("SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'", libsql::params![])
+            .query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'",
+                libsql::params![],
+            )
             .await
             .expect("Failed to query sqlite_master");
 
-        assert!(rows.next().await.expect("Failed to get row").is_some(), "organizations table should exist");
+        assert!(
+            rows.next().await.expect("Failed to get row").is_some(),
+            "organizations table should exist"
+        );
 
         // Verify users table exists
         let mut rows = conn_guard
-            .query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'", libsql::params![])
+            .query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+                libsql::params![],
+            )
             .await
             .expect("Failed to query sqlite_master");
 
-        assert!(rows.next().await.expect("Failed to get row").is_some(), "users table should exist");
+        assert!(
+            rows.next().await.expect("Failed to get row").is_some(),
+            "users table should exist"
+        );
 
         // Verify agents table exists
         let mut rows = conn_guard
-            .query("SELECT name FROM sqlite_master WHERE type='table' AND name='agents'", libsql::params![])
+            .query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='agents'",
+                libsql::params![],
+            )
             .await
             .expect("Failed to query sqlite_master");
 
-        assert!(rows.next().await.expect("Failed to get row").is_some(), "agents table should exist");
+        assert!(
+            rows.next().await.expect("Failed to get row").is_some(),
+            "agents table should exist"
+        );
 
         println!("✅ LibSQL connection and migrations test passed!");
     }
@@ -93,7 +116,10 @@ mod libsql_tests {
         // Verify still only 10 migrations
         let conn_guard = conn.lock().await;
         let mut rows = conn_guard
-            .query("SELECT COUNT(*) as count FROM _migrations", libsql::params![])
+            .query(
+                "SELECT COUNT(*) as count FROM _migrations",
+                libsql::params![],
+            )
             .await
             .expect("Failed to query migrations table");
 
@@ -141,7 +167,10 @@ mod libsql_tests {
 
         // Query the organization
         let mut rows = conn_guard
-            .query("SELECT id, name FROM organizations WHERE id = ?", libsql::params![org_id])
+            .query(
+                "SELECT id, name FROM organizations WHERE id = ?",
+                libsql::params![org_id],
+            )
             .await
             .expect("Failed to query organization");
 
@@ -166,7 +195,10 @@ mod libsql_tests {
 
         // Verify update
         let mut rows = conn_guard
-            .query("SELECT name FROM organizations WHERE id = ?", libsql::params![org_id])
+            .query(
+                "SELECT name FROM organizations WHERE id = ?",
+                libsql::params![org_id],
+            )
             .await
             .expect("Failed to query organization");
 
@@ -188,7 +220,10 @@ mod libsql_tests {
 
         // Verify soft delete
         let mut rows = conn_guard
-            .query("SELECT is_deleted FROM organizations WHERE id = ?", libsql::params![org_id])
+            .query(
+                "SELECT is_deleted FROM organizations WHERE id = ?",
+                libsql::params![org_id],
+            )
             .await
             .expect("Failed to query organization");
 
@@ -202,4 +237,3 @@ mod libsql_tests {
         println!("✅ LibSQL basic CRUD test passed!");
     }
 }
-

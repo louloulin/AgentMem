@@ -1,5 +1,5 @@
 //! Memory API 真实演示示例
-//! 
+//!
 //! 展示AgentMem的核心功能：
 //! 1. 添加记忆
 //! 2. 搜索记忆
@@ -13,19 +13,19 @@ use anyhow::Result;
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::fmt::init();
-    
+
     println!("🚀 AgentMem Memory API 演示\n");
-    
+
     // 1. 创建Memory实例（使用FastEmbed本地嵌入，零配置）
     println!("1️⃣ 创建Memory实例（使用FastEmbed本地嵌入）...");
     let memory = MemoryBuilder::new()
         .with_agent("demo_agent")
         .with_user("demo_user")
-        .with_embedder("fastembed", "all-MiniLM-L6-v2")  // 本地嵌入，无需API key
+        .with_embedder("fastembed", "all-MiniLM-L6-v2") // 本地嵌入，无需API key
         .build()
         .await?;
     println!("✅ Memory实例创建成功\n");
-    
+
     // 2. 添加记忆
     println!("2️⃣ 添加记忆...");
     let memories = vec![
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
         "Cangjie（仓颉）是华为开发的新编程语言",
         "向量数据库可以实现语义搜索",
     ];
-    
+
     for content in &memories {
         match memory.add(content).await {
             Ok(result) => {
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
         }
     }
     println!();
-    
+
     // 3. 搜索记忆
     println!("3️⃣ 搜索记忆...");
     let queries = vec![
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
         ("性能", "搜索关于性能的记忆"),
         ("安全", "搜索关于安全的记忆"),
     ];
-    
+
     for (query, description) in &queries {
         println!("\n  🔍 {}: \"{}\"", description, query);
         match memory.search(query).await {
@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
         }
     }
     println!();
-    
+
     // 4. 获取所有记忆
     println!("4️⃣ 获取所有记忆...");
     match memory.get_all().await {
@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
         Err(e) => println!("  ❌ 获取失败: {}", e),
     }
     println!();
-    
+
     // 5. 删除特定记忆
     println!("5️⃣ 删除记忆...");
     match memory.get_all().await {
@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
         Err(e) => println!("  ❌ 获取记忆失败: {}", e),
     }
     println!();
-    
+
     // 6. 验证删除
     println!("6️⃣ 验证删除后的记忆数量...");
     match memory.get_all().await {
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
         }
         Err(e) => println!("  ❌ 获取失败: {}", e),
     }
-    
+
     println!("\n🎉 演示完成！");
     println!("\n📊 AgentMem特性：");
     println!("  ✅ 零配置启动（LibSQL + FastEmbed）");
@@ -119,7 +119,6 @@ async fn main() -> Result<()> {
     println!("  ✅ 语义搜索，智能匹配");
     println!("  ✅ 向量维度自动适配");
     println!("  ✅ Rust性能，2-10x提升");
-    
+
     Ok(())
 }
-

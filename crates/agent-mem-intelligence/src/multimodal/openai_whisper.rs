@@ -67,16 +67,14 @@ impl OpenAIWhisperClient {
             .mime_str(&format!("audio/{file_extension}"))
             .map_err(|e| AgentMemError::internal_error(format!("创建文件部分失败: {e}")))?;
 
-        let mut form = multipart::Form::new()
-            .part("file", file_part)
-            .text(
-                "model",
-                self.config
-                    .model_name
-                    .as_ref()
-                    .unwrap_or(&"whisper-1".to_string())
-                    .clone(),
-            );
+        let mut form = multipart::Form::new().part("file", file_part).text(
+            "model",
+            self.config
+                .model_name
+                .as_ref()
+                .unwrap_or(&"whisper-1".to_string())
+                .clone(),
+        );
 
         // 添加可选参数
         if let Some(language) = &request.language {
@@ -261,8 +259,8 @@ mod tests {
 
     #[test]
     fn test_audio_format_mapping() {
-        let client = OpenAIWhisperClient::new(AIModelConfig::openai("test_key".to_string()))
-            .unwrap();
+        let client =
+            OpenAIWhisperClient::new(AIModelConfig::openai("test_key".to_string())).unwrap();
 
         assert_eq!(client.map_audio_format(&AudioFormat::Mp3), "mp3");
         assert_eq!(client.map_audio_format(&AudioFormat::Wav), "wav");
@@ -278,4 +276,3 @@ mod tests {
         assert!(!diarization.enabled);
     }
 }
-

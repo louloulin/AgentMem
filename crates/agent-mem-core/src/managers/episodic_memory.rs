@@ -99,7 +99,9 @@ impl EpisodicMemoryManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create episodic event: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -119,13 +121,19 @@ impl EpisodicMemoryManager {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get episodic event: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
     /// 查询情景记忆事件
-    pub async fn query_events(&self, user_id: &str, query: EpisodicQuery) -> Result<Vec<EpisodicEvent>> {
+    pub async fn query_events(
+        &self,
+        user_id: &str,
+        query: EpisodicQuery,
+    ) -> Result<Vec<EpisodicEvent>> {
         info!("Querying episodic events for user: {}", user_id);
 
         let mut sql = String::from("SELECT * FROM episodic_events WHERE user_id = $1");
@@ -186,7 +194,9 @@ impl EpisodicMemoryManager {
         let results = query_builder
             .fetch_all(self.pool.as_ref())
             .await
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to query episodic events: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to query episodic events: {}", e))
+            })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -205,13 +215,20 @@ impl EpisodicMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete episodic event: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete episodic event: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 
     /// 更新事件重要性评分
-    pub async fn update_importance(&self, event_id: &str, user_id: &str, importance_score: f32) -> Result<bool> {
+    pub async fn update_importance(
+        &self,
+        event_id: &str,
+        user_id: &str,
+        importance_score: f32,
+    ) -> Result<bool> {
         debug!("Updating importance for event: {}", event_id);
 
         let result = sqlx::query!(
@@ -227,7 +244,9 @@ impl EpisodicMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update importance: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update importance: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -676,7 +695,9 @@ mod tests {
 
         // 中等重要性
         let medium_importance = create_test_event("event-medium", "conversation", 0.5);
-        assert!(medium_importance.importance_score >= 0.3 && medium_importance.importance_score < 0.7);
+        assert!(
+            medium_importance.importance_score >= 0.3 && medium_importance.importance_score < 0.7
+        );
 
         // 高重要性
         let high_importance = create_test_event("event-high", "decision", 0.9);
@@ -873,4 +894,3 @@ mod tests {
         assert!(event.metadata["department"].is_string());
     }
 }
-

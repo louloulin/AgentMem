@@ -264,10 +264,12 @@ impl AdvancedReasoner {
         let mappings = self.find_analogical_mappings(&source_domain, &target_domain)?;
 
         // 计算类比强度
-        let analogy_strength = self.calculate_analogy_strength(&mappings, &source_domain, &target_domain);
+        let analogy_strength =
+            self.calculate_analogy_strength(&mappings, &source_domain, &target_domain);
 
         // 生成结论
-        let conclusion = self.generate_analogy_conclusion(&source_domain, &target_domain, &mappings);
+        let conclusion =
+            self.generate_analogy_conclusion(&source_domain, &target_domain, &mappings);
 
         Ok(AnalogyResult {
             source_domain,
@@ -437,7 +439,11 @@ impl AdvancedReasoner {
     }
 
     /// 确定因果类型
-    fn determine_causal_type(&self, cause: &MemoryData, effect: &MemoryData) -> Result<CausalRelationType> {
+    fn determine_causal_type(
+        &self,
+        cause: &MemoryData,
+        effect: &MemoryData,
+    ) -> Result<CausalRelationType> {
         // 简化的因果类型判断
         let time_diff = effect.created_at.signed_duration_since(cause.created_at);
         let hours = time_diff.num_hours();
@@ -452,7 +458,11 @@ impl AdvancedReasoner {
     }
 
     /// 收集因果证据
-    fn collect_causal_evidence(&self, cause: &MemoryData, effect: &MemoryData) -> Result<Vec<String>> {
+    fn collect_causal_evidence(
+        &self,
+        cause: &MemoryData,
+        effect: &MemoryData,
+    ) -> Result<Vec<String>> {
         let mut evidence = Vec::new();
 
         // 时间证据
@@ -469,7 +479,12 @@ impl AdvancedReasoner {
         if !shared.is_empty() {
             evidence.push(format!(
                 "共享关键词: {}",
-                shared.iter().take(3).map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                shared
+                    .iter()
+                    .take(3)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
 
@@ -524,9 +539,10 @@ impl AdvancedReasoner {
 
             // 如果记忆在目标之后创建，且内容相关，则可能依赖于目标
             if memory.created_at > target.created_at
-                && self.has_causal_relationship(target, memory)? {
-                    dependent.push(memory.clone());
-                }
+                && self.has_causal_relationship(target, memory)?
+            {
+                dependent.push(memory.clone());
+            }
         }
 
         Ok(dependent)
@@ -545,10 +561,7 @@ impl AdvancedReasoner {
         if affected.is_empty() {
             outcome.push_str("则不会影响其他记忆。");
         } else {
-            outcome.push_str(&format!(
-                "则会影响 {} 个相关记忆: ",
-                affected.len()
-            ));
+            outcome.push_str(&format!("则会影响 {} 个相关记忆: ", affected.len()));
 
             let affected_ids: Vec<_> = affected.iter().take(3).map(|m| m.id.as_str()).collect();
             outcome.push_str(&affected_ids.join(", "));
@@ -609,7 +622,12 @@ impl AdvancedReasoner {
             let keywords = self.extract_keywords(&memory.content);
             features.insert(
                 format!("entity_{i}"),
-                keywords.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
+                keywords
+                    .iter()
+                    .take(3)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", "),
             );
         }
 
@@ -665,8 +683,14 @@ impl AdvancedReasoner {
                 if source_rel.1 == target_rel.1 {
                     // 相同类型的关系
                     mappings.push(AnalogicalMapping {
-                        source_element: format!("{}-{}-{}", source_rel.0, source_rel.1, source_rel.2),
-                        target_element: format!("{}-{}-{}", target_rel.0, target_rel.1, target_rel.2),
+                        source_element: format!(
+                            "{}-{}-{}",
+                            source_rel.0, source_rel.1, source_rel.2
+                        ),
+                        target_element: format!(
+                            "{}-{}-{}",
+                            target_rel.0, target_rel.1, target_rel.2
+                        ),
                         mapping_type: MappingType::Relation,
                         confidence: 0.8,
                     });
@@ -694,7 +718,8 @@ impl AdvancedReasoner {
         let coverage = mappings.len() as f32 / source_size.max(target_size) as f32;
 
         // 平均映射置信度
-        let avg_confidence: f32 = mappings.iter().map(|m| m.confidence).sum::<f32>() / mappings.len() as f32;
+        let avg_confidence: f32 =
+            mappings.iter().map(|m| m.confidence).sum::<f32>() / mappings.len() as f32;
 
         // 综合强度
         (coverage * 0.4 + avg_confidence * 0.6).min(1.0)
@@ -726,7 +751,9 @@ impl AdvancedReasoner {
     /// 辅助方法：余弦相似度
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
         let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
@@ -746,13 +773,20 @@ impl AdvancedReasoner {
             .to_lowercase()
             .split_whitespace()
             .filter(|word| word.len() > 3)
-            .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .map(|word| {
+                word.trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_string()
+            })
             .filter(|word| !word.is_empty())
             .collect()
     }
 
     /// 辅助方法：计算关键词重叠度
-    fn calculate_keyword_overlap(&self, keywords1: &HashSet<String>, keywords2: &HashSet<String>) -> f32 {
+    fn calculate_keyword_overlap(
+        &self,
+        keywords1: &HashSet<String>,
+        keywords2: &HashSet<String>,
+    ) -> f32 {
         let intersection_size = keywords1.intersection(keywords2).count();
         let union_size = keywords1.union(keywords2).count();
 
@@ -770,4 +804,3 @@ impl AdvancedReasoner {
         self.calculate_keyword_overlap(&words1, &words2)
     }
 }
-

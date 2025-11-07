@@ -3,9 +3,9 @@
 //! Provides HTTP endpoints for managing WASM plugins in AgentMem.
 
 #[cfg(feature = "plugins")]
-use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
-#[cfg(feature = "plugins")]
 use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+#[cfg(feature = "plugins")]
+use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -124,11 +124,11 @@ pub async fn list_plugins(
     State(memory_manager): State<Arc<MemoryManager>>,
 ) -> ServerResult<Json<Vec<PluginResponse>>> {
     info!("Listing all registered plugins");
-    
+
     #[cfg(feature = "plugins")]
     {
         let plugins = memory_manager.memory.list_plugins().await;
-        
+
         let response: Vec<PluginResponse> = plugins
             .into_iter()
             .map(|metadata| PluginResponse {
@@ -148,11 +148,11 @@ pub async fn list_plugins(
                 last_loaded_at: None,
             })
             .collect();
-        
+
         debug!("Found {} plugins", response.len());
         Ok(Json(response))
     }
-    
+
     #[cfg(not(feature = "plugins"))]
     {
         Err(ServerError::internal("Plugins feature is not enabled"))
@@ -179,7 +179,7 @@ pub async fn register_plugin(
     Json(request): Json<RegisterPluginRequest>,
 ) -> ServerResult<(StatusCode, Json<PluginResponse>)> {
     info!("Registering plugin: {}", request.id);
-    
+
     // Convert DTO to domain model
     let metadata = PluginMetadata {
         name: request.metadata.name.clone(),
@@ -195,14 +195,14 @@ pub async fn register_plugin(
             .collect(),
         config_schema: request.metadata.config_schema,
     };
-    
+
     let mut config = PluginConfig::default();
     if let serde_json::Value::Object(map) = request.config.settings {
         for (key, value) in map {
             config.settings.insert(key, value);
         }
     }
-    
+
     let plugin = RegisteredPlugin {
         id: request.id.clone(),
         metadata: metadata.clone(),
@@ -212,15 +212,16 @@ pub async fn register_plugin(
         registered_at: chrono::Utc::now(),
         last_loaded_at: None,
     };
-    
+
     // Register the plugin
-    memory_manager.memory
+    memory_manager
+        .memory
         .register_plugin(plugin)
         .await
         .map_err(|e| ServerError::ServerError(format!("Failed to register plugin: {}", e)))?;
-    
+
     info!("Plugin {} registered successfully", request.id);
-    
+
     // Build response
     let response = PluginResponse {
         id: request.id,
@@ -238,7 +239,7 @@ pub async fn register_plugin(
         registered_at: chrono::Utc::now().to_rfc3339(),
         last_loaded_at: None,
     };
-    
+
     Ok((StatusCode::CREATED, Json(response)))
 }
 
@@ -264,15 +265,15 @@ pub async fn get_plugin(
     Path(id): Path<String>,
 ) -> ServerResult<Json<PluginResponse>> {
     debug!("Getting plugin: {}", id);
-    
+
     let plugins = memory_manager.memory.list_plugins().await;
-    
+
     // Find plugin by name (using name as ID)
     let plugin = plugins
         .into_iter()
         .find(|p| p.name == id)
         .ok_or_else(|| ServerError::NotFound(format!("Plugin not found: {}", id)))?;
-    
+
     let response = PluginResponse {
         id: plugin.name.clone(),
         name: plugin.name,
@@ -289,7 +290,7 @@ pub async fn get_plugin(
         registered_at: chrono::Utc::now().to_rfc3339(),
         last_loaded_at: None,
     };
-    
+
     Ok(Json(response))
 }
 
@@ -376,4 +377,3 @@ pub async fn get_plugin(
         "Plugins feature is not enabled".to_string(),
     ))
 }
-

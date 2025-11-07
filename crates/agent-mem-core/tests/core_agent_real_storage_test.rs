@@ -55,11 +55,7 @@ impl CoreMemoryStore for MockCoreStore {
             .collect())
     }
 
-    async fn get_by_category(
-        &self,
-        user_id: &str,
-        category: &str,
-    ) -> Result<Vec<CoreMemoryItem>> {
+    async fn get_by_category(&self, user_id: &str, category: &str) -> Result<Vec<CoreMemoryItem>> {
         let prefix = format!("{}:", user_id);
         Ok(self
             .items
@@ -347,4 +343,3 @@ async fn test_core_agent_search_with_real_store() {
     assert!(result["total_count"].as_u64().unwrap() > 0);
     assert!(result["results"].as_array().unwrap().len() > 0);
 }
-

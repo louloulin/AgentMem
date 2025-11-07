@@ -156,9 +156,7 @@ impl OpenAIEmbedder {
                         continue;
                     }
 
-                    return Err(AgentMemError::network_error(format!(
-                        "Request failed: {e}"
-                    )));
+                    return Err(AgentMemError::network_error(format!("Request failed: {e}")));
                 }
             }
         }

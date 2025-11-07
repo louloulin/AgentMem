@@ -62,7 +62,7 @@ impl RRFRanker {
     fn calculate_rrf_score(&self, rank: usize) -> f32 {
         1.0 / (self.k + rank as f32)
     }
-    
+
     /// 使用自定义权重融合两个结果列表
     ///
     /// # Arguments
@@ -84,7 +84,7 @@ impl RRFRanker {
     ) -> Result<Vec<SearchResult>> {
         self.fuse(
             vec![vector_results, fulltext_results],
-            vec![vector_weight, fulltext_weight]
+            vec![vector_weight, fulltext_weight],
         )
     }
 }
@@ -112,7 +112,8 @@ impl SearchResultRanker for RRFRanker {
 
         // P2 优化 #24,#25: 保留原始分数，不仅仅保留RRF分数
         // 计算每个文档的 RRF 分数，同时保留原始的vector_score和fulltext_score
-        let mut doc_data: HashMap<String, (f32, SearchResult, Option<f32>, Option<f32>)> = HashMap::new();
+        let mut doc_data: HashMap<String, (f32, SearchResult, Option<f32>, Option<f32>)> =
+            HashMap::new();
 
         for (list_idx, results) in results_lists.iter().enumerate() {
             let weight = normalized_weights[list_idx];
@@ -126,18 +127,28 @@ impl SearchResultRanker for RRFRanker {
                         *score += rrf_score;
                         // 保留最高的原始分数
                         if let Some(vs) = result.vector_score {
-                            *vector_score = Some(vector_score.map_or(vs, |existing| existing.max(vs)));
+                            *vector_score =
+                                Some(vector_score.map_or(vs, |existing| existing.max(vs)));
                         }
                         if let Some(fs) = result.fulltext_score {
-                            *fulltext_score = Some(fulltext_score.map_or(fs, |existing| existing.max(fs)));
+                            *fulltext_score =
+                                Some(fulltext_score.map_or(fs, |existing| existing.max(fs)));
                         }
                     })
-                    .or_insert_with(|| (rrf_score, result.clone(), result.vector_score, result.fulltext_score));
+                    .or_insert_with(|| {
+                        (
+                            rrf_score,
+                            result.clone(),
+                            result.vector_score,
+                            result.fulltext_score,
+                        )
+                    });
             }
         }
 
         // 按RRF分数排序
-        let mut final_results: Vec<(f32, SearchResult, Option<f32>, Option<f32>)> = doc_data.into_values().collect();
+        let mut final_results: Vec<(f32, SearchResult, Option<f32>, Option<f32>)> =
+            doc_data.into_values().collect();
         final_results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // P2 优化 #25: 同时保留RRF分数和原始分数

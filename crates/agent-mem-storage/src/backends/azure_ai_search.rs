@@ -211,9 +211,7 @@ impl AzureAISearchStore {
             .send()
             .await
             .map_err(|e| {
-                AgentMemError::network_error(format!(
-                    "Failed to connect to Azure AI Search: {e}"
-                ))
+                AgentMemError::network_error(format!("Failed to connect to Azure AI Search: {e}"))
             })?;
 
         if response.status().is_success() {

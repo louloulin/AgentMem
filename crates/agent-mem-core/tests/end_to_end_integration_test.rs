@@ -48,7 +48,11 @@ impl EpisodicMemoryStore for MockEpisodicStore {
         Ok(events.iter().find(|e| e.id == event_id).cloned())
     }
 
-    async fn query_events(&self, user_id: &str, query: EpisodicQuery) -> Result<Vec<EpisodicEvent>> {
+    async fn query_events(
+        &self,
+        user_id: &str,
+        query: EpisodicQuery,
+    ) -> Result<Vec<EpisodicEvent>> {
         let events = self.events.lock().unwrap();
         let mut filtered: Vec<EpisodicEvent> = events
             .iter()
@@ -84,7 +88,12 @@ impl EpisodicMemoryStore for MockEpisodicStore {
         Ok(events.len() < before_len)
     }
 
-    async fn update_importance(&self, event_id: &str, _user_id: &str, importance: f32) -> Result<bool> {
+    async fn update_importance(
+        &self,
+        event_id: &str,
+        _user_id: &str,
+        importance: f32,
+    ) -> Result<bool> {
         let mut events = self.events.lock().unwrap();
         if let Some(event) = events.iter_mut().find(|e| e.id == event_id) {
             event.importance_score = importance;
@@ -152,7 +161,11 @@ impl SemanticMemoryStore for MockSemanticStore {
         Ok(items.iter().find(|i| i.id == item_id).cloned())
     }
 
-    async fn query_items(&self, user_id: &str, query: SemanticQuery) -> Result<Vec<SemanticMemoryItem>> {
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: SemanticQuery,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         let mut filtered: Vec<SemanticMemoryItem> = items
             .iter()
@@ -188,7 +201,11 @@ impl SemanticMemoryStore for MockSemanticStore {
         Ok(items.len() < before_len)
     }
 
-    async fn search_by_tree_path(&self, user_id: &str, tree_path: Vec<String>) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_tree_path(
+        &self,
+        user_id: &str,
+        tree_path: Vec<String>,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         Ok(items
             .iter()
@@ -197,7 +214,12 @@ impl SemanticMemoryStore for MockSemanticStore {
             .collect())
     }
 
-    async fn search_by_name(&self, user_id: &str, name_pattern: &str, limit: i64) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_name(
+        &self,
+        user_id: &str,
+        name_pattern: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         Ok(items
             .iter()
@@ -244,15 +266,11 @@ async fn test_e2e_agent_with_factory() {
     let factory = MockStorageFactory::new();
 
     // 2. Create agents with stores from factory
-    let episodic_agent = EpisodicAgent::with_store(
-        "e2e-episodic-agent".to_string(),
-        factory.episodic_store(),
-    );
+    let episodic_agent =
+        EpisodicAgent::with_store("e2e-episodic-agent".to_string(), factory.episodic_store());
 
-    let semantic_agent = SemanticAgent::with_store(
-        "e2e-semantic-agent".to_string(),
-        factory.semantic_store(),
-    );
+    let semantic_agent =
+        SemanticAgent::with_store("e2e-semantic-agent".to_string(), factory.semantic_store());
 
     // 3. Verify agents were created successfully
     assert_eq!(episodic_agent.agent_id(), "e2e-episodic-agent");
@@ -268,10 +286,7 @@ async fn test_e2e_memory_storage_and_retrieval() {
     let episodic_store = factory.episodic_store();
 
     // 2. Create agent
-    let _agent = EpisodicAgent::with_store(
-        "e2e-memory-agent".to_string(),
-        episodic_store.clone(),
-    );
+    let _agent = EpisodicAgent::with_store("e2e-memory-agent".to_string(), episodic_store.clone());
 
     // 3. Store a memory
     let now = Utc::now();
@@ -295,12 +310,12 @@ async fn test_e2e_memory_storage_and_retrieval() {
     assert_eq!(stored_event.id, "event-1");
 
     // 4. Retrieve the memory
-    let retrieved = episodic_store
-        .get_event("event-1", "user-1")
-        .await
-        .unwrap();
+    let retrieved = episodic_store.get_event("event-1", "user-1").await.unwrap();
     assert!(retrieved.is_some());
-    assert_eq!(retrieved.unwrap().summary, "User met John at the coffee shop");
+    assert_eq!(
+        retrieved.unwrap().summary,
+        "User met John at the coffee shop"
+    );
 
     // 5. Query for memories
     let query = EpisodicQuery {
@@ -310,10 +325,7 @@ async fn test_e2e_memory_storage_and_retrieval() {
         min_importance: Some(0.5),
         limit: Some(10),
     };
-    let search_results = episodic_store
-        .query_events("user-1", query)
-        .await
-        .unwrap();
+    let search_results = episodic_store.query_events("user-1", query).await.unwrap();
     assert_eq!(search_results.len(), 1);
     assert_eq!(search_results[0].id, "event-1");
 
@@ -326,15 +338,11 @@ async fn test_e2e_multi_agent_workflow() {
     let factory = MockStorageFactory::new();
 
     // 2. Create multiple agents
-    let _episodic_agent = EpisodicAgent::with_store(
-        "workflow-episodic".to_string(),
-        factory.episodic_store(),
-    );
+    let _episodic_agent =
+        EpisodicAgent::with_store("workflow-episodic".to_string(), factory.episodic_store());
 
-    let _semantic_agent = SemanticAgent::with_store(
-        "workflow-semantic".to_string(),
-        factory.semantic_store(),
-    );
+    let _semantic_agent =
+        SemanticAgent::with_store("workflow-semantic".to_string(), factory.semantic_store());
 
     // 3. Store episodic memory
     let now = Utc::now();
@@ -372,7 +380,11 @@ async fn test_e2e_multi_agent_workflow() {
         updated_at: now,
     };
 
-    factory.semantic_store().create_item(semantic_item).await.unwrap();
+    factory
+        .semantic_store()
+        .create_item(semantic_item)
+        .await
+        .unwrap();
 
     // 5. Verify both agents can access their respective stores
     let episodic_query = EpisodicQuery {
@@ -404,4 +416,3 @@ async fn test_e2e_multi_agent_workflow() {
 
     println!("✅ End-to-end multi-agent workflow test passed");
 }
-

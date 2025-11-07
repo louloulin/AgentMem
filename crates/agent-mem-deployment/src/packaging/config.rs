@@ -10,31 +10,31 @@ use std::path::PathBuf;
 pub struct PackageConfig {
     /// 目标平台
     pub target: TargetPlatform,
-    
+
     /// 优化级别
     pub optimization_level: OptimizationLevel,
-    
+
     /// 是否启用 LTO（链接时优化）
     pub enable_lto: bool,
-    
+
     /// 是否启用 strip（移除符号）
     pub enable_strip: bool,
-    
+
     /// 是否启用压缩
     pub enable_compression: bool,
-    
+
     /// 压缩算法
     pub compression: CompressionAlgorithm,
-    
+
     /// 输出目录
     pub output_dir: PathBuf,
-    
+
     /// 二进制文件名
     pub binary_name: String,
-    
+
     /// 是否包含配置文件
     pub include_config: bool,
-    
+
     /// 是否包含文档
     pub include_docs: bool,
 }
@@ -65,7 +65,7 @@ impl TargetPlatform {
             TargetPlatform::WindowsX64 => "x86_64-pc-windows-msvc",
         }
     }
-    
+
     /// 获取平台名称
     pub fn name(&self) -> &'static str {
         match self {
@@ -76,7 +76,7 @@ impl TargetPlatform {
             TargetPlatform::WindowsX64 => "windows-x64",
         }
     }
-    
+
     /// 获取二进制文件扩展名
     pub fn binary_extension(&self) -> &'static str {
         match self {
@@ -109,7 +109,7 @@ impl OptimizationLevel {
             OptimizationLevel::MaxSpeed => "release",
         }
     }
-    
+
     /// 获取优化标志
     pub fn opt_level(&self) -> &'static str {
         match self {
@@ -163,7 +163,7 @@ impl PackageConfig {
             ..Default::default()
         }
     }
-    
+
     /// 创建最小化打包配置
     pub fn minimal() -> Self {
         Self {
@@ -177,7 +177,7 @@ impl PackageConfig {
             ..Default::default()
         }
     }
-    
+
     /// 创建开发环境打包配置
     pub fn development() -> Self {
         Self {
@@ -191,34 +191,30 @@ impl PackageConfig {
             ..Default::default()
         }
     }
-    
+
     /// 设置目标平台
     pub fn with_target(mut self, target: TargetPlatform) -> Self {
         self.target = target;
         self
     }
-    
+
     /// 设置输出目录
     pub fn with_output_dir(mut self, dir: PathBuf) -> Self {
         self.output_dir = dir;
         self
     }
-    
+
     /// 设置二进制名称
     pub fn with_binary_name(mut self, name: String) -> Self {
         self.binary_name = name;
         self
     }
-    
+
     /// 获取完整的二进制文件名
     pub fn full_binary_name(&self) -> String {
-        format!(
-            "{}{}",
-            self.binary_name,
-            self.target.binary_extension()
-        )
+        format!("{}{}", self.binary_name, self.target.binary_extension())
     }
-    
+
     /// 获取输出路径
     pub fn output_path(&self) -> PathBuf {
         self.output_dir.join(self.full_binary_name())
@@ -228,7 +224,7 @@ impl PackageConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_target_platform() {
         assert_eq!(
@@ -239,7 +235,7 @@ mod tests {
         assert_eq!(TargetPlatform::LinuxX64.binary_extension(), "");
         assert_eq!(TargetPlatform::WindowsX64.binary_extension(), ".exe");
     }
-    
+
     #[test]
     fn test_optimization_level() {
         assert_eq!(OptimizationLevel::Debug.cargo_profile(), "dev");
@@ -247,32 +243,30 @@ mod tests {
         assert_eq!(OptimizationLevel::MinSize.opt_level(), "z");
         assert_eq!(OptimizationLevel::MaxSpeed.opt_level(), "3");
     }
-    
+
     #[test]
     fn test_package_config() {
         let config = PackageConfig::default();
         assert_eq!(config.binary_name, "agentmem");
         assert_eq!(config.full_binary_name(), "agentmem");
-        
-        let config = PackageConfig::default()
-            .with_target(TargetPlatform::WindowsX64);
+
+        let config = PackageConfig::default().with_target(TargetPlatform::WindowsX64);
         assert_eq!(config.full_binary_name(), "agentmem.exe");
     }
-    
+
     #[test]
     fn test_package_config_presets() {
         let prod = PackageConfig::production();
         assert!(prod.enable_lto);
         assert!(prod.enable_strip);
         assert!(prod.enable_compression);
-        
+
         let minimal = PackageConfig::minimal();
         assert_eq!(minimal.optimization_level, OptimizationLevel::MinSize);
         assert!(!minimal.include_docs);
-        
+
         let dev = PackageConfig::development();
         assert_eq!(dev.optimization_level, OptimizationLevel::Debug);
         assert!(!dev.enable_lto);
     }
 }
-

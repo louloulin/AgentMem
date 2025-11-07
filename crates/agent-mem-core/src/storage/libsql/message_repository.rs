@@ -24,7 +24,9 @@ impl LibSqlMessageRepository {
 
     /// Helper function to serialize JSON fields
     fn serialize_json(value: &Option<serde_json::Value>) -> Option<String> {
-        value.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default())
+        value
+            .as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
     }
 
     /// Helper function to deserialize JSON fields
@@ -82,10 +84,12 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
                 "SELECT id, organization_id, user_id, agent_id, role, text, content, model, name,
                         tool_calls, tool_call_id, step_id, otid, tool_returns, group_id, sender_id,
                         created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
-                 FROM messages WHERE id = ? AND is_deleted = 0"
+                 FROM messages WHERE id = ? AND is_deleted = 0",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(libsql::params![id])
@@ -98,33 +102,81 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let message = Message {
-                id: row.get::<String>(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
-                organization_id: row.get::<String>(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
-                user_id: row.get::<String>(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
-                agent_id: row.get::<String>(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?,
-                role: row.get::<String>(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
-                text: row.get::<Option<String>>(5).map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
-                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?),
-                model: row.get::<Option<String>>(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get model: {e}")))?,
-                name: row.get::<Option<String>>(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
-                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_calls: {e}")))?),
-                tool_call_id: row.get::<Option<String>>(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}")))?,
-                step_id: row.get::<Option<String>>(11).map_err(|e| AgentMemError::StorageError(format!("Failed to get step_id: {e}")))?,
-                otid: row.get::<Option<String>>(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
-                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")))?),
-                group_id: row.get::<Option<String>>(14).map_err(|e| AgentMemError::StorageError(format!("Failed to get group_id: {e}")))?,
-                sender_id: row.get::<Option<String>>(15).map_err(|e| AgentMemError::StorageError(format!("Failed to get sender_id: {e}")))?,
+                id: row
+                    .get::<String>(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                organization_id: row.get::<String>(1).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get organization_id: {e}"))
+                })?,
+                user_id: row.get::<String>(2).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get user_id: {e}"))
+                })?,
+                agent_id: row.get::<String>(3).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
+                })?,
+                role: row
+                    .get::<String>(4)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
+                text: row
+                    .get::<Option<String>>(5)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
+                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get content: {e}"))
+                })?),
+                model: row.get::<Option<String>>(7).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get model: {e}"))
+                })?,
+                name: row
+                    .get::<Option<String>>(8)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_calls: {e}"))
+                })?),
+                tool_call_id: row.get::<Option<String>>(10).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}"))
+                })?,
+                step_id: row.get::<Option<String>>(11).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get step_id: {e}"))
+                })?,
+                otid: row
+                    .get::<Option<String>>(12)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
+                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(
+                    |e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")),
+                )?),
+                group_id: row.get::<Option<String>>(14).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get group_id: {e}"))
+                })?,
+                sender_id: row.get::<Option<String>>(15).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get sender_id: {e}"))
+                })?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(16).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(16).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(17).map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(17).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row.get::<i64>(18).map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))? != 0,
-                created_by_id: row.get::<Option<String>>(19).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_by_id: {e}")))?,
-                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}")))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(18).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
+                created_by_id: row.get::<Option<String>>(19).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get created_by_id: {e}"))
+                })?,
+                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}"))
+                })?,
             };
             Ok(Some(message))
         } else {
@@ -157,33 +209,81 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let message = Message {
-                id: row.get::<String>(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
-                organization_id: row.get::<String>(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
-                user_id: row.get::<String>(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
-                agent_id: row.get::<String>(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?,
-                role: row.get::<String>(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
-                text: row.get::<Option<String>>(5).map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
-                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?),
-                model: row.get::<Option<String>>(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get model: {e}")))?,
-                name: row.get::<Option<String>>(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
-                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_calls: {e}")))?),
-                tool_call_id: row.get::<Option<String>>(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}")))?,
-                step_id: row.get::<Option<String>>(11).map_err(|e| AgentMemError::StorageError(format!("Failed to get step_id: {e}")))?,
-                otid: row.get::<Option<String>>(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
-                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")))?),
-                group_id: row.get::<Option<String>>(14).map_err(|e| AgentMemError::StorageError(format!("Failed to get group_id: {e}")))?,
-                sender_id: row.get::<Option<String>>(15).map_err(|e| AgentMemError::StorageError(format!("Failed to get sender_id: {e}")))?,
+                id: row
+                    .get::<String>(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                organization_id: row.get::<String>(1).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get organization_id: {e}"))
+                })?,
+                user_id: row.get::<String>(2).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get user_id: {e}"))
+                })?,
+                agent_id: row.get::<String>(3).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
+                })?,
+                role: row
+                    .get::<String>(4)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
+                text: row
+                    .get::<Option<String>>(5)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
+                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get content: {e}"))
+                })?),
+                model: row.get::<Option<String>>(7).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get model: {e}"))
+                })?,
+                name: row
+                    .get::<Option<String>>(8)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_calls: {e}"))
+                })?),
+                tool_call_id: row.get::<Option<String>>(10).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}"))
+                })?,
+                step_id: row.get::<Option<String>>(11).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get step_id: {e}"))
+                })?,
+                otid: row
+                    .get::<Option<String>>(12)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
+                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(
+                    |e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")),
+                )?),
+                group_id: row.get::<Option<String>>(14).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get group_id: {e}"))
+                })?,
+                sender_id: row.get::<Option<String>>(15).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get sender_id: {e}"))
+                })?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(16).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(16).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(17).map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(17).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row.get::<i64>(18).map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))? != 0,
-                created_by_id: row.get::<Option<String>>(19).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_by_id: {e}")))?,
-                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}")))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(18).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
+                created_by_id: row.get::<Option<String>>(19).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get created_by_id: {e}"))
+                })?,
+                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}"))
+                })?,
             };
             messages.push(message);
         }
@@ -216,33 +316,81 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
             let message = Message {
-                id: row.get::<String>(0).map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
-                organization_id: row.get::<String>(1).map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
-                user_id: row.get::<String>(2).map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
-                agent_id: row.get::<String>(3).map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?,
-                role: row.get::<String>(4).map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
-                text: row.get::<Option<String>>(5).map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
-                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?),
-                model: row.get::<Option<String>>(7).map_err(|e| AgentMemError::StorageError(format!("Failed to get model: {e}")))?,
-                name: row.get::<Option<String>>(8).map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
-                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_calls: {e}")))?),
-                tool_call_id: row.get::<Option<String>>(10).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}")))?,
-                step_id: row.get::<Option<String>>(11).map_err(|e| AgentMemError::StorageError(format!("Failed to get step_id: {e}")))?,
-                otid: row.get::<Option<String>>(12).map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
-                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(|e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")))?),
-                group_id: row.get::<Option<String>>(14).map_err(|e| AgentMemError::StorageError(format!("Failed to get group_id: {e}")))?,
-                sender_id: row.get::<Option<String>>(15).map_err(|e| AgentMemError::StorageError(format!("Failed to get sender_id: {e}")))?,
+                id: row
+                    .get::<String>(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                organization_id: row.get::<String>(1).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get organization_id: {e}"))
+                })?,
+                user_id: row.get::<String>(2).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get user_id: {e}"))
+                })?,
+                agent_id: row.get::<String>(3).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
+                })?,
+                role: row
+                    .get::<String>(4)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get role: {e}")))?,
+                text: row
+                    .get::<Option<String>>(5)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get text: {e}")))?,
+                content: Self::deserialize_json(row.get::<Option<String>>(6).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get content: {e}"))
+                })?),
+                model: row.get::<Option<String>>(7).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get model: {e}"))
+                })?,
+                name: row
+                    .get::<Option<String>>(8)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                tool_calls: Self::deserialize_json(row.get::<Option<String>>(9).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_calls: {e}"))
+                })?),
+                tool_call_id: row.get::<Option<String>>(10).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get tool_call_id: {e}"))
+                })?,
+                step_id: row.get::<Option<String>>(11).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get step_id: {e}"))
+                })?,
+                otid: row
+                    .get::<Option<String>>(12)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get otid: {e}")))?,
+                tool_returns: Self::deserialize_json(row.get::<Option<String>>(13).map_err(
+                    |e| AgentMemError::StorageError(format!("Failed to get tool_returns: {e}")),
+                )?),
+                group_id: row.get::<Option<String>>(14).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get group_id: {e}"))
+                })?,
+                sender_id: row.get::<Option<String>>(15).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get sender_id: {e}"))
+                })?,
                 created_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(16).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?,
+                    row.get::<i64>(16).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
                 updated_at: chrono::DateTime::from_timestamp(
-                    row.get::<i64>(17).map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?,
+                    row.get::<i64>(17).map_err(|e| {
+                        AgentMemError::StorageError(format!("Failed to get updated_at: {e}"))
+                    })?,
                     0,
-                ).ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
-                is_deleted: row.get::<i64>(18).map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))? != 0,
-                created_by_id: row.get::<Option<String>>(19).map_err(|e| AgentMemError::StorageError(format!("Failed to get created_by_id: {e}")))?,
-                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}")))?,
+                )
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
+                is_deleted: row.get::<i64>(18).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+                })? != 0,
+                created_by_id: row.get::<Option<String>>(19).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get created_by_id: {e}"))
+                })?,
+                last_updated_by_id: row.get::<Option<String>>(20).map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}"))
+                })?,
             };
             messages.push(message);
         }
@@ -300,14 +448,16 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     async fn delete_by_agent_id(&self, agent_id: &str) -> Result<u64> {
         let conn = self.conn.lock().await;
 
-        let rows_affected = conn.execute(
-            "UPDATE messages SET is_deleted = 1 WHERE agent_id = ?",
-            libsql::params![agent_id],
-        )
-        .await
-        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete messages by agent_id: {e}")))?;
+        let rows_affected = conn
+            .execute(
+                "UPDATE messages SET is_deleted = 1 WHERE agent_id = ?",
+                libsql::params![agent_id],
+            )
+            .await
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to delete messages by agent_id: {e}"))
+            })?;
 
         Ok(rows_affected)
     }
 }
-

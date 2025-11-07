@@ -10,13 +10,15 @@
 //! - RBAC authorization
 //! - OpenAPI documentation
 
-
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use crate::orchestrator_factory::create_orchestrator;
-use agent_mem_core::storage::{factory::Repositories, models::{generate_id, Agent}};
 use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
+use agent_mem_core::storage::{
+    factory::Repositories,
+    models::{generate_id, Agent},
+};
 use axum::{
     extract::{Extension, Path, Query},
     http::StatusCode,
@@ -529,7 +531,10 @@ pub async fn send_message_to_agent(
     let orchestrator = create_orchestrator(&agent, &repositories).await?;
 
     // ✅ 构建 OrchestratorChatRequest
-    let user_id = req.user_id.clone().unwrap_or_else(|| auth_user.user_id.clone());
+    let user_id = req
+        .user_id
+        .clone()
+        .unwrap_or_else(|| auth_user.user_id.clone());
     let session_id = format!("{}_{}", user_id, uuid::Uuid::new_v4());
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
@@ -541,20 +546,20 @@ pub async fn send_message_to_agent(
         max_memories: 10,
     };
 
-    debug!("Calling orchestrator.step() with request: {:?}", orchestrator_request);
+    debug!(
+        "Calling orchestrator.step() with request: {:?}",
+        orchestrator_request
+    );
 
     // ✅ 调用 orchestrator.step()
     let orchestrator_response = orchestrator
         .step(orchestrator_request)
         .await
-        .map_err(|e| {
-            ServerError::internal_error(format!("Orchestrator failed: {}", e))
-        })?;
+        .map_err(|e| ServerError::internal_error(format!("Orchestrator failed: {}", e)))?;
 
     info!(
         "Orchestrator completed: message_id={}, memories_count={}",
-        orchestrator_response.message_id,
-        orchestrator_response.memories_count
+        orchestrator_response.message_id, orchestrator_response.memories_count
     );
 
     // ✅ 使用真实的 LLM 响应

@@ -17,26 +17,40 @@ async fn test_memory_search_basic() {
     // Test 1: Search for "pizza" - should find at least 2 memories
     let results = memory.search("pizza").await.unwrap();
 
-    println!("Search results for 'pizza': {} memories found", results.len());
+    println!(
+        "Search results for 'pizza': {} memories found",
+        results.len()
+    );
     for (i, mem) in results.iter().enumerate() {
         println!("  {}. {}", i + 1, mem.content);
     }
 
-    assert!(!results.is_empty(), "Should find at least one memory about pizza");
     assert!(
-        results.iter().any(|m| m.content.to_lowercase().contains("pizza")),
+        !results.is_empty(),
+        "Should find at least one memory about pizza"
+    );
+    assert!(
+        results
+            .iter()
+            .any(|m| m.content.to_lowercase().contains("pizza")),
         "Results should contain pizza"
     );
 
     // Test 2: Search for "food"
     let results = memory.search("food").await.unwrap();
 
-    println!("\nSearch results for 'food': {} memories found", results.len());
+    println!(
+        "\nSearch results for 'food': {} memories found",
+        results.len()
+    );
     for (i, mem) in results.iter().enumerate() {
         println!("  {}. {}", i + 1, mem.content);
     }
 
-    assert!(!results.is_empty(), "Should find at least one memory about food");
+    assert!(
+        !results.is_empty(),
+        "Should find at least one memory about food"
+    );
 
     println!("\n✅ Memory search tests passed!");
 }
@@ -47,14 +61,20 @@ async fn test_memory_search_relevance_scoring() {
     let memory = SimpleMemory::new().await.unwrap();
 
     // Add memories with different relevance to query
-    memory.add("The quick brown fox jumps over the lazy dog").await.unwrap();
+    memory
+        .add("The quick brown fox jumps over the lazy dog")
+        .await
+        .unwrap();
     memory.add("A brown fox is a type of animal").await.unwrap();
     memory.add("Dogs and cats are common pets").await.unwrap();
 
     // Search for "brown fox"
     let results = memory.search("brown fox").await.unwrap();
 
-    println!("\nSearch results for 'brown fox': {} memories found", results.len());
+    println!(
+        "\nSearch results for 'brown fox': {} memories found",
+        results.len()
+    );
     for (i, mem) in results.iter().enumerate() {
         println!("  {}. {}", i + 1, mem.content);
     }
@@ -70,4 +90,3 @@ async fn test_memory_search_relevance_scoring() {
 
     println!("✅ Relevance scoring tests passed!");
 }
-

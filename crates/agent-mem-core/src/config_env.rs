@@ -26,8 +26,8 @@
 //! - `PINECONE_API_KEY`: Pinecone API key
 //! - `WEAVIATE_URL`: Weaviate server URL
 
-use agent_mem_storage::factory::{create_factory, StorageBackend, StorageConfig};
 use agent_mem_storage::factory::AllStores;
+use agent_mem_storage::factory::{create_factory, StorageBackend, StorageConfig};
 use agent_mem_traits::Result;
 use std::env;
 
@@ -121,13 +121,12 @@ pub fn get_storage_config_from_env() -> Result<StorageConfig> {
 
     // Get connection string based on backend
     let connection = match backend {
-        StorageBackend::PostgreSQL => {
-            env::var("POSTGRES_URL").unwrap_or_else(|_| {
-                "postgresql://postgres:postgres@localhost:5432/agentmem".to_string()
-            })
-        }
+        StorageBackend::PostgreSQL => env::var("POSTGRES_URL").unwrap_or_else(|_| {
+            "postgresql://postgres:postgres@localhost:5432/agentmem".to_string()
+        }),
         StorageBackend::LibSQL => {
-            let path = env::var("AGENTMEM_DB_PATH").unwrap_or_else(|_| DEFAULT_LIBSQL_PATH.to_string());
+            let path =
+                env::var("AGENTMEM_DB_PATH").unwrap_or_else(|_| DEFAULT_LIBSQL_PATH.to_string());
             if path.starts_with("file:") || path.starts_with("libsql://") {
                 path
             } else {
@@ -248,16 +247,14 @@ pub fn get_llm_config_from_env() -> LLMEnvConfig {
 /// export AGENTMEM_EMBEDDING_MODEL="all-MiniLM-L6-v2"
 /// ```
 pub fn get_embedding_config_from_env() -> EmbeddingEnvConfig {
-    let provider = env::var("AGENTMEM_EMBEDDING_PROVIDER")
-        .ok()
-        .or_else(|| {
-            // Default to openai if API key is available
-            if env::var("OPENAI_API_KEY").is_ok() {
-                Some("openai".to_string())
-            } else {
-                None
-            }
-        });
+    let provider = env::var("AGENTMEM_EMBEDDING_PROVIDER").ok().or_else(|| {
+        // Default to openai if API key is available
+        if env::var("OPENAI_API_KEY").is_ok() {
+            Some("openai".to_string())
+        } else {
+            None
+        }
+    });
 
     let api_key = if provider.as_deref() == Some("openai") {
         env::var("OPENAI_API_KEY").ok()
@@ -348,10 +345,16 @@ mod tests {
         let config = get_storage_config_from_env().unwrap();
         assert_eq!(config.backend, StorageBackend::LibSQL);
         // Connection should be "file:agentmem.db" by default
-        assert!(config.connection.contains("agentmem.db"),
-                "Expected connection to contain 'agentmem.db', got: {}", config.connection);
-        assert!(config.connection.starts_with("file:") || config.connection.ends_with(".db"),
-                "Expected connection to start with 'file:' or end with '.db', got: {}", config.connection);
+        assert!(
+            config.connection.contains("agentmem.db"),
+            "Expected connection to contain 'agentmem.db', got: {}",
+            config.connection
+        );
+        assert!(
+            config.connection.starts_with("file:") || config.connection.ends_with(".db"),
+            "Expected connection to start with 'file:' or end with '.db', got: {}",
+            config.connection
+        );
     }
 
     #[test]
@@ -405,4 +408,3 @@ mod tests {
         env::remove_var("DATABASE_URL");
     }
 }
-

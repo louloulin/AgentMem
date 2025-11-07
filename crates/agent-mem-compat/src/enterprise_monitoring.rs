@@ -991,9 +991,7 @@ impl BackupManager {
             tokio::fs::create_dir_all(&config.backup_directory)
                 .await
                 .map_err(|e| {
-                    AgentMemError::storage_error(format!(
-                        "Failed to create backup directory: {e}"
-                    ))
+                    AgentMemError::storage_error(format!("Failed to create backup directory: {e}"))
                 })?;
         }
 
@@ -1445,9 +1443,7 @@ impl ClusterManager {
         };
 
         let message = if self.config.enabled {
-            format!(
-                "Cluster enabled, {active_nodes}/{total_nodes} nodes healthy"
-            )
+            format!("Cluster enabled, {active_nodes}/{total_nodes} nodes healthy")
         } else {
             "Cluster disabled".to_string()
         };

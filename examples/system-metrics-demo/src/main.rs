@@ -58,9 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(Duration::from_secs(3)).await;
 
         // 记录一些请求指标
-        collector
-            .record_request("GET", "/api/health", 200)
-            .await;
+        collector.record_request("GET", "/api/health", 200).await;
         collector
             .record_request_duration("GET", "/api/health", 0.005)
             .await;
@@ -69,7 +67,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         collector.set_active_connections(i * 5).await;
 
         // 设置应用内存使用（模拟）
-        collector.set_memory_usage(1024 * 1024 * (100 + i * 10) as u64).await;
+        collector
+            .set_memory_usage(1024 * 1024 * (100 + i * 10) as u64)
+            .await;
 
         info!("📈 已记录第 {} 次请求指标", i);
     }
@@ -95,4 +95,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

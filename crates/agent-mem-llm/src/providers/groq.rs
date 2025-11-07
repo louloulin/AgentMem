@@ -96,9 +96,7 @@ impl GroqProvider {
         let client = Client::builder()
             .timeout(Duration::from_secs(30)) // Groq 以速度著称，30秒足够
             .build()
-            .map_err(|e| {
-                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::llm_error(format!("Failed to create HTTP client: {e}")))?;
 
         let base_url = config
             .base_url

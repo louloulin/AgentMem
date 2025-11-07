@@ -2,7 +2,7 @@
 //!
 //! This crate provides Python bindings for AgentMem using PyO3.
 
-use agent_mem::{Memory as RustMemory, AddResult, GetAllOptions, DeleteAllOptions};
+use agent_mem::{AddResult, DeleteAllOptions, GetAllOptions, Memory as RustMemory};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Python wrapper for Memory
 #[pyclass(name = "Memory")]
 struct PyMemory {
-    inner: RustMemory,  // Memory already implements Clone
+    inner: RustMemory, // Memory already implements Clone
 }
 
 #[pymethods]
@@ -33,15 +33,13 @@ impl PyMemory {
     ///
     /// Returns:
     ///     str: Memory ID
-    fn add<'py>(
-        &self,
-        py: Python<'py>,
-        content: String,
-    ) -> PyResult<&'py PyAny> {
+    fn add<'py>(&self, py: Python<'py>, content: String) -> PyResult<&'py PyAny> {
         let memory = self.inner.clone();
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let result: AddResult = memory.add(&content).await
+            let result: AddResult = memory
+                .add(&content)
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to add memory: {}", e)))?;
 
             // Return the first memory ID from results
@@ -60,15 +58,13 @@ impl PyMemory {
     ///
     /// Returns:
     ///     list: List of matching memories
-    fn search<'py>(
-        &self,
-        py: Python<'py>,
-        query: String,
-    ) -> PyResult<&'py PyAny> {
+    fn search<'py>(&self, py: Python<'py>, query: String) -> PyResult<&'py PyAny> {
         let memory = self.inner.clone();
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let results = memory.search(&query).await
+            let results = memory
+                .search(&query)
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to search: {}", e)))?;
 
             // Convert to Python-friendly format
@@ -91,14 +87,13 @@ impl PyMemory {
     ///
     /// Returns:
     ///     list: List of all memories
-    fn get_all<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<&'py PyAny> {
+    fn get_all<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let memory = self.inner.clone();
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let results = memory.get_all(GetAllOptions::default()).await
+            let results = memory
+                .get_all(GetAllOptions::default())
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to get all: {}", e)))?;
 
             let py_results: Vec<HashMap<String, String>> = results
@@ -123,15 +118,13 @@ impl PyMemory {
     ///
     /// Returns:
     ///     bool: Success status
-    fn delete<'py>(
-        &self,
-        py: Python<'py>,
-        memory_id: String,
-    ) -> PyResult<&'py PyAny> {
+    fn delete<'py>(&self, py: Python<'py>, memory_id: String) -> PyResult<&'py PyAny> {
         let memory = self.inner.clone();
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            memory.delete(&memory_id).await
+            memory
+                .delete(&memory_id)
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to delete: {}", e)))?;
 
             Ok(true)
@@ -142,14 +135,13 @@ impl PyMemory {
     ///
     /// Returns:
     ///     int: Number of deleted memories
-    fn clear<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<&'py PyAny> {
+    fn clear<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let memory = self.inner.clone();
 
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let count = memory.delete_all(DeleteAllOptions::default()).await
+            let count = memory
+                .delete_all(DeleteAllOptions::default())
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear: {}", e)))?;
 
             Ok(count)

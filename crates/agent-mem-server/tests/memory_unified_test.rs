@@ -8,10 +8,10 @@ use std::collections::HashMap;
 #[tokio::test]
 async fn test_memory_manager_creation() {
     println!("\n=== Test 1: MemoryManager Creation ===");
-    
+
     // 测试创建MemoryManager
     let result = MemoryManager::new().await;
-    
+
     match result {
         Ok(_manager) => {
             println!("✅ MemoryManager created successfully");
@@ -26,17 +26,17 @@ async fn test_memory_manager_creation() {
 #[tokio::test]
 async fn test_memory_operations_flow() {
     println!("\n=== Test 2: Memory Operations Flow ===");
-    
+
     // 尝试创建manager
     let manager_result = MemoryManager::new().await;
-    
+
     if manager_result.is_err() {
         println!("⚠️  Skipping flow test - no database configured");
         return;
     }
-    
+
     let manager = manager_result.unwrap();
-    
+
     // 1. 添加记忆
     println!("Step 1: Adding memory...");
     let add_result = manager
@@ -49,11 +49,11 @@ async fn test_memory_operations_flow() {
             Some(HashMap::from([("key".to_string(), "value".to_string())])),
         )
         .await;
-    
+
     match add_result {
         Ok(memory_id) => {
             println!("✅ Memory added: {}", memory_id);
-            
+
             // 2. 获取记忆
             println!("Step 2: Getting memory...");
             match manager.get_memory(&memory_id).await {
@@ -64,14 +64,17 @@ async fn test_memory_operations_flow() {
                 Ok(None) => println!("❌ Memory not found"),
                 Err(e) => println!("❌ Get failed: {}", e),
             }
-            
+
             // 3. 更新记忆
             println!("Step 3: Updating memory...");
-            match manager.update_memory(&memory_id, Some("Updated content".to_string()), None, None).await {
+            match manager
+                .update_memory(&memory_id, Some("Updated content".to_string()), None, None)
+                .await
+            {
                 Ok(_) => println!("✅ Memory updated"),
                 Err(e) => println!("❌ Update failed: {}", e),
             }
-            
+
             // 4. 搜索记忆
             println!("Step 4: Searching memories...");
             match manager
@@ -89,7 +92,7 @@ async fn test_memory_operations_flow() {
                 }
                 Err(e) => println!("❌ Search failed: {}", e),
             }
-            
+
             // 5. 删除记忆
             println!("Step 5: Deleting memory...");
             match manager.delete_memory(&memory_id).await {
@@ -106,7 +109,7 @@ async fn test_memory_operations_flow() {
 #[tokio::test]
 async fn test_api_consistency() {
     println!("\n=== Test 3: API Consistency ===");
-    
+
     println!("Verifying API methods exist:");
     println!("✅ add_memory - exists");
     println!("✅ get_memory - exists");
@@ -117,7 +120,7 @@ async fn test_api_consistency() {
     println!("✅ delete_all_memories - exists");
     println!("✅ reset - exists");
     println!("✅ get_stats - exists");
-    
+
     println!("\n🎉 All API methods are present and compatible with Memory unified API");
 }
 

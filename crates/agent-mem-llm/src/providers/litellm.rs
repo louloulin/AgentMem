@@ -302,9 +302,7 @@ impl LiteLLMProvider {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AgentMemError::LLMError(format!(
-                "API error: {error_text}"
-            )));
+            return Err(AgentMemError::LLMError(format!("API error: {error_text}")));
         }
 
         let llm_response: LiteLLMResponse = response

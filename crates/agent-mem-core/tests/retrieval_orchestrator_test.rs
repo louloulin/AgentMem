@@ -36,7 +36,10 @@ async fn test_retrieval_orchestrator_basic() {
         response.memories.len() <= 10,
         "Should not exceed max_results"
     );
-    assert!(response.processing_time_ms > 0, "Should have processing time");
+    assert!(
+        response.processing_time_ms > 0,
+        "Should have processing time"
+    );
     assert!(
         response.confidence_score >= 0.0 && response.confidence_score <= 1.0,
         "Confidence score should be between 0 and 1"
@@ -136,10 +139,7 @@ async fn test_retrieval_orchestrator_relevance_scoring() {
     println!("✅ Relevance scoring test passed");
     println!("   Retrieved {} memories", response.memories.len());
     if !response.memories.is_empty() {
-        println!(
-            "   Top score: {:.3}",
-            response.memories[0].relevance_score
-        );
+        println!("   Top score: {:.3}", response.memories[0].relevance_score);
         println!(
             "   Lowest score: {:.3}",
             response.memories.last().unwrap().relevance_score
@@ -281,6 +281,8 @@ async fn test_retrieval_orchestrator_metadata() {
     }
 
     println!("✅ Metadata test passed");
-    println!("   All {} memories have complete metadata", response.memories.len());
+    println!(
+        "   All {} memories have complete metadata",
+        response.memories.len()
+    );
 }
-

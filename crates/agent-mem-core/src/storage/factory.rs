@@ -103,12 +103,8 @@ impl RepositoryFactory {
     /// ```
     pub async fn create_repositories(config: &DatabaseConfig) -> Result<Repositories> {
         match config.backend {
-            DatabaseBackend::LibSql => {
-                Self::create_libsql_repositories(config).await
-            }
-            DatabaseBackend::Postgres => {
-                Self::create_postgres_repositories(config).await
-            }
+            DatabaseBackend::LibSql => Self::create_libsql_repositories(config).await,
+            DatabaseBackend::Postgres => Self::create_postgres_repositories(config).await,
         }
     }
 
@@ -118,15 +114,15 @@ impl RepositoryFactory {
         use agent_mem_traits::AgentMemError;
 
         // Create connection pool
-        let conn = create_libsql_pool(&config.url)
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}")))?;
+        let conn = create_libsql_pool(&config.url).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}"))
+        })?;
 
         // Run migrations if auto_migrate is enabled
         if config.auto_migrate {
-            run_migrations(conn.clone())
-                .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {e}")))?;
+            run_migrations(conn.clone()).await.map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to run migrations: {e}"))
+            })?;
         }
 
         // Create repository instances
@@ -155,7 +151,8 @@ impl RepositoryFactory {
     async fn create_libsql_repositories(_config: &DatabaseConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
         Err(AgentMemError::ConfigError(
-            "LibSQL support is not enabled. Enable the 'libsql' feature to use LibSQL backend.".to_string()
+            "LibSQL support is not enabled. Enable the 'libsql' feature to use LibSQL backend."
+                .to_string(),
         ))
     }
 
@@ -169,25 +166,36 @@ impl RepositoryFactory {
         let pool = PgPoolOptions::new()
             .max_connections(config.pool.max_connections)
             .min_connections(config.pool.min_connections)
-            .acquire_timeout(std::time::Duration::from_secs(config.pool.acquire_timeout_seconds))
-            .idle_timeout(Some(std::time::Duration::from_secs(config.pool.idle_timeout_seconds)))
-            .max_lifetime(Some(std::time::Duration::from_secs(config.pool.max_lifetime_seconds)))
+            .acquire_timeout(std::time::Duration::from_secs(
+                config.pool.acquire_timeout_seconds,
+            ))
+            .idle_timeout(Some(std::time::Duration::from_secs(
+                config.pool.idle_timeout_seconds,
+            )))
+            .max_lifetime(Some(std::time::Duration::from_secs(
+                config.pool.max_lifetime_seconds,
+            )))
             .connect(&config.url)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create PostgreSQL pool: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create PostgreSQL pool: {}", e))
+            })?;
 
         // Run migrations if auto_migrate is enabled
         if config.auto_migrate {
             // Use our internal Rust-based migrations module
             crate::storage::migrations::run_migrations(&pool)
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {}", e)))?;
+                .map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to run migrations: {}", e))
+                })?;
         }
 
         // PostgreSQL repositories are under refactor and not yet implementing traits.
         // Return a clear error to callers for now.
         Err(AgentMemError::ConfigError(
-            "PostgreSQL repositories are not yet implemented for the new trait-based factory.".to_string(),
+            "PostgreSQL repositories are not yet implemented for the new trait-based factory."
+                .to_string(),
         ))
     }
 
@@ -224,7 +232,11 @@ mod tests {
         };
 
         let repos = RepositoryFactory::create_repositories(&config).await;
-        assert!(repos.is_ok(), "Failed to create LibSQL repositories: {:?}", repos.err());
+        assert!(
+            repos.is_ok(),
+            "Failed to create LibSQL repositories: {:?}",
+            repos.err()
+        );
 
         let repos = repos.unwrap();
 
@@ -250,26 +262,36 @@ mod tests {
             slow_query_threshold_ms: 1000,
         };
 
-        let repos = RepositoryFactory::create_repositories(&config).await.unwrap();
+        let repos = RepositoryFactory::create_repositories(&config)
+            .await
+            .unwrap();
 
         // Verify migrations ran by checking we can create an organization first
         use crate::storage::models::{Organization, User};
-        
+
         // Create organization first (required for foreign key constraint)
         let org = Organization::new("Test Org".to_string());
         let org_result = repos.organizations.create(&org).await;
-        assert!(org_result.is_ok(), "Failed to create organization after migration: {:?}", org_result.err());
-        
+        assert!(
+            org_result.is_ok(),
+            "Failed to create organization after migration: {:?}",
+            org_result.err()
+        );
+
         // Now create user with the organization ID
         let user = User::new(
             org.id.clone(),
             "Test User".to_string(),
             "test@example.com".to_string(),
             "password_hash".to_string(),
-            "UTC".to_string()
+            "UTC".to_string(),
         );
         let result = repos.users.create(&user).await;
-        assert!(result.is_ok(), "Failed to create user after migration: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to create user after migration: {:?}",
+            result.err()
+        );
     }
 
     #[tokio::test]
@@ -289,7 +311,9 @@ mod tests {
             slow_query_threshold_ms: 1000,
         };
 
-        let repos = RepositoryFactory::create_repositories(&config).await.unwrap();
+        let repos = RepositoryFactory::create_repositories(&config)
+            .await
+            .unwrap();
 
         // Without migrations, creating a user should fail
         use crate::storage::models::User;
@@ -298,10 +322,13 @@ mod tests {
             "Test User".to_string(),
             "test@example.com".to_string(),
             "password_hash".to_string(),
-            "UTC".to_string()
+            "UTC".to_string(),
         );
         let result = repos.users.create(&user).await;
-        assert!(result.is_err(), "Expected error without migrations, but got success");
+        assert!(
+            result.is_err(),
+            "Expected error without migrations, but got success"
+        );
     }
 
     #[tokio::test]
@@ -318,7 +345,10 @@ mod tests {
 
         let result = RepositoryFactory::create_repositories(&config).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("LibSQL support is not enabled"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("LibSQL support is not enabled"));
     }
 
     #[tokio::test]
@@ -419,12 +449,8 @@ impl StorageFactory {
     /// - Vector store initialization fails
     pub async fn create(mode: DeploymentMode) -> Result<Repositories> {
         match mode {
-            DeploymentMode::Embedded(config) => {
-                Self::create_embedded(config).await
-            }
-            DeploymentMode::Server(config) => {
-                Self::create_server(config).await
-            }
+            DeploymentMode::Embedded(config) => Self::create_embedded(config).await,
+            DeploymentMode::Server(config) => Self::create_server(config).await,
         }
     }
 
@@ -444,7 +470,9 @@ impl StorageFactory {
         // 1. Create LibSQL connection
         let conn = create_libsql_pool(&config.database_path.to_string_lossy())
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}"))
+            })?;
 
         // 2. Run migrations
         run_migrations(conn.clone())
@@ -474,7 +502,8 @@ impl StorageFactory {
     async fn create_embedded(_config: EmbeddedModeConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
         Err(AgentMemError::ConfigError(
-            "LibSQL support is not enabled. Enable the 'libsql' feature to use embedded mode.".to_string()
+            "LibSQL support is not enabled. Enable the 'libsql' feature to use embedded mode."
+                .to_string(),
         ))
     }
 
@@ -496,12 +525,20 @@ impl StorageFactory {
         let pool = PgPoolOptions::new()
             .max_connections(config.pool_config.max_connections)
             .min_connections(config.pool_config.min_connections)
-            .acquire_timeout(std::time::Duration::from_secs(config.pool_config.connect_timeout_seconds))
-            .idle_timeout(Some(std::time::Duration::from_secs(config.pool_config.idle_timeout_seconds)))
-            .max_lifetime(Some(std::time::Duration::from_secs(config.pool_config.max_lifetime_seconds)))
+            .acquire_timeout(std::time::Duration::from_secs(
+                config.pool_config.connect_timeout_seconds,
+            ))
+            .idle_timeout(Some(std::time::Duration::from_secs(
+                config.pool_config.idle_timeout_seconds,
+            )))
+            .max_lifetime(Some(std::time::Duration::from_secs(
+                config.pool_config.max_lifetime_seconds,
+            )))
             .connect(&config.database_url)
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create PostgreSQL pool: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create PostgreSQL pool: {}", e))
+            })?;
 
         // 2. Run migrations
         crate::storage::migrations::run_migrations(&pool)
@@ -511,7 +548,8 @@ impl StorageFactory {
         // 3. PostgreSQL repositories are under refactor
         // Return a clear error until they implement the new traits
         Err(AgentMemError::ConfigError(
-            "PostgreSQL repositories are not yet implemented for the new trait-based factory.".to_string(),
+            "PostgreSQL repositories are not yet implemented for the new trait-based factory."
+                .to_string(),
         ))
     }
 
@@ -520,7 +558,8 @@ impl StorageFactory {
     async fn create_server(_config: ServerModeConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
         Err(AgentMemError::ConfigError(
-            "PostgreSQL support is not enabled. Enable the 'postgres' feature to use server mode.".to_string()
+            "PostgreSQL support is not enabled. Enable the 'postgres' feature to use server mode."
+                .to_string(),
         ))
     }
 }
@@ -541,7 +580,11 @@ mod storage_factory_tests {
         let mode = DeploymentMode::embedded(data_root);
         let repos = StorageFactory::create(mode).await;
 
-        assert!(repos.is_ok(), "Failed to create embedded storage: {:?}", repos.err());
+        assert!(
+            repos.is_ok(),
+            "Failed to create embedded storage: {:?}",
+            repos.err()
+        );
 
         let repos = repos.unwrap();
 
@@ -553,9 +596,8 @@ mod storage_factory_tests {
     #[tokio::test]
     #[cfg(feature = "libsql")]
     async fn test_storage_factory_embedded_with_custom_config() {
-        use tempfile::TempDir;
         use agent_mem_config::EmbeddedModeConfig;
-        
+        use tempfile::TempDir;
 
         let temp_dir = TempDir::new().unwrap();
 
@@ -570,14 +612,18 @@ mod storage_factory_tests {
         let mode = DeploymentMode::Embedded(config);
         let repos = StorageFactory::create(mode).await;
 
-        assert!(repos.is_ok(), "Failed to create embedded storage with custom config: {:?}", repos.err());
+        assert!(
+            repos.is_ok(),
+            "Failed to create embedded storage with custom config: {:?}",
+            repos.err()
+        );
     }
 
     #[tokio::test]
     #[cfg(feature = "libsql")]
     async fn test_storage_factory_embedded_creates_tables() {
-        use tempfile::TempDir;
         use crate::storage::models::{Organization, User};
+        use tempfile::TempDir;
 
         let temp_dir = TempDir::new().unwrap();
         let mode = DeploymentMode::embedded(temp_dir.path());
@@ -593,7 +639,7 @@ mod storage_factory_tests {
             "Test User".to_string(),
             "test@example.com".to_string(),
             "password_hash".to_string(),
-            "UTC".to_string()
+            "UTC".to_string(),
         );
 
         let result = repos.users.create(&user).await;
@@ -618,15 +664,17 @@ mod storage_factory_tests {
         let result = StorageFactory::create(mode).await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("LibSQL support is not enabled"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("LibSQL support is not enabled"));
     }
 
     #[tokio::test]
     #[cfg(not(feature = "postgres"))]
     async fn test_storage_factory_server_feature_disabled() {
-        let mode = DeploymentMode::server_with_pgvector(
-            "postgresql://localhost:5432/test".to_string()
-        );
+        let mode =
+            DeploymentMode::server_with_pgvector("postgresql://localhost:5432/test".to_string());
 
         let result = StorageFactory::create(mode).await;
 
@@ -640,7 +688,7 @@ mod storage_factory_tests {
     #[cfg(feature = "postgres")]
     async fn test_storage_factory_server_not_yet_implemented() {
         let mode = DeploymentMode::server_with_pgvector(
-            "postgresql://localhost:5432/agentmem".to_string()
+            "postgresql://localhost:5432/agentmem".to_string(),
         );
 
         let result = StorageFactory::create(mode).await;
@@ -686,6 +734,3 @@ mod storage_factory_tests {
         let _ = &repos.associations;
     }
 }
-
-
-

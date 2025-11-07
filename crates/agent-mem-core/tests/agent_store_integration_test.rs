@@ -2,7 +2,9 @@
 //!
 //! Tests that agents correctly use the trait-based storage backends
 
-use agent_mem_core::agents::{CoreAgent, EpisodicAgent, ProceduralAgent, SemanticAgent, WorkingAgent};
+use agent_mem_core::agents::{
+    CoreAgent, EpisodicAgent, ProceduralAgent, SemanticAgent, WorkingAgent,
+};
 use agent_mem_traits::{
     CoreMemoryItem, CoreMemoryStore, EpisodicEvent, EpisodicMemoryStore, EpisodicQuery,
     ProceduralMemoryItem, ProceduralMemoryStore, ProceduralQuery, Result, SemanticMemoryItem,
@@ -43,7 +45,11 @@ impl EpisodicMemoryStore for MockEpisodicStore {
         Ok(events.iter().find(|e| e.id == event_id).cloned())
     }
 
-    async fn query_events(&self, user_id: &str, query: EpisodicQuery) -> Result<Vec<EpisodicEvent>> {
+    async fn query_events(
+        &self,
+        user_id: &str,
+        query: EpisodicQuery,
+    ) -> Result<Vec<EpisodicEvent>> {
         let events = self.events.lock().unwrap();
         let mut filtered: Vec<EpisodicEvent> = events
             .iter()
@@ -110,7 +116,12 @@ impl EpisodicMemoryStore for MockEpisodicStore {
         }
     }
 
-    async fn update_importance(&self, event_id: &str, _user_id: &str, importance_score: f32) -> Result<bool> {
+    async fn update_importance(
+        &self,
+        event_id: &str,
+        _user_id: &str,
+        importance_score: f32,
+    ) -> Result<bool> {
         let mut events = self.events.lock().unwrap();
         if let Some(event) = events.iter_mut().find(|e| e.id == event_id) {
             event.importance_score = importance_score;
@@ -181,7 +192,11 @@ impl SemanticMemoryStore for MockSemanticStore {
         Ok(items.iter().find(|i| i.id == item_id).cloned())
     }
 
-    async fn query_items(&self, user_id: &str, query: SemanticQuery) -> Result<Vec<SemanticMemoryItem>> {
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: SemanticQuery,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         let mut filtered: Vec<SemanticMemoryItem> = items
             .iter()
@@ -231,7 +246,11 @@ impl SemanticMemoryStore for MockSemanticStore {
         }
     }
 
-    async fn search_by_tree_path(&self, user_id: &str, tree_path: Vec<String>) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_tree_path(
+        &self,
+        user_id: &str,
+        tree_path: Vec<String>,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         Ok(items
             .iter()
@@ -241,7 +260,12 @@ impl SemanticMemoryStore for MockSemanticStore {
             .collect())
     }
 
-    async fn search_by_name(&self, user_id: &str, name_pattern: &str, limit: i64) -> Result<Vec<SemanticMemoryItem>> {
+    async fn search_by_name(
+        &self,
+        user_id: &str,
+        name_pattern: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticMemoryItem>> {
         let items = self.items.lock().unwrap();
         let mut filtered: Vec<SemanticMemoryItem> = items
             .iter()
@@ -427,12 +451,20 @@ impl ProceduralMemoryStore for MockProceduralStore {
         Ok(item)
     }
 
-    async fn get_item(&self, item_id: &str, _user_id: &str) -> Result<Option<ProceduralMemoryItem>> {
+    async fn get_item(
+        &self,
+        item_id: &str,
+        _user_id: &str,
+    ) -> Result<Option<ProceduralMemoryItem>> {
         let items = self.items.lock().unwrap();
         Ok(items.iter().find(|i| i.id == item_id).cloned())
     }
 
-    async fn query_items(&self, user_id: &str, query: ProceduralQuery) -> Result<Vec<ProceduralMemoryItem>> {
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: ProceduralQuery,
+    ) -> Result<Vec<ProceduralMemoryItem>> {
         let items = self.items.lock().unwrap();
         let mut filtered: Vec<ProceduralMemoryItem> = items
             .iter()
@@ -481,9 +513,17 @@ impl ProceduralMemoryStore for MockProceduralStore {
         }
     }
 
-    async fn update_execution_stats(&self, item_id: &str, user_id: &str, success: bool) -> Result<bool> {
+    async fn update_execution_stats(
+        &self,
+        item_id: &str,
+        user_id: &str,
+        success: bool,
+    ) -> Result<bool> {
         let mut items = self.items.lock().unwrap();
-        if let Some(item) = items.iter_mut().find(|i| i.id == item_id && i.user_id == user_id) {
+        if let Some(item) = items
+            .iter_mut()
+            .find(|i| i.id == item_id && i.user_id == user_id)
+        {
             let old_count = item.execution_count as f32;
             let old_rate = item.success_rate;
             item.execution_count += 1;
@@ -545,12 +585,19 @@ impl CoreMemoryStore for MockCoreStore {
     async fn get_value(&self, user_id: &str, key: &str) -> Result<Option<CoreMemoryItem>> {
         let items = self.items.lock().unwrap();
         let lookup_key = format!("{}:*:{}", user_id, key);
-        Ok(items.values().find(|i| i.user_id == user_id && i.key == key).cloned())
+        Ok(items
+            .values()
+            .find(|i| i.user_id == user_id && i.key == key)
+            .cloned())
     }
 
     async fn get_all(&self, user_id: &str) -> Result<Vec<CoreMemoryItem>> {
         let items = self.items.lock().unwrap();
-        Ok(items.values().filter(|i| i.user_id == user_id).cloned().collect())
+        Ok(items
+            .values()
+            .filter(|i| i.user_id == user_id)
+            .cloned()
+            .collect())
     }
 
     async fn get_by_category(&self, user_id: &str, category: &str) -> Result<Vec<CoreMemoryItem>> {
@@ -651,7 +698,11 @@ impl WorkingMemoryStore for MockWorkingStore {
         Ok((before_len - items.len()) as i64)
     }
 
-    async fn get_by_priority(&self, session_id: &str, min_priority: i32) -> Result<Vec<WorkingMemoryItem>> {
+    async fn get_by_priority(
+        &self,
+        session_id: &str,
+        min_priority: i32,
+    ) -> Result<Vec<WorkingMemoryItem>> {
         let items = self.items.lock().unwrap();
         let now = Utc::now();
         let mut filtered: Vec<WorkingMemoryItem> = items
@@ -722,7 +773,10 @@ async fn test_mock_procedural_store_operations() {
     assert_eq!(retrieved.unwrap().skill_name, "test_skill");
 
     // Test update execution stats
-    let updated = store.update_execution_stats("proc-1", "user-1", true).await.unwrap();
+    let updated = store
+        .update_execution_stats("proc-1", "user-1", true)
+        .await
+        .unwrap();
     assert!(updated);
 
     // Test query
@@ -871,4 +925,3 @@ async fn test_mock_working_store_operations() {
     let cleared = store.clear_session("session-1").await.unwrap();
     assert_eq!(cleared, 1);
 }
-

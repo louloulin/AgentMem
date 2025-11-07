@@ -3,9 +3,9 @@
 //! 演示如何使用 OpenAI Vision 和 Whisper API 进行多模态内容处理
 
 use agent_mem_intelligence::multimodal::{
-    AIModelConfig, AudioFormat, AudioTranscriptionRequest, DetailLevel,
-    ImageAnalysisRequest, ImageAnalysisTask, OpenAIVisionClient, OpenAIWhisperClient,
-    VideoAnalysisRequest, VideoAnalyzer, VideoAnalyzerConfig,
+    AIModelConfig, AudioFormat, AudioTranscriptionRequest, DetailLevel, ImageAnalysisRequest,
+    ImageAnalysisTask, OpenAIVisionClient, OpenAIWhisperClient, VideoAnalysisRequest,
+    VideoAnalyzer, VideoAnalyzerConfig,
 };
 use base64::{engine::general_purpose, Engine as _};
 use tracing::Level;
@@ -14,9 +14,7 @@ use tracing_subscriber;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化 tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     println!("=== 多模态 AI 功能演示 ===\n");
 
@@ -39,7 +37,7 @@ async fn demo_vision_api() -> Result<(), Box<dyn std::error::Error>> {
 
     // 检查是否有 API 密钥
     let api_key = std::env::var("OPENAI_API_KEY").ok();
-    
+
     if api_key.is_none() {
         println!("⚠️  未设置 OPENAI_API_KEY 环境变量");
         println!("   提示: export OPENAI_API_KEY='your-api-key'");
@@ -90,19 +88,19 @@ async fn demo_vision_api() -> Result<(), Box<dyn std::error::Error>> {
         Ok(response) => {
             println!("\n✓ 图像分析成功!");
             println!("  置信度: {:.2}", response.confidence);
-            
+
             if let Some(desc) = &response.scene_description {
                 println!("\n  场景描述:");
                 println!("    {}", desc);
             }
-            
+
             if !response.objects.is_empty() {
                 println!("\n  检测到的对象 ({}):", response.objects.len());
                 for obj in &response.objects {
                     println!("    - {}: {:.2}%", obj.name, obj.confidence * 100.0);
                 }
             }
-            
+
             if !response.labels.is_empty() {
                 println!("\n  标签 ({}):", response.labels.len());
                 for label in &response.labels {
@@ -142,7 +140,7 @@ async fn demo_whisper_api() -> Result<(), Box<dyn std::error::Error>> {
 
     // 检查是否有 API 密钥
     let api_key = std::env::var("OPENAI_API_KEY").ok();
-    
+
     if api_key.is_none() {
         println!("⚠️  未设置 OPENAI_API_KEY 环境变量");
         println!("   跳过真实 API 调用演示\n");
@@ -218,7 +216,7 @@ async fn demo_video_analyzer() -> Result<(), Box<dyn std::error::Error>> {
 
     // 检查是否有 API 密钥
     let api_key = std::env::var("OPENAI_API_KEY").ok();
-    
+
     if api_key.is_none() {
         println!("⚠️  未设置 OPENAI_API_KEY 环境变量");
         println!("   跳过视频分析演示\n");
@@ -267,7 +265,7 @@ async fn demo_video_analyzer() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n⚠️  注意: 视频分析将调用多次 OpenAI API");
     println!("   跳过真实 API 调用，使用模拟结果");
-    
+
     demo_video_analyzer_mock().await?;
 
     println!();
@@ -299,14 +297,13 @@ fn create_test_image() -> String {
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG 签名
         0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
-        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE,
-        0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
-        0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
-        0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB4,
-        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44,
+        0x41, 0x54, // IDAT chunk
+        0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D,
+        0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
         0xAE, 0x42, 0x60, 0x82,
     ];
-    
+
     general_purpose::STANDARD.encode(&png_data)
 }
 
@@ -326,7 +323,6 @@ fn create_test_audio() -> String {
         0x64, 0x61, 0x74, 0x61, // "data"
         0x00, 0x00, 0x00, 0x00, // 数据大小（0）
     ];
-    
+
     general_purpose::STANDARD.encode(&wav_data)
 }
-

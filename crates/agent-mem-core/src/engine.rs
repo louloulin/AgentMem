@@ -187,43 +187,63 @@ impl MemoryEngine {
         scope: Option<MemoryScope>,
         limit: Option<usize>,
     ) -> crate::CoreResult<Vec<Memory>> {
-        info!("Searching memories: query='{}', scope={:?}, limit={:?}", query, scope, limit);
+        info!(
+            "Searching memories: query='{}', scope={:?}, limit={:?}",
+            query, scope, limit
+        );
 
         // ✅ 优先使用 LibSQL Repository（持久化存储）
         if let Some(memory_repo) = &self.memory_repository {
             info!("Using LibSQL memory repository for persistent search");
-            
+
             // 提取scope信息用于过滤和加权
             let (agent_id, target_user_id, target_session_id) = match &scope {
                 Some(MemoryScope::Agent(id)) => (Some(id.as_str()), None, None),
                 Some(MemoryScope::User { agent_id, user_id }) => {
                     (Some(agent_id.as_str()), Some(user_id.as_str()), None)
                 }
-                Some(MemoryScope::Session { agent_id, user_id, session_id }) => {
-                    (Some(agent_id.as_str()), Some(user_id.as_str()), Some(session_id.as_str()))
-                }
+                Some(MemoryScope::Session {
+                    agent_id,
+                    user_id,
+                    session_id,
+                }) => (
+                    Some(agent_id.as_str()),
+                    Some(user_id.as_str()),
+                    Some(session_id.as_str()),
+                ),
                 _ => (None, None, None),
             };
-            
+
             let fetch_limit = limit.unwrap_or(100) as i64;
-            
+
             // 根据scope获取记忆
             let db_memories = if let Some(uid) = target_user_id {
                 // 优先按user_id过滤（同一用户的记忆）
-                memory_repo.find_by_user_id(uid, fetch_limit).await
+                memory_repo
+                    .find_by_user_id(uid, fetch_limit)
+                    .await
                     .map_err(|e| crate::CoreError::Storage(e.to_string()))?
             } else if let Some(aid) = agent_id {
                 // 回退到agent_id过滤
-                memory_repo.find_by_agent_id(aid, fetch_limit).await
+                memory_repo
+                    .find_by_agent_id(aid, fetch_limit)
+                    .await
                     .map_err(|e| crate::CoreError::Storage(e.to_string()))?
             } else {
-                memory_repo.list(0, fetch_limit).await
+                memory_repo
+                    .list(0, fetch_limit)
+                    .await
                     .map_err(|e| crate::CoreError::Storage(e.to_string()))?
             };
-            
-            info!("Found {} memories from LibSQL (agent={:?}, user={:?}, session={:?})", 
-                  db_memories.len(), agent_id, target_user_id, target_session_id);
-            
+
+            info!(
+                "Found {} memories from LibSQL (agent={:?}, user={:?}, session={:?})",
+                db_memories.len(),
+                agent_id,
+                target_user_id,
+                target_session_id
+            );
+
             // 转换为 Memory (MemoryItem) 类型并计算相关性
             let mut scored_memories: Vec<(Memory, f64)> = db_memories
                 .into_iter()
@@ -318,14 +338,19 @@ impl MemoryEngine {
                     (memory, final_score)
                 })
                 .collect();
-            
-            info!("📊 Collected {} memories with weighted scores", scored_memories.len());
-            
+
+            info!(
+                "📊 Collected {} memories with weighted scores",
+                scored_memories.len()
+            );
+
             // 按最终分数排序
             scored_memories.sort_by(|(_, score_a), (_, score_b)| {
-                score_b.partial_cmp(score_a).unwrap_or(std::cmp::Ordering::Equal)
+                score_b
+                    .partial_cmp(score_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
-            
+
             // 应用限制并设置分数
             let final_memories: Vec<Memory> = scored_memories
                 .into_iter()
@@ -335,14 +360,17 @@ impl MemoryEngine {
                     mem
                 })
                 .collect();
-            
-            info!("Returning {} memories from LibSQL (after ranking and limit)", final_memories.len());
+
+            info!(
+                "Returning {} memories from LibSQL (after ranking and limit)",
+                final_memories.len()
+            );
             return Ok(final_memories);
         }
 
         // ⚠️ Fallback: 使用内存层级管理器（当没有repository时）
         warn!("No LibSQL repository available, falling back to hierarchy_manager (may be empty!)");
-        
+
         // Get all memories from hierarchy based on scope
         let mut all_memories = Vec::new();
 
@@ -357,7 +385,10 @@ impl MemoryEngine {
             all_memories.extend(level_memories.into_iter().map(|hm| hm.memory));
         }
 
-        debug!("Found {} total memories before filtering", all_memories.len());
+        debug!(
+            "Found {} total memories before filtering",
+            all_memories.len()
+        );
 
         // Apply scope filtering if specified
         let filtered_memories = if let Some(scope) = scope {
@@ -369,7 +400,10 @@ impl MemoryEngine {
             all_memories
         };
 
-        debug!("Found {} memories after scope filtering", filtered_memories.len());
+        debug!(
+            "Found {} memories after scope filtering",
+            filtered_memories.len()
+        );
 
         // Perform text-based search and ranking
         let mut scored_memories: Vec<(Memory, f64)> = filtered_memories
@@ -410,12 +444,13 @@ impl MemoryEngine {
         match scope {
             MemoryScope::Global => true,
             MemoryScope::Agent(agent_id) => &memory.agent_id == agent_id,
-            MemoryScope::User {
-                agent_id,
-                user_id,
-            } => {
+            MemoryScope::User { agent_id, user_id } => {
                 &memory.agent_id == agent_id
-                    && memory.user_id.as_ref().map(|uid| uid == user_id).unwrap_or(false)
+                    && memory
+                        .user_id
+                        .as_ref()
+                        .map(|uid| uid == user_id)
+                        .unwrap_or(false)
             }
             MemoryScope::Session {
                 agent_id,
@@ -423,7 +458,11 @@ impl MemoryEngine {
                 session_id,
             } => {
                 &memory.agent_id == agent_id
-                    && memory.user_id.as_ref().map(|uid| uid == user_id).unwrap_or(false)
+                    && memory
+                        .user_id
+                        .as_ref()
+                        .map(|uid| uid == user_id)
+                        .unwrap_or(false)
                     && memory
                         .metadata
                         .get("session_id")
@@ -446,26 +485,26 @@ impl MemoryEngine {
 
         // ✅ 改进：支持中文和英文的混合匹配
         // 对于中文，按字符匹配；对于英文，按单词匹配
-        
+
         // 方法1: 简单字符重叠（适用于中文）
         let query_chars: Vec<char> = query_lower.chars().filter(|c| !c.is_whitespace()).collect();
         if query_chars.is_empty() {
             return 0.5; // 空查询给个默认分数
         }
-        
+
         let mut char_matches = 0;
         for query_char in &query_chars {
             if content_lower.contains(*query_char) {
                 char_matches += 1;
             }
         }
-        
+
         let char_score = (char_matches as f64) / (query_chars.len() as f64);
-        
+
         // 方法2: 单词重叠（适用于英文）
         let query_words: Vec<&str> = query_lower.split_whitespace().collect();
         let content_words: Vec<&str> = content_lower.split_whitespace().collect();
-        
+
         let word_score = if !query_words.is_empty() && !content_words.is_empty() {
             let mut word_matches = 0;
             for query_word in &query_words {
@@ -477,10 +516,13 @@ impl MemoryEngine {
         } else {
             0.0
         };
-        
+
         // 返回两种方法的最大值（兼容中英文）
         let final_score = char_score.max(word_score);
-        info!("📊 Scoring: char_score={:.3}, word_score={:.3}, final={:.3}", char_score, word_score, final_score);
+        info!(
+            "📊 Scoring: char_score={:.3}, word_score={:.3}, final={:.3}",
+            char_score, word_score, final_score
+        );
         final_score
     }
 

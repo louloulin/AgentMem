@@ -55,8 +55,7 @@ impl Default for ProcessingConfig {
 }
 
 /// Memory processing statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProcessingStats {
     /// Number of memories processed
     pub processed_count: usize,
@@ -76,7 +75,6 @@ pub struct ProcessingStats {
     /// Processing time in milliseconds
     pub processing_time_ms: u64,
 }
-
 
 /// Main memory processing engine
 pub struct MemoryProcessor {

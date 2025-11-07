@@ -16,8 +16,8 @@ use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use crate::orchestrator_factory::create_orchestrator;
-use agent_mem_core::storage::factory::Repositories;
 use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest as OrchestratorChatRequest};
+use agent_mem_core::storage::factory::Repositories;
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
@@ -30,8 +30,8 @@ use axum::{
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
-use std::sync::Arc;
 use std::convert::Infallible;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, error, info};
 use utoipa::ToSchema;
@@ -174,13 +174,13 @@ pub async fn send_chat_message(
 
     // ✅ 构建 OrchestratorChatRequest
     let user_id = req.user_id.unwrap_or_else(|| auth_user.user_id.clone());
-    
+
     // ✅ 生成或使用提供的session_id
-    let session_id = req.session_id.unwrap_or_else(|| {
-        format!("{}_{}", user_id, Uuid::new_v4())
-    });
+    let session_id = req
+        .session_id
+        .unwrap_or_else(|| format!("{}_{}", user_id, Uuid::new_v4()));
     debug!("Using session_id: {}", session_id);
-    
+
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
         agent_id: agent_id.clone(),
@@ -191,20 +191,20 @@ pub async fn send_chat_message(
         max_memories: 10,
     };
 
-    debug!("Calling orchestrator.step() with request: {:?}", orchestrator_request);
+    debug!(
+        "Calling orchestrator.step() with request: {:?}",
+        orchestrator_request
+    );
 
     // ✅ 调用 orchestrator.step()
     let orchestrator_response = orchestrator
         .step(orchestrator_request)
         .await
-        .map_err(|e| {
-            ServerError::internal_error(format!("Orchestrator failed: {}", e))
-        })?;
+        .map_err(|e| ServerError::internal_error(format!("Orchestrator failed: {}", e)))?;
 
     info!(
         "Orchestrator completed: message_id={}, memories_count={}",
-        orchestrator_response.message_id,
-        orchestrator_response.memories_count
+        orchestrator_response.message_id, orchestrator_response.memories_count
     );
 
     // ✅ 转换响应
@@ -215,9 +215,9 @@ pub async fn send_chat_message(
         content: orchestrator_response.content,
         memories_updated: orchestrator_response.memories_updated,
         memories_count: orchestrator_response.memories_count,
-        tool_calls: orchestrator_response.tool_calls.map(|calls| {
-            calls.into_iter().map(|c| c.into()).collect()
-        }),
+        tool_calls: orchestrator_response
+            .tool_calls
+            .map(|calls| calls.into_iter().map(|c| c.into()).collect()),
         processing_time_ms,
     };
 
@@ -263,8 +263,8 @@ pub async fn send_chat_message_stream(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    use futures::stream::{self, StreamExt};
     use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
+    use futures::stream::{self, StreamExt};
 
     let start_time = Instant::now();
 
@@ -287,7 +287,10 @@ pub async fn send_chat_message_stream(
     }
 
     // Determine user_id
-    let user_id = req.user_id.clone().unwrap_or_else(|| auth_user.user_id.clone());
+    let user_id = req
+        .user_id
+        .clone()
+        .unwrap_or_else(|| auth_user.user_id.clone());
 
     info!(
         "Starting streaming chat for agent_id={}, user_id={}, message_len={}",
@@ -305,9 +308,10 @@ pub async fn send_chat_message_stream(
         })?;
 
     // Create orchestrator request
-    let session_id_for_stream = req.session_id.clone().unwrap_or_else(|| {
-        format!("{}_{}", user_id, Uuid::new_v4())
-    });
+    let session_id_for_stream = req
+        .session_id
+        .clone()
+        .unwrap_or_else(|| format!("{}_{}", user_id, Uuid::new_v4()));
     let orchestrator_request = OrchestratorChatRequest {
         message: req.message.clone(),
         agent_id: agent_id.clone(),
@@ -329,102 +333,102 @@ pub async fn send_chat_message_stream(
         Streaming(String, usize, usize), // (content, memories_count, char_index)
         Done,
     }
-    
-    let initial_state = StreamState::Start(orchestrator_clone, orchestrator_request);
-    
-    let response_stream = stream::unfold(
-        initial_state,
-        |state| async move {
-            match state {
-                StreamState::Start(orch, req) => {
-                    // Send start chunk
-                    let start_chunk = StreamChunk {
-                        chunk_type: "start".to_string(),
-                        content: None,
-                        tool_call: None,
-                        memories_count: None,
-                    };
-                    
-                    let start_event = match serde_json::to_string(&start_chunk) {
-                        Ok(json) => Ok(Event::default().data(json)),
-                        Err(_) => return None,
-                    };
 
-                    // Execute orchestrator and get full response
-                    match orch.step(req).await {
-                        Ok(response) => {
-                            let content = response.content;
-                            let memories_count = response.memories_count;
-                            
-                            // Transition to streaming state
-                            Some((start_event, StreamState::Streaming(content, memories_count, 0)))
-                        }
-                        Err(e) => {
-                            // Send error and end
-                            let error_chunk = StreamChunk {
-                                chunk_type: "error".to_string(),
-                                content: Some(format!("Error: {}", e)),
-                                tool_call: None,
-                                memories_count: None,
-                            };
-                            
-                            if let Ok(json) = serde_json::to_string(&error_chunk) {
-                                Some((Ok(Event::default().data(json)), StreamState::Done))
-                            } else {
-                                None
-                            }
-                        }
+    let initial_state = StreamState::Start(orchestrator_clone, orchestrator_request);
+
+    let response_stream = stream::unfold(initial_state, |state| async move {
+        match state {
+            StreamState::Start(orch, req) => {
+                // Send start chunk
+                let start_chunk = StreamChunk {
+                    chunk_type: "start".to_string(),
+                    content: None,
+                    tool_call: None,
+                    memories_count: None,
+                };
+
+                let start_event = match serde_json::to_string(&start_chunk) {
+                    Ok(json) => Ok(Event::default().data(json)),
+                    Err(_) => return None,
+                };
+
+                // Execute orchestrator and get full response
+                match orch.step(req).await {
+                    Ok(response) => {
+                        let content = response.content;
+                        let memories_count = response.memories_count;
+
+                        // Transition to streaming state
+                        Some((
+                            start_event,
+                            StreamState::Streaming(content, memories_count, 0),
+                        ))
                     }
-                }
-                StreamState::Streaming(content, memories_count, char_index) => {
-                    // Stream content in small chunks for typewriter effect
-                    const CHUNK_SIZE: usize = 5; // Send 5 chars at a time
-                    
-                    let char_count = content.chars().count();
-                    if char_index >= char_count {
-                        // All content sent, send done chunk
-                        let done_chunk = StreamChunk {
-                            chunk_type: "done".to_string(),
-                            content: None,
+                    Err(e) => {
+                        // Send error and end
+                        let error_chunk = StreamChunk {
+                            chunk_type: "error".to_string(),
+                            content: Some(format!("Error: {}", e)),
                             tool_call: None,
-                            memories_count: Some(memories_count),
+                            memories_count: None,
                         };
-                        
-                        if let Ok(json) = serde_json::to_string(&done_chunk) {
+
+                        if let Ok(json) = serde_json::to_string(&error_chunk) {
                             Some((Ok(Event::default().data(json)), StreamState::Done))
                         } else {
                             None
                         }
-                    } else {
-                        // Send next chunk of content (using character-based indexing for UTF-8 safety)
-                        let chars: Vec<char> = content.chars().collect();
-                        let end_index = std::cmp::min(char_index + CHUNK_SIZE, chars.len());
-                        let chunk_content: String = chars[char_index..end_index].iter().collect();
-                        
-                        let content_chunk = StreamChunk {
-                            chunk_type: "content".to_string(),
-                            content: Some(chunk_content),
-                            tool_call: None,
-                            memories_count: None,
-                        };
-                        
-                        if let Ok(json) = serde_json::to_string(&content_chunk) {
-                            // Add small delay for typewriter effect (optional, can be removed for faster streaming)
-                            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-                            
-                            Some((
-                                Ok(Event::default().data(json)),
-                                StreamState::Streaming(content, memories_count, end_index)
-                            ))
-                        } else {
-                            None
-                        }
                     }
                 }
-                StreamState::Done => None,
             }
-        },
-    );
+            StreamState::Streaming(content, memories_count, char_index) => {
+                // Stream content in small chunks for typewriter effect
+                const CHUNK_SIZE: usize = 5; // Send 5 chars at a time
+
+                let char_count = content.chars().count();
+                if char_index >= char_count {
+                    // All content sent, send done chunk
+                    let done_chunk = StreamChunk {
+                        chunk_type: "done".to_string(),
+                        content: None,
+                        tool_call: None,
+                        memories_count: Some(memories_count),
+                    };
+
+                    if let Ok(json) = serde_json::to_string(&done_chunk) {
+                        Some((Ok(Event::default().data(json)), StreamState::Done))
+                    } else {
+                        None
+                    }
+                } else {
+                    // Send next chunk of content (using character-based indexing for UTF-8 safety)
+                    let chars: Vec<char> = content.chars().collect();
+                    let end_index = std::cmp::min(char_index + CHUNK_SIZE, chars.len());
+                    let chunk_content: String = chars[char_index..end_index].iter().collect();
+
+                    let content_chunk = StreamChunk {
+                        chunk_type: "content".to_string(),
+                        content: Some(chunk_content),
+                        tool_call: None,
+                        memories_count: None,
+                    };
+
+                    if let Ok(json) = serde_json::to_string(&content_chunk) {
+                        // Add small delay for typewriter effect (optional, can be removed for faster streaming)
+                        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+                        Some((
+                            Ok(Event::default().data(json)),
+                            StreamState::Streaming(content, memories_count, end_index),
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            }
+            StreamState::Done => None,
+        }
+    });
 
     Ok(Sse::new(response_stream).keep_alive(
         axum::response::sse::KeepAlive::new()
@@ -507,4 +511,3 @@ mod tests {
         assert_eq!(req.stream, false);
     }
 }
-

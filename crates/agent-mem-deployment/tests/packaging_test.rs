@@ -1,7 +1,7 @@
 //! 打包功能测试
 
-use agent_mem_deployment::packaging::{PackageConfig, BinaryOptimizer};
-use agent_mem_deployment::packaging::config::{TargetPlatform, OptimizationLevel};
+use agent_mem_deployment::packaging::config::{OptimizationLevel, TargetPlatform};
+use agent_mem_deployment::packaging::{BinaryOptimizer, PackageConfig};
 
 #[test]
 fn test_package_config_creation() {
@@ -66,8 +66,7 @@ fn test_optimization_level_opt_level() {
 
 #[test]
 fn test_package_config_with_target() {
-    let config = PackageConfig::default()
-        .with_target(TargetPlatform::MacOSArm64);
+    let config = PackageConfig::default().with_target(TargetPlatform::MacOSArm64);
     assert_eq!(config.target, TargetPlatform::MacOSArm64);
 }
 
@@ -75,7 +74,7 @@ fn test_package_config_with_target() {
 fn test_package_config_full_binary_name() {
     let config = PackageConfig::default();
     assert_eq!(config.full_binary_name(), "agentmem");
-    
+
     let config = config.with_target(TargetPlatform::WindowsX64);
     assert_eq!(config.full_binary_name(), "agentmem.exe");
 }
@@ -89,10 +88,9 @@ fn test_binary_optimizer_creation() {
 #[test]
 fn test_format_size() {
     use agent_mem_deployment::packaging::optimizer::format_size;
-    
+
     assert_eq!(format_size(512), "512 bytes");
     assert_eq!(format_size(1024), "1.00 KB");
     assert_eq!(format_size(1024 * 1024), "1.00 MB");
     assert_eq!(format_size(1024 * 1024 * 1024), "1.00 GB");
 }
-

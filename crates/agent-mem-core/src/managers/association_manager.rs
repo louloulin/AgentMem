@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info};
 
-use crate::storage::traits::{AssociationRepositoryTrait, MemoryAssociation as RepoMemoryAssociation};
+use crate::storage::traits::{
+    AssociationRepositoryTrait, MemoryAssociation as RepoMemoryAssociation,
+};
 
 /// 关联类型
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -124,7 +126,10 @@ pub struct AssociationManager {
 
 impl AssociationManager {
     /// 创建新的关联管理器
-    pub fn new(repository: Arc<dyn AssociationRepositoryTrait>, config: AssociationManagerConfig) -> Self {
+    pub fn new(
+        repository: Arc<dyn AssociationRepositoryTrait>,
+        config: AssociationManagerConfig,
+    ) -> Self {
         Self { repository, config }
     }
 
@@ -189,22 +194,28 @@ impl AssociationManager {
         memory_id: &str,
         user_id: &str,
     ) -> Result<Vec<MemoryAssociation>> {
-        let repo_associations = self.repository.find_by_memory_id(memory_id, user_id).await?;
+        let repo_associations = self
+            .repository
+            .find_by_memory_id(memory_id, user_id)
+            .await?;
 
-        let results = repo_associations.into_iter().map(|a| MemoryAssociation {
-            id: a.id,
-            organization_id: a.organization_id,
-            user_id: a.user_id,
-            agent_id: a.agent_id,
-            from_memory_id: a.from_memory_id,
-            to_memory_id: a.to_memory_id,
-            association_type: a.association_type,
-            strength: a.strength,
-            confidence: a.confidence,
-            metadata: a.metadata,
-            created_at: a.created_at,
-            updated_at: a.updated_at,
-        }).collect();
+        let results = repo_associations
+            .into_iter()
+            .map(|a| MemoryAssociation {
+                id: a.id,
+                organization_id: a.organization_id,
+                user_id: a.user_id,
+                agent_id: a.agent_id,
+                from_memory_id: a.from_memory_id,
+                to_memory_id: a.to_memory_id,
+                association_type: a.association_type,
+                strength: a.strength,
+                confidence: a.confidence,
+                metadata: a.metadata,
+                created_at: a.created_at,
+                updated_at: a.updated_at,
+            })
+            .collect();
 
         Ok(results)
     }
@@ -217,34 +228,41 @@ impl AssociationManager {
         association_type: AssociationType,
     ) -> Result<Vec<MemoryAssociation>> {
         let type_str = association_type.as_str();
-        let repo_associations = self.repository.find_by_type(memory_id, user_id, type_str).await?;
+        let repo_associations = self
+            .repository
+            .find_by_type(memory_id, user_id, type_str)
+            .await?;
 
-        let results = repo_associations.into_iter().map(|a| MemoryAssociation {
-            id: a.id,
-            organization_id: a.organization_id,
-            user_id: a.user_id,
-            agent_id: a.agent_id,
-            from_memory_id: a.from_memory_id,
-            to_memory_id: a.to_memory_id,
-            association_type: a.association_type,
-            strength: a.strength,
-            confidence: a.confidence,
-            metadata: a.metadata,
-            created_at: a.created_at,
-            updated_at: a.updated_at,
-        }).collect();
+        let results = repo_associations
+            .into_iter()
+            .map(|a| MemoryAssociation {
+                id: a.id,
+                organization_id: a.organization_id,
+                user_id: a.user_id,
+                agent_id: a.agent_id,
+                from_memory_id: a.from_memory_id,
+                to_memory_id: a.to_memory_id,
+                association_type: a.association_type,
+                strength: a.strength,
+                confidence: a.confidence,
+                metadata: a.metadata,
+                created_at: a.created_at,
+                updated_at: a.updated_at,
+            })
+            .collect();
 
         Ok(results)
     }
 
     /// 更新关联强度
-    pub async fn update_strength(
-        &self,
-        association_id: &str,
-        new_strength: f32,
-    ) -> Result<()> {
-        self.repository.update_strength(association_id, new_strength).await?;
-        debug!("Updated association {} strength to {}", association_id, new_strength);
+    pub async fn update_strength(&self, association_id: &str, new_strength: f32) -> Result<()> {
+        self.repository
+            .update_strength(association_id, new_strength)
+            .await?;
+        debug!(
+            "Updated association {} strength to {}",
+            association_id, new_strength
+        );
         Ok(())
     }
 
@@ -275,20 +293,23 @@ impl AssociationManager {
 
         // 最强关联
         let repo_strongest = self.repository.find_strongest(user_id, 10).await?;
-        let strongest_associations = repo_strongest.into_iter().map(|a| MemoryAssociation {
-            id: a.id,
-            organization_id: a.organization_id,
-            user_id: a.user_id,
-            agent_id: a.agent_id,
-            from_memory_id: a.from_memory_id,
-            to_memory_id: a.to_memory_id,
-            association_type: a.association_type,
-            strength: a.strength,
-            confidence: a.confidence,
-            metadata: a.metadata,
-            created_at: a.created_at,
-            updated_at: a.updated_at,
-        }).collect();
+        let strongest_associations = repo_strongest
+            .into_iter()
+            .map(|a| MemoryAssociation {
+                id: a.id,
+                organization_id: a.organization_id,
+                user_id: a.user_id,
+                agent_id: a.agent_id,
+                from_memory_id: a.from_memory_id,
+                to_memory_id: a.to_memory_id,
+                association_type: a.association_type,
+                strength: a.strength,
+                confidence: a.confidence,
+                metadata: a.metadata,
+                created_at: a.created_at,
+                updated_at: a.updated_at,
+            })
+            .collect();
 
         Ok(AssociationStats {
             total_associations: total,
@@ -298,4 +319,3 @@ impl AssociationManager {
         })
     }
 }
-

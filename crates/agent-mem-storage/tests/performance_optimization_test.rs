@@ -14,17 +14,17 @@ use std::time::Instant;
 #[cfg(feature = "lancedb")]
 async fn test_batch_insertion_performance() {
     let dir = tempfile::tempdir().unwrap();
-    
+
     // Prepare test data (reduced size for stability)
     let dimension = 64;
     let num_vectors = 100;
-    
+
     // Test 1: Sequential insertion (baseline)
     let seq_path = dir.path().join("seq_test.lance");
     let seq_store = LanceDBStore::new(seq_path.to_str().unwrap(), "vectors")
         .await
         .unwrap();
-    
+
     let start = Instant::now();
     for i in 0..num_vectors {
         let vector = vec![VectorData {
@@ -35,15 +35,18 @@ async fn test_batch_insertion_performance() {
         seq_store.add_vectors(vector).await.unwrap();
     }
     let sequential_duration = start.elapsed();
-    
-    println!("Sequential insertion: {:?} for {} vectors", sequential_duration, num_vectors);
-    
-    // Test 2: Batch insertion (optimized)  
+
+    println!(
+        "Sequential insertion: {:?} for {} vectors",
+        sequential_duration, num_vectors
+    );
+
+    // Test 2: Batch insertion (optimized)
     let batch_path = dir.path().join("batch_test.lance");
     let batch_store = LanceDBStore::new(batch_path.to_str().unwrap(), "vectors")
         .await
         .unwrap();
-    
+
     let mut batch_vectors = Vec::new();
     for i in 0..num_vectors {
         batch_vectors.push(VectorData {
@@ -52,17 +55,20 @@ async fn test_batch_insertion_performance() {
             metadata: HashMap::new(),
         });
     }
-    
+
     let start = Instant::now();
     batch_store.add_vectors(batch_vectors).await.unwrap();
     let batch_duration = start.elapsed();
-    
-    println!("Batch insertion: {:?} for {} vectors", batch_duration, num_vectors);
-    
+
+    println!(
+        "Batch insertion: {:?} for {} vectors",
+        batch_duration, num_vectors
+    );
+
     // Calculate speedup
     let speedup = sequential_duration.as_secs_f64() / batch_duration.as_secs_f64();
     println!("Batch insertion speedup: {:.2}x", speedup);
-    
+
     // Batch should be at least 1.5x faster (conservative estimate)
     assert!(
         speedup >= 1.5,
@@ -76,25 +82,27 @@ async fn test_batch_insertion_performance() {
 async fn test_search_performance_scaling() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("search_perf.lance");
-    
+
     let store = LanceDBStore::new(path.to_str().unwrap(), "search_perf_vectors")
         .await
         .unwrap();
 
     let dimension = 128;
-    
+
     // Test search performance at different scales (reduced for stability)
     let scales = vec![100, 500, 1000];
     let mut search_times = Vec::new();
-    
+
     for &num_vectors in &scales {
         // Use unique table per scale to avoid conflicts
         let scale_path = dir.path().join(format!("scale_{}.lance", num_vectors));
         let scale_store = LanceDBStore::new(
             scale_path.to_str().unwrap(),
-            &format!("vectors_{}", num_vectors)
-        ).await.unwrap();
-        
+            &format!("vectors_{}", num_vectors),
+        )
+        .await
+        .unwrap();
+
         // Insert vectors in batches
         let batch_size = 100;
         for batch_start in (0..num_vectors).step_by(batch_size) {
@@ -109,15 +117,15 @@ async fn test_search_performance_scaling() {
             }
             scale_store.add_vectors(batch_vectors).await.unwrap();
         }
-        
+
         // Benchmark search
         let query = vec![0.5; dimension];
         let start = Instant::now();
         let results = scale_store.search_vectors(query, 10, None).await.unwrap();
         let search_time = start.elapsed();
-        
+
         search_times.push((num_vectors, search_time));
-        
+
         println!(
             "Search with {} vectors: {:?} ({} results)",
             num_vectors,
@@ -125,15 +133,15 @@ async fn test_search_performance_scaling() {
             results.len()
         );
     }
-    
+
     // Verify search time scaling
     // Search should not grow linearly with vector count
     let time_100 = search_times.iter().find(|(n, _)| *n == 100).unwrap().1;
     let time_1k = search_times.iter().find(|(n, _)| *n == 1000).unwrap().1;
-    
+
     let growth_ratio = time_1k.as_secs_f64() / time_100.as_secs_f64();
     println!("Search time growth (100→1K): {:.2}x", growth_ratio);
-    
+
     // Growth should be sub-linear (< 10x for 10x data)
     assert!(
         growth_ratio < 10.0,
@@ -147,7 +155,7 @@ async fn test_search_performance_scaling() {
 async fn test_threshold_filtering_performance() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("threshold_test.lance");
-    
+
     let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
         .await
         .unwrap();
@@ -156,7 +164,7 @@ async fn test_threshold_filtering_performance() {
     let dimension = 128;
     let num_vectors = 1000;
     let mut vectors = Vec::new();
-    
+
     for i in 0..num_vectors {
         vectors.push(VectorData {
             id: format!("vec_{}", i),
@@ -170,25 +178,28 @@ async fn test_threshold_filtering_performance() {
             metadata: HashMap::new(),
         });
     }
-    
+
     store.add_vectors(vectors).await.unwrap();
-    
+
     // Test different thresholds
     let query = vec![0.5; dimension];
     let thresholds = vec![None, Some(0.9), Some(0.7), Some(0.5)];
-    
+
     for threshold in thresholds {
         let start = Instant::now();
-        let results = store.search_vectors(query.clone(), 100, threshold).await.unwrap();
+        let results = store
+            .search_vectors(query.clone(), 100, threshold)
+            .await
+            .unwrap();
         let duration = start.elapsed();
-        
+
         println!(
             "Threshold {:?}: {} results in {:?}",
             threshold,
             results.len(),
             duration
         );
-        
+
         // Verify filtering works
         if let Some(t) = threshold {
             for result in &results {
@@ -208,26 +219,24 @@ async fn test_threshold_filtering_performance() {
 async fn test_ivf_index_placeholder() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("index_test.lance");
-    
+
     let store = LanceDBStore::new(path.to_str().unwrap(), "vectors")
         .await
         .unwrap();
 
     // Add some vectors
-    let vectors = vec![
-        VectorData {
-            id: "test1".to_string(),
-            vector: vec![1.0, 0.0, 0.0],
-            metadata: HashMap::new(),
-        },
-    ];
-    
+    let vectors = vec![VectorData {
+        id: "test1".to_string(),
+        vector: vec![1.0, 0.0, 0.0],
+        metadata: HashMap::new(),
+    }];
+
     store.add_vectors(vectors).await.unwrap();
-    
+
     // Test index creation (should not error)
     let result = store.create_ivf_index(10).await;
     assert!(result.is_ok(), "Index creation should not error");
-    
+
     let result = store.create_ivf_index_auto().await;
     assert!(result.is_ok(), "Auto index creation should not error");
 }
@@ -237,17 +246,17 @@ async fn test_ivf_index_placeholder() {
 async fn test_concurrent_operations() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("concurrent_test.lance");
-    
+
     // Use unique table name to avoid conflicts
     let store = std::sync::Arc::new(
         LanceDBStore::new(path.to_str().unwrap(), "concurrent_vectors")
             .await
-            .unwrap()
+            .unwrap(),
     );
 
     // Concurrent insertions
     let mut handles = Vec::new();
-    
+
     for batch_id in 0..5 {
         let store_clone = store.clone();
         let handle = tokio::spawn(async move {
@@ -263,19 +272,22 @@ async fn test_concurrent_operations() {
         });
         handles.push(handle);
     }
-    
+
     // Wait for all insertions
     for handle in handles {
         handle.await.unwrap();
     }
-    
+
     // Verify total count
     let count = store.count_vectors().await.unwrap();
-    assert_eq!(count, 500, "Should have 500 vectors from concurrent inserts");
-    
+    assert_eq!(
+        count, 500,
+        "Should have 500 vectors from concurrent inserts"
+    );
+
     // Concurrent searches
     let mut search_handles = Vec::new();
-    
+
     for i in 0..10 {
         let store_clone = store.clone();
         let handle = tokio::spawn(async move {
@@ -284,7 +296,7 @@ async fn test_concurrent_operations() {
         });
         search_handles.push(handle);
     }
-    
+
     // All searches should complete successfully
     for handle in search_handles {
         let results = handle.await.unwrap();
@@ -298,7 +310,7 @@ async fn test_concurrent_operations() {
 async fn test_real_world_workflow() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("workflow_test.lance");
-    
+
     let store = LanceDBStore::new(path.to_str().unwrap(), "workflow_vectors")
         .await
         .unwrap();
@@ -316,15 +328,15 @@ async fn test_real_world_workflow() {
             },
         })
         .collect();
-    
+
     let start = Instant::now();
     store.add_vectors(initial_vectors).await.unwrap();
     println!("Initial load: {:?} for 100 vectors", start.elapsed());
-    
+
     // Phase 2: Create index (placeholder, but tests API)
     println!("Phase 2: Optimize with index");
     store.create_ivf_index_auto().await.unwrap();
-    
+
     // Phase 3: Incremental updates
     println!("Phase 3: Incremental updates");
     for batch in 0..5 {
@@ -340,21 +352,20 @@ async fn test_real_world_workflow() {
                 },
             })
             .collect();
-        
+
         store.add_vectors(updates).await.unwrap();
     }
-    
+
     // Phase 4: Search workload
     println!("Phase 4: Search workload");
-    let search_queries = vec![
-        vec![0.1; 64],
-        vec![0.5; 64],
-        vec![0.9; 64],
-    ];
-    
+    let search_queries = vec![vec![0.1; 64], vec![0.5; 64], vec![0.9; 64]];
+
     for (i, query) in search_queries.iter().enumerate() {
         let start = Instant::now();
-        let results = store.search_vectors(query.clone(), 10, Some(0.3)).await.unwrap();
+        let results = store
+            .search_vectors(query.clone(), 10, Some(0.3))
+            .await
+            .unwrap();
         println!(
             "Query {}: {} results in {:?}",
             i + 1,
@@ -362,15 +373,14 @@ async fn test_real_world_workflow() {
             start.elapsed()
         );
     }
-    
+
     // Phase 5: Cleanup old data
     println!("Phase 5: Cleanup");
     let delete_ids: Vec<String> = (0..10).map(|i| format!("init_{}", i)).collect();
     store.delete_vectors(delete_ids).await.unwrap();
-    
+
     // Verify final state
     let final_count = store.count_vectors().await.unwrap();
     println!("Final vector count: {}", final_count);
     assert_eq!(final_count, 140, "Should have 90 initial + 50 updates");
 }
-

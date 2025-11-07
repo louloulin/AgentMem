@@ -30,7 +30,10 @@ async fn test_resource_memory_table_exists() {
     .await;
 
     assert!(result.is_ok(), "Failed to query table: {:?}", result.err());
-    assert!(result.unwrap().is_some(), "Table resource_memory does not exist");
+    assert!(
+        result.unwrap().is_some(),
+        "Table resource_memory does not exist"
+    );
 }
 
 #[tokio::test]
@@ -161,12 +164,18 @@ async fn test_unique_file_hash_constraint() {
     .execute(&pool)
     .await;
 
-    assert!(result2.is_err(), "Should fail due to unique file hash constraint");
+    assert!(
+        result2.is_err(),
+        "Should fail due to unique file hash constraint"
+    );
 
     // 清理测试数据
-    let _ = sqlx::query!("DELETE FROM resource_memory WHERE file_hash = $1", file_hash)
-        .execute(&pool)
-        .await;
+    let _ = sqlx::query!(
+        "DELETE FROM resource_memory WHERE file_hash = $1",
+        file_hash
+    )
+    .execute(&pool)
+    .await;
 }
 
 #[test]
@@ -237,4 +246,3 @@ fn test_compression_info() {
     let compression_ratio = compressed_size as f64 / original_size as f64;
     assert!(compression_ratio < 1.0);
 }
-

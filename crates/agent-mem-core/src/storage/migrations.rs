@@ -5,8 +5,8 @@
 
 use sqlx::PgPool;
 
-use crate::{CoreError, CoreResult};
 use super::memory_tables_migration;
+use crate::{CoreError, CoreResult};
 
 /// Run all database migrations
 pub async fn run_migrations(pool: &PgPool) -> CoreResult<()> {
@@ -501,20 +501,24 @@ async fn create_memory_history_table(pool: &PgPool) -> CoreResult<()> {
     .map_err(|e| CoreError::Database(format!("Failed to create memory_history table: {}", e)))?;
 
     // 2. 创建索引
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_memory_id ON memory_history(memory_id)")
-        .execute(pool)
-        .await
-        .map_err(|e| CoreError::Database(format!("Failed to create memory_id index: {}", e)))?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_memory_history_memory_id ON memory_history(memory_id)",
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create memory_id index: {}", e)))?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_memory_version ON memory_history(memory_id, version DESC)")
         .execute(pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to create memory_version index: {}", e)))?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_change_type ON memory_history(change_type)")
-        .execute(pool)
-        .await
-        .map_err(|e| CoreError::Database(format!("Failed to create change_type index: {}", e)))?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_memory_history_change_type ON memory_history(change_type)",
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| CoreError::Database(format!("Failed to create change_type index: {}", e)))?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_memory_history_created_at ON memory_history(created_at DESC)")
         .execute(pool)

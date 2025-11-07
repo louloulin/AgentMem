@@ -2,10 +2,10 @@
 //!
 //! 对比固定权重 vs 自适应权重的性能和准确性
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use agent_mem_core::search::{
     AdaptiveSearchOptimizer, QueryFeatures, SearchQuery, SearchReranker, WeightPredictor,
 };
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 /// 测试查询特征提取性能
 fn bench_feature_extraction(c: &mut Criterion) {
@@ -17,7 +17,7 @@ fn bench_feature_extraction(c: &mut Criterion) {
         "simple",
         "Explain how to optimize vector search performance in large-scale systems",
     ];
-    
+
     c.bench_function("feature_extraction", |b| {
         b.iter(|| {
             for query in &queries {
@@ -30,7 +30,7 @@ fn bench_feature_extraction(c: &mut Criterion) {
 /// 测试权重预测性能
 fn bench_weight_prediction(c: &mut Criterion) {
     let predictor = WeightPredictor::new();
-    
+
     let test_features = vec![
         QueryFeatures {
             has_exact_terms: true,
@@ -57,7 +57,7 @@ fn bench_weight_prediction(c: &mut Criterion) {
             is_question: true,
         },
     ];
-    
+
     c.bench_function("weight_prediction", |b| {
         b.iter(|| {
             for features in &test_features {
@@ -70,7 +70,7 @@ fn bench_weight_prediction(c: &mut Criterion) {
 /// 测试端到端优化流程
 fn bench_end_to_end_optimization(c: &mut Criterion) {
     let optimizer = AdaptiveSearchOptimizer::new(true);
-    
+
     let queries = vec![
         SearchQuery {
             query: "user@example.com".to_string(),
@@ -88,7 +88,7 @@ fn bench_end_to_end_optimization(c: &mut Criterion) {
             ..Default::default()
         },
     ];
-    
+
     c.bench_function("end_to_end_optimization", |b| {
         b.iter(|| {
             for query in &queries {
@@ -101,12 +101,12 @@ fn bench_end_to_end_optimization(c: &mut Criterion) {
 /// 测试结果重排序性能
 fn bench_reranking(c: &mut Criterion) {
     use agent_mem_core::search::SearchResult;
-    
+
     let reranker = SearchReranker::new();
-    
+
     // 创建不同大小的结果集
     let sizes = vec![10, 50, 100];
-    
+
     for size in sizes {
         let mut results: Vec<SearchResult> = (0..size)
             .map(|i| SearchResult {
@@ -125,62 +125,60 @@ fn bench_reranking(c: &mut Criterion) {
                 },
             })
             .collect();
-        
+
         let query = SearchQuery {
             query: "test query".to_string(),
             ..Default::default()
         };
-        
-        c.bench_with_input(
-            BenchmarkId::new("reranking", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    let _reranked = reranker.rerank(black_box(results.clone()), black_box(&query));
-                });
-            },
-        );
+
+        c.bench_with_input(BenchmarkId::new("reranking", size), &size, |b, _| {
+            b.iter(|| {
+                let _reranked = reranker.rerank(black_box(results.clone()), black_box(&query));
+            });
+        });
     }
 }
 
 /// 对比不同查询类型的优化效果
 fn bench_query_types_comparison(c: &mut Criterion) {
     let optimizer = AdaptiveSearchOptimizer::new(true);
-    
+
     let query_types = vec![
         ("exact_match", "user@example.com"),
-        ("semantic", "How does artificial intelligence improve search quality and relevance?"),
+        (
+            "semantic",
+            "How does artificial intelligence improve search quality and relevance?",
+        ),
         ("temporal", "what happened yesterday in our discussion?"),
         ("simple", "pizza"),
-        ("complex", "Analyze the performance characteristics of distributed vector databases"),
+        (
+            "complex",
+            "Analyze the performance characteristics of distributed vector databases",
+        ),
     ];
-    
+
     let mut group = c.benchmark_group("query_types");
-    
+
     for (type_name, query_text) in query_types {
         let query = SearchQuery {
             query: query_text.to_string(),
             ..Default::default()
         };
-        
-        group.bench_with_input(
-            BenchmarkId::from_parameter(type_name),
-            &query,
-            |b, q| {
-                b.iter(|| {
-                    let (_optimized, _weights) = optimizer.optimize_query(black_box(q));
-                });
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::from_parameter(type_name), &query, |b, q| {
+            b.iter(|| {
+                let (_optimized, _weights) = optimizer.optimize_query(black_box(q));
+            });
+        });
     }
-    
+
     group.finish();
 }
 
 /// 测试权重归一化性能
 fn bench_weight_normalization(c: &mut Criterion) {
     use agent_mem_core::search::SearchWeights;
-    
+
     c.bench_function("weight_normalization", |b| {
         b.iter(|| {
             for i in 0..100 {
@@ -207,4 +205,3 @@ criterion_group!(
 );
 
 criterion_main!(benches);
-

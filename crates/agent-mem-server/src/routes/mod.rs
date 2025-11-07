@@ -20,8 +20,10 @@ pub mod users;
 pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait
 
 use crate::error::{ServerError, ServerResult};
-use crate::middleware::{audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware};
 use crate::middleware::rbac::rbac_middleware;
+use crate::middleware::{
+    audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware,
+};
 use crate::rbac::RbacChecker;
 use tracing::info;
 // ✅ 使用memory::MemoryManager（基于agent-mem统一API）
@@ -49,29 +51,34 @@ pub async fn create_router(
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
     let sse_manager = Arc::new(SseManager::new());
-    
+
     // Create RBAC checker for role-based access control
     let rbac_checker = Arc::new(RbacChecker);
 
     // 🆕 Initialize MCP Server with ToolExecutor
     use agent_mem_tools::executor::ToolExecutor;
-    use agent_mem_tools::mcp::McpServer;
     use agent_mem_tools::mcp::server::McpServerConfig;
-    
+    use agent_mem_tools::mcp::McpServer;
+
     let tool_executor = Arc::new(ToolExecutor::new());
     let mcp_config = McpServerConfig::default();
     let mcp_server = Arc::new(McpServer::new(mcp_config, tool_executor));
-    
+
     // Initialize MCP server
-    mcp_server.initialize().await
+    mcp_server
+        .initialize()
+        .await
         .map_err(|e| ServerError::ServerError(format!("Failed to initialize MCP server: {e}")))?;
-    
+
     info!("MCP server initialized successfully");
 
     let mut app = Router::new()
         // Memory management routes (✅ 使用Memory统一API)
         // 🆕 Fix 1: 添加GET方法支持全局列表查询
-        .route("/api/v1/memories", get(memory::list_all_memories).post(memory::add_memory))
+        .route(
+            "/api/v1/memories",
+            get(memory::list_all_memories).post(memory::add_memory),
+        )
         .route("/api/v1/memories/:id", get(memory::get_memory))
         .route("/api/v1/memories/:id", put(memory::update_memory))
         .route("/api/v1/memories/:id", delete(memory::delete_memory))
@@ -94,20 +101,29 @@ pub async fn create_router(
         .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
         // Dashboard statistics
         .route("/api/v1/stats/dashboard", get(stats::get_dashboard_stats))
-        .route("/api/v1/stats/memories/growth", get(stats::get_memory_growth))
-        .route("/api/v1/stats/agents/activity", get(stats::get_agent_activity_stats))
-        .route("/api/v1/stats/memory/quality", get(stats::get_memory_quality_stats));
+        .route(
+            "/api/v1/stats/memories/growth",
+            get(stats::get_memory_growth),
+        )
+        .route(
+            "/api/v1/stats/agents/activity",
+            get(stats::get_agent_activity_stats),
+        )
+        .route(
+            "/api/v1/stats/memory/quality",
+            get(stats::get_memory_quality_stats),
+        );
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app
-            // User management routes
-            .route("/api/v1/users", get(users::get_users_list))
-            .route("/api/v1/users/register", post(users::register_user))
-            .route("/api/v1/users/login", post(users::login_user))
-            .route("/api/v1/users/me", get(users::get_current_user))
-            .route("/api/v1/users/me", put(users::update_current_user))
-            .route("/api/v1/users/me/password", post(users::change_password))
-            .route("/api/v1/users/:user_id", get(users::get_user_by_id))
+        // User management routes
+        .route("/api/v1/users", get(users::get_users_list))
+        .route("/api/v1/users/register", post(users::register_user))
+        .route("/api/v1/users/login", post(users::login_user))
+        .route("/api/v1/users/me", get(users::get_current_user))
+        .route("/api/v1/users/me", put(users::update_current_user))
+        .route("/api/v1/users/me/password", post(users::change_password))
+        .route("/api/v1/users/:user_id", get(users::get_user_by_id))
         // Organization management routes
         .route(
             "/api/v1/organizations",
@@ -185,11 +201,26 @@ pub async fn create_router(
         .route("/api/v1/mcp/tools/:tool_name", get(mcp::get_tool))
         .route("/api/v1/mcp/health", get(mcp::health_check))
         // Working Memory routes (session-based temporary context)
-        .route("/api/v1/working-memory", post(working_memory::add_working_memory))
-        .route("/api/v1/working-memory", get(working_memory::get_working_memory))
-        .route("/api/v1/working-memory/:item_id", delete(working_memory::delete_working_memory_item))
-        .route("/api/v1/working-memory/sessions/:session_id", delete(working_memory::clear_working_memory))
-        .route("/api/v1/working-memory/cleanup", post(working_memory::cleanup_expired))
+        .route(
+            "/api/v1/working-memory",
+            post(working_memory::add_working_memory),
+        )
+        .route(
+            "/api/v1/working-memory",
+            get(working_memory::get_working_memory),
+        )
+        .route(
+            "/api/v1/working-memory/:item_id",
+            delete(working_memory::delete_working_memory_item),
+        )
+        .route(
+            "/api/v1/working-memory/sessions/:session_id",
+            delete(working_memory::clear_working_memory),
+        )
+        .route(
+            "/api/v1/working-memory/cleanup",
+            post(working_memory::cleanup_expired),
+        )
         // 🆕 Plugin management routes
         .route("/api/v1/plugins", get(plugins::list_plugins))
         .route("/api/v1/plugins", post(plugins::register_plugin))
@@ -198,9 +229,11 @@ pub async fn create_router(
     // Graph visualization routes (PostgreSQL only)
     #[cfg(feature = "postgres")]
     let app = {
-        app
-            .route("/api/v1/graph/data", get(graph::get_graph_data))
-            .route("/api/v1/graph/associations", post(graph::create_association))
+        app.route("/api/v1/graph/data", get(graph::get_graph_data))
+            .route(
+                "/api/v1/graph/associations",
+                post(graph::create_association),
+            )
             .route(
                 "/api/v1/graph/memories/:memory_id/associations",
                 get(graph::get_memory_associations),
@@ -226,15 +259,15 @@ pub async fn create_router(
         .layer(TraceLayer::new_for_http())
         .layer(axum_middleware::from_fn(quota_middleware))
         .layer(axum_middleware::from_fn(audit_logging_middleware))
-        .layer(axum_middleware::from_fn(rbac_middleware))  // ✅ RBAC权限检查
+        .layer(axum_middleware::from_fn(rbac_middleware)) // ✅ RBAC权限检查
         .layer(axum_middleware::from_fn(metrics_middleware))
         // Add default auth middleware (injects default AuthUser when auth is disabled)
         .layer(axum_middleware::from_fn(default_auth_middleware))
         // Add shared state via Extension (must be after middleware that uses them)
-        .layer(Extension(rbac_checker))  // ✅ RBAC检查器
+        .layer(Extension(rbac_checker)) // ✅ RBAC检查器
         .layer(Extension(sse_manager))
         .layer(Extension(ws_manager))
-        .layer(Extension(mcp_server))  // 🆕 Add MCP server extension
+        .layer(Extension(mcp_server)) // 🆕 Add MCP server extension
         .layer(Extension(metrics_registry))
         .layer(Extension(memory_manager))
         .layer(Extension(Arc::new(repositories)));

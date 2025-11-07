@@ -10,7 +10,8 @@ use uuid::Uuid;
 #[async_trait]
 pub trait RelationExtractor: Send + Sync {
     /// 从文本和实体中提取关系
-    async fn extract_relations(&self, text: &str, entities: &[Entity]) -> CoreResult<Vec<Relation>>;
+    async fn extract_relations(&self, text: &str, entities: &[Entity])
+        -> CoreResult<Vec<Relation>>;
 }
 
 /// 基于规则的关系提取器
@@ -33,7 +34,15 @@ impl RuleBasedRelationExtractor {
     /// 创建新的基于规则的关系提取器
     pub fn new() -> Self {
         Self {
-            work_keywords: vec!["在", "工作", "就职", "任职", "供职", "works at", "employed by"],
+            work_keywords: vec![
+                "在",
+                "工作",
+                "就职",
+                "任职",
+                "供职",
+                "works at",
+                "employed by",
+            ],
             location_keywords: vec!["位于", "在", "坐落于", "located at", "in"],
             like_keywords: vec!["喜欢", "爱", "热爱", "钟爱", "like", "love", "enjoy"],
             dislike_keywords: vec!["不喜欢", "讨厌", "厌恶", "hate", "dislike"],
@@ -106,7 +115,8 @@ impl RuleBasedRelationExtractor {
         // 检查位置关系模式
         for entity in &other_entities {
             for location in &locations {
-                let has_location_keyword = self.location_keywords.iter().any(|kw| text.contains(kw));
+                let has_location_keyword =
+                    self.location_keywords.iter().any(|kw| text.contains(kw));
 
                 if has_location_keyword {
                     if let (Some((e_start, _)), Some((l_start, _))) = (entity.span, location.span) {
@@ -236,7 +246,9 @@ impl RuleBasedRelationExtractor {
         for relation in relations {
             let key = format!(
                 "{}:{}:{}",
-                relation.subject_id, relation.relation_type.as_str(), relation.object_id
+                relation.subject_id,
+                relation.relation_type.as_str(),
+                relation.object_id
             );
 
             if !seen.contains(&key) {
@@ -251,7 +263,11 @@ impl RuleBasedRelationExtractor {
 
 #[async_trait]
 impl RelationExtractor for RuleBasedRelationExtractor {
-    async fn extract_relations(&self, text: &str, entities: &[Entity]) -> CoreResult<Vec<Relation>> {
+    async fn extract_relations(
+        &self,
+        text: &str,
+        entities: &[Entity],
+    ) -> CoreResult<Vec<Relation>> {
         info!("开始提取关系，实体数量: {}", entities.len());
 
         let mut all_relations = Vec::new();
@@ -276,4 +292,3 @@ impl Default for RuleBasedRelationExtractor {
         Self::new()
     }
 }
-

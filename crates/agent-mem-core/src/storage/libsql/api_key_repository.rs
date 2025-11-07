@@ -62,16 +62,20 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  WHERE key_hash = ? AND is_deleted = 0",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(libsql::params![key_hash.to_string()])
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query API key: {e}")))?;
 
-        if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
-        })? {
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch API key row: {e}")))?
+        {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();
             let created_at_ts: i64 = row.get(7).unwrap();
@@ -86,10 +90,12 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                 organization_id: row.get(4).unwrap(),
                 expires_at: expires_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 last_used_at: last_used_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                created_at: DateTime::from_timestamp(created_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
-                updated_at: DateTime::from_timestamp(updated_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
+                created_at: DateTime::from_timestamp(created_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
+                updated_at: DateTime::from_timestamp(updated_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
                 is_deleted: is_deleted != 0,
             }))
         } else {
@@ -109,7 +115,9 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  ORDER BY created_at DESC",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(libsql::params![user_id.to_string()])
@@ -117,9 +125,11 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {e}")))?;
 
         let mut api_keys = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
-        })? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch API key row: {e}")))?
+        {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();
             let created_at_ts: i64 = row.get(7).unwrap();
@@ -134,10 +144,12 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                 organization_id: row.get(4).unwrap(),
                 expires_at: expires_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 last_used_at: last_used_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                created_at: DateTime::from_timestamp(created_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
-                updated_at: DateTime::from_timestamp(updated_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
+                created_at: DateTime::from_timestamp(created_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
+                updated_at: DateTime::from_timestamp(updated_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
                 is_deleted: is_deleted != 0,
             });
         }
@@ -169,7 +181,9 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                     ],
                 )
                 .await
-                .map_err(|e| AgentMemError::StorageError(format!("Failed to update API key: {e}")))?;
+                .map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to update API key: {e}"))
+                })?;
 
             if rows_affected == 0 {
                 return Err(AgentMemError::NotFound(format!(
@@ -180,9 +194,9 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
         } // Release lock here
 
         // Fetch and return the updated API key
-        self.find_by_key(&api_key.key_hash)
-            .await?
-            .ok_or_else(|| AgentMemError::NotFound(format!("API key with id {api_key_id} not found")))
+        self.find_by_key(&api_key.key_hash).await?.ok_or_else(|| {
+            AgentMemError::NotFound(format!("API key with id {api_key_id} not found"))
+        })
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
@@ -238,7 +252,9 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                  LIMIT ? OFFSET ?",
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to prepare statement: {e}"))
+            })?;
 
         let mut rows = stmt
             .query(libsql::params![limit, offset])
@@ -246,9 +262,11 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query API keys: {e}")))?;
 
         let mut api_keys = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch API key row: {e}"))
-        })? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch API key row: {e}")))?
+        {
             let expires_at_ts: Option<i64> = row.get(5).unwrap();
             let last_used_at_ts: Option<i64> = row.get(6).unwrap();
             let created_at_ts: i64 = row.get(7).unwrap();
@@ -263,10 +281,12 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
                 organization_id: row.get(4).unwrap(),
                 expires_at: expires_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 last_used_at: last_used_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                created_at: DateTime::from_timestamp(created_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid created_at timestamp".to_string()))?,
-                updated_at: DateTime::from_timestamp(updated_at_ts, 0)
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid updated_at timestamp".to_string()))?,
+                created_at: DateTime::from_timestamp(created_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid created_at timestamp".to_string())
+                })?,
+                updated_at: DateTime::from_timestamp(updated_at_ts, 0).ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
+                })?,
                 is_deleted: is_deleted != 0,
             });
         }
@@ -274,4 +294,3 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
         Ok(api_keys)
     }
 }
-

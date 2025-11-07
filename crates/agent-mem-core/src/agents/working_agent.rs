@@ -122,10 +122,9 @@ impl WorkingAgent {
                 created_at: Utc::now(),
             };
 
-            let created_item = store
-                .add_item(item)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to add working memory: {e}")))?;
+            let created_item = store.add_item(item).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to add working memory: {e}"))
+            })?;
 
             let response = serde_json::json!({
                 "success": true,
@@ -134,7 +133,10 @@ impl WorkingAgent {
                 "message": "Working memory inserted successfully"
             });
 
-            log::info!("Working agent: Inserted working memory with ID {}", created_item.id);
+            log::info!(
+                "Working agent: Inserted working memory with ID {}",
+                created_item.id
+            );
             return Ok(response);
         }
 
@@ -155,10 +157,9 @@ impl WorkingAgent {
 
         // Use actual working memory store if available
         if let Some(store) = &self.working_store {
-            let items = store
-                .get_session_items(session_id)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to get session items: {e}")))?;
+            let items = store.get_session_items(session_id).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to get session items: {e}"))
+            })?;
 
             let results: Vec<_> = items
                 .iter()
@@ -180,7 +181,11 @@ impl WorkingAgent {
                 "session_id": session_id
             });
 
-            log::info!("Working agent: Found {} items for session {}", items.len(), session_id);
+            log::info!(
+                "Working agent: Found {} items for session {}",
+                items.len(),
+                session_id
+            );
             return Ok(response);
         }
 
@@ -201,10 +206,9 @@ impl WorkingAgent {
 
         // Use actual working memory store if available
         if let Some(store) = &self.working_store {
-            let deleted = store
-                .remove_item(item_id)
-                .await
-                .map_err(|e| AgentError::TaskExecutionError(format!("Failed to delete item: {e}")))?;
+            let deleted = store.remove_item(item_id).await.map_err(|e| {
+                AgentError::TaskExecutionError(format!("Failed to delete item: {e}"))
+            })?;
 
             if deleted {
                 let response = serde_json::json!({
@@ -253,10 +257,7 @@ impl MemoryAgent for WorkingAgent {
             // 使用 system 会话 ID 进行测试查询
             match store.get_session_items("system").await {
                 Ok(items) => {
-                    log::info!(
-                        "成功连接到工作记忆存储，发现 {} 个活跃项",
-                        items.len()
-                    );
+                    log::info!("成功连接到工作记忆存储，发现 {} 个活跃项", items.len());
 
                     // 更新统计信息
                     let mut context = self.context.write().await;

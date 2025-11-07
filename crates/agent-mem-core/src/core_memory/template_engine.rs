@@ -90,9 +90,8 @@ impl TemplateEngine {
     /// 处理变量替换 {{variable}}
     fn process_variables(&self, template: &str, context: &TemplateContext) -> Result<String> {
         let mut result = template.to_string();
-        let var_pattern = regex::Regex::new(r"\{\{([^}]+)\}\}").map_err(|e| {
-            AgentMemError::internal_error(format!("Failed to compile regex: {e}"))
-        })?;
+        let var_pattern = regex::Regex::new(r"\{\{([^}]+)\}\}")
+            .map_err(|e| AgentMemError::internal_error(format!("Failed to compile regex: {e}")))?;
 
         for cap in var_pattern.captures_iter(template) {
             let full_match = &cap[0];
@@ -161,11 +160,10 @@ impl TemplateEngine {
     /// 处理循环语句 {% for item in list %}...{% endfor %}
     fn process_loops(&self, template: &str, context: &TemplateContext) -> Result<String> {
         let mut result = template.to_string();
-        let for_pattern =
-            regex::Regex::new(r"(?s)\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}(.*?)\{%\s*endfor\s*%\}")
-                .map_err(|e| {
-                AgentMemError::internal_error(format!("Failed to compile regex: {e}"))
-            })?;
+        let for_pattern = regex::Regex::new(
+            r"(?s)\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}(.*?)\{%\s*endfor\s*%\}",
+        )
+        .map_err(|e| AgentMemError::internal_error(format!("Failed to compile regex: {e}")))?;
 
         for cap in for_pattern.captures_iter(template) {
             let full_match = &cap[0];

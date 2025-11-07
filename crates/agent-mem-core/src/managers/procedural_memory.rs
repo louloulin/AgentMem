@@ -66,11 +66,13 @@ impl ProceduralMemoryManager {
     pub async fn create_item(&self, item: ProceduralMemoryItem) -> Result<ProceduralMemoryItem> {
         info!("Creating procedural memory item: {}", item.id);
 
-        let steps_json = serde_json::to_value(&item.steps)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e)))?;
+        let steps_json = serde_json::to_value(&item.steps).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e))
+        })?;
 
-        let tree_path_json = serde_json::to_value(&item.tree_path)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+        let tree_path_json = serde_json::to_value(&item.tree_path).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+        })?;
 
         let result = sqlx::query_as!(
             ProceduralMemoryItemRow,
@@ -97,13 +99,19 @@ impl ProceduralMemoryManager {
         )
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to create procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to create procedural item: {}", e))
+        })?;
 
         Ok(result.into())
     }
 
     /// 获取程序记忆项
-    pub async fn get_item(&self, item_id: &str, user_id: &str) -> Result<Option<ProceduralMemoryItem>> {
+    pub async fn get_item(
+        &self,
+        item_id: &str,
+        user_id: &str,
+    ) -> Result<Option<ProceduralMemoryItem>> {
         debug!("Getting procedural memory item: {}", item_id);
 
         let result = sqlx::query_as!(
@@ -117,13 +125,19 @@ impl ProceduralMemoryManager {
         )
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get procedural item: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
 
     /// 查询程序记忆项
-    pub async fn query_items(&self, user_id: &str, query: ProceduralQuery) -> Result<Vec<ProceduralMemoryItem>> {
+    pub async fn query_items(
+        &self,
+        user_id: &str,
+        query: ProceduralQuery,
+    ) -> Result<Vec<ProceduralMemoryItem>> {
         info!("Querying procedural memory items for user: {}", user_id);
 
         let mut sql = String::from("SELECT * FROM procedural_memory WHERE user_id = $1");
@@ -165,8 +179,9 @@ impl ProceduralMemoryManager {
         }
 
         if let Some(tree_path_prefix) = query.tree_path_prefix {
-            let tree_path_json = serde_json::to_value(&tree_path_prefix)
-                .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+            let tree_path_json = serde_json::to_value(&tree_path_prefix).map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+            })?;
             query_builder = query_builder.bind(tree_path_json);
         }
 
@@ -177,7 +192,9 @@ impl ProceduralMemoryManager {
         let results = query_builder
             .fetch_all(self.pool.as_ref())
             .await
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to query procedural items: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::storage_error(&format!("Failed to query procedural items: {}", e))
+            })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -186,11 +203,13 @@ impl ProceduralMemoryManager {
     pub async fn update_item(&self, item: ProceduralMemoryItem) -> Result<bool> {
         info!("Updating procedural memory item: {}", item.id);
 
-        let steps_json = serde_json::to_value(&item.steps)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e)))?;
+        let steps_json = serde_json::to_value(&item.steps).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize steps: {}", e))
+        })?;
 
-        let tree_path_json = serde_json::to_value(&item.tree_path)
-            .map_err(|e| AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e)))?;
+        let tree_path_json = serde_json::to_value(&item.tree_path).map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to serialize tree_path: {}", e))
+        })?;
 
         let result = sqlx::query!(
             r#"
@@ -210,7 +229,9 @@ impl ProceduralMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update procedural item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -229,13 +250,20 @@ impl ProceduralMemoryManager {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete procedural item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete procedural item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 
     /// 按类型获取程序记忆项
-    pub async fn get_items_by_type(&self, user_id: &str, entry_type: &str, limit: i64) -> Result<Vec<ProceduralMemoryItem>> {
+    pub async fn get_items_by_type(
+        &self,
+        user_id: &str,
+        entry_type: &str,
+        limit: i64,
+    ) -> Result<Vec<ProceduralMemoryItem>> {
         debug!("Getting procedural items by type: {}", entry_type);
 
         let results = sqlx::query_as!(
@@ -252,13 +280,20 @@ impl ProceduralMemoryManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get items by type: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get items by type: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 
     /// 搜索程序记忆项
-    pub async fn search_by_summary(&self, user_id: &str, summary_query: &str, limit: i64) -> Result<Vec<ProceduralMemoryItem>> {
+    pub async fn search_by_summary(
+        &self,
+        user_id: &str,
+        summary_query: &str,
+        limit: i64,
+    ) -> Result<Vec<ProceduralMemoryItem>> {
         debug!("Searching procedural items by summary: {}", summary_query);
 
         let results = sqlx::query_as!(
@@ -275,7 +310,9 @@ impl ProceduralMemoryManager {
         )
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to search procedural items: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to search procedural items: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -600,11 +637,7 @@ mod tests {
     #[test]
     fn test_tree_path_variations() {
         // Single level
-        let item1 = create_test_item(
-            "proc-1",
-            "process",
-            vec!["Step 1".to_string()],
-        );
+        let item1 = create_test_item("proc-1", "process", vec!["Step 1".to_string()]);
         assert_eq!(item1.tree_path.len(), 2);
 
         // Deep nesting
@@ -702,4 +735,3 @@ mod tests {
         assert!(query.limit.is_none());
     }
 }
-

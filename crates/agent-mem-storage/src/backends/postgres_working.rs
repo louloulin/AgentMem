@@ -73,7 +73,9 @@ impl WorkingMemoryStore for PostgresWorkingStore {
         .bind(item.created_at)
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to add working memory item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to add working memory item: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -90,7 +92,9 @@ impl WorkingMemoryStore for PostgresWorkingStore {
         .bind(session_id)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get session items: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get session items: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -105,7 +109,9 @@ impl WorkingMemoryStore for PostgresWorkingStore {
         .bind(item_id)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to remove working memory item: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to remove working memory item: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -119,7 +125,9 @@ impl WorkingMemoryStore for PostgresWorkingStore {
         )
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to clear expired items: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to clear expired items: {}", e))
+        })?;
 
         Ok(result.rows_affected() as i64)
     }
@@ -157,9 +165,10 @@ impl WorkingMemoryStore for PostgresWorkingStore {
         .bind(min_priority)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get items by priority: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get items by priority: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
 }
-

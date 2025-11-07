@@ -84,7 +84,9 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(item.updated_at)
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to set core memory value: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to set core memory value: {}", e))
+        })?;
 
         Ok(result.into())
     }
@@ -100,7 +102,9 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(key)
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get core memory value: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get core memory value: {}", e))
+        })?;
 
         Ok(result.map(Into::into))
     }
@@ -116,7 +120,9 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(user_id)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get all core memory: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get all core memory: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -133,7 +139,9 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(category)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to get core memory by category: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to get core memory by category: {}", e))
+        })?;
 
         Ok(results.into_iter().map(Into::into).collect())
     }
@@ -149,7 +157,9 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(key)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to delete core memory value: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to delete core memory value: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -167,9 +177,10 @@ impl CoreMemoryStore for PostgresCoreStore {
         .bind(key)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| AgentMemError::storage_error(&format!("Failed to update core memory value: {}", e)))?;
+        .map_err(|e| {
+            AgentMemError::storage_error(&format!("Failed to update core memory value: {}", e))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 }
-

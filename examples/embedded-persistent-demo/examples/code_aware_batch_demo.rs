@@ -201,7 +201,10 @@ fn create_code_memories() -> Vec<CodeMemory> {
 }
 
 /// 批量写入代码记忆
-async fn batch_write_code_memories(_agent: &CoreAgent, memories: &[CodeMemory]) -> Result<Vec<String>> {
+async fn batch_write_code_memories(
+    _agent: &CoreAgent,
+    memories: &[CodeMemory],
+) -> Result<Vec<String>> {
     println!("\n📝 批量写入代码记忆...");
     println!("{}", "=".repeat(60));
 
@@ -229,15 +232,15 @@ async fn batch_write_code_memories(_agent: &CoreAgent, memories: &[CodeMemory]) 
 
         memory_ids.push(format!("code_mem_{}", i));
     }
-    
+
     let duration = start.elapsed();
     let ops_per_sec = memories.len() as f64 / duration.as_secs_f64();
-    
+
     println!("\n✅ 批量写入完成:");
     println!("  - 总数: {} 条记忆", memories.len());
     println!("  - 耗时: {:.2?}", duration);
     println!("  - 吞吐量: {:.0} ops/s", ops_per_sec);
-    
+
     Ok(memory_ids)
 }
 
@@ -245,28 +248,28 @@ async fn batch_write_code_memories(_agent: &CoreAgent, memories: &[CodeMemory]) 
 async fn test_semantic_search(_agent: &CoreAgent, queries: &[(&str, &str)]) -> Result<()> {
     println!("\n🔍 语义搜索测试...");
     println!("{}", "=".repeat(60));
-    
+
     for (i, (query, expected_context)) in queries.iter().enumerate() {
         println!("\n查询 {}: \"{}\"", i + 1, query);
         println!("期望上下文: {}", expected_context);
-        
+
         let start = Instant::now();
-        
+
         // 模拟搜索（实际应该调用 agent 的搜索方法）
         // let results = agent.search(query, 3).await?;
-        
+
         let duration = start.elapsed();
-        
+
         println!("  ⏱️  搜索耗时: {:.2?}", duration);
         println!("  📊 模拟结果: 找到 3 条相关记忆");
-        
+
         // 这里应该显示实际的搜索结果
         println!("  🎯 Top 结果:");
         println!("    1. [function] semantic_search - 相似度: 0.92");
         println!("    2. [function] hybrid_search - 相似度: 0.85");
         println!("    3. [class] VectorStore - 相似度: 0.78");
     }
-    
+
     Ok(())
 }
 
@@ -274,36 +277,39 @@ async fn test_semantic_search(_agent: &CoreAgent, queries: &[(&str, &str)]) -> R
 fn analyze_memory_distribution(memories: &[CodeMemory]) {
     println!("\n📊 记忆类型分布分析...");
     println!("{}", "=".repeat(60));
-    
+
     let mut type_counts: HashMap<String, usize> = HashMap::new();
     let mut lang_counts: HashMap<String, usize> = HashMap::new();
     let mut memory_type_counts: HashMap<String, usize> = HashMap::new();
-    
+
     for mem in memories {
         *type_counts.entry(mem.code_type.clone()).or_insert(0) += 1;
         *lang_counts.entry(mem.language.clone()).or_insert(0) += 1;
-        *memory_type_counts.entry(mem.memory_type.to_string()).or_insert(0) += 1;
+        *memory_type_counts
+            .entry(mem.memory_type.to_string())
+            .or_insert(0) += 1;
     }
-    
+
     println!("\n代码类型分布:");
     for (code_type, count) in type_counts.iter() {
         let percentage = (*count as f64 / memories.len() as f64) * 100.0;
         println!("  - {}: {} ({:.1}%)", code_type, count, percentage);
     }
-    
+
     println!("\n编程语言分布:");
     for (lang, count) in lang_counts.iter() {
         let percentage = (*count as f64 / memories.len() as f64) * 100.0;
         println!("  - {}: {} ({:.1}%)", lang, count, percentage);
     }
-    
+
     println!("\n记忆类型分布:");
     for (mem_type, count) in memory_type_counts.iter() {
         let percentage = (*count as f64 / memories.len() as f64) * 100.0;
         println!("  - {}: {} ({:.1}%)", mem_type, count, percentage);
     }
-    
-    let avg_importance: f32 = memories.iter().map(|m| m.importance).sum::<f32>() / memories.len() as f32;
+
+    let avg_importance: f32 =
+        memories.iter().map(|m| m.importance).sum::<f32>() / memories.len() as f32;
     println!("\n平均重要性: {:.2}", avg_importance);
 }
 
@@ -313,26 +319,26 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
-    
+
     println!("🚀 AgentMem 代码感知批量记忆示例");
     println!("{}", "=".repeat(60));
-    
+
     // 1. 创建 Agent（使用持久化存储）
     println!("\n1️⃣  创建 CoreAgent (持久化存储)...");
     let agent = CoreAgent::from_env("code-aware-agent".to_string()).await?;
     println!("✅ Agent 创建成功");
-    
+
     // 2. 创建代码记忆数据集
     println!("\n2️⃣  创建代码记忆数据集...");
     let code_memories = create_code_memories();
     println!("✅ 创建了 {} 条代码记忆", code_memories.len());
-    
+
     // 3. 分析记忆分布
     analyze_memory_distribution(&code_memories);
-    
+
     // 4. 批量写入记忆
     let _memory_ids = batch_write_code_memories(&agent, &code_memories).await?;
-    
+
     // 5. 语义搜索测试
     let search_queries = vec![
         ("如何搜索记忆？", "搜索功能实现"),
@@ -341,9 +347,9 @@ async fn main() -> Result<()> {
         ("Python 客户端如何使用？", "Python SDK"),
         ("混合搜索算法", "RRF 融合算法"),
     ];
-    
+
     test_semantic_search(&agent, &search_queries).await?;
-    
+
     // 6. 总结
     println!("\n{}", "=".repeat(60));
     println!("✅ 代码感知批量记忆示例完成！");
@@ -352,14 +358,13 @@ async fn main() -> Result<()> {
     println!("  - 支持语言: Rust, Python, TypeScript");
     println!("  - 记忆类型: Semantic, Procedural, Knowledge");
     println!("  - 代码类型: function, class, module, struct, config, endpoint");
-    
+
     println!("\n💡 应用场景:");
     println!("  ✓ 代码库索引和搜索");
     println!("  ✓ API 文档智能检索");
     println!("  ✓ 代码片段推荐");
     println!("  ✓ 开发知识库管理");
     println!("  ✓ AI 编程助手");
-    
+
     Ok(())
 }
-

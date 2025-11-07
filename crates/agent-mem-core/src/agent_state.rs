@@ -80,7 +80,6 @@ impl fmt::Display for AgentState {
     }
 }
 
-
 /// Agent state machine
 ///
 /// Manages state transitions and validates state changes according to the state machine rules.
@@ -225,10 +224,7 @@ mod tests {
         assert_eq!(AgentState::Error.as_str(), "error");
 
         assert_eq!(AgentState::from_str("idle"), Some(AgentState::Idle));
-        assert_eq!(
-            AgentState::from_str("thinking"),
-            Some(AgentState::Thinking)
-        );
+        assert_eq!(AgentState::from_str("thinking"), Some(AgentState::Thinking));
         assert_eq!(
             AgentState::from_str("executing"),
             Some(AgentState::Executing)
@@ -291,9 +287,7 @@ mod tests {
         let mut sm = AgentStateMachine::new("agent-1".to_string());
 
         // Transition to error
-        assert!(sm
-            .transition_to_error("Test error".to_string())
-            .is_ok());
+        assert!(sm.transition_to_error("Test error".to_string()).is_ok());
         assert_eq!(sm.current_state(), &AgentState::Error);
         assert_eq!(sm.error_message(), Some("Test error"));
 
@@ -317,4 +311,3 @@ mod tests {
         assert!(sm.error_message().is_none());
     }
 }
-

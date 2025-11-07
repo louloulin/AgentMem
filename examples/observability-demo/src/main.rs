@@ -45,9 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 记录一些请求
     for i in 0..10 {
         let status = if i % 5 == 0 { 500 } else { 200 };
-        collector
-            .record_request("GET", "/api/users", status)
-            .await;
+        collector.record_request("GET", "/api/users", status).await;
         collector
             .record_request_duration("GET", "/api/users", 0.05 + (i as f64 * 0.01))
             .await;
@@ -56,12 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ 记录了 10 个请求指标");
 
     // 记录工具执行
-    collector
-        .record_tool_execution("calculator", 0.001)
-        .await;
-    collector
-        .record_tool_execution("web_search", 0.5)
-        .await;
+    collector.record_tool_execution("calculator", 0.001).await;
+    collector.record_tool_execution("web_search", 0.5).await;
     info!("✓ 记录了 2 个工具执行指标");
     println!("✓ 记录了 2 个工具执行指标");
 
@@ -94,11 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 不同级别的日志
     info!(user_id = "user123", action = "login", "用户登录");
-    warn!(
-        user_id = "user456",
-        attempt = 3,
-        "用户登录失败次数过多"
-    );
+    warn!(user_id = "user456", attempt = 3, "用户登录失败次数过多");
     error!(
         error_code = "DB_001",
         error_message = "数据库连接失败",
@@ -171,9 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 模拟一些操作
     for i in 0..20 {
         let duration = Duration::from_millis(10 + (i * 5));
-        analyzer
-            .record_operation("database_query", duration)
-            .await;
+        analyzer.record_operation("database_query", duration).await;
     }
 
     for i in 0..15 {
@@ -195,7 +183,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  总操作数: {}", report.total_operations);
     println!("  平均延迟: {:.2} ms", report.avg_duration_ms);
     if let Some(slowest) = &report.slowest_operation {
-        println!("  最慢操作: {} ({:.2} ms)", slowest.name, slowest.max_duration_ms);
+        println!(
+            "  最慢操作: {} ({:.2} ms)",
+            slowest.name, slowest.max_duration_ms
+        );
     }
 
     // 识别慢操作
@@ -224,9 +215,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 记录请求
         let status = if i % 10 == 0 { 500 } else { 200 };
-        collector
-            .record_request("GET", "/api/data", status)
-            .await;
+        collector.record_request("GET", "/api/data", status).await;
         collector
             .record_request_duration("GET", "/api/data", 0.1 + (i as f64 * 0.01))
             .await;
@@ -268,7 +257,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  总操作数: {}", final_report.total_operations);
     println!("  平均延迟: {:.2} ms", final_report.avg_duration_ms);
     if let Some(slowest) = &final_report.slowest_operation {
-        println!("  最慢操作: {} ({:.2} ms)", slowest.name, slowest.max_duration_ms);
+        println!(
+            "  最慢操作: {} ({:.2} ms)",
+            slowest.name, slowest.max_duration_ms
+        );
     }
 
     println!("\n提示:");
@@ -338,4 +330,3 @@ async fn process_data(user_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(Duration::from_millis(20)).await;
     Ok(())
 }
-

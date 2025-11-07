@@ -242,10 +242,19 @@ pub trait AssociationRepositoryTrait: Send + Sync {
     async fn find_by_id(&self, id: &str) -> Result<Option<MemoryAssociation>>;
 
     /// Get all associations for a memory
-    async fn find_by_memory_id(&self, memory_id: &str, user_id: &str) -> Result<Vec<MemoryAssociation>>;
+    async fn find_by_memory_id(
+        &self,
+        memory_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<MemoryAssociation>>;
 
     /// Get associations by type
-    async fn find_by_type(&self, memory_id: &str, user_id: &str, association_type: &str) -> Result<Vec<MemoryAssociation>>;
+    async fn find_by_type(
+        &self,
+        memory_id: &str,
+        user_id: &str,
+        association_type: &str,
+    ) -> Result<Vec<MemoryAssociation>>;
 
     /// Update association strength
     async fn update_strength(&self, id: &str, strength: f32) -> Result<()>;

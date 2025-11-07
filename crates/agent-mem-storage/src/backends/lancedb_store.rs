@@ -11,18 +11,21 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "lancedb")]
-use lancedb::{connect, Connection, Table};
-#[cfg(feature = "lancedb")]
 use lancedb::query::{ExecutableQuery, QueryBase};
+#[cfg(feature = "lancedb")]
+use lancedb::{connect, Connection, Table};
 
 #[cfg(feature = "lancedb")]
-use arrow::array::{Array, ArrayRef, FixedSizeListArray, Float32Array, RecordBatch, RecordBatchIterator, StringArray};
+use arrow::array::{
+    Array, ArrayRef, FixedSizeListArray, Float32Array, RecordBatch, RecordBatchIterator,
+    StringArray,
+};
 #[cfg(feature = "lancedb")]
 use arrow::datatypes::{DataType, Field, Schema};
 #[cfg(feature = "lancedb")]
-use std::sync::Arc as ArrowArc;
-#[cfg(feature = "lancedb")]
 use futures::TryStreamExt;
+#[cfg(feature = "lancedb")]
+use std::sync::Arc as ArrowArc;
 
 /// LanceDB vector store
 #[cfg(feature = "lancedb")]
@@ -69,10 +72,9 @@ impl LanceDBStore {
         }
 
         // Connect to LanceDB
-        let conn = connect(&expanded_path)
-            .execute()
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to connect to LanceDB: {e}")))?;
+        let conn = connect(&expanded_path).execute().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to connect to LanceDB: {e}"))
+        })?;
 
         info!("LanceDB store initialized successfully");
 
@@ -134,7 +136,7 @@ impl LanceDBStore {
     /// - For 10K vectors: ~20ms (50x faster)  
     /// - For 100K vectors: ~50ms (100x faster)
     ///
-    /// **Current Status:** 
+    /// **Current Status:**
     /// LanceDB already provides good performance out-of-the-box. This method is reserved
     /// for future optimization when dealing with >100K vectors.
     ///
@@ -167,7 +169,7 @@ impl LanceDBStore {
     /// Rule of thumb: num_partitions = sqrt(num_vectors)
     pub async fn create_ivf_index_auto(&self) -> Result<()> {
         let count = self.count_vectors().await?;
-        
+
         if count == 0 {
             info!("Table is empty, no index needed");
             return Ok(());
@@ -175,7 +177,7 @@ impl LanceDBStore {
 
         // Calculate optimal partitions: sqrt(num_vectors)
         let num_partitions = ((count as f64).sqrt().floor() as usize).clamp(10, 10000);
-        
+
         info!(
             "Auto-optimization for {} vectors (would use {} partitions when implemented)",
             count, num_partitions
@@ -219,10 +221,7 @@ impl VectorStore for LanceDBStore {
         let id_array = StringArray::from(ids.clone());
 
         // Vector array (as FixedSizeList)
-        let vector_values: Vec<f32> = vectors
-            .iter()
-            .flat_map(|v| v.vector.clone())
-            .collect();
+        let vector_values: Vec<f32> = vectors.iter().flat_map(|v| v.vector.clone()).collect();
         let vector_value_array = Float32Array::from(vector_values);
         let vector_array = FixedSizeListArray::new(
             ArrowArc::new(Field::new("item", DataType::Float32, true)),
@@ -253,9 +252,7 @@ impl VectorStore for LanceDBStore {
                 ArrowArc::new(metadata_array) as ArrayRef,
             ],
         )
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to create RecordBatch: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to create RecordBatch: {e}")))?;
 
         debug!(
             "Created RecordBatch with {} rows, {} columns",
@@ -290,18 +287,22 @@ impl VectorStore for LanceDBStore {
                 .await
                 .map_err(|e| AgentMemError::StorageError(format!("Failed to add vectors: {e}")))?;
 
-            info!("Added {} vectors to existing table '{}'", num_vectors, self.table_name);
+            info!(
+                "Added {} vectors to existing table '{}'",
+                num_vectors, self.table_name
+            );
         } else {
             // Create new table with data
             self.conn
                 .create_table(&self.table_name, reader)
                 .execute()
                 .await
-                .map_err(|e| {
-                    AgentMemError::StorageError(format!("Failed to create table: {e}"))
-                })?;
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to create table: {e}")))?;
 
-            info!("Created table '{}' with {} vectors", self.table_name, num_vectors);
+            info!(
+                "Created table '{}' with {} vectors",
+                self.table_name, num_vectors
+            );
         }
 
         Ok(ids)
@@ -313,7 +314,10 @@ impl VectorStore for LanceDBStore {
         limit: usize,
         threshold: Option<f32>,
     ) -> Result<Vec<VectorSearchResult>> {
-        debug!("Searching for {} similar vectors with threshold {:?}", limit, threshold);
+        debug!(
+            "Searching for {} similar vectors with threshold {:?}",
+            limit, threshold
+        );
 
         // 1. 获取表
         let table = self.get_or_create_table().await?;
@@ -324,7 +328,9 @@ impl VectorStore for LanceDBStore {
         let batches = table
             .query()
             .nearest_to(query_vector.as_slice())
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create nearest_to query: {e}")))?
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create nearest_to query: {e}"))
+            })?
             .limit(limit)
             .execute()
             .await
@@ -348,24 +354,33 @@ impl VectorStore for LanceDBStore {
                 .ok_or_else(|| AgentMemError::StorageError("Missing 'id' column".to_string()))?
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'id' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'id' column type".to_string())
+                })?;
 
             let vector_array = batch
                 .column_by_name("vector")
                 .ok_or_else(|| AgentMemError::StorageError("Missing 'vector' column".to_string()))?
                 .as_any()
                 .downcast_ref::<FixedSizeListArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'vector' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'vector' column type".to_string())
+                })?;
 
             let metadata_array = batch
                 .column_by_name("metadata")
-                .ok_or_else(|| AgentMemError::StorageError("Missing 'metadata' column".to_string()))?
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Missing 'metadata' column".to_string())
+                })?
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'metadata' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'metadata' column type".to_string())
+                })?;
 
             // 检查是否有距离列（LanceDB 搜索结果可能包含 _distance 列）
-            let distance_array = batch.column_by_name("_distance")
+            let distance_array = batch
+                .column_by_name("_distance")
                 .and_then(|col| col.as_any().downcast_ref::<Float32Array>());
 
             // 处理每一行
@@ -377,7 +392,9 @@ impl VectorStore for LanceDBStore {
                 let vector_data = vector_list
                     .as_any()
                     .downcast_ref::<Float32Array>()
-                    .ok_or_else(|| AgentMemError::StorageError("Invalid vector data type".to_string()))?;
+                    .ok_or_else(|| {
+                        AgentMemError::StorageError("Invalid vector data type".to_string())
+                    })?;
                 let vector: Vec<f32> = vector_data.values().to_vec();
 
                 // 提取 metadata
@@ -397,7 +414,8 @@ impl VectorStore for LanceDBStore {
                     dist_arr.value(i)
                 } else {
                     // 如果没有距离列，手动计算欧氏距离
-                    let sum: f32 = query_vector.iter()
+                    let sum: f32 = query_vector
+                        .iter()
                         .zip(vector.iter())
                         .map(|(a, b)| (a - b).powi(2))
                         .sum();
@@ -456,7 +474,8 @@ impl VectorStore for LanceDBStore {
 
         // 2. 构建删除条件
         // LanceDB delete API 使用 SQL-like 条件: "id = 'vec1' OR id = 'vec2'"
-        let condition = ids.iter()
+        let condition = ids
+            .iter()
             .map(|id| format!("id = '{}'", id.replace("'", "''"))) // 转义单引号
             .collect::<Vec<_>>()
             .join(" OR ");
@@ -530,21 +549,29 @@ impl VectorStore for LanceDBStore {
                 .ok_or_else(|| AgentMemError::StorageError("Missing 'id' column".to_string()))?
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'id' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'id' column type".to_string())
+                })?;
 
             let vector_array = batch
                 .column_by_name("vector")
                 .ok_or_else(|| AgentMemError::StorageError("Missing 'vector' column".to_string()))?
                 .as_any()
                 .downcast_ref::<FixedSizeListArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'vector' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'vector' column type".to_string())
+                })?;
 
             let metadata_array = batch
                 .column_by_name("metadata")
-                .ok_or_else(|| AgentMemError::StorageError("Missing 'metadata' column".to_string()))?
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Missing 'metadata' column".to_string())
+                })?
                 .as_any()
                 .downcast_ref::<StringArray>()
-                .ok_or_else(|| AgentMemError::StorageError("Invalid 'metadata' column type".to_string()))?;
+                .ok_or_else(|| {
+                    AgentMemError::StorageError("Invalid 'metadata' column type".to_string())
+                })?;
 
             // Scan all rows to find matching ID
             for row_idx in 0..batch.num_rows() {
@@ -557,7 +584,9 @@ impl VectorStore for LanceDBStore {
                     let vector_data = vector_list
                         .as_any()
                         .downcast_ref::<Float32Array>()
-                        .ok_or_else(|| AgentMemError::StorageError("Invalid vector data type".to_string()))?;
+                        .ok_or_else(|| {
+                            AgentMemError::StorageError("Invalid vector data type".to_string())
+                        })?;
                     let vector: Vec<f32> = vector_data.values().to_vec();
 
                     // Extract metadata
@@ -588,10 +617,9 @@ impl VectorStore for LanceDBStore {
         match self.get_or_create_table().await {
             Ok(table) => {
                 // Get count from table
-                let count = table
-                    .count_rows(None)
-                    .await
-                    .map_err(|e| AgentMemError::StorageError(format!("Failed to count rows: {e}")))?;
+                let count = table.count_rows(None).await.map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to count rows: {e}"))
+                })?;
                 Ok(count)
             }
             Err(_) => Ok(0),
@@ -750,13 +778,11 @@ mod tests {
             .unwrap();
 
         // First batch
-        let vectors1 = vec![
-            VectorData {
-                id: "vec1".to_string(),
-                vector: vec![1.0, 2.0, 3.0],
-                metadata: std::collections::HashMap::new(),
-            },
-        ];
+        let vectors1 = vec![VectorData {
+            id: "vec1".to_string(),
+            vector: vec![1.0, 2.0, 3.0],
+            metadata: std::collections::HashMap::new(),
+        }];
         let ids1 = store.add_vectors(vectors1).await.unwrap();
         assert_eq!(ids1.len(), 1);
 
@@ -863,7 +889,10 @@ mod tests {
 
         // Search with high threshold - should filter out distant vectors
         let query = vec![1.0, 0.0, 0.0];
-        let results = store.search_vectors(query.clone(), 10, Some(0.8)).await.unwrap();
+        let results = store
+            .search_vectors(query.clone(), 10, Some(0.8))
+            .await
+            .unwrap();
 
         // Only vec1 should pass the threshold (exact match, similarity = 1.0)
         assert_eq!(results.len(), 1);
@@ -906,14 +935,20 @@ mod tests {
         assert_eq!(stats.total_vectors, 3);
 
         // Delete vec2
-        store.delete_vectors(vec!["vec2".to_string()]).await.unwrap();
+        store
+            .delete_vectors(vec!["vec2".to_string()])
+            .await
+            .unwrap();
 
         // Verify vec2 is deleted
         let stats = store.get_stats().await.unwrap();
         assert_eq!(stats.total_vectors, 2);
 
         // Search should not return vec2
-        let results = store.search_vectors(vec![0.0, 1.0, 0.0], 10, None).await.unwrap();
+        let results = store
+            .search_vectors(vec![0.0, 1.0, 0.0], 10, None)
+            .await
+            .unwrap();
         assert!(!results.iter().any(|r| r.id == "vec2"));
     }
 
@@ -948,14 +983,20 @@ mod tests {
         store.add_vectors(vectors).await.unwrap();
 
         // Delete vec1 and vec3
-        store.delete_vectors(vec!["vec1".to_string(), "vec3".to_string()]).await.unwrap();
+        store
+            .delete_vectors(vec!["vec1".to_string(), "vec3".to_string()])
+            .await
+            .unwrap();
 
         // Verify only vec2 remains
         let stats = store.get_stats().await.unwrap();
         assert_eq!(stats.total_vectors, 1);
 
         // Search should only return vec2
-        let results = store.search_vectors(vec![0.0, 1.0, 0.0], 10, None).await.unwrap();
+        let results = store
+            .search_vectors(vec![0.0, 1.0, 0.0], 10, None)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "vec2");
     }
@@ -1009,13 +1050,11 @@ mod tests {
         updated_metadata1.insert("version".to_string(), "2".to_string());
         updated_metadata1.insert("updated".to_string(), "true".to_string());
 
-        let updated_vectors = vec![
-            VectorData {
-                id: "vec1".to_string(),
-                vector: vec![0.9, 0.1, 0.0, 0.0], // Changed vector
-                metadata: updated_metadata1,
-            },
-        ];
+        let updated_vectors = vec![VectorData {
+            id: "vec1".to_string(),
+            vector: vec![0.9, 0.1, 0.0, 0.0], // Changed vector
+            metadata: updated_metadata1,
+        }];
 
         store.update_vectors(updated_vectors).await.unwrap();
 
@@ -1154,7 +1193,10 @@ mod tests {
         println!("插入 {num_vectors} 个向量耗时: {duration:?}");
 
         // 验证性能指标
-        assert!(ops_per_sec > 1000.0, "插入性能未达标: {ops_per_sec:.2} ops/s < 1000 ops/s");
+        assert!(
+            ops_per_sec > 1000.0,
+            "插入性能未达标: {ops_per_sec:.2} ops/s < 1000 ops/s"
+        );
     }
 
     /// 性能基准测试：向量搜索性能 (1K 向量)
@@ -1194,7 +1236,10 @@ mod tests {
         println!("返回结果数: {}", results.len());
 
         // 验证性能指标（LanceDB 嵌入式数据库，50ms 是合理目标）
-        assert!(duration.as_millis() < 50, "搜索延迟未达标: {duration:?} >= 50ms");
+        assert!(
+            duration.as_millis() < 50,
+            "搜索延迟未达标: {duration:?} >= 50ms"
+        );
     }
 
     /// 性能基准测试：向量搜索性能 (10K 向量)
@@ -1238,7 +1283,9 @@ mod tests {
         println!("返回结果数: {}", results.len());
 
         // 验证性能指标（10K 向量应该 < 50ms）
-        assert!(duration.as_millis() < 50, "搜索延迟未达标: {duration:?} >= 50ms");
+        assert!(
+            duration.as_millis() < 50,
+            "搜索延迟未达标: {duration:?} >= 50ms"
+        );
     }
 }
-

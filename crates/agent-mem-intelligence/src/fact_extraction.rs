@@ -168,7 +168,7 @@ pub struct FactExtractor {
 impl FactExtractor {
     /// 创建新的事实提取器
     pub fn new(llm: Arc<dyn LLMProvider + Send + Sync>) -> Self {
-        Self { 
+        Self {
             llm,
             timeout_config: TimeoutConfig::default(),
             cache: None,
@@ -176,9 +176,12 @@ impl FactExtractor {
     }
 
     /// 创建带自定义超时配置的事实提取器
-    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
-        Self { 
-            llm, 
+    pub fn with_timeout_config(
+        llm: Arc<dyn LLMProvider + Send + Sync>,
+        timeout_config: TimeoutConfig,
+    ) -> Self {
+        Self {
+            llm,
             timeout_config,
             cache: None,
         }
@@ -228,12 +231,11 @@ impl FactExtractor {
         // P0 优化 #2: 添加超时控制
         let llm = self.llm.clone();
         let response_text = with_timeout(
-            async move {
-                llm.generate(&[Message::user(&prompt)]).await
-            },
+            async move { llm.generate(&[Message::user(&prompt)]).await },
             self.timeout_config.fact_extraction_timeout_secs,
             "fact_extraction",
-        ).await?;
+        )
+        .await?;
 
         // 尝试提取 JSON 部分
         let json_text = self.extract_json_from_response(&response_text)?;
@@ -250,7 +252,7 @@ impl FactExtractor {
             Err(e) => {
                 warn!("LLM事实提取JSON解析失败: {}, 降级到规则提取", e);
                 warn!("JSON text: {}", json_text);
-                
+
                 // P1 优化 #3: 降级到基于规则的提取
                 self.rule_based_fact_extraction(messages)?
             }
@@ -651,19 +653,19 @@ Requirements:
     }
 
     /// P1 优化 #3: 基于规则的事实提取（降级方案）
-    /// 
+    ///
     /// 当 LLM 解析失败时使用此方法作为后备方案
     fn rule_based_fact_extraction(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
         info!("使用基于规则的事实提取（降级方案）");
-        
+
         let mut facts = Vec::new();
 
         for message in messages {
             let content = &message.content;
-            
+
             // 规则1: 提取包含关键词的句子作为事实
             let sentences: Vec<&str> = content.split('。').collect();
-            
+
             for (idx, sentence) in sentences.iter().enumerate() {
                 let sentence = sentence.trim();
                 if sentence.is_empty() {
@@ -672,7 +674,7 @@ Requirements:
 
                 // 判断事实类别
                 let category = self.classify_by_keywords(sentence);
-                
+
                 // 构建事实
                 let fact = ExtractedFact {
                     content: sentence.to_string(),
@@ -685,12 +687,12 @@ Requirements:
                         let mut map = HashMap::new();
                         map.insert(
                             "extraction_method".to_string(),
-                            serde_json::json!("rule_based")
+                            serde_json::json!("rule_based"),
                         );
                         map
                     },
                 };
-                
+
                 facts.push(fact);
             }
         }
@@ -709,7 +711,7 @@ Requirements:
                         let mut map = HashMap::new();
                         map.insert(
                             "extraction_method".to_string(),
-                            serde_json::json!("fallback_raw")
+                            serde_json::json!("fallback_raw"),
                         );
                         map
                     },
@@ -724,37 +726,43 @@ Requirements:
     /// 基于关键词分类事实类别
     fn classify_by_keywords(&self, text: &str) -> FactCategory {
         let text_lower = text.to_lowercase();
-        
+
         // 个人信息关键词
-        if text_lower.contains("我") && (text_lower.contains("叫") || text_lower.contains("是")) {
+        if text_lower.contains("我") && (text_lower.contains("叫") || text_lower.contains("是"))
+        {
             return FactCategory::Personal;
         }
-        
+
         // 偏好关键词
-        if text_lower.contains("喜欢") || text_lower.contains("讨厌") || text_lower.contains("爱") {
+        if text_lower.contains("喜欢") || text_lower.contains("讨厌") || text_lower.contains("爱")
+        {
             return FactCategory::Preference;
         }
-        
+
         // 关系关键词
-        if text_lower.contains("朋友") || text_lower.contains("家人") || text_lower.contains("同事") {
+        if text_lower.contains("朋友") || text_lower.contains("家人") || text_lower.contains("同事")
+        {
             return FactCategory::Relationship;
         }
-        
+
         // 事件关键词
-        if text_lower.contains("发生") || text_lower.contains("经历") || text_lower.contains("做了") {
+        if text_lower.contains("发生") || text_lower.contains("经历") || text_lower.contains("做了")
+        {
             return FactCategory::Event;
         }
-        
+
         // 技能关键词
-        if text_lower.contains("会") || text_lower.contains("能") || text_lower.contains("擅长") {
+        if text_lower.contains("会") || text_lower.contains("能") || text_lower.contains("擅长")
+        {
             return FactCategory::Skill;
         }
-        
+
         // 目标关键词
-        if text_lower.contains("想") || text_lower.contains("打算") || text_lower.contains("计划") {
+        if text_lower.contains("想") || text_lower.contains("打算") || text_lower.contains("计划")
+        {
             return FactCategory::Goal;
         }
-        
+
         // 默认为知识类
         FactCategory::Knowledge
     }
@@ -1011,8 +1019,14 @@ impl AdvancedFactExtractor {
     }
 
     /// 创建带超时配置的高级事实提取器
-    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
-        Self { llm, timeout_config }
+    pub fn with_timeout_config(
+        llm: Arc<dyn LLMProvider + Send + Sync>,
+        timeout_config: TimeoutConfig,
+    ) -> Self {
+        Self {
+            llm,
+            timeout_config,
+        }
     }
 
     /// 提取结构化事实 (Mem5 核心功能)
@@ -1113,19 +1127,20 @@ impl AdvancedFactExtractor {
 
             for (i, word) in words.iter().enumerate() {
                 // 简单的人名识别
-                if word.len() >= 2 && word.chars().all(|c| c.is_alphabetic())
+                if word.len() >= 2
+                    && word.chars().all(|c| c.is_alphabetic())
                     && i > 0
-                        && (words[i - 1] == "我叫" || words[i - 1] == "叫" || words[i - 1] == "是")
-                    {
-                        entities.push(Entity {
-                            id: format!("entity_{entity_id}"),
-                            name: word.to_string(),
-                            entity_type: EntityType::Person,
-                            confidence: 0.8,
-                            attributes: HashMap::new(),
-                        });
-                        entity_id += 1;
-                    }
+                    && (words[i - 1] == "我叫" || words[i - 1] == "叫" || words[i - 1] == "是")
+                {
+                    entities.push(Entity {
+                        id: format!("entity_{entity_id}"),
+                        name: word.to_string(),
+                        entity_type: EntityType::Person,
+                        confidence: 0.8,
+                        attributes: HashMap::new(),
+                    });
+                    entity_id += 1;
+                }
 
                 // 简单的地点识别
                 if word.ends_with("市") || word.ends_with("省") || word.ends_with("区") {

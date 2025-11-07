@@ -312,7 +312,6 @@ impl ImportanceEvaluator {
         let age_days = (now - memory.created_at).num_days() as f32;
 
         // 应用时间衰减
-        
 
         // 最近的记忆更重要
         self.config.time_decay_factor.powf(age_days)

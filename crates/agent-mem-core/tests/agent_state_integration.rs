@@ -352,4 +352,3 @@ async fn test_multiple_background_agents() {
     manager.stop_all().await;
     assert_eq!(manager.running_agent_count().await, 0);
 }
-

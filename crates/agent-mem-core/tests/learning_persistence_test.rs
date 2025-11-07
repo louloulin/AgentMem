@@ -7,7 +7,7 @@ mod persistence_tests {
     use agent_mem_core::search::adaptive::{QueryFeatures, SearchWeights};
     use agent_mem_core::search::learning::{LearningConfig, LearningEngine};
     use agent_mem_core::storage::libsql::{
-        create_libsql_pool, run_migrations, LibSqlLearningRepository, LearningRepositoryTrait,
+        create_libsql_pool, run_migrations, LearningRepositoryTrait, LibSqlLearningRepository,
     };
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -17,9 +17,7 @@ mod persistence_tests {
         // 创建临时数据库
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test_learning.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
 
         // 运行迁移
         run_migrations(conn.clone()).await.unwrap();
@@ -91,9 +89,7 @@ mod persistence_tests {
 
         // 第一次启动：创建和记录反馈
         {
-            let conn = create_libsql_pool(db_path.to_str().unwrap())
-                .await
-                .unwrap();
+            let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
             run_migrations(conn.clone()).await.unwrap();
 
             let repo = Arc::new(LibSqlLearningRepository::new(conn));
@@ -125,9 +121,7 @@ mod persistence_tests {
 
         // 第二次启动：重新加载数据
         {
-            let conn = create_libsql_pool(db_path.to_str().unwrap())
-                .await
-                .unwrap();
+            let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
 
             let repo = Arc::new(LibSqlLearningRepository::new(conn));
             let engine = LearningEngine::with_persistence(LearningConfig::default(), repo.clone());
@@ -160,9 +154,7 @@ mod persistence_tests {
     async fn test_learning_repository_operations() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test_repo.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
 
         run_migrations(conn.clone()).await.unwrap();
 
@@ -249,9 +241,7 @@ mod persistence_tests {
     async fn test_old_feedback_cleanup() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test_cleanup.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
 
         run_migrations(conn.clone()).await.unwrap();
 
@@ -317,4 +307,3 @@ mod persistence_tests {
         assert_eq!(remaining[0].id, "new-record");
     }
 }
-

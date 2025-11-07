@@ -65,7 +65,14 @@ async fn test_streaming_chunk_format() {
 #[test]
 fn test_stream_chunk_types() {
     // 测试不同类型的 chunk
-    let chunk_types = vec!["start", "content", "tool_call", "memory_update", "done", "error"];
+    let chunk_types = vec![
+        "start",
+        "content",
+        "tool_call",
+        "memory_update",
+        "done",
+        "error",
+    ];
 
     for chunk_type in chunk_types {
         let chunk = serde_json::json!({
@@ -82,4 +89,3 @@ fn test_stream_chunk_types() {
         assert!(serialized.contains(chunk_type));
     }
 }
-

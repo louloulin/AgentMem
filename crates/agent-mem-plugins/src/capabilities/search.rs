@@ -36,7 +36,7 @@ impl SearchCapability {
             .iter()
             .filter_map(|memory| {
                 let content_lower = memory.content.to_lowercase();
-                
+
                 // Simple scoring: count occurrences of query words
                 let mut score = 0.0;
                 for word in query_lower.split_whitespace() {
@@ -49,13 +49,15 @@ impl SearchCapability {
                     let mut metadata = HashMap::new();
                     metadata.insert(
                         "content_preview".to_string(),
-                        serde_json::Value::String(memory.content.chars().take(100).collect::<String>())
+                        serde_json::Value::String(
+                            memory.content.chars().take(100).collect::<String>(),
+                        ),
                     );
                     metadata.insert(
                         "created_at".to_string(),
-                        serde_json::Value::String(memory.created_at.clone())
+                        serde_json::Value::String(memory.created_at.clone()),
                     );
-                    
+
                     Some(SearchResult {
                         memory: memory.clone(),
                         score,
@@ -69,7 +71,7 @@ impl SearchCapability {
 
         // Sort by score descending
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-        
+
         // Apply limit
         results.truncate(limit);
 
@@ -77,7 +79,11 @@ impl SearchCapability {
     }
 
     /// Search memories by type
-    pub async fn search_by_type(&self, memory_type: &str, limit: usize) -> Result<Vec<SearchResult>> {
+    pub async fn search_by_type(
+        &self,
+        memory_type: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>> {
         let memories = self.memories.read().await;
 
         let mut results: Vec<SearchResult> = memories
@@ -87,9 +93,9 @@ impl SearchCapability {
                 let mut metadata = HashMap::new();
                 metadata.insert(
                     "user_id".to_string(),
-                    serde_json::Value::String(memory.user_id.clone())
+                    serde_json::Value::String(memory.user_id.clone()),
                 );
-                
+
                 SearchResult {
                     memory: memory.clone(),
                     score: 1.0,
@@ -111,12 +117,10 @@ impl SearchCapability {
         let mut results: Vec<SearchResult> = memories
             .iter()
             .filter(|memory| memory.user_id == user_id)
-            .map(|memory| {
-                SearchResult {
-                    memory: memory.clone(),
-                    score: 1.0,
-                    metadata: HashMap::new(),
-                }
+            .map(|memory| SearchResult {
+                memory: memory.clone(),
+                score: 1.0,
+                metadata: HashMap::new(),
             })
             .collect();
 
@@ -168,11 +172,25 @@ mod tests {
     #[tokio::test]
     async fn test_search_by_content() {
         let search = SearchCapability::new();
-        
-        search.index_memory(create_test_memory("1", "Hello world", "message", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("2", "Goodbye world", "message", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("3", "Hello universe", "message", "user1")).await.unwrap();
-        
+
+        search
+            .index_memory(create_test_memory("1", "Hello world", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Goodbye world", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory(
+                "3",
+                "Hello universe",
+                "message",
+                "user1",
+            ))
+            .await
+            .unwrap();
+
         let results = search.search("hello", 10).await.unwrap();
         assert_eq!(results.len(), 2);
     }
@@ -180,11 +198,20 @@ mod tests {
     #[tokio::test]
     async fn test_search_by_type() {
         let search = SearchCapability::new();
-        
-        search.index_memory(create_test_memory("1", "Content 1", "message", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("2", "Content 2", "note", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("3", "Content 3", "message", "user1")).await.unwrap();
-        
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "note", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("3", "Content 3", "message", "user1"))
+            .await
+            .unwrap();
+
         let results = search.search_by_type("message", 10).await.unwrap();
         assert_eq!(results.len(), 2);
     }
@@ -192,11 +219,20 @@ mod tests {
     #[tokio::test]
     async fn test_search_by_user() {
         let search = SearchCapability::new();
-        
-        search.index_memory(create_test_memory("1", "Content 1", "message", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("2", "Content 2", "message", "user2")).await.unwrap();
-        search.index_memory(create_test_memory("3", "Content 3", "message", "user1")).await.unwrap();
-        
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "message", "user2"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("3", "Content 3", "message", "user1"))
+            .await
+            .unwrap();
+
         let results = search.search_by_user("user1", 10).await.unwrap();
         assert_eq!(results.len(), 2);
     }
@@ -204,11 +240,19 @@ mod tests {
     #[tokio::test]
     async fn test_search_limit() {
         let search = SearchCapability::new();
-        
+
         for i in 0..10 {
-            search.index_memory(create_test_memory(&i.to_string(), "test content", "message", "user1")).await.unwrap();
+            search
+                .index_memory(create_test_memory(
+                    &i.to_string(),
+                    "test content",
+                    "message",
+                    "user1",
+                ))
+                .await
+                .unwrap();
         }
-        
+
         let results = search.search("test", 5).await.unwrap();
         assert_eq!(results.len(), 5);
     }
@@ -216,12 +260,18 @@ mod tests {
     #[tokio::test]
     async fn test_search_count_and_clear() {
         let search = SearchCapability::new();
-        
-        search.index_memory(create_test_memory("1", "Content 1", "message", "user1")).await.unwrap();
-        search.index_memory(create_test_memory("2", "Content 2", "message", "user1")).await.unwrap();
-        
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "message", "user1"))
+            .await
+            .unwrap();
+
         assert_eq!(search.count().await.unwrap(), 2);
-        
+
         search.clear().await.unwrap();
         assert_eq!(search.count().await.unwrap(), 0);
     }

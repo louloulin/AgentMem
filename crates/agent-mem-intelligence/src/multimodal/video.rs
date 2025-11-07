@@ -312,9 +312,7 @@ impl VideoProcessor {
         start_time: f64,
         end_time: f64,
     ) -> String {
-        format!(
-            "{scene_type} scene from {start_time:.1}s to {end_time:.1}s"
-        )
+        format!("{scene_type} scene from {start_time:.1}s to {end_time:.1}s")
     }
 
     /// 检测视频格式

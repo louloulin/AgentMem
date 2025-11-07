@@ -1,7 +1,7 @@
 //! 配置加载器测试
 
 use agent_mem_config::{DeploymentMode, VectorServiceType};
-use agent_mem_deployment::{ConfigLoader, ConfigFormat};
+use agent_mem_deployment::{ConfigFormat, ConfigLoader};
 use std::path::PathBuf;
 
 #[test]
@@ -289,4 +289,3 @@ fn test_config_format_from_extension() {
         None
     );
 }
-

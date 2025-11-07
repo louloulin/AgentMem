@@ -88,7 +88,9 @@ pub async fn list_tools(
 ) -> ServerResult<Json<ApiResponse<serde_json::Value>>> {
     info!("Listing MCP tools");
 
-    let response = mcp_server.list_tools().await
+    let response = mcp_server
+        .list_tools()
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
 
     Ok(Json(ApiResponse::success(serde_json::json!({
@@ -131,23 +133,28 @@ pub async fn call_tool(
         arguments: request.arguments,
     };
 
-    let mcp_response = mcp_server.call_tool(mcp_request).await
+    let mcp_response = mcp_server
+        .call_tool(mcp_request)
+        .await
         .map_err(|e| ServerError::Internal(format!("Tool execution failed: {}", e)))?;
 
     // 转换响应
-    let content: Vec<ContentItem> = mcp_response.content
+    let content: Vec<ContentItem> = mcp_response
+        .content
         .into_iter()
         .map(|c| match c {
             agent_mem_tools::mcp::types::McpContent::Text { text } => ContentItem::Text { text },
             agent_mem_tools::mcp::types::McpContent::Image { data, mime_type } => {
                 ContentItem::Image { data, mime_type }
             }
-            agent_mem_tools::mcp::types::McpContent::Resource { uri, mime_type, text: _ } => {
-                ContentItem::Resource {
-                    uri,
-                    mime_type: mime_type.unwrap_or_else(|| "application/octet-stream".to_string())
-                }
-            }
+            agent_mem_tools::mcp::types::McpContent::Resource {
+                uri,
+                mime_type,
+                text: _,
+            } => ContentItem::Resource {
+                uri,
+                mime_type: mime_type.unwrap_or_else(|| "application/octet-stream".to_string()),
+            },
         })
         .collect();
 
@@ -181,10 +188,13 @@ pub async fn get_tool(
 ) -> ServerResult<Json<ApiResponse<serde_json::Value>>> {
     info!("Getting MCP tool: {}", tool_name);
 
-    let response = mcp_server.list_tools().await
+    let response = mcp_server
+        .list_tools()
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
 
-    let tool = response.tools
+    let tool = response
+        .tools
         .into_iter()
         .find(|t| t.name == tool_name)
         .ok_or_else(|| ServerError::NotFound(format!("Tool '{}' not found", tool_name)))?;
@@ -256,10 +266,6 @@ mod tests {
 
         let response = health_check(Extension(mcp_server)).await.unwrap();
         assert!(response.0.success);
-        assert_eq!(
-            response.0.data["status"].as_str().unwrap(),
-            "healthy"
-        );
+        assert_eq!(response.0.data["status"].as_str().unwrap(), "healthy");
     }
 }
-

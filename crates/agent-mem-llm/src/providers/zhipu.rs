@@ -172,7 +172,8 @@ impl LLMProvider for ZhipuProvider {
 
         let base_url = self
             .config
-            .base_url.as_deref()
+            .base_url
+            .as_deref()
             .unwrap_or("https://open.bigmodel.cn/api/paas/v4");
 
         let url = format!("{base_url}/chat/completions");
@@ -216,9 +217,10 @@ impl LLMProvider for ZhipuProvider {
             )));
         }
 
-        let zhipu_response: ZhipuResponse = response.json().await.map_err(|e| {
-            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
-        })?;
+        let zhipu_response: ZhipuResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}")))?;
 
         zhipu_response
             .choices
@@ -238,7 +240,8 @@ impl LLMProvider for ZhipuProvider {
 
         let base_url = self
             .config
-            .base_url.as_deref()
+            .base_url
+            .as_deref()
             .unwrap_or("https://open.bigmodel.cn/api/paas/v4");
 
         let url = format!("{base_url}/chat/completions");
@@ -276,9 +279,10 @@ impl LLMProvider for ZhipuProvider {
             )));
         }
 
-        let zhipu_response: ZhipuResponse = response.json().await.map_err(|e| {
-            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
-        })?;
+        let zhipu_response: ZhipuResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}")))?;
 
         let choice = zhipu_response
             .choices

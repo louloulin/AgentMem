@@ -204,4 +204,3 @@ fn print_usage_examples() {
     info!("export QDRANT_URL=\"http://localhost:6333\"");
     info!("cargo run --example env-config-demo");
 }
-

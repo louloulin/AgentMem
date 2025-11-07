@@ -129,8 +129,14 @@ async fn test_get_items_by_tree_path() {
 
     // 获取特定层级路径下的项
     let tree_path = vec!["test".to_string(), "concepts".to_string()];
-    let result = manager.get_items_by_tree_path("user-test", &tree_path).await;
-    assert!(result.is_ok(), "Failed to get items by tree path: {:?}", result.err());
+    let result = manager
+        .get_items_by_tree_path("user-test", &tree_path)
+        .await;
+    assert!(
+        result.is_ok(),
+        "Failed to get items by tree path: {:?}",
+        result.err()
+    );
 
     let items = result.unwrap();
     for item in items {
@@ -223,8 +229,7 @@ fn test_semantic_query_builder() {
     assert!(json.contains("Machine Learning"));
 
     // 测试反序列化
-    let deserialized: SemanticQuery =
-        serde_json::from_str(&json).expect("Failed to deserialize");
+    let deserialized: SemanticQuery = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.name_query, query.name_query);
     assert_eq!(deserialized.limit, query.limit);
 }
@@ -257,4 +262,3 @@ fn test_source_field() {
     assert!(item.source.is_some());
     assert_eq!(item.source.unwrap(), "test-source");
 }
-

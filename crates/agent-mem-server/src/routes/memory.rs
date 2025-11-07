@@ -14,7 +14,7 @@ use crate::{
         UpdateMemoryRequest,
     },
 };
-use agent_mem::{Memory, AddMemoryOptions, SearchOptions, GetAllOptions, DeleteAllOptions};
+use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions};
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,42 +35,45 @@ impl MemoryManager {
         embedder_model: Option<String>,
     ) -> ServerResult<Self> {
         // 🔧 修复：使用builder模式显式指定LibSQL存储，而不是默认的内存存储
-        let db_path = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
-        
+        let db_path =
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+
         info!("Initializing Memory with LibSQL storage: {}", db_path);
-        
-        let mut builder = Memory::builder()
-            .with_storage(&db_path);  // 🔑 关键修复：显式指定使用LibSQL
-        
+
+        let mut builder = Memory::builder().with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
+
         // 🔑 关键修复 #2：配置Embedder（P0问题）
         if let (Some(provider), Some(model)) = (embedder_provider, embedder_model) {
-            info!("Configuring embedder: provider={}, model={}", provider, model);
+            info!(
+                "Configuring embedder: provider={}, model={}",
+                provider, model
+            );
             builder = builder.with_embedder(provider, model);
         } else {
             // 使用默认FastEmbed配置
             info!("No embedder config provided, using default FastEmbed");
             builder = builder.with_embedder("fastembed", "BAAI/bge-small-en-v1.5");
         }
-        
-        let memory = builder
-            .build()
-            .await
-            .map_err(|e| ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e)))?;
-        
+
+        let memory = builder.build().await.map_err(|e| {
+            ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e))
+        })?;
+
         info!("Memory initialized successfully with LibSQL persistence");
-        
+
         // 🆕 Fix 2: 初始化QueryOptimizer和Reranker
         let query_optimizer = {
             use std::sync::RwLock;
-            let stats = Arc::new(RwLock::new(agent_mem_core::search::IndexStatistics::default()));
+            let stats = Arc::new(RwLock::new(
+                agent_mem_core::search::IndexStatistics::default(),
+            ));
             agent_mem_core::search::QueryOptimizer::with_default_config(stats)
         };
-        
+
         let reranker = agent_mem_core::search::ResultReranker::with_default_config();
-        
+
         info!("✅ QueryOptimizer and Reranker initialized");
-        
+
         Ok(Self {
             memory: Arc::new(memory),
             query_optimizer: Arc::new(query_optimizer),
@@ -83,12 +86,14 @@ impl MemoryManager {
         // 🆕 Fix 2: 初始化QueryOptimizer和Reranker
         let query_optimizer = {
             use std::sync::RwLock;
-            let stats = Arc::new(RwLock::new(agent_mem_core::search::IndexStatistics::default()));
+            let stats = Arc::new(RwLock::new(
+                agent_mem_core::search::IndexStatistics::default(),
+            ));
             agent_mem_core::search::QueryOptimizer::with_default_config(stats)
         };
-        
+
         let reranker = agent_mem_core::search::ResultReranker::with_default_config();
-        
+
         Self {
             memory: Arc::new(memory),
             query_optimizer: Arc::new(query_optimizer),
@@ -97,7 +102,7 @@ impl MemoryManager {
     }
 
     /// 添加记忆（🔧 最佳方案：Memory API + LibSQL 双写）
-    /// 
+    ///
     /// Strategy:
     /// 1. 使用Memory API生成向量嵌入（保留智能功能）
     /// 2. 同时写入LibSQL确保持久化
@@ -114,59 +119,67 @@ impl MemoryManager {
     ) -> Result<String, String> {
         use agent_mem_utils::hash::compute_content_hash;
         use chrono::Utc;
-        
+
         // Step 1: 使用Memory API（生成向量嵌入）
         let options = AddMemoryOptions {
             agent_id: Some(agent_id.clone()),
             user_id: user_id.clone(),
-            infer: false,  // 简单模式，避免复杂推理
+            infer: false, // 简单模式，避免复杂推理
             metadata: metadata.clone().unwrap_or_default(),
             memory_type: memory_type.as_ref().map(|t| format!("{:?}", t)),
             ..Default::default()
         };
 
-        let add_result = self.memory
+        let add_result = self
+            .memory
             .add_with_options(&content, options)
             .await
             .map_err(|e| e.to_string())?;
 
-        let memory_id = add_result.results
+        let memory_id = add_result
+            .results
             .first()
             .map(|r| r.id.clone())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-        
+
         // Step 2: 写入LibSQL Repository（持久化）
         let user_id_val = user_id.unwrap_or_else(|| "default".to_string());
         let content_hash = compute_content_hash(&content);
         let now = Utc::now();
-        
+
         // 构建metadata JSON
         let mut full_metadata = metadata.unwrap_or_default();
         full_metadata.insert("agent_id".to_string(), agent_id.clone());
         full_metadata.insert("user_id".to_string(), user_id_val.clone());
         full_metadata.insert("data".to_string(), content.clone());
         full_metadata.insert("hash".to_string(), content_hash.clone());
-        
+
         let metadata_json: serde_json::Value = full_metadata
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
             .collect();
-        
+
         // Step 2.5: 确保Agent存在（获取其organization_id和user_id）
-        let agent = repositories.agents.find_by_id(&agent_id).await
+        let agent = repositories
+            .agents
+            .find_by_id(&agent_id)
+            .await
             .map_err(|e| format!("Failed to query agent: {}", e))?
             .ok_or_else(|| format!("Agent not found: {}", agent_id))?;
-        
+
         let memory = agent_mem_core::storage::models::Memory {
             id: memory_id.clone(),
-            organization_id: agent.organization_id.clone(),  // 使用Agent的organization_id
-            user_id: "default".to_string(),  // 使用默认user (TODO: 应该从auth获取实际user)
+            organization_id: agent.organization_id.clone(), // 使用Agent的organization_id
+            user_id: "default".to_string(), // 使用默认user (TODO: 应该从auth获取实际user)
             agent_id: agent_id.clone(),
             content,
             hash: Some(content_hash),
             metadata: metadata_json,
             score: None,
-            memory_type: format!("{:?}", memory_type.unwrap_or(agent_mem_traits::MemoryType::Semantic)),
+            memory_type: format!(
+                "{:?}",
+                memory_type.unwrap_or(agent_mem_traits::MemoryType::Semantic)
+            ),
             scope: "agent".to_string(),
             level: "normal".to_string(),
             importance: importance.unwrap_or(0.5),
@@ -178,51 +191,68 @@ impl MemoryManager {
             created_by_id: None,
             last_updated_by_id: None,
         };
-        
-        repositories.memories.create(&memory).await
+
+        repositories
+            .memories
+            .create(&memory)
+            .await
             .map_err(|e| format!("Failed to persist to LibSQL: {}", e))?;
-        
-        info!("✅ Memory persisted: VectorStore + LibSQL (ID: {})", memory_id);
+
+        info!(
+            "✅ Memory persisted: VectorStore + LibSQL (ID: {})",
+            memory_id
+        );
         Ok(memory_id)
     }
 
     /// 获取记忆（直接数据库查询）
     pub async fn get_memory(&self, id: &str) -> Result<Option<serde_json::Value>, String> {
-        use libsql::{Builder, params};
-        
-        let db_path = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "data/agentmem.db".to_string());
-        
-        let db = Builder::new_local(&db_path).build().await
+        use libsql::{params, Builder};
+
+        let db_path =
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| "data/agentmem.db".to_string());
+
+        let db = Builder::new_local(&db_path)
+            .build()
+            .await
             .map_err(|e| format!("Failed to open database: {}", e))?;
-        
-        let conn = db.connect()
+
+        let conn = db
+            .connect()
             .map_err(|e| format!("Failed to connect: {}", e))?;
-        
+
         let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
                      created_at, last_accessed, access_count, metadata, hash \
                      FROM memories WHERE id = ? AND is_deleted = 0 LIMIT 1";
-        
-        let mut stmt = conn.prepare(query).await
+
+        let mut stmt = conn
+            .prepare(query)
+            .await
             .map_err(|e| format!("Failed to prepare query: {}", e))?;
-        
-        let mut rows = stmt.query(params![id]).await
+
+        let mut rows = stmt
+            .query(params![id])
+            .await
             .map_err(|e| format!("Failed to query: {}", e))?;
-        
-        if let Some(row) = rows.next().await.map_err(|e| format!("Failed to fetch row: {}", e))? {
+
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| format!("Failed to fetch row: {}", e))?
+        {
             // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
             use chrono::{DateTime, Utc};
-            
+
             let created_at_ts: Option<i64> = row.get(6).ok();
             let created_at_str = created_at_ts
                 .and_then(|ts| DateTime::from_timestamp(ts, 0))
                 .map(|dt| dt.to_rfc3339());
-            
+
             let last_accessed_ts: Option<i64> = row.get(7).ok();
             let last_accessed_str = last_accessed_ts
                 .and_then(|ts| DateTime::from_timestamp(ts, 0))
                 .map(|dt| dt.to_rfc3339());
-            
+
             let json = serde_json::json!({
                 "id": row.get::<String>(0).unwrap_or_default(),
                 "agent_id": row.get::<String>(1).unwrap_or_default(),
@@ -276,10 +306,7 @@ impl MemoryManager {
 
     /// 删除记忆
     pub async fn delete_memory(&self, id: &str) -> Result<(), String> {
-        self.memory
-            .delete(id)
-            .await
-            .map_err(|e| e.to_string())
+        self.memory.delete(id).await.map_err(|e| e.to_string())
     }
 
     /// 搜索记忆 (🆕 Fix 2: 集成QueryOptimizer和Reranker)
@@ -301,15 +328,16 @@ impl MemoryManager {
             fulltext_weight: 0.3,
             filters: None,
         };
-        
-        let optimized_plan = self.query_optimizer
+
+        let optimized_plan = self
+            .query_optimizer
             .optimize_query(&search_query)
             .map_err(|e| format!("Query optimization failed: {}", e))?;
-        
+
         info!("🚀 Query optimized: strategy={:?}, should_rerank={}, rerank_factor={}, estimated_latency={}ms", 
             optimized_plan.strategy, optimized_plan.should_rerank, optimized_plan.rerank_factor, 
             optimized_plan.estimated_latency_ms);
-        
+
         // 🆕 Fix 2: 使用优化后的参数 - 如果需要重排序，增加候选数量
         let base_limit = limit.unwrap_or(10);
         let fetch_limit = if optimized_plan.should_rerank {
@@ -317,7 +345,7 @@ impl MemoryManager {
         } else {
             base_limit
         };
-        
+
         let options = SearchOptions {
             user_id: user_id.clone(),
             limit: Some(fetch_limit),
@@ -326,31 +354,44 @@ impl MemoryManager {
         };
 
         // 执行搜索
-        let raw_results = self.memory
+        let raw_results = self
+            .memory
             .search_with_options(query.clone(), options)
             .await
             .map_err(|e| e.to_string())?;
 
         // 🆕 Phase 3-D: 如果需要重排序且有结果，使用Reranker优化
-        if optimized_plan.should_rerank && !raw_results.is_empty() && raw_results.len() > base_limit {
+        if optimized_plan.should_rerank && !raw_results.is_empty() && raw_results.len() > base_limit
+        {
             // 保存结果数量用于日志
             let raw_count = raw_results.len();
-            
-            match self.apply_reranking(&query, &search_query, raw_results, base_limit).await {
+
+            match self
+                .apply_reranking(&query, &search_query, raw_results, base_limit)
+                .await
+            {
                 Ok(reranked) => {
-                    info!("✨ Reranking applied successfully: {} → {} final results", raw_count, reranked.len());
+                    info!(
+                        "✨ Reranking applied successfully: {} → {} final results",
+                        raw_count,
+                        reranked.len()
+                    );
                     return Ok(reranked);
                 }
                 Err(e) => {
                     // Reranking失败时降级：重新执行搜索，使用base_limit
-                    warn!("⚠️  Reranking failed ({}), falling back to direct search with base_limit", e);
+                    warn!(
+                        "⚠️  Reranking failed ({}), falling back to direct search with base_limit",
+                        e
+                    );
                     let fallback_options = SearchOptions {
                         user_id,
                         limit: Some(base_limit),
                         threshold: Some(0.7),
                         ..Default::default()
                     };
-                    return self.memory
+                    return self
+                        .memory
                         .search_with_options(query, fallback_options)
                         .await
                         .map_err(|e| e.to_string());
@@ -375,7 +416,8 @@ impl MemoryManager {
         use agent_mem_core::search::SearchResult;
 
         // 1. 生成query vector
-        let query_vector = self.memory
+        let query_vector = self
+            .memory
             .generate_query_vector(query)
             .await
             .map_err(|e| format!("Failed to generate query vector: {}", e))?;
@@ -389,7 +431,9 @@ impl MemoryManager {
                 score: item.score.unwrap_or(0.5),
                 vector_score: item.score,
                 fulltext_score: None,
-                metadata: Some(serde_json::to_value(&item.metadata).unwrap_or(serde_json::json!({}))),
+                metadata: Some(
+                    serde_json::to_value(&item.metadata).unwrap_or(serde_json::json!({})),
+                ),
             })
             .collect();
 
@@ -461,18 +505,12 @@ impl MemoryManager {
 
     /// 重置所有记忆（危险操作）
     pub async fn reset(&self) -> Result<(), String> {
-        self.memory
-            .reset()
-            .await
-            .map_err(|e| e.to_string())
+        self.memory.reset().await.map_err(|e| e.to_string())
     }
 
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<agent_mem::MemoryStats, String> {
-        self.memory
-            .get_stats()
-            .await
-            .map_err(|e| e.to_string())
+        self.memory.get_stats().await.map_err(|e| e.to_string())
     }
 }
 
@@ -510,7 +548,10 @@ pub async fn add_memory(
     Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<crate::models::MemoryRequest>,
-) -> ServerResult<(StatusCode, Json<crate::models::ApiResponse<crate::models::MemoryResponse>>)> {
+) -> ServerResult<(
+    StatusCode,
+    Json<crate::models::ApiResponse<crate::models::MemoryResponse>>,
+)> {
     info!(
         "Adding new memory for agent_id: {:?}, user_id: {:?}",
         request.agent_id, request.user_id
@@ -518,7 +559,7 @@ pub async fn add_memory(
 
     let memory_id = memory_manager
         .add_memory(
-            repositories,  // 传递repositories用于LibSQL持久化
+            repositories, // 传递repositories用于LibSQL持久化
             request.agent_id,
             request.user_id,
             request.content,
@@ -537,7 +578,10 @@ pub async fn add_memory(
         message: "Memory added successfully (VectorStore + LibSQL)".to_string(),
     };
 
-    Ok((StatusCode::CREATED, Json(crate::models::ApiResponse::success(response))))
+    Ok((
+        StatusCode::CREATED,
+        Json(crate::models::ApiResponse::success(response)),
+    ))
 }
 
 /// 获取记忆
@@ -775,7 +819,7 @@ pub async fn batch_add_memories(
     for memory_req in request.memories {
         match memory_manager
             .add_memory(
-                repositories.clone(),  // 传递repositories用于LibSQL持久化
+                repositories.clone(), // 传递repositories用于LibSQL持久化
                 memory_req.agent_id,
                 memory_req.user_id,
                 memory_req.content,
@@ -860,46 +904,54 @@ pub async fn get_agent_memories(
     // ===== 真实实现：直接数据库查询（绕过embedder）=====
     // 原因：Memory API 需要 embedder (get_all → search → embedder)
     // 解决：直接使用 LibSQL 查询，避免 ONNX Runtime 依赖
-    
-    use libsql::{Builder, params};
-    
-    let db_path = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "data/agentmem.db".to_string());
-    
-    let db = Builder::new_local(&db_path).build().await
+
+    use libsql::{params, Builder};
+
+    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "data/agentmem.db".to_string());
+
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
-    
-    let conn = db.connect()
+
+    let conn = db
+        .connect()
         .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
-    
+
     let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
                  created_at, last_accessed, access_count, metadata, hash \
                  FROM memories WHERE agent_id = ? AND is_deleted = 0 LIMIT 100";
-    
-    let mut stmt = conn.prepare(query).await
+
+    let mut stmt = conn
+        .prepare(query)
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
-    
-    let mut rows = stmt.query(params![agent_id.clone()]).await
+
+    let mut rows = stmt
+        .query(params![agent_id.clone()])
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?;
-    
+
     let mut memories_json: Vec<serde_json::Value> = vec![];
-    
-    while let Some(row) = rows.next().await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
-        
+
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
         // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
         use chrono::{DateTime, Utc};
-        
+
         let created_at_ts: Option<i64> = row.get(6).ok();
         let created_at_str = created_at_ts
             .and_then(|ts| DateTime::from_timestamp(ts, 0))
             .map(|dt| dt.to_rfc3339());
-        
+
         let last_accessed_ts: Option<i64> = row.get(7).ok();
         let last_accessed_str = last_accessed_ts
             .and_then(|ts| DateTime::from_timestamp(ts, 0))
             .map(|dt| dt.to_rfc3339());
-        
+
         memories_json.push(serde_json::json!({
             "id": row.get::<String>(0).unwrap_or_default(),
             "agent_id": row.get::<String>(1).unwrap_or_default(),
@@ -914,13 +966,16 @@ pub async fn get_agent_memories(
             "hash": row.get::<Option<String>>(10).ok().flatten(),
         }));
     }
-    
-    info!("Returning {} real memories from database", memories_json.len());
+
+    info!(
+        "Returning {} real memories from database",
+        memories_json.len()
+    );
     Ok(Json(crate::models::ApiResponse::success(memories_json)))
 }
 
 /// List all memories with pagination and filtering
-/// 
+///
 /// 🆕 Fix 1: 全局memories列表API - 不依赖Agent
 #[utoipa::path(
     get,
@@ -943,27 +998,44 @@ pub async fn list_all_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
-    use libsql::{Builder, params as sql_params};
     use chrono::{DateTime, Utc};
-    
+    use libsql::{params as sql_params, Builder};
+
     // 解析参数
-    let page = params.get("page").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
-    let limit = params.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20).min(100);
+    let page = params
+        .get("page")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = params
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(20)
+        .min(100);
     let agent_id = params.get("agent_id");
     let memory_type = params.get("memory_type");
-    let sort_by = params.get("sort_by").map(|s| s.as_str()).unwrap_or("created_at");
+    let sort_by = params
+        .get("sort_by")
+        .map(|s| s.as_str())
+        .unwrap_or("created_at");
     let order = params.get("order").map(|s| s.as_str()).unwrap_or("DESC");
     let offset = page * limit;
-    
-    info!("📋 List all memories: page={}, limit={}, agent_id={:?}", page, limit, agent_id);
-    
+
+    info!(
+        "📋 List all memories: page={}, limit={}, agent_id={:?}",
+        page, limit, agent_id
+    );
+
     // 连接数据库
-    let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
-    let db = Builder::new_local(&db_path).build().await
+    let db_path =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
         .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
-    let conn = db.connect()
+    let conn = db
+        .connect()
         .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
-    
+
     // 构建查询并执行
     use libsql::params;
     let mut rows = match (agent_id, memory_type) {
@@ -974,11 +1046,14 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn.prepare(&query).await
+            let mut stmt = conn
+                .prepare(&query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
-            stmt.query(params![limit as i64, offset as i64]).await
+            stmt.query(params![limit as i64, offset as i64])
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
-        },
+        }
         (Some(aid), None) => {
             let query = format!(
                 "SELECT id, agent_id, user_id, content, memory_type, importance, \
@@ -986,11 +1061,14 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn.prepare(&query).await
+            let mut stmt = conn
+                .prepare(&query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
-            stmt.query(params![aid.clone(), limit as i64, offset as i64]).await
+            stmt.query(params![aid.clone(), limit as i64, offset as i64])
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
-        },
+        }
         (None, Some(mt)) => {
             let query = format!(
                 "SELECT id, agent_id, user_id, content, memory_type, importance, \
@@ -998,11 +1076,14 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn.prepare(&query).await
+            let mut stmt = conn
+                .prepare(&query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
-            stmt.query(params![mt.clone(), limit as i64, offset as i64]).await
+            stmt.query(params![mt.clone(), limit as i64, offset as i64])
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
-        },
+        }
         (Some(aid), Some(mt)) => {
             let query = format!(
                 "SELECT id, agent_id, user_id, content, memory_type, importance, \
@@ -1010,33 +1091,43 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn.prepare(&query).await
+            let mut stmt = conn
+                .prepare(&query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
-            stmt.query(params![aid.clone(), mt.clone(), limit as i64, offset as i64]).await
-                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
-        },
+            stmt.query(params![
+                aid.clone(),
+                mt.clone(),
+                limit as i64,
+                offset as i64
+            ])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+        }
     };
-    
+
     let mut memories_json: Vec<serde_json::Value> = vec![];
-    while let Some(row) = rows.next().await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))? {
-        
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
         let created_at_ts: Option<i64> = row.get(6).ok();
         let created_at_str = created_at_ts
             .and_then(|ts| DateTime::from_timestamp(ts, 0))
             .map(|dt| dt.to_rfc3339())
             .unwrap_or_else(|| Utc::now().to_rfc3339());
-        
+
         let last_accessed_ts: Option<i64> = row.get(7).ok();
         let last_accessed_str = last_accessed_ts
             .and_then(|ts| DateTime::from_timestamp(ts, 0))
             .map(|dt| dt.to_rfc3339());
-        
+
         let metadata_str: Option<String> = row.get(9).ok();
         let metadata_value: serde_json::Value = metadata_str
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or(serde_json::json!({}));
-        
+
         memories_json.push(serde_json::json!({
             "id": row.get::<String>(0).ok(),
             "agent_id": row.get::<String>(1).ok(),
@@ -1051,57 +1142,85 @@ pub async fn list_all_memories(
             "hash": row.get::<String>(10).ok(),
         }));
     }
-    
+
     // 获取总数
     let total_count = match (agent_id, memory_type) {
         (None, None) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0";
-            let mut stmt = conn.prepare(query).await
+            let mut stmt = conn
+                .prepare(query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
-            if let Some(count_row) = stmt.query(params![]).await.ok()
-                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+            if let Some(count_row) = stmt
+                .query(params![])
+                .await
+                .ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten())
+            {
                 count_row.get::<i64>(0).unwrap_or(0)
             } else {
                 0
             }
-        },
+        }
         (Some(aid), None) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ?";
-            let mut stmt = conn.prepare(query).await
+            let mut stmt = conn
+                .prepare(query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
-            if let Some(count_row) = stmt.query(params![aid.clone()]).await.ok()
-                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+            if let Some(count_row) = stmt
+                .query(params![aid.clone()])
+                .await
+                .ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten())
+            {
                 count_row.get::<i64>(0).unwrap_or(0)
             } else {
                 0
             }
-        },
+        }
         (None, Some(mt)) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND memory_type = ?";
-            let mut stmt = conn.prepare(query).await
+            let mut stmt = conn
+                .prepare(query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
-            if let Some(count_row) = stmt.query(params![mt.clone()]).await.ok()
-                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+            if let Some(count_row) = stmt
+                .query(params![mt.clone()])
+                .await
+                .ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten())
+            {
                 count_row.get::<i64>(0).unwrap_or(0)
             } else {
                 0
             }
-        },
+        }
         (Some(aid), Some(mt)) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ?";
-            let mut stmt = conn.prepare(query).await
+            let mut stmt = conn
+                .prepare(query)
+                .await
                 .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
-            if let Some(count_row) = stmt.query(params![aid.clone(), mt.clone()]).await.ok()
-                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten()) {
+            if let Some(count_row) = stmt
+                .query(params![aid.clone(), mt.clone()])
+                .await
+                .ok()
+                .and_then(|mut rows| futures::executor::block_on(rows.next()).ok().flatten())
+            {
                 count_row.get::<i64>(0).unwrap_or(0)
             } else {
                 0
             }
-        },
+        }
     };
-    
-    info!("✅ Retrieved {} memories (total: {})", memories_json.len(), total_count);
-    
+
+    info!(
+        "✅ Retrieved {} memories (total: {})",
+        memories_json.len(),
+        total_count
+    );
+
     Ok(Json(crate::models::ApiResponse {
         data: serde_json::json!({
             "memories": memories_json,
@@ -1123,7 +1242,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_memory_manager_creation() {
-        let result = MemoryManager::new(Some("fastembed".to_string()), Some("BAAI/bge-small-en-v1.5".to_string())).await;
+        let result = MemoryManager::new(
+            Some("fastembed".to_string()),
+            Some("BAAI/bge-small-en-v1.5".to_string()),
+        )
+        .await;
         // 可能因为配置问题失败，但应该能创建
         println!("MemoryManager creation: {:?}", result.is_ok());
     }
@@ -1132,7 +1255,7 @@ mod tests {
     async fn test_memory_manager_with_builder() {
         // 使用Memory builder创建配置
         let memory = Memory::builder()
-            .disable_intelligent_features()  // 测试时禁用智能功能
+            .disable_intelligent_features() // 测试时禁用智能功能
             .build()
             .await;
 
@@ -1142,4 +1265,3 @@ mod tests {
         }
     }
 }
-

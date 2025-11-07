@@ -1,6 +1,6 @@
 //! 系统提示和清空功能集成测试
 
-use agent_mem_core::client::{AgentMemClient, Messages, MemoryType};
+use agent_mem_core::client::{AgentMemClient, MemoryType, Messages};
 use agent_mem_traits::Result;
 
 #[tokio::test]
@@ -173,7 +173,9 @@ async fn test_clear_all_memories() -> Result<()> {
     }
 
     // 验证记忆已添加
-    let memories_before = client.get_all(Some(user.id.clone()), None, None, None).await?;
+    let memories_before = client
+        .get_all(Some(user.id.clone()), None, None, None)
+        .await?;
     assert_eq!(memories_before.len(), 5);
 
     // 清空所有记忆
@@ -181,7 +183,9 @@ async fn test_clear_all_memories() -> Result<()> {
     assert_eq!(deleted_count, 5);
 
     // 验证记忆已清空
-    let memories_after = client.get_all(Some(user.id.clone()), None, None, None).await?;
+    let memories_after = client
+        .get_all(Some(user.id.clone()), None, None, None)
+        .await?;
     assert_eq!(memories_after.len(), 0);
 
     Ok(())
@@ -227,7 +231,9 @@ async fn test_clear_conversation_history() -> Result<()> {
     }
 
     // 验证总共有 5 个记忆
-    let memories_before = client.get_all(Some(user.id.clone()), None, None, None).await?;
+    let memories_before = client
+        .get_all(Some(user.id.clone()), None, None, None)
+        .await?;
     assert_eq!(memories_before.len(), 5);
 
     // 清空对话历史
@@ -235,7 +241,9 @@ async fn test_clear_conversation_history() -> Result<()> {
     assert_eq!(deleted_count, 3);
 
     // 验证只剩下语义记忆
-    let memories_after = client.get_all(Some(user.id.clone()), None, None, None).await?;
+    let memories_after = client
+        .get_all(Some(user.id.clone()), None, None, None)
+        .await?;
     assert_eq!(memories_after.len(), 2);
 
     // 验证剩余的都是语义记忆
@@ -259,4 +267,3 @@ async fn test_clear_empty_user() -> Result<()> {
 
     Ok(())
 }
-

@@ -662,8 +662,8 @@ pub struct VectorStoreConfig {
 impl Default for VectorStoreConfig {
     fn default() -> Self {
         Self {
-            provider: "memory".to_string(),  // Changed from "lancedb" to "memory" for zero-config embedded mode
-            path: "".to_string(),             // Empty path for in-memory storage
+            provider: "memory".to_string(), // Changed from "lancedb" to "memory" for zero-config embedded mode
+            path: "".to_string(),           // Empty path for in-memory storage
             table_name: "memories".to_string(),
             dimension: Some(1536),
             api_key: None,

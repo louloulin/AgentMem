@@ -220,9 +220,7 @@ impl LLMProvider for OllamaProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Ollama API request failed: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Ollama API request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
@@ -276,9 +274,7 @@ impl LLMProvider for OllamaProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(format!(
-                        "Stream error: {e}"
-                    ))),
+                    Err(e) => Err(AgentMemError::network_error(format!("Stream error: {e}"))),
                 }
             })
             .filter(|result| {

@@ -4,11 +4,10 @@
 //! 测试完整的对话循环，包括记忆检索、LLM 调用、记忆提取
 
 use agent_mem_core::{
-    orchestrator::{AgentOrchestrator, ChatRequest, OrchestratorConfig},
     engine::{MemoryEngine, MemoryEngineConfig},
+    orchestrator::{AgentOrchestrator, ChatRequest, OrchestratorConfig},
     storage::{
-        message_repository::MessageRepository,
-        models::Message as StorageMessage,
+        message_repository::MessageRepository, models::Message as StorageMessage,
         repository::Repository,
     },
     Memory, MemoryType,
@@ -16,8 +15,8 @@ use agent_mem_core::{
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::{
-    Entity, FunctionCall, FunctionCallResponse, FunctionDefinition, LLMConfig, LLMProvider, Message,
-    ModelInfo, Relation, Result as TraitResult, Session,
+    Entity, FunctionCall, FunctionCallResponse, FunctionDefinition, LLMConfig, LLMProvider,
+    Message, ModelInfo, Relation, Result as TraitResult, Session,
 };
 use chrono::Utc;
 use sqlx::PgPool;
@@ -164,7 +163,10 @@ async fn test_orchestrator_basic_conversation() {
         .expect("Failed to execute conversation step");
 
     // 6. 验证响应
-    assert!(!response.message_id.is_empty(), "Message ID should not be empty");
+    assert!(
+        !response.message_id.is_empty(),
+        "Message ID should not be empty"
+    );
     assert_eq!(
         response.content, "Hello! How can I help you today?",
         "Response content should match mock LLM output"
@@ -332,7 +334,10 @@ async fn test_orchestrator_memory_extraction() {
 
     // 6. 验证响应
     assert!(!response.message_id.is_empty());
-    assert_eq!(response.memories_updated, true, "Memories should be extracted");
+    assert_eq!(
+        response.memories_updated, true,
+        "Memories should be extracted"
+    );
     assert!(
         response.memories_count > 0,
         "At least one memory should be extracted"
@@ -546,7 +551,11 @@ async fn test_memory_integrator_filter_by_relevance() {
     let filtered = integrator.filter_by_relevance(memories);
 
     // 4. 验证过滤结果（只保留 score >= 0.7 的记忆）
-    assert_eq!(filtered.len(), 2, "Should keep 2 memories with score >= 0.7");
+    assert_eq!(
+        filtered.len(),
+        2,
+        "Should keep 2 memories with score >= 0.7"
+    );
     assert!(filtered.iter().all(|m| m.score.unwrap_or(0.0) >= 0.7));
 
     println!("✅ test_memory_integrator_filter_by_relevance passed");
@@ -641,4 +650,3 @@ async fn test_memory_integrator_sort_memories() {
 
     println!("✅ test_memory_integrator_sort_memories passed");
 }
-

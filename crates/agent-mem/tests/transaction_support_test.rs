@@ -9,7 +9,7 @@ mod tests {
     use super::*;
 
     /// 测试 P0-#18: add_memory 的事务支持
-    /// 
+    ///
     /// 验证：
     /// 1. 成功时三个存储都写入
     /// 2. 失败时自动回滚
@@ -17,23 +17,25 @@ mod tests {
     async fn test_add_memory_transaction_success() {
         // 创建 orchestrator
         let orchestrator = MemoryOrchestrator::new_with_auto_config().await;
-        
+
         if orchestrator.is_err() {
             println!("跳过测试：无法初始化 MemoryOrchestrator");
             return;
         }
-        
+
         let orchestrator = orchestrator.unwrap();
-        
+
         // 添加记忆
-        let result = orchestrator.add_memory(
-            "Test memory content".to_string(),
-            "test_agent".to_string(),
-            Some("test_user".to_string()),
-            None,
-            None,
-        ).await;
-        
+        let result = orchestrator
+            .add_memory(
+                "Test memory content".to_string(),
+                "test_agent".to_string(),
+                Some("test_user".to_string()),
+                None,
+                None,
+            )
+            .await;
+
         // 如果 Embedder 未初始化，期望返回错误
         // 如果初始化了，期望成功
         match result {
@@ -58,7 +60,7 @@ mod tests {
     async fn test_add_memory_rollback_on_failure() {
         // 这个测试验证回滚逻辑的存在
         // 实际的回滚需要模拟存储失败
-        
+
         println!("✅ add_memory 已实现回滚机制（rollback_add_memory 函数）");
         println!("   - 记录 completed_steps");
         println!("   - 失败时逆序回滚");
@@ -72,7 +74,7 @@ mod tests {
         println!("   - 记录 CompletedOperation");
         println!("   - 失败时调用 rollback_decisions");
         println!("   - 支持 ADD/UPDATE/DELETE/MERGE 操作的回滚");
-        
+
         // 验证 CompletedOperation 枚举存在
         // （通过编译即可验证）
         assert!(true, "CompletedOperation 类型已定义");
@@ -85,15 +87,14 @@ mod tests {
 
         // A - Atomicity (原子性)
         println!("✅ 原子性: 所有操作要么全部成功，要么全部回滚");
-        
+
         // C - Consistency (一致性)
         println!("✅ 一致性: 失败时恢复到事务前的状态");
-        
+
         // I - Isolation (隔离性)
         println!("⚠️ 隔离性: 当前为顺序执行，天然隔离");
-        
+
         // D - Durability (持久性)
         println!("✅ 持久性: 成功的操作持久化到存储");
     }
 }
-

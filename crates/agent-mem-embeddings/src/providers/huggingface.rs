@@ -95,8 +95,7 @@ impl HuggingFaceEmbedder {
 
         // 如果有 API key，添加认证头
         if let Some(api_key) = &self.config.api_key {
-            request_builder =
-                request_builder.header("Authorization", format!("Bearer {api_key}"));
+            request_builder = request_builder.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = request_builder.send().await.map_err(|e| {

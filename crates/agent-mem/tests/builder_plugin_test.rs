@@ -1,11 +1,11 @@
 //! Tests for Builder plugin integration
 
 #[cfg(feature = "plugins")]
-use agent_mem::Memory;
+use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
 #[cfg(feature = "plugins")]
 use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
 #[cfg(feature = "plugins")]
-use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+use agent_mem::Memory;
 #[cfg(feature = "plugins")]
 use anyhow::Result;
 #[cfg(feature = "plugins")]
@@ -115,7 +115,9 @@ async fn test_builder_with_plugin_and_config() -> Result<()> {
     };
 
     let mut config = PluginConfig::default();
-    config.settings.insert("max_depth".to_string(), serde_json::json!(5));
+    config
+        .settings
+        .insert("max_depth".to_string(), serde_json::json!(5));
 
     let plugin = RegisteredPlugin {
         id: "configured-plugin".to_string(),
@@ -139,8 +141,12 @@ async fn test_builder_with_plugin_and_config() -> Result<()> {
     assert_eq!(plugins.len(), 1);
     assert_eq!(plugins[0].name, "configured-plugin");
     assert_eq!(plugins[0].version, "2.0.0");
-    assert!(plugins[0].required_capabilities.contains(&Capability::MemoryAccess));
-    assert!(plugins[0].required_capabilities.contains(&Capability::StorageAccess));
+    assert!(plugins[0]
+        .required_capabilities
+        .contains(&Capability::MemoryAccess));
+    assert!(plugins[0]
+        .required_capabilities
+        .contains(&Capability::StorageAccess));
 
     Ok(())
 }
@@ -212,10 +218,7 @@ async fn test_builder_chain_with_other_configs() -> Result<()> {
 #[tokio::test]
 async fn test_builder_without_plugins() -> Result<()> {
     // Test that builder works without any plugins
-    let mem = Memory::builder()
-        .with_storage("memory://")
-        .build()
-        .await?;
+    let mem = Memory::builder().with_storage("memory://").build().await?;
 
     // Should have no plugins
     let plugins = mem.list_plugins().await;
@@ -246,4 +249,3 @@ async fn test_builder_without_plugins_feature() {
 
     assert!(!results.is_empty());
 }
-

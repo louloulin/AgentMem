@@ -192,22 +192,21 @@ impl ConflictResolver {
         );
 
         // P0 优化 #10: 限制记忆数量，防止prompt过长
-        let limited_existing_memories: Vec<Memory> = if existing_memories.len() > self.config.max_consideration_memories {
-            warn!(
-                "现有记忆数量 {} 超过限制 {}，仅取最相关的前 {} 个",
-                existing_memories.len(),
-                self.config.max_consideration_memories,
-                self.config.max_consideration_memories
-            );
-            // 取最新的记忆
-            let mut sorted_memories = existing_memories.to_vec();
-            sorted_memories.sort_by(|a, b| {
-                b.created_at.cmp(&a.created_at)
-            });
-            sorted_memories[..self.config.max_consideration_memories].to_vec()
-        } else {
-            existing_memories.to_vec()
-        };
+        let limited_existing_memories: Vec<Memory> =
+            if existing_memories.len() > self.config.max_consideration_memories {
+                warn!(
+                    "现有记忆数量 {} 超过限制 {}，仅取最相关的前 {} 个",
+                    existing_memories.len(),
+                    self.config.max_consideration_memories,
+                    self.config.max_consideration_memories
+                );
+                // 取最新的记忆
+                let mut sorted_memories = existing_memories.to_vec();
+                sorted_memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                sorted_memories[..self.config.max_consideration_memories].to_vec()
+            } else {
+                existing_memories.to_vec()
+            };
 
         let mut conflicts = Vec::new();
 
@@ -409,12 +408,11 @@ impl ConflictResolver {
         // P0 优化: 添加超时控制
         let llm = self.llm.clone();
         let response = with_timeout(
-            async move {
-                llm.generate(&[Message::user(&prompt)]).await
-            },
+            async move { llm.generate(&[Message::user(&prompt)]).await },
             self.timeout_config.conflict_detection_timeout_secs,
             "conflict_detection_llm",
-        ).await?;
+        )
+        .await?;
 
         // 解析响应
         #[derive(Deserialize)]
@@ -552,46 +550,54 @@ impl ConflictResolver {
     }
 
     /// P1 优化 #11: 基于规则的冲突检测（降级方案）
-    /// 
+    ///
     /// 当 LLM 解析失败时使用此方法作为后备方案
     fn rule_based_conflict_detection(&self, memory1: &Memory, memory2: &Memory) -> f32 {
         info!("使用基于规则的冲突检测（降级方案）");
-        
+
         let content1 = memory1.content.to_lowercase();
         let content2 = memory2.content.to_lowercase();
-        
+
         // 规则1: 检测否定词冲突（"不"、"没有" vs "是"、"有"）
-        let has_negation1 = content1.contains("不") || content1.contains("没有") || content1.contains("never");
-        let has_negation2 = content2.contains("不") || content2.contains("没有") || content2.contains("never");
-        
-        let has_affirmation1 = content1.contains("是") || content1.contains("有") || content1.contains("yes");
-        let has_affirmation2 = content2.contains("是") || content2.contains("有") || content2.contains("yes");
-        
+        let has_negation1 =
+            content1.contains("不") || content1.contains("没有") || content1.contains("never");
+        let has_negation2 =
+            content2.contains("不") || content2.contains("没有") || content2.contains("never");
+
+        let has_affirmation1 =
+            content1.contains("是") || content1.contains("有") || content1.contains("yes");
+        let has_affirmation2 =
+            content2.contains("是") || content2.contains("有") || content2.contains("yes");
+
         // 否定与肯定矛盾
         if (has_negation1 && has_affirmation2) || (has_affirmation1 && has_negation2) {
             debug!("规则检测：否定-肯定冲突");
             return 0.7; // 中等-高冲突
         }
-        
+
         // 规则2: 检测数字冲突
         let conflict_score = self.detect_number_conflicts(&content1, &content2);
         if conflict_score > 0.0 {
             debug!("规则检测：数字冲突，严重程度: {}", conflict_score);
             return conflict_score;
         }
-        
+
         // 规则3: 检测时间冲突
         if self.has_temporal_conflict(&content1, &content2) {
             debug!("规则检测：时间冲突");
             return 0.6; // 中等冲突
         }
-        
+
         // 规则4: 检测反义词冲突
         let antonym_pairs = vec![
-            ("喜欢", "讨厌"), ("爱", "恨"), ("快", "慢"),
-            ("大", "小"), ("多", "少"), ("新", "旧"),
+            ("喜欢", "讨厌"),
+            ("爱", "恨"),
+            ("快", "慢"),
+            ("大", "小"),
+            ("多", "少"),
+            ("新", "旧"),
         ];
-        
+
         for (word1, word2) in antonym_pairs {
             if (content1.contains(word1) && content2.contains(word2))
                 || (content1.contains(word2) && content2.contains(word1))
@@ -600,12 +606,12 @@ impl ConflictResolver {
                 return 0.8; // 高冲突
             }
         }
-        
+
         // 无明显冲突
         debug!("规则检测：无明显冲突");
         0.0
     }
-    
+
     /// 检测数字冲突
     fn detect_number_conflicts(&self, content1: &str, content2: &str) -> f32 {
         // 简单的数字提取和比较
@@ -613,23 +619,23 @@ impl ConflictResolver {
             .split_whitespace()
             .filter_map(|s| s.parse::<i32>().ok())
             .collect();
-        
+
         let numbers2: Vec<i32> = content2
             .split_whitespace()
             .filter_map(|s| s.parse::<i32>().ok())
             .collect();
-        
+
         // 如果两个内容都包含数字且数字不同，可能存在冲突
         if !numbers1.is_empty() && !numbers2.is_empty() {
-            let has_different_numbers = numbers1.iter().any(|n1| {
-                numbers2.iter().any(|n2| (n1 - n2).abs() > 0)
-            });
-            
+            let has_different_numbers = numbers1
+                .iter()
+                .any(|n1| numbers2.iter().any(|n2| (n1 - n2).abs() > 0));
+
             if has_different_numbers {
                 return 0.5; // 中等冲突
             }
         }
-        
+
         0.0
     }
 }

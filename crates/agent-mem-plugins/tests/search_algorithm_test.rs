@@ -90,7 +90,10 @@ fn test_keyword_search_algorithm() {
     // Verify results
     assert!(!results.is_empty(), "Should find matching memories");
     assert_eq!(results[0].memory_id, "1", "Exact match should rank first");
-    assert!(results[0].score > results[1].score, "Scores should be ordered");
+    assert!(
+        results[0].score > results[1].score,
+        "Scores should be ordered"
+    );
 }
 
 #[test]
@@ -354,4 +357,3 @@ fn test_memory_type_boosting() {
     assert_eq!(results[0].memory_id, "1");
     assert!(results[0].score > results[1].score);
 }
-

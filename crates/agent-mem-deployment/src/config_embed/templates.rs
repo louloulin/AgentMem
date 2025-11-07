@@ -31,7 +31,7 @@ impl ConfigTemplate {
             ConfigTemplate::Full,
         ]
     }
-    
+
     /// 获取模板名称
     pub fn name(&self) -> &'static str {
         match self {
@@ -42,7 +42,7 @@ impl ConfigTemplate {
             ConfigTemplate::Full => "full",
         }
     }
-    
+
     /// 获取模板描述
     pub fn description(&self) -> &'static str {
         match self {
@@ -53,7 +53,7 @@ impl ConfigTemplate {
             ConfigTemplate::Full => "完整功能配置，启用所有功能",
         }
     }
-    
+
     /// 获取模板内容（TOML 格式）
     pub fn to_toml(&self) -> &'static str {
         match self {
@@ -64,7 +64,7 @@ impl ConfigTemplate {
             ConfigTemplate::Full => include_str!("../../templates/config.full.toml"),
         }
     }
-    
+
     /// 从名称解析模板
     pub fn from_name(name: &str) -> Option<ConfigTemplate> {
         match name.to_lowercase().as_str() {
@@ -90,17 +90,17 @@ impl ConfigVariables {
             variables: HashMap::new(),
         }
     }
-    
+
     /// 添加变量
     pub fn add(&mut self, key: String, value: String) -> &mut Self {
         self.variables.insert(key, value);
         self
     }
-    
+
     /// 从环境变量加载
     pub fn from_env() -> Self {
         let mut variables = HashMap::new();
-        
+
         // 常用环境变量
         if let Ok(val) = std::env::var("DATABASE_URL") {
             variables.insert("DATABASE_URL".to_string(), val);
@@ -114,19 +114,19 @@ impl ConfigVariables {
         if let Ok(val) = std::env::var("LOG_LEVEL") {
             variables.insert("LOG_LEVEL".to_string(), val);
         }
-        
+
         Self { variables }
     }
-    
+
     /// 替换模板中的变量
     pub fn replace(&self, template: &str) -> String {
         let mut result = template.to_string();
-        
+
         for (key, value) in &self.variables {
             let placeholder = format!("${{{key}}}");
             result = result.replace(&placeholder, value);
         }
-        
+
         result
     }
 }
@@ -140,19 +140,19 @@ impl Default for ConfigVariables {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_config_template_all() {
         let templates = ConfigTemplate::all();
         assert_eq!(templates.len(), 5);
     }
-    
+
     #[test]
     fn test_config_template_name() {
         assert_eq!(ConfigTemplate::Development.name(), "development");
         assert_eq!(ConfigTemplate::Production.name(), "production");
     }
-    
+
     #[test]
     fn test_config_template_from_name() {
         assert_eq!(
@@ -165,15 +165,14 @@ mod tests {
         );
         assert_eq!(ConfigTemplate::from_name("invalid"), None);
     }
-    
+
     #[test]
     fn test_config_variables() {
         let mut vars = ConfigVariables::new();
         vars.add("DATABASE_URL".to_string(), "test.db".to_string());
-        
+
         let template = "url = \"${DATABASE_URL}\"";
         let result = vars.replace(template);
         assert_eq!(result, "url = \"test.db\"");
     }
 }
-

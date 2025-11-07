@@ -420,9 +420,7 @@ impl MetaMemoryManager {
         stats.total_agents += 1;
         stats.healthy_agents += 1;
 
-        log::info!(
-            "Registered agent {agent_id} with capacity {max_capacity}"
-        );
+        log::info!("Registered agent {agent_id} with capacity {max_capacity}");
         Ok(())
     }
 

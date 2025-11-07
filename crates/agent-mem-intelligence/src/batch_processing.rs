@@ -7,11 +7,11 @@
 //! - 批量重要性评估
 //! - 批量metadata查询
 
-use agent_mem_llm::LLMProvider;
-use agent_mem_traits::{Message, Result};
 use crate::fact_extraction::{ExtractedFact, StructuredFact};
 use crate::importance_evaluator::ImportanceEvaluation;
 use crate::timeout::{with_timeout, TimeoutConfig};
+use agent_mem_llm::LLMProvider;
+use agent_mem_traits::{Message, Result};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -75,30 +75,29 @@ impl BatchEntityExtractor {
         // 按批次处理
         for chunk in facts.chunks(self.batch_config.batch_size) {
             debug!("处理批次: {} 个事实", chunk.len());
-            
+
             let structured_facts = self.extract_batch_internal(chunk).await?;
             all_structured_facts.extend(structured_facts);
         }
 
-        info!("批量提取完成，生成 {} 个结构化事实", all_structured_facts.len());
+        info!(
+            "批量提取完成，生成 {} 个结构化事实",
+            all_structured_facts.len()
+        );
         Ok(all_structured_facts)
     }
 
     /// 内部批量提取实现
-    async fn extract_batch_internal(
-        &self,
-        facts: &[ExtractedFact],
-    ) -> Result<Vec<StructuredFact>> {
+    async fn extract_batch_internal(&self, facts: &[ExtractedFact]) -> Result<Vec<StructuredFact>> {
         let prompt = self.build_batch_entity_prompt(facts);
 
         let llm = self.llm.clone();
         let response = with_timeout(
-            async move {
-                llm.generate(&[Message::user(&prompt)]).await
-            },
+            async move { llm.generate(&[Message::user(&prompt)]).await },
             self.timeout_config.fact_extraction_timeout_secs,
             "batch_entity_extraction",
-        ).await?;
+        )
+        .await?;
 
         self.parse_batch_response(&response, facts.len())
     }
@@ -165,7 +164,7 @@ Extract all entities and their relationships."#
         facts: &[ExtractedFact],
     ) -> Result<Vec<StructuredFact>> {
         let mut results = Vec::new();
-        
+
         for fact in facts {
             // 简单的结构化事实生成
             let structured_fact = StructuredFact {
@@ -227,7 +226,7 @@ impl BatchImportanceEvaluator {
         // 按批次处理
         for chunk in facts.chunks(self.batch_config.batch_size) {
             debug!("评估批次: {} 个事实", chunk.len());
-            
+
             let evaluations = self.evaluate_batch_internal(chunk).await?;
             all_evaluations.extend(evaluations);
         }
@@ -245,12 +244,11 @@ impl BatchImportanceEvaluator {
 
         let llm = self.llm.clone();
         let response = with_timeout(
-            async move {
-                llm.generate(&[Message::user(&prompt)]).await
-            },
+            async move { llm.generate(&[Message::user(&prompt)]).await },
             self.timeout_config.decision_timeout_secs,
             "batch_importance_evaluation",
-        ).await?;
+        )
+        .await?;
 
         self.parse_evaluation_response(&response, facts)
     }
@@ -260,7 +258,12 @@ impl BatchImportanceEvaluator {
         let facts_summary: Vec<String> = facts
             .iter()
             .enumerate()
-            .map(|(idx, f)| format!("{}. {} (confidence: {:.2})", idx, f.description, f.confidence))
+            .map(|(idx, f)| {
+                format!(
+                    "{}. {} (confidence: {:.2})",
+                    idx, f.description, f.confidence
+                )
+            })
             .collect();
 
         format!(
@@ -386,17 +389,13 @@ mod tests {
 
     #[test]
     fn test_batch_entity_extractor_creation() {
-        use agent_mem_llm::{LocalTestProvider, LLMConfig};
-        
+        use agent_mem_llm::{LLMConfig, LocalTestProvider};
+
         let llm = Arc::new(LocalTestProvider::new(LLMConfig::default()).unwrap());
-        let extractor = BatchEntityExtractor::new(
-            llm,
-            TimeoutConfig::default(),
-            BatchConfig::default(),
-        );
+        let extractor =
+            BatchEntityExtractor::new(llm, TimeoutConfig::default(), BatchConfig::default());
 
         // 验证创建成功
         assert_eq!(extractor.batch_config.batch_size, 10);
     }
 }
-

@@ -12,7 +12,7 @@ pub enum DatabaseBackend {
     /// LibSQL (embedded SQLite fork) - default
     #[serde(rename = "libsql")]
     LibSql,
-    
+
     /// PostgreSQL (enterprise-grade)
     #[serde(rename = "postgres")]
     Postgres,
@@ -50,16 +50,16 @@ impl std::str::FromStr for DatabaseBackend {
 pub struct PoolConfig {
     /// Minimum number of connections in the pool
     pub min_connections: u32,
-    
+
     /// Maximum number of connections in the pool
     pub max_connections: u32,
-    
+
     /// Connection acquire timeout in seconds
     pub acquire_timeout_seconds: u64,
-    
+
     /// Idle connection timeout in seconds
     pub idle_timeout_seconds: u64,
-    
+
     /// Maximum connection lifetime in seconds
     pub max_lifetime_seconds: u64,
 }
@@ -81,21 +81,21 @@ impl Default for PoolConfig {
 pub struct DatabaseConfig {
     /// Database backend type
     pub backend: DatabaseBackend,
-    
+
     /// Connection URL
     /// - For LibSQL: file path (e.g., "./data/agentmem.db")
     /// - For PostgreSQL: connection string (e.g., "postgresql://localhost/agentmem")
     pub url: String,
-    
+
     /// Connection pool configuration
     pub pool: PoolConfig,
-    
+
     /// Whether to automatically run migrations on startup
     pub auto_migrate: bool,
-    
+
     /// Enable query logging
     pub log_queries: bool,
-    
+
     /// Slow query threshold in milliseconds
     pub slow_query_threshold_ms: u64,
 }
@@ -150,10 +150,10 @@ impl DatabaseConfig {
     /// - `DATABASE_LOG_QUERIES`: "true" or "false" (default: "false")
     /// - `DATABASE_MAX_CONNECTIONS`: maximum pool size (default: 10)
     pub fn from_env() -> Self {
-        let backend_str = env::var("DATABASE_BACKEND")
-            .unwrap_or_else(|_| "libsql".to_string());
-        
-        let backend = backend_str.parse::<DatabaseBackend>()
+        let backend_str = env::var("DATABASE_BACKEND").unwrap_or_else(|_| "libsql".to_string());
+
+        let backend = backend_str
+            .parse::<DatabaseBackend>()
             .unwrap_or(DatabaseBackend::LibSql);
 
         let default_url = match backend {
@@ -217,7 +217,9 @@ impl DatabaseConfig {
             DatabaseBackend::LibSql => {
                 // LibSQL uses file paths
                 if self.url.starts_with("postgresql://") || self.url.starts_with("postgres://") {
-                    return Err("LibSQL backend requires a file path, not a PostgreSQL URL".to_string());
+                    return Err(
+                        "LibSQL backend requires a file path, not a PostgreSQL URL".to_string()
+                    );
                 }
             }
             DatabaseBackend::Postgres => {
@@ -258,11 +260,26 @@ mod tests {
 
     #[test]
     fn test_database_backend_from_str() {
-        assert_eq!("libsql".parse::<DatabaseBackend>().unwrap(), DatabaseBackend::LibSql);
-        assert_eq!("sqlite".parse::<DatabaseBackend>().unwrap(), DatabaseBackend::LibSql);
-        assert_eq!("postgres".parse::<DatabaseBackend>().unwrap(), DatabaseBackend::Postgres);
-        assert_eq!("postgresql".parse::<DatabaseBackend>().unwrap(), DatabaseBackend::Postgres);
-        assert_eq!("pg".parse::<DatabaseBackend>().unwrap(), DatabaseBackend::Postgres);
+        assert_eq!(
+            "libsql".parse::<DatabaseBackend>().unwrap(),
+            DatabaseBackend::LibSql
+        );
+        assert_eq!(
+            "sqlite".parse::<DatabaseBackend>().unwrap(),
+            DatabaseBackend::LibSql
+        );
+        assert_eq!(
+            "postgres".parse::<DatabaseBackend>().unwrap(),
+            DatabaseBackend::Postgres
+        );
+        assert_eq!(
+            "postgresql".parse::<DatabaseBackend>().unwrap(),
+            DatabaseBackend::Postgres
+        );
+        assert_eq!(
+            "pg".parse::<DatabaseBackend>().unwrap(),
+            DatabaseBackend::Postgres
+        );
         assert!("unknown".parse::<DatabaseBackend>().is_err());
     }
 
@@ -312,4 +329,3 @@ mod tests {
         assert_eq!(config.safe_url(), "./data/test.db");
     }
 }
-

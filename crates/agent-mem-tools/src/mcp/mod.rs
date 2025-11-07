@@ -52,3 +52,6 @@ pub use sampling::{
 pub use logging::{
     LoggingManager, LogEntry, LogLevel, LogFilter, LoggingConfig, LogStats,
 };
+
+#[cfg(test)]
+mod server_tests;

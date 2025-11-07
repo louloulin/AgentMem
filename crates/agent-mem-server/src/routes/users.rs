@@ -134,7 +134,10 @@ pub async fn register_user(
         request.name.clone(),
         request.email.clone(),
         password_hash,
-        request.timezone.clone().unwrap_or_else(|| "UTC".to_string()),
+        request
+            .timezone
+            .clone()
+            .unwrap_or_else(|| "UTC".to_string()),
     );
 
     // Save user to database
@@ -216,7 +219,9 @@ pub async fn login_user(
     let token = auth_service.generate_token(
         &user.id,
         user.organization_id.clone(),
-        user.roles.clone().unwrap_or_else(|| vec!["user".to_string()]),
+        user.roles
+            .clone()
+            .unwrap_or_else(|| vec!["user".to_string()]),
         None,
     )?;
 
@@ -492,13 +497,13 @@ pub async fn get_users_list(
         .and_then(|p| p.parse::<usize>().ok())
         .unwrap_or(1)
         .max(1);
-    
+
     let page_size = params
         .get("page_size")
         .and_then(|p| p.parse::<usize>().ok())
         .unwrap_or(50)
-        .min(100)  // Max 100 items per page
-        .max(1);   // Min 1 item per page
+        .min(100) // Max 100 items per page
+        .max(1); // Min 1 item per page
 
     // Calculate offset
     let offset = (page - 1) * page_size;

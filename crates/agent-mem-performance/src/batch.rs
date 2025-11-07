@@ -453,7 +453,7 @@ mod tests {
 
         let result = processor.submit(item).await;
         assert!(result.is_ok());
-        
+
         // Allow worker tasks time to complete before dropping
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }

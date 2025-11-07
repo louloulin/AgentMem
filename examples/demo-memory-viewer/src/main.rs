@@ -9,7 +9,7 @@
 //
 // 真实实现，对标MIRIX的mirix_memory_viewer.py
 
-use agent_mem::{Memory, MemoryBuilder, MemoryItem, GetAllOptions, AddMemoryOptions};
+use agent_mem::{AddMemoryOptions, GetAllOptions, Memory, MemoryBuilder, MemoryItem};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
 use clap::{Parser, Subcommand};
@@ -151,9 +151,18 @@ impl MemoryStatistics {
     }
 
     fn display(&self) {
-        println!("\n{}", "╔═══════════════════════════════════════════════════════╗".cyan());
-        println!("{}", "║            📊 记忆统计信息                          ║".cyan());
-        println!("{}", "╚═══════════════════════════════════════════════════════╝".cyan());
+        println!(
+            "\n{}",
+            "╔═══════════════════════════════════════════════════════╗".cyan()
+        );
+        println!(
+            "{}",
+            "║            📊 记忆统计信息                          ║".cyan()
+        );
+        println!(
+            "{}",
+            "╚═══════════════════════════════════════════════════════╝".cyan()
+        );
 
         println!("\n{}", "总体统计:".yellow().bold());
         println!("  - 总记忆数: {}", self.total_count.to_string().green());
@@ -180,7 +189,10 @@ impl MemoryStatistics {
 
         println!("\n{}", "元数据统计:".yellow().bold());
         println!("  - 有元数据: {}", self.with_metadata.to_string().green());
-        println!("  - 无元数据: {}", self.without_metadata.to_string().green());
+        println!(
+            "  - 无元数据: {}",
+            self.without_metadata.to_string().green()
+        );
     }
 }
 
@@ -205,7 +217,10 @@ async fn list_memories(memory: &Memory, limit: usize, brief: bool) -> Result<()>
         run_id: None,
         limit: Some(limit),
     };
-    let memories = memory.get_all(options).await.context("Failed to get memories")?;
+    let memories = memory
+        .get_all(options)
+        .await
+        .context("Failed to get memories")?;
 
     if memories.is_empty() {
         println!("{}", "⚠️  没有找到记忆。".yellow());
@@ -240,7 +255,11 @@ async fn list_memories(memory: &Memory, limit: usize, brief: bool) -> Result<()>
             } else {
                 mem.content.clone()
             };
-            let created = mem.created_at.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string();
+            let created = mem
+                .created_at
+                .with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M")
+                .to_string();
 
             builder.push_record(vec![
                 (idx + 1).to_string(),
@@ -266,7 +285,10 @@ async fn list_memories(memory: &Memory, limit: usize, brief: bool) -> Result<()>
 async fn search_memories(memory: &Memory, query: &str, limit: usize) -> Result<()> {
     println!("\n{}", format!("🔍 搜索: \"{}\"", query).cyan());
 
-    let results = memory.search(query.to_string()).await.context("Search failed")?;
+    let results = memory
+        .search(query.to_string())
+        .await
+        .context("Search failed")?;
 
     if results.is_empty() {
         println!("{}", "⚠️  未找到相关记忆。".yellow());
@@ -316,7 +338,10 @@ async fn show_statistics(memory: &Memory) -> Result<()> {
         run_id: None,
         limit: None,
     };
-    let memories = memory.get_all(options).await.context("Failed to get memories")?;
+    let memories = memory
+        .get_all(options)
+        .await
+        .context("Failed to get memories")?;
 
     if memories.is_empty() {
         println!("{}", "⚠️  没有记忆数据可供统计。".yellow());
@@ -339,16 +364,28 @@ async fn show_memory_detail(memory: &Memory, id: &str) -> Result<()> {
         run_id: None,
         limit: None,
     };
-    let memories = memory.get_all(options).await.context("Failed to get memories")?;
+    let memories = memory
+        .get_all(options)
+        .await
+        .context("Failed to get memories")?;
 
     let mem = memories
         .iter()
         .find(|m| m.id == id || m.id.starts_with(id))
         .context("Memory not found")?;
 
-    println!("\n{}", "╔═══════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║            📝 记忆详情                              ║".cyan());
-    println!("{}", "╚═══════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "\n{}",
+        "╔═══════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║            📝 记忆详情                              ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚═══════════════════════════════════════════════════════╝".cyan()
+    );
 
     println!("\n{}", "基本信息:".yellow().bold());
     println!("  - ID: {}", mem.id.green());
@@ -453,7 +490,10 @@ async fn export_memories(memory: &Memory, output_path: &str) -> Result<()> {
         run_id: None,
         limit: None,
     };
-    let memories = memory.get_all(options).await.context("Failed to get memories")?;
+    let memories = memory
+        .get_all(options)
+        .await
+        .context("Failed to get memories")?;
 
     if memories.is_empty() {
         println!("{}", "⚠️  没有记忆可导出。".yellow());
@@ -475,9 +515,18 @@ async fn export_memories(memory: &Memory, output_path: &str) -> Result<()> {
 
 /// 可视化记忆（对标MIRIX的visualize_memories）
 async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
-    println!("\n{}", "╔═══════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║            🎨 记忆可视化                            ║".cyan());
-    println!("{}", "╚═══════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "\n{}",
+        "╔═══════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║            🎨 记忆可视化                            ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚═══════════════════════════════════════════════════════╝".cyan()
+    );
 
     let options = GetAllOptions {
         user_id: None,
@@ -485,7 +534,10 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
         run_id: None,
         limit: None,
     };
-    let memories = memory.get_all(options).await.context("Failed to get memories")?;
+    let memories = memory
+        .get_all(options)
+        .await
+        .context("Failed to get memories")?;
 
     if memories.is_empty() {
         println!("\n{}", "⚠️  没有记忆可显示。".yellow());
@@ -496,17 +548,15 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
     println!("\n{}", "📊 统计摘要:".yellow().bold());
     let stats = MemoryStatistics::from_memories(&memories);
     println!("  - 总记忆数: {}", stats.total_count.to_string().green());
-    println!(
-        "  - 有元数据: {}",
-        stats.with_metadata.to_string().green()
-    );
+    println!("  - 有元数据: {}", stats.with_metadata.to_string().green());
     println!(
         "  - 无元数据: {}",
         stats.without_metadata.to_string().green()
     );
 
     // 按用户分组（如果有user_id元数据）
-    let mut by_user: std::collections::HashMap<String, Vec<&MemoryItem>> = std::collections::HashMap::new();
+    let mut by_user: std::collections::HashMap<String, Vec<&MemoryItem>> =
+        std::collections::HashMap::new();
     for mem in &memories {
         if let Some(user_id) = mem.metadata.get("user_id") {
             by_user
@@ -536,7 +586,11 @@ async fn visualize_memories(memory: &Memory, verbose: bool) -> Result<()> {
         } else {
             mem.content.clone()
         };
-        let time_str = mem.created_at.with_timezone(&Local).format("%H:%M:%S").to_string();
+        let time_str = mem
+            .created_at
+            .with_timezone(&Local)
+            .format("%H:%M:%S")
+            .to_string();
         println!(
             "  {}. {} | {}",
             (idx + 1).to_string().cyan(),
@@ -631,4 +685,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

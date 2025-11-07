@@ -14,7 +14,7 @@ use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use agent_mem_core::managers::{
     AssociationManager, AssociationManagerConfig, AssociationType, EntityType,
-    KnowledgeGraphManager, KnowledgeGraphConfig,
+    KnowledgeGraphConfig, KnowledgeGraphManager,
 };
 use axum::{
     extract::{Path, Query, State},
@@ -337,4 +337,3 @@ pub async fn get_graph_stats(
 
     Ok(Json(ApiResponse::success(response)))
 }
-

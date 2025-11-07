@@ -1,7 +1,7 @@
 //! MemoryExtractor 单元测试
 
-use agent_mem_core::orchestrator::memory_extraction::{MemoryExtractor, MemoryExtractorConfig};
 use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
+use agent_mem_core::orchestrator::memory_extraction::{MemoryExtractor, MemoryExtractorConfig};
 use agent_mem_llm::LLMClient;
 use agent_mem_traits::{LLMConfig, Message, MessageRole};
 use chrono::Utc;
@@ -32,7 +32,7 @@ fn test_memory_extractor_config_custom() {
 async fn test_extract_from_conversation() {
     // 这个测试需要真实的 LLM 客户端
     // 在实际环境中运行时需要设置 LLM_API_KEY 等环境变量
-    
+
     if std::env::var("LLM_API_KEY").is_err() {
         println!("Skipping test: LLM_API_KEY not set");
         return;
@@ -42,7 +42,7 @@ async fn test_extract_from_conversation() {
     let llm_client = Arc::new(LLMClient::new(&llm_config).expect("Failed to create LLMClient"));
     let memory_engine = Arc::new(MemoryEngine::new(MemoryEngineConfig::default()));
     let config = MemoryExtractorConfig::default();
-    
+
     let extractor = MemoryExtractor::new(llm_client, memory_engine, config);
 
     let messages = vec![
@@ -110,13 +110,13 @@ fn format_conversation_for_test(messages: &[Message]) -> String {
 }
 
 #[tokio::test]
-#[ignore] // TODO: 需要配置 LLMClient  
+#[ignore] // TODO: 需要配置 LLMClient
 async fn test_save_memories_empty() {
     let llm_config = LLMConfig::default();
     let llm_client = Arc::new(LLMClient::new(&llm_config).expect("Failed to create LLMClient"));
     let memory_engine = Arc::new(MemoryEngine::new(MemoryEngineConfig::default()));
     let config = MemoryExtractorConfig::default();
-    
+
     let extractor = MemoryExtractor::new(llm_client, memory_engine, config);
 
     let result = extractor.save_memories(vec![]).await;
@@ -160,23 +160,21 @@ fn test_importance_score_range() {
 #[test]
 fn test_min_turns_for_extraction() {
     let config = MemoryExtractorConfig::default();
-    
+
     // 少于最小轮数的对话
-    let short_conversation = vec![
-        Message {
-            role: MessageRole::User,
-            content: "Hi".to_string(),
-            timestamp: Some(Utc::now()),
-        },
-    ];
-    
+    let short_conversation = vec![Message {
+        role: MessageRole::User,
+        content: "Hi".to_string(),
+        timestamp: Some(Utc::now()),
+    }];
+
     assert!(short_conversation.len() < config.min_turns_for_extraction);
 }
 
 #[test]
 fn test_extraction_prompt_template() {
     let config = MemoryExtractorConfig::default();
-    
+
     // 验证提示词模板包含关键元素
     assert!(config.extraction_prompt.contains("conversation"));
     assert!(config.extraction_prompt.contains("JSON"));
@@ -200,7 +198,7 @@ fn test_json_parsing() {
     let valid_json = r#"[
         {"content": "User likes Python", "type": "semantic", "importance": 0.7}
     ]"#;
-    
+
     let result: Result<Vec<serde_json::Value>, _> = serde_json::from_str(valid_json);
     assert!(result.is_ok());
 
@@ -250,4 +248,3 @@ fn test_message_role_types() {
     };
     assert!(matches!(assistant_msg.role, MessageRole::Assistant));
 }
-

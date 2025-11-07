@@ -75,7 +75,10 @@ impl VideoAnalyzer {
     }
 
     /// 分析视频
-    pub async fn analyze_video(&self, request: &VideoAnalysisRequest) -> Result<VideoAnalysisResponse> {
+    pub async fn analyze_video(
+        &self,
+        request: &VideoAnalysisRequest,
+    ) -> Result<VideoAnalysisResponse> {
         info!("开始视频分析: {}", request.video_id);
 
         let mut response = VideoAnalysisResponse {
@@ -190,14 +193,12 @@ impl VideoAnalyzer {
         let mut current_scene_labels: Vec<String> = Vec::new();
 
         for (i, keyframe) in keyframes.iter().enumerate() {
-            let keyframe_labels: Vec<String> = keyframe
-                .labels
-                .iter()
-                .map(|l| l.name.clone())
-                .collect();
+            let keyframe_labels: Vec<String> =
+                keyframe.labels.iter().map(|l| l.name.clone()).collect();
 
             // 检测场景变化
-            let similarity = self.calculate_label_similarity(&current_scene_labels, &keyframe_labels);
+            let similarity =
+                self.calculate_label_similarity(&current_scene_labels, &keyframe_labels);
 
             if similarity < self.config.scene_change_threshold || i == 0 {
                 // 场景变化
@@ -264,10 +265,7 @@ impl VideoAnalyzer {
 
         // 基于场景生成摘要
         if !response.scenes.is_empty() {
-            summary_parts.push(format!(
-                "视频包含 {} 个场景",
-                response.scenes.len()
-            ));
+            summary_parts.push(format!("视频包含 {} 个场景", response.scenes.len()));
 
             for (i, scene) in response.scenes.iter().enumerate() {
                 summary_parts.push(format!(
@@ -452,4 +450,3 @@ pub struct SceneAnalysis {
     /// 置信度
     pub confidence: f32,
 }
-

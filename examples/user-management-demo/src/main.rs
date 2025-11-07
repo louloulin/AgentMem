@@ -39,10 +39,12 @@ async fn main() -> Result<()> {
     let users = client.list_users().await?;
     println!("   找到 {} 个用户:", users.len().to_string().green());
     for user in &users {
-        println!("   - {} (ID: {}, 创建时间: {})",
+        println!(
+            "   - {} (ID: {}, 创建时间: {})",
             user.name.cyan(),
             user.id,
-            user.created_at.format("%Y-%m-%d %H:%M:%S"));
+            user.created_at.format("%Y-%m-%d %H:%M:%S")
+        );
     }
     println!();
 
@@ -72,7 +74,10 @@ async fn main() -> Result<()> {
     println!("{}", "5. 测试幂等性（重复创建用户）...".yellow());
     let user_alice_again = client.create_user("alice".to_string()).await?;
     if user_alice_again.id == user1.id {
-        println!("   ✅ 幂等性测试通过：返回相同的用户 (ID: {})", user_alice_again.id.green());
+        println!(
+            "   ✅ 幂等性测试通过：返回相同的用户 (ID: {})",
+            user_alice_again.id.green()
+        );
     } else {
         println!("   ❌ 幂等性测试失败：返回了不同的用户");
     }
@@ -82,12 +87,18 @@ async fn main() -> Result<()> {
     println!("{}", "6. 测试验证逻辑（空用户名）...".yellow());
     match client.create_user("".to_string()).await {
         Ok(_) => println!("   ❌ 验证失败：应该拒绝空用户名"),
-        Err(e) => println!("   ✅ 验证通过：正确拒绝空用户名 ({})", e.to_string().yellow()),
+        Err(e) => println!(
+            "   ✅ 验证通过：正确拒绝空用户名 ({})",
+            e.to_string().yellow()
+        ),
     }
 
     match client.create_user("   ".to_string()).await {
         Ok(_) => println!("   ❌ 验证失败：应该拒绝空白用户名"),
-        Err(e) => println!("   ✅ 验证通过：正确拒绝空白用户名 ({})", e.to_string().yellow()),
+        Err(e) => println!(
+            "   ✅ 验证通过：正确拒绝空白用户名 ({})",
+            e.to_string().yellow()
+        ),
     }
     println!();
 
@@ -103,5 +114,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-
-

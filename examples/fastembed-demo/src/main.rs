@@ -1,25 +1,23 @@
 //! FastEmbed 演示示例
-//! 
+//!
 //! 展示如何使用 FastEmbed 进行本地嵌入生成
 
 use agent_mem_embeddings::EmbeddingFactory;
-use agent_mem_traits::Embedder;  // For trait methods
+use agent_mem_traits::Embedder; // For trait methods
 use anyhow::Result;
 use tracing::{info, Level};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("🚀 FastEmbed 演示开始");
 
     // 方式 1: 使用默认配置（零配置）
     info!("\n📦 方式 1: 零配置创建");
     let embedder = EmbeddingFactory::create_default().await?;
-    
+
     info!("  - 提供商: {}", embedder.provider_name());
     info!("  - 模型: {}", embedder.model_name());
     info!("  - 维度: {}", embedder.dimension());
@@ -28,7 +26,7 @@ async fn main() -> Result<()> {
     info!("\n📝 测试单个嵌入");
     let text = "你好，世界！这是一个测试。";
     info!("  - 输入文本: {}", text);
-    
+
     let embedding = embedder.embed(text).await?;
     info!("  - 嵌入维度: {}", embedding.len());
     info!("  - 前5个值: {:?}", &embedding[..5.min(embedding.len())]);
@@ -40,11 +38,11 @@ async fn main() -> Result<()> {
         "机器学习是AI的核心技术".to_string(),
         "深度学习推动了AI的发展".to_string(),
     ];
-    
+
     info!("  - 文本数量: {}", texts.len());
     let embeddings = embedder.embed_batch(&texts).await?;
     info!("  - 嵌入数量: {}", embeddings.len());
-    
+
     for (i, emb) in embeddings.iter().enumerate() {
         info!("  - 嵌入 {}: {} 维", i + 1, emb.len());
     }
@@ -67,8 +65,9 @@ async fn main() -> Result<()> {
     info!("  - 文本3: {}", text3);
     info!("  - 相似度(1-2): {:.4}", sim_12);
     info!("  - 相似度(1-3): {:.4}", sim_13);
-    info!("  - 结论: 相似句子的相似度 ({:.4}) {} 不相似句子 ({:.4})", 
-        sim_12, 
+    info!(
+        "  - 结论: 相似句子的相似度 ({:.4}) {} 不相似句子 ({:.4})",
+        sim_12,
         if sim_12 > sim_13 { ">" } else { "<" },
         sim_13
     );
@@ -85,7 +84,14 @@ async fn main() -> Result<()> {
     // 健康检查
     info!("\n🏥 健康检查");
     let is_healthy = embedder.health_check().await?;
-    info!("  - 状态: {}", if is_healthy { "✅ 健康" } else { "❌ 不健康" });
+    info!(
+        "  - 状态: {}",
+        if is_healthy {
+            "✅ 健康"
+        } else {
+            "❌ 不健康"
+        }
+    );
 
     info!("\n✅ FastEmbed 演示完成");
     Ok(())
@@ -105,4 +111,3 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         dot_product / (norm_a * norm_b)
     }
 }
-

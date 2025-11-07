@@ -353,16 +353,34 @@ mod tests {
     #[test]
     fn test_error_severity() {
         // Critical errors
-        assert_eq!(AgentMemError::SystemNotRunning.severity(), ErrorSeverity::Critical);
-        assert_eq!(AgentMemError::storage_error("test").severity(), ErrorSeverity::Critical);
+        assert_eq!(
+            AgentMemError::SystemNotRunning.severity(),
+            ErrorSeverity::Critical
+        );
+        assert_eq!(
+            AgentMemError::storage_error("test").severity(),
+            ErrorSeverity::Critical
+        );
 
         // High severity errors
-        assert_eq!(AgentMemError::memory_error("test").severity(), ErrorSeverity::High);
-        assert_eq!(AgentMemError::llm_error("test").severity(), ErrorSeverity::High);
+        assert_eq!(
+            AgentMemError::memory_error("test").severity(),
+            ErrorSeverity::High
+        );
+        assert_eq!(
+            AgentMemError::llm_error("test").severity(),
+            ErrorSeverity::High
+        );
 
         // Medium severity errors
-        assert_eq!(AgentMemError::rate_limit_error("test").severity(), ErrorSeverity::Medium);
-        assert_eq!(AgentMemError::validation_error("test").severity(), ErrorSeverity::Medium);
+        assert_eq!(
+            AgentMemError::rate_limit_error("test").severity(),
+            ErrorSeverity::Medium
+        );
+        assert_eq!(
+            AgentMemError::validation_error("test").severity(),
+            ErrorSeverity::Medium
+        );
     }
 
     #[test]

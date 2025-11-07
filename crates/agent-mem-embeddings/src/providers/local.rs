@@ -82,13 +82,14 @@ impl ModelCache {
 
         info!("Downloading model {} from {}", model_name, url);
 
-        let response = reqwest::get(url).await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to download model: {e}"))
-        })?;
+        let response = reqwest::get(url)
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to download model: {e}")))?;
 
-        let bytes = response.bytes().await.map_err(|e| {
-            AgentMemError::network_error(format!("Failed to read model data: {e}"))
-        })?;
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read model data: {e}")))?;
 
         tokio::fs::write(&model_path, &bytes)
             .await
@@ -276,7 +277,9 @@ impl LocalEmbedder {
         // 注意：ort 2.0.0-rc API 仍在变化中，这里使用简化的加载方式
         let session = Session::builder()
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to create ONNX session builder: {e}"))
+                AgentMemError::embedding_error(format!(
+                    "Failed to create ONNX session builder: {e}"
+                ))
             })?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| {
@@ -288,7 +291,9 @@ impl LocalEmbedder {
             })?
             .commit_from_file(model_path)
             .map_err(|e| {
-                AgentMemError::embedding_error(format!("Failed to load ONNX model from {model_path:?}: {e}"))
+                AgentMemError::embedding_error(format!(
+                    "Failed to load ONNX model from {model_path:?}: {e}"
+                ))
             })?;
 
         self.onnx_session = Some(Arc::new(Mutex::new(session)));
@@ -487,9 +492,9 @@ impl LocalEmbedder {
     async fn generate_onnx_embedding(&self, text: &str) -> Result<Vec<f32>> {
         if let (Some(session), Some(tokenizer)) = (&self.onnx_session, &self.onnx_tokenizer) {
             // 1. 分词
-            let encoding = tokenizer.encode(text, true).map_err(|e| {
-                AgentMemError::embedding_error(format!("Tokenization failed: {e}"))
-            })?;
+            let encoding = tokenizer
+                .encode(text, true)
+                .map_err(|e| AgentMemError::embedding_error(format!("Tokenization failed: {e}")))?;
 
             let input_ids = encoding.get_ids();
             let attention_mask = encoding.get_attention_mask();
@@ -536,13 +541,9 @@ impl LocalEmbedder {
                 })?
                 .1;
 
-            let (shape, data) = output_value
-                .try_extract_tensor::<f32>()
-                .map_err(|e| {
-                    AgentMemError::embedding_error(format!(
-                        "Failed to extract output tensor: {e}"
-                    ))
-                })?;
+            let (shape, data) = output_value.try_extract_tensor::<f32>().map_err(|e| {
+                AgentMemError::embedding_error(format!("Failed to extract output tensor: {e}"))
+            })?;
             debug!("Output tensor shape: {:?}", shape);
 
             // 5. 池化策略：使用 [CLS] token（第一个 token 的嵌入）
@@ -626,8 +627,8 @@ impl LocalEmbedder {
             }
 
             // 创建形状为 [batch_size, max_len] 的张量
-            let input_ids_tensor =
-                Tensor::from_array((vec![batch_size, max_len], input_ids_batch)).map_err(|e| {
+            let input_ids_tensor = Tensor::from_array((vec![batch_size, max_len], input_ids_batch))
+                .map_err(|e| {
                     AgentMemError::embedding_error(format!(
                         "Failed to create batch input_ids tensor: {e}"
                     ))
@@ -659,13 +660,11 @@ impl LocalEmbedder {
                 })?
                 .1;
 
-            let (shape, data) = output_value
-                .try_extract_tensor::<f32>()
-                .map_err(|e| {
-                    AgentMemError::embedding_error(format!(
-                        "Failed to extract batch output tensor: {e}"
-                    ))
-                })?;
+            let (shape, data) = output_value.try_extract_tensor::<f32>().map_err(|e| {
+                AgentMemError::embedding_error(format!(
+                    "Failed to extract batch output tensor: {e}"
+                ))
+            })?;
             debug!("Batch output tensor shape: {:?}", shape);
 
             // 6. 提取每个样本的嵌入向量

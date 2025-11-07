@@ -51,18 +51,18 @@ async fn check_server_running() -> bool {
 #[ignore] // 需要运行中的服务器
 async fn test_e2e_health_check() {
     let client = create_client();
-    
+
     let response = client
         .get(format!("{}/health", BASE_URL))
         .send()
         .await
         .expect("Failed to send health check request");
-    
+
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let body: Value = response.json().await.expect("Failed to parse response");
     assert_eq!(body["status"], "healthy");
-    
+
     println!("✅ Health check passed");
 }
 
@@ -73,10 +73,10 @@ async fn test_e2e_complete_agent_workflow() {
         println!("⚠️  Server not running, skipping test");
         return;
     }
-    
+
     let client = create_client();
     let auth_token = get_test_auth_token();
-    
+
     // Step 1: 创建 Agent
     println!("Step 1: Creating agent...");
     let create_agent_request = json!({
@@ -89,7 +89,7 @@ async fn test_e2e_complete_agent_workflow() {
             "llm_model": "gpt-4"
         }
     });
-    
+
     let create_response = client
         .post(format!("{}/api/{}/agents", BASE_URL, API_VERSION))
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -97,50 +97,56 @@ async fn test_e2e_complete_agent_workflow() {
         .send()
         .await
         .expect("Failed to create agent");
-    
+
     assert_eq!(create_response.status(), StatusCode::CREATED);
-    
+
     let agent: Value = create_response.json().await.expect("Failed to parse agent");
     let agent_id = agent["id"].as_str().expect("Agent ID not found");
-    
+
     println!("✅ Agent created: {}", agent_id);
-    
+
     // Step 2: 获取 Agent
     println!("Step 2: Getting agent...");
     let get_response = client
-        .get(format!("{}/api/{}/agents/{}", BASE_URL, API_VERSION, agent_id))
+        .get(format!(
+            "{}/api/{}/agents/{}",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
         .expect("Failed to get agent");
-    
+
     assert_eq!(get_response.status(), StatusCode::OK);
-    
+
     let retrieved_agent: Value = get_response.json().await.expect("Failed to parse agent");
     assert_eq!(retrieved_agent["id"], agent_id);
     assert_eq!(retrieved_agent["name"], "E2E Test Agent");
-    
+
     println!("✅ Agent retrieved successfully");
-    
+
     // Step 3: 更新 Agent
     println!("Step 3: Updating agent...");
     let update_request = json!({
         "name": "E2E Test Agent (Updated)",
         "description": "Updated description"
     });
-    
+
     let update_response = client
-        .put(format!("{}/api/{}/agents/{}", BASE_URL, API_VERSION, agent_id))
+        .put(format!(
+            "{}/api/{}/agents/{}",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .json(&update_request)
         .send()
         .await
         .expect("Failed to update agent");
-    
+
     assert_eq!(update_response.status(), StatusCode::OK);
-    
+
     println!("✅ Agent updated successfully");
-    
+
     // Step 4: 列出 Agents
     println!("Step 4: Listing agents...");
     let list_response = client
@@ -149,25 +155,28 @@ async fn test_e2e_complete_agent_workflow() {
         .send()
         .await
         .expect("Failed to list agents");
-    
+
     assert_eq!(list_response.status(), StatusCode::OK);
-    
+
     let agents: Value = list_response.json().await.expect("Failed to parse agents");
     assert!(agents["agents"].is_array());
-    
+
     println!("✅ Agents listed successfully");
-    
+
     // Step 5: 删除 Agent
     println!("Step 5: Deleting agent...");
     let delete_response = client
-        .delete(format!("{}/api/{}/agents/{}", BASE_URL, API_VERSION, agent_id))
+        .delete(format!(
+            "{}/api/{}/agents/{}",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
         .expect("Failed to delete agent");
-    
+
     assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
-    
+
     println!("✅ Agent deleted successfully");
     println!("🎉 Complete agent workflow test passed!");
 }
@@ -179,13 +188,13 @@ async fn test_e2e_complete_memory_workflow() {
         println!("⚠️  Server not running, skipping test");
         return;
     }
-    
+
     let client = create_client();
     let auth_token = get_test_auth_token();
-    
+
     // 首先创建一个 agent
     let agent_id = "test-agent-memory-workflow";
-    
+
     // Step 1: 创建 Memory
     println!("Step 1: Creating memory...");
     let create_memory_request = json!({
@@ -199,7 +208,7 @@ async fn test_e2e_complete_memory_workflow() {
             "tags": ["meetings", "schedule", "morning"]
         }
     });
-    
+
     let create_response = client
         .post(format!("{}/api/{}/memories", BASE_URL, API_VERSION))
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -207,31 +216,40 @@ async fn test_e2e_complete_memory_workflow() {
         .send()
         .await
         .expect("Failed to create memory");
-    
+
     assert_eq!(create_response.status(), StatusCode::CREATED);
-    
-    let memory: Value = create_response.json().await.expect("Failed to parse memory");
+
+    let memory: Value = create_response
+        .json()
+        .await
+        .expect("Failed to parse memory");
     let memory_id = memory["id"].as_str().expect("Memory ID not found");
-    
+
     println!("✅ Memory created: {}", memory_id);
-    
+
     // Step 2: 获取 Memory
     println!("Step 2: Getting memory...");
     let get_response = client
-        .get(format!("{}/api/{}/memories/{}", BASE_URL, API_VERSION, memory_id))
+        .get(format!(
+            "{}/api/{}/memories/{}",
+            BASE_URL, API_VERSION, memory_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
         .expect("Failed to get memory");
-    
+
     assert_eq!(get_response.status(), StatusCode::OK);
-    
+
     let retrieved_memory: Value = get_response.json().await.expect("Failed to parse memory");
     assert_eq!(retrieved_memory["id"], memory_id);
-    assert_eq!(retrieved_memory["content"], "User prefers morning meetings at 9 AM");
-    
+    assert_eq!(
+        retrieved_memory["content"],
+        "User prefers morning meetings at 9 AM"
+    );
+
     println!("✅ Memory retrieved successfully");
-    
+
     // Step 3: 搜索 Memories
     println!("Step 3: Searching memories...");
     let search_request = json!({
@@ -239,7 +257,7 @@ async fn test_e2e_complete_memory_workflow() {
         "agent_id": agent_id,
         "limit": 10
     });
-    
+
     let search_response = client
         .post(format!("{}/api/{}/memories/search", BASE_URL, API_VERSION))
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -247,44 +265,53 @@ async fn test_e2e_complete_memory_workflow() {
         .send()
         .await
         .expect("Failed to search memories");
-    
+
     assert_eq!(search_response.status(), StatusCode::OK);
-    
-    let search_results: Value = search_response.json().await.expect("Failed to parse search results");
+
+    let search_results: Value = search_response
+        .json()
+        .await
+        .expect("Failed to parse search results");
     assert!(search_results["results"].is_array());
-    
+
     println!("✅ Memory search completed");
-    
+
     // Step 4: 更新 Memory
     println!("Step 4: Updating memory...");
     let update_request = json!({
         "importance": 0.9,
         "content": "User strongly prefers morning meetings at 9 AM"
     });
-    
+
     let update_response = client
-        .put(format!("{}/api/{}/memories/{}", BASE_URL, API_VERSION, memory_id))
+        .put(format!(
+            "{}/api/{}/memories/{}",
+            BASE_URL, API_VERSION, memory_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .json(&update_request)
         .send()
         .await
         .expect("Failed to update memory");
-    
+
     assert_eq!(update_response.status(), StatusCode::OK);
-    
+
     println!("✅ Memory updated successfully");
-    
+
     // Step 5: 删除 Memory
     println!("Step 5: Deleting memory...");
     let delete_response = client
-        .delete(format!("{}/api/{}/memories/{}", BASE_URL, API_VERSION, memory_id))
+        .delete(format!(
+            "{}/api/{}/memories/{}",
+            BASE_URL, API_VERSION, memory_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
         .expect("Failed to delete memory");
-    
+
     assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
-    
+
     println!("✅ Memory deleted successfully");
     println!("🎉 Complete memory workflow test passed!");
 }
@@ -313,7 +340,10 @@ async fn test_e2e_chat_workflow() {
     });
 
     let chat_response = client
-        .post(format!("{}/api/{}/agents/{}/chat", BASE_URL, API_VERSION, agent_id))
+        .post(format!(
+            "{}/api/{}/agents/{}/chat",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .json(&chat_request)
         .send()
@@ -322,7 +352,10 @@ async fn test_e2e_chat_workflow() {
 
     assert_eq!(chat_response.status(), StatusCode::OK);
 
-    let response: Value = chat_response.json().await.expect("Failed to parse chat response");
+    let response: Value = chat_response
+        .json()
+        .await
+        .expect("Failed to parse chat response");
     assert!(response["content"].is_string());
     assert!(response["message_id"].is_string());
 
@@ -338,7 +371,10 @@ async fn test_e2e_chat_workflow() {
     });
 
     let followup_response = client
-        .post(format!("{}/api/{}/agents/{}/chat", BASE_URL, API_VERSION, agent_id))
+        .post(format!(
+            "{}/api/{}/agents/{}/chat",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .json(&followup_request)
         .send()
@@ -347,7 +383,10 @@ async fn test_e2e_chat_workflow() {
 
     assert_eq!(followup_response.status(), StatusCode::OK);
 
-    let response2: Value = followup_response.json().await.expect("Failed to parse response");
+    let response2: Value = followup_response
+        .json()
+        .await
+        .expect("Failed to parse response");
     let content = response2["content"].as_str().unwrap();
 
     // 验证响应中包含了之前的记忆（morning meetings）
@@ -377,7 +416,10 @@ async fn test_e2e_streaming_chat() {
     });
 
     let response = client
-        .post(format!("{}/api/{}/agents/{}/chat/stream", BASE_URL, API_VERSION, agent_id))
+        .post(format!(
+            "{}/api/{}/agents/{}/chat/stream",
+            BASE_URL, API_VERSION, agent_id
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .json(&chat_request)
         .send()
@@ -480,7 +522,10 @@ async fn test_e2e_error_handling() {
     // Test 2: 获取不存在的 Agent
     println!("Test 2: Getting non-existent agent...");
     let response = client
-        .get(format!("{}/api/{}/agents/non-existent-agent-id", BASE_URL, API_VERSION))
+        .get(format!(
+            "{}/api/{}/agents/non-existent-agent-id",
+            BASE_URL, API_VERSION
+        ))
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
@@ -514,4 +559,3 @@ async fn test_e2e_error_handling() {
 
     println!("🎉 Error handling test passed!");
 }
-

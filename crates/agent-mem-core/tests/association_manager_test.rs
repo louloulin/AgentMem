@@ -128,7 +128,10 @@ fn test_config_clone() {
     let config1 = AssociationManagerConfig::default();
     let config2 = config1.clone();
 
-    assert_eq!(config1.min_strength_threshold, config2.min_strength_threshold);
+    assert_eq!(
+        config1.min_strength_threshold,
+        config2.min_strength_threshold
+    );
     assert_eq!(
         config1.max_associations_per_memory,
         config2.max_associations_per_memory
@@ -303,4 +306,3 @@ fn test_association_metadata_concept() {
 
 // 注意：数据库集成测试需要实际的数据库连接
 // 这些测试应该在集成测试中进行，而不是单元测试
-

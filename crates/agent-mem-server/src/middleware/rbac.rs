@@ -39,8 +39,7 @@ pub async fn check_memory_permission(
     let action = Action::from_http_method(method);
 
     if let Some(user) = user_ctx {
-        let result =
-            RbacChecker::check_resource_action(&user.roles, Resource::Memory, action);
+        let result = RbacChecker::check_resource_action(&user.roles, Resource::Memory, action);
 
         // 记录审计日志
         let audit_log = AuditLogEntry::new(
@@ -169,9 +168,7 @@ pub async fn admin_only(
             );
             audit_log.log();
 
-            Err(ServerError::Forbidden(
-                "Admin access required".to_string(),
-            ))
+            Err(ServerError::Forbidden("Admin access required".to_string()))
         }
     } else {
         Err(ServerError::Unauthorized(
@@ -215,16 +212,13 @@ pub async fn no_read_only(
 }
 
 /// 通用RBAC权限验证中间件
-/// 
+///
 /// 这是一个基本的RBAC中间件，检查用户是否有权限访问资源
-pub async fn rbac_middleware(
-    req: Request,
-    next: Next,
-) -> ServerResult<Response> {
+pub async fn rbac_middleware(req: Request, next: Next) -> ServerResult<Response> {
     // 从 request extensions 中提取用户信息
     // 尝试获取 UserContext，如果没有则尝试 AuthUser
     let user_ctx = req.extensions().get::<UserContext>().cloned();
-    
+
     if let Some(user) = user_ctx {
         // 对于认证用户，记录审计日志并继续
         let audit_log = AuditLogEntry::new(
@@ -238,13 +232,13 @@ pub async fn rbac_middleware(
             None,
         );
         audit_log.log();
-        
+
         Ok(next.run(req).await)
     } else {
         // 尝试从 AuthUser 获取（用于开发模式）
         use crate::middleware::AuthUser;
         let auth_user = req.extensions().get::<AuthUser>().cloned();
-        
+
         if let Some(user) = auth_user {
             // 对于默认认证用户，记录审计日志并继续
             let audit_log = AuditLogEntry::new(
@@ -258,7 +252,7 @@ pub async fn rbac_middleware(
                 None,
             );
             audit_log.log();
-            
+
             Ok(next.run(req).await)
         } else {
             // 没有任何用户上下文，需要认证
@@ -288,4 +282,3 @@ mod tests {
         assert_eq!(Action::from_http_method("DELETE"), Action::Delete);
     }
 }
-

@@ -17,13 +17,13 @@ use tracing::{debug, info};
 pub struct EmbeddingBatchConfig {
     /// Maximum batch size (most embedding APIs have limits)
     pub max_batch_size: usize,
-    
+
     /// Minimum batch size before processing
     pub min_batch_size: usize,
-    
+
     /// Maximum wait time before processing partial batch (ms)
     pub max_wait_ms: u64,
-    
+
     /// Enable automatic batching
     pub enable_auto_batching: bool,
 }
@@ -63,15 +63,15 @@ impl EmbeddingBatchStats {
         self.total_batches += 1;
         self.total_texts += batch_size;
         self.total_processing_time_ms += processing_time_ms;
-        
+
         self.average_batch_size = self.total_texts as f64 / self.total_batches as f64;
-        
+
         if self.total_processing_time_ms > 0 {
-            self.throughput_texts_per_second = 
+            self.throughput_texts_per_second =
                 (self.total_texts as f64 / self.total_processing_time_ms as f64) * 1000.0;
         }
     }
-    
+
     pub fn format_report(&self) -> String {
         format!(
             "Embedding Batch Statistics:\n\
@@ -106,14 +106,17 @@ pub struct EmbeddingBatchProcessor {
 
 impl EmbeddingBatchProcessor {
     pub fn new(config: EmbeddingBatchConfig) -> Self {
-        info!("Creating embedding batch processor (max_batch: {})", config.max_batch_size);
-        
+        info!(
+            "Creating embedding batch processor (max_batch: {})",
+            config.max_batch_size
+        );
+
         Self {
             config,
             stats: Arc::new(RwLock::new(EmbeddingBatchStats::default())),
         }
     }
-    
+
     /// Process texts in optimized batches
     ///
     /// # Arguments
@@ -139,52 +142,52 @@ impl EmbeddingBatchProcessor {
     {
         let start = Instant::now();
         let total_texts = texts.len();
-        
+
         debug!("Batch embedding {} texts", total_texts);
-        
+
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         // Single text - no batching needed, but still update stats
         if texts.len() == 1 {
             let chunk_start = Instant::now();
             let result = embed_fn(texts).await?;
             let chunk_time = chunk_start.elapsed().as_millis() as u64;
-            
+
             // Update statistics
             {
                 let mut stats = self.stats.write().await;
                 stats.update(1, chunk_time);
             }
-            
+
             return Ok(result);
         }
-        
+
         // Process in batches
         let mut all_embeddings = Vec::with_capacity(total_texts);
-        
+
         for chunk in texts.chunks(self.config.max_batch_size) {
             let chunk_start = Instant::now();
             let chunk_texts = chunk.to_vec();
             let chunk_size = chunk_texts.len();
-            
+
             // Call embedding function with batch
             let embeddings = embed_fn(chunk_texts).await?;
-            
+
             let chunk_time = chunk_start.elapsed().as_millis() as u64;
-            
+
             // Update statistics
             {
                 let mut stats = self.stats.write().await;
                 stats.update(chunk_size, chunk_time);
             }
-            
+
             all_embeddings.extend(embeddings);
         }
-        
+
         let total_time = start.elapsed().as_millis() as u64;
-        
+
         debug!(
             "Batch embedding completed: {} texts in {}ms ({:.1} texts/sec)",
             total_texts,
@@ -195,21 +198,21 @@ impl EmbeddingBatchProcessor {
                 0.0
             }
         );
-        
+
         Ok(all_embeddings)
     }
-    
+
     /// Get statistics
     pub async fn get_stats(&self) -> EmbeddingBatchStats {
         self.stats.read().await.clone()
     }
-    
+
     /// Reset statistics
     pub async fn reset_stats(&self) {
         let mut stats = self.stats.write().await;
         *stats = EmbeddingBatchStats::default();
     }
-    
+
     /// Calculate expected speedup for batch size
     ///
     /// Based on empirical data from common embedding APIs
@@ -257,19 +260,19 @@ impl EmbeddingBatchHelper {
         Fut2: std::future::Future<Output = Result<Vec<Vec<f32>>>> + Send,
     {
         let text_count = texts.len();
-        
+
         // Test single embedding
         let single_start = Instant::now();
         for text in texts.iter() {
             let _ = single_embed_fn(text.clone()).await?;
         }
         let single_time = single_start.elapsed().as_millis() as u64;
-        
+
         // Test batch embedding
         let batch_start = Instant::now();
         let _ = batch_embed_fn(texts).await?;
         let batch_time = batch_start.elapsed().as_millis() as u64;
-        
+
         Ok(BatchPerformanceComparison {
             text_count,
             single_method_ms: single_time,
@@ -317,7 +320,9 @@ impl BatchPerformanceComparison {
             self.speedup,
             self.single_method_ms.saturating_sub(self.batch_method_ms),
             if self.single_method_ms > 0 {
-                ((self.single_method_ms - self.batch_method_ms) as f64 / self.single_method_ms as f64) * 100.0
+                ((self.single_method_ms - self.batch_method_ms) as f64
+                    / self.single_method_ms as f64)
+                    * 100.0
             } else {
                 0.0
             }
@@ -328,7 +333,7 @@ impl BatchPerformanceComparison {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_expected_speedup() {
         assert_eq!(EmbeddingBatchProcessor::expected_speedup(1), 1.0);
@@ -338,17 +343,17 @@ mod tests {
         assert_eq!(EmbeddingBatchProcessor::expected_speedup(100), 4.5);
         assert_eq!(EmbeddingBatchProcessor::expected_speedup(200), 5.0);
     }
-    
+
     #[tokio::test]
     async fn test_batch_processor_creation() {
         let config = EmbeddingBatchConfig::default();
         let processor = EmbeddingBatchProcessor::new(config);
-        
+
         let stats = processor.get_stats().await;
         assert_eq!(stats.total_batches, 0);
         assert_eq!(stats.total_texts, 0);
     }
-    
+
     #[tokio::test]
     async fn test_batch_embedding() {
         let config = EmbeddingBatchConfig {
@@ -356,11 +361,9 @@ mod tests {
             ..Default::default()
         };
         let processor = EmbeddingBatchProcessor::new(config);
-        
-        let texts: Vec<String> = (0..25)
-            .map(|i| format!("Text {}", i))
-            .collect();
-        
+
+        let texts: Vec<String> = (0..25).map(|i| format!("Text {}", i)).collect();
+
         // Mock embedding function
         let embed_fn = |batch: Vec<String>| async move {
             let embeddings: Vec<Vec<f32>> = batch
@@ -369,25 +372,27 @@ mod tests {
                 .collect();
             Ok(embeddings)
         };
-        
-        let embeddings = processor.batch_embed(texts.clone(), embed_fn).await.unwrap();
-        
+
+        let embeddings = processor
+            .batch_embed(texts.clone(), embed_fn)
+            .await
+            .unwrap();
+
         assert_eq!(embeddings.len(), 25);
-        
+
         let stats = processor.get_stats().await;
         assert_eq!(stats.total_texts, 25);
         assert!(stats.total_batches >= 3); // 25 texts / 10 batch_size = 3 batches
     }
-    
+
     #[test]
     fn test_stats_formatting() {
         let mut stats = EmbeddingBatchStats::default();
         stats.update(10, 100);
         stats.update(20, 150);
-        
+
         let report = stats.format_report();
         assert!(report.contains("Total batches: 2"));
         assert!(report.contains("Total texts processed: 30"));
     }
 }
-

@@ -105,9 +105,7 @@ fn demo_content_type_detection() {
 
     for (filename, expected_mime) in test_cases {
         let detected_type = detect_content_type_from_filename(filename);
-        println!(
-            "      📄 {filename} -> {detected_type} (预期: {expected_mime})"
-        );
+        println!("      📄 {filename} -> {detected_type} (预期: {expected_mime})");
     }
 
     println!("   ✅ 内容类型识别完成");

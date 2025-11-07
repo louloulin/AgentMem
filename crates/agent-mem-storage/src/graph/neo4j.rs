@@ -143,9 +143,10 @@ impl Neo4jStore {
             )));
         }
 
-        let result: Neo4jQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let result: Neo4jQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(
@@ -200,9 +201,10 @@ impl Neo4jStore {
             )));
         }
 
-        let result: Neo4jQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let result: Neo4jQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(

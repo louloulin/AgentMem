@@ -181,9 +181,12 @@ impl StorageBackend for PostgresStorage {
         })?;
 
         // 序列化 embedding 为 JSON（如果存在）
-        let embedding_json = memory.memory.embedding.as_ref().map(|emb| {
-            serde_json::to_value(&emb.values).ok()
-        }).flatten();
+        let embedding_json = memory
+            .memory
+            .embedding
+            .as_ref()
+            .map(|emb| serde_json::to_value(&emb.values).ok())
+            .flatten();
 
         // 转换 expires_at 为 DateTime
         let expires_at = memory.memory.expires_at.map(|ts| {
@@ -271,9 +274,12 @@ impl StorageBackend for PostgresStorage {
         })?;
 
         // 序列化 embedding 为 JSON（如果存在）
-        let embedding_json = memory.memory.embedding.as_ref().map(|emb| {
-            serde_json::to_value(&emb.values).ok()
-        }).flatten();
+        let embedding_json = memory
+            .memory
+            .embedding
+            .as_ref()
+            .map(|emb| serde_json::to_value(&emb.values).ok())
+            .flatten();
 
         // 转换 expires_at 为 DateTime
         let expires_at = memory.memory.expires_at.map(|ts| {

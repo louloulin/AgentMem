@@ -2,7 +2,9 @@
 //!
 //! 这个示例程序测试 LRU 缓存的基本功能
 
-use agent_mem_traits::{CacheStats, ExtractedFact, IntelligenceCache, MemoryActionType, MemoryDecision};
+use agent_mem_traits::{
+    CacheStats, ExtractedFact, IntelligenceCache, MemoryActionType, MemoryDecision,
+};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -45,11 +47,11 @@ impl IntelligenceCache for SimpleCache {
             None
         }
     }
-    
+
     async fn set_facts(&self, key: &str, facts: Vec<ExtractedFact>) {
         self.facts.write().await.insert(key.to_string(), facts);
     }
-    
+
     async fn get_decision(&self, key: &str) -> Option<MemoryDecision> {
         let decisions = self.decisions.read().await;
         if let Some(d) = decisions.get(key) {
@@ -60,31 +62,34 @@ impl IntelligenceCache for SimpleCache {
             None
         }
     }
-    
+
     async fn set_decision(&self, key: &str, decision: MemoryDecision) {
-        self.decisions.write().await.insert(key.to_string(), decision);
+        self.decisions
+            .write()
+            .await
+            .insert(key.to_string(), decision);
     }
-    
+
     async fn clear(&self) {
         self.facts.write().await.clear();
         self.decisions.write().await.clear();
         *self.hits.write().await = 0;
         *self.misses.write().await = 0;
     }
-    
+
     async fn stats(&self) -> CacheStats {
         let hits = *self.hits.read().await;
         let misses = *self.misses.read().await;
         let facts_size = self.facts.read().await.len();
         let decisions_size = self.decisions.read().await.len();
-        
+
         let total = hits + misses;
         let hit_rate = if total > 0 {
             hits as f64 / total as f64
         } else {
             0.0
         };
-        
+
         CacheStats {
             hits,
             misses,
@@ -198,18 +203,18 @@ async fn test_decision_cache(cache: Arc<dyn IntelligenceCache>) -> anyhow::Resul
 /// 测试缓存统计
 async fn test_cache_stats(cache: Arc<dyn IntelligenceCache>) -> anyhow::Result<()> {
     let stats = cache.stats().await;
-    
+
     println!("  缓存统计:");
     println!("    命中次数: {}", stats.hits);
     println!("    未命中次数: {}", stats.misses);
     println!("    缓存大小: {}", stats.size);
     println!("    命中率: {:.2}%", stats.hit_rate * 100.0);
-    
+
     assert!(stats.hits > 0, "应该有缓存命中");
     assert!(stats.misses > 0, "应该有缓存未命中");
     assert!(stats.hit_rate > 0.0, "命中率应该大于 0");
     assert!(stats.hit_rate < 1.0, "命中率应该小于 1");
-    
+
     println!("  ✓ 统计信息正确");
 
     Ok(())
@@ -234,4 +239,3 @@ async fn test_cache_clear(cache: Arc<dyn IntelligenceCache>) -> anyhow::Result<(
 
     Ok(())
 }
-

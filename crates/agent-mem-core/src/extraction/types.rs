@@ -269,4 +269,3 @@ impl ExtractionResult {
         self.relations.len()
     }
 }
-

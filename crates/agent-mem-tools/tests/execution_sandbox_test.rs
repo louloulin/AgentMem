@@ -16,7 +16,10 @@ fn test_sandbox_type_conversion() {
     assert_eq!(SandboxType::VM.as_str(), "vm");
 
     assert_eq!(SandboxType::from_str("local").unwrap(), SandboxType::Local);
-    assert_eq!(SandboxType::from_str("docker").unwrap(), SandboxType::Docker);
+    assert_eq!(
+        SandboxType::from_str("docker").unwrap(),
+        SandboxType::Docker
+    );
     assert_eq!(SandboxType::from_str("vm").unwrap(), SandboxType::VM);
 
     assert!(SandboxType::from_str("invalid").is_err());
@@ -291,7 +294,10 @@ fn test_local_config_with_venv() {
 
     // 虚拟环境路径应该是 sandbox_dir/venv_name
     let expected_venv_path = config.sandbox_dir.join(&config.venv_name);
-    assert_eq!(expected_venv_path, PathBuf::from("/tmp/venv_sandbox/my_venv"));
+    assert_eq!(
+        expected_venv_path,
+        PathBuf::from("/tmp/venv_sandbox/my_venv")
+    );
 }
 
 #[test]
@@ -314,4 +320,3 @@ fn test_multiple_env_vars() {
     assert_eq!(config.env_vars.get("VAR2"), Some(&"value2".to_string()));
     assert_eq!(config.env_vars.get("VAR3"), Some(&"value3".to_string()));
 }
-

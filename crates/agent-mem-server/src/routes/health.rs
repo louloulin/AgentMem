@@ -2,11 +2,11 @@
 //!
 //! 完整版本，集成组件健康检查
 
-use axum::{http::StatusCode, response::Json, Extension};
 use crate::error::ServerResult;
-use crate::models::{HealthResponse, ComponentStatus};
-use std::sync::Arc;
+use crate::models::{ComponentStatus, HealthResponse};
+use axum::{http::StatusCode, response::Json, Extension};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// GET /health - 基础健康检查
 ///
@@ -23,15 +23,15 @@ pub async fn health_check(
     Extension(repos): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
 ) -> ServerResult<(StatusCode, Json<HealthResponse>)> {
     let mut checks = HashMap::new();
-    
+
     // Check database connectivity
     let db_status = check_database(&repos).await;
     checks.insert("database".to_string(), db_status.clone());
-    
+
     // Check memory system
     let memory_status = check_memory_system().await;
     checks.insert("memory_system".to_string(), memory_status.clone());
-    
+
     // Determine overall status based on components
     let overall_status = if checks.values().all(|s| s.status == "healthy") {
         "healthy"
@@ -40,7 +40,7 @@ pub async fn health_check(
     } else {
         "degraded"
     };
-    
+
     let status_code = match overall_status {
         "healthy" => StatusCode::OK,
         "degraded" => StatusCode::OK, // Still operational
@@ -69,11 +69,14 @@ pub async fn health_check(
     )
 )]
 pub async fn liveness_check() -> ServerResult<(StatusCode, Json<serde_json::Value>)> {
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "status": "alive",
-        "timestamp": chrono::Utc::now(),
-        "version": env!("CARGO_PKG_VERSION"),
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "alive",
+            "timestamp": chrono::Utc::now(),
+            "version": env!("CARGO_PKG_VERSION"),
+        })),
+    ))
 }
 
 /// GET /health/ready - Readiness probe (Kubernetes)
@@ -94,29 +97,30 @@ pub async fn readiness_check(
     // Check all critical dependencies
     let db_healthy = check_database(&repos).await.status == "healthy";
     let memory_healthy = check_memory_system().await.status == "healthy";
-    
+
     let is_ready = db_healthy && memory_healthy;
-    
+
     let status_code = if is_ready {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    
-    Ok((status_code, Json(serde_json::json!({
-        "status": if is_ready { "ready" } else { "not_ready" },
-        "timestamp": chrono::Utc::now(),
-        "checks": {
-            "database": db_healthy,
-            "memory_system": memory_healthy,
-        }
-    }))))
+
+    Ok((
+        status_code,
+        Json(serde_json::json!({
+            "status": if is_ready { "ready" } else { "not_ready" },
+            "timestamp": chrono::Utc::now(),
+            "checks": {
+                "database": db_healthy,
+                "memory_system": memory_healthy,
+            }
+        })),
+    ))
 }
 
 /// Check database connectivity
-async fn check_database(
-    repos: &agent_mem_core::storage::factory::Repositories,
-) -> ComponentStatus {
+async fn check_database(repos: &agent_mem_core::storage::factory::Repositories) -> ComponentStatus {
     // Try to perform a simple operation to verify connectivity
     match repos.agents.list(10, 0).await {
         Ok(_) => ComponentStatus {

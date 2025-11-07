@@ -1,7 +1,7 @@
 //! PostgreSQL + pgvector 向量存储测试
 //!
 //! 这些测试需要运行 PostgreSQL 数据库并安装 pgvector 扩展
-//! 
+//!
 //! 设置测试环境:
 //! ```bash
 //! docker run -d --name postgres-test \
@@ -30,8 +30,9 @@ mod tests {
 
     /// 创建测试数据库连接池
     async fn create_test_pool() -> Arc<sqlx::PgPool> {
-        let database_url = env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql://postgres:test@localhost:5432/agentmem_test".to_string());
+        let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgresql://postgres:test@localhost:5432/agentmem_test".to_string()
+        });
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -127,13 +128,13 @@ mod tests {
             .search_vectors(vec![0.1; 128], 10, Some(0.9))
             .await
             .unwrap();
-        println!(
-            "✅ 带阈值搜索返回 {} 个结果",
-            results_with_threshold.len()
-        );
+        println!("✅ 带阈值搜索返回 {} 个结果", results_with_threshold.len());
 
         // 测试删除向量
-        store.delete_vectors(vec!["vec2".to_string()]).await.unwrap();
+        store
+            .delete_vectors(vec!["vec2".to_string()])
+            .await
+            .unwrap();
         let count_after_delete = store.count_vectors().await.unwrap();
         assert_eq!(count_after_delete, 2);
         println!("✅ 删除向量后计数: {}", count_after_delete);
@@ -284,10 +285,7 @@ mod tests {
             },
         ];
 
-        let results = store
-            .add_vectors_batch(vec![batch1, batch2])
-            .await
-            .unwrap();
+        let results = store.add_vectors_batch(vec![batch1, batch2]).await.unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].len(), 2);
         assert_eq!(results[1].len(), 2);
@@ -356,4 +354,3 @@ mod tests {
         cleanup_test_table(&pool, "test_health").await;
     }
 }
-

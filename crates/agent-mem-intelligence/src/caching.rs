@@ -92,7 +92,7 @@ impl<T: Clone> LruCacheWrapper<T> {
         }
 
         let mut cache = self.cache.lock().unwrap();
-        
+
         if let Some(entry) = cache.get(key) {
             if entry.is_expired() {
                 debug!("缓存过期: {}", &key[..16]);
@@ -117,10 +117,7 @@ impl<T: Clone> LruCacheWrapper<T> {
             return;
         }
 
-        let entry = CacheEntry::new(
-            value,
-            Duration::from_secs(self.config.ttl_secs),
-        );
+        let entry = CacheEntry::new(value, Duration::from_secs(self.config.ttl_secs));
 
         let mut cache = self.cache.lock().unwrap();
         cache.put(key, entry);
@@ -181,7 +178,7 @@ mod tests {
         let cache: LruCacheWrapper<String> = LruCacheWrapper::new(config);
 
         let key = LruCacheWrapper::<String>::compute_key("test content");
-        
+
         // 第一次获取应该未命中
         assert!(cache.get(&key).is_none());
 
@@ -278,4 +275,3 @@ mod tests {
         assert_ne!(key1, key2);
     }
 }
-

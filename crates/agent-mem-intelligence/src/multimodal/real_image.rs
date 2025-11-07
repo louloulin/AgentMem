@@ -209,9 +209,7 @@ impl RealImageProcessor {
                 file_size / 500
             )
         } else {
-            format!(
-                "Image text analysis: Detected text regions in {file_size} byte image"
-            )
+            format!("Image text analysis: Detected text regions in {file_size} byte image")
         };
 
         Ok(extracted_text)

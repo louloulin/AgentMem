@@ -19,10 +19,7 @@ fn test_embedded_mode_default() {
 #[test]
 fn test_server_mode_default() {
     let config = ServerModeConfig::default();
-    assert_eq!(
-        config.database_url,
-        "postgresql://localhost:5432/agentmem"
-    );
+    assert_eq!(config.database_url, "postgresql://localhost:5432/agentmem");
     assert_eq!(config.vector_service, VectorServiceType::PgVector);
     assert_eq!(config.vector_dimension, 1536);
 }
@@ -43,7 +40,10 @@ fn test_deployment_mode_embedded() {
 
     match mode {
         DeploymentMode::Embedded(config) => {
-            assert_eq!(config.database_path, PathBuf::from("./test_data/agentmem.db"));
+            assert_eq!(
+                config.database_path,
+                PathBuf::from("./test_data/agentmem.db")
+            );
             assert_eq!(config.vector_path, PathBuf::from("./test_data/vectors"));
             assert_eq!(config.vector_dimension, 1536);
             assert!(config.enable_wal);
@@ -54,9 +54,7 @@ fn test_deployment_mode_embedded() {
 
 #[test]
 fn test_deployment_mode_server_with_pgvector() {
-    let mode = DeploymentMode::server_with_pgvector(
-        "postgresql://localhost:5432/test".to_string(),
-    );
+    let mode = DeploymentMode::server_with_pgvector("postgresql://localhost:5432/test".to_string());
 
     match mode {
         DeploymentMode::Server(config) => {
@@ -240,9 +238,7 @@ fn test_serde_deployment_mode_embedded() {
 
 #[test]
 fn test_serde_deployment_mode_server() {
-    let mode = DeploymentMode::server_with_pgvector(
-        "postgresql://localhost:5432/test".to_string(),
-    );
+    let mode = DeploymentMode::server_with_pgvector("postgresql://localhost:5432/test".to_string());
     let json = serde_json::to_string(&mode).unwrap();
     let deserialized: DeploymentMode = serde_json::from_str(&json).unwrap();
 
@@ -264,4 +260,3 @@ fn test_serde_vector_service_type() {
     let deserialized: VectorServiceType = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, VectorServiceType::Qdrant);
 }
-

@@ -210,9 +210,10 @@ impl LLMProvider for OpenAIProvider {
             )));
         }
 
-        let openai_response: OpenAIResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let openai_response: OpenAIResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if openai_response.choices.is_empty() {
             return Err(AgentMemError::llm_error("No choices in OpenAI response"));
@@ -268,9 +269,7 @@ impl LLMProvider for OpenAIProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("OpenAI API request failed: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("OpenAI API request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
@@ -313,9 +312,7 @@ impl LLMProvider for OpenAIProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(format!(
-                        "Stream error: {e}"
-                    ))),
+                    Err(e) => Err(AgentMemError::network_error(format!("Stream error: {e}"))),
                 }
             })
             .filter(|result| {
@@ -398,9 +395,7 @@ impl LLMProvider for OpenAIProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("OpenAI API request failed: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("OpenAI API request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();

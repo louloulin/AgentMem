@@ -1,7 +1,6 @@
 /// 测试输入验证功能
 ///
 /// 验证 ChatRequest 的所有验证规则
-
 use agent_mem_core::orchestrator::ChatRequest;
 
 #[test]
@@ -31,7 +30,10 @@ fn test_empty_message() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Message cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Message cannot be empty"));
 }
 
 #[test]
@@ -47,7 +49,10 @@ fn test_whitespace_only_message() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Message cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Message cannot be empty"));
 }
 
 #[test]
@@ -79,7 +84,10 @@ fn test_empty_agent_id() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Agent ID cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Agent ID cannot be empty"));
 }
 
 #[test]
@@ -95,7 +103,10 @@ fn test_agent_id_too_long() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Agent ID too long"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Agent ID too long"));
 }
 
 #[test]
@@ -111,7 +122,10 @@ fn test_empty_user_id() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("User ID cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("User ID cannot be empty"));
 }
 
 #[test]
@@ -143,7 +157,10 @@ fn test_empty_organization_id() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Organization ID cannot be empty"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Organization ID cannot be empty"));
 }
 
 #[test]
@@ -159,7 +176,10 @@ fn test_organization_id_too_long() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Organization ID too long"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Organization ID too long"));
 }
 
 #[test]
@@ -175,7 +195,10 @@ fn test_max_memories_zero() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("max_memories must be at least 1"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("max_memories must be at least 1"));
 }
 
 #[test]
@@ -191,7 +214,10 @@ fn test_max_memories_too_large() {
 
     let result = request.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("max_memories too large"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("max_memories too large"));
 }
 
 #[test]
@@ -237,7 +263,7 @@ fn test_message_length_boundary() {
 fn test_id_length_boundary() {
     // Test max allowed length (255 characters)
     let long_id = "a".repeat(255);
-    
+
     let request = ChatRequest {
         message: "Hello".to_string(),
         agent_id: long_id.clone(),
@@ -248,4 +274,3 @@ fn test_id_length_boundary() {
     };
     assert!(request.validate().is_ok());
 }
-

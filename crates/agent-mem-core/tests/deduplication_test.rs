@@ -1,13 +1,15 @@
 //! MemoryDeduplicator 单元测试
 
-use agent_mem_core::managers::{
-    DeduplicationConfig, MemoryDeduplicator, MergeStrategy,
-};
+use agent_mem_core::managers::{DeduplicationConfig, MemoryDeduplicator, MergeStrategy};
 use chrono::Utc;
 use std::collections::HashMap;
 
 // 辅助函数：创建测试记忆
-fn create_test_memory(id: &str, content: &str, importance: f32) -> agent_mem_core::managers::deduplication::MemoryItem {
+fn create_test_memory(
+    id: &str,
+    content: &str,
+    importance: f32,
+) -> agent_mem_core::managers::deduplication::MemoryItem {
     agent_mem_core::managers::deduplication::MemoryItem {
         id: id.to_string(),
         content: content.to_string(),
@@ -342,4 +344,3 @@ fn test_all_merge_strategies() {
         assert!(!serialized.is_empty());
     }
 }
-

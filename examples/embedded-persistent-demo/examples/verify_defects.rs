@@ -184,8 +184,8 @@ async fn verify_defect_4() -> Result<()> {
     println!("🔴 缺陷 4: 配置存在但不生效");
     println!("----------------------------------------------------------------------");
 
-    use agent_mem_config::MemoryConfig;
     use agent_mem_config::memory::IntelligenceConfig;
+    use agent_mem_config::MemoryConfig;
 
     // 创建启用智能功能的配置
     let mut config = MemoryConfig::default();
@@ -194,9 +194,18 @@ async fn verify_defect_4() -> Result<()> {
     config.intelligence.enable_deduplication = true;
 
     println!("   📋 配置:");
-    println!("      enable_intelligent_extraction: {}", config.intelligence.enable_intelligent_extraction);
-    println!("      enable_decision_engine: {}", config.intelligence.enable_decision_engine);
-    println!("      enable_deduplication: {}", config.intelligence.enable_deduplication);
+    println!(
+        "      enable_intelligent_extraction: {}",
+        config.intelligence.enable_intelligent_extraction
+    );
+    println!(
+        "      enable_decision_engine: {}",
+        config.intelligence.enable_decision_engine
+    );
+    println!(
+        "      enable_deduplication: {}",
+        config.intelligence.enable_deduplication
+    );
 
     // 使用配置创建 SimpleMemory
     let mem = SimpleMemory::with_config(config).await?;
@@ -230,4 +239,3 @@ async fn verify_defect_4() -> Result<()> {
 
     Ok(())
 }
-

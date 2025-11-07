@@ -34,10 +34,11 @@ impl MemoryServer {
 
         // Create database configuration from server config
         let db_config = DatabaseConfig {
-            backend: if config.database_url.starts_with("libsql://") 
-                || config.database_url.ends_with(".db") 
-                || config.database_url == ":memory:" 
-                || config.database_url.starts_with("file:") {
+            backend: if config.database_url.starts_with("libsql://")
+                || config.database_url.ends_with(".db")
+                || config.database_url == ":memory:"
+                || config.database_url.starts_with("file:")
+            {
                 DatabaseBackend::LibSql
             } else {
                 DatabaseBackend::Postgres
@@ -64,8 +65,10 @@ impl MemoryServer {
                 config.embedder_provider.clone(),
                 config.embedder_model.clone(),
             )
-                .await
-                .map_err(|e| ServerError::ServerError(format!("Failed to create memory manager: {e}")))?
+            .await
+            .map_err(|e| {
+                ServerError::ServerError(format!("Failed to create memory manager: {e}"))
+            })?,
         );
         info!("Memory manager initialized (using agent-mem unified API)");
 

@@ -51,7 +51,7 @@ async fn demo_simple_memory() {
         Ok(mem) => {
             info!("✅ SimpleMemory 创建成功");
             info!("⚠️  注意：数据存储在内存中，进程退出后会丢失");
-            
+
             // 添加一些测试数据
             match mem.add("我喜欢吃披萨").await {
                 Ok(id) => info!("✅ 添加记忆成功: {}", id),
@@ -92,7 +92,7 @@ async fn demo_agent_api() {
     match CoreAgent::from_env("production-agent-1".to_string()).await {
         Ok(mut agent) => {
             info!("✅ CoreAgent 创建成功");
-            
+
             // 初始化
             match agent.initialize().await {
                 Ok(_) => info!("✅ Agent 初始化成功"),
@@ -121,7 +121,7 @@ async fn demo_agent_api() {
     match EpisodicAgent::from_env("production-agent-2".to_string()).await {
         Ok(mut agent) => {
             info!("✅ EpisodicAgent 创建成功");
-            
+
             match agent.initialize().await {
                 Ok(_) => info!("✅ Agent 初始化成功"),
                 Err(e) => error!("❌ Agent 初始化失败: {}", e),
@@ -143,7 +143,7 @@ async fn demo_agent_api() {
     match SemanticAgent::from_env("production-agent-3".to_string()).await {
         Ok(mut agent) => {
             info!("✅ SemanticAgent 创建成功");
-            
+
             match agent.initialize().await {
                 Ok(_) => info!("✅ Agent 初始化成功"),
                 Err(e) => error!("❌ Agent 初始化失败: {}", e),
@@ -174,4 +174,3 @@ async fn demo_agent_api() {
     info!("  # 使用 PostgreSQL");
     info!("  DATABASE_URL=postgresql://user:pass@localhost/agentmem cargo run --example production-memory-demo");
 }
-

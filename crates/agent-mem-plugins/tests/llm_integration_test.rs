@@ -14,28 +14,25 @@ fn get_wasm_plugin_path(plugin_name: &str) -> PathBuf {
         .parent()
         .unwrap()
         .to_path_buf();
-    
-    workspace_root.join(format!(
-        "target/wasm32-wasip1/release/{}.wasm",
-        plugin_name
-    ))
+
+    workspace_root.join(format!("target/wasm32-wasip1/release/{}.wasm", plugin_name))
 }
 
 #[tokio::test]
 #[ignore]
 async fn test_llm_plugin_summarize() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
-    
+
     if !wasm_path.exists() {
         eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
         eprintln!("   Run: ./build_plugins.sh");
         return;
     }
-    
+
     println!("\n🧪 Testing LLM Plugin - Summarize");
-    
+
     let manager = PluginManager::new(10);
-    
+
     let plugin = RegisteredPlugin {
         id: "llm-plugin".to_string(),
         metadata: PluginMetadata {
@@ -53,20 +50,20 @@ async fn test_llm_plugin_summarize() {
         registered_at: Utc::now(),
         last_loaded_at: None,
     };
-    
+
     manager.register(plugin).await.unwrap();
     println!("  ✅ Plugin registered");
-    
+
     // Test summarize
     let input = serde_json::json!({
         "text": "This is a long text that needs to be summarized. It contains multiple sentences. The plugin should extract the key points and create a concise summary.",
         "max_length": 100
     });
-    
+
     let result = manager
         .call_plugin("llm-plugin", "summarize", &input.to_string())
         .await;
-    
+
     match result {
         Ok(output) => {
             println!("  ✅ Summarize function executed");
@@ -80,7 +77,7 @@ async fn test_llm_plugin_summarize() {
             panic!("Summarize test failed");
         }
     }
-    
+
     println!("✅ LLM Plugin summarize test completed\n");
 }
 
@@ -88,16 +85,16 @@ async fn test_llm_plugin_summarize() {
 #[ignore]
 async fn test_llm_plugin_translate() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
-    
+
     if !wasm_path.exists() {
         eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
         return;
     }
-    
+
     println!("\n🧪 Testing LLM Plugin - Translate");
-    
+
     let manager = PluginManager::new(10);
-    
+
     let plugin = RegisteredPlugin {
         id: "llm-translate".to_string(),
         metadata: PluginMetadata {
@@ -115,19 +112,19 @@ async fn test_llm_plugin_translate() {
         registered_at: Utc::now(),
         last_loaded_at: None,
     };
-    
+
     manager.register(plugin).await.unwrap();
-    
+
     // Test translate
     let input = serde_json::json!({
         "text": "Hello, how are you?",
         "target_language": "zh-CN"
     });
-    
+
     let result = manager
         .call_plugin("llm-translate", "translate", &input.to_string())
         .await;
-    
+
     match result {
         Ok(output) => {
             println!("  ✅ Translate function executed");
@@ -141,7 +138,7 @@ async fn test_llm_plugin_translate() {
             panic!("Translate test failed");
         }
     }
-    
+
     println!("✅ LLM Plugin translate test completed\n");
 }
 
@@ -149,16 +146,16 @@ async fn test_llm_plugin_translate() {
 #[ignore]
 async fn test_llm_plugin_answer_question() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
-    
+
     if !wasm_path.exists() {
         eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
         return;
     }
-    
+
     println!("\n🧪 Testing LLM Plugin - Answer Question");
-    
+
     let manager = PluginManager::new(10);
-    
+
     let plugin = RegisteredPlugin {
         id: "llm-qa".to_string(),
         metadata: PluginMetadata {
@@ -176,19 +173,19 @@ async fn test_llm_plugin_answer_question() {
         registered_at: Utc::now(),
         last_loaded_at: None,
     };
-    
+
     manager.register(plugin).await.unwrap();
-    
+
     // Test answer_question
     let input = serde_json::json!({
         "context": "The AgentMem plugin system uses WebAssembly for security and performance.",
         "question": "What does AgentMem use for plugins?"
     });
-    
+
     let result = manager
         .call_plugin("llm-qa", "answer_question", &input.to_string())
         .await;
-    
+
     match result {
         Ok(output) => {
             println!("  ✅ Answer question function executed");
@@ -202,7 +199,7 @@ async fn test_llm_plugin_answer_question() {
             panic!("Answer question test failed");
         }
     }
-    
+
     println!("✅ LLM Plugin Q&A test completed\n");
 }
 
@@ -217,4 +214,3 @@ fn test_llm_capability_api() {
     println!("   • translate(text, target_language) -> translation");
     println!("   • answer_question(context, question) -> answer");
 }
-

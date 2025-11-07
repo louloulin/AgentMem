@@ -107,13 +107,34 @@ async fn main() -> Result<()> {
         .with(LevelFilter::INFO)
         .init();
 
-    println!("{}", "╔════════════════════════════════════════════════════════════════╗".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "║         🚀 AgentMem vs MIRIX 性能对比测试 🚀                 ║".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "║             真实性能测试，对标MIRIX                           ║".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "╚════════════════════════════════════════════════════════════════╝".blue());
+    println!(
+        "{}",
+        "╔════════════════════════════════════════════════════════════════╗".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║         🚀 AgentMem vs MIRIX 性能对比测试 🚀                 ║".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║             真实性能测试，对标MIRIX                           ║".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "╚════════════════════════════════════════════════════════════════╝".blue()
+    );
 
     let mut tracker = TestTracker::new();
     let config = TestConfig::default();
@@ -165,14 +186,11 @@ async fn test_add_performance(
     memory: &Memory,
     config: &TestConfig,
 ) -> Result<()> {
-    tracker.start_test(
-        "Add Operation Performance",
-        "测试不同大小记忆的添加性能",
-    );
+    tracker.start_test("Add Operation Performance", "测试不同大小记忆的添加性能");
 
     let medium_text = "A".repeat(100);
     let large_text = "B".repeat(1000);
-    
+
     let test_sizes = vec![
         ("Small (10 bytes)", "Small text"),
         ("Medium (100 bytes)", medium_text.as_str()),
@@ -383,10 +401,7 @@ async fn test_concurrent_performance(
 
 /// 测试5: 不同数据规模性能
 async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig) -> Result<()> {
-    tracker.start_test(
-        "Scale Performance Test",
-        "测试不同数据规模下的性能表现",
-    );
+    tracker.start_test("Scale Performance Test", "测试不同数据规模下的性能表现");
 
     let scales = vec![100, 500, 1000];
 
@@ -398,7 +413,11 @@ async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig)
         let mut success_count = 0;
 
         for i in 0..scale {
-            if memory.add(&format!("Scale test memory {}", i)).await.is_ok() {
+            if memory
+                .add(&format!("Scale test memory {}", i))
+                .await
+                .is_ok()
+            {
                 success_count += 1;
             }
         }
@@ -424,10 +443,7 @@ async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig)
         } else {
             tracker.pass_subtest(
                 None,
-                &format!(
-                    "Add: {:.2} ops/s, Search: failed",
-                    stats.ops_per_second()
-                ),
+                &format!("Add: {:.2} ops/s, Search: failed", stats.ops_per_second()),
             );
         }
     }
@@ -438,11 +454,26 @@ async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig)
 
 /// 生成性能报告
 fn generate_performance_report(tracker: &TestTracker) -> Result<()> {
-    println!("\n{}", "╔════════════════════════════════════════════════════════════════╗".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "║                     📊 性能报告                                ║".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "╚════════════════════════════════════════════════════════════════╝".blue());
+    println!(
+        "\n{}",
+        "╔════════════════════════════════════════════════════════════════╗".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║                     📊 性能报告                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "╚════════════════════════════════════════════════════════════════╝".blue()
+    );
 
     let summary = tracker.get_summary();
 
@@ -466,14 +497,34 @@ fn generate_performance_report(tracker: &TestTracker) -> Result<()> {
         summary.failed_subtests.to_string().red()
     );
 
-    println!("\n{}", "╔════════════════════════════════════════════════════════════════╗".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "║          ✅ AgentMem性能测试完成！✅                          ║".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "║  查看详细报告: PERFORMANCE_COMPARISON_REPORT.md               ║".blue());
-    println!("{}", "║                                                                ║".blue());
-    println!("{}", "╚════════════════════════════════════════════════════════════════╝".blue());
+    println!(
+        "\n{}",
+        "╔════════════════════════════════════════════════════════════════╗".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║          ✅ AgentMem性能测试完成！✅                          ║".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "║  查看详细报告: PERFORMANCE_COMPARISON_REPORT.md               ║".blue()
+    );
+    println!(
+        "{}",
+        "║                                                                ║".blue()
+    );
+    println!(
+        "{}",
+        "╚════════════════════════════════════════════════════════════════╝".blue()
+    );
 
     Ok(())
 }
-

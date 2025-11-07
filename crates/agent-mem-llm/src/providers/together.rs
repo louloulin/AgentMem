@@ -98,9 +98,7 @@ impl TogetherProvider {
         let client = Client::builder()
             .timeout(Duration::from_secs(60)) // Together 可能需要更长时间
             .build()
-            .map_err(|e| {
-                AgentMemError::llm_error(format!("Failed to create HTTP client: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::llm_error(format!("Failed to create HTTP client: {e}")))?;
 
         let base_url = config
             .base_url

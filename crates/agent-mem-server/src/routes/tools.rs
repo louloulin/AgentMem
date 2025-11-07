@@ -277,8 +277,7 @@ pub async fn list_tools(
         repo.find_by_tags(&auth_user.org_id, &tags).await
     } else {
         // Find all tools in organization
-        repo.find_by_organization_id(&auth_user.org_id)
-            .await
+        repo.find_by_organization_id(&auth_user.org_id).await
     }
     .map_err(|e| ServerError::internal_error(format!("Failed to list tools: {e}")))?;
 

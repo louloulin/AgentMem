@@ -15,7 +15,7 @@ use std::time::Instant;
 #[derive(Debug, Clone)]
 struct CodeSnippet {
     name: String,
-    code_type: String,  // function, class, struct, etc.
+    code_type: String, // function, class, struct, etc.
     language: String,
     description: String,
     code: String,
@@ -51,11 +51,15 @@ fn create_code_repository() -> Vec<CodeSnippet> {
     use crate::config_env::create_stores_from_env;
     let stores = create_stores_from_env().await?;
     Ok(Self::with_store(agent_id, stores.core))
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-core/src/agents/core_agent.rs".to_string(),
-            tags: vec!["agent".to_string(), "initialization".to_string(), "persistent".to_string()],
+            tags: vec![
+                "agent".to_string(),
+                "initialization".to_string(),
+                "persistent".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "MemoryManager::add_memory".to_string(),
             code_type: "function".to_string(),
@@ -69,11 +73,11 @@ fn create_code_repository() -> Vec<CodeSnippet> {
     memory_type: Option<MemoryType>,
     importance: Option<f32>,
     metadata: Option<HashMap<String, String>>,
-) -> Result<String>"#.to_string(),
+) -> Result<String>"#
+                .to_string(),
             file_path: "crates/agent-mem-core/src/manager.rs".to_string(),
             tags: vec!["memory".to_string(), "crud".to_string(), "api".to_string()],
         },
-        
         CodeSnippet {
             name: "VectorStore".to_string(),
             code_type: "trait".to_string(),
@@ -85,11 +89,15 @@ pub trait VectorStore: Send + Sync {
     async fn search(&self, query: Vector, limit: usize) -> Result<Vec<SearchResult>>;
     async fn delete(&self, ids: Vec<String>) -> Result<usize>;
     async fn update(&self, id: String, vector: Vector) -> Result<()>;
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-traits/src/vector.rs".to_string(),
-            tags: vec!["vector".to_string(), "storage".to_string(), "trait".to_string()],
+            tags: vec![
+                "vector".to_string(),
+                "storage".to_string(),
+                "trait".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "hybrid_search".to_string(),
             code_type: "function".to_string(),
@@ -103,11 +111,15 @@ pub trait VectorStore: Send + Sync {
     let vector_results = self.vector_search(query, limit * 2).await?;
     let text_results = self.text_search(query, limit * 2).await?;
     Ok(self.rrf_fusion(vector_results, text_results, limit))
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-core/src/search/hybrid.rs".to_string(),
-            tags: vec!["search".to_string(), "hybrid".to_string(), "rrf".to_string()],
+            tags: vec![
+                "search".to_string(),
+                "hybrid".to_string(),
+                "rrf".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "BatchProcessor".to_string(),
             code_type: "struct".to_string(),
@@ -123,11 +135,15 @@ impl BatchProcessor {
     pub async fn batch_insert<T>(&self, items: Vec<T>) -> Result<Vec<R>> {
         self.batch_execute(items, insert_fn).await
     }
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-core/src/performance/batch.rs".to_string(),
-            tags: vec!["performance".to_string(), "batch".to_string(), "concurrent".to_string()],
+            tags: vec![
+                "performance".to_string(),
+                "batch".to_string(),
+                "concurrent".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "AgentMemClient".to_string(),
             code_type: "class".to_string(),
@@ -144,11 +160,15 @@ impl BatchProcessor {
             f"{self.base_url}/api/v1/memories",
             json={"content": content, "memory_type": memory_type}
         )
-        return response.json()["id"]"#.to_string(),
+        return response.json()["id"]"#
+                .to_string(),
             file_path: "sdks/python/agentmem/client.py".to_string(),
-            tags: vec!["sdk".to_string(), "python".to_string(), "client".to_string()],
+            tags: vec![
+                "sdk".to_string(),
+                "python".to_string(),
+                "client".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "MemoryManager".to_string(),
             code_type: "class".to_string(),
@@ -168,11 +188,15 @@ impl BatchProcessor {
   async delete(id: string): Promise<void> {
     await this.store.delete(id);
   }
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "sdks/typescript/src/memory/manager.ts".to_string(),
-            tags: vec!["sdk".to_string(), "typescript".to_string(), "manager".to_string()],
+            tags: vec![
+                "sdk".to_string(),
+                "typescript".to_string(),
+                "manager".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "create_memory_endpoint".to_string(),
             code_type: "endpoint".to_string(),
@@ -191,11 +215,15 @@ impl BatchProcessor {
         request.metadata,
     ).await?;
     Ok(Json(CreateMemoryResponse { id }))
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-server/src/routes/memory.rs".to_string(),
-            tags: vec!["api".to_string(), "rest".to_string(), "endpoint".to_string()],
+            tags: vec![
+                "api".to_string(),
+                "rest".to_string(),
+                "endpoint".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "LibSqlStorageFactory".to_string(),
             code_type: "struct".to_string(),
@@ -219,11 +247,15 @@ impl LibSqlStorageFactory {
             // ...
         })
     }
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-storage/src/factory/libsql.rs".to_string(),
-            tags: vec!["storage".to_string(), "libsql".to_string(), "factory".to_string()],
+            tags: vec![
+                "storage".to_string(),
+                "libsql".to_string(),
+                "factory".to_string(),
+            ],
         },
-        
         CodeSnippet {
             name: "LanceDBStore".to_string(),
             code_type: "struct".to_string(),
@@ -245,9 +277,14 @@ impl LanceDBStore {
         let results = table.vector_search(query).limit(limit).execute().await?;
         Ok(results)
     }
-}"#.to_string(),
+}"#
+            .to_string(),
             file_path: "crates/agent-mem-storage/src/backends/lancedb_store.rs".to_string(),
-            tags: vec!["vector".to_string(), "lancedb".to_string(), "search".to_string()],
+            tags: vec![
+                "vector".to_string(),
+                "lancedb".to_string(),
+                "search".to_string(),
+            ],
         },
     ]
 }
@@ -258,45 +295,45 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
-    
+
     println!("🚀 AgentMem 代码搜索演示");
     println!("{}", "=".repeat(70));
-    
+
     // 1. 创建 SimpleMemory 实例
     println!("\n📦 1. 初始化 SimpleMemory...");
     let memory = SimpleMemory::new().await?;
     println!("   ✅ SimpleMemory 创建成功");
-    
+
     // 2. 创建代码库
     println!("\n📚 2. 创建示例代码库...");
     let code_repo = create_code_repository();
     println!("   ✅ 创建了 {} 个代码片段", code_repo.len());
-    
+
     // 统计信息
     let mut lang_stats: HashMap<String, usize> = HashMap::new();
     let mut type_stats: HashMap<String, usize> = HashMap::new();
-    
+
     for snippet in &code_repo {
         *lang_stats.entry(snippet.language.clone()).or_insert(0) += 1;
         *type_stats.entry(snippet.code_type.clone()).or_insert(0) += 1;
     }
-    
+
     println!("\n   📊 代码库统计:");
     println!("      语言分布: {:?}", lang_stats);
     println!("      类型分布: {:?}", type_stats);
-    
+
     // 3. 批量索引代码
     println!("\n🔨 3. 批量索引代码片段...");
     let start = Instant::now();
     let mut indexed_ids = Vec::new();
-    
+
     for (i, snippet) in code_repo.iter().enumerate() {
         let content = snippet.to_memory_content();
-        
+
         // 添加到记忆系统
         let id = memory.add(&content).await?;
         indexed_ids.push(id);
-        
+
         println!(
             "   [{:2}/{}] ✓ {} - {} ({})",
             i + 1,
@@ -306,19 +343,19 @@ async fn main() -> Result<()> {
             snippet.language
         );
     }
-    
+
     let duration = start.elapsed();
     let ops_per_sec = code_repo.len() as f64 / duration.as_secs_f64();
-    
+
     println!("\n   ✅ 索引完成:");
     println!("      总数: {} 个代码片段", code_repo.len());
     println!("      耗时: {:.2?}", duration);
     println!("      吞吐量: {:.0} ops/s", ops_per_sec);
-    
+
     // 4. 语义搜索测试
     println!("\n🔍 4. 语义搜索测试...");
     println!("{}", "-".repeat(70));
-    
+
     let search_queries = vec![
         ("如何创建 Agent？", "agent initialization"),
         ("向量搜索怎么实现？", "vector search"),
@@ -327,7 +364,7 @@ async fn main() -> Result<()> {
         ("混合搜索算法", "hybrid search"),
         ("数据库连接配置", "database connection"),
     ];
-    
+
     for (i, (query, context)) in search_queries.iter().enumerate() {
         println!("\n   查询 {}: \"{}\"", i + 1, query);
         println!("   上下文: {}", context);
@@ -344,7 +381,8 @@ async fn main() -> Result<()> {
             for (j, result) in results.iter().take(3).enumerate() {
                 // 提取代码片段名称（简化显示）
                 let first_line = result.content.lines().next().unwrap_or("Unknown");
-                println!("      {}. {} (相似度: {:.3})",
+                println!(
+                    "      {}. {} (相似度: {:.3})",
                     j + 1,
                     first_line,
                     result.score.unwrap_or(0.0)
@@ -352,7 +390,7 @@ async fn main() -> Result<()> {
             }
         }
     }
-    
+
     // 5. 总结
     println!("\n{}", "=".repeat(70));
     println!("✅ 代码搜索演示完成！");
@@ -361,7 +399,7 @@ async fn main() -> Result<()> {
     println!("   - 索引速度: {:.0} ops/s", ops_per_sec);
     println!("   - 搜索查询: {} 次", search_queries.len());
     println!("   - 支持语言: Rust, Python, TypeScript");
-    
+
     println!("\n💡 应用场景:");
     println!("   ✓ 代码库智能搜索");
     println!("   ✓ API 文档检索");
@@ -369,7 +407,6 @@ async fn main() -> Result<()> {
     println!("   ✓ 开发知识库");
     println!("   ✓ AI 编程助手");
     println!("   ✓ 代码审查辅助");
-    
+
     Ok(())
 }
-

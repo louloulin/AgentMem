@@ -22,7 +22,9 @@ impl LibSqlToolRepository {
 
     /// Helper function to serialize JSON fields
     fn serialize_json(value: &Option<serde_json::Value>) -> Option<String> {
-        value.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default())
+        value
+            .as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
     }
 
     /// Helper function to deserialize JSON fields
@@ -32,7 +34,8 @@ impl LibSqlToolRepository {
 
     /// Helper function to serialize tags
     fn serialize_tags(tags: &Option<Vec<String>>) -> Option<String> {
-        tags.as_ref().map(|t| serde_json::to_string(t).unwrap_or_default())
+        tags.as_ref()
+            .map(|t| serde_json::to_string(t).unwrap_or_default())
     }
 
     /// Helper function to deserialize tags
@@ -372,4 +375,3 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         Ok(tools)
     }
 }
-

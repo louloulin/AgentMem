@@ -37,11 +37,7 @@ impl BackgroundAgentManager {
     ///
     /// Creates a message queue for the agent and starts a background task
     /// to process messages.
-    pub async fn start_agent<F>(
-        &self,
-        agent_id: String,
-        processor: F,
-    ) -> Result<(), CoreError>
+    pub async fn start_agent<F>(&self, agent_id: String, processor: F) -> Result<(), CoreError>
     where
         F: Fn(AgentMessage) -> Result<(), CoreError> + Send + Sync + 'static,
     {
@@ -314,4 +310,3 @@ mod tests {
         manager.stop_agent("agent-1").await.unwrap();
     }
 }
-

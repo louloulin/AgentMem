@@ -10,11 +10,11 @@
 
 use agent_mem_core::SimpleMemory;
 use agent_mem_traits::Result;
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use regex::Regex;
 
 /// 代码元素类型
 #[derive(Debug, Clone, PartialEq)]
@@ -56,17 +56,20 @@ impl CodeElement {
             self.name,
             self.file_path
         );
-        
+
         if let Some(doc) = &self.doc_comment {
             content.push_str(&format!("Documentation: {doc}\n"));
         }
-        
+
         content.push_str(&format!("\nSignature:\n{}\n", self.signature));
-        content.push_str(&format!("Location: {}:{}", self.file_path, self.line_number));
-        
+        content.push_str(&format!(
+            "Location: {}:{}",
+            self.file_path, self.line_number
+        ));
+
         content
     }
-    
+
     /// 生成元数据
     fn to_metadata(&self) -> HashMap<String, String> {
         let mut metadata = HashMap::new();
@@ -92,24 +95,24 @@ impl CodeScanner {
             elements: Vec::new(),
         }
     }
-    
+
     /// 扫描目录
     fn scan(&mut self) -> Result<()> {
         println!("📂 扫描代码库: {:?}", self.root_path);
-        
+
         let root_path = self.root_path.clone();
         self.scan_directory(&root_path)?;
-        
+
         println!("✅ 扫描完成，找到 {} 个代码元素", self.elements.len());
         Ok(())
     }
-    
+
     /// 递归扫描目录
     fn scan_directory(&mut self, dir: &Path) -> Result<()> {
         if !dir.is_dir() {
             return Ok(());
         }
-        
+
         // 跳过 target 和隐藏目录
         if let Some(name) = dir.file_name() {
             let name_str = name.to_string_lossy();
@@ -117,55 +120,58 @@ impl CodeScanner {
                 return Ok(());
             }
         }
-        
+
         for entry in fs::read_dir(dir).map_err(|e| {
             agent_mem_traits::AgentMemError::internal_error(format!("Failed to read dir: {e}"))
         })? {
             let entry = entry.map_err(|e| {
-                agent_mem_traits::AgentMemError::internal_error(format!("Failed to read entry: {e}"))
+                agent_mem_traits::AgentMemError::internal_error(format!(
+                    "Failed to read entry: {e}"
+                ))
             })?;
             let path = entry.path();
-            
+
             if path.is_dir() {
                 self.scan_directory(&path)?;
             } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
                 self.scan_rust_file(&path)?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// 扫描 Rust 文件
     fn scan_rust_file(&mut self, file_path: &Path) -> Result<()> {
         let content = fs::read_to_string(file_path).map_err(|e| {
             agent_mem_traits::AgentMemError::internal_error(format!("Failed to read file: {e}"))
         })?;
-        
+
         let relative_path = file_path
             .strip_prefix(&self.root_path)
             .unwrap_or(file_path)
             .to_string_lossy()
             .to_string();
-        
+
         // 提取代码元素
         self.extract_functions(&content, &relative_path);
         self.extract_structs(&content, &relative_path);
         self.extract_traits(&content, &relative_path);
         self.extract_enums(&content, &relative_path);
-        
+
         Ok(())
     }
-    
+
     /// 提取函数
     fn extract_functions(&mut self, content: &str, file_path: &str) {
-        let re = Regex::new(r"(?m)^[\s]*(pub\s+)?(async\s+)?fn\s+(\w+)\s*(<[^>]+>)?\s*\([^)]*\)").unwrap();
-        
+        let re = Regex::new(r"(?m)^[\s]*(pub\s+)?(async\s+)?fn\s+(\w+)\s*(<[^>]+>)?\s*\([^)]*\)")
+            .unwrap();
+
         for (line_num, line) in content.lines().enumerate() {
             if let Some(caps) = re.captures(line) {
                 if let Some(name) = caps.get(3) {
                     let doc = self.extract_doc_comment(content, line_num);
-                    
+
                     self.elements.push(CodeElement {
                         element_type: CodeElementType::Function,
                         name: name.as_str().to_string(),
@@ -178,16 +184,16 @@ impl CodeScanner {
             }
         }
     }
-    
+
     /// 提取结构体
     fn extract_structs(&mut self, content: &str, file_path: &str) {
         let re = Regex::new(r"(?m)^[\s]*(pub\s+)?struct\s+(\w+)").unwrap();
-        
+
         for (line_num, line) in content.lines().enumerate() {
             if let Some(caps) = re.captures(line) {
                 if let Some(name) = caps.get(2) {
                     let doc = self.extract_doc_comment(content, line_num);
-                    
+
                     self.elements.push(CodeElement {
                         element_type: CodeElementType::Struct,
                         name: name.as_str().to_string(),
@@ -200,16 +206,16 @@ impl CodeScanner {
             }
         }
     }
-    
+
     /// 提取 trait
     fn extract_traits(&mut self, content: &str, file_path: &str) {
         let re = Regex::new(r"(?m)^[\s]*(pub\s+)?trait\s+(\w+)").unwrap();
-        
+
         for (line_num, line) in content.lines().enumerate() {
             if let Some(caps) = re.captures(line) {
                 if let Some(name) = caps.get(2) {
                     let doc = self.extract_doc_comment(content, line_num);
-                    
+
                     self.elements.push(CodeElement {
                         element_type: CodeElementType::Trait,
                         name: name.as_str().to_string(),
@@ -222,16 +228,16 @@ impl CodeScanner {
             }
         }
     }
-    
+
     /// 提取枚举
     fn extract_enums(&mut self, content: &str, file_path: &str) {
         let re = Regex::new(r"(?m)^[\s]*(pub\s+)?enum\s+(\w+)").unwrap();
-        
+
         for (line_num, line) in content.lines().enumerate() {
             if let Some(caps) = re.captures(line) {
                 if let Some(name) = caps.get(2) {
                     let doc = self.extract_doc_comment(content, line_num);
-                    
+
                     self.elements.push(CodeElement {
                         element_type: CodeElementType::Enum,
                         name: name.as_str().to_string(),
@@ -244,12 +250,12 @@ impl CodeScanner {
             }
         }
     }
-    
+
     /// 提取文档注释
     fn extract_doc_comment(&self, content: &str, line_num: usize) -> Option<String> {
         let lines: Vec<&str> = content.lines().collect();
         let mut doc_lines = Vec::new();
-        
+
         // 向上查找文档注释
         for i in (0..line_num).rev() {
             let line = lines[i].trim();
@@ -261,7 +267,7 @@ impl CodeScanner {
                 break;
             }
         }
-        
+
         if doc_lines.is_empty() {
             None
         } else {
@@ -276,52 +282,54 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
-    
+
     println!("🚀 AgentMem 持久化代码索引器 (LibSQL + LanceDB)");
     println!("{}", "=".repeat(70));
-    
+
     // 设置环境变量
     std::env::set_var("AGENTMEM_STORAGE_TYPE", "libsql");
     std::env::set_var("AGENTMEM_LIBSQL_URL", "./test-data/code-index.db");
     std::env::set_var("AGENTMEM_VECTOR_STORE_TYPE", "lancedb");
     std::env::set_var("AGENTMEM_LANCEDB_PATH", "./test-data/code-vectors.lance");
-    
+
     println!("\n📦 1. 初始化 SimpleMemory (持久化存储)...");
     println!("   - 数据目录: ./test-data/");
 
     let memory = SimpleMemory::new().await?;
     println!("   ✅ SimpleMemory 创建成功");
-    
+
     // 2. 扫描代码库
     println!("\n📂 2. 扫描 AgentMem 代码库...");
     let crates_path = PathBuf::from("../../crates/agent-mem-core/src");
-    
+
     if !crates_path.exists() {
         println!("   ⚠️  路径不存在: {crates_path:?}");
         println!("   使用当前目录的示例代码");
         return Ok(());
     }
-    
+
     let mut scanner = CodeScanner::new(crates_path);
     scanner.scan()?;
-    
+
     // 统计信息
     let mut type_stats: HashMap<String, usize> = HashMap::new();
     for element in &scanner.elements {
-        *type_stats.entry(element.element_type.as_str().to_string()).or_insert(0) += 1;
+        *type_stats
+            .entry(element.element_type.as_str().to_string())
+            .or_insert(0) += 1;
     }
-    
+
     println!("\n   📊 代码元素统计:");
     for (elem_type, count) in type_stats.iter() {
         println!("      - {elem_type}: {count}");
     }
-    
+
     // 3. 批量索引到 AgentMem (持久化存储)
     println!("\n🔨 3. 批量索引代码元素到持久化存储...");
     let start = Instant::now();
     let mut indexed_count = 0;
     let max_to_index = 100; // 索引 100 个元素
-    
+
     for (i, element) in scanner.elements.iter().take(max_to_index).enumerate() {
         let content = element.to_memory_content();
         let metadata = element.to_metadata();
@@ -332,10 +340,15 @@ async fn main() -> Result<()> {
         indexed_count += 1;
 
         if (i + 1) % 20 == 0 {
-            println!("   [{:3}/{}] 已索引 {} 个元素...", i + 1, max_to_index, i + 1);
+            println!(
+                "   [{:3}/{}] 已索引 {} 个元素...",
+                i + 1,
+                max_to_index,
+                i + 1
+            );
         }
     }
-    
+
     let duration = start.elapsed();
     let ops_per_sec = indexed_count as f64 / duration.as_secs_f64();
 
@@ -369,11 +382,13 @@ async fn main() -> Result<()> {
     println!("\n🔍 5. 语义搜索测试 (真实向量搜索)...");
     println!("{}", "-".repeat(70));
 
-    let search_queries = [("如何创建 Agent？", "查找 Agent 创建相关的函数"),
+    let search_queries = [
+        ("如何创建 Agent？", "查找 Agent 创建相关的函数"),
         ("SimpleMemory 实现", "查找 SimpleMemory 的实现代码"),
         ("MemoryManager", "查找 MemoryManager 相关代码"),
         ("trait 定义", "查找 trait 定义"),
-        ("配置管理", "查找配置相关的代码")];
+        ("配置管理", "查找配置相关的代码"),
+    ];
 
     for (i, (query, description)) in search_queries.iter().enumerate() {
         println!("\n   查询 {}: \"{}\"", i + 1, query);
@@ -436,4 +451,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

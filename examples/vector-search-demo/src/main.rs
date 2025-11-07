@@ -38,18 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let search_engine = VectorSearchEngine::with_config(
-        vector_store.clone(),
-        1536,
-        config,
-    );
+    let search_engine = VectorSearchEngine::with_config(vector_store.clone(), 1536, config);
 
     // ========================================
     // 演示 1: 添加测试向量
     // ========================================
     println!("📊 演示 1: 添加测试向量");
     println!("----------------------------------------");
-    
+
     let test_vectors = vec![
         VectorData {
             id: "vec1".to_string(),
@@ -95,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("📊 演示 2: 获取向量存储统计信息");
     println!("----------------------------------------");
-    
+
     let stats = search_engine.get_stats().await?;
     println!("✅ 统计信息:");
     println!("   - 总向量数: {}", stats.total_vectors);
@@ -112,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("🔍 演示 3: 执行向量搜索");
     println!("----------------------------------------");
-    
+
     let query_vector = vec![0.15; 1536];
     let query = SearchQuery {
         query: "测试查询".to_string(),
@@ -129,13 +125,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         vector_weight: 1.0,
         fulltext_weight: 0.0,
     };
-    
+
     let (results, search_time) = search_engine.search(query_vector.clone(), &query).await?;
     println!("✅ 搜索完成:");
     println!("   - 搜索时间: {} ms", search_time);
     println!("   - 结果数量: {}", results.len());
     for (i, result) in results.iter().enumerate() {
-        println!("   - 结果 {}: ID={}, 分数={:.4}", i + 1, result.id, result.score);
+        println!(
+            "   - 结果 {}: ID={}, 分数={:.4}",
+            i + 1,
+            result.id,
+            result.score
+        );
     }
     println!();
 
@@ -144,16 +145,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("⚡ 演示 4: 缓存效果验证");
     println!("----------------------------------------");
-    
+
     // 第二次搜索（应该命中缓存）
     let (results2, search_time2) = search_engine.search(query_vector.clone(), &query).await?;
     println!("✅ 第二次搜索（缓存）:");
     println!("   - 搜索时间: {} ms", search_time2);
     println!("   - 结果数量: {}", results2.len());
-    println!("   - 时间对比: 第一次 {} ms vs 第二次 {} ms", search_time, search_time2);
-    
+    println!(
+        "   - 时间对比: 第一次 {} ms vs 第二次 {} ms",
+        search_time, search_time2
+    );
+
     if search_time2 < search_time {
-        println!("   ✅ 缓存生效！搜索速度提升 {:.1}x", search_time as f64 / search_time2 as f64);
+        println!(
+            "   ✅ 缓存生效！搜索速度提升 {:.1}x",
+            search_time as f64 / search_time2 as f64
+        );
     }
     println!();
 
@@ -162,13 +169,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("🚀 演示 5: 批量搜索优化");
     println!("----------------------------------------");
-    
-    let query_vectors = vec![
-        vec![0.1; 1536],
-        vec![0.2; 1536],
-        vec![0.3; 1536],
-    ];
-    
+
+    let query_vectors = vec![vec![0.1; 1536], vec![0.2; 1536], vec![0.3; 1536]];
+
     let batch_results = search_engine.batch_search(query_vectors, &query).await?;
     println!("✅ 批量搜索完成:");
     println!("   - 查询数量: {}", batch_results.len());
@@ -182,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("⚙️  演示 6: 性能优化");
     println!("----------------------------------------");
-    
+
     search_engine.optimize_search_performance().await?;
     println!("✅ 性能优化完成");
     println!("   - 清理了过期的缓存条目");
@@ -194,14 +197,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("📊 演示 7: 最终统计信息");
     println!("----------------------------------------");
-    
+
     let final_stats = search_engine.get_stats().await?;
     println!("✅ 最终统计:");
     println!("   - 总向量数: {}", final_stats.total_vectors);
     println!("   - 总搜索次数: {}", final_stats.total_searches);
     println!("   - 缓存命中次数: {}", final_stats.cache_hits);
-    println!("   - 缓存命中率: {:.2}%", final_stats.cache_hit_rate * 100.0);
-    println!("   - 平均搜索时间: {:.2} ms", final_stats.avg_search_time_ms);
+    println!(
+        "   - 缓存命中率: {:.2}%",
+        final_stats.cache_hit_rate * 100.0
+    );
+    println!(
+        "   - 平均搜索时间: {:.2} ms",
+        final_stats.avg_search_time_ms
+    );
     println!();
 
     // ========================================
@@ -247,4 +256,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

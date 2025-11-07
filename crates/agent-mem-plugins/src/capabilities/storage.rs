@@ -77,9 +77,12 @@ mod tests {
     #[tokio::test]
     async fn test_storage_set_and_get() {
         let storage = StorageCapability::new();
-        
-        storage.set("key1".to_string(), "value1".to_string()).await.unwrap();
-        
+
+        storage
+            .set("key1".to_string(), "value1".to_string())
+            .await
+            .unwrap();
+
         let value = storage.get("key1").await.unwrap();
         assert_eq!(value, Some("value1".to_string()));
     }
@@ -87,10 +90,13 @@ mod tests {
     #[tokio::test]
     async fn test_storage_delete() {
         let storage = StorageCapability::new();
-        
-        storage.set("key1".to_string(), "value1".to_string()).await.unwrap();
+
+        storage
+            .set("key1".to_string(), "value1".to_string())
+            .await
+            .unwrap();
         assert!(storage.exists("key1").await.unwrap());
-        
+
         let deleted = storage.delete("key1").await.unwrap();
         assert!(deleted);
         assert!(!storage.exists("key1").await.unwrap());
@@ -99,11 +105,20 @@ mod tests {
     #[tokio::test]
     async fn test_storage_list_keys() {
         let storage = StorageCapability::new();
-        
-        storage.set("key1".to_string(), "value1".to_string()).await.unwrap();
-        storage.set("key2".to_string(), "value2".to_string()).await.unwrap();
-        storage.set("key3".to_string(), "value3".to_string()).await.unwrap();
-        
+
+        storage
+            .set("key1".to_string(), "value1".to_string())
+            .await
+            .unwrap();
+        storage
+            .set("key2".to_string(), "value2".to_string())
+            .await
+            .unwrap();
+        storage
+            .set("key3".to_string(), "value3".to_string())
+            .await
+            .unwrap();
+
         let keys = storage.list_keys().await.unwrap();
         assert_eq!(keys.len(), 3);
         assert!(keys.contains(&"key1".to_string()));
@@ -114,14 +129,19 @@ mod tests {
     #[tokio::test]
     async fn test_storage_clear() {
         let storage = StorageCapability::new();
-        
-        storage.set("key1".to_string(), "value1".to_string()).await.unwrap();
-        storage.set("key2".to_string(), "value2".to_string()).await.unwrap();
-        
+
+        storage
+            .set("key1".to_string(), "value1".to_string())
+            .await
+            .unwrap();
+        storage
+            .set("key2".to_string(), "value2".to_string())
+            .await
+            .unwrap();
+
         assert_eq!(storage.count().await.unwrap(), 2);
-        
+
         storage.clear().await.unwrap();
         assert_eq!(storage.count().await.unwrap(), 0);
     }
 }
-

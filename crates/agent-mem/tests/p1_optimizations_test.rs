@@ -11,14 +11,11 @@
 #[cfg(test)]
 mod p1_optimizations_tests {
     use agent_mem::orchestrator::MemoryOrchestrator;
-    use agent_mem_intelligence::{
-        caching::CacheConfig,
-        BatchConfig, FactExtractor,
-    };
+    use agent_mem_intelligence::{caching::CacheConfig, BatchConfig, FactExtractor};
     use agent_mem_llm::{LLMProvider, Message, ModelInfo};
     use agent_mem_traits::{Embedder, Result as TraitResult};
-    use std::sync::Arc;
     use async_trait::async_trait;
+    use std::sync::Arc;
 
     // Mock implementations for testing
     struct MockLLMProvider;
@@ -85,7 +82,7 @@ mod p1_optimizations_tests {
         println!("\n=== 测试 P1-#1: FactExtractor 缓存 ===\n");
 
         let llm = Arc::new(MockLLMProvider::new());
-        
+
         // 创建带缓存的 FactExtractor
         let cache_config = CacheConfig {
             size: 10,
@@ -110,7 +107,7 @@ mod p1_optimizations_tests {
         let stats2 = extractor.cache_stats().unwrap();
         println!("第二次提取后缓存统计: {:?}", stats2);
         assert_eq!(stats2.hits, 1);
-        
+
         // 结果应该一致
         assert_eq!(facts1.len(), facts2.len());
 
@@ -197,18 +194,21 @@ mod p1_optimizations_tests {
             },
         ];
 
-        let structured_facts = batch_extractor.extract_entities_batch(&facts).await.unwrap();
-        println!(
-            "批量实体提取结果: {} 个结构化事实",
-            structured_facts.len()
-        );
+        let structured_facts = batch_extractor
+            .extract_entities_batch(&facts)
+            .await
+            .unwrap();
+        println!("批量实体提取结果: {} 个结构化事实", structured_facts.len());
 
         // 测试批量重要性评估
         let batch_evaluator =
             BatchImportanceEvaluator::new(llm.clone(), timeout_config, batch_config);
 
         if !structured_facts.is_empty() {
-            let evaluations = batch_evaluator.evaluate_batch(&structured_facts).await.unwrap();
+            let evaluations = batch_evaluator
+                .evaluate_batch(&structured_facts)
+                .await
+                .unwrap();
             println!("批量重要性评估结果: {} 个评估", evaluations.len());
         }
 
@@ -248,4 +248,3 @@ mod p1_optimizations_tests {
         println!("\n✅ 所有 P1 优化已实现并测试通过");
     }
 }
-

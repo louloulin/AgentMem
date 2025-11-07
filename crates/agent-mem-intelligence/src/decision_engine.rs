@@ -173,7 +173,10 @@ impl MemoryDecisionEngine {
     }
 
     /// 创建带超时配置的决策引擎
-    pub fn with_timeout_config(llm: Arc<dyn LLMProvider + Send + Sync>, timeout_config: TimeoutConfig) -> Self {
+    pub fn with_timeout_config(
+        llm: Arc<dyn LLMProvider + Send + Sync>,
+        timeout_config: TimeoutConfig,
+    ) -> Self {
         Self {
             llm,
             similarity_threshold: 0.7,
@@ -221,21 +224,20 @@ impl MemoryDecisionEngine {
             content: prompt,
             timestamp: Some(chrono::Utc::now()),
         }];
-        
+
         // P0 优化 #12: 添加超时和重试
         let llm = self.llm.clone();
         let response_text = with_timeout_and_retry(
             || {
                 let llm = llm.clone();
                 let messages = messages.clone();
-                async move {
-                    llm.generate(&messages).await
-                }
+                async move { llm.generate(&messages).await }
             },
             self.timeout_config.decision_timeout_secs,
             2, // 最多重试2次
             "decision_making",
-        ).await?;
+        )
+        .await?;
         let cleaned_json = self.extract_json_from_response(&response_text)?;
         let response: DecisionResponse = serde_json::from_str(&cleaned_json)
             .map_err(agent_mem_traits::AgentMemError::SerializationError)?;
@@ -278,16 +280,15 @@ impl MemoryDecisionEngine {
             content: prompt,
             timestamp: Some(chrono::Utc::now()),
         }];
-        
+
         // P0 优化 #12: 添加超时控制
         let llm = self.llm.clone();
         let response_text = with_timeout(
-            async move {
-                llm.generate(&messages).await
-            },
+            async move { llm.generate(&messages).await },
             self.timeout_config.conflict_detection_timeout_secs,
             "conflict_detection",
-        ).await?;
+        )
+        .await?;
         let response: ConflictDetection = serde_json::from_str(&response_text)
             .map_err(agent_mem_traits::AgentMemError::SerializationError)?;
 
@@ -1185,21 +1186,27 @@ struct EvaluatedAction {
 
 impl MemoryDecisionEngine {
     /// P2 优化 #13: 验证决策一致性
-    /// 
+    ///
     /// 确保决策之间没有冲突，例如：
     /// - UPDATE和DELETE同一个记忆
     /// - 多个DELETE同一个记忆
     /// - MERGE中的记忆被DELETE
-    fn validate_decision_consistency(&self, mut decisions: Vec<MemoryDecision>) -> Result<Vec<MemoryDecision>> {
+    fn validate_decision_consistency(
+        &self,
+        mut decisions: Vec<MemoryDecision>,
+    ) -> Result<Vec<MemoryDecision>> {
         use std::collections::HashSet;
-        
-        info!("P2优化 #13: 开始验证决策一致性，共 {} 个决策", decisions.len());
-        
+
+        info!(
+            "P2优化 #13: 开始验证决策一致性，共 {} 个决策",
+            decisions.len()
+        );
+
         let mut to_update: HashSet<String> = HashSet::new();
         let mut to_delete: HashSet<String> = HashSet::new();
         let mut to_merge: HashSet<String> = HashSet::new();
         let mut conflicts = Vec::new();
-        
+
         // 第一遍：收集所有操作的目标记忆
         for decision in decisions.iter() {
             match &decision.action {
@@ -1209,7 +1216,11 @@ impl MemoryDecisionEngine {
                 MemoryAction::Delete { memory_id, .. } => {
                     to_delete.insert(memory_id.clone());
                 }
-                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+                MemoryAction::Merge {
+                    primary_memory_id,
+                    secondary_memory_ids,
+                    ..
+                } => {
                     to_merge.insert(primary_memory_id.clone());
                     for id in secondary_memory_ids {
                         to_merge.insert(id.clone());
@@ -1218,12 +1229,12 @@ impl MemoryDecisionEngine {
                 _ => {}
             }
         }
-        
+
         // 第二遍：检测冲突
         for (idx, decision) in decisions.iter().enumerate() {
             let mut has_conflict = false;
             let mut conflict_reason = String::new();
-            
+
             match &decision.action {
                 MemoryAction::Update { memory_id, .. } => {
                     // UPDATE vs DELETE 冲突
@@ -1244,7 +1255,11 @@ impl MemoryDecisionEngine {
                         conflict_reason = format!("记忆 {memory_id} 同时被DELETE和MERGE");
                     }
                 }
-                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+                MemoryAction::Merge {
+                    primary_memory_id,
+                    secondary_memory_ids,
+                    ..
+                } => {
                     // MERGE 内部冲突：主记忆被删除
                     if to_delete.contains(primary_memory_id) {
                         has_conflict = true;
@@ -1261,30 +1276,34 @@ impl MemoryDecisionEngine {
                 }
                 _ => {}
             }
-            
+
             if has_conflict {
                 warn!("❌ 决策冲突 #{}: {}", idx, conflict_reason);
                 conflicts.push(idx);
             }
         }
-        
+
         // 移除冲突的决策（保留置信度较高的）
         if !conflicts.is_empty() {
             warn!("发现 {} 个决策冲突，移除冲突决策", conflicts.len());
-            
+
             let total_decisions = decisions.len();
-            
+
             // 按置信度从高到低排序
-            decisions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
-            
+            decisions.sort_by(|a, b| {
+                b.confidence
+                    .partial_cmp(&a.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
             // 重新验证（移除低置信度的冲突决策）
             let mut validated = Vec::new();
             let mut processed_memories: HashSet<String> = HashSet::new();
-            
+
             for decision in decisions {
                 let memory_ids = self.get_affected_memory_ids(&decision.action);
                 let has_processed = memory_ids.iter().any(|id| processed_memories.contains(id));
-                
+
                 if !has_processed {
                     // 记录已处理的记忆
                     for id in memory_ids {
@@ -1292,28 +1311,36 @@ impl MemoryDecisionEngine {
                     }
                     validated.push(decision);
                 } else {
-                    warn!("移除冲突决策: {:?} (置信度: {})", decision.action, decision.confidence);
+                    warn!(
+                        "移除冲突决策: {:?} (置信度: {})",
+                        decision.action, decision.confidence
+                    );
                 }
             }
-            
-            info!("✅ 决策一致性验证完成：保留 {} 个决策，移除 {} 个冲突决策",
+
+            info!(
+                "✅ 决策一致性验证完成：保留 {} 个决策，移除 {} 个冲突决策",
                 validated.len(),
                 total_decisions - validated.len()
             );
-            
+
             Ok(validated)
         } else {
             info!("✅ 所有决策一致，无冲突");
             Ok(decisions)
         }
     }
-    
+
     /// 获取决策影响的记忆ID列表
     fn get_affected_memory_ids(&self, action: &MemoryAction) -> Vec<String> {
         match action {
             MemoryAction::Update { memory_id, .. } => vec![memory_id.clone()],
             MemoryAction::Delete { memory_id, .. } => vec![memory_id.clone()],
-            MemoryAction::Merge { primary_memory_id, secondary_memory_ids, .. } => {
+            MemoryAction::Merge {
+                primary_memory_id,
+                secondary_memory_ids,
+                ..
+            } => {
                 let mut ids = vec![primary_memory_id.clone()];
                 ids.extend(secondary_memory_ids.clone());
                 ids
@@ -1321,9 +1348,9 @@ impl MemoryDecisionEngine {
             _ => Vec::new(),
         }
     }
-    
+
     /// P2 优化 #14: 记录决策审计日志
-    /// 
+    ///
     /// 记录所有决策的详细信息，便于调试和追踪
     fn log_decisions(
         &self,
@@ -1337,14 +1364,14 @@ impl MemoryDecisionEngine {
         info!("现有记忆数量: {}", existing_memories.len());
         info!("决策数量: {}", decisions.len());
         info!("");
-        
+
         // 统计决策类型
         let mut add_count = 0;
         let mut update_count = 0;
         let mut delete_count = 0;
         let mut merge_count = 0;
         let mut no_action_count = 0;
-        
+
         for decision in decisions {
             match &decision.action {
                 MemoryAction::Add { .. } => add_count += 1,
@@ -1354,7 +1381,7 @@ impl MemoryDecisionEngine {
                 MemoryAction::NoAction { .. } => no_action_count += 1,
             }
         }
-        
+
         info!("决策类型统计:");
         info!("  - ADD: {}", add_count);
         info!("  - UPDATE: {}", update_count);
@@ -1362,35 +1389,67 @@ impl MemoryDecisionEngine {
         info!("  - MERGE: {}", merge_count);
         info!("  - NO_ACTION: {}", no_action_count);
         info!("");
-        
+
         // 记录每个决策的详细信息
         for (idx, decision) in decisions.iter().enumerate() {
-            info!("决策 #{}: {:?}", idx + 1, self.format_decision_action(&decision.action));
+            info!(
+                "决策 #{}: {:?}",
+                idx + 1,
+                self.format_decision_action(&decision.action)
+            );
             info!("  置信度: {:.2}", decision.confidence);
             info!("  影响的记忆: {:?}", decision.affected_memories);
             info!("  预估影响: {:.2}", decision.estimated_impact);
-            info!("  推理依据: {}", decision.reasoning.chars().take(100).collect::<String>());
-            
+            info!(
+                "  推理依据: {}",
+                decision.reasoning.chars().take(100).collect::<String>()
+            );
+
             // 详细的操作参数
             match &decision.action {
-                MemoryAction::Add { content, importance, .. } => {
-                    info!("  内容预览: {}", content.chars().take(50).collect::<String>());
+                MemoryAction::Add {
+                    content,
+                    importance,
+                    ..
+                } => {
+                    info!(
+                        "  内容预览: {}",
+                        content.chars().take(50).collect::<String>()
+                    );
                     info!("  重要性: {:.2}", importance);
                 }
-                MemoryAction::Update { memory_id, new_content, merge_strategy, change_reason } => {
+                MemoryAction::Update {
+                    memory_id,
+                    new_content,
+                    merge_strategy,
+                    change_reason,
+                } => {
                     info!("  目标记忆ID: {}", memory_id);
-                    info!("  新内容预览: {}", new_content.chars().take(50).collect::<String>());
+                    info!(
+                        "  新内容预览: {}",
+                        new_content.chars().take(50).collect::<String>()
+                    );
                     info!("  合并策略: {:?}", merge_strategy);
                     info!("  变更原因: {}", change_reason);
                 }
-                MemoryAction::Delete { memory_id, deletion_reason } => {
+                MemoryAction::Delete {
+                    memory_id,
+                    deletion_reason,
+                } => {
                     info!("  删除记忆ID: {}", memory_id);
                     info!("  删除原因: {:?}", deletion_reason);
                 }
-                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
+                MemoryAction::Merge {
+                    primary_memory_id,
+                    secondary_memory_ids,
+                    merged_content,
+                } => {
                     info!("  主记忆ID: {}", primary_memory_id);
                     info!("  次要记忆ID: {:?}", secondary_memory_ids);
-                    info!("  合并内容预览: {}", merged_content.chars().take(50).collect::<String>());
+                    info!(
+                        "  合并内容预览: {}",
+                        merged_content.chars().take(50).collect::<String>()
+                    );
                 }
                 MemoryAction::NoAction { reason } => {
                     info!("  原因: {}", reason);
@@ -1398,10 +1457,10 @@ impl MemoryDecisionEngine {
             }
             info!("");
         }
-        
+
         info!("====================================================");
     }
-    
+
     /// 格式化决策动作类型
     fn format_decision_action(&self, action: &MemoryAction) -> &'static str {
         match action {

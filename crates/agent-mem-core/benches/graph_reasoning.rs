@@ -9,10 +9,10 @@
 //! - 推理操作: < 200ms
 
 use agent_mem_core::{
-    graph_memory::{GraphMemoryEngine, NodeType, RelationType, ReasoningType},
+    graph_memory::{GraphMemoryEngine, NodeType, ReasoningType, RelationType},
     types::{Memory, MemoryType},
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 
@@ -127,11 +127,7 @@ fn bench_find_shortest_path(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let paths = engine
-                    .find_shortest_paths(
-                        black_box(&node_a),
-                        black_box(&node_d),
-                        black_box(5),
-                    )
+                    .find_shortest_paths(black_box(&node_a), black_box(&node_d), black_box(5))
                     .await
                     .unwrap();
                 black_box(paths)
@@ -224,12 +220,7 @@ fn bench_get_neighbors(c: &mut Criterion) {
             let memory = create_test_memory(&format!("neighbor_{}", i), &format!("Neighbor {}", i));
             let neighbor_id = engine.add_node(memory, NodeType::Concept).await.unwrap();
             engine
-                .add_edge(
-                    center_id.clone(),
-                    neighbor_id,
-                    RelationType::Similar,
-                    0.8,
-                )
+                .add_edge(center_id.clone(), neighbor_id, RelationType::Similar, 0.8)
                 .await
                 .unwrap();
         }
@@ -240,10 +231,7 @@ fn bench_get_neighbors(c: &mut Criterion) {
     c.bench_function("get_neighbors", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let neighbors = engine
-                    .get_neighbors(black_box(&center_node))
-                    .await
-                    .unwrap();
+                let neighbors = engine.get_neighbors(black_box(&center_node)).await.unwrap();
                 black_box(neighbors)
             })
         });
@@ -303,14 +291,9 @@ fn bench_batch_add_edges(c: &mut Criterion) {
                         // 先创建节点
                         let mut node_ids = Vec::new();
                         for i in 0..size {
-                            let memory = create_test_memory(
-                                &format!("node_{}", i),
-                                &format!("Node {}", i),
-                            );
-                            let node_id = engine
-                                .add_node(memory, NodeType::Concept)
-                                .await
-                                .unwrap();
+                            let memory =
+                                create_test_memory(&format!("node_{}", i), &format!("Node {}", i));
+                            let node_id = engine.add_node(memory, NodeType::Concept).await.unwrap();
                             node_ids.push(node_id);
                         }
 
@@ -350,4 +333,3 @@ criterion_group!(
 );
 
 criterion_main!(benches);
-

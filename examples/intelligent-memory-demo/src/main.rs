@@ -77,16 +77,17 @@ async fn demo_intelligent_operations() -> Result<()> {
     info!("✅ Memory 创建成功（智能功能取决于环境变量配置）");
 
     // 添加包含多个事实的复杂内容
-    let complex_content = "我叫张三，今年30岁，在北京工作。我喜欢编程和阅读，最喜欢的编程语言是 Rust。";
-    
+    let complex_content =
+        "我叫张三，今年30岁，在北京工作。我喜欢编程和阅读，最喜欢的编程语言是 Rust。";
+
     info!("添加复杂记忆: {}", complex_content);
-    
+
     match memory.add(complex_content).await {
         Ok(result) => {
             if let Some(first) = result.results.first() {
                 info!("✅ 记忆添加成功: {}", first.id);
             }
-            
+
             // 获取该记忆
             if let Ok(memories) = memory.get_all(agent_mem::GetAllOptions::default()).await {
                 if let Some(mem) = memories.last() {
@@ -144,11 +145,7 @@ async fn demo_search_and_retrieval() -> Result<()> {
     }
 
     // 多次搜索测试
-    let search_queries = vec![
-        "编程语言",
-        "周末活动",
-        "食物",
-    ];
+    let search_queries = vec!["编程语言", "周末活动", "食物"];
 
     for query in search_queries {
         info!("\n搜索: '{}'", query);

@@ -9,7 +9,7 @@ use tempfile::TempDir;
 #[cfg(feature = "lancedb")]
 use agent_mem_storage::backends::lancedb_store::LanceDBStore;
 #[cfg(feature = "lancedb")]
-use agent_mem_traits::{VectorStore, VectorData};
+use agent_mem_traits::{VectorData, VectorStore};
 #[cfg(feature = "lancedb")]
 use std::collections::HashMap;
 
@@ -276,4 +276,3 @@ async fn test_lancedb_stats() {
     drop(store);
     drop(temp_dir);
 }
-

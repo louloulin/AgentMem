@@ -141,9 +141,7 @@ impl PostgresVectorStore {
         sqlx::query(&create_table_sql)
             .execute(self.pool.as_ref())
             .await
-            .map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to create table: {}", e))
-            })?;
+            .map_err(|e| AgentMemError::storage_error(&format!("Failed to create table: {}", e)))?;
 
         // 创建向量索引
         if let Some(index_type) = &self.config.index_type {
@@ -179,7 +177,10 @@ impl PostgresVectorStore {
                 )
             }
             _ => {
-                warn!("Unknown index type: {}, skipping index creation", index_type);
+                warn!(
+                    "Unknown index type: {}, skipping index creation",
+                    index_type
+                );
                 return Ok(());
             }
         };
@@ -362,9 +363,9 @@ impl VectorStore for PostgresVectorStore {
 
         let mut results = Vec::new();
         for row in rows {
-            let id: String = row.try_get("id").map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to get id: {}", e))
-            })?;
+            let id: String = row
+                .try_get("id")
+                .map_err(|e| AgentMemError::storage_error(&format!("Failed to get id: {}", e)))?;
 
             let vector_str: String = row.try_get(vector_column.as_str()).map_err(|e| {
                 AgentMemError::storage_error(&format!("Failed to get vector: {}", e))
@@ -386,7 +387,10 @@ impl VectorStore for PostgresVectorStore {
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
 
-            let similarity = self.config.distance_operator.distance_to_similarity(distance);
+            let similarity = self
+                .config
+                .distance_operator
+                .distance_to_similarity(distance);
 
             results.push(VectorSearchResult {
                 id,
@@ -449,14 +453,12 @@ impl VectorStore for PostgresVectorStore {
             .bind(id)
             .fetch_optional(self.pool.as_ref())
             .await
-            .map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to get vector: {}", e))
-            })?;
+            .map_err(|e| AgentMemError::storage_error(&format!("Failed to get vector: {}", e)))?;
 
         if let Some(row) = row {
-            let id: String = row.try_get("id").map_err(|e| {
-                AgentMemError::storage_error(&format!("Failed to get id: {}", e))
-            })?;
+            let id: String = row
+                .try_get("id")
+                .map_err(|e| AgentMemError::storage_error(&format!("Failed to get id: {}", e)))?;
 
             let vector_str: String = row.try_get(vector_column.as_str()).map_err(|e| {
                 AgentMemError::storage_error(&format!("Failed to get vector: {}", e))
@@ -494,9 +496,9 @@ impl VectorStore for PostgresVectorStore {
                 AgentMemError::storage_error(&format!("Failed to count vectors: {}", e))
             })?;
 
-        let count: i64 = row.try_get("count").map_err(|e| {
-            AgentMemError::storage_error(&format!("Failed to get count: {}", e))
-        })?;
+        let count: i64 = row
+            .try_get("count")
+            .map_err(|e| AgentMemError::storage_error(&format!("Failed to get count: {}", e)))?;
 
         Ok(count as usize)
     }
@@ -521,9 +523,7 @@ impl VectorStore for PostgresVectorStore {
         sqlx::query("SELECT 1")
             .fetch_one(self.pool.as_ref())
             .await
-            .map_err(|e| {
-                AgentMemError::storage_error(&format!("Health check failed: {}", e))
-            })?;
+            .map_err(|e| AgentMemError::storage_error(&format!("Health check failed: {}", e)))?;
 
         Ok(HealthStatus::Healthy)
     }
@@ -556,4 +556,3 @@ impl VectorStore for PostgresVectorStore {
         Ok(results)
     }
 }
-

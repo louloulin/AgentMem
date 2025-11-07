@@ -18,14 +18,14 @@ async fn test_llm_client_has_stream_method() {
         max_tokens: Some(100),
         ..Default::default()
     };
-    
+
     // 创建 LLMClient
     let llm_client = LLMClient::new(&llm_config).expect("Failed to create LLMClient");
-    
+
     // 验证 generate_stream 方法存在
     // 注意：这个测试不会实际调用 API，因为没有真实的 API key
     // 只是验证方法签名正确
-    
+
     println!("LLMClient has generate_stream method ✅");
     assert!(true, "LLMClient should have generate_stream method");
 }
@@ -33,7 +33,7 @@ async fn test_llm_client_has_stream_method() {
 #[tokio::test]
 async fn test_stream_chunk_serialization() {
     use serde_json::json;
-    
+
     // 测试 StreamChunk 序列化
     let chunk = json!({
         "chunk_type": "content",
@@ -41,10 +41,10 @@ async fn test_stream_chunk_serialization() {
         "tool_call": null,
         "memories_count": 5
     });
-    
+
     let serialized = serde_json::to_string(&chunk).expect("Failed to serialize");
     println!("Serialized chunk: {}", serialized);
-    
+
     assert!(serialized.contains("content"));
     assert!(serialized.contains("Hello, world!"));
 }
@@ -52,10 +52,17 @@ async fn test_stream_chunk_serialization() {
 #[tokio::test]
 async fn test_stream_event_types() {
     use serde_json::json;
-    
+
     // 测试不同类型的流式事件
-    let event_types = vec!["start", "content", "tool_call", "memory_update", "done", "error"];
-    
+    let event_types = vec![
+        "start",
+        "content",
+        "tool_call",
+        "memory_update",
+        "done",
+        "error",
+    ];
+
     for event_type in event_types {
         let chunk = json!({
             "chunk_type": event_type,
@@ -63,7 +70,7 @@ async fn test_stream_event_types() {
             "tool_call": null,
             "memories_count": null
         });
-        
+
         let serialized = serde_json::to_string(&chunk).expect("Failed to serialize");
         assert!(serialized.contains(event_type));
         println!("Event type '{}' serialized successfully ✅", event_type);
@@ -73,10 +80,10 @@ async fn test_stream_event_types() {
 #[tokio::test]
 async fn test_sse_keep_alive_duration() {
     use std::time::Duration;
-    
+
     // 测试 SSE keep-alive 间隔
     let keep_alive_interval = Duration::from_secs(15);
-    
+
     assert_eq!(keep_alive_interval.as_secs(), 15);
     println!("SSE keep-alive interval: {:?} ✅", keep_alive_interval);
 }
@@ -85,17 +92,17 @@ async fn test_sse_keep_alive_duration() {
 // 1. 真实的 LLM API key
 // 2. 运行中的服务器
 // 3. HTTP 客户端发送流式请求
-// 
+//
 // 这些测试应该在集成测试环境中进行，而不是单元测试
 
 #[tokio::test]
 async fn test_stream_state_machine() {
     // 测试流式响应的状态机
     // 状态: 0 (start) -> 1 (content) -> 2 (done) -> 3 (end)
-    
+
     let states = vec![0, 1, 2, 3];
     let expected_chunks = vec!["start", "content", "done", "end"];
-    
+
     for (state, expected) in states.iter().zip(expected_chunks.iter()) {
         match state {
             0 => assert_eq!(*expected, "start"),
@@ -105,14 +112,14 @@ async fn test_stream_state_machine() {
             _ => panic!("Unexpected state"),
         }
     }
-    
+
     println!("Stream state machine validated ✅");
 }
 
 #[tokio::test]
 async fn test_stream_error_handling() {
     use serde_json::json;
-    
+
     // 测试错误处理
     let error_chunk = json!({
         "chunk_type": "error",
@@ -120,18 +127,18 @@ async fn test_stream_error_handling() {
         "tool_call": null,
         "memories_count": null
     });
-    
+
     let serialized = serde_json::to_string(&error_chunk).expect("Failed to serialize");
     assert!(serialized.contains("error"));
     assert!(serialized.contains("Test error message"));
-    
+
     println!("Error handling validated ✅");
 }
 
 #[tokio::test]
 async fn test_stream_with_tool_calls() {
     use serde_json::json;
-    
+
     // 测试包含工具调用的流式响应
     let tool_call_chunk = json!({
         "chunk_type": "tool_call",
@@ -143,18 +150,18 @@ async fn test_stream_with_tool_calls() {
         },
         "memories_count": null
     });
-    
+
     let serialized = serde_json::to_string(&tool_call_chunk).expect("Failed to serialize");
     assert!(serialized.contains("tool_call"));
     assert!(serialized.contains("calculator"));
-    
+
     println!("Tool call streaming validated ✅");
 }
 
 #[tokio::test]
 async fn test_stream_with_memory_updates() {
     use serde_json::json;
-    
+
     // 测试包含记忆更新的流式响应
     let memory_chunk = json!({
         "chunk_type": "memory_update",
@@ -162,11 +169,11 @@ async fn test_stream_with_memory_updates() {
         "tool_call": null,
         "memories_count": 3
     });
-    
+
     let serialized = serde_json::to_string(&memory_chunk).expect("Failed to serialize");
     assert!(serialized.contains("memory_update"));
     assert!(serialized.contains("\"memories_count\":3"));
-    
+
     println!("Memory update streaming validated ✅");
 }
 
@@ -174,7 +181,7 @@ async fn test_stream_with_memory_updates() {
 #[tokio::test]
 async fn test_complete_stream_flow() {
     use serde_json::json;
-    
+
     // 模拟完整的流式响应流程
     let chunks = vec![
         json!({"chunk_type": "start", "content": null}),
@@ -184,13 +191,13 @@ async fn test_complete_stream_flow() {
         json!({"chunk_type": "memory_update", "memories_count": 2}),
         json!({"chunk_type": "done", "content": null}),
     ];
-    
+
     let mut full_content = String::new();
     let mut memory_count = 0;
-    
+
     for chunk in chunks {
         let chunk_type = chunk["chunk_type"].as_str().unwrap();
-        
+
         match chunk_type {
             "start" => {
                 println!("Stream started ✅");
@@ -211,10 +218,10 @@ async fn test_complete_stream_flow() {
             _ => {}
         }
     }
-    
+
     assert_eq!(full_content, "Hello world!");
     assert_eq!(memory_count, 2);
-    
+
     println!("Complete stream flow validated ✅");
     println!("Final content: {}", full_content);
     println!("Memory count: {}", memory_count);
@@ -224,20 +231,21 @@ async fn test_complete_stream_flow() {
 async fn test_stream_timeout_handling() {
     use std::time::Duration;
     use tokio::time::timeout;
-    
+
     // 测试流式响应的超时处理
     let timeout_duration = Duration::from_secs(30);
-    
+
     // 模拟一个快速完成的流
     let result = timeout(timeout_duration, async {
         // 模拟流式处理
         tokio::time::sleep(Duration::from_millis(100)).await;
         "completed"
-    }).await;
-    
+    })
+    .await;
+
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "completed");
-    
+
     println!("Stream timeout handling validated ✅");
 }
 
@@ -250,4 +258,3 @@ async fn test_stream_timeout_handling() {
 // 5. 验证事件顺序和内容
 //
 // 这些应该在 E2E 测试中实现
-

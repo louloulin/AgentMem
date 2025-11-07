@@ -217,7 +217,10 @@ async fn test_list_tools() {
             .unwrap();
     }
 
-    let tools = manager.list_tools("org_test", Some(10), Some(0)).await.unwrap();
+    let tools = manager
+        .list_tools("org_test", Some(10), Some(0))
+        .await
+        .unwrap();
 
     assert!(tools.len() >= 5);
 }
@@ -360,4 +363,3 @@ async fn create_test_pool() -> PgPool {
         .await
         .expect("Failed to connect to test database")
 }
-

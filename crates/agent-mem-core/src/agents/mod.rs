@@ -272,9 +272,8 @@ impl BaseAgent {
     /// Send task response
     pub async fn send_response(&self, response: TaskResponse) -> AgentResult<()> {
         if let Some(ref tx) = self.response_tx {
-            tx.send(response).map_err(|e| {
-                AgentError::InternalError(format!("Failed to send response: {e}"))
-            })?;
+            tx.send(response)
+                .map_err(|e| AgentError::InternalError(format!("Failed to send response: {e}")))?;
         }
         Ok(())
     }

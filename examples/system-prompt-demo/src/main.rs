@@ -6,7 +6,7 @@
 //! 2. Extract relevant memories for system prompts
 //! 3. Construct complete system messages with memory context
 
-use agent_mem_core::client::{AgentMemClient, Messages, MemoryType};
+use agent_mem_core::client::{AgentMemClient, MemoryType, Messages};
 use agent_mem_traits::Result;
 
 #[tokio::main]

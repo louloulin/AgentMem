@@ -307,12 +307,7 @@ impl ActiveRetrievalSystem {
 
             // 执行针对特定记忆类型的检索
             let memories = self
-                .retrieve_from_memory_type(
-                    request,
-                    memory_type,
-                    &strategy,
-                    strategy_weight,
-                )
+                .retrieve_from_memory_type(request, memory_type, &strategy, strategy_weight)
                 .await?;
 
             all_memories.extend(memories);
@@ -354,9 +349,7 @@ impl ActiveRetrievalSystem {
             let registry = self.agent_registry.read().await;
 
             if registry.has_agent(memory_type).await {
-                log::debug!(
-                    "Using real agent for {agent_id} with {strategy:?} strategy"
-                );
+                log::debug!("Using real agent for {agent_id} with {strategy:?} strategy");
 
                 // 构建任务请求
                 let task = crate::coordination::TaskRequest {
@@ -392,20 +385,13 @@ impl ActiveRetrievalSystem {
                     }
                 }
             } else {
-                log::debug!(
-                    "No real agent registered for {memory_type:?}, using mock"
-                );
+                log::debug!("No real agent registered for {memory_type:?}, using mock");
             }
         }
 
         // 使用 Mock 结果（默认或回退）
-        let mock_results = self.generate_mock_results(
-            request,
-            memory_type,
-            &agent_id,
-            strategy,
-            strategy_weight,
-        );
+        let mock_results =
+            self.generate_mock_results(request, memory_type, &agent_id, strategy, strategy_weight);
 
         log::debug!(
             "Retrieved {} mock results from {} using {:?} strategy",
@@ -450,7 +436,8 @@ impl ActiveRetrievalSystem {
                     let score = mem.get("score")?.as_f64().unwrap_or(0.5) as f32;
 
                     Some(RetrievedMemory {
-                        id: mem.get("id")
+                        id: mem
+                            .get("id")
                             .and_then(|v| v.as_str())
                             .unwrap_or("unknown")
                             .to_string(),
@@ -462,11 +449,7 @@ impl ActiveRetrievalSystem {
                         metadata: mem
                             .get("metadata")
                             .and_then(|v| v.as_object())
-                            .map(|obj| {
-                                obj.iter()
-                                    .map(|(k, v)| (k.clone(), v.clone()))
-                                    .collect()
-                            })
+                            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                             .unwrap_or_default(),
                     })
                 })
@@ -480,9 +463,7 @@ impl ActiveRetrievalSystem {
 
             Ok(retrieved_memories)
         } else {
-            log::warn!(
-                "No memories found in agent response from {agent_id}"
-            );
+            log::warn!("No memories found in agent response from {agent_id}");
             Ok(Vec::new())
         }
     }
@@ -507,7 +488,12 @@ impl ActiveRetrievalSystem {
             let relevance_score = base_score * strategy_weight * position_penalty;
 
             let memory = RetrievedMemory {
-                id: format!("{}_{}_result_{}", memory_type.to_string().to_lowercase(), agent_id, i),
+                id: format!(
+                    "{}_{}_result_{}",
+                    memory_type.to_string().to_lowercase(),
+                    agent_id,
+                    i
+                ),
                 memory_type: *memory_type,
                 content: format!(
                     "Mock {} memory result {} for query: '{}' (strategy: {:?})",
@@ -521,10 +507,7 @@ impl ActiveRetrievalSystem {
                 retrieval_strategy: strategy.clone(),
                 metadata: {
                     let mut map = HashMap::new();
-                    map.insert(
-                        "mock".to_string(),
-                        serde_json::json!(true),
-                    );
+                    map.insert("mock".to_string(), serde_json::json!(true));
                     map.insert(
                         "query".to_string(),
                         serde_json::json!(request.query.clone()),

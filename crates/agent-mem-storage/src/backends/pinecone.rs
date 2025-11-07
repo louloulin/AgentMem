@@ -259,9 +259,10 @@ impl VectorStore for PineconeStore {
             )));
         }
 
-        let query_response: PineconeQueryResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let query_response: PineconeQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         let mut results: Vec<VectorSearchResult> = query_response
             .matches
@@ -345,9 +346,10 @@ impl VectorStore for PineconeStore {
             )));
         }
 
-        let fetch_response: serde_json::Value = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let fetch_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if let Some(vectors) = fetch_response.get("vectors") {
             if let Some(vector_data) = vectors.get(id) {
@@ -405,9 +407,10 @@ impl VectorStore for PineconeStore {
             )));
         }
 
-        let stats: PineconeStatsResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let stats: PineconeStatsResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(stats.total_vector_count)
     }

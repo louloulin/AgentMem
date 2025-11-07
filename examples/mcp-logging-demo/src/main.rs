@@ -2,18 +2,14 @@
 //!
 //! 演示如何使用 MCP Logging 功能进行日志管理
 
-use agent_mem_tools::mcp::{
-    LoggingManager, LogEntry, LogLevel, LogFilter, LoggingConfig,
-};
+use agent_mem_tools::mcp::{LogEntry, LogFilter, LogLevel, LoggingConfig, LoggingManager};
 use futures::StreamExt;
 use tracing::Level;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化 tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     println!("=== MCP Logging 功能演示 ===\n");
 
@@ -71,33 +67,41 @@ async fn demo_logging() -> Result<(), Box<dyn std::error::Error>> {
 
     // 记录不同级别的日志
     println!("\n✓ 记录不同级别的日志:");
-    
-    manager.log(
-        LogEntry::new(LogLevel::Info, "应用启动", "app")
-            .with_operation("startup")
-            .with_tag("system")
-    ).await?;
+
+    manager
+        .log(
+            LogEntry::new(LogLevel::Info, "应用启动", "app")
+                .with_operation("startup")
+                .with_tag("system"),
+        )
+        .await?;
     println!("  [INFO] 应用启动");
 
-    manager.log(
-        LogEntry::new(LogLevel::Debug, "加载配置文件", "config")
-            .with_operation("load")
-            .with_field("file", serde_json::json!("config.toml"))
-    ).await?;
+    manager
+        .log(
+            LogEntry::new(LogLevel::Debug, "加载配置文件", "config")
+                .with_operation("load")
+                .with_field("file", serde_json::json!("config.toml")),
+        )
+        .await?;
     println!("  [DEBUG] 加载配置文件");
 
-    manager.log(
-        LogEntry::new(LogLevel::Warn, "连接超时，正在重试", "network")
-            .with_operation("connect")
-            .with_user_id("user1")
-    ).await?;
+    manager
+        .log(
+            LogEntry::new(LogLevel::Warn, "连接超时，正在重试", "network")
+                .with_operation("connect")
+                .with_user_id("user1"),
+        )
+        .await?;
     println!("  [WARN] 连接超时，正在重试");
 
-    manager.log(
-        LogEntry::new(LogLevel::Error, "数据库连接失败", "database")
-            .with_operation("connect")
-            .with_field("error", serde_json::json!("connection refused"))
-    ).await?;
+    manager
+        .log(
+            LogEntry::new(LogLevel::Error, "数据库连接失败", "database")
+                .with_operation("connect")
+                .with_field("error", serde_json::json!("connection refused")),
+        )
+        .await?;
     println!("  [ERROR] 数据库连接失败");
 
     // 查询所有日志
@@ -106,13 +110,9 @@ async fn demo_logging() -> Result<(), Box<dyn std::error::Error>> {
     println!("  总数: {}", all_logs.len());
 
     // 查询特定级别的日志
-    let warn_logs = manager.query_logs(
-        Some(LogLevel::Warn),
-        None,
-        None,
-        None,
-        None,
-    ).await;
+    let warn_logs = manager
+        .query_logs(Some(LogLevel::Warn), None, None, None, None)
+        .await;
     println!("\n✓ 查询 Warn 及以上级别的日志:");
     println!("  数量: {}", warn_logs.len());
     for log in &warn_logs {
@@ -120,13 +120,9 @@ async fn demo_logging() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 查询特定组件的日志
-    let network_logs = manager.query_logs(
-        None,
-        Some("network"),
-        None,
-        None,
-        None,
-    ).await;
+    let network_logs = manager
+        .query_logs(None, Some("network"), None, None, None)
+        .await;
     println!("\n✓ 查询 network 组件的日志:");
     println!("  数量: {}", network_logs.len());
 
@@ -141,27 +137,26 @@ async fn demo_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let manager = LoggingManager::new(LoggingConfig::default());
 
     // 添加过滤器：只记录 Warn 及以上级别的日志
-    let filter = LogFilter::new("warn-filter")
-        .with_min_level(LogLevel::Warn);
+    let filter = LogFilter::new("warn-filter").with_min_level(LogLevel::Warn);
     manager.add_filter(filter).await;
     println!("✓ 添加过滤器: 只记录 Warn 及以上级别");
 
     // 记录不同级别的日志
     println!("\n✓ 记录日志:");
-    
-    manager.log(
-        LogEntry::new(LogLevel::Info, "这条日志会被过滤", "test")
-    ).await?;
+
+    manager
+        .log(LogEntry::new(LogLevel::Info, "这条日志会被过滤", "test"))
+        .await?;
     println!("  [INFO] 这条日志会被过滤 (不会被记录)");
 
-    manager.log(
-        LogEntry::new(LogLevel::Warn, "这条日志会被记录", "test")
-    ).await?;
+    manager
+        .log(LogEntry::new(LogLevel::Warn, "这条日志会被记录", "test"))
+        .await?;
     println!("  [WARN] 这条日志会被记录");
 
-    manager.log(
-        LogEntry::new(LogLevel::Error, "这条日志也会被记录", "test")
-    ).await?;
+    manager
+        .log(LogEntry::new(LogLevel::Error, "这条日志也会被记录", "test"))
+        .await?;
     println!("  [ERROR] 这条日志也会被记录");
 
     // 查看实际记录的日志
@@ -176,19 +171,22 @@ async fn demo_filtering() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n✓ 移除过滤器");
 
     // 添加组件过滤器
-    let comp_filter = LogFilter::new("mcp-filter")
-        .with_component("mcp");
+    let comp_filter = LogFilter::new("mcp-filter").with_component("mcp");
     manager.add_filter(comp_filter).await;
     println!("✓ 添加组件过滤器: 只记录 mcp 组件");
 
-    manager.log(
-        LogEntry::new(LogLevel::Info, "MCP 服务器启动", "mcp-server")
-    ).await?;
+    manager
+        .log(LogEntry::new(
+            LogLevel::Info,
+            "MCP 服务器启动",
+            "mcp-server",
+        ))
+        .await?;
     println!("  [INFO] MCP 服务器启动 (会被记录)");
 
-    manager.log(
-        LogEntry::new(LogLevel::Info, "其他组件日志", "other")
-    ).await?;
+    manager
+        .log(LogEntry::new(LogLevel::Info, "其他组件日志", "other"))
+        .await?;
     println!("  [INFO] 其他组件日志 (不会被记录)");
 
     // 获取所有过滤器
@@ -208,19 +206,31 @@ async fn demo_stats() -> Result<(), Box<dyn std::error::Error>> {
     // 记录多条日志
     println!("✓ 记录多条日志...");
     for i in 0..5 {
-        manager.log(
-            LogEntry::new(LogLevel::Info, format!("Info 日志 {i}"), "app")
-        ).await?;
+        manager
+            .log(LogEntry::new(
+                LogLevel::Info,
+                format!("Info 日志 {i}"),
+                "app",
+            ))
+            .await?;
     }
     for i in 0..3 {
-        manager.log(
-            LogEntry::new(LogLevel::Warn, format!("Warn 日志 {i}"), "network")
-        ).await?;
+        manager
+            .log(LogEntry::new(
+                LogLevel::Warn,
+                format!("Warn 日志 {i}"),
+                "network",
+            ))
+            .await?;
     }
     for i in 0..2 {
-        manager.log(
-            LogEntry::new(LogLevel::Error, format!("Error 日志 {i}"), "database")
-        ).await?;
+        manager
+            .log(LogEntry::new(
+                LogLevel::Error,
+                format!("Error 日志 {i}"),
+                "database",
+            ))
+            .await?;
     }
 
     // 获取统计信息
@@ -271,9 +281,13 @@ async fn demo_streaming() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         for i in 0..3 {
-            let _ = manager_clone.log(
-                LogEntry::new(LogLevel::Info, format!("流式日志 {i}"), "stream-test")
-            ).await;
+            let _ = manager_clone
+                .log(LogEntry::new(
+                    LogLevel::Info,
+                    format!("流式日志 {i}"),
+                    "stream-test",
+                ))
+                .await;
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
     });
@@ -282,7 +296,10 @@ async fn demo_streaming() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n✓ 接收流式日志:");
     let mut count = 0;
     while let Some(entry) = stream.next().await {
-        println!("  - [{:?}] {}: {}", entry.level, entry.component, entry.message);
+        println!(
+            "  - [{:?}] {}: {}",
+            entry.level, entry.component, entry.message
+        );
         count += 1;
         if count >= 3 {
             break;
@@ -292,4 +309,3 @@ async fn demo_streaming() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     Ok(())
 }
-

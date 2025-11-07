@@ -33,7 +33,7 @@ fn create_test_event(event_type: &str, summary: &str) -> EpisodicEvent {
 async fn test_create_episodic_event() {
     // 这个测试需要真实的数据库连接
     // 在 CI/CD 环境中应该设置 DATABASE_URL
-    
+
     if std::env::var("DATABASE_URL").is_err() {
         println!("Skipping test: DATABASE_URL not set");
         return;
@@ -147,7 +147,11 @@ async fn test_update_importance() {
     let result = manager
         .update_importance(&created.id, "user-test", 0.95)
         .await;
-    assert!(result.is_ok(), "Failed to update importance: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to update importance: {:?}",
+        result.err()
+    );
     assert!(result.unwrap(), "Should have updated the event");
 
     // 验证更新
@@ -192,8 +196,7 @@ fn test_episodic_event_serialization() {
     assert!(json.contains("Test event"));
 
     // 测试反序列化
-    let deserialized: EpisodicEvent =
-        serde_json::from_str(&json).expect("Failed to deserialize");
+    let deserialized: EpisodicEvent = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.summary, event.summary);
     assert_eq!(deserialized.event_type, event.event_type);
 }
@@ -213,8 +216,7 @@ fn test_episodic_query_builder() {
     assert!(json.contains("conversation"));
 
     // 测试反序列化
-    let deserialized: EpisodicQuery =
-        serde_json::from_str(&json).expect("Failed to deserialize");
+    let deserialized: EpisodicQuery = serde_json::from_str(&json).expect("Failed to deserialize");
     assert_eq!(deserialized.event_type, query.event_type);
     assert_eq!(deserialized.limit, query.limit);
 }
@@ -243,4 +245,3 @@ fn test_event_metadata() {
     assert_eq!(event.metadata["test"], true);
     assert_eq!(event.metadata["category"], "test");
 }
-

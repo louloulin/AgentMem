@@ -263,7 +263,7 @@ impl ImportanceEvaluator {
         }
 
         // 基于交互次数的评分
-        
+
         (memory.interaction_count as f32 / 10.0).min(1.0)
     }
 

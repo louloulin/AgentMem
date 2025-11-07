@@ -1,8 +1,8 @@
 //! 嵌入式存储测试
 
-use agent_mem_deployment::embedded::EmbeddedConfig;
 use agent_mem_deployment::embedded::database::EmbeddedDatabaseConfig;
-use agent_mem_deployment::embedded::vector_store::{EmbeddedVectorStoreConfig, DistanceMetric};
+use agent_mem_deployment::embedded::vector_store::{DistanceMetric, EmbeddedVectorStoreConfig};
+use agent_mem_deployment::embedded::EmbeddedConfig;
 
 #[test]
 fn test_embedded_config_creation() {
@@ -83,12 +83,12 @@ fn test_embedded_vector_store_config_file() {
 #[test]
 fn test_embedded_config_serialization() {
     let config = EmbeddedConfig::default();
-    
+
     // JSON 序列化
     let json = serde_json::to_string(&config).unwrap();
     let deserialized: EmbeddedConfig = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.data_root, config.data_root);
-    
+
     // TOML 序列化
     let toml_str = toml::to_string(&config).unwrap();
     let deserialized: EmbeddedConfig = toml::from_str(&toml_str).unwrap();
@@ -100,10 +100,10 @@ fn test_embedded_config_serialization() {
 async fn test_embedded_config_initialize_all() {
     let config = EmbeddedConfig::in_memory();
     let result = config.initialize_all().await;
-    
+
     if result.is_ok() {
         let (db, vector_store) = result.unwrap();
-        
+
         // 关闭
         let _ = db.shutdown().await;
         let _ = vector_store.shutdown().await;
@@ -113,27 +113,26 @@ async fn test_embedded_config_initialize_all() {
 #[test]
 fn test_embedded_config_save_and_load() {
     use tempfile::tempdir;
-    
+
     let dir = tempdir().unwrap();
     let json_path = dir.path().join("config.json");
     let toml_path = dir.path().join("config.toml");
-    
+
     let config = EmbeddedConfig::default();
-    
+
     // 保存 JSON
     config.save_to_json_file(&json_path).unwrap();
     assert!(json_path.exists());
-    
+
     // 加载 JSON
     let loaded = EmbeddedConfig::from_json_file(&json_path).unwrap();
     assert_eq!(loaded.data_root, config.data_root);
-    
+
     // 保存 TOML
     config.save_to_toml_file(&toml_path).unwrap();
     assert!(toml_path.exists());
-    
+
     // 加载 TOML
     let loaded = EmbeddedConfig::from_toml_file(&toml_path).unwrap();
     assert_eq!(loaded.data_root, config.data_root);
 }
-

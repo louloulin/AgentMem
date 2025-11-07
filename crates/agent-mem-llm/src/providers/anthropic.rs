@@ -173,9 +173,10 @@ impl LLMProvider for AnthropicProvider {
             )));
         }
 
-        let anthropic_response: AnthropicResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let anthropic_response: AnthropicResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if anthropic_response.content.is_empty() {
             return Err(AgentMemError::llm_error("No content in Anthropic response"));
@@ -294,9 +295,7 @@ impl LLMProvider for AnthropicProvider {
                         }
                         Ok("".to_string())
                     }
-                    Err(e) => Err(AgentMemError::network_error(format!(
-                        "Stream error: {e}"
-                    ))),
+                    Err(e) => Err(AgentMemError::network_error(format!("Stream error: {e}"))),
                 }
             })
             .filter(|result| {

@@ -37,11 +37,7 @@ impl Default for TimeoutConfig {
 }
 
 /// 带超时的异步函数执行
-pub async fn with_timeout<F, T>(
-    future: F,
-    timeout_secs: u64,
-    operation_name: &str,
-) -> Result<T>
+pub async fn with_timeout<F, T>(future: F, timeout_secs: u64, operation_name: &str) -> Result<T>
 where
     F: std::future::Future<Output = Result<T>>,
 {
@@ -199,4 +195,3 @@ mod tests {
         assert!(result.is_err());
     }
 }
-

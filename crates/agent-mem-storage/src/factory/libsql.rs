@@ -62,7 +62,9 @@ impl LibSqlStorageFactory {
                 .await
         } else if connection_string.starts_with("file:") {
             // Local file
-            let path = connection_string.strip_prefix("file:").unwrap_or(connection_string);
+            let path = connection_string
+                .strip_prefix("file:")
+                .unwrap_or(connection_string);
             Builder::new_local(path).build().await
         } else {
             // Assume local file without prefix
@@ -99,9 +101,9 @@ impl StorageFactory for LibSqlStorageFactory {
 
     async fn create_procedural_store(&self) -> Result<Arc<dyn ProceduralMemoryStore>> {
         let conn = Self::create_connection(&self.connection_string).await?;
-        Ok(Arc::new(LibSqlProceduralStore::new(Arc::new(
-            Mutex::new(conn),
-        ))))
+        Ok(Arc::new(LibSqlProceduralStore::new(Arc::new(Mutex::new(
+            conn,
+        )))))
     }
 
     async fn create_core_store(&self) -> Result<Arc<dyn CoreMemoryStore>> {
@@ -158,4 +160,3 @@ mod tests {
         assert!(factory.is_ok());
     }
 }
-

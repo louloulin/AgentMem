@@ -5,8 +5,8 @@
 
 use crate::error::{ServerError, ServerResult};
 use agent_mem_core::{
-    orchestrator::{AgentOrchestrator, OrchestratorConfig},
     engine::{MemoryEngine, MemoryEngineConfig},
+    orchestrator::{AgentOrchestrator, OrchestratorConfig},
     storage::factory::Repositories,
     storage::models::Agent,
 };
@@ -19,13 +19,13 @@ use tracing::{debug, error, info, warn};
 /// 从 Agent 配置中解析 LLM 配置
 pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
     // agent.llm_config 是 Option<JSON> 格式
-    let llm_config_value = agent.llm_config.clone()
+    let llm_config_value = agent
+        .llm_config
+        .clone()
         .ok_or_else(|| ServerError::bad_request("Agent LLM config not set"))?;
 
     let mut llm_config: LLMConfig = serde_json::from_value(llm_config_value)
-        .map_err(|e| {
-            ServerError::internal_error(format!("Failed to parse LLM config: {}", e))
-        })?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to parse LLM config: {}", e)))?;
 
     // 验证必要字段
     if llm_config.provider.is_empty() {
@@ -78,18 +78,17 @@ pub async fn create_orchestrator(
     repositories: &Arc<Repositories>,
 ) -> ServerResult<AgentOrchestrator> {
     info!("Creating AgentOrchestrator for agent: {}", agent.id);
-    
+
     // 1. 解析 LLM 配置
     let llm_config = parse_llm_config(agent)?;
-    
+
     // 2. 创建 LLMClient
-    let llm_client = Arc::new(
-        LLMClient::new(&llm_config).map_err(|e| {
+    let llm_client =
+        Arc::new(LLMClient::new(&llm_config).map_err(|e| {
             ServerError::internal_error(format!("Failed to create LLM client: {}", e))
-        })?
-    );
+        })?);
     debug!("Created LLMClient with provider: {}", llm_config.provider);
-    
+
     // 3. 创建 MemoryEngine（注入 LibSQL memory_repository 以支持持久化搜索）
     let memory_engine_config = MemoryEngineConfig::default();
     let memory_repository = repositories.memories.clone();
@@ -98,11 +97,11 @@ pub async fn create_orchestrator(
         memory_repository,
     ));
     info!("Created MemoryEngine with LibSQL repository for persistent memory search");
-    
+
     // 4. 获取 MessageRepository
     let message_repo = repositories.messages.clone();
     debug!("Got MessageRepository");
-    
+
     // 5. 创建 ToolExecutor 并注册内置工具
     let tool_executor = Arc::new(ToolExecutor::new());
     debug!("Created ToolExecutor");
@@ -126,12 +125,12 @@ pub async fn create_orchestrator(
         enable_tool_calling: true, // ✅ 启用工具调用
     };
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
-    
+
     // 7. 获取 Working Memory Store（统一抽象，与其他 repositories 平级）
     // ✅ 直接从 repositories 获取，保持抽象层次一致
     let working_store = Some(repositories.working_memory.clone());
     debug!("✅ Got WorkingMemoryStore from repositories (uses unified memories table)");
-    
+
     // 8. 创建 AgentOrchestrator
     let orchestrator = AgentOrchestrator::new(
         orchestrator_config,
@@ -141,8 +140,11 @@ pub async fn create_orchestrator(
         tool_executor,
         working_store,
     );
-    
-    info!("Successfully created AgentOrchestrator with Working Memory support for agent: {}", agent.id);
+
+    info!(
+        "Successfully created AgentOrchestrator with Working Memory support for agent: {}",
+        agent.id
+    );
     Ok(orchestrator)
 }
 
@@ -223,4 +225,3 @@ mod tests {
         assert!(result.is_err());
     }
 }
-

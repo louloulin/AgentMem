@@ -125,7 +125,13 @@ async fn test_memory_repository() {
         .await
         .expect("Failed to create organization");
 
-    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+    let user = User::new(
+        org.id.clone(),
+        "Test User".to_string(),
+        "test@example.com".to_string(),
+        "hashed_password".to_string(),
+        "UTC".to_string(),
+    );
     let user = user_repo
         .create(&user)
         .await
@@ -216,7 +222,13 @@ async fn test_batch_operations() {
         .await
         .expect("Failed to create organization");
 
-    let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+    let user = User::new(
+        org.id.clone(),
+        "Test User".to_string(),
+        "test@example.com".to_string(),
+        "hashed_password".to_string(),
+        "UTC".to_string(),
+    );
     let user = user_repo
         .create(&user)
         .await

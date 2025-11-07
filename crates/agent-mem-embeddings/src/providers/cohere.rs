@@ -121,9 +121,10 @@ impl CohereEmbedder {
             )));
         }
 
-        let embedding_response: CohereEmbeddingResponse = response.json().await.map_err(|e| {
-            AgentMemError::parsing_error(format!("Failed to parse response: {e}"))
-        })?;
+        let embedding_response: CohereEmbeddingResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(embedding_response.embeddings)
     }

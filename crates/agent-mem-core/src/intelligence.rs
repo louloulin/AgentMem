@@ -137,14 +137,21 @@ impl ImportanceScorer for DefaultImportanceScorer {
         // Combines the memory's base importance with its semantic score
         let base_importance = memory.importance as f64;
         let semantic_score = memory.score.unwrap_or(0.5) as f64;
-        let relevance_score = (base_importance * 0.6 + semantic_score * 0.4).max(0.0).min(1.0);
+        let relevance_score = (base_importance * 0.6 + semantic_score * 0.4)
+            .max(0.0)
+            .min(1.0);
 
         // Calculate interaction score based on access count and recency
         // Recent accesses are weighted more heavily
         let hours_since_access = (now - memory.last_accessed_at).num_hours() as f64;
         let access_recency = (-0.02 * hours_since_access).exp();
-        let access_count_normalized = (memory.access_count as f64 / (memory.access_count as f64 + 10.0)).max(0.0).min(1.0);
-        let interaction_score = (access_recency * 0.5 + access_count_normalized * 0.5).max(0.0).min(1.0);
+        let access_count_normalized = (memory.access_count as f64
+            / (memory.access_count as f64 + 10.0))
+            .max(0.0)
+            .min(1.0);
+        let interaction_score = (access_recency * 0.5 + access_count_normalized * 0.5)
+            .max(0.0)
+            .min(1.0);
 
         // Calculate final weighted score
         let weights = &self.config.importance_weights;
@@ -172,10 +179,10 @@ impl ImportanceScorer for DefaultImportanceScorer {
         // Calculate importance boost based on access type
         // Different access types have different impacts on importance
         let importance_boost = match access_type {
-            AccessType::Read => 0.01,        // Small boost for reads
-            AccessType::Update => 0.03,      // Small-moderate boost for updates
-            AccessType::Reference => 0.02,   // Small boost for references
-            AccessType::Decision => 0.08,    // Large boost for decision-making
+            AccessType::Read => 0.01,      // Small boost for reads
+            AccessType::Update => 0.03,    // Small-moderate boost for updates
+            AccessType::Reference => 0.02, // Small boost for references
+            AccessType::Decision => 0.08,  // Large boost for decision-making
         };
 
         // Return the calculated boost

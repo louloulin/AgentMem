@@ -1,7 +1,7 @@
 //! 快速测试 LanceDB 功能
 
 use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-use agent_mem_traits::{VectorStore, VectorData};
+use agent_mem_traits::{VectorData, VectorStore};
 use std::collections::HashMap;
 
 #[tokio::main]
@@ -19,16 +19,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         VectorData {
             id: "vec1".to_string(),
             vector: vec![0.1; 128],
-            metadata: HashMap::from([
-                ("text".to_string(), "测试文本 1".to_string()),
-            ]),
+            metadata: HashMap::from([("text".to_string(), "测试文本 1".to_string())]),
         },
         VectorData {
             id: "vec2".to_string(),
             vector: vec![0.2; 128],
-            metadata: HashMap::from([
-                ("text".to_string(), "测试文本 2".to_string()),
-            ]),
+            metadata: HashMap::from([("text".to_string(), "测试文本 2".to_string())]),
         },
     ];
 
@@ -41,14 +37,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let results = store.search_vectors(query, 2, None).await?;
     println!("✅ 找到 {} 个结果:", results.len());
     for (i, result) in results.iter().enumerate() {
-        println!("  {}. ID: {}, 相似度: {:.4}", i + 1, result.id, result.similarity);
+        println!(
+            "  {}. ID: {}, 相似度: {:.4}",
+            i + 1,
+            result.id,
+            result.similarity
+        );
     }
     println!();
 
     // 4. 获取向量
     println!("📄 获取向量 vec1...");
     if let Some(vector) = store.get_vector("vec1").await? {
-        println!("✅ 找到向量: ID={}, 维度={}", vector.id, vector.vector.len());
+        println!(
+            "✅ 找到向量: ID={}, 维度={}",
+            vector.id,
+            vector.vector.len()
+        );
     }
     println!();
 
@@ -68,7 +73,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 6. 验证更新
     println!("🔍 验证更新...");
     if let Some(vector) = store.get_vector("vec1").await? {
-        let updated = vector.metadata.get("updated")
+        let updated = vector
+            .metadata
+            .get("updated")
             .map(|v| v == "true")
             .unwrap_or(false);
         println!("✅ 验证成功: updated={}", updated);
@@ -92,4 +99,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

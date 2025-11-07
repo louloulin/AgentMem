@@ -23,7 +23,10 @@ async fn test_reset_method() {
     mem.reset().await.expect("Failed to reset");
 
     // 验证：应该没有记忆了
-    let results = mem.get_all(Default::default()).await.expect("Failed to get all");
+    let results = mem
+        .get_all(Default::default())
+        .await
+        .expect("Failed to get all");
     assert_eq!(results.len(), 0, "重置后应该没有记忆");
 
     println!("✅ test_reset_method passed");
@@ -36,7 +39,12 @@ async fn test_update_method() {
 
     // 添加一个记忆
     let results = mem.add("原始内容").await.expect("Failed to add memory");
-    let memory_id = results.results.first().expect("No memory created").id.clone();
+    let memory_id = results
+        .results
+        .first()
+        .expect("No memory created")
+        .id
+        .clone();
 
     // 更新记忆
     let mut update_data = HashMap::new();
@@ -44,7 +52,10 @@ async fn test_update_method() {
     update_data.insert("user_id".to_string(), serde_json::json!("user123"));
     update_data.insert("agent_id".to_string(), serde_json::json!("agent456"));
 
-    let updated = mem.update(&memory_id, update_data).await.expect("Failed to update");
+    let updated = mem
+        .update(&memory_id, update_data)
+        .await
+        .expect("Failed to update");
 
     // 验证更新
     assert_eq!(updated.content, "更新后的内容");
@@ -52,7 +63,10 @@ async fn test_update_method() {
     assert!(updated.updated_at.is_some(), "应该有 updated_at");
 
     // 验证历史记录
-    let history = mem.history(&memory_id).await.expect("Failed to get history");
+    let history = mem
+        .history(&memory_id)
+        .await
+        .expect("Failed to get history");
     assert!(!history.is_empty(), "应该有历史记录");
     assert_eq!(history.iter().filter(|h| h.event == "UPDATE").count(), 1);
 
@@ -66,15 +80,23 @@ async fn test_delete_method() {
 
     // 添加一个记忆
     let results = mem.add("要删除的记忆").await.expect("Failed to add memory");
-    let memory_id = results.results.first().expect("No memory created").id.clone();
+    let memory_id = results
+        .results
+        .first()
+        .expect("No memory created")
+        .id
+        .clone();
 
     // 删除记忆
     mem.delete(&memory_id).await.expect("Failed to delete");
 
     // 验证历史记录
-    let history = mem.history(&memory_id).await.expect("Failed to get history");
+    let history = mem
+        .history(&memory_id)
+        .await
+        .expect("Failed to get history");
     assert!(!history.is_empty(), "应该有历史记录");
-    
+
     let delete_entries: Vec<_> = history.iter().filter(|h| h.event == "DELETE").collect();
     assert_eq!(delete_entries.len(), 1, "应该有一条 DELETE 记录");
     assert!(delete_entries[0].is_deleted, "DELETE 记录应该标记为已删除");
@@ -101,12 +123,12 @@ async fn test_vector_search() {
         for result in &results {
             println!("  - {}: {:.4}", result.content, result.score.unwrap_or(0.0));
         }
-        
+
         // 验证：应该包含食物相关的内容
-        let has_food_related = results.iter().any(|r| 
-            r.content.contains("披萨") || r.content.contains("意大利面")
-        );
-        
+        let has_food_related = results
+            .iter()
+            .any(|r| r.content.contains("披萨") || r.content.contains("意大利面"));
+
         if has_food_related {
             println!("✅ 找到了食物相关的记忆");
         }
@@ -142,19 +164,24 @@ async fn test_complete_workflow() {
     // 1. 添加
     let add_result = mem.add("初始内容").await.expect("Failed to add");
     let memory_id = add_result.results.first().expect("No memory").id.clone();
-    
+
     // 2. 更新
     let mut update_data = HashMap::new();
     update_data.insert("content".to_string(), serde_json::json!("更新内容"));
-    mem.update(&memory_id, update_data).await.expect("Failed to update");
-    
+    mem.update(&memory_id, update_data)
+        .await
+        .expect("Failed to update");
+
     // 3. 删除
     mem.delete(&memory_id).await.expect("Failed to delete");
-    
+
     // 4. 验证历史
-    let history = mem.history(&memory_id).await.expect("Failed to get history");
+    let history = mem
+        .history(&memory_id)
+        .await
+        .expect("Failed to get history");
     assert!(history.len() >= 2, "应该至少有 2 条历史记录");
-    
+
     // 验证事件顺序（最新的在前）
     let events: Vec<_> = history.iter().map(|h| h.event.as_str()).collect();
     assert!(events.contains(&"ADD"));
@@ -163,4 +190,3 @@ async fn test_complete_workflow() {
 
     println!("✅ test_complete_workflow passed");
 }
-

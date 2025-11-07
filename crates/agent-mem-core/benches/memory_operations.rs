@@ -13,16 +13,14 @@ use agent_mem_core::{
     types::{Memory, MemoryType},
 };
 use agent_mem_traits::Vector;
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 
 /// 创建测试用的 MemoryManager
 fn create_test_manager() -> MemoryManager {
     let rt = Runtime::new().unwrap();
-    rt.block_on(async {
-        MemoryManager::new_in_memory().await.unwrap()
-    })
+    rt.block_on(async { MemoryManager::new_in_memory().await.unwrap() })
 }
 
 /// 创建测试记忆
@@ -153,7 +151,7 @@ fn bench_batch_memory_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     let mut group = c.benchmark_group("batch_memory_creation");
-    
+
     for batch_size in [10, 50, 100].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
@@ -239,7 +237,7 @@ fn bench_memory_deletion(c: &mut Criterion) {
                     )
                     .await
                     .unwrap();
-                
+
                 // 删除它
                 manager.delete_memory(black_box(&memory_id)).await.unwrap();
             })
@@ -306,4 +304,3 @@ criterion_group!(
 );
 
 criterion_main!(benches);
-

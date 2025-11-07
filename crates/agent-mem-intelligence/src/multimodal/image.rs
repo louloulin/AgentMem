@@ -85,9 +85,7 @@ impl ImageProcessor {
                     )
                 } else {
                     // 通用图像文本提取
-                    format!(
-                        "Image text analysis: Detected text regions in {file_size} byte image"
-                    )
+                    format!("Image text analysis: Detected text regions in {file_size} byte image")
                 };
 
                 return Ok(Some(extracted_text));

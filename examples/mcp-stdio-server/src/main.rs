@@ -3,14 +3,14 @@
 //! 这是一个通过标准输入输出与 Claude Desktop 集成的 MCP 服务器示例
 
 use agent_mem_core::client::{AgentMemClient, AgentMemClientConfig};
-use agent_mem_tools::mcp::server::{McpServer, McpServerConfig};
-use agent_mem_tools::mcp::transport::stdio::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
 use agent_mem_tools::executor::ToolExecutor;
+use agent_mem_tools::mcp::server::{McpServer, McpServerConfig};
+use agent_mem_tools::mcp::transport::stdio::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 use agent_mem_tools::register_agentmem_tools;
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::{debug, error, info};
-use serde_json::Value;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,7 +31,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 注册 AgentMem 工具
     register_agentmem_tools(&executor).await?;
-    info!("已注册 {} 个 AgentMem 工具", executor.list_tools().await.len());
+    info!(
+        "已注册 {} 个 AgentMem 工具",
+        executor.list_tools().await.len()
+    );
 
     // 创建 MCP 服务器配置
     let config = McpServerConfig {
@@ -57,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let mut line = String::new();
-        
+
         // 读取一行 JSON-RPC 请求
         match reader.read_line(&mut line).await {
             Ok(0) => {
@@ -78,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(req) => req,
                     Err(e) => {
                         error!("解析请求失败: {}", e);
-                        
+
                         // 返回错误响应
                         let error_response = JsonRpcResponse {
                             jsonrpc: "2.0".to_string(),
@@ -105,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // 发送响应
                 let response_json = serde_json::to_string(&response)?;
                 debug!("发送响应: {}", response_json);
-                
+
                 stdout.write_all(response_json.as_bytes()).await?;
                 stdout.write_all(b"\n").await?;
                 stdout.flush().await?;
@@ -172,8 +175,11 @@ async fn handle_request(
         "tools/call" => {
             // 调用工具
             let params = request.params.unwrap_or(Value::Null);
-            
-            match server.call_tool(serde_json::from_value(params).unwrap()).await {
+
+            match server
+                .call_tool(serde_json::from_value(params).unwrap())
+                .await
+            {
                 Ok(tool_response) => JsonRpcResponse {
                     jsonrpc: "2.0".to_string(),
                     id: request_id,
@@ -207,4 +213,3 @@ async fn handle_request(
         }
     }
 }
-

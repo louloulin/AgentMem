@@ -458,9 +458,8 @@ impl TopicExtractor {
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<serde_json::Value> {
         let stats = self.stats.read().await;
-        serde_json::to_value(&*stats).map_err(|e| {
-            AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}"))
-        })
+        serde_json::to_value(&*stats)
+            .map_err(|e| AgentMemError::ProcessingError(format!("Failed to serialize stats: {e}")))
     }
 
     /// 清理缓存

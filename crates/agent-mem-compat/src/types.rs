@@ -56,8 +56,7 @@ pub struct MemorySearchResult {
 }
 
 /// Sort order for memory operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum SortOrder {
     /// Ascending order
     Asc,
@@ -66,10 +65,8 @@ pub enum SortOrder {
     Desc,
 }
 
-
 /// Sort field for memory operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum SortField {
     /// Sort by creation date
     #[default]
@@ -83,7 +80,6 @@ pub enum SortField {
     /// Sort by custom metadata field
     Metadata(String),
 }
-
 
 /// Complex filter operations
 #[derive(Debug, Clone, Serialize, Deserialize)]

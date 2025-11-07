@@ -11,7 +11,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-
 /// Performance metrics collector
 pub struct MetricsCollector {
     enabled: bool,

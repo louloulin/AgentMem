@@ -17,7 +17,7 @@
 //! cargo run --package chat-demo
 //! ```
 
-use agent_mem_core::client::{AgentMemClient, AgentMemClientConfig, Messages, MemoryType};
+use agent_mem_core::client::{AgentMemClient, AgentMemClientConfig, MemoryType, Messages};
 use agent_mem_traits::{LLMConfig, Result};
 
 #[tokio::main]
@@ -65,7 +65,10 @@ async fn main() -> Result<()> {
         ("I am a software engineer at Google", MemoryType::Semantic),
         ("I live in San Francisco", MemoryType::Semantic),
         ("I enjoy hiking and photography", MemoryType::Semantic),
-        ("My favorite programming language is Rust", MemoryType::Semantic),
+        (
+            "My favorite programming language is Rust",
+            MemoryType::Semantic,
+        ),
         ("I have a cat named Whiskers", MemoryType::Semantic),
     ];
 
@@ -103,11 +106,7 @@ async fn main() -> Result<()> {
         println!("{}", "-".repeat(60));
 
         match client
-            .chat(
-                question.to_string(),
-                Some(user.id.clone()),
-                *save_to_memory,
-            )
+            .chat(question.to_string(), Some(user.id.clone()), *save_to_memory)
             .await
         {
             Ok(response) => {
@@ -153,15 +152,16 @@ async fn main() -> Result<()> {
 
     // 7. 测试清空对话历史
     println!("\n📝 Step 7: 清空对话历史");
-    let deleted_count = client
-        .clear_conversation_history(user.id.clone())
-        .await?;
+    let deleted_count = client.clear_conversation_history(user.id.clone()).await?;
     println!("✅ 删除了 {} 条对话记录", deleted_count);
 
     let remaining_memories = client
         .get_all(Some(user.id.clone()), None, None, None)
         .await?;
-    println!("✅ 剩余记忆数: {} (语义记忆被保留)", remaining_memories.len());
+    println!(
+        "✅ 剩余记忆数: {} (语义记忆被保留)",
+        remaining_memories.len()
+    );
 
     // 8. 再次对话，验证语义记忆仍然有效
     println!("\n📝 Step 8: 验证语义记忆保留");

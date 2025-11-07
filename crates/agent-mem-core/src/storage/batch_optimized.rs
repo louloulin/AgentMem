@@ -3,11 +3,11 @@
 //! This module provides optimized batch operations that use SQL's
 //! multi-row INSERT statements instead of looping single INSERTs.
 
-#[cfg(feature = "postgres")]
-use sqlx::PgPool;
 use super::models::*;
 use super::transaction::{retry_operation, RetryConfig};
 use crate::{CoreError, CoreResult};
+#[cfg(feature = "postgres")]
+use sqlx::PgPool;
 
 /// Optimized batch operations manager
 #[cfg(feature = "postgres")]
@@ -169,7 +169,8 @@ impl OptimizedBatchOperations {
                 let mut values = Vec::new();
                 for (i, _) in chunk.iter().enumerate() {
                     let base = i * 21;
-                    let placeholders: Vec<String> = (1..=21).map(|j| format!("${}", base + j)).collect();
+                    let placeholders: Vec<String> =
+                        (1..=21).map(|j| format!("${}", base + j)).collect();
                     values.push(format!("({})", placeholders.join(", ")));
                 }
 
@@ -202,10 +203,9 @@ impl OptimizedBatchOperations {
                         .bind(&message.last_updated_by_id);
                 }
 
-                let result = sql_query
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| CoreError::Database(format!("Failed to batch insert messages: {}", e)))?;
+                let result = sql_query.execute(&pool).await.map_err(|e| {
+                    CoreError::Database(format!("Failed to batch insert messages: {}", e))
+                })?;
 
                 Ok(result.rows_affected())
             }
@@ -225,8 +225,12 @@ impl OptimizedBatchOperations {
     ) -> CoreResult<u64>
     where
         T: Clone + Send + Sync,
-        F: Fn(&mut sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>, &T) 
-            -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments> + Send + Sync,
+        F: Fn(
+                &mut sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
+                &T,
+            ) -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>
+            + Send
+            + Sync,
     {
         if items.is_empty() {
             return Ok(0);
@@ -236,7 +240,9 @@ impl OptimizedBatchOperations {
         let mut total_inserted = 0;
 
         for chunk in items.chunks(CHUNK_SIZE) {
-            let inserted = self.insert_generic_chunk(chunk, table_name, columns, &bind_fn).await?;
+            let inserted = self
+                .insert_generic_chunk(chunk, table_name, columns, &bind_fn)
+                .await?;
             total_inserted += inserted;
         }
 
@@ -252,16 +258,15 @@ impl OptimizedBatchOperations {
     ) -> CoreResult<u64>
     where
         T: Clone,
-        F: Fn(&mut sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>, &T) 
-            -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
+        F: Fn(
+            &mut sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
+            &T,
+        ) -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
     {
         let column_list = columns.join(", ");
         let num_columns = columns.len();
 
-        let mut query = format!(
-            "INSERT INTO {} ({}) VALUES ",
-            table_name, column_list
-        );
+        let mut query = format!("INSERT INTO {} ({}) VALUES ", table_name, column_list);
 
         let mut values = Vec::new();
         for (i, _) in chunk.iter().enumerate() {
@@ -339,12 +344,8 @@ mod tests {
 
     #[test]
     fn test_performance_metrics() {
-        let metrics = BatchPerformanceMetrics::new(
-            "batch_insert_memories".to_string(),
-            1000,
-            5000,
-            2000,
-        );
+        let metrics =
+            BatchPerformanceMetrics::new("batch_insert_memories".to_string(), 1000, 5000, 2000);
 
         assert_eq!(metrics.items_count, 1000);
         assert_eq!(metrics.old_method_ms, 5000);
@@ -352,4 +353,3 @@ mod tests {
         assert_eq!(metrics.speedup, 2.5);
     }
 }
-

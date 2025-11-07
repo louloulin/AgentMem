@@ -77,8 +77,7 @@ impl ExecutionMetrics {
         self.last_execution_time = Some(Instant::now());
 
         // Update average
-        self.avg_execution_time =
-            self.total_execution_time / (self.total_calls as u32).max(1);
+        self.avg_execution_time = self.total_execution_time / (self.total_calls as u32).max(1);
 
         // Update min
         self.min_execution_time = Some(match self.min_execution_time {
@@ -211,7 +210,8 @@ impl ExecutionTracker {
     /// Complete the execution with an error
     pub fn fail(self, error: String) {
         let duration = self.start_time.elapsed();
-        self.monitor.record_failure(&self.plugin_id, duration, error);
+        self.monitor
+            .record_failure(&self.plugin_id, duration, error);
     }
 
     /// Get elapsed time
@@ -371,14 +371,8 @@ mod tests {
         metrics.record_success(Duration::from_millis(50));
         metrics.record_success(Duration::from_millis(200));
 
-        assert_eq!(
-            metrics.min_execution_time,
-            Some(Duration::from_millis(50))
-        );
-        assert_eq!(
-            metrics.max_execution_time,
-            Some(Duration::from_millis(200))
-        );
+        assert_eq!(metrics.min_execution_time, Some(Duration::from_millis(50)));
+        assert_eq!(metrics.max_execution_time, Some(Duration::from_millis(200)));
     }
 
     #[test]
@@ -393,4 +387,3 @@ mod tests {
         assert_eq!(metrics.avg_execution_time, Duration::from_millis(200));
     }
 }
-

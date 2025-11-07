@@ -51,7 +51,8 @@ pub trait EpisodicMemoryStore: Send + Sync {
     async fn get_event(&self, event_id: &str, user_id: &str) -> Result<Option<EpisodicEvent>>;
 
     /// Query episodic events with filters
-    async fn query_events(&self, user_id: &str, query: EpisodicQuery) -> Result<Vec<EpisodicEvent>>;
+    async fn query_events(&self, user_id: &str, query: EpisodicQuery)
+        -> Result<Vec<EpisodicEvent>>;
 
     /// Update an episodic event
     async fn update_event(&self, event: EpisodicEvent) -> Result<bool>;
@@ -60,7 +61,12 @@ pub trait EpisodicMemoryStore: Send + Sync {
     async fn delete_event(&self, event_id: &str, user_id: &str) -> Result<bool>;
 
     /// Update importance score
-    async fn update_importance(&self, event_id: &str, user_id: &str, importance_score: f32) -> Result<bool>;
+    async fn update_importance(
+        &self,
+        event_id: &str,
+        user_id: &str,
+        importance_score: f32,
+    ) -> Result<bool>;
 
     /// Count events in time range
     async fn count_events_in_range(
@@ -114,7 +120,11 @@ pub trait SemanticMemoryStore: Send + Sync {
     async fn get_item(&self, item_id: &str, user_id: &str) -> Result<Option<SemanticMemoryItem>>;
 
     /// Query semantic memory items with filters
-    async fn query_items(&self, user_id: &str, query: SemanticQuery) -> Result<Vec<SemanticMemoryItem>>;
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: SemanticQuery,
+    ) -> Result<Vec<SemanticMemoryItem>>;
 
     /// Update a semantic memory item
     async fn update_item(&self, item: SemanticMemoryItem) -> Result<bool>;
@@ -123,10 +133,19 @@ pub trait SemanticMemoryStore: Send + Sync {
     async fn delete_item(&self, item_id: &str, user_id: &str) -> Result<bool>;
 
     /// Search by tree path
-    async fn search_by_tree_path(&self, user_id: &str, tree_path: Vec<String>) -> Result<Vec<SemanticMemoryItem>>;
+    async fn search_by_tree_path(
+        &self,
+        user_id: &str,
+        tree_path: Vec<String>,
+    ) -> Result<Vec<SemanticMemoryItem>>;
 
     /// Get items by name pattern
-    async fn search_by_name(&self, user_id: &str, name_pattern: &str, limit: i64) -> Result<Vec<SemanticMemoryItem>>;
+    async fn search_by_name(
+        &self,
+        user_id: &str,
+        name_pattern: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticMemoryItem>>;
 }
 
 // ============================================================================
@@ -168,7 +187,11 @@ pub trait ProceduralMemoryStore: Send + Sync {
     async fn get_item(&self, item_id: &str, user_id: &str) -> Result<Option<ProceduralMemoryItem>>;
 
     /// Query procedural memory items with filters
-    async fn query_items(&self, user_id: &str, query: ProceduralQuery) -> Result<Vec<ProceduralMemoryItem>>;
+    async fn query_items(
+        &self,
+        user_id: &str,
+        query: ProceduralQuery,
+    ) -> Result<Vec<ProceduralMemoryItem>>;
 
     /// Update a procedural memory item
     async fn update_item(&self, item: ProceduralMemoryItem) -> Result<bool>;
@@ -225,7 +248,11 @@ pub trait WorkingMemoryStore: Send + Sync {
     async fn clear_session(&self, session_id: &str) -> Result<i64>;
 
     /// Get items by priority
-    async fn get_by_priority(&self, session_id: &str, min_priority: i32) -> Result<Vec<WorkingMemoryItem>>;
+    async fn get_by_priority(
+        &self,
+        session_id: &str,
+        min_priority: i32,
+    ) -> Result<Vec<WorkingMemoryItem>>;
 }
 
 // ============================================================================
@@ -268,4 +295,3 @@ pub trait CoreMemoryStore: Send + Sync {
     /// Update a core memory value
     async fn update_value(&self, user_id: &str, key: &str, value: &str) -> Result<bool>;
 }
-

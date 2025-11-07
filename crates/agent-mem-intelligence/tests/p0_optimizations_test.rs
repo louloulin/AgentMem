@@ -6,8 +6,8 @@
 //! - #21: 零向量降级修复
 
 use agent_mem_intelligence::{
-    ConflictResolver, FactExtractor, MemoryDecisionEngine, TimeoutConfig,
-    conflict_resolution::ConflictResolverConfig,
+    conflict_resolution::ConflictResolverConfig, ConflictResolver, FactExtractor,
+    MemoryDecisionEngine, TimeoutConfig,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,7 +21,7 @@ mod tests {
     #[ignore] // TODO: 需要实现 MockLLMProvider
     async fn test_fact_extractor_timeout() {
         let mock_llm = Arc::new(MockLLMProvider::new());
-        
+
         // 创建一个超时时间很短的配置
         let timeout_config = TimeoutConfig {
             fact_extraction_timeout_secs: 1,
@@ -49,7 +49,7 @@ mod tests {
     #[ignore] // TODO: 需要实现 MockLLMProvider
     async fn test_decision_engine_timeout_and_retry() {
         let mock_llm = Arc::new(MockLLMProvider::new());
-        
+
         let timeout_config = TimeoutConfig {
             decision_timeout_secs: 1,
             ..Default::default()
@@ -72,10 +72,10 @@ mod tests {
         use agent_mem_core::Memory;
         use agent_mem_traits::MemoryType;
         use std::collections::HashMap;
-        
+
         // Mock provider not available
         // let mock_llm = Arc::new(MockLLMProvider::new());
-        
+
         let config = ConflictResolverConfig {
             max_consideration_memories: 5, // 限制为5个
             ..Default::default()
@@ -111,7 +111,7 @@ mod tests {
 
         // 测试冲突检测应该能处理大量记忆（通过限制）
         let result = resolver.detect_conflicts(&[], &memories).await;
-        
+
         // 应该成功（即使有很多记忆，也会被限制）
         assert!(result.is_ok());
     }
@@ -128,4 +128,3 @@ mod tests {
         assert_eq!(config.search_timeout_secs, 5);
     }
 }
-

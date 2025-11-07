@@ -18,6 +18,8 @@ pub mod cache;
 pub mod client;
 pub mod collaboration;
 pub mod compression;
+/// Environment-based configuration
+pub mod config_env;
 pub mod conflict;
 pub mod context;
 /// Multi-agent coordination and orchestration
@@ -40,8 +42,6 @@ pub mod lifecycle;
 pub mod manager;
 /// Specialized memory managers for different memory types
 pub mod managers;
-/// Simplified Memory API (Mem0-style)
-pub mod simple_memory;
 /// Message queue system for agent communication
 pub mod message_queue;
 pub mod operations;
@@ -53,6 +53,8 @@ pub mod performance;
 pub mod retrieval;
 pub mod search;
 pub mod security;
+/// Simplified Memory API (Mem0-style)
+pub mod simple_memory;
 pub mod storage;
 /// Temporal graph memory with time-aware knowledge graphs
 pub mod temporal_graph;
@@ -62,8 +64,6 @@ pub mod tenant;
 pub mod types;
 /// Vector storage ecosystem with capability detection and auto-selection
 pub mod vector_ecosystem;
-/// Environment-based configuration
-pub mod config_env;
 
 // Re-export core types
 pub use agent_state::{AgentState, AgentStateMachine};
@@ -74,7 +74,6 @@ pub use extraction::{
     RelationType, RuleBasedExtractor, RuleBasedRelationExtractor,
 };
 pub use hierarchy::{HierarchyManager, MemoryLevel};
-pub use message_queue::{AgentMessage as QueueMessage, MessageAccumulator, MessageQueue};
 pub use managers::{
     ActivityState, ChangeType, ContextCorrelation, ContextState, ContextualMemoryConfig,
     ContextualMemoryManager, ContextualMemoryStats, CoreMemoryBlock, CoreMemoryBlockType,
@@ -83,6 +82,7 @@ pub use managers::{
     ResourceMetadata, ResourceStorageConfig, ResourceStorageStats, ResourceType, Season,
     TemporalInfo, TimeOfDay, UserState,
 };
+pub use message_queue::{AgentMessage as QueueMessage, MessageAccumulator, MessageQueue};
 
 // Re-export coordination and agents modules
 pub use agents::{
@@ -118,10 +118,10 @@ pub use orchestrator::{
 
 // Re-export cache modules
 pub use cache::{
-    Cache, CacheConfig, CacheKey, CacheLevel, CacheMetadata, CacheStats, CacheValue,
-    CacheWarmer, CacheWarmingConfig, DataLoader, EvictionPolicy, InvalidationStrategy,
-    MemoryCache, MemoryCacheConfig, MemoryCacheStats, MultiLevelCache, MultiLevelCacheConfig,
-    WarmingStats, WarmingStrategy,
+    Cache, CacheConfig, CacheKey, CacheLevel, CacheMetadata, CacheStats, CacheValue, CacheWarmer,
+    CacheWarmingConfig, DataLoader, EvictionPolicy, InvalidationStrategy, MemoryCache,
+    MemoryCacheConfig, MemoryCacheStats, MultiLevelCache, MultiLevelCacheConfig, WarmingStats,
+    WarmingStrategy,
 };
 
 // Re-export from traits

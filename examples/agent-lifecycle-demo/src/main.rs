@@ -1,25 +1,21 @@
 //! Agent 生命周期演示
-//! 
+//!
 //! 本示例演示 AgentMem 中所有 Agent 的 initialize() 和 shutdown() 方法。
-//! 
+//!
 //! 功能:
 //! - 创建 5 个不同类型的 Agent
 //! - 调用 initialize() 方法初始化 Agent
 //! - 执行简单任务
 //! - 调用 shutdown() 方法关闭 Agent
-//! 
+//!
 //! 运行方式:
 //! ```bash
 //! cargo run --example agent-lifecycle-demo
 //! ```
 
 use agent_mem_core::agents::{
-    core_agent::CoreAgent,
-    episodic_agent::EpisodicAgent,
-    semantic_agent::SemanticAgent,
-    procedural_agent::ProceduralAgent,
-    working_agent::WorkingAgent,
-    MemoryAgent,
+    core_agent::CoreAgent, episodic_agent::EpisodicAgent, procedural_agent::ProceduralAgent,
+    semantic_agent::SemanticAgent, working_agent::WorkingAgent, MemoryAgent,
 };
 use anyhow::Result;
 
@@ -38,15 +34,15 @@ async fn main() -> Result<()> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let mut core_agent = CoreAgent::new("core-agent-demo".to_string());
-    
+
     println!("📌 调用 initialize()...");
     core_agent.initialize().await?;
-    
+
     println!("✅ CoreAgent 初始化完成\n");
-    
+
     println!("📌 调用 shutdown()...");
     core_agent.shutdown().await?;
-    
+
     println!("✅ CoreAgent 关闭完成\n");
 
     // 2. 测试 EpisodicAgent
@@ -106,15 +102,15 @@ async fn main() -> Result<()> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let mut working_agent = WorkingAgent::new("working-agent-demo".to_string());
-    
+
     println!("📌 调用 initialize()...");
     working_agent.initialize().await?;
-    
+
     println!("✅ WorkingAgent 初始化完成\n");
-    
+
     println!("📌 调用 shutdown()...");
     working_agent.shutdown().await?;
-    
+
     println!("✅ WorkingAgent 关闭完成\n");
 
     // 总结
@@ -136,4 +132,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

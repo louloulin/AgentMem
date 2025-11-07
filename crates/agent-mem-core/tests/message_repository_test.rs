@@ -23,9 +23,7 @@ mod libsql_message_tests {
     ) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap())
-            .await
-            .unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
         run_migrations(conn.clone()).await.unwrap();
 
         let message_repo = LibSqlMessageRepository::new(conn.clone());
@@ -44,7 +42,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -71,7 +75,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -103,7 +113,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -122,10 +138,7 @@ mod libsql_message_tests {
         }
 
         // Find by agent ID
-        let messages = message_repo
-            .find_by_agent_id(&agent.id, 10)
-            .await
-            .unwrap();
+        let messages = message_repo.find_by_agent_id(&agent.id, 10).await.unwrap();
         assert_eq!(messages.len(), 3);
     }
 
@@ -137,7 +150,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -168,7 +187,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -203,7 +228,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -235,7 +266,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -258,10 +295,7 @@ mod libsql_message_tests {
         assert_eq!(deleted_count, 3);
 
         // Verify deletion
-        let messages = message_repo
-            .find_by_agent_id(&agent.id, 10)
-            .await
-            .unwrap();
+        let messages = message_repo.find_by_agent_id(&agent.id, 10).await.unwrap();
         assert_eq!(messages.len(), 0);
     }
 
@@ -273,7 +307,13 @@ mod libsql_message_tests {
         let org = Organization::new("Test Org".to_string());
         org_repo.create(&org).await.unwrap();
 
-        let user = User::new(org.id.clone(), "Test User".to_string(), "test@example.com".to_string(), "hashed_password".to_string(), "UTC".to_string());
+        let user = User::new(
+            org.id.clone(),
+            "Test User".to_string(),
+            "test@example.com".to_string(),
+            "hashed_password".to_string(),
+            "UTC".to_string(),
+        );
         user_repo.create(&user).await.unwrap();
 
         let agent = Agent::new(org.id.clone(), Some("Test Agent".to_string()));
@@ -304,4 +344,3 @@ mod libsql_message_tests {
         );
     }
 }
-

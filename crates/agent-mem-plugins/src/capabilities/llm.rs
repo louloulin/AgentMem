@@ -10,19 +10,19 @@ use tokio::sync::RwLock;
 pub struct LlmRequest {
     /// Model name
     pub model: String,
-    
+
     /// Prompt
     pub prompt: String,
-    
+
     /// System message (optional)
     pub system: Option<String>,
-    
+
     /// Temperature (0.0 - 2.0)
     pub temperature: Option<f32>,
-    
+
     /// Max tokens
     pub max_tokens: Option<usize>,
-    
+
     /// Additional parameters
     pub parameters: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -32,16 +32,16 @@ pub struct LlmRequest {
 pub struct LlmResponse {
     /// Generated text
     pub text: String,
-    
+
     /// Model used
     pub model: String,
-    
+
     /// Tokens used
     pub tokens_used: usize,
-    
+
     /// Finish reason
     pub finish_reason: String,
-    
+
     /// Additional metadata
     pub metadata: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -51,7 +51,7 @@ pub struct LlmResponse {
 pub struct LlmCapability {
     /// Request history for testing
     history: Arc<RwLock<Vec<LlmRequest>>>,
-    
+
     /// Mock mode for testing
     mock_mode: bool,
 }
@@ -139,7 +139,7 @@ mod tests {
     #[tokio::test]
     async fn test_llm_call() {
         let llm = LlmCapability::new(true);
-        
+
         let request = LlmRequest {
             model: "gpt-4".to_string(),
             prompt: "Summarize this text".to_string(),
@@ -148,9 +148,9 @@ mod tests {
             max_tokens: Some(100),
             parameters: std::collections::HashMap::new(),
         };
-        
+
         let response = llm.call_llm(request).await.unwrap();
-        
+
         assert!(response.text.contains("summary"));
         assert_eq!(response.model, "gpt-4");
         assert!(response.tokens_used > 0);
@@ -159,7 +159,7 @@ mod tests {
     #[tokio::test]
     async fn test_llm_history() {
         let llm = LlmCapability::new(true);
-        
+
         let request1 = LlmRequest {
             model: "gpt-4".to_string(),
             prompt: "Test 1".to_string(),
@@ -168,7 +168,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        
+
         let request2 = LlmRequest {
             model: "gpt-3.5-turbo".to_string(),
             prompt: "Test 2".to_string(),
@@ -177,10 +177,10 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        
+
         llm.call_llm(request1).await.unwrap();
         llm.call_llm(request2).await.unwrap();
-        
+
         let history = llm.get_history().await;
         assert_eq!(history.len(), 2);
         assert_eq!(history[0].prompt, "Test 1");
@@ -190,7 +190,7 @@ mod tests {
     #[tokio::test]
     async fn test_llm_mock_responses() {
         let llm = LlmCapability::new(true);
-        
+
         // Test summarize
         let request = LlmRequest {
             model: "gpt-4".to_string(),
@@ -202,7 +202,7 @@ mod tests {
         };
         let response = llm.call_llm(request).await.unwrap();
         assert!(response.text.contains("summary"));
-        
+
         // Test translate
         let request = LlmRequest {
             model: "gpt-4".to_string(),
@@ -214,7 +214,7 @@ mod tests {
         };
         let response = llm.call_llm(request).await.unwrap();
         assert!(response.text.contains("翻译"));
-        
+
         // Test analyze
         let request = LlmRequest {
             model: "gpt-4".to_string(),
@@ -231,7 +231,7 @@ mod tests {
     #[tokio::test]
     async fn test_llm_clear_history() {
         let llm = LlmCapability::new(true);
-        
+
         let request = LlmRequest {
             model: "gpt-4".to_string(),
             prompt: "Test".to_string(),
@@ -240,12 +240,11 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        
+
         llm.call_llm(request).await.unwrap();
         assert_eq!(llm.get_history().await.len(), 1);
-        
+
         llm.clear_history().await.unwrap();
         assert_eq!(llm.get_history().await.len(), 0);
     }
 }
-

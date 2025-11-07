@@ -95,16 +95,17 @@ impl ContextAnalyzer {
         // 简单的关键词提取：分词并过滤停用词
         let stop_words = vec![
             "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
-            "by", "from", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-            "had", "do", "does", "did", "will", "would", "should", "could", "may", "might",
-            "can", "what", "when", "where", "who", "why", "how",
+            "by", "from", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+            "do", "does", "did", "will", "would", "should", "could", "may", "might", "can", "what",
+            "when", "where", "who", "why", "how",
         ];
 
         query
             .to_lowercase()
             .split_whitespace()
             .filter(|word| {
-                word.len() > 2 && !stop_words.contains(&word.trim_matches(|c: char| !c.is_alphanumeric()))
+                word.len() > 2
+                    && !stop_words.contains(&word.trim_matches(|c: char| !c.is_alphanumeric()))
             })
             .map(|s| s.to_string())
             .collect()

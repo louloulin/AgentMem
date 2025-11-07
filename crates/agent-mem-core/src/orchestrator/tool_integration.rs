@@ -170,7 +170,9 @@ impl ToolIntegrator {
     /// 获取工具定义列表
     ///
     /// 从 ToolExecutor 获取所有已注册工具的定义，转换为 LLM 可用的格式
-    pub async fn get_tool_definitions(&self) -> Result<Vec<agent_mem_traits::llm::FunctionDefinition>> {
+    pub async fn get_tool_definitions(
+        &self,
+    ) -> Result<Vec<agent_mem_traits::llm::FunctionDefinition>> {
         use agent_mem_traits::llm::FunctionDefinition;
 
         // 获取所有工具名称
@@ -184,10 +186,13 @@ impl ToolIntegrator {
                 // 构建 properties
                 let mut properties = serde_json::Map::new();
                 for (key, prop) in &schema.parameters.properties {
-                    properties.insert(key.clone(), serde_json::json!({
-                        "type": prop.prop_type,
-                        "description": prop.description,
-                    }));
+                    properties.insert(
+                        key.clone(),
+                        serde_json::json!({
+                            "type": prop.prop_type,
+                            "description": prop.description,
+                        }),
+                    );
                 }
 
                 // 转换为 FunctionDefinition

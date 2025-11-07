@@ -2,9 +2,9 @@
 //!
 //! 参考 MIRIX 的 absorb_content_into_memory 逻辑
 
-use crate::{Memory, engine::MemoryEngine};
+use crate::{engine::MemoryEngine, Memory};
 use agent_mem_llm::LLMClient;
-use agent_mem_traits::{Result, Message, MemoryType, Session};
+use agent_mem_traits::{MemoryType, Message, Result, Session};
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -105,7 +105,10 @@ impl MemoryExtractor {
         let conversation = self.format_conversation(messages);
 
         // 构建提取提示词
-        let prompt = self.config.extraction_prompt.replace("{conversation}", &conversation);
+        let prompt = self
+            .config
+            .extraction_prompt
+            .replace("{conversation}", &conversation);
 
         // 调用 LLM 提取记忆
         let extraction_messages = vec![Message::user(&prompt)];
@@ -235,28 +238,26 @@ impl MemoryExtractor {
         text.lines()
             .filter(|line| !line.trim().is_empty() && line.len() > 10)
             .take(5) // 最多提取 5 条
-            .map(|line| {
-                Memory {
-                    id: Uuid::new_v4().to_string(),
-                    content: line.trim().to_string(),
-                    hash: None,
-                    metadata: HashMap::new(),
-                    score: Some(0.5),
-                    created_at: now,
-                    updated_at: Some(now),
-                    session: Session::new(),
-                    memory_type: MemoryType::Episodic,
-                    entities: Vec::new(),
-                    relations: Vec::new(),
-                    agent_id: agent_id.to_string(),
-                    user_id: Some(user_id.to_string()),
-                    importance: 0.5,
-                    embedding: None,
-                    last_accessed_at: now,
-                    access_count: 0,
-                    expires_at: None,
-                    version: 1,
-                }
+            .map(|line| Memory {
+                id: Uuid::new_v4().to_string(),
+                content: line.trim().to_string(),
+                hash: None,
+                metadata: HashMap::new(),
+                score: Some(0.5),
+                created_at: now,
+                updated_at: Some(now),
+                session: Session::new(),
+                memory_type: MemoryType::Episodic,
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: agent_id.to_string(),
+                user_id: Some(user_id.to_string()),
+                importance: 0.5,
+                embedding: None,
+                last_accessed_at: now,
+                access_count: 0,
+                expires_at: None,
+                version: 1,
             })
             .collect()
     }
@@ -289,4 +290,3 @@ impl MemoryExtractor {
         Ok(count)
     }
 }
-

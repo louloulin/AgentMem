@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use tracing::{debug, info, warn};
 
 /// FastEmbed 提供商
-/// 
+///
 /// 使用 FastEmbed-rs 库提供本地嵌入功能，支持多种预训练模型。
-/// 
+///
 /// # 特性
 /// - 完全本地运行，无需 API 调用
 /// - 支持 19+ 预训练模型
@@ -21,31 +21,31 @@ use tracing::{debug, info, warn};
 pub struct FastEmbedProvider {
     /// FastEmbed 模型实例（包装在 Mutex 中以支持异步）
     model: Arc<Mutex<TextEmbedding>>,
-    
+
     /// 配置
     config: EmbeddingConfig,
-    
+
     /// 模型名称
     model_name: String,
-    
+
     /// 嵌入维度
     dimension: usize,
 }
 
 impl FastEmbedProvider {
     /// 创建新的 FastEmbed 提供商
-    /// 
+    ///
     /// # 参数
     /// - `config`: 嵌入配置
-    /// 
+    ///
     /// # 返回
     /// - `Ok(FastEmbedProvider)`: 成功创建的提供商
     /// - `Err(AgentMemError)`: 创建失败
-    /// 
+    ///
     /// # 示例
     /// ```no_run
     /// use agent_mem_embeddings::{EmbeddingConfig, providers::FastEmbedProvider};
-    /// 
+    ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let config = EmbeddingConfig {
     ///     provider: "fastembed".to_string(),
@@ -53,33 +53,33 @@ impl FastEmbedProvider {
     ///     dimension: 384,
     ///     ..Default::default()
     /// };
-    /// 
+    ///
     /// let provider = FastEmbedProvider::new(config).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn new(config: EmbeddingConfig) -> Result<Self> {
         info!("初始化 FastEmbed 提供商: {}", config.model);
-        
+
         // 解析模型名称
         let embedding_model = Self::parse_model(&config.model)?;
-        
+
         // 在阻塞线程中初始化模型
         let model_clone = embedding_model.clone();
         let model = tokio::task::spawn_blocking(move || {
-            TextEmbedding::try_new(
-                InitOptions::new(model_clone)
-                    .with_show_download_progress(true)
-            )
+            TextEmbedding::try_new(InitOptions::new(model_clone).with_show_download_progress(true))
         })
         .await
         .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
         .map_err(|e| AgentMemError::embedding_error(format!("FastEmbed 初始化失败: {e}")))?;
-        
+
         let dimension = Self::get_dimension(&embedding_model);
-        
-        info!("FastEmbed 模型加载成功: {} (维度: {})", config.model, dimension);
-        
+
+        info!(
+            "FastEmbed 模型加载成功: {} (维度: {})",
+            config.model, dimension
+        );
+
         Ok(Self {
             model: Arc::new(Mutex::new(model)),
             config: config.clone(),
@@ -87,7 +87,7 @@ impl FastEmbedProvider {
             dimension,
         })
     }
-    
+
     /// 解析模型名称到 FastEmbed 模型枚举
     fn parse_model(model: &str) -> Result<EmbeddingModel> {
         match model {
@@ -133,7 +133,7 @@ impl FastEmbedProvider {
             ))),
         }
     }
-    
+
     /// 获取模型维度
     fn get_dimension(model: &EmbeddingModel) -> usize {
         match model {
@@ -157,10 +157,10 @@ impl FastEmbedProvider {
 impl Embedder for FastEmbedProvider {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         debug!("FastEmbed 生成嵌入: {} 字符", text.len());
-        
+
         let text = text.to_string();
         let model = self.model.clone();
-        
+
         // 在阻塞线程中执行同步操作
         let embedding = tokio::task::spawn_blocking(move || {
             let mut model = model.lock().expect("无法获取模型锁");
@@ -169,24 +169,24 @@ impl Embedder for FastEmbedProvider {
         .await
         .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
         .map_err(|e| AgentMemError::embedding_error(format!("嵌入生成失败: {e}")))?;
-        
+
         embedding
             .into_iter()
             .next()
             .ok_or_else(|| AgentMemError::embedding_error("未返回嵌入"))
     }
-    
+
     async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         debug!("FastEmbed 批量生成嵌入: {} 个文本", texts.len());
-        
+
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         let texts = texts.to_vec();
         let model = self.model.clone();
         let batch_size = self.config.batch_size;
-        
+
         // 在阻塞线程中执行同步操作
         let embeddings = tokio::task::spawn_blocking(move || {
             let mut model = model.lock().expect("无法获取模型锁");
@@ -195,22 +195,22 @@ impl Embedder for FastEmbedProvider {
         .await
         .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
         .map_err(|e| AgentMemError::embedding_error(format!("批量嵌入失败: {e}")))?;
-        
+
         Ok(embeddings)
     }
-    
+
     fn dimension(&self) -> usize {
         self.dimension
     }
-    
+
     fn provider_name(&self) -> &str {
         "fastembed"
     }
-    
+
     fn model_name(&self) -> &str {
         &self.model_name
     }
-    
+
     async fn health_check(&self) -> Result<bool> {
         // 测试嵌入生成
         match self.embed("health check").await {
@@ -238,7 +238,7 @@ impl Embedder for FastEmbedProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     #[ignore] // 需要下载模型，默认跳过
     async fn test_fastembed_provider_basic() {
@@ -249,31 +249,28 @@ mod tests {
             batch_size: 256,
             ..Default::default()
         };
-        
+
         let provider = FastEmbedProvider::new(config).await.unwrap();
-        
+
         // 测试单个嵌入
         let embedding = provider.embed("Hello, world!").await.unwrap();
         assert_eq!(embedding.len(), 384);
-        
+
         // 测试批量嵌入
         let texts = vec!["Hello".to_string(), "World".to_string()];
         let embeddings = provider.embed_batch(&texts).await.unwrap();
         assert_eq!(embeddings.len(), 2);
         assert_eq!(embeddings[0].len(), 384);
-        
+
         // 测试健康检查
         assert!(provider.health_check().await.unwrap());
     }
-    
+
     #[tokio::test]
     #[ignore] // 需要下载模型，默认跳过
     async fn test_fastembed_models() {
-        let models = vec![
-            ("bge-small-en-v1.5", 384),
-            ("all-MiniLM-L6-v2", 384),
-        ];
-        
+        let models = vec![("bge-small-en-v1.5", 384), ("all-MiniLM-L6-v2", 384)];
+
         for (model, dim) in models {
             let config = EmbeddingConfig {
                 provider: "fastembed".to_string(),
@@ -281,13 +278,12 @@ mod tests {
                 dimension: dim,
                 ..Default::default()
             };
-            
+
             let provider = FastEmbedProvider::new(config).await.unwrap();
             assert_eq!(provider.dimension(), dim);
-            
+
             let embedding = provider.embed("test").await.unwrap();
             assert_eq!(embedding.len(), dim);
         }
     }
 }
-

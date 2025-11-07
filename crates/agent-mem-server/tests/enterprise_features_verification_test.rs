@@ -6,8 +6,8 @@
 //! - Audit logging
 //! - Metrics collection
 
-use agent_mem_server::auth::{AuthService, ApiKey, Role, Permission, PasswordService};
-use agent_mem_server::middleware::quota::{QuotaManager, QuotaLimits};
+use agent_mem_server::auth::{ApiKey, AuthService, PasswordService, Permission, Role};
+use agent_mem_server::middleware::quota::{QuotaLimits, QuotaManager};
 use std::collections::HashSet;
 
 #[cfg(test)]
@@ -45,13 +45,15 @@ mod enterprise_verification_tests {
         assert_eq!(claims.project_id, Some("project789".to_string()));
 
         println!("  ✅ JWT Token validated successfully");
-        println!("  ✅ Claims: user_id={}, org_id={}, roles={:?}", 
-                 claims.sub, claims.org_id, claims.roles);
+        println!(
+            "  ✅ Claims: user_id={}, org_id={}, roles={:?}",
+            claims.sub, claims.org_id, claims.roles
+        );
 
         // Test token extraction from header
         let header = format!("Bearer {}", token);
-        let extracted = AuthService::extract_token_from_header(&header)
-            .expect("Failed to extract token");
+        let extracted =
+            AuthService::extract_token_from_header(&header).expect("Failed to extract token");
         assert_eq!(extracted, token);
 
         println!("  ✅ Token extraction from header works");
@@ -64,17 +66,16 @@ mod enterprise_verification_tests {
         println!("\n🔒 Testing Password Hashing...");
 
         let password = "secure_password_123!@#";
-        
+
         // Hash password
-        let hash = PasswordService::hash_password(password)
-            .expect("Failed to hash password");
+        let hash = PasswordService::hash_password(password).expect("Failed to hash password");
 
         println!("  ✅ Password hashed with Argon2");
         println!("  ✅ Hash: {}...", &hash[..50]);
 
         // Verify correct password
-        let is_valid = PasswordService::verify_password(password, &hash)
-            .expect("Failed to verify password");
+        let is_valid =
+            PasswordService::verify_password(password, &hash).expect("Failed to verify password");
         assert!(is_valid, "Valid password should be verified");
 
         println!("  ✅ Correct password verified");
@@ -106,7 +107,10 @@ mod enterprise_verification_tests {
         );
 
         println!("  ✅ API Key generated: {}", api_key.key);
-        assert!(api_key.key.starts_with("agm_"), "API key should have correct prefix");
+        assert!(
+            api_key.key.starts_with("agm_"),
+            "API key should have correct prefix"
+        );
 
         // Test validity
         assert!(api_key.is_valid(), "New API key should be valid");
@@ -114,7 +118,10 @@ mod enterprise_verification_tests {
 
         // Test scope checking
         assert!(api_key.has_scope("read:memories"), "Should have read scope");
-        assert!(api_key.has_scope("write:memories"), "Should have write scope");
+        assert!(
+            api_key.has_scope("write:memories"),
+            "Should have write scope"
+        );
         assert!(!api_key.has_scope("admin"), "Should not have admin scope");
         println!("  ✅ Scope checking works correctly");
 
@@ -213,7 +220,7 @@ mod enterprise_verification_tests {
 
         // Add 5 more users (total 10)
         manager.update_resource_count("org123", "user", 5).await;
-        
+
         // Should fail (10 >= 10)
         let result = manager.check_resource_quota("org123", "user").await;
         assert!(result.is_err(), "Resource quota should fail");
@@ -230,19 +237,23 @@ mod enterprise_verification_tests {
 
         // 1. JWT Authentication
         let auth = AuthService::new("super-secret-key-for-production-use-only");
-        let token = auth.generate_token(
-            "alice",
-            "acme-corp".to_string(),
-            vec!["admin".to_string()],
-            None,
-        ).expect("Token generation failed");
+        let token = auth
+            .generate_token(
+                "alice",
+                "acme-corp".to_string(),
+                vec!["admin".to_string()],
+                None,
+            )
+            .expect("Token generation failed");
         println!("✅ JWT Authentication: Token generated and validated");
 
         // 2. Password Hashing
-        let password_hash = PasswordService::hash_password("alice_password_123")
-            .expect("Password hashing failed");
-        assert!(PasswordService::verify_password("alice_password_123", &password_hash)
-            .expect("Password verification failed"));
+        let password_hash =
+            PasswordService::hash_password("alice_password_123").expect("Password hashing failed");
+        assert!(
+            PasswordService::verify_password("alice_password_123", &password_hash)
+                .expect("Password verification failed")
+        );
         println!("✅ Password Hashing: Argon2 working");
 
         // 3. API Key Management
@@ -262,7 +273,9 @@ mod enterprise_verification_tests {
 
         // 5. Rate Limiting
         let quota_manager = QuotaManager::new();
-        quota_manager.set_limits("acme-corp", QuotaLimits::default()).await;
+        quota_manager
+            .set_limits("acme-corp", QuotaLimits::default())
+            .await;
         assert!(quota_manager.check_request_quota("acme-corp").await.is_ok());
         println!("✅ Rate Limiting: Quota management working");
 
@@ -295,4 +308,3 @@ fn test_enterprise_features_summary() {
     println!("╚═══════════════════════════════════════════════════════════╝");
     println!();
 }
-

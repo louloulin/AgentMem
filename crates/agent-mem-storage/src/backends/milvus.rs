@@ -407,9 +407,7 @@ impl EmbeddingVectorStore for MilvusStore {
             .json(&insert_request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to store embedding: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to store embedding: {e}")))?;
 
         if response.status().is_success() {
             debug!("Successfully stored embedding for memory: {}", memory_id);
@@ -585,9 +583,7 @@ impl EmbeddingVectorStore for MilvusStore {
             .json(&query_request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to get embedding: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to get embedding: {e}")))?;
 
         if response.status().is_success() {
             // Parse response and extract embedding
@@ -651,9 +647,7 @@ impl EmbeddingVectorStore for MilvusStore {
             .json(&query_request)
             .send()
             .await
-            .map_err(|e| {
-                AgentMemError::network_error(format!("Failed to list embeddings: {e}"))
-            })?;
+            .map_err(|e| AgentMemError::network_error(format!("Failed to list embeddings: {e}")))?;
 
         if response.status().is_success() {
             // Parse response and extract memory IDs

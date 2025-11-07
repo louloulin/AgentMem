@@ -975,7 +975,6 @@ impl ProductionTelemetrySystem {
     /// Initialize Jaeger tracing
     #[cfg(feature = "jaeger")]
     async fn initialize_jaeger(&self) -> Result<()> {
-        
         use opentelemetry_jaeger::new_agent_pipeline;
         use tracing_subscriber::{layer::SubscriberExt, Registry};
 

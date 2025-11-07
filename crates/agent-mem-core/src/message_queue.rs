@@ -43,12 +43,7 @@ impl AgentMessage {
     }
 
     /// Create a new agent message with priority
-    pub fn with_priority(
-        agent_id: String,
-        user_id: String,
-        content: String,
-        priority: u8,
-    ) -> Self {
+    pub fn with_priority(agent_id: String, user_id: String, content: String, priority: u8) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             agent_id,
@@ -190,8 +185,7 @@ impl MessageAccumulator {
 
     /// Check if the accumulator should be flushed
     fn should_flush(&self) -> bool {
-        self.messages.len() >= self.max_messages
-            || self.last_flush.elapsed() >= self.max_duration
+        self.messages.len() >= self.max_messages || self.last_flush.elapsed() >= self.max_duration
     }
 
     /// Flush the accumulator
@@ -306,4 +300,3 @@ mod tests {
         assert_eq!(accumulator.len(), 0);
     }
 }
-

@@ -260,7 +260,7 @@ impl MemoryBuilder {
     ///     registered_at: chrono::Utc::now(),
     ///     last_loaded_at: None,
     /// };
-    /// 
+    ///
     /// let mem = Memory::builder()
     ///     .with_storage("memory://")
     ///     .with_plugin(plugin)
@@ -297,38 +297,40 @@ impl MemoryBuilder {
     /// ```
     #[cfg(feature = "plugins")]
     pub async fn load_plugins_from_dir(mut self, dir: impl AsRef<std::path::Path>) -> Result<Self> {
+        use crate::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginType};
+        use crate::plugins::{PluginStatus, RegisteredPlugin};
         use tracing::{debug, warn};
-        use crate::plugins::{RegisteredPlugin, PluginStatus};
-        use crate::plugins::sdk::{PluginMetadata, PluginType, Capability, PluginConfig};
-        
+
         let dir_path = dir.as_ref();
         debug!("从目录加载插件: {:?}", dir_path);
-        
+
         if !dir_path.exists() {
             warn!("插件目录不存在: {:?}", dir_path);
             return Ok(self);
         }
-        
-        let entries = std::fs::read_dir(dir_path)
-            .map_err(|e| agent_mem_traits::AgentMemError::Other(anyhow::anyhow!("读取目录失败: {}", e)))?;
-        
+
+        let entries = std::fs::read_dir(dir_path).map_err(|e| {
+            agent_mem_traits::AgentMemError::Other(anyhow::anyhow!("读取目录失败: {}", e))
+        })?;
+
         for entry in entries {
             let entry = entry.map_err(|e| {
                 agent_mem_traits::AgentMemError::Other(anyhow::anyhow!("读取目录项失败: {}", e))
             })?;
             let path = entry.path();
-            
+
             // 只处理 .wasm 文件
             if path.extension().and_then(|s| s.to_str()) != Some("wasm") {
                 continue;
             }
-            
-            let file_name = path.file_stem()
+
+            let file_name = path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
-            
+
             debug!("发现插件: {:?}", path);
-            
+
             // 创建插件元数据（使用默认值）
             let plugin = RegisteredPlugin {
                 id: file_name.to_string(),
@@ -347,10 +349,10 @@ impl MemoryBuilder {
                 registered_at: chrono::Utc::now(),
                 last_loaded_at: None,
             };
-            
+
             self.plugins.push(plugin);
         }
-        
+
         info!("从目录加载了 {} 个插件", self.plugins.len());
         Ok(self)
     }
@@ -375,12 +377,9 @@ impl MemoryBuilder {
 
         let orchestrator = MemoryOrchestrator::new_with_config(self.config).await?;
 
-        let memory = Memory::from_orchestrator(
-            orchestrator,
-            self.default_user_id,
-            self.default_agent_id,
-        );
-        
+        let memory =
+            Memory::from_orchestrator(orchestrator, self.default_user_id, self.default_agent_id);
+
         // 注册所有插件 (如果启用了 plugins feature)
         #[cfg(feature = "plugins")]
         {
@@ -393,7 +392,7 @@ impl MemoryBuilder {
                 }
             }
         }
-        
+
         Ok(memory)
     }
 }

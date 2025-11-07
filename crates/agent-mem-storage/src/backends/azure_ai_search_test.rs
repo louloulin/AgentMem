@@ -1,5 +1,5 @@
 //! Azure AI Search 后端测试
-//! 
+//!
 //! NOTE: These tests require Azure AI Search credentials to run.
 //! They are ignored by default. To run them, use:
 //! `cargo test --lib -p agent-mem-storage -- --ignored`

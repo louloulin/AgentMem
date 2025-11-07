@@ -58,10 +58,7 @@ fn test_lifecycle_event_type_as_str() {
         LifecycleEventType::ImportanceChanged.as_str(),
         "importance_changed"
     );
-    assert_eq!(
-        LifecycleEventType::ExpirationSet.as_str(),
-        "expiration_set"
-    );
+    assert_eq!(LifecycleEventType::ExpirationSet.as_str(), "expiration_set");
 }
 
 #[test]
@@ -255,7 +252,10 @@ fn test_state_progression() {
     ];
 
     for (i, state) in progression.iter().enumerate() {
-        assert_eq!(state.as_str(), MemoryState::from_str(state.as_str()).unwrap().as_str());
+        assert_eq!(
+            state.as_str(),
+            MemoryState::from_str(state.as_str()).unwrap().as_str()
+        );
         println!("State {}: {:?}", i, state);
     }
 }
@@ -284,4 +284,3 @@ fn test_event_type_coverage() {
 
 // 注意：数据库集成测试需要实际的数据库连接
 // 这些测试应该在集成测试中进行，而不是单元测试
-

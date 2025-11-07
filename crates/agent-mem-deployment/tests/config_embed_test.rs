@@ -1,7 +1,7 @@
 //! 配置嵌入测试
 
-use agent_mem_deployment::config_embed::{ConfigTemplate, EmbeddedConfigManager};
 use agent_mem_deployment::config_embed::templates::ConfigVariables;
+use agent_mem_deployment::config_embed::{ConfigTemplate, EmbeddedConfigManager};
 
 #[test]
 fn test_config_template_all() {
@@ -76,7 +76,7 @@ fn test_config_variables_creation() {
 fn test_config_variables_add() {
     let mut vars = ConfigVariables::new();
     vars.add("KEY".to_string(), "value".to_string());
-    
+
     let template = "${KEY}";
     let result = vars.replace(template);
     assert_eq!(result, "value");
@@ -87,7 +87,7 @@ fn test_config_variables_replace() {
     let mut vars = ConfigVariables::new();
     vars.add("DATABASE_URL".to_string(), "test.db".to_string());
     vars.add("PORT".to_string(), "8080".to_string());
-    
+
     let template = "url = \"${DATABASE_URL}\"\nport = ${PORT}";
     let result = vars.replace(template);
     assert_eq!(result, "url = \"test.db\"\nport = 8080");
@@ -111,10 +111,9 @@ fn test_embedded_config_manager_default() {
 fn test_embedded_config_manager_with_variables() {
     let mut vars = ConfigVariables::new();
     vars.add("DATABASE_URL".to_string(), "custom.db".to_string());
-    
-    let manager = EmbeddedConfigManager::new(ConfigTemplate::Development)
-        .with_variables(vars);
-    
+
+    let manager = EmbeddedConfigManager::new(ConfigTemplate::Development).with_variables(vars);
+
     let config = manager.get_config();
     assert!(!config.is_empty());
 }
@@ -123,7 +122,7 @@ fn test_embedded_config_manager_with_variables() {
 fn test_embedded_config_manager_add_variable() {
     let manager = EmbeddedConfigManager::new(ConfigTemplate::Development)
         .add_variable("KEY".to_string(), "value".to_string());
-    
+
     let config = manager.get_config();
     assert!(!config.is_empty());
 }
@@ -132,7 +131,7 @@ fn test_embedded_config_manager_add_variable() {
 fn test_embedded_config_manager_list_templates() {
     let templates = EmbeddedConfigManager::list_templates();
     assert_eq!(templates.len(), 5);
-    
+
     for (template, name, desc) in templates {
         assert_eq!(template.name(), name);
         assert_eq!(template.description(), desc);
@@ -149,16 +148,16 @@ fn test_embedded_config_manager_validate() {
 #[test]
 fn test_embedded_config_manager_export_to_file() {
     use tempfile::tempdir;
-    
+
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("config.toml");
-    
+
     let manager = EmbeddedConfigManager::new(ConfigTemplate::Development);
     let result = manager.export_to_file(&file_path);
     assert!(result.is_ok());
-    
+
     assert!(file_path.exists());
-    
+
     // 验证文件内容
     let content = std::fs::read_to_string(&file_path).unwrap();
     assert!(!content.is_empty());
@@ -173,4 +172,3 @@ fn test_all_templates_valid() {
         assert!(result.is_ok(), "模板 {} 验证失败", template.name());
     }
 }
-

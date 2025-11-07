@@ -168,7 +168,7 @@ fn extract_ip_address<B>(request: &axum::http::Request<B>) -> Option<String> {
     // Try to get from connection info (if available)
     // Note: This would require access to the connection remote address
     // which is not directly available in Axum middleware without custom extension
-    
+
     None
 }
 
@@ -501,8 +501,14 @@ mod tests {
 
         // Read the file and verify content
         let content = tokio::fs::read_to_string(&log_file).await.unwrap();
-        assert!(content.contains("test_user"), "Log file should contain user_id");
-        assert!(content.contains("mem123"), "Log file should contain resource_id");
+        assert!(
+            content.contains("test_user"),
+            "Log file should contain user_id"
+        );
+        assert!(
+            content.contains("mem123"),
+            "Log file should contain resource_id"
+        );
     }
 
     #[tokio::test]
@@ -533,14 +539,20 @@ mod tests {
 
         // Read the file and verify content
         let content = tokio::fs::read_to_string(&log_file).await.unwrap();
-        assert!(content.contains("test_user"), "Log file should contain user_id");
-        assert!(content.contains("192.168.1.100"), "Log file should contain IP address");
+        assert!(
+            content.contains("test_user"),
+            "Log file should contain user_id"
+        );
+        assert!(
+            content.contains("192.168.1.100"),
+            "Log file should contain IP address"
+        );
     }
 
     #[test]
     fn test_extract_ip_address() {
-        use axum::http::{HeaderValue};
-        
+        use axum::http::HeaderValue;
+
         // Test X-Forwarded-For header
         let req = axum::http::Request::builder()
             .header("x-forwarded-for", "203.0.113.1, 198.51.100.1")
@@ -558,9 +570,7 @@ mod tests {
         assert_eq!(ip, Some("203.0.113.2".to_string()));
 
         // Test no headers
-        let req = axum::http::Request::builder()
-            .body(())
-            .unwrap();
+        let req = axum::http::Request::builder().body(()).unwrap();
         let ip = extract_ip_address(&req);
         assert_eq!(ip, None);
     }

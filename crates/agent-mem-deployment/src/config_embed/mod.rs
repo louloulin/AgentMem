@@ -7,4 +7,3 @@ pub mod templates;
 
 pub use manager::EmbeddedConfigManager;
 pub use templates::ConfigTemplate;
-
