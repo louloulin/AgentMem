@@ -176,6 +176,13 @@ impl Tool for SearchMemoriesTool {
             .ok_or_else(|| crate::error::ToolError::InvalidArgument("query is required".to_string()))?;
 
         let limit = args["limit"].as_i64().unwrap_or(10) as usize;
+        
+        // 提取 user_id 参数（如果未提供，使用默认值"default"）
+        let user_id = args["user_id"]
+            .as_str()
+            .unwrap_or("default");
+
+        tracing::debug!("Searching memories: query='{}', user_id='{}', limit={}", query, user_id, limit);
 
         // 调用 AgentMem Backend API (使用同步 HTTP 客户端)
         let api_url = get_api_url();
@@ -183,6 +190,7 @@ impl Tool for SearchMemoriesTool {
 
         let request_body = json!({
             "query": query,
+            "user_id": user_id,
             "limit": limit
         });
 
@@ -211,7 +219,8 @@ impl Tool for SearchMemoriesTool {
         .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
 
         // 提取搜索结果
-        let memories = api_response["data"]["memories"]
+        // 注意：API返回的是 {"data": [...]}，不是 {"data": {"memories": [...]}}
+        let memories = api_response["data"]
             .as_array()
             .cloned()
             .unwrap_or_default();
