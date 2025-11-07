@@ -467,6 +467,8 @@ impl VectorStore for LanceDBStore {
             .and_then(|v| v.as_str())
             .map(|s| s.to_lowercase());
         
+        debug!("🔍 查询提示: {:?}, 过滤器: {:?}", query_hint, filters.keys().collect::<Vec<_>>());
+        
         // 🔧 动态调整检索数量：短查询需要更多候选
         let fetch_multiplier = if filters.is_empty() { 50 } else { 10 };
         
@@ -625,7 +627,12 @@ impl VectorStore for LanceDBStore {
                     };
                     
                     if similarity < effective_threshold {
+                        debug!("❌ Filtered by threshold: id={}, sim={:.4} < {:.4}", 
+                            id, similarity, effective_threshold);
                         continue;
+                    } else {
+                        debug!("✅ Passed threshold: id={}, sim={:.4} >= {:.4}, has_match={}", 
+                            id, similarity, effective_threshold, has_text_match);
                     }
                 }
 

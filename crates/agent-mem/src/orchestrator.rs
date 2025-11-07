@@ -1468,6 +1468,12 @@ impl MemoryOrchestrator {
                 .await?;
 
             info!("向量搜索完成: {} 个结果", search_results.len());
+            
+            // 🔍 临时调试：打印搜索结果详情
+            for (i, r) in search_results.iter().enumerate().take(3) {
+                debug!("  Result {}: id={}, similarity={:.4}, metadata_keys={:?}", 
+                    i+1, r.id, r.similarity, r.metadata.keys().collect::<Vec<_>>());
+            }
 
             // 3. 转换为 MemoryItem
             let memory_items: Vec<MemoryItem> = search_results
@@ -1533,6 +1539,12 @@ impl MemoryOrchestrator {
                     }
                 })
                 .collect();
+
+            info!("🔍 转换后 MemoryItems 数量: {}", memory_items.len());
+            for (i, item) in memory_items.iter().enumerate().take(3) {
+                debug!("  MemoryItem {}: id={}, content_len={}, score={:?}", 
+                    i+1, item.id, item.content.len(), item.score);
+            }
 
             Ok(memory_items)
         } else {
