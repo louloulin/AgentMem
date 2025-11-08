@@ -250,7 +250,7 @@ mod tests {
             user_id: Some("test_user".to_string()),
             memory_type: Some(MemoryType::Semantic),
             limit: Some(10),
-            threshold: Some(0.7),
+            threshold: Some(0.3),  // 🔧 降低阈值以支持商品ID等精确查询
         };
 
         assert!(request.validate().is_ok());

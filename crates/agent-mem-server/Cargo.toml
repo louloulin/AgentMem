@@ -72,6 +72,9 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Time handling
 chrono = { version = "0.4", features = ["serde"] }
 
+# Regular expressions
+regex = "1.10"
+
 # Validation
 validator = { version = "0.18", features = ["derive"] }
 

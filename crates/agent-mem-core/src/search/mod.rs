@@ -89,7 +89,7 @@ impl Default for SearchQuery {
         Self {
             query: String::new(),
             limit: 10,
-            threshold: Some(0.7),
+            threshold: Some(0.3),  // 🔧 降低阈值以支持商品ID等精确查询
             vector_weight: 0.7,
             fulltext_weight: 0.3,
             filters: None,
@@ -158,7 +158,7 @@ mod tests {
     fn test_search_query_default() {
         let query = SearchQuery::default();
         assert_eq!(query.limit, 10);
-        assert_eq!(query.threshold, Some(0.7));
+        assert_eq!(query.threshold, Some(0.3));  // 🔧 更新测试以匹配新的默认阈值
         assert_eq!(query.vector_weight, 0.7);
         assert_eq!(query.fulltext_weight, 0.3);
     }

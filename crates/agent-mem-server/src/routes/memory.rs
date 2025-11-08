@@ -402,15 +402,9 @@ impl MemoryManager {
             base_limit
         };
 
-        // 🔧 动态调整阈值：短查询用低阈值，长查询用高阈值
-        let query_len = query.len();
-        let dynamic_threshold = if query_len < 20 {
-            0.3  // 短查询（如商品ID）用低阈值
-        } else if query_len < 50 {
-            0.5  // 中等长度查询
-        } else {
-            0.7  // 长查询用高阈值
-        };
+        // 🔧 智能阈值调整：根据查询类型动态设置
+        let dynamic_threshold = get_adaptive_threshold(&query);
+        info!("📊 自适应阈值: query='{}', threshold={}", query, dynamic_threshold);
         
         let options = SearchOptions {
             user_id: user_id.clone(),
@@ -755,6 +749,54 @@ pub async fn delete_memory(
 /// 搜索记忆
 // ========== 混合检索辅助函数 ==========
 
+/// 智能阈值计算：根据查询类型动态调整阈值
+fn get_adaptive_threshold(query: &str) -> f32 {
+    use regex::Regex;
+    
+    // 检测商品ID格式: P + 6位数字
+    if let Ok(pattern) = Regex::new(r"^P\d{6}$") {
+        if pattern.is_match(query) {
+            return 0.1;  // 商品ID: 极低阈值，几乎只要匹配就返回
+        }
+    }
+    
+    // 检测UUID格式
+    if query.len() == 36 && query.matches('-').count() == 4 {
+        return 0.1;  // UUID: 极低阈值
+    }
+    
+    // 检测其他精确ID格式（全字母数字，无空格，长度< 20）
+    if query.len() < 20 
+        && !query.contains(' ') 
+        && query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return 0.2;  // 精确ID: 低阈值
+    }
+    
+    // 短查询（< 5字符）
+    if query.len() < 5 {
+        return 0.3;  // 短查询: 低阈值
+    }
+    
+    // 包含商品相关关键词
+    let lower_query = query.to_lowercase();
+    if lower_query.contains("商品") 
+        || lower_query.contains("订单") 
+        || lower_query.contains("id") 
+        || lower_query.contains("product") {
+        return 0.4;  // 商品相关: 中低阈值
+    }
+    
+    // 根据长度调整
+    let query_len = query.len();
+    if query_len < 20 {
+        0.3  // 短查询
+    } else if query_len < 50 {
+        0.5  // 中等长度查询
+    } else {
+        0.7  // 长查询用高阈值
+    }
+}
+
 /// 检测是否是精确查询（商品ID、SKU等）
 fn detect_exact_query(query: &str) -> bool {
     // 商品ID格式：P + 6位数字
@@ -770,41 +812,63 @@ fn detect_exact_query(query: &str) -> bool {
         && query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
-/// 通过LibSQL精确查询（商品ID等）
+/// 通过LibSQL精确查询（商品ID等）- 使用search方法，直接返回JSON
 async fn search_by_libsql_exact(
     repositories: &Arc<agent_mem_core::storage::factory::Repositories>,
     query: &str,
     limit: usize,
-) -> Result<Vec<agent_mem_core::traits::MemoryItem>, String> {
-    use agent_mem_core::storage::RepositoryExt;
-    use tracing::{error, info};
+) -> Result<Vec<serde_json::Value>, String> {
+    use tracing::{error, info, debug};
     
-    // 构建查询条件
-    let filters = vec![
-        format!("JSON_EXTRACT(metadata, '$.product_id') = '{}'", query),
-        format!("content LIKE '%{}%'", query),
-    ];
+    info!("🔍 LibSQL精确查询: query='{}', limit={}", query, limit);
     
-    let where_clause = filters.join(" OR ");
-    
-    // 执行查询
+    // 使用repositories.memories.search方法（支持content LIKE查询）
     match repositories.memories
-        .find_by_custom_filter(&where_clause, Some(limit as i64))
+        .search(query, limit as i64)
         .await
     {
-        Ok(memories) => {
-            info!("📝 LibSQL查询成功: 找到 {} 条记忆", memories.len());
-            Ok(memories)
+        Ok(memories) if !memories.is_empty() => {
+            info!("✅ LibSQL查询成功: 找到 {} 条记忆", memories.len());
+            for mem in &memories {
+                debug!("  - ID: {}, Content: {}...", mem.id, &mem.content[..50.min(mem.content.len())]);
+            }
+            
+            // 直接转换为JSON
+            let json_results: Vec<serde_json::Value> = memories
+                .into_iter()
+                .map(|m| {
+                    serde_json::json!({
+                        "id": m.id,
+                        "agent_id": m.agent_id,
+                        "user_id": m.user_id,
+                        "content": m.content,
+                        "memory_type": m.memory_type,
+                        "importance": m.importance,
+                        "created_at": m.created_at,
+                        "updated_at": m.updated_at,
+                        "access_count": m.access_count,
+                        "metadata": m.metadata,
+                        "hash": m.hash,
+                        "score": m.score.unwrap_or(1.0),
+                    })
+                })
+                .collect();
+            
+            Ok(json_results)
+        }
+        Ok(_) => {
+            info!("⚠️  LibSQL未找到结果: query='{}'", query);
+            Err(format!("未找到匹配的记忆: {}", query))
         }
         Err(e) => {
             error!("❌ LibSQL查询失败: {}", e);
-            Err(e.to_string())
+            Err(format!("LibSQL查询失败: {}", e))
         }
     }
 }
 
 /// 转换CoreMemoryItem为JSON
-fn convert_memory_to_json(item: agent_mem_core::traits::MemoryItem) -> serde_json::Value {
+fn convert_memory_to_json(item: agent_mem_traits::MemoryItem) -> serde_json::Value {
     serde_json::json!({
         "id": item.id,
         "agent_id": item.agent_id,
@@ -846,20 +910,11 @@ pub async fn search_memories(
         info!("🎯 检测到精确查询，使用LibSQL: {}", request.query);
         
         // 尝试LibSQL精确匹配
-        match search_by_libsql_exact(&repositories, &request.query, request.limit).await {
-            Ok(exact_results) if !exact_results.is_empty() => {
-                info!("✅ LibSQL精确匹配找到 {} 条结果", exact_results.len());
-                
-                let json_results: Vec<serde_json::Value> = exact_results
-                    .into_iter()
-                    .map(convert_memory_to_json)
-                    .collect();
-                
-                return Ok(Json(crate::models::ApiResponse {
-                    success: true,
-                    data: json_results,
-                    error: None,
-                }));
+        let limit = request.limit.unwrap_or(10);
+        match search_by_libsql_exact(&repositories, &request.query, limit).await {
+            Ok(json_results) if !json_results.is_empty() => {
+                info!("✅ LibSQL精确匹配找到 {} 条结果", json_results.len());
+                return Ok(Json(crate::models::ApiResponse::success(json_results)));
             }
             Ok(_) => {
                 info!("⚠️  LibSQL未找到结果，降级到向量搜索");

@@ -4,6 +4,7 @@
 
 use crate::{engine::MemoryEngine, Memory};
 use agent_mem_traits::{MemoryType, Result};
+use regex::Regex;
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -170,6 +171,53 @@ impl MemoryIntegrator {
             "🧠 Episodic-first检索 (理论指导): agent={}, user={:?}, session={:?}, target={}",
             agent_id, user_id, session_id, max_count
         );
+
+        // 🆕 特殊处理: 检测商品ID查询，优先查询Global Scope
+        let is_product_id = Regex::new(r"^P\d{6}$")
+            .unwrap()
+            .is_match(query);
+        
+        if is_product_id {
+            info!("🎯 检测到商品ID查询，优先查询Global Scope: {}", query);
+            
+            let global_scope = MemoryScope::Global;
+            match self
+                .memory_engine
+                .search_memories(query, Some(global_scope), Some(max_count * 2))
+                .await
+            {
+                Ok(memories) if !memories.is_empty() => {
+                    info!("✅ Global Memory (商品ID查询) 找到 {} 条记忆", memories.len());
+                    for mut memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            // 商品ID查询结果权重提升
+                            if let Some(score) = memory.score {
+                                memory.score = Some(score * 1.5);  // 提升权重
+                            }
+                            all_memories.push(memory);
+                        }
+                    }
+                    
+                    // 如果找到足够的结果，直接返回
+                    if all_memories.len() >= max_count {
+                        info!("✅ 商品ID查询完成，返回 {} 条结果", all_memories.len());
+                        all_memories.sort_by(|a, b| {
+                            b.score
+                                .unwrap_or(0.0)
+                                .partial_cmp(&a.score.unwrap_or(0.0))
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        return Ok(all_memories.into_iter().take(max_count).collect());
+                    }
+                }
+                Ok(_) => {
+                    warn!("⚠️  Global Memory查询返回0结果: query='{}'", query);
+                }
+                Err(e) => {
+                    warn!("⚠️  Global Memory查询失败: {}, 继续其他scope查询", e);
+                }
+            }
+        }
 
         // ========== Priority 1: Episodic Memory (Agent/User Scope) ==========
         // 理论依据: Atkinson-Shiffrin模型 - Long-term Memory是主要来源
