@@ -1317,11 +1317,321 @@ pub trait PipelineStage: Send + Sync {
     }
 }
 
-/// Pipeline构建器
+/// Pipeline构建器（线性执行）
 pub struct Pipeline<I, O> {
     name: String,
     stages: Vec<Box<dyn PipelineStage<Input = I, Output = O>>>,
     error_handler: Option<Box<dyn Fn(&str, &str) + Send + Sync>>,
+}
+
+// ========== 🆕 DAG Pipeline支持 ==========
+
+/// DAG节点（Stage包装器）
+pub struct DagNode<I, O> {
+    pub id: String,
+    pub stage: Box<dyn PipelineStage<Input = I, Output = O>>,
+    pub dependencies: Vec<String>, // 依赖的节点ID
+}
+
+/// 条件函数（用于分支决策）
+pub type ConditionFn = Box<dyn Fn(&PipelineContext) -> bool + Send + Sync>;
+
+/// DAG边（带条件）
+#[derive(Clone)]
+pub struct DagEdge {
+    pub from: String,
+    pub to: String,
+    pub condition: Option<String>, // context中的条件键
+}
+
+/// DAG Pipeline构建器
+pub struct DagPipeline<I, O> {
+    name: String,
+    nodes: HashMap<String, DagNode<I, O>>,
+    edges: Vec<DagEdge>,
+    conditions: HashMap<String, ConditionFn>,
+    entry_nodes: Vec<String>, // 入口节点（无依赖）
+    max_parallelism: usize,
+    error_handler: Option<std::sync::Arc<dyn Fn(&str, &str) + Send + Sync>>,
+}
+
+impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            nodes: HashMap::new(),
+            edges: vec![],
+            conditions: HashMap::new(),
+            entry_nodes: vec![],
+            max_parallelism: 10,
+            error_handler: None,
+        }
+    }
+    
+    /// 添加节点
+    pub fn add_node<S>(mut self, id: impl Into<String>, stage: S, dependencies: Vec<String>) -> Self
+    where
+        S: PipelineStage<Input = I, Output = O> + 'static,
+    {
+        let id = id.into();
+        let node = DagNode {
+            id: id.clone(),
+            stage: Box::new(stage),
+            dependencies: dependencies.clone(),
+        };
+        
+        self.nodes.insert(id.clone(), node);
+        
+        // 如果没有依赖，是入口节点
+        if dependencies.is_empty() {
+            self.entry_nodes.push(id);
+        }
+        
+        self
+    }
+    
+    /// 添加边（带条件）
+    pub fn add_edge(mut self, from: impl Into<String>, to: impl Into<String>, condition: Option<String>) -> Self {
+        self.edges.push(DagEdge {
+            from: from.into(),
+            to: to.into(),
+            condition,
+        });
+        self
+    }
+    
+    /// 添加条件函数
+    pub fn add_condition<F>(mut self, name: impl Into<String>, condition: F) -> Self
+    where
+        F: Fn(&PipelineContext) -> bool + Send + Sync + 'static,
+    {
+        self.conditions.insert(name.into(), Box::new(condition));
+        self
+    }
+    
+    /// 设置最大并行度
+    pub fn with_max_parallelism(mut self, max: usize) -> Self {
+        self.max_parallelism = max;
+        self
+    }
+    
+    pub fn with_error_handler<F>(mut self, handler: F) -> Self
+    where
+        F: Fn(&str, &str) + Send + Sync + 'static,
+    {
+        self.error_handler = Some(Box::new(handler));
+        self
+    }
+    
+    /// 执行DAG Pipeline
+    pub async fn execute(
+        &self,
+        input: I,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<HashMap<String, O>> {
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+        
+        // 拓扑排序，检测循环依赖
+        let execution_order = self.topological_sort()?;
+        
+        // 存储每个节点的执行结果
+        let results: Arc<Mutex<HashMap<String, O>>> = Arc::new(Mutex::new(HashMap::new()));
+        let context_shared = Arc::new(Mutex::new(context.clone()));
+        
+        // 按层级执行（同层级可以并行）
+        for level in execution_order {
+            let mut handles = vec![];
+            
+            for node_id in level {
+                let node = self.nodes.get(&node_id).ok_or_else(|| {
+                    anyhow::anyhow!("Node '{}' not found", node_id)
+                })?;
+                
+                // 检查边条件
+                let should_execute = self.check_edge_conditions(&node_id, &context_shared).await?;
+                if !should_execute {
+                    continue;
+                }
+                
+                let input_clone = input.clone();
+                let results_clone = results.clone();
+                let context_clone = context_shared.clone();
+                let node_name = node.stage.name().to_string();
+                let error_handler = self.error_handler.clone();
+                
+                // 执行节点（并行）
+                let handle = tokio::spawn(async move {
+                    let mut ctx = context_clone.lock().await;
+                    
+                    match node.stage.execute(input_clone, &mut *ctx).await {
+                        Ok(StageResult::Continue(output)) => {
+                            results_clone.lock().await.insert(node_id.clone(), output);
+                            Ok(())
+                        }
+                        Ok(StageResult::Skip(output)) => {
+                            results_clone.lock().await.insert(node_id.clone(), output);
+                            Ok(())
+                        }
+                        Ok(StageResult::Abort(reason)) => {
+                            if let Some(ref handler) = error_handler {
+                                handler(&node_name, &reason);
+                            }
+                            Err(anyhow::anyhow!("Node '{}' aborted: {}", node_id, reason))
+                        }
+                        Err(e) => {
+                            if node.stage.is_optional() {
+                                if let Some(ref handler) = error_handler {
+                                    handler(&node_name, &e.to_string());
+                                }
+                                Ok(())
+                            } else {
+                                Err(anyhow::anyhow!("Node '{}' failed: {}", node_id, e))
+                            }
+                        }
+                    }
+                });
+                
+                handles.push(handle);
+                
+                // 控制并行度
+                if handles.len() >= self.max_parallelism {
+                    for handle in handles.drain(..) {
+                        handle.await??;
+                    }
+                }
+            }
+            
+            // 等待当前层级所有任务完成
+            for handle in handles {
+                handle.await??;
+            }
+        }
+        
+        // 更新context
+        *context = context_shared.lock().await.clone();
+        
+        let final_results = results.lock().await.clone();
+        Ok(final_results)
+    }
+    
+    /// 拓扑排序（Kahn算法）
+    fn topological_sort(&self) -> anyhow::Result<Vec<Vec<String>>> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+        
+        // 计算每个节点的入度
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+        
+        for node_id in self.nodes.keys() {
+            in_degree.insert(node_id.clone(), 0);
+            adjacency.insert(node_id.clone(), vec![]);
+        }
+        
+        // 构建邻接表和入度
+        for edge in &self.edges {
+            if let Some(degree) = in_degree.get_mut(&edge.to) {
+                *degree += 1;
+            }
+            adjacency.entry(edge.from.clone())
+                .or_insert_with(Vec::new)
+                .push(edge.to.clone());
+        }
+        
+        // 也从节点的dependencies构建
+        for (node_id, node) in &self.nodes {
+            for dep in &node.dependencies {
+                if let Some(degree) = in_degree.get_mut(node_id) {
+                    *degree += 1;
+                }
+                adjacency.entry(dep.clone())
+                    .or_insert_with(Vec::new)
+                    .push(node_id.clone());
+            }
+        }
+        
+        // Kahn算法
+        let mut queue: VecDeque<String> = in_degree.iter()
+            .filter(|(_, &degree)| degree == 0)
+            .map(|(id, _)| id.clone())
+            .collect();
+        
+        let mut result: Vec<Vec<String>> = vec![];
+        let mut visited = HashSet::new();
+        
+        while !queue.is_empty() {
+            let level_size = queue.len();
+            let mut current_level = vec![];
+            
+            for _ in 0..level_size {
+                if let Some(node_id) = queue.pop_front() {
+                    if visited.contains(&node_id) {
+                        continue;
+                    }
+                    
+                    visited.insert(node_id.clone());
+                    current_level.push(node_id.clone());
+                    
+                    // 减少后继节点的入度
+                    if let Some(neighbors) = adjacency.get(&node_id) {
+                        for neighbor in neighbors {
+                            if let Some(degree) = in_degree.get_mut(neighbor) {
+                                *degree -= 1;
+                                if *degree == 0 {
+                                    queue.push_back(neighbor.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if !current_level.is_empty() {
+                result.push(current_level);
+            }
+        }
+        
+        // 检测循环依赖
+        if visited.len() != self.nodes.len() {
+            return Err(anyhow::anyhow!(
+                "Cycle detected in DAG: visited {} nodes, expected {}",
+                visited.len(),
+                self.nodes.len()
+            ));
+        }
+        
+        Ok(result)
+    }
+    
+    /// 检查边条件
+    async fn check_edge_conditions(
+        &self,
+        node_id: &str,
+        context: &std::sync::Arc<tokio::sync::Mutex<PipelineContext>>,
+    ) -> anyhow::Result<bool> {
+        // 找到所有指向该节点的边
+        let incoming_edges: Vec<&DagEdge> = self.edges.iter()
+            .filter(|e| e.to == node_id)
+            .collect();
+        
+        if incoming_edges.is_empty() {
+            return Ok(true); // 无入边，直接执行
+        }
+        
+        // 检查所有入边的条件
+        let ctx = context.lock().await;
+        for edge in incoming_edges {
+            if let Some(ref condition_name) = edge.condition {
+                if let Some(condition_fn) = self.conditions.get(condition_name) {
+                    if !condition_fn(&*ctx) {
+                        return Ok(false); // 条件不满足
+                    }
+                }
+            }
+        }
+        
+        Ok(true)
+    }
 }
 
 impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
@@ -2361,5 +2671,181 @@ mod tests {
             }
             _ => panic!("Expected Session scope"),
         }
+    }
+    
+    // ========== DAG Pipeline测试 ==========
+    
+    // 简单的测试Stage
+    struct TestStage {
+        name: String,
+        delay_ms: u64,
+    }
+    
+    impl TestStage {
+        fn new(name: impl Into<String>, delay_ms: u64) -> Self {
+            Self {
+                name: name.into(),
+                delay_ms,
+            }
+        }
+    }
+    
+    #[async_trait::async_trait]
+    impl PipelineStage for TestStage {
+        type Input = i32;
+        type Output = i32;
+        
+        fn name(&self) -> &str {
+            &self.name
+        }
+        
+        async fn execute(
+            &self,
+            input: Self::Input,
+            context: &mut PipelineContext,
+        ) -> anyhow::Result<StageResult<Self::Output>> {
+            tokio::time::sleep(tokio::time::Duration::from_millis(self.delay_ms)).await;
+            let _ = context.set(format!("{}_executed", self.name), true);
+            Ok(StageResult::Continue(input + 1))
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_linear() {
+        // 线性DAG: A -> B -> C
+        let dag = DagPipeline::new("test_linear")
+            .add_node("A", TestStage::new("A", 10), vec![])
+            .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
+            .add_node("C", TestStage::new("C", 10), vec!["B".to_string()]);
+        
+        let mut ctx = PipelineContext::new();
+        let results = dag.execute(0, &mut ctx).await.unwrap();
+        
+        assert_eq!(results.len(), 3);
+        assert_eq!(results.get("A"), Some(&1));
+        assert_eq!(results.get("B"), Some(&1));
+        assert_eq!(results.get("C"), Some(&1));
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_parallel() {
+        // 并行DAG: A, B, C (无依赖)
+        let dag = DagPipeline::new("test_parallel")
+            .add_node("A", TestStage::new("A", 50), vec![])
+            .add_node("B", TestStage::new("B", 50), vec![])
+            .add_node("C", TestStage::new("C", 50), vec![]);
+        
+        let start = std::time::Instant::now();
+        let mut ctx = PipelineContext::new();
+        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let elapsed = start.elapsed().as_millis();
+        
+        assert_eq!(results.len(), 3);
+        // 并行执行应该快于串行
+        assert!(elapsed < 150, "Parallel execution took {}ms, expected < 150ms", elapsed);
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_diamond() {
+        // 菱形DAG: A -> B,C -> D
+        let dag = DagPipeline::new("test_diamond")
+            .add_node("A", TestStage::new("A", 10), vec![])
+            .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
+            .add_node("C", TestStage::new("C", 10), vec!["A".to_string()])
+            .add_node("D", TestStage::new("D", 10), vec!["B".to_string(), "C".to_string()]);
+        
+        let mut ctx = PipelineContext::new();
+        let results = dag.execute(0, &mut ctx).await.unwrap();
+        
+        assert_eq!(results.len(), 4);
+        assert!(ctx.get::<bool>("A_executed").unwrap_or(false));
+        assert!(ctx.get::<bool>("B_executed").unwrap_or(false));
+        assert!(ctx.get::<bool>("C_executed").unwrap_or(false));
+        assert!(ctx.get::<bool>("D_executed").unwrap_or(false));
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_conditional() {
+        // 条件分支: A -> B (if true) or C (if false)
+        struct ConditionalStage;
+        
+        #[async_trait::async_trait]
+        impl PipelineStage for ConditionalStage {
+            type Input = i32;
+            type Output = i32;
+            
+            fn name(&self) -> &str {
+                "Conditional"
+            }
+            
+            async fn execute(
+                &self,
+                input: Self::Input,
+                context: &mut PipelineContext,
+            ) -> anyhow::Result<StageResult<Self::Output>> {
+                let _ = context.set("condition_value", input > 5);
+                Ok(StageResult::Continue(input))
+            }
+        }
+        
+        let dag = DagPipeline::new("test_conditional")
+            .add_node("A", ConditionalStage, vec![])
+            .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
+            .add_node("C", TestStage::new("C", 10), vec!["A".to_string()])
+            .add_condition("is_high", |ctx| {
+                ctx.get::<bool>("condition_value").unwrap_or(false)
+            })
+            .add_condition("is_low", |ctx| {
+                !ctx.get::<bool>("condition_value").unwrap_or(true)
+            })
+            .add_edge("A", "B", Some("is_high".to_string()))
+            .add_edge("A", "C", Some("is_low".to_string()));
+        
+        // Test with high value (should execute B)
+        let mut ctx1 = PipelineContext::new();
+        let results1 = dag.execute(10, &mut ctx1).await.unwrap();
+        assert!(results1.contains_key("B"));
+        assert!(!results1.contains_key("C"));
+        
+        // Test with low value (should execute C)
+        let mut ctx2 = PipelineContext::new();
+        let results2 = dag.execute(3, &mut ctx2).await.unwrap();
+        assert!(!results2.contains_key("B"));
+        assert!(results2.contains_key("C"));
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_cycle_detection() {
+        // 创建循环依赖: A -> B -> C -> A
+        let dag = DagPipeline::new("test_cycle")
+            .add_node("A", TestStage::new("A", 10), vec!["C".to_string()])
+            .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
+            .add_node("C", TestStage::new("C", 10), vec!["B".to_string()]);
+        
+        let mut ctx = PipelineContext::new();
+        let result = dag.execute(0, &mut ctx).await;
+        
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Cycle detected"));
+    }
+    
+    #[tokio::test]
+    async fn test_dag_pipeline_max_parallelism() {
+        // 测试并行度控制
+        let dag = DagPipeline::new("test_parallelism")
+            .add_node("A", TestStage::new("A", 100), vec![])
+            .add_node("B", TestStage::new("B", 100), vec![])
+            .add_node("C", TestStage::new("C", 100), vec![])
+            .add_node("D", TestStage::new("D", 100), vec![])
+            .with_max_parallelism(2); // 最多同时执行2个
+        
+        let start = std::time::Instant::now();
+        let mut ctx = PipelineContext::new();
+        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let elapsed = start.elapsed().as_millis();
+        
+        assert_eq!(results.len(), 4);
+        // 4个任务，并行度2，每批100ms，应该 >= 200ms
+        assert!(elapsed >= 180, "Execution took {}ms, expected >= 180ms", elapsed);
     }
 }
