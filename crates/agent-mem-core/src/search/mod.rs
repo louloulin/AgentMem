@@ -15,6 +15,8 @@ pub mod adaptive_threshold;
 pub mod adaptive_router;
 /// Week 5-6: Adaptive search engine (complete integration)
 pub mod adaptive_search_engine;
+/// Week 7-8: Cached adaptive engine with parallel search
+pub mod cached_adaptive_engine;
 pub mod bm25;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
