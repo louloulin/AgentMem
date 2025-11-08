@@ -236,6 +236,28 @@ impl AttributeKey {
     pub fn legacy(name: impl Into<String>) -> Self {
         Self::new("legacy", name)
     }
+    
+    // ========== 🆕 标准Scope属性键（替代MemoryScope enum） ==========
+    
+    /// 是否为全局scope (system::scope_global = true)
+    pub fn scope_global() -> Self {
+        Self::system("scope_global")
+    }
+    
+    /// Agent ID (system::agent_id)
+    pub fn agent_id() -> Self {
+        Self::system("agent_id")
+    }
+    
+    /// User ID (system::user_id)
+    pub fn user_id() -> Self {
+        Self::system("user_id")
+    }
+    
+    /// Session ID (system::session_id)
+    pub fn session_id() -> Self {
+        Self::system("session_id")
+    }
 }
 
 /// 属性值（类型安全）
@@ -395,7 +417,11 @@ impl AttributeSet {
     pub fn query(&self, pattern: &AttributePattern) -> Vec<(&AttributeKey, &AttributeValue)> {
         match pattern {
             AttributePattern::Exact { key } => {
-                self.get(key).map(|v| vec![(key, v)]).unwrap_or_default()
+                if let Some(value) = self.get(key) {
+                    vec![(key, value)]
+                } else {
+                    vec![]
+                }
             }
             AttributePattern::Prefix { namespace, prefix } => {
                 self.attributes.iter()
@@ -412,11 +438,14 @@ impl AttributeSet {
                 }
             }
             AttributePattern::Range { key, min, max } => {
-                self.get(key)
-                    .and_then(|v| v.as_number())
-                    .filter(|&n| n >= *min && n <= *max)
-                    .map(|_| vec![(key, self.get(key).unwrap())])
-                    .unwrap_or_default()
+                if let Some(value) = self.get(key) {
+                    if let Some(n) = value.as_number() {
+                        if n >= *min && n <= *max {
+                            return vec![(key, value)];
+                        }
+                    }
+                }
+                vec![]
             }
         }
     }
@@ -427,11 +456,176 @@ impl AttributeSet {
             .filter(|(k, _)| k.namespace == namespace)
             .collect()
     }
+    
+    // ========== 🆕 Scope辅助方法（替代MemoryScope） ==========
+    
+    /// 设置为全局scope
+    pub fn set_global_scope(&mut self) {
+        self.set(AttributeKey::scope_global(), AttributeValue::Boolean(true));
+    }
+    
+    /// 设置Agent scope
+    pub fn set_agent_scope(&mut self, agent_id: impl Into<String>) {
+        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
+    }
+    
+    /// 设置User scope
+    pub fn set_user_scope(&mut self, agent_id: impl Into<String>, user_id: impl Into<String>) {
+        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
+        self.set(AttributeKey::user_id(), AttributeValue::String(user_id.into()));
+    }
+    
+    /// 设置Session scope
+    pub fn set_session_scope(
+        &mut self,
+        agent_id: impl Into<String>,
+        user_id: impl Into<String>,
+        session_id: impl Into<String>,
+    ) {
+        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
+        self.set(AttributeKey::user_id(), AttributeValue::String(user_id.into()));
+        self.set(AttributeKey::session_id(), AttributeValue::String(session_id.into()));
+    }
+    
+    /// 判断是否为全局scope
+    pub fn is_global_scope(&self) -> bool {
+        self.get(&AttributeKey::scope_global())
+            .and_then(|v| v.as_boolean())
+            .unwrap_or(false)
+    }
+    
+    /// 获取Agent ID
+    pub fn get_agent_id(&self) -> Option<String> {
+        self.get(&AttributeKey::agent_id())
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
+    }
+    
+    /// 获取User ID
+    pub fn get_user_id(&self) -> Option<String> {
+        self.get(&AttributeKey::user_id())
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
+    }
+    
+    /// 获取Session ID
+    pub fn get_session_id(&self) -> Option<String> {
+        self.get(&AttributeKey::session_id())
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
+    }
+    
+    /// 推断scope层级（0=Global, 1=Agent, 2=User, 3=Session）
+    pub fn infer_scope_level(&self) -> u8 {
+        if self.is_global_scope() {
+            return 0;
+        }
+        
+        let has_agent = self.get_agent_id().is_some();
+        let has_user = self.get_user_id().is_some();
+        let has_session = self.get_session_id().is_some();
+        
+        match (has_agent, has_user, has_session) {
+            (false, false, false) => 0, // 默认Global
+            (true, false, false) => 1,  // Agent
+            (true, true, false) => 2,   // User
+            (true, true, true) => 3,    // Session
+            _ => 0,                     // 其他情况默认Global
+        }
+    }
+    
+    /// 检查是否可以访问另一个AttributeSet的scope
+    pub fn can_access(&self, other: &AttributeSet) -> bool {
+        let self_level = self.infer_scope_level();
+        let other_level = other.infer_scope_level();
+        
+        // 更高权限可以访问更低权限
+        if self_level < other_level {
+            return true;
+        }
+        
+        // 同级别需要匹配ID
+        if self_level == other_level {
+            match self_level {
+                0 => true, // Global总是可以访问Global
+                1 => self.get_agent_id() == other.get_agent_id(),
+                2 => {
+                    self.get_agent_id() == other.get_agent_id()
+                        && self.get_user_id() == other.get_user_id()
+                }
+                3 => {
+                    self.get_agent_id() == other.get_agent_id()
+                        && self.get_user_id() == other.get_user_id()
+                        && self.get_session_id() == other.get_session_id()
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
 }
 
 impl Default for AttributeSet {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ========== 🆕 从MemoryScope转换（向后兼容） ==========
+
+use crate::hierarchy::MemoryScope;
+
+impl From<MemoryScope> for AttributeSet {
+    fn from(scope: MemoryScope) -> Self {
+        let mut attrs = AttributeSet::new();
+        
+        match scope {
+            MemoryScope::Global => {
+                attrs.set_global_scope();
+            }
+            MemoryScope::Agent(agent_id) => {
+                attrs.set_agent_scope(agent_id);
+            }
+            MemoryScope::User { agent_id, user_id } => {
+                attrs.set_user_scope(agent_id, user_id);
+            }
+            MemoryScope::Session {
+                agent_id,
+                user_id,
+                session_id,
+            } => {
+                attrs.set_session_scope(agent_id, user_id, session_id);
+            }
+        }
+        
+        attrs
+    }
+}
+
+impl From<&AttributeSet> for MemoryScope {
+    fn from(attrs: &AttributeSet) -> Self {
+        if attrs.is_global_scope() {
+            return MemoryScope::Global;
+        }
+        
+        let agent_id = attrs.get_agent_id();
+        let user_id = attrs.get_user_id();
+        let session_id = attrs.get_session_id();
+        
+        match (agent_id, user_id, session_id) {
+            (Some(aid), Some(uid), Some(sid)) => MemoryScope::Session {
+                agent_id: aid,
+                user_id: uid,
+                session_id: sid,
+            },
+            (Some(aid), Some(uid), None) => MemoryScope::User {
+                agent_id: aid,
+                user_id: uid,
+            },
+            (Some(aid), None, None) => MemoryScope::Agent(aid),
+            _ => MemoryScope::Global,
+        }
     }
 }
 
@@ -705,6 +899,501 @@ impl From<&str> for Content {
 impl From<AttributeKey> for String {
     fn from(key: AttributeKey) -> Self {
         format!("{}::{}", key.namespace, key.name)
+    }
+}
+
+// ========== 🆕 V4.0 Query抽象 ==========
+
+/// 查询意图（自动推断）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum QueryIntent {
+    /// ID查询（精确匹配）
+    Lookup { entity_id: String },
+    /// 语义搜索
+    SemanticSearch {
+        text: String,
+        semantic_vector: Option<Vec<f32>>,
+    },
+    /// 关系查询
+    RelationQuery {
+        source: String,
+        relation: String,
+    },
+    /// 聚合查询
+    Aggregation {
+        operation: AggregationOp,
+    },
+}
+
+/// 聚合操作
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AggregationOp {
+    Count,
+    Sum(String),
+    Average(String),
+    Max(String),
+    Min(String),
+}
+
+/// 查询约束（硬性条件，必须满足）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Constraint {
+    /// 属性匹配
+    AttributeMatch {
+        key: AttributeKey,
+        operator: ComparisonOperator,
+        value: AttributeValue,
+    },
+    /// 属性范围
+    AttributeRange {
+        key: AttributeKey,
+        min: f64,
+        max: f64,
+    },
+    /// 时间范围
+    TimeRange {
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    },
+    /// 关系约束
+    RelationConstraint {
+        relation_type: String,
+        target: Option<String>,
+    },
+    /// 结果数量限制
+    Limit(usize),
+    /// 最小分数
+    MinScore(f32),
+    /// 逻辑组合
+    And(Vec<Constraint>),
+    Or(Vec<Constraint>),
+    Not(Box<Constraint>),
+}
+
+/// 比较操作符
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComparisonOperator {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    Contains,
+    StartsWith,
+    EndsWith,
+    Matches, // Regex
+}
+
+/// 查询偏好（软性要求，影响排序）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Preference {
+    pub preference_type: PreferenceType,
+    pub weight: f32,
+}
+
+/// 偏好类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PreferenceType {
+    /// 时间偏好（新鲜度）
+    Temporal(TemporalPreference),
+    /// 相关性偏好
+    Relevance(RelevancePreference),
+    /// 多样性偏好
+    Diversity(DiversityPreference),
+    /// 重要性偏好
+    Importance { min_importance: f32 },
+}
+
+/// 时间偏好
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TemporalPreference {
+    /// 偏好最近的记忆
+    Recent { within_days: u32 },
+    /// 偏好特定时间段
+    TimeWindow { start: DateTime<Utc>, end: DateTime<Utc> },
+    /// 偏好访问频繁的
+    FrequentlyAccessed,
+}
+
+/// 相关性偏好
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RelevancePreference {
+    /// 语义相关性
+    Semantic { threshold: f32 },
+    /// 关系相关性
+    Relational { max_hops: usize },
+}
+
+/// 多样性偏好
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DiversityPreference {
+    /// 类型多样性
+    TypeDiversity,
+    /// 来源多样性
+    SourceDiversity,
+    /// 最大最小相关性
+    MaxMarginalRelevance { lambda: f32 },
+}
+
+/// 查询上下文
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct QueryContext {
+    /// 当前会话信息
+    pub session_info: Option<HashMap<String, String>>,
+    /// 用户上下文
+    pub user_context: Option<HashMap<String, String>>,
+    /// 历史查询
+    pub query_history: Vec<String>,
+    /// 额外元数据
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// 🆕 V4.0 Query结构（完全抽象化）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Query {
+    /// 查询ID
+    pub id: String,
+    /// 查询意图
+    pub intent: QueryIntent,
+    /// 约束条件（必须满足）
+    pub constraints: Vec<Constraint>,
+    /// 偏好（影响排序）
+    pub preferences: Vec<Preference>,
+    /// 查询上下文
+    pub context: QueryContext,
+}
+
+impl Query {
+    /// 创建构建器
+    pub fn builder() -> QueryBuilder {
+        QueryBuilder::new()
+    }
+    
+    /// 从字符串自动构建Query（智能推断）
+    pub fn from_string(s: &str) -> Self {
+        let features = QueryFeatures::extract(s);
+        
+        Query {
+            id: Uuid::new_v4().to_string(),
+            intent: features.infer_intent(s),
+            constraints: features.extract_constraints(),
+            preferences: vec![],
+            context: QueryContext::default(),
+        }
+    }
+}
+
+/// 查询特征提取
+struct QueryFeatures {
+    has_id_pattern: bool,
+    has_attribute_filter: bool,
+    has_relation_query: bool,
+    complexity: QueryComplexity,
+}
+
+#[derive(Debug, Clone)]
+enum QueryComplexity {
+    Simple,   // 单一条件
+    Medium,   // 2-3个条件
+    Complex,  // 4+个条件
+}
+
+impl QueryFeatures {
+    fn extract(s: &str) -> Self {
+        let has_id_pattern = Regex::new(r"[A-Z]\d{6}").unwrap().is_match(s);
+        let has_attribute_filter = s.contains("::");
+        let has_relation_query = s.contains("->");
+        
+        let word_count = s.split_whitespace().count();
+        let complexity = if word_count <= 3 {
+            QueryComplexity::Simple
+        } else if word_count <= 10 {
+            QueryComplexity::Medium
+        } else {
+            QueryComplexity::Complex
+        };
+        
+        Self {
+            has_id_pattern,
+            has_attribute_filter,
+            has_relation_query,
+            complexity,
+        }
+    }
+    
+    fn infer_intent(&self, s: &str) -> QueryIntent {
+        if self.has_id_pattern {
+            // Extract ID pattern
+            if let Some(captures) = Regex::new(r"([A-Z]\d{6})").unwrap().captures(s) {
+                return QueryIntent::Lookup {
+                    entity_id: captures.get(1).unwrap().as_str().to_string(),
+                };
+            }
+        }
+        
+        if self.has_relation_query {
+            let parts: Vec<&str> = s.split("->").collect();
+            if parts.len() == 2 {
+                return QueryIntent::RelationQuery {
+                    source: parts[0].trim().to_string(),
+                    relation: parts[1].trim().to_string(),
+                };
+            }
+        }
+        
+        // Default: Semantic search
+        QueryIntent::SemanticSearch {
+            text: s.to_string(),
+            semantic_vector: None,
+        }
+    }
+    
+    fn extract_constraints(&self) -> Vec<Constraint> {
+        let mut constraints = vec![];
+        
+        // Default limit
+        constraints.push(Constraint::Limit(100));
+        
+        constraints
+    }
+}
+
+/// Query构建器
+pub struct QueryBuilder {
+    intent: Option<QueryIntent>,
+    constraints: Vec<Constraint>,
+    preferences: Vec<Preference>,
+    context: QueryContext,
+}
+
+impl QueryBuilder {
+    pub fn new() -> Self {
+        Self {
+            intent: None,
+            constraints: vec![],
+            preferences: vec![],
+            context: QueryContext::default(),
+        }
+    }
+    
+    /// 设置文本查询
+    pub fn text(mut self, text: impl Into<String>) -> Self {
+        self.intent = Some(QueryIntent::SemanticSearch {
+            text: text.into(),
+            semantic_vector: None,
+        });
+        self
+    }
+    
+    /// 设置ID查询
+    pub fn lookup(mut self, entity_id: impl Into<String>) -> Self {
+        self.intent = Some(QueryIntent::Lookup {
+            entity_id: entity_id.into(),
+        });
+        self
+    }
+    
+    /// 添加属性约束
+    pub fn with_attribute(
+        mut self,
+        key: AttributeKey,
+        operator: ComparisonOperator,
+        value: AttributeValue,
+    ) -> Self {
+        self.constraints.push(Constraint::AttributeMatch {
+            key,
+            operator,
+            value,
+        });
+        self
+    }
+    
+    /// 添加时间范围约束
+    pub fn with_time_range(mut self, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
+        self.constraints.push(Constraint::TimeRange { start, end });
+        self
+    }
+    
+    /// 设置结果限制
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.constraints.push(Constraint::Limit(limit));
+        self
+    }
+    
+    /// 添加偏好
+    pub fn prefer(mut self, preference_type: PreferenceType, weight: f32) -> Self {
+        self.preferences.push(Preference {
+            preference_type,
+            weight,
+        });
+        self
+    }
+    
+    /// 构建Query
+    pub fn build(self) -> Query {
+        Query {
+            id: Uuid::new_v4().to_string(),
+            intent: self.intent.expect("intent is required"),
+            constraints: self.constraints,
+            preferences: self.preferences,
+            context: self.context,
+        }
+    }
+}
+
+impl Default for QueryBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ========== 🆕 V4.0 Pipeline框架 ==========
+
+/// Pipeline上下文（在各stage间传递）
+#[derive(Debug, Clone, Default)]
+pub struct PipelineContext {
+    /// 键值对存储
+    data: HashMap<String, serde_json::Value>,
+}
+
+impl PipelineContext {
+    pub fn new() -> Self {
+        Self {
+            data: HashMap::new(),
+        }
+    }
+    
+    pub fn set(&mut self, key: impl Into<String>, value: impl Serialize) -> std::result::Result<(), serde_json::Error> {
+        let json_value = serde_json::to_value(value)?;
+        self.data.insert(key.into(), json_value);
+        Ok(())
+    }
+    
+    pub fn get<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
+        self.data.get(key)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+    
+    pub fn contains(&self, key: &str) -> bool {
+        self.data.contains_key(key)
+    }
+    
+    pub fn remove(&mut self, key: &str) -> Option<serde_json::Value> {
+        self.data.remove(key)
+    }
+}
+
+/// Pipeline Stage结果
+#[derive(Debug)]
+pub enum StageResult<T> {
+    /// 成功，继续下一个stage
+    Continue(T),
+    /// 成功，跳过后续stage
+    Skip(T),
+    /// 失败，中止pipeline
+    Abort(String),
+}
+
+/// Pipeline Stage trait
+#[async_trait::async_trait]
+pub trait PipelineStage: Send + Sync {
+    type Input: Send;
+    type Output: Send;
+    
+    /// Stage名称
+    fn name(&self) -> &str;
+    
+    /// 执行stage
+    async fn execute(
+        &self,
+        input: Self::Input,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<StageResult<Self::Output>>;
+    
+    /// 是否可选（可选stage失败不会中止pipeline）
+    fn is_optional(&self) -> bool {
+        false
+    }
+}
+
+/// Pipeline构建器
+pub struct Pipeline<I, O> {
+    name: String,
+    stages: Vec<Box<dyn PipelineStage<Input = I, Output = O>>>,
+    error_handler: Option<Box<dyn Fn(&str, &str) + Send + Sync>>,
+}
+
+impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            stages: vec![],
+            error_handler: None,
+        }
+    }
+    
+    pub fn add_stage<S>(mut self, stage: S) -> Self
+    where
+        S: PipelineStage<Input = I, Output = O> + 'static,
+    {
+        self.stages.push(Box::new(stage));
+        self
+    }
+    
+    pub fn with_error_handler<F>(mut self, handler: F) -> Self
+    where
+        F: Fn(&str, &str) + Send + Sync + 'static,
+    {
+        self.error_handler = Some(Box::new(handler));
+        self
+    }
+    
+    pub async fn execute(
+        &self,
+        mut input: I,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<O>
+    where
+        I: Clone,
+        O: Clone,
+    {
+        let mut current_output: Option<O> = None;
+        
+        for stage in &self.stages {
+            let stage_name = stage.name();
+            
+            match stage.execute(input.clone(), context).await {
+                Ok(StageResult::Continue(output)) => {
+                    current_output = Some(output.clone());
+                    // If there's a next stage that expects the output as input,
+                    // we need type conversion here (simplified for now)
+                }
+                Ok(StageResult::Skip(output)) => {
+                    current_output = Some(output);
+                    break;
+                }
+                Ok(StageResult::Abort(reason)) => {
+                    if let Some(ref handler) = self.error_handler {
+                        handler(stage_name, &reason);
+                    }
+                    return Err(anyhow::anyhow!("Pipeline aborted at stage '{}': {}", stage_name, reason));
+                }
+                Err(e) => {
+                    if stage.is_optional() {
+                        if let Some(ref handler) = self.error_handler {
+                            handler(stage_name, &e.to_string());
+                        }
+                        continue;
+                    } else {
+                        return Err(anyhow::anyhow!("Pipeline failed at stage '{}': {}", stage_name, e));
+                    }
+                }
+            }
+        }
+        
+        current_output
+            .ok_or_else(|| anyhow::anyhow!("Pipeline completed but no output was produced"))
     }
 }
 
@@ -1483,5 +2172,194 @@ mod tests {
             0.6,
         );
         assert_eq!(contextual_memory.memory_type, MemoryType::Contextual);
+    }
+    
+    // ========== Query抽象测试 ==========
+    
+    #[test]
+    fn test_query_builder_basic() {
+        let query = Query::builder()
+            .text("测试查询")
+            .limit(10)
+            .build();
+        
+        assert!(!query.id.is_empty());
+        assert!(matches!(query.intent, QueryIntent::SemanticSearch { .. }));
+        assert_eq!(query.constraints.len(), 1);
+    }
+    
+    #[test]
+    fn test_query_from_string_id_pattern() {
+        let query = Query::from_string("P000257商品详情");
+        
+        if let QueryIntent::Lookup { entity_id } = query.intent {
+            assert_eq!(entity_id, "P000257");
+        } else {
+            panic!("Expected Lookup intent");
+        }
+    }
+    
+    #[test]
+    fn test_query_from_string_semantic() {
+        let query = Query::from_string("查询所有电子产品");
+        
+        if let QueryIntent::SemanticSearch { text, .. } = query.intent {
+            assert_eq!(text, "查询所有电子产品");
+        } else {
+            panic!("Expected SemanticSearch intent");
+        }
+    }
+    
+    #[test]
+    fn test_query_builder_with_constraints() {
+        let query = Query::builder()
+            .text("测试")
+            .with_attribute(
+                AttributeKey::domain("product_id"),
+                ComparisonOperator::Equal,
+                AttributeValue::String("P000257".to_string()),
+            )
+            .limit(5)
+            .build();
+        
+        assert_eq!(query.constraints.len(), 2); // attribute + limit
+    }
+    
+    #[test]
+    fn test_query_builder_with_preferences() {
+        let query = Query::builder()
+            .text("测试")
+            .prefer(
+                PreferenceType::Temporal(TemporalPreference::Recent { within_days: 7 }),
+                0.8,
+            )
+            .prefer(
+                PreferenceType::Importance { min_importance: 0.5 },
+                0.6,
+            )
+            .build();
+        
+        assert_eq!(query.preferences.len(), 2);
+        assert_eq!(query.preferences[0].weight, 0.8);
+        assert_eq!(query.preferences[1].weight, 0.6);
+    }
+    
+    #[test]
+    fn test_constraint_logic() {
+        let constraint = Constraint::And(vec![
+            Constraint::AttributeMatch {
+                key: AttributeKey::domain("category"),
+                operator: ComparisonOperator::Equal,
+                value: AttributeValue::String("电子产品".to_string()),
+            },
+            Constraint::MinScore(0.7),
+        ]);
+        
+        match constraint {
+            Constraint::And(inner) => assert_eq!(inner.len(), 2),
+            _ => panic!("Expected And constraint"),
+        }
+    }
+    
+    // ========== Scope消除测试（AttributeSet替代MemoryScope） ==========
+    
+    #[test]
+    fn test_attributeset_global_scope() {
+        let mut attrs = AttributeSet::new();
+        attrs.set_global_scope();
+        
+        assert!(attrs.is_global_scope());
+        assert_eq!(attrs.infer_scope_level(), 0);
+    }
+    
+    #[test]
+    fn test_attributeset_agent_scope() {
+        let mut attrs = AttributeSet::new();
+        attrs.set_agent_scope("agent-123");
+        
+        assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
+        assert_eq!(attrs.infer_scope_level(), 1);
+    }
+    
+    #[test]
+    fn test_attributeset_user_scope() {
+        let mut attrs = AttributeSet::new();
+        attrs.set_user_scope("agent-123", "user-456");
+        
+        assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
+        assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
+        assert_eq!(attrs.infer_scope_level(), 2);
+    }
+    
+    #[test]
+    fn test_attributeset_session_scope() {
+        let mut attrs = AttributeSet::new();
+        attrs.set_session_scope("agent-123", "user-456", "session-789");
+        
+        assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
+        assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
+        assert_eq!(attrs.get_session_id(), Some("session-789".to_string()));
+        assert_eq!(attrs.infer_scope_level(), 3);
+    }
+    
+    #[test]
+    fn test_attributeset_can_access() {
+        let mut global = AttributeSet::new();
+        global.set_global_scope();
+        
+        let mut agent = AttributeSet::new();
+        agent.set_agent_scope("agent-123");
+        
+        let mut user = AttributeSet::new();
+        user.set_user_scope("agent-123", "user-456");
+        
+        // Global可以访问所有
+        assert!(global.can_access(&agent));
+        assert!(global.can_access(&user));
+        
+        // Agent可以访问相同agent的user
+        assert!(agent.can_access(&user));
+        
+        // User不能访问Agent
+        assert!(!user.can_access(&agent));
+    }
+    
+    #[test]
+    fn test_memoryscope_to_attributeset() {
+        use crate::hierarchy::MemoryScope;
+        
+        let scope = MemoryScope::User {
+            agent_id: "agent-123".to_string(),
+            user_id: "user-456".to_string(),
+        };
+        
+        let attrs: AttributeSet = scope.into();
+        
+        assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
+        assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
+        assert_eq!(attrs.infer_scope_level(), 2);
+    }
+    
+    #[test]
+    fn test_attributeset_to_memoryscope() {
+        use crate::hierarchy::MemoryScope;
+        
+        let mut attrs = AttributeSet::new();
+        attrs.set_session_scope("agent-123", "user-456", "session-789");
+        
+        let scope: MemoryScope = (&attrs).into();
+        
+        match scope {
+            MemoryScope::Session {
+                agent_id,
+                user_id,
+                session_id,
+            } => {
+                assert_eq!(agent_id, "agent-123");
+                assert_eq!(user_id, "user-456");
+                assert_eq!(session_id, "session-789");
+            }
+            _ => panic!("Expected Session scope"),
+        }
     }
 }
