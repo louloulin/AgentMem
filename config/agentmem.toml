@@ -1,0 +1,107 @@
+# AgentMem V4.0 Unified Configuration
+# Week 3-4: Zero Hardcoding Configuration System
+
+[system]
+version = "4.0.0"
+environment = "development"  # development | production
+log_level = "info"           # trace | debug | info | warn | error
+performance_mode = "balanced" # lowlatency | balanced | highaccuracy
+
+[search.hybrid]
+# Hybrid search weights (must sum to 1.0)
+vector = 0.7        # Vector search weight (replaced hardcoded 0.7)
+fulltext = 0.3      # Fulltext search weight (replaced hardcoded 0.3)
+bm25 = 0.4          # BM25 weight
+graph = 0.2         # Graph search weight
+rrf_k = 60.0        # RRF fusion parameter (replaced hardcoded 60)
+
+[search.reranking]
+enable_llm = true
+model = "gpt-4"
+top_k = 20
+min_score_delta = 0.05
+
+[search.cache]
+enabled = true
+ttl_seconds = 300      # 5 minutes
+max_entries = 10000
+strategy = "lru"       # lru | lfu | fifo
+
+[search.timeout]
+search_ms = 5000            # Total search timeout (replaced hardcoded 5s)
+vector_search_ms = 2000
+fulltext_search_ms = 1000
+llm_call_ms = 10000
+
+[importance]
+# Importance scoring weights (sum to 1.0)
+recency_weight = 0.25       # Replaced hardcoded 0.25
+frequency_weight = 0.20     # Replaced hardcoded 0.20
+relevance_weight = 0.25     # Replaced hardcoded 0.25
+emotional_weight = 0.15     # Replaced hardcoded 0.15
+context_weight = 0.10       # Replaced hardcoded 0.10
+interaction_weight = 0.05   # Replaced hardcoded 0.05
+
+enable_dynamic_weights = true
+learning_rate = 0.01
+min_score_threshold = 0.0
+max_score_cap = 10.0
+
+[memory_integration]
+max_memories = 10
+relevance_threshold = 0.1   # Replaced hardcoded 0.1
+include_timestamp = true
+sort_by_importance = true
+
+# Cognitive architecture weights
+episodic_weight = 1.2       # Long-term memory priority
+working_weight = 1.0        # Context supplement
+semantic_weight = 0.9       # Backup source
+
+[intelligence]
+conflict_sensitivity = 0.8
+auto_resolution_threshold = 0.9
+
+[intelligence.importance_weights]
+recency = 0.3
+frequency = 0.2
+relevance = 0.3
+interaction = 0.2
+
+[compression]
+enable_importance_compression = true
+enable_semantic_compression = true
+enable_temporal_compression = true
+enable_adaptive_compression = true
+
+min_importance_threshold = 0.3
+target_compression_ratio = 0.7
+semantic_similarity_threshold = 0.85
+temporal_decay_factor = 0.95
+adaptive_learning_rate = 0.1
+
+[adaptive_threshold]
+# Base thresholds by query type
+[adaptive_threshold.base_thresholds]
+exactid = 0.0
+shortkeyword = 0.1
+naturallanguage = 0.3
+semantic = 0.5
+temporal = 0.0
+
+# Adaptive factors
+length_factor = 0.3
+complexity_factor = 0.2
+enable_historical_feedback = true
+min_threshold = 0.0
+max_threshold = 0.9
+
+[learning]
+enable_adaptive = true
+learning_rate = 0.01
+exploration_rate = 0.1      # ε in ε-greedy
+decay_rate = 0.99
+min_samples = 100           # Minimum samples to trigger learning
+strategy = "multiarmedbandit"  # multiarmedbandit | reinforcementlearning | contextualbandit
+
+

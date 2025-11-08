@@ -1,0 +1,102 @@
+# AgentMem V4.0 Configuration Example
+# Week 3-4: Zero Hardcoding - All configurable parameters
+
+# ============================================================================
+# Hybrid Search Configuration
+# ============================================================================
+[hybrid_search]
+# Search weights (must sum to 1.0)
+vector_weight = 0.7        # Vector search weight (default: 0.7)
+fulltext_weight = 0.3      # Fulltext search weight (default: 0.3)
+rrf_k = 60.0              # RRF fusion parameter (default: 60.0)
+enable_parallel = true     # Enable parallel search
+enable_cache = false       # Enable search cache
+
+# ============================================================================
+# Importance Scorer Configuration
+# ============================================================================
+[importance_scorer]
+# Weights (must sum to 1.0)
+recency_weight = 0.25      # How recent the memory is
+frequency_weight = 0.20    # How often accessed
+relevance_weight = 0.25    # Semantic relevance
+emotional_weight = 0.15    # Emotional significance
+context_weight = 0.10      # Contextual importance
+interaction_weight = 0.05  # User interaction level
+
+# Dynamic adjustment
+enable_dynamic_weights = true
+learning_rate = 0.01
+
+# Score bounds
+min_score_threshold = 0.0
+max_score_cap = 10.0
+
+# ============================================================================
+# Memory Integration Configuration
+# ============================================================================
+[memory_integration]
+max_memories = 10           # Max memories to retrieve
+relevance_threshold = 0.1   # Minimum relevance score
+include_timestamp = true
+sort_by_importance = true
+
+# Cognitive architecture weights
+episodic_weight = 1.2      # Long-term memory priority
+working_weight = 1.0       # Context supplement
+semantic_weight = 0.9      # Backup source
+
+# ============================================================================
+# Intelligence Configuration
+# ============================================================================
+[intelligence]
+conflict_sensitivity = 0.8
+auto_resolution_threshold = 0.9
+
+[intelligence.importance_weights]
+recency = 0.3
+frequency = 0.2
+relevance = 0.3
+interaction = 0.2
+
+# ============================================================================
+# Compression Configuration
+# ============================================================================
+[compression]
+enable_importance_compression = true
+enable_semantic_compression = true
+enable_temporal_compression = true
+enable_adaptive_compression = true
+
+min_importance_threshold = 0.3
+target_compression_ratio = 0.7
+semantic_similarity_threshold = 0.85
+temporal_decay_factor = 0.95
+adaptive_learning_rate = 0.1
+
+# ============================================================================
+# Adaptive Threshold Configuration
+# ============================================================================
+[adaptive_threshold]
+# Base thresholds by query type
+[adaptive_threshold.base_thresholds]
+ExactId = 0.0
+ShortKeyword = 0.1
+NaturalLanguage = 0.3
+Semantic = 0.5
+Temporal = 0.0
+
+# Adaptive factors
+length_factor = 0.3
+complexity_factor = 0.2
+enable_historical_feedback = true
+min_threshold = 0.0
+max_threshold = 0.9
+
+# ============================================================================
+# Environment Variable Overrides (optional)
+# ============================================================================
+# AGENTMEM_VECTOR_WEIGHT=0.8
+# AGENTMEM_FULLTEXT_WEIGHT=0.2
+# AGENTMEM_RECENCY_WEIGHT=0.3
+

@@ -49,6 +49,8 @@ pub mod operations;
 pub mod orchestrator;
 /// Pipeline framework for memory operations
 pub mod pipeline;
+/// Configuration loader (Week 3-4: eliminate hardcoding)
+pub mod config;
 /// Performance optimization system with caching, batching, and benchmarking
 pub mod performance;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis

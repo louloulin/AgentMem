@@ -4785,6 +4785,39 @@ let matching_attrs = memory.attributes.query(&pattern);
    - ✅ 12个单元测试（覆盖核心功能）
    - ✅ 编译验证通过（0个错误）
 
+2. ✅ Day 4-6: Query抽象 + Scope消除
+   - ✅ QueryIntent（Lookup/SemanticSearch/RelationQuery/Aggregation）
+   - ✅ Constraint抽象（AttributeMatch/Range/Time/Relation/Limit/MinScore）
+   - ✅ Preference抽象（Temporal/Relevance/Diversity/Importance）
+   - ✅ Query::from_string智能推断
+   - ✅ QueryBuilder构建器
+   - ✅ AttributeSet Scope辅助方法（set_*_scope/can_access/infer_scope_level）
+   - ✅ From<MemoryScope> for AttributeSet向后兼容
+   - ✅ 单元测试（覆盖所有场景）
+   - ✅ 编译验证通过
+
+3. ✅ Week 3-4: 配置系统（消除硬编码）
+   - ✅ Day 11: 统一配置系统
+     - ✅ AgentMemConfig主配置结构（整合所有子模块）
+     - ✅ 复用现有配置（HybridSearchConfig/ImportanceScorerConfig/MemoryIntegratorConfig等）
+     - ✅ 配置加载器（from_file/from_toml_str/apply_env_overrides）
+     - ✅ 配置验证（权重总和检查/阈值范围检查）
+     - ✅ 配置文件示例（config/agentmem.example.toml）
+     - ✅ 单元测试（test_default_config/test_validation/test_env_overrides）
+   - ✅ Day 12: 文档+示例
+     - ✅ examples/config_loading.rs（6种配置加载方式演示）
+     - ✅ docs/config-migration.md（迁移指南）
+     - ✅ 消除硬编码统计:
+       - ✅ 搜索权重: vector_weight/fulltext_weight/rrf_k
+       - ✅ 重要性权重: 6个权重（recency/frequency/relevance/emotional/context/interaction）
+       - ✅ 记忆集成: max_memories/relevance_threshold/认知架构权重
+       - ✅ 编排器: max_tool_rounds/tool_timeout_seconds
+       - ✅ 压缩: min_importance_threshold/target_compression_ratio等
+       - ✅ 自适应阈值: base_thresholds/length_factor/complexity_factor
+   - ✅ 已有默认值保留（向后兼容）
+   - ✅ 环境变量覆盖支持
+   - ✅ 编译验证通过（0个linter错误）
+
 **下一步**: 
-1. Day 4-6: Query抽象 + Scope消除
-2. Day 7-14: 存储层适配
+1. Day 13-14: 配置集成到所有模块（确保所有地方使用配置而非硬编码）
+2. Week 5-6: 智能增强（自适应学习集成）
