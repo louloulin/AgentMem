@@ -11,6 +11,10 @@
 
 pub mod adaptive;
 pub mod adaptive_threshold;
+/// Week 5-6: Adaptive router with Thompson Sampling
+pub mod adaptive_router;
+/// Week 5-6: Adaptive search engine (complete integration)
+pub mod adaptive_search_engine;
 pub mod bm25;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
