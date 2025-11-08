@@ -574,7 +574,86 @@ println!("记忆决策: {:?}", result.memory_decisions);
 
 ## 🚀 快速开始
 
-### 方式 1: 零配置启动（推荐）
+### 方式 1: Rust API 零配置使用（推荐）⭐
+
+**最简单的使用方式** - 3 行代码即可开始使用智能记忆功能：
+
+```rust
+use agent_mem::Memory;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. 设置环境变量（任选其一）
+    std::env::set_var("OPENAI_API_KEY", "sk-...");
+    // 或 std::env::set_var("ZHIPU_API_KEY", "...");
+    // 或 std::env::set_var("ANTHROPIC_API_KEY", "...");
+
+    // 2. 零配置初始化 - 自动检测环境变量并启用智能功能
+    let mem = Memory::new().await?;
+
+    // 3. 添加记忆 - 默认启用智能功能（事实提取、去重、冲突解决）✅
+    mem.add("I love pizza").await?;
+    mem.add("I live in San Francisco").await?;
+    mem.add("My favorite food is pizza").await?;  // 自动去重
+
+    // 4. 搜索记忆 - 智能语义搜索
+    let results = mem.search("What do you know about me?").await?;
+    for result in results {
+        println!("- {}", result.memory);
+    }
+
+    Ok(())
+}
+```
+
+**关键特性**：
+- ✅ **零配置**：`Memory::new()` 自动检测环境变量
+- ✅ **智能默认**：默认启用智能功能（`infer: true`），对标 Mem0
+- ✅ **自动事实提取**：AI 自动识别和提取关键信息
+- ✅ **智能去重**：自动检测和合并重复记忆
+- ✅ **冲突解决**：智能处理矛盾信息
+- ✅ **语义搜索**：毫秒级向量相似度搜索
+
+**高级用法** - 自定义配置：
+
+```rust
+use agent_mem::{Memory, AddMemoryOptions};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mem = Memory::new().await?;
+
+    // 方式 1: 使用默认选项（推荐）
+    mem.add("I love pizza").await?;  // infer: true（默认）
+
+    // 方式 2: 显式禁用智能功能（如果需要）
+    let options = AddMemoryOptions {
+        infer: false,  // 禁用智能功能，仅存储原始文本
+        ..Default::default()
+    };
+    mem.add_with_options("Raw text", options).await?;
+
+    // 方式 3: 指定 Session 上下文
+    let options = AddMemoryOptions {
+        user_id: Some("user123".to_string()),
+        agent_id: Some("assistant".to_string()),
+        run_id: Some("session_001".to_string()),
+        ..Default::default()  // infer: true（默认）
+    };
+    mem.add_with_options("I prefer dark mode", options).await?;
+
+    Ok(())
+}
+```
+
+**为什么默认启用智能功能？**
+- ✅ 对标 Mem0 的 API 设计（`infer=True` 默认）
+- ✅ 提供开箱即用的智能体验
+- ✅ 用户仍可通过 `infer: false` 禁用（向后兼容）
+
+---
+
+### 方式 2: 服务器模式启动
 
 ```bash
 # 克隆仓库
@@ -596,7 +675,7 @@ cargo run --bin agent-mem-server
 - 🔹 插件 API: `http://localhost:8080/api/v1/plugins`
 - 🔹 API 文档: `http://localhost:8080/swagger-ui/`
 
-### 方式 2: 使用 Docker
+### 方式 3: 使用 Docker
 
 ```bash
 # 使用 Docker Compose 启动完整堆栈

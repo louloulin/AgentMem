@@ -33,7 +33,7 @@ impl Default for AddMemoryOptions {
             agent_id: None,
             run_id: None,
             metadata: HashMap::new(),
-            infer: false,
+            infer: true,  // ✅ 修改为 true，对标 Mem0，默认启用智能功能
             memory_type: None,
             prompt: None,
         }
