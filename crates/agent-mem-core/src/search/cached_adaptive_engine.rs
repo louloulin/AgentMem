@@ -129,12 +129,16 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
     
     /// 构建缓存键
     fn build_cache_key(&self, query: &SearchQuery) -> CacheKey {
-        // 构建参数结构用于哈希
+        // 构建参数结构用于哈希（排除f32和DateTime等不可hash的类型）
+        let filter_str = query.filters.as_ref().map(|f| {
+            format!("{:?}_{:?}_{:?}", f.user_id, f.organization_id, f.agent_id)
+        });
+        
         let params = (
             &query.query,
             query.limit,
-            query.threshold,
-            &query.filters,
+            query.threshold.map(|t| (t * 1000.0) as i32), // Convert f32 to i32
+            filter_str,
         );
         
         CacheKey::new("adaptive_search", &params)

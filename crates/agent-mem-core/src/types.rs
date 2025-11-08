@@ -179,6 +179,26 @@ pub enum Content {
     Mixed(Vec<Content>),
 }
 
+impl std::fmt::Display for Content {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_text())
+    }
+}
+
+impl PartialEq for Content {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Content::Text(a), Content::Text(b)) => a == b,
+            (Content::Image { url: u1, caption: c1 }, Content::Image { url: u2, caption: c2 }) => u1 == u2 && c1 == c2,
+            (Content::Audio { url: u1, transcript: t1 }, Content::Audio { url: u2, transcript: t2 }) => u1 == u2 && t1 == t2,
+            (Content::Video { url: u1, summary: s1 }, Content::Video { url: u2, summary: s2 }) => u1 == u2 && s1 == s2,
+            (Content::Structured(v1), Content::Structured(v2)) => v1 == v2,
+            (Content::Mixed(m1), Content::Mixed(m2)) => m1 == m2,
+            _ => false,
+        }
+    }
+}
+
 impl Content {
     /// 获取文本表示（用于向后兼容）
     pub fn as_text(&self) -> String {
@@ -414,7 +434,7 @@ impl AttributeSet {
     }
     
     /// 模式查询（支持通配符、正则、范围）
-    pub fn query(&self, pattern: &AttributePattern) -> Vec<(&AttributeKey, &AttributeValue)> {
+    pub fn query<'a>(&'a self, pattern: &'a AttributePattern) -> Vec<(&'a AttributeKey, &'a AttributeValue)> {
         match pattern {
             AttributePattern::Exact { key } => {
                 if let Some(value) = self.get(key) {
@@ -734,6 +754,97 @@ impl Memory {
     /// 创建构建器
     pub fn builder() -> MemoryBuilder {
         MemoryBuilder::new()
+    }
+    
+    /// 便捷方法：创建新的Memory（向后兼容）
+    pub fn new(
+        agent_id: String,
+        user_id: Option<String>,
+        memory_type: MemoryType,
+        content: String,
+        importance: f32,
+    ) -> Self {
+        let mut builder = MemoryBuilder::new()
+            .content(Content::Text(content));
+        
+        builder.attributes.set(
+            AttributeKey::system("agent_id"),
+            AttributeValue::String(agent_id),
+        );
+        
+        if let Some(uid) = user_id {
+            builder.attributes.set(
+                AttributeKey::system("user_id"),
+                AttributeValue::String(uid),
+            );
+        }
+        
+        builder.attributes.set(
+            AttributeKey::system("memory_type"),
+            AttributeValue::String(memory_type.as_str().to_string()),
+        );
+        
+        builder.attributes.set(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance as f64),
+        );
+        
+        builder.build()
+    }
+    
+    /// 获取importance（向后兼容）
+    pub fn importance(&self) -> f32 {
+        self.attributes
+            .get(&AttributeKey::system("importance"))
+            .and_then(|v| v.as_number())
+            .unwrap_or(0.0) as f32
+    }
+    
+    /// 获取agent_id（向后兼容）
+    pub fn agent_id(&self) -> String {
+        self.attributes
+            .get(&AttributeKey::system("agent_id"))
+            .and_then(|v| v.as_string())
+            .unwrap_or_default()
+    }
+    
+    /// 获取user_id（向后兼容）
+    pub fn user_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::system("user_id"))
+            .and_then(|v| v.as_string())
+    }
+    
+    /// 获取version（向后兼容）
+    pub fn version(&self) -> u32 {
+        self.attributes
+            .get(&AttributeKey::system("version"))
+            .and_then(|v| v.as_number())
+            .unwrap_or(1.0) as u32
+    }
+    
+    /// 获取created_at（向后兼容）
+    pub fn created_at(&self) -> i64 {
+        self.metadata.created_at.timestamp()
+    }
+    
+    /// 获取last_accessed_at（向后兼容）
+    pub fn last_accessed_at(&self) -> i64 {
+        self.metadata.last_accessed.unwrap_or(self.metadata.updated_at).timestamp()
+    }
+    
+    /// 更新内容（向后兼容）
+    pub fn update_content(&mut self, new_content: String) {
+        self.content = Content::Text(new_content);
+        self.metadata.updated_at = chrono::Utc::now();
+    }
+    
+    /// 添加元数据（向后兼容）
+    pub fn add_metadata(&mut self, key: String, value: String) {
+        self.attributes.set(
+            AttributeKey::user(key),
+            AttributeValue::String(value),
+        );
     }
     
     /// 从旧格式迁移（用于数据迁移）

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 /// 记忆集成器配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MemoryIntegratorConfig {
     /// 最大检索记忆数量
     pub max_memories: usize,

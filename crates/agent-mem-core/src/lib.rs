@@ -36,6 +36,7 @@ pub mod graph_memory;
 pub mod graph_optimization;
 pub mod hierarchy;
 pub mod history;
+pub mod importance_scorer;
 pub mod integration;
 pub mod intelligence;
 pub mod lifecycle;

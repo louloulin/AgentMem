@@ -368,34 +368,51 @@ impl MemoryOperations for InMemoryOperations {
         // Calculate statistics
         let mut total_importance = 0.0;
         let mut total_access_count = 0u64;
-        let mut most_accessed_count = 0u32;
+        let mut most_accessed_count = 0u64;
         let mut oldest_timestamp = i64::MAX;
         let current_time = chrono::Utc::now().timestamp();
 
         for memory in &memories {
-            // Type distribution
-            *stats
-                .memories_by_type
-                .entry(memory.memory_type)
-                .or_insert(0) += 1;
+            // Type distribution - from attributes
+            if let Some(memory_type_str) = memory.attributes.get(&crate::types::AttributeKey::system("memory_type"))
+                .and_then(|v| v.as_string())
+            {
+                if let Ok(memory_type) = memory_type_str.parse::<agent_mem_traits::MemoryType>() {
+                    *stats
+                        .memories_by_type
+                        .entry(memory_type)
+                        .or_insert(0) += 1;
+                }
+            }
 
-            // Agent distribution
-            *stats
-                .memories_by_agent
-                .entry(memory.agent_id.clone())
-                .or_insert(0) += 1;
+            // Agent distribution - from attributes
+            if let Some(agent_id) = memory.attributes.get(&crate::types::AttributeKey::system("agent_id"))
+                .and_then(|v| v.as_string())
+            {
+                *stats
+                    .memories_by_agent
+                    .entry(agent_id)
+                    .or_insert(0) += 1;
+            }
 
-            // Importance and access stats
-            total_importance += memory.importance;
-            total_access_count += memory.access_count as u64;
+            // Importance and access stats - from attributes
+            let importance = memory.attributes.get(&crate::types::AttributeKey::system("importance"))
+                .and_then(|v| v.as_number())
+                .unwrap_or(0.0) as f32;
+            total_importance += importance;
+            
+            let access_count = memory.metadata.accessed_count;
+            total_access_count += access_count as u64;
 
-            if memory.access_count > most_accessed_count {
-                most_accessed_count = memory.access_count;
+            if access_count > most_accessed_count {
+                most_accessed_count = access_count;
                 stats.most_accessed_memory_id = Some(memory.id.clone());
             }
 
-            if memory.created_at < oldest_timestamp {
-                oldest_timestamp = memory.created_at;
+            // created_at from metadata
+            let created_timestamp = memory.metadata.created_at.timestamp();
+            if created_timestamp < oldest_timestamp {
+                oldest_timestamp = created_timestamp;
             }
         }
 
