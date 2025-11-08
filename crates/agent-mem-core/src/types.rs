@@ -1329,7 +1329,7 @@ pub struct Pipeline<I, O> {
 /// DAG节点（Stage包装器）
 pub struct DagNode<I, O> {
     pub id: String,
-    pub stage: Box<dyn PipelineStage<Input = I, Output = O>>,
+    pub stage: std::sync::Arc<dyn PipelineStage<Input = I, Output = O>>,
     pub dependencies: Vec<String>, // 依赖的节点ID
 }
 
@@ -1376,7 +1376,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         let id = id.into();
         let node = DagNode {
             id: id.clone(),
-            stage: Box::new(stage),
+            stage: std::sync::Arc::new(stage),
             dependencies: dependencies.clone(),
         };
         
@@ -1459,12 +1459,14 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 let context_clone = context_shared.clone();
                 let node_name = node.stage.name().to_string();
                 let error_handler = self.error_handler.clone();
+                let stage_clone = node.stage.clone();
+                let is_optional = node.stage.is_optional();
                 
                 // 执行节点（并行）
                 let handle = tokio::spawn(async move {
                     let mut ctx = context_clone.lock().await;
                     
-                    match node.stage.execute(input_clone, &mut *ctx).await {
+                    match stage_clone.execute(input_clone, &mut *ctx).await {
                         Ok(StageResult::Continue(output)) => {
                             results_clone.lock().await.insert(node_id.clone(), output);
                             Ok(())
@@ -1480,7 +1482,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                             Err(anyhow::anyhow!("Node '{}' aborted: {}", node_id, reason))
                         }
                         Err(e) => {
-                            if node.stage.is_optional() {
+                            if is_optional {
                                 if let Some(ref handler) = error_handler {
                                     handler(&node_name, &e.to_string());
                                 }

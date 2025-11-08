@@ -4753,7 +4753,23 @@ let matching_attrs = memory.attributes.query(&pattern);
    - ✅ 单元测试（全覆盖）
    - ✅ 编译通过，无linter错误
 
-**Week 1完成！接下来**: Week 2 - 适配器层实现  
+6. **DAG Pipeline扩展** (用户需求)
+   - ✅ DagNode + DagEdge（节点+边表示）
+   - ✅ DagPipeline构建器（add_node/add_edge/add_condition）
+   - ✅ 拓扑排序（Kahn算法，循环检测）
+   - ✅ 并行执行（同层级并行，max_parallelism控制）
+   - ✅ 条件分支（ConditionFn动态决策）
+   - ✅ Arc<Stage>设计（支持clone+并发）
+   - ✅ 单元测试（7个测试）:
+     - ✅ test_dag_pipeline_linear（线性执行）
+     - ✅ test_dag_pipeline_parallel（并行执行验证）
+     - ✅ test_dag_pipeline_diamond（菱形依赖）
+     - ✅ test_dag_pipeline_conditional（条件分支）
+     - ✅ test_dag_pipeline_cycle_detection（循环检测）
+     - ✅ test_dag_pipeline_max_parallelism（并行度控制）
+   - ✅ 编译通过，无linter错误
+
+**Week 1完成（含DAG扩展）！接下来**: Week 2 - 适配器层实现  
 **总行数**: 3906 行  
 **已完成**: 
 1. ✅ Day 1-3: Memory结构革命（Content/AttributeSet/RelationGraph/Memory/Builder）
