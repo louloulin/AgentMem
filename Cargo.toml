@@ -94,6 +94,7 @@ members = [
     "examples/client-demo",
     "examples/mem0-compat-demo",
     "examples/client-server-integration-test",
+    "examples/comprehensive-verification",  # 综合功能验证
     "examples/intelligent-reasoning-demo",
     "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
     "examples/graph-memory-demo",

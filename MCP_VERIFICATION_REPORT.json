@@ -1,0 +1,50 @@
+{
+  "timestamp": 1762589953.434602,
+  "total_tests": 7,
+  "passed": 7,
+  "failed": 0,
+  "results": [
+    {
+      "test": "P0: infer \u9ed8\u8ba4\u503c",
+      "status": "PASS",
+      "details": "\u9ed8\u8ba4\u503c\u5df2\u6b63\u786e\u8bbe\u7f6e\u4e3a true",
+      "timestamp": 1762589953.4334452
+    },
+    {
+      "test": "P1: MemoryScope \u679a\u4e3e",
+      "status": "PASS",
+      "details": "\u627e\u5230 5/6 \u4e2a Scope \u7c7b\u578b: Organization, User, Agent, Run, Session",
+      "timestamp": 1762589953.433574
+    },
+    {
+      "test": "\u6279\u91cf\u64cd\u4f5c API",
+      "status": "PASS",
+      "details": "add_batch() \u65b9\u6cd5\u5df2\u5b9e\u73b0",
+      "timestamp": 1762589953.433732
+    },
+    {
+      "test": "\u641c\u7d22\u529f\u80fd",
+      "status": "PASS",
+      "details": "\u627e\u5230 4/4 \u4e2a\u641c\u7d22\u7ec4\u4ef6",
+      "timestamp": 1762589953.4340212
+    },
+    {
+      "test": "MCP \u670d\u52a1\u5668",
+      "status": "PASS",
+      "details": "MCP \u670d\u52a1\u5668\u5df2\u5b9e\u73b0",
+      "timestamp": 1762589953.434091
+    },
+    {
+      "test": "MCP \u5ba2\u6237\u7aef",
+      "status": "PASS",
+      "details": "MCP \u5ba2\u6237\u7aef\u5df2\u5b9e\u73b0",
+      "timestamp": 1762589953.434158
+    },
+    {
+      "test": "\u6d4b\u8bd5\u8986\u76d6",
+      "status": "PASS",
+      "details": "\u627e\u5230 4/4 \u4e2a\u6d4b\u8bd5\u6587\u4ef6",
+      "timestamp": 1762589953.434425
+    }
+  ]
+}
