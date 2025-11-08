@@ -896,7 +896,7 @@ async fn search_by_libsql_exact(
                 info!("⚠️  过滤后没有有效结果: query='{}'", query);
                 Err(format!("未找到匹配的记忆: {}", query))
             } else {
-                Ok(json_results)
+            Ok(json_results)
             }
         }
         Ok(_) => {
@@ -1024,7 +1024,7 @@ pub async fn search_memories(
         sorted_results = exact_matches;
         sorted_results.extend(fuzzy_matches);
     }
-    
+
     // 转换为JSON格式，简化结构以匹配前端期望
     let json_results: Vec<serde_json::Value> = sorted_results
         .into_iter()

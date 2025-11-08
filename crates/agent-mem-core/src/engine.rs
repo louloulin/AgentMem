@@ -221,10 +221,10 @@ impl MemoryEngine {
                 Some(MemoryScope::Global) => {
                     // 🔧 修复: Global Scope使用search方法进行LIKE查询，而不是list()
                     info!("🔍 Global Scope: 使用search方法查询: '{}'", query);
-                    memory_repo
+                memory_repo
                         .search(query, fetch_limit)
-                        .await
-                        .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                    .await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
                 }
                 _ => {
                     // 其他scope使用原有逻辑
@@ -245,18 +245,18 @@ impl MemoryEngine {
                         } else {
                             user_memories.into_iter().take(fetch_limit as usize).collect()
                         }
-                    } else if let Some(aid) = agent_id {
-                        // 回退到agent_id过滤
-                        memory_repo
-                            .find_by_agent_id(aid, fetch_limit)
-                            .await
-                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
-                    } else {
+            } else if let Some(aid) = agent_id {
+                // 回退到agent_id过滤
+                memory_repo
+                    .find_by_agent_id(aid, fetch_limit)
+                    .await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+            } else {
                         // 无scope限制，使用search方法
-                        memory_repo
+                memory_repo
                             .search(query, fetch_limit)
-                            .await
-                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                    .await
+                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
                     }
                 }
             };
@@ -274,7 +274,7 @@ impl MemoryEngine {
                 use regex::Regex;
                 Regex::new(r"P\d{6}").unwrap().is_match(query)
             };
-            
+
             // 转换为 Memory (MemoryItem) 类型并计算相关性
             let mut scored_memories: Vec<(Memory, f64)> = db_memories
                 .into_iter()

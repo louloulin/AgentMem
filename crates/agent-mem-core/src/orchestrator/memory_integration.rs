@@ -220,7 +220,7 @@ impl MemoryIntegrator {
                                 exact_product_memories.push(memory);
                             } else if !is_working_memory {
                                 // 其他相关记忆
-                                if let Some(score) = memory.score {
+                            if let Some(score) = memory.score {
                                     memory.score = Some(score * 1.2);  // 适度提升权重
                                 }
                                 other_memories.push(memory);
