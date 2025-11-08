@@ -53,27 +53,27 @@ export function useMemorySearch({
       setLastQuery(query);
       
       try {
-        // Construct search URL
-        const params = new URLSearchParams({
-          query: query,
-          user_id: userId,
-          limit: '10',
-        });
-        
-        if (agentId) {
-          params.append('agent_id', agentId);
-        }
-        
-        const url = `${API_BASE_URL}/api/v1/memories/search?${params.toString()}`;
+        // 🔧 修复: 使用 POST 方法，因为服务器端定义的是 POST
+        const url = `${API_BASE_URL}/api/v1/memories/search`;
         
         // Get token from localStorage
         const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
         
+        // Construct request body
+        const requestBody = {
+          query: query,
+          user_id: userId,
+          limit: 10,
+          ...(agentId ? { agent_id: agentId } : {}),
+        };
+        
         const response = await fetch(url, {
+          method: 'POST',  // ✅ 修复: 改为 POST
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+          body: JSON.stringify(requestBody),
         });
         
         if (!response.ok) {
