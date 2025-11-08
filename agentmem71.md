@@ -7,11 +7,17 @@
 
 ---
 
-## 🎉 P0 优化验证完成报告（2025-11-08 最新）
+## 🎉 P0 优化验证完成报告（2025-11-08 最新更新）
 
 **验证日期**: 2025-11-08
 **验证状态**: ✅ **全部通过**
-**测试结果**: ✅ **6/6 单元测试 + 17/17 智能组件测试通过**
+**测试结果**: ✅ **12/12 默认行为测试 + 17/17 智能组件测试 + 真实验证通过**
+
+**最新验证结果** (2025-11-08):
+- ✅ 默认行为测试: 12/12 通过
+- ✅ 智能组件测试: 17/17 通过 (2 个忽略)
+- ✅ 真实验证: 使用真实 Zhipu AI API 验证通过
+- ✅ 向后兼容性: 用户仍可通过 `infer: false` 禁用智能功能
 
 ### 验证摘要
 
@@ -2400,40 +2406,59 @@ client.add(
 
 ---
 
-#### P1 - Session 管理灵活性（1 周）⚠️ **高优先级**
+#### P1 - Session 管理灵活性 ✅ **已完成**
+
+**实施日期**: 2025-11-08
+**实施状态**: ✅ **全部完成**
+**验证状态**: ✅ **所有测试通过（4/4 P1 测试）**
 
 **问题**: 当前 Session 管理依赖 `agent_id`，不够灵活
 
-**现状**:
+**解决方案**: 引入 `MemoryScope` 枚举，支持多种记忆隔离模式
+
+**实施内容**:
+
+1. **添加 MemoryScope 枚举** (`crates/agent-mem/src/types.rs`)
+   - ✅ `Global` - 全局作用域
+   - ✅ `Organization { org_id }` - 组织级（企业多租户）
+   - ✅ `User { user_id }` - 用户级（单用户 AI 助手）
+   - ✅ `Agent { user_id, agent_id }` - Agent 级（多 Agent 系统）
+   - ✅ `Run { user_id, run_id }` - 运行级（临时会话）
+   - ✅ `Session { user_id, session_id }` - 会话级（多窗口对话）
+
+2. **添加便捷方法** (`crates/agent-mem/src/memory.rs`)
+   - ✅ `Memory::add_with_scope()` - 使用 MemoryScope 添加记忆
+   - ✅ `AddMemoryOptions::to_scope()` - 从 Options 转换为 Scope
+   - ✅ `MemoryScope::from_options()` - 从 Options 创建 Scope
+   - ✅ `MemoryScope::to_options()` - 转换为 Options
+
+3. **测试验证** (`crates/agent-mem/tests/p1_session_flexibility_test.rs`)
+   - ✅ 4/4 测试通过
+   - ✅ 覆盖所有 Scope 类型
+   - ✅ 验证转换功能
+
+**代码改动**: 约 150 行代码
+
+**使用示例**:
 ```rust
-pub async fn add_memory(
-    &self,
-    content: String,
-    agent_id: String,              // ❌ 必需参数
-    user_id: Option<String>,       // ⚠️ 应该是必需
-    // ...
-)
+use agent_mem::{Memory, MemoryScope};
+
+// 组织级记忆（企业多租户）
+let scope = MemoryScope::Organization { org_id: "acme-corp".to_string() };
+mem.add_with_scope("Company policy", scope).await?;
+
+// 会话级记忆（多窗口对话）
+let scope = MemoryScope::Session {
+    user_id: "alice".to_string(),
+    session_id: "window-1".to_string(),
+};
+mem.add_with_scope("Current conversation", scope).await?;
 ```
 
-**影响**:
-- 不支持纯 `user_id` 的场景（单用户 AI 助手）
-- 不支持 `org_id` 的场景（企业多租户）
-- 不支持 `session_id` 的场景（多窗口对话）
-
-**修复方案**: 引入 `MemoryScope` 枚举
-
-```rust
-pub enum MemoryScope {
-    Global,                                    // 全局作用域
-    Organization { org_id: String },           // 组织级
-    User { user_id: String },                  // 用户级
-    Agent { user_id: String, agent_id: String }, // Agent 级
-    Run { user_id: String, run_id: String },   // 运行级
-    Session { user_id: String, session_id: String }, // 会话级
-}
-```
-
-**工作量**: 1 周（设计 + 实现 + 测试 + 文档）
+**验证结果**:
+- ✅ 所有 Scope 类型正常工作
+- ✅ Options 和 Scope 之间转换正确
+- ✅ 向后兼容性良好（现有 API 不受影响）
 
 ---
 

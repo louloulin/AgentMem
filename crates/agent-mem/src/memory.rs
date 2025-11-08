@@ -13,8 +13,8 @@ use agent_mem_traits::{AgentMemError, MemoryItem, MemoryType, Result};
 use crate::builder::MemoryBuilder;
 use crate::orchestrator::MemoryOrchestrator;
 use crate::types::{
-    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryStats,
-    RelationEvent, SearchOptions,
+    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryScope,
+    MemoryStats, RelationEvent, SearchOptions,
 };
 
 /// 统一的记忆管理接口
@@ -1143,6 +1143,38 @@ impl Memory {
             run_id: Some(run_id.into()),
             ..Default::default()
         };
+        self.add_with_options(content, options).await
+    }
+    
+    /// 🆕 P1: 使用 MemoryScope 添加记忆（支持灵活的 Session 管理）
+    /// 
+    /// 支持多种记忆隔离模式：Global, Organization, User, Agent, Run, Session
+    /// 
+    /// # 示例
+    /// ```rust,no_run
+    /// # use agent_mem::{Memory, MemoryScope};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// 
+    /// // 组织级记忆（企业多租户）
+    /// let scope = MemoryScope::Organization { org_id: "acme-corp".to_string() };
+    /// mem.add_with_scope("Company policy", scope).await?;
+    /// 
+    /// // 会话级记忆（多窗口对话）
+    /// let scope = MemoryScope::Session {
+    ///     user_id: "alice".to_string(),
+    ///     session_id: "window-1".to_string(),
+    /// };
+    /// mem.add_with_scope("Current conversation", scope).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn add_with_scope(
+        &self,
+        content: impl Into<String>,
+        scope: MemoryScope,
+    ) -> Result<AddResult> {
+        let options = scope.to_options();
         self.add_with_options(content, options).await
     }
 }

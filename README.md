@@ -651,6 +651,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ 提供开箱即用的智能体验
 - ✅ 用户仍可通过 `infer: false` 禁用（向后兼容）
 
+**P1 新功能: 灵活的 MemoryScope** 🆕
+
+支持多种记忆隔离模式，适用于不同的应用场景：
+
+```rust
+use agent_mem::{Memory, MemoryScope};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mem = Memory::new().await?;
+
+    // 场景 1: 用户级记忆（单用户 AI 助手）
+    let scope = MemoryScope::User {
+        user_id: "alice".to_string(),
+    };
+    mem.add_with_scope("我喜欢喝咖啡", scope).await?;
+
+    // 场景 2: 组织级记忆（企业多租户）
+    let scope = MemoryScope::Organization {
+        org_id: "acme-corp".to_string(),
+    };
+    mem.add_with_scope("公司政策：每周五远程办公", scope).await?;
+
+    // 场景 3: 会话级记忆（多窗口对话）
+    let scope = MemoryScope::Session {
+        user_id: "alice".to_string(),
+        session_id: "window-1".to_string(),
+    };
+    mem.add_with_scope("正在讨论项目计划", scope).await?;
+
+    // 场景 4: Agent 级记忆（多 Agent 系统）
+    let scope = MemoryScope::Agent {
+        user_id: "alice".to_string(),
+        agent_id: "coding-assistant".to_string(),
+    };
+    mem.add_with_scope("偏好使用 Rust 编程", scope).await?;
+
+    Ok(())
+}
+```
+
+**MemoryScope 支持的 6 种隔离模式**:
+- 🔹 `Global` - 全局作用域（所有用户共享）
+- 🔹 `Organization { org_id }` - 组织级（企业多租户）✨ 新增
+- 🔹 `User { user_id }` - 用户级（单用户 AI 助手）
+- 🔹 `Agent { user_id, agent_id }` - Agent 级（多 Agent 系统）
+- 🔹 `Run { user_id, run_id }` - 运行级（临时会话）
+- 🔹 `Session { user_id, session_id }` - 会话级（多窗口对话）✨ 新增
+
 ---
 
 ### 方式 2: 服务器模式启动

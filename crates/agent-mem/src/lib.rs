@@ -82,8 +82,8 @@ pub mod visualization;
 pub use builder::MemoryBuilder;
 pub use memory::Memory;
 pub use types::{
-    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryStats,
-    RelationEvent, SearchOptions,
+    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryScope,
+    MemoryStats, RelationEvent, SearchOptions,
 };
 
 // 重新导出 traits 中的常用类型
