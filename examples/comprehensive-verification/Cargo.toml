@@ -1,0 +1,17 @@
+[package]
+name = "comprehensive-verification"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "comprehensive-verification"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+tokio = { version = "1.42", features = ["full"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde_json = "1.0"
+
