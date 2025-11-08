@@ -1419,7 +1419,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
     where
         F: Fn(&str, &str) + Send + Sync + 'static,
     {
-        self.error_handler = Some(Box::new(handler));
+        self.error_handler = Some(std::sync::Arc::new(handler));
         self
     }
     
@@ -1661,7 +1661,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
     
     pub async fn execute(
         &self,
-        mut input: I,
+        input: I,
         context: &mut PipelineContext,
     ) -> anyhow::Result<O>
     where
