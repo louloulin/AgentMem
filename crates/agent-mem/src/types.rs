@@ -5,7 +5,66 @@ use std::collections::HashMap;
 
 use agent_mem_traits::{MemoryItem, MemoryType};
 
-/// 添加记忆的选项（mem0 兼容）
+/// 添加记忆的选项（Mem0 兼容）
+///
+/// # 默认行为
+///
+/// - `infer`: **默认为 `true`**，启用智能功能（事实提取、去重、冲突解决）
+/// - 如果智能组件未初始化（如未配置 LLM API Key），会自动降级到简单模式
+/// - 与 Mem0 的默认行为一致
+///
+/// # 示例
+///
+/// ## 使用默认值（推荐）
+///
+/// ```rust
+/// use agent_mem::Memory;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let mem = Memory::new().await?;
+///
+/// // 使用默认值（智能模式）
+/// mem.add("I love pizza").await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ## 显式禁用智能功能
+///
+/// ```rust
+/// use agent_mem::{Memory, AddMemoryOptions};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let mem = Memory::new().await?;
+///
+/// // 禁用智能功能（直接存储原始内容）
+/// let options = AddMemoryOptions {
+///     infer: false,
+///     ..Default::default()
+/// };
+/// mem.add_with_options("Raw content".to_string(), options).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ## 使用 Session 管理
+///
+/// ```rust
+/// use agent_mem::{Memory, AddMemoryOptions};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let mem = Memory::new().await?;
+///
+/// let options = AddMemoryOptions {
+///     user_id: Some("alice".to_string()),
+///     agent_id: Some("assistant".to_string()),
+///     run_id: Some("session-123".to_string()),
+///     ..Default::default()  // infer: true
+/// };
+/// mem.add_with_options("I love pizza".to_string(), options).await?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddMemoryOptions {
     /// 用户 ID
@@ -17,8 +76,12 @@ pub struct AddMemoryOptions {
     /// 元数据（支持多种类型数据）
     pub metadata: HashMap<String, String>,
     /// 启用智能推理（事实提取、去重等）
-    /// 如果为 true，使用 LLM 提取事实并决策 ADD/UPDATE/DELETE
-    /// 如果为 false，直接添加原始消息作为记忆
+    ///
+    /// **默认值**: `true`（与 Mem0 一致）
+    ///
+    /// - 如果为 `true`，使用 LLM 提取事实并决策 ADD/UPDATE/DELETE
+    /// - 如果为 `false`，直接添加原始消息作为记忆
+    /// - 如果智能组件未初始化，自动降级到简单模式
     pub infer: bool,
     /// 记忆类型（如 "procedural_memory"）
     pub memory_type: Option<String>,
