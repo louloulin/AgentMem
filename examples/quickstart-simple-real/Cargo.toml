@@ -1,10 +1,10 @@
 [package]
-name = "quickstart-simple-mode"
+name = "quickstart-simple-real"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "quickstart-simple-mode"
+name = "quickstart-simple-real"
 path = "src/main.rs"
 
 [dependencies]

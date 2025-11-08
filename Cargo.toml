@@ -76,6 +76,10 @@ members = [
     "examples/observability-demo",
     "examples/fastembed-demo",
     "examples/mem0-api-demo",
+    "examples/quickstart-zero-config",  # P1: 零配置快速开始示例
+    "examples/quickstart-simple-mode",  # P1: 简单模式示例
+    "examples/test-fastembed",  # 测试 FastEmbed 初始化
+    "examples/p0-real-verification",  # P0 真实验证
 
     # 示例
     "examples/demo",

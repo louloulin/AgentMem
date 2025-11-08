@@ -56,7 +56,7 @@ echo "  LLM_PROVIDER=$LLM_PROVIDER"
 echo "  EMBEDDER_PROVIDER=$EMBEDDER_PROVIDER"
 echo "  EMBEDDER_MODEL=$EMBEDDER_MODEL"
 echo "  ENABLE_AUTH=$ENABLE_AUTH (禁用认证)"
-
+export http_proxy=http://127.0.0.1:4780 && export https_proxy=http://127.0.0.1:4780
 # 启动服务器
 echo ""
 echo "🚀 启动 AgentMem 服务器 (无认证模式)..."

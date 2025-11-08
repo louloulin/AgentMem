@@ -21,7 +21,7 @@
 //! 3. **智能去重**: 自动检测和合并重复记忆
 //! 4. **语义搜索**: 毫秒级向量相似度搜索
 
-use agent_mem::Memory;
+use agent_mem::{GetAllOptions, Memory};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,7 +72,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 搜索成功，找到 {} 条记忆:\n", results.len());
 
     for (i, result) in results.iter().enumerate() {
-        println!("  {}. {} (相关性: {:.2})", i + 1, result.content, result.score);
+        let score = result.score.unwrap_or(0.0);
+        println!("  {}. {} (相关性: {:.2})", i + 1, result.content, score);
     }
 
     // ========================================
@@ -80,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("\n📚 步骤 4: 获取所有记忆");
 
-    let all_memories = mem.get_all().await?;
+    let all_memories = mem.get_all(GetAllOptions::default()).await?;
     println!("✅ 共有 {} 条记忆:\n", all_memories.len());
 
     for (i, memory) in all_memories.iter().enumerate() {
