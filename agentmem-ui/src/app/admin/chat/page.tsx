@@ -150,6 +150,8 @@ export default function ChatPage() {
 
     try {
       const url = `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/stream`;
+      console.log('[Chat] Sending streaming request to:', url);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -164,62 +166,113 @@ export default function ChatPage() {
         }),
       });
 
+      console.log('[Chat] Response status:', response.status, response.statusText);
+      console.log('[Chat] Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Try to read error message from response body
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+          }
+        } catch {
+          // Ignore parsing errors, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
       if (!reader) {
-        throw new Error('No response body');
+        throw new Error('No response body - server returned empty response');
       }
 
       let accumulatedContent = '';
+      let hasReceivedData = false;
+      let streamError: Error | null = null;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('[Chat] Stream ended, received data:', hasReceivedData);
+            if (!hasReceivedData) {
+              throw new Error('Stream ended without receiving any data');
+            }
+            break;
+          }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+          const chunk = decoder.decode(value, { stream: true });
+          if (chunk.trim()) {
+            hasReceivedData = true;
+          }
+          
+          const lines = chunk.split('\n');
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (!data || data === 'keep-alive') continue;
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (!data || data === 'keep-alive') continue;
 
-            try {
-              const parsed = JSON.parse(data);
-              
-              if (parsed.chunk_type === 'content' && parsed.content) {
-                accumulatedContent += parsed.content;
+              try {
+                const parsed = JSON.parse(data);
+                console.log('[Chat] Received SSE chunk:', parsed.chunk_type);
                 
-                // Update message content
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === agentMessageId
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  )
-                );
-              } else if (parsed.chunk_type === 'done') {
-                // Mark streaming as complete
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === agentMessageId
-                      ? { ...msg, isStreaming: false }
-                      : msg
-                  )
-                );
-              } else if (parsed.chunk_type === 'error') {
-                throw new Error(parsed.content || 'Unknown error');
+                if (parsed.chunk_type === 'start') {
+                  console.log('[Chat] Stream started');
+                  // Stream started successfully
+                } else if (parsed.chunk_type === 'content' && parsed.content) {
+                  accumulatedContent += parsed.content;
+                  
+                  // Update message content
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === agentMessageId
+                        ? { ...msg, content: accumulatedContent }
+                        : msg
+                    )
+                  );
+                } else if (parsed.chunk_type === 'done') {
+                  console.log('[Chat] Stream completed, memories_count:', parsed.memories_count);
+                  // Mark streaming as complete
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === agentMessageId
+                        ? { ...msg, isStreaming: false }
+                        : msg
+                    )
+                  );
+                  break; // Exit the while loop
+                } else if (parsed.chunk_type === 'error') {
+                  const errorMsg = parsed.content || 'Unknown error occurred';
+                  console.error('[Chat] Stream error:', errorMsg);
+                  streamError = new Error(errorMsg);
+                  throw streamError;
+                }
+              } catch (parseErr) {
+                // If it's a stream error we threw, re-throw it
+                if (parseErr instanceof Error && parseErr === streamError) {
+                  throw parseErr;
+                }
+                console.error('[Chat] Failed to parse SSE data:', parseErr, 'Raw data:', data);
+                // Continue processing other lines even if one fails to parse
               }
-            } catch (parseErr) {
-              console.error('Failed to parse SSE data:', parseErr);
+            } else if (line.trim() && !line.startsWith(':')) {
+              // Log non-SSE lines for debugging
+              console.warn('[Chat] Unexpected SSE line:', line);
             }
           }
         }
+      } catch (streamErr) {
+        // Re-throw stream errors
+        if (streamErr instanceof Error) {
+          throw streamErr;
+        }
+        throw new Error(`Stream processing error: ${streamErr}`);
       }
     } catch (err) {
       console.error('Streaming error:', err);
@@ -595,4 +648,5 @@ function MessageBubble({ message }: MessageBubbleProps) {
     </div>
   );
 }
+
 

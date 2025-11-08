@@ -278,3 +278,7 @@ curl -X POST http://localhost:8080/api/v1/memories/search \
 **UI 状态**: ✅ 可访问  
 **记忆功能**: ✅ 基本正常（需要小优化）
 
+
+
+
+

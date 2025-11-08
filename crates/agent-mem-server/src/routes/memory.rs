@@ -824,17 +824,55 @@ async fn search_by_libsql_exact(
     
     // 使用repositories.memories.search方法（支持content LIKE查询）
     match repositories.memories
-        .search(query, limit as i64)
+        .search(query, (limit * 2) as i64)  // 多取一些，用于排序过滤
         .await
     {
         Ok(memories) if !memories.is_empty() => {
             info!("✅ LibSQL查询成功: 找到 {} 条记忆", memories.len());
-            for mem in &memories {
-                debug!("  - ID: {}, Content: {}...", mem.id, &mem.content[..50.min(mem.content.len())]);
+            
+            // 🔧 修复: 优先返回精确匹配的商品记忆
+            // 1. 分离精确匹配和模糊匹配
+            let mut exact_matches = Vec::new();
+            let mut fuzzy_matches = Vec::new();
+            
+            for mem in memories {
+                let is_exact = {
+                    // 检查 content 是否包含 "商品ID: {query}"
+                    mem.content.contains(&format!("商品ID: {}", query)) ||
+                    // 检查 metadata 中的 product_id 是否匹配
+                    mem.metadata
+                        .get("product_id")
+                        .and_then(|v| v.as_str())
+                        .map(|pid| pid == query)
+                        .unwrap_or(false)
+                };
+                
+                // 排除工作记忆（working memory），它们通常是LLM的回复
+                let is_working_memory = matches!(mem.memory_type.as_str(), "working" | "Working");
+                
+                if is_exact && !is_working_memory {
+                    exact_matches.push(mem);
+                } else if !is_working_memory {
+                    fuzzy_matches.push(mem);
+                }
+            }
+            
+            info!("📊 精确匹配: {} 条, 模糊匹配: {} 条", exact_matches.len(), fuzzy_matches.len());
+            
+            // 2. 合并结果：精确匹配在前，模糊匹配在后
+            let mut sorted_memories = exact_matches;
+            sorted_memories.extend(fuzzy_matches);
+            
+            // 3. 限制返回数量
+            sorted_memories.truncate(limit);
+            
+            for mem in &sorted_memories {
+                debug!("  - ID: {}, Type: {}, Content: {}...", 
+                    mem.id, mem.memory_type, &mem.content[..50.min(mem.content.len())]);
             }
             
             // 直接转换为JSON
-            let json_results: Vec<serde_json::Value> = memories
+            let json_results: Vec<serde_json::Value> = sorted_memories
                 .into_iter()
                 .map(|m| {
                     serde_json::json!({
@@ -854,7 +892,12 @@ async fn search_by_libsql_exact(
                 })
                 .collect();
             
-            Ok(json_results)
+            if json_results.is_empty() {
+                info!("⚠️  过滤后没有有效结果: query='{}'", query);
+                Err(format!("未找到匹配的记忆: {}", query))
+            } else {
+                Ok(json_results)
+            }
         }
         Ok(_) => {
             info!("⚠️  LibSQL未找到结果: query='{}'", query);
@@ -941,8 +984,49 @@ pub async fn search_memories(
             ServerError::MemoryError(e.to_string())
         })?;
 
+    // 🔧 修复: 对于精确查询，优先返回精确匹配的结果
+    let mut sorted_results = results;
+    if is_exact_query {
+        // 分离精确匹配和模糊匹配
+        let mut exact_matches = Vec::new();
+        let mut fuzzy_matches = Vec::new();
+        
+        for item in sorted_results {
+            let is_exact = {
+                // 检查 content 是否包含 "商品ID: {query}"
+                item.content.contains(&format!("商品ID: {}", request.query)) ||
+                // 检查 metadata 中的 product_id 是否匹配
+                item.metadata
+                    .as_object()
+                    .and_then(|m| m.get("product_id"))
+                    .and_then(|v| v.as_str())
+                    .map(|pid| pid == request.query)
+                    .unwrap_or(false)
+            };
+            
+            // 排除工作记忆（working memory）
+            let is_working_memory = matches!(
+                item.memory_type.to_string().as_str(),
+                "working" | "Working"
+            );
+            
+            if is_exact && !is_working_memory {
+                exact_matches.push(item);
+            } else if !is_working_memory {
+                fuzzy_matches.push(item);
+            }
+        }
+        
+        info!("📊 向量搜索排序: 精确匹配 {} 条, 模糊匹配 {} 条", 
+            exact_matches.len(), fuzzy_matches.len());
+        
+        // 合并：精确匹配在前，模糊匹配在后
+        sorted_results = exact_matches;
+        sorted_results.extend(fuzzy_matches);
+    }
+    
     // 转换为JSON格式，简化结构以匹配前端期望
-    let json_results: Vec<serde_json::Value> = results
+    let json_results: Vec<serde_json::Value> = sorted_results
         .into_iter()
         .map(|item| {
             serde_json::json!({

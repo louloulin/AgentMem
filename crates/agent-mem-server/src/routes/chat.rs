@@ -18,21 +18,16 @@ use crate::models::ApiResponse;
 use crate::orchestrator_factory::create_orchestrator;
 use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest as OrchestratorChatRequest};
 use agent_mem_core::storage::factory::Repositories;
-use agent_mem_llm::LLMClient;
-use agent_mem_tools::ToolExecutor;
-use agent_mem_traits::LLMConfig;
 use axum::{
     extract::{Extension, Path},
-    http::StatusCode,
     response::sse::{Event, Sse},
     Json,
 };
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value as JsonValue};
+use serde_json::Value as JsonValue;
 use std::convert::Infallible;
 use std::sync::Arc;
-use std::time::Instant;
 use tracing::{debug, error, info};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -264,9 +259,7 @@ pub async fn send_chat_message_stream(
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
-    use futures::stream::{self, StreamExt};
-
-    let start_time = Instant::now();
+    use futures::stream;
 
     // Validate agent exists and belongs to user's organization
     let agent_repo = repositories.agents.clone();
@@ -349,7 +342,23 @@ pub async fn send_chat_message_stream(
 
                 let start_event = match serde_json::to_string(&start_chunk) {
                     Ok(json) => Ok(Event::default().data(json)),
-                    Err(_) => return None,
+                    Err(e) => {
+                        error!("Failed to serialize start chunk: {}", e);
+                        // Even if serialization fails, send a fallback error message
+                        let fallback_error = StreamChunk {
+                            chunk_type: "error".to_string(),
+                            content: Some("Failed to initialize stream".to_string()),
+                            tool_call: None,
+                            memories_count: None,
+                        };
+                        match serde_json::to_string(&fallback_error) {
+                            Ok(json) => Ok(Event::default().data(json)),
+                            Err(_) => {
+                                // Last resort: send plain text error
+                                Ok(Event::default().data("{\"chunk_type\":\"error\",\"content\":\"Stream initialization failed\"}"))
+                            }
+                        }
+                    }
                 };
 
                 // Execute orchestrator and get full response
@@ -358,6 +367,12 @@ pub async fn send_chat_message_stream(
                         let content = response.content;
                         let memories_count = response.memories_count;
 
+                        info!(
+                            "Orchestrator step completed: content_len={}, memories_count={}",
+                            content.len(),
+                            memories_count
+                        );
+
                         // Transition to streaming state
                         Some((
                             start_event,
@@ -365,19 +380,27 @@ pub async fn send_chat_message_stream(
                         ))
                     }
                     Err(e) => {
-                        // Send error and end
+                        error!("Orchestrator step failed: {}", e);
+                        // Send error and end - ensure we always send something
                         let error_chunk = StreamChunk {
                             chunk_type: "error".to_string(),
-                            content: Some(format!("Error: {}", e)),
+                            content: Some(format!("Orchestrator error: {}", e)),
                             tool_call: None,
                             memories_count: None,
                         };
 
-                        if let Ok(json) = serde_json::to_string(&error_chunk) {
-                            Some((Ok(Event::default().data(json)), StreamState::Done))
-                        } else {
-                            None
-                        }
+                        let error_event = match serde_json::to_string(&error_chunk) {
+                            Ok(json) => Ok(Event::default().data(json)),
+                            Err(ser_err) => {
+                                error!("Failed to serialize error chunk: {}", ser_err);
+                                // Fallback: send plain text error
+                                Ok(Event::default().data(format!(
+                                    "{{\"chunk_type\":\"error\",\"content\":\"{}\"}}",
+                                    e.to_string().replace('"', "\\\"")
+                                )))
+                            }
+                        };
+                        Some((error_event, StreamState::Done))
                     }
                 }
             }
@@ -395,11 +418,18 @@ pub async fn send_chat_message_stream(
                         memories_count: Some(memories_count),
                     };
 
-                    if let Ok(json) = serde_json::to_string(&done_chunk) {
-                        Some((Ok(Event::default().data(json)), StreamState::Done))
-                    } else {
-                        None
-                    }
+                    let done_event = match serde_json::to_string(&done_chunk) {
+                        Ok(json) => Ok(Event::default().data(json)),
+                        Err(e) => {
+                            error!("Failed to serialize done chunk: {}", e);
+                            // Fallback: send plain text done message
+                            Ok(Event::default().data(format!(
+                                "{{\"chunk_type\":\"done\",\"memories_count\":{}}}",
+                                memories_count
+                            )))
+                        }
+                    };
+                    Some((done_event, StreamState::Done))
                 } else {
                     // Send next chunk of content (using character-based indexing for UTF-8 safety)
                     let chars: Vec<char> = content.chars().collect();
@@ -413,17 +443,25 @@ pub async fn send_chat_message_stream(
                         memories_count: None,
                     };
 
-                    if let Ok(json) = serde_json::to_string(&content_chunk) {
-                        // Add small delay for typewriter effect (optional, can be removed for faster streaming)
-                        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    let content_event = match serde_json::to_string(&content_chunk) {
+                        Ok(json) => Ok(Event::default().data(json)),
+                        Err(e) => {
+                            error!("Failed to serialize content chunk: {}", e);
+                            // Fallback: send plain text content
+                            Ok(Event::default().data(format!(
+                                "{{\"chunk_type\":\"content\",\"content\":\"{}\"}}",
+                                chunk_content.replace('"', "\\\"").replace('\n', "\\n")
+                            )))
+                        }
+                    };
 
-                        Some((
-                            Ok(Event::default().data(json)),
-                            StreamState::Streaming(content, memories_count, end_index),
-                        ))
-                    } else {
-                        None
-                    }
+                    // Add small delay for typewriter effect (optional, can be removed for faster streaming)
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+                    Some((
+                        content_event,
+                        StreamState::Streaming(content, memories_count, end_index),
+                    ))
                 }
             }
             StreamState::Done => None,
