@@ -355,10 +355,10 @@ impl EnhancedHybridSearchEngine {
         let query = query.to_string();
         let threshold = strategy.threshold;
         
-        let (vector_result, bm25_result) = tokio::join!(
+        let (vector_result, bm25_result): (Result<(Vec<SearchResult>, u64)>, Result<(Vec<SearchResult>, u64)>) = tokio::join!(
             async {
                 if !strategy.use_vector {
-                    return Ok((Vec::new(), 0u64));
+                    return Ok::<(Vec<SearchResult>, u64), AgentMemError>((Vec::new(), 0u64));
                 }
                 
                 if let Some(searcher) = vector_searcher {
@@ -372,7 +372,7 @@ impl EnhancedHybridSearchEngine {
             },
             async {
                 if !strategy.use_bm25 {
-                    return Ok((Vec::new(), 0u64));
+                    return Ok::<(Vec<SearchResult>, u64), AgentMemError>((Vec::new(), 0u64));
                 }
                 
                 if let Some(searcher) = bm25_searcher {

@@ -281,9 +281,11 @@ impl LibSQLFTS5Store {
                 AgentMemError::StorageError(format!("Failed to get content: {e}"))
             })?;
             
-            let score: f32 = row.get(2).map_err(|e| {
+            // Get as f64 first, then convert to f32
+            let score_f64: f64 = row.get(2).map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to get score: {e}"))
             })?;
+            let score = score_f64 as f32;
             
             let agent_id: String = row.get(3).map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
@@ -359,15 +361,29 @@ impl LibSQLFTS5Store {
         while let Some(row) = rows.next().await.map_err(|e| {
             AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
         })? {
-            let id: String = row.get(0)?;
-            let content: String = row.get(1)?;
-            let score: f32 = row.get(2)?;
-            let agent_id: String = row.get(3)?;
+            let id: String = row.get(0).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get id: {e}"))
+            })?;
+            let content: String = row.get(1).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get content: {e}"))
+            })?;
+            // Get as f64 first, then convert to f32
+            let score_f64: f64 = row.get(2).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get score: {e}"))
+            })?;
+            let score = score_f64 as f32;
+            let agent_id: String = row.get(3).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
+            })?;
             let user_id: Option<String> = row.get(4).ok();
-            let created_at_ts: i64 = row.get(5)?;
+            let created_at_ts: i64 = row.get(5).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
+            })?;
             let created_at = DateTime::from_timestamp(created_at_ts, 0)
                 .unwrap_or_else(|| Utc::now());
-            let metadata_json: String = row.get(6)?;
+            let metadata_json: String = row.get(6).map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to get metadata: {e}"))
+            })?;
             let metadata: HashMap<String, String> = serde_json::from_str(&metadata_json)
                 .unwrap_or_default();
             
@@ -410,7 +426,9 @@ impl LibSQLFTS5Store {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to get stats: {e}")))?;
         
-        let total_memories = if let Some(row) = rows.next().await? {
+        let total_memories = if let Some(row) = rows.next().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get stats row: {e}"))
+        })? {
             row.get::<i64>(0).unwrap_or(0) as usize
         } else {
             0
