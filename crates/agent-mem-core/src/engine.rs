@@ -216,24 +216,49 @@ impl MemoryEngine {
 
             let fetch_limit = limit.unwrap_or(100) as i64;
 
-            // 根据scope获取记忆
-            let db_memories = if let Some(uid) = target_user_id {
-                // 优先按user_id过滤（同一用户的记忆）
-                memory_repo
-                    .find_by_user_id(uid, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
-            } else if let Some(aid) = agent_id {
-                // 回退到agent_id过滤
-                memory_repo
-                    .find_by_agent_id(aid, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
-            } else {
-                memory_repo
-                    .list(0, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+            // 🔧 修复: 根据scope获取记忆，对于Global Scope使用search方法
+            let db_memories = match &scope {
+                Some(MemoryScope::Global) => {
+                    // 🔧 修复: Global Scope使用search方法进行LIKE查询，而不是list()
+                    info!("🔍 Global Scope: 使用search方法查询: '{}'", query);
+                    memory_repo
+                        .search(query, fetch_limit)
+                        .await
+                        .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                }
+                _ => {
+                    // 其他scope使用原有逻辑
+                    if let Some(uid) = target_user_id {
+                        // 优先按user_id过滤（同一用户的记忆）
+                        // 🔧 修复: 对于User scope，先按user_id过滤，然后搜索
+                        let user_memories = memory_repo
+                            .find_by_user_id(uid, fetch_limit * 2)
+                            .await
+                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?;
+                        
+                        // 如果查询不为空，过滤包含查询的记忆
+                        if !query.trim().is_empty() {
+                            user_memories.into_iter()
+                                .filter(|m| m.content.contains(query))
+                                .take(fetch_limit as usize)
+                                .collect()
+                        } else {
+                            user_memories.into_iter().take(fetch_limit as usize).collect()
+                        }
+                    } else if let Some(aid) = agent_id {
+                        // 回退到agent_id过滤
+                        memory_repo
+                            .find_by_agent_id(aid, fetch_limit)
+                            .await
+                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                    } else {
+                        // 无scope限制，使用search方法
+                        memory_repo
+                            .search(query, fetch_limit)
+                            .await
+                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                    }
+                }
             };
 
             info!(
@@ -244,9 +269,26 @@ impl MemoryEngine {
                 target_session_id
             );
 
+            // 🔧 修复: 检测商品ID查询，用于过滤工作记忆
+            let is_product_query = {
+                use regex::Regex;
+                Regex::new(r"P\d{6}").unwrap().is_match(query)
+            };
+            
             // 转换为 Memory (MemoryItem) 类型并计算相关性
             let mut scored_memories: Vec<(Memory, f64)> = db_memories
                 .into_iter()
+                .filter(|db_mem| {
+                    // 🔧 修复: 对于商品ID查询，过滤工作记忆
+                    if is_product_query {
+                        !matches!(
+                            db_mem.memory_type.as_str(),
+                            "working" | "Working"
+                        )
+                    } else {
+                        true  // 非商品查询，不过滤
+                    }
+                })
                 .map(|db_mem| {
                     use std::collections::HashMap;
                     use chrono::Utc;
@@ -323,7 +365,6 @@ impl MemoryEngine {
                     let final_score = relevance_score * time_decay * user_match_boost * (0.5 + 0.5 * memory.importance as f64);
                     
                     // 日志（安全截取字符串）
-                    let query_preview: String = query.chars().take(20).collect();
                     let content_preview: String = memory.content.chars().take(30).collect();
                     info!("🔍 Memory: user={:?} age={}h relevance={:.2} decay={:.2} user_boost={:.1} importance={:.2} → final={:.3} | '{}'", 
                           memory.user_id.as_ref().map(|s| s.chars().take(8).collect::<String>()), 
@@ -344,8 +385,59 @@ impl MemoryEngine {
                 scored_memories.len()
             );
 
-            // 按最终分数排序
-            scored_memories.sort_by(|(_, score_a), (_, score_b)| {
+            // 🔧 修复: 改进排序逻辑 - 精确匹配优先，工作记忆降权
+            let is_product_query = {
+                use regex::Regex;
+                Regex::new(r"P\d{6}").unwrap().is_match(query)
+            };
+            
+            scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
+                // 辅助函数：检查是否是精确商品匹配
+                let is_exact_product_match = |mem: &Memory, q: &str| -> bool {
+                    if let Some(product_id) = {
+                        use regex::Regex;
+                        Regex::new(r"P\d{6}").unwrap().find(q).map(|m| m.as_str())
+                    } {
+                        mem.content.contains(&format!("商品ID: {}", product_id)) ||
+                        mem.metadata
+                            .get("product_id")
+                            .and_then(|v| v.as_str())
+                            .map(|pid| pid == product_id)
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    }
+                };
+                
+                if is_product_query {
+                    // 1. 精确匹配优先
+                    let a_exact = is_exact_product_match(mem_a, query);
+                    let b_exact = is_exact_product_match(mem_b, query);
+                    
+                    match (a_exact, b_exact) {
+                        (true, false) => return std::cmp::Ordering::Less,   // a 排在前面
+                        (false, true) => return std::cmp::Ordering::Greater, // b 排在前面
+                        _ => {}
+                    }
+                    
+                    // 2. 工作记忆降权（虽然已经过滤，但保留逻辑以防万一）
+                    let a_working = matches!(
+                        mem_a.memory_type,
+                        agent_mem_traits::MemoryType::Working
+                    );
+                    let b_working = matches!(
+                        mem_b.memory_type,
+                        agent_mem_traits::MemoryType::Working
+                    );
+                    
+                    match (a_working, b_working) {
+                        (true, false) => return std::cmp::Ordering::Greater,  // a 排在后面
+                        (false, true) => return std::cmp::Ordering::Less,     // b 排在后面
+                        _ => {}
+                    }
+                }
+                
+                // 3. 按分数排序
                 score_b
                     .partial_cmp(score_a)
                     .unwrap_or(std::cmp::Ordering::Equal)
@@ -474,12 +566,37 @@ impl MemoryEngine {
 
     /// Calculate relevance score for a memory based on query
     fn calculate_relevance_score(&self, memory: &Memory, query: &str) -> f64 {
+        use regex::Regex;
+        
+        // 🔧 修复: 检测商品ID查询，优先处理精确ID匹配
+        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();
+        if let Some(product_id) = product_id_pattern.find(query) {
+            let product_id = product_id.as_str();
+            
+            // 1. 精确ID匹配（最高分）
+            if memory.content.contains(&format!("商品ID: {}", product_id)) ||
+               memory.metadata
+                   .get("product_id")
+                   .and_then(|v| v.as_str())
+                   .map(|pid| pid == product_id)
+                   .unwrap_or(false) {
+                info!("✅ 精确商品ID匹配: product_id={}", product_id);
+                return 2.0;  // 精确匹配：最高分
+            }
+            
+            // 2. 包含ID但不精确（中等分）
+            if memory.content.contains(product_id) {
+                info!("✅ 包含商品ID: product_id={}", product_id);
+                return 1.5;
+            }
+        }
+        
         let query_lower = query.to_lowercase();
         let content_lower = memory.content.to_lowercase();
 
-        // Exact match gets highest score
+        // 3. 完全匹配（高分）
         if content_lower.contains(&query_lower) {
-            info!("✅ Exact match found!");
+            info!("✅ 完全匹配");
             return 1.0;
         }
 

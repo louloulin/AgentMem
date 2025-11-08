@@ -172,35 +172,71 @@ impl MemoryIntegrator {
             agent_id, user_id, session_id, max_count
         );
 
-        // 🆕 特殊处理: 检测商品ID查询，优先查询Global Scope
-        let is_product_id = Regex::new(r"^P\d{6}$")
-            .unwrap()
-            .is_match(query);
+        // 🔧 修复: 改进商品ID检测 - 从查询中提取商品ID（即使包含其他文本）
+        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();  // 不要求完全匹配，允许包含其他文本
+        let extracted_product_id = product_id_pattern.find(query)
+            .map(|m| m.as_str());
         
-        if is_product_id {
-            info!("🎯 检测到商品ID查询，优先查询Global Scope: {}", query);
+        if let Some(product_id) = extracted_product_id {
+            info!("🎯 检测到商品ID查询，提取ID: {} (from query: {})", product_id, query);
             
+            // 使用提取的商品ID进行查询（而不是完整查询）
             let global_scope = MemoryScope::Global;
             match self
                 .memory_engine
-                .search_memories(query, Some(global_scope), Some(max_count * 2))
+                .search_memories(product_id, Some(global_scope), Some(max_count * 2))
                 .await
             {
                 Ok(memories) if !memories.is_empty() => {
                     info!("✅ Global Memory (商品ID查询) 找到 {} 条记忆", memories.len());
+                    
+                    // 🔧 修复: 优先返回精确匹配的商品记忆，过滤工作记忆
+                    let mut exact_product_memories = Vec::new();
+                    let mut other_memories = Vec::new();
+                    
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            // 商品ID查询结果权重提升
-                            if let Some(score) = memory.score {
-                                memory.score = Some(score * 1.5);  // 提升权重
+                            // 检查是否是精确匹配的商品记忆
+                            let is_exact_product = {
+                                memory.content.contains(&format!("商品ID: {}", product_id)) ||
+                                memory.metadata
+                                    .get("product_id")
+                                    .and_then(|v| v.as_str())
+                                    .map(|pid| pid == product_id)
+                                    .unwrap_or(false)
+                            };
+                            
+                            // 排除工作记忆
+                            let is_working_memory = matches!(
+                                memory.memory_type,
+                                agent_mem_traits::MemoryType::Working
+                            );
+                            
+                            if is_exact_product && !is_working_memory {
+                                // 精确匹配的商品记忆，权重提升
+                                if let Some(score) = memory.score {
+                                    memory.score = Some(score * 2.0);  // 大幅提升权重
+                                }
+                                exact_product_memories.push(memory);
+                            } else if !is_working_memory {
+                                // 其他相关记忆
+                                if let Some(score) = memory.score {
+                                    memory.score = Some(score * 1.2);  // 适度提升权重
+                                }
+                                other_memories.push(memory);
                             }
-                            all_memories.push(memory);
                         }
                     }
                     
+                    // 合并：精确匹配在前
+                    all_memories.extend(exact_product_memories);
+                    all_memories.extend(other_memories);
+                    
                     // 如果找到足够的结果，直接返回
                     if all_memories.len() >= max_count {
-                        info!("✅ 商品ID查询完成，返回 {} 条结果", all_memories.len());
+                        info!("✅ 商品ID查询完成，返回 {} 条结果 (精确匹配: {})", 
+                            all_memories.len(), 
+                            exact_product_memories.len());
                         all_memories.sort_by(|a, b| {
                             b.score
                                 .unwrap_or(0.0)
@@ -211,7 +247,7 @@ impl MemoryIntegrator {
                     }
                 }
                 Ok(_) => {
-                    warn!("⚠️  Global Memory查询返回0结果: query='{}'", query);
+                    warn!("⚠️  Global Memory查询返回0结果: product_id='{}'", product_id);
                 }
                 Err(e) => {
                     warn!("⚠️  Global Memory查询失败: {}, 继续其他scope查询", e);
