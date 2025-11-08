@@ -1,9 +1,167 @@
-# AgentMem 通用记忆平台架构改造方案
+# AgentMem 全面重构方案 (Radical Transformation Plan)
 
-**文档版本**: v3.0 (架构级改造)  
+**文档版本**: v4.0 (全面重构版)  
 **创建日期**: 2025-11-08  
-**核心理念**: 架构优先 + 抽象能力 + 泛化设计  
-**参考**: agentmem80.md深度分析 + Cursor/Augment记忆机制 + Mem0架构
+**重构类型**: 🔥 **激进式全面重构** (非渐进式)  
+**时间框架**: 12周（3个月）  
+**代码复用**: 80%+ (改造现有，非重写)  
+**核心理念**: 零硬编码 + 完全抽象 + 原地升级 + 立即切换
+
+---
+
+## ⚡ 全面重构战略
+
+### 📋 战略决策
+
+| 决策点 | 渐进式方案 ❌ | 激进式方案 ✅ | 理由 |
+|-------|-------------|-------------|------|
+| **迁移方式** | 双写6个月 | 立即切换 | 技术债立即清零 |
+| **代码处理** | 新建+旧保留 | 原地改造 | 保留git历史 |
+| **兼容性** | 向后兼容 | 强制升级 | 清理历史包袱 |
+| **硬编码** | 逐步消除 | 一次清零 | 全部196个一次性配置化 |
+| **测试策略** | 渐进测试 | 全量E2E | 确保一次成功 |
+| **上线方式** | 灰度发布 | 全量切换 | 快速验证 |
+
+### 🎯 核心改造策略
+
+#### 1. **原地重构**（非新建）
+
+```rust
+// ❌ 错误：新建一个crate
+// crates/agent-mem-abstractions/
+
+// ✅ 正确：直接改造现有代码
+// crates/agent-mem-core/src/types.rs
+
+// 之前（❌ 删除）
+pub struct Memory {
+    pub content: String,
+    pub user_id: Option<String>,
+    pub agent_id: Option<String>,
+    pub memory_type: MemoryType,
+    // ...
+}
+
+// 之后（✅ 直接替换）
+pub struct Memory {
+    pub id: MemoryId,
+    pub content: Content,                // ✅ 多模态
+    pub attributes: AttributeSet,        // ✅ 完全开放
+    pub relations: RelationGraph,        // ✅ 关系网络
+    pub metadata: Metadata,              // ✅ 系统元信息
+}
+
+// 无需适配器，直接迁移
+```
+
+#### 2. **立即切换**（非双写）
+
+```rust
+// ❌ 错误：双写模式（保留6个月）
+impl MemoryEngine {
+    pub async fn add_memory(&self, memory: Memory) -> Result<String> {
+        // 新写
+        self.new_storage.store(memory).await?;
+        // 旧写（兼容）
+        self.old_storage.store(old_format).await?;
+    }
+}
+
+// ✅ 正确：强制迁移（立即）
+impl MemoryEngine {
+    pub async fn add_memory(&self, memory: Memory) -> Result<String> {
+        // 只写新格式
+        self.storage.store(memory).await?;
+        // 旧API直接返回错误，引导用户升级
+    }
+}
+
+// 启动时一次性数据迁移工具
+// cargo run --bin agentmem-migrate-v4 --force
+```
+
+#### 3. **配置驱动**（非硬编码）
+
+```rust
+// ❌ 错误：代码中硬编码
+const VECTOR_WEIGHT: f32 = 0.7;
+const FULLTEXT_WEIGHT: f32 = 0.3;
+
+// ✅ 正确：配置文件
+// config/agentmem.toml
+[search]
+vector_weight = 0.7
+fulltext_weight = 0.3
+adaptive_learning = true
+
+[importance]
+recency_weight = 0.25
+frequency_weight = 0.20
+
+// 运行时动态加载
+let config = Config::load("config/agentmem.toml")?;
+```
+
+#### 4. **复用优质代码**（非重写）
+
+**当前39.5万行代码，80%是高质量的**：
+
+| 组件 | 行数 | 质量 | 处理方式 |
+|------|------|------|----------|
+| HybridSearchEngine | 3,500 | ⭐⭐⭐⭐⭐ | ✅ 保留，增强接口 |
+| ImportanceEvaluator | 2,800 | ⭐⭐⭐⭐⭐ | ✅ 保留，配置化权重 |
+| DecisionEngine | 2,200 | ⭐⭐⭐⭐ | ✅ 保留，添加学习模块 |
+| Memory固定结构 | 1,200 | ⭐⭐ | ❌ 删除，替换为AttributeSet |
+| Scope推断硬编码 | 800 | ⭐ | ❌ 删除，替换为属性查询 |
+| 196个硬编码 | 散布 | ⭐ | ❌ 删除，替换为配置 |
+
+**复用示例**：
+
+```rust
+// ✅ HybridSearchEngine几乎不变，只改接口
+impl HybridSearchEngine {
+    // 之前（❌ 固定参数）
+    pub async fn search(
+        &self,
+        query: String,                    // ❌ 字符串
+        vector_weight: f32,               // ❌ 硬编码
+        fulltext_weight: f32,             // ❌ 硬编码
+    ) -> Result<Vec<Memory>> { ... }
+    
+    // 之后（✅ 抽象参数）
+    pub async fn search(
+        &self,
+        query: &Query,                    // ✅ 抽象Query
+        strategy: &SearchStrategy,        // ✅ 策略对象
+    ) -> Result<Vec<Memory>> { 
+        // 内部实现99%不变
+        // 只是参数接口改变
+    }
+}
+```
+
+### ⏱️ 12周时间线（快速迭代）
+
+| 周 | 阶段 | 关键产出 | 验收标准 |
+|----|------|---------|----------|
+| **W1-2** | 🔥 核心重构 | Memory/Query/AttributeSet替换 | 编译通过 |
+| **W3-4** | 🔧 配置化 | 所有硬编码消除 | 0硬编码 |
+| **W5-6** | 🧠 智能增强 | 自适应学习集成 | 准确率+30% |
+| **W7-8** | 🚀 性能优化 | 缓存+并发 | 性能无回退 |
+| **W9-10** | ✅ 测试完善 | E2E测试覆盖 | 覆盖率>90% |
+| **W11** | 📚 文档+工具 | 迁移工具+文档 | 工具可用 |
+| **W12** | 🎉 上线部署 | 全量切换 | 生产就绪 |
+
+### 🎯 成功指标
+
+| 指标 | 基线 | 目标 | 验收 |
+|------|------|------|------|
+| **硬编码数量** | 196个 | 0个 | 全部配置化 |
+| **代码复用率** | 20-30% | 80%+ | Git统计 |
+| **搜索准确率** | 60% | 95%+ | 评测集 |
+| **响应延迟** | 200ms | <200ms | 不能回退 |
+| **QPS** | 500 | 1000+ | 压测 |
+| **测试覆盖率** | 70% | 90%+ | Coverage工具 |
 
 ---
 
@@ -787,9 +945,647 @@ pub enum PluginType {
 
 ---
 
-## 🔄 实施路线图
+## 🔄 激进式实施路线图 (12周全面重构)
 
-### Phase 0: 核心抽象重构（4周）
+### 重构原则
+
+1. **大爆炸式迁移** (Big Bang Migration)
+   - 不再保留旧代码
+   - 一次性切换所有API
+   - 启动时自动数据迁移
+
+2. **原地手术** (In-Place Surgery)
+   - 直接修改现有文件
+   - 保留Git历史
+   - 保留测试文件结构
+
+3. **配置先行** (Configuration First)
+   - 先统一配置系统
+   - 后消除硬编码
+   - 最后添加学习机制
+
+### Week 1-2: 🔥 核心结构大重构
+
+**目标**: 一次性替换Memory/Query/Scope所有核心类型
+
+#### Day 1-3: Memory结构革命
+
+**文件**: `crates/agent-mem-core/src/types.rs` (原地修改)
+
+```rust
+// ========== 删除旧定义 ==========
+// pub struct Memory { ... }  // ❌ 删除整个结构
+
+// ========== 新增定义 ==========
+/// 通用内容类型（支持多模态）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Content {
+    Text(String),
+    Image { url: String, caption: Option<String> },
+    Audio { url: String, transcript: Option<String> },
+    Video { url: String, summary: Option<String> },
+    Structured(serde_json::Value),
+    Mixed(Vec<Content>),
+}
+
+/// 属性集（完全开放）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeSet {
+    attributes: HashMap<AttributeKey, AttributeValue>,
+    schema: Option<Arc<AttributeSchema>>,
+}
+
+impl AttributeSet {
+    pub fn set(&mut self, key: AttributeKey, value: AttributeValue) {
+        self.attributes.insert(key, value);
+    }
+    
+    pub fn get(&self, key: &AttributeKey) -> Option<&AttributeValue> {
+        self.attributes.get(key)
+    }
+    
+    /// 模式查询（支持通配符、正则、范围）
+    pub fn query(&self, pattern: &AttributePattern) -> Vec<(&AttributeKey, &AttributeValue)> {
+        match pattern {
+            AttributePattern::Exact { key } => {
+                self.get(key).map(|v| vec![(key, v)]).unwrap_or_default()
+            }
+            AttributePattern::Prefix { namespace, prefix } => {
+                self.attributes.iter()
+                    .filter(|(k, _)| k.namespace == *namespace && k.name.starts_with(prefix))
+                    .collect()
+            }
+            AttributePattern::Regex { namespace, pattern } => {
+                let re = Regex::new(pattern).unwrap();
+                self.attributes.iter()
+                    .filter(|(k, _)| k.namespace == *namespace && re.is_match(&k.name))
+                    .collect()
+            }
+            AttributePattern::Range { key, min, max } => {
+                self.get(key)
+                    .and_then(|v| v.as_number())
+                    .filter(|&n| n >= *min && n <= *max)
+                    .map(|_| vec![(key, self.get(key).unwrap())])
+                    .unwrap_or_default()
+            }
+        }
+    }
+}
+
+/// 属性键（命名空间化）
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct AttributeKey {
+    pub namespace: String,
+    pub name: String,
+}
+
+impl AttributeKey {
+    pub fn system(name: impl Into<String>) -> Self {
+        Self { namespace: "system".to_string(), name: name.into() }
+    }
+    
+    pub fn user(name: impl Into<String>) -> Self {
+        Self { namespace: "user".to_string(), name: name.into() }
+    }
+    
+    pub fn domain(name: impl Into<String>) -> Self {
+        Self { namespace: "domain".to_string(), name: name.into() }
+    }
+}
+
+/// 属性值（类型安全）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AttributeValue {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+    Timestamp(DateTime<Utc>),
+    Array(Vec<AttributeValue>),
+    Object(HashMap<String, AttributeValue>),
+}
+
+/// 关系图（记忆间关系）
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RelationGraph {
+    relations: Vec<Relation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Relation {
+    pub target_id: MemoryId,
+    pub relation_type: RelationType,
+    pub strength: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RelationType {
+    References,
+    Supersedes,
+    PartOf,
+    SimilarTo,
+    CausedBy,
+    Custom(String),
+}
+
+/// 🆕 新Memory定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Memory {
+    pub id: MemoryId,
+    pub content: Content,
+    pub attributes: AttributeSet,
+    pub relations: RelationGraph,
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metadata {
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub accessed_count: u64,
+    pub last_accessed: Option<DateTime<Utc>>,
+}
+
+impl Memory {
+    pub fn builder() -> MemoryBuilder {
+        MemoryBuilder::new()
+    }
+    
+    /// 从旧格式迁移（只在数据迁移时使用）
+    pub fn from_legacy(old: OldMemory) -> Self {
+        let mut attributes = AttributeSet::new();
+        
+        // 迁移固定字段到属性
+        if let Some(user_id) = old.user_id {
+            attributes.set(
+                AttributeKey::system("user_id"),
+                AttributeValue::String(user_id),
+            );
+        }
+        if let Some(agent_id) = old.agent_id {
+            attributes.set(
+                AttributeKey::system("agent_id"),
+                AttributeValue::String(agent_id),
+            );
+        }
+        attributes.set(
+            AttributeKey::system("memory_type"),
+            AttributeValue::String(old.memory_type.to_string()),
+        );
+        attributes.set(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(old.importance as f64),
+        );
+        
+        // 迁移metadata
+        for (key, value) in old.metadata {
+            attributes.set(
+                AttributeKey::user(key),
+                AttributeValue::from_json(value),
+            );
+        }
+        
+        Self {
+            id: MemoryId::from_string(old.id),
+            content: Content::Text(old.content),
+            attributes,
+            relations: RelationGraph::default(),
+            metadata: Metadata {
+                created_at: old.created_at,
+                updated_at: old.updated_at.unwrap_or(old.created_at),
+                accessed_count: 0,
+                last_accessed: None,
+            },
+        }
+    }
+}
+
+/// Builder模式
+pub struct MemoryBuilder {
+    content: Option<Content>,
+    attributes: AttributeSet,
+    relations: RelationGraph,
+}
+
+impl MemoryBuilder {
+    pub fn new() -> Self {
+        Self {
+            content: None,
+            attributes: AttributeSet::new(),
+            relations: RelationGraph::default(),
+        }
+    }
+    
+    pub fn content(mut self, content: impl Into<Content>) -> Self {
+        self.content = Some(content.into());
+        self
+    }
+    
+    pub fn attribute(mut self, key: impl Into<AttributeKey>, value: impl Into<AttributeValue>) -> Self {
+        self.attributes.set(key.into(), value.into());
+        self
+    }
+    
+    pub fn relation(mut self, target_id: MemoryId, relation_type: RelationType, strength: f32) -> Self {
+        self.relations.relations.push(Relation { target_id, relation_type, strength });
+        self
+    }
+    
+    pub fn build(self) -> Memory {
+        Memory {
+            id: MemoryId::new(),
+            content: self.content.expect("content is required"),
+            attributes: self.attributes,
+            relations: self.relations,
+            metadata: Metadata {
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                accessed_count: 0,
+                last_accessed: None,
+            },
+        }
+    }
+}
+```
+
+**测试**:
+```bash
+# 编译检查
+cargo check -p agent-mem-core
+# 单元测试
+cargo test -p agent-mem-core test_memory_builder
+cargo test -p agent-mem-core test_attribute_set_query
+```
+
+#### Day 4-6: Query抽象 + Scope消除
+
+**文件**: `crates/agent-mem-core/src/query.rs` (新建)
+
+```rust
+/// 查询抽象（替代String查询）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Query {
+    pub id: QueryId,
+    pub intent: QueryIntent,
+    pub constraints: Vec<Constraint>,
+    pub preferences: Vec<Preference>,
+    pub context: QueryContext,
+}
+
+/// 查询意图（自动推断）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum QueryIntent {
+    Lookup { entity_id: String },
+    SemanticSearch { semantic_vector: Option<Vec<f32>> },
+    RelationQuery { source: String, relation: String },
+    Aggregation { op: AggregationOp },
+}
+
+/// 约束条件（替代固定Scope）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Constraint {
+    AttributeMatch { key: AttributeKey, value: AttributeValue },
+    AttributeRange { key: AttributeKey, min: f64, max: f64 },
+    TimeRange { start: DateTime<Utc>, end: DateTime<Utc> },
+    Limit(usize),
+    MinScore(f32),
+}
+
+/// 偏好（软约束）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Preference {
+    PreferRecent { weight: f32 },
+    PreferImportant { weight: f32 },
+    PreferType { memory_type: String, weight: f32 },
+}
+
+impl Query {
+    /// 从字符串自动构建Query
+    pub fn from_string(s: &str) -> Self {
+        let features = Self::extract_features(s);
+        
+        Query {
+            id: QueryId::new(),
+            intent: Self::infer_intent(&features),
+            constraints: Self::extract_constraints(&features),
+            preferences: vec![],
+            context: QueryContext::default(),
+        }
+    }
+    
+    fn extract_features(s: &str) -> QueryFeatures {
+        QueryFeatures {
+            has_id_pattern: Regex::new(r"[A-Z]\d{6}").unwrap().is_match(s),
+            has_attribute_filter: s.contains("::"),
+            has_relation_query: s.contains("->"),
+            language: detect_language(s),
+            complexity: estimate_complexity(s),
+        }
+    }
+    
+    fn infer_intent(features: &QueryFeatures) -> QueryIntent {
+        if features.has_id_pattern {
+            QueryIntent::Lookup {
+                entity_id: extract_id_pattern(&features.text),
+            }
+        } else if features.has_relation_query {
+            QueryIntent::RelationQuery {
+                source: extract_source(&features.text),
+                relation: extract_relation(&features.text),
+            }
+        } else {
+            QueryIntent::SemanticSearch {
+                semantic_vector: None,
+            }
+        }
+    }
+}
+```
+
+**删除旧Scope系统**:
+```rust
+// ❌ 删除整个文件
+// crates/agent-mem-core/src/hierarchy.rs
+
+// ❌ 删除MemoryScope enum
+// pub enum MemoryScope { Global, Agent, User, Session }
+
+// ✅ 替换为属性查询
+// 之前：filter by scope
+// memories.filter(|m| m.scope == MemoryScope::User { user_id: "u1" })
+
+// 之后：filter by attributes
+// memories.filter(|m| {
+//     m.attributes.get(&AttributeKey::system("user_id")) == Some(&AttributeValue::String("u1"))
+// })
+```
+
+#### Day 7-14: 存储层适配
+
+**文件**: `crates/agent-mem-storage/src/libsql/memory_repository.rs`
+
+```rust
+impl MemoryRepository for LibSQLMemoryRepository {
+    async fn store(&self, memory: &Memory) -> Result<()> {
+        // ✅ JSON存储attributes（无需改表结构）
+        sqlx::query!(
+            r#"
+            INSERT INTO memories (id, content, attributes, relations, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            "#,
+            memory.id.to_string(),
+            serde_json::to_string(&memory.content)?,
+            serde_json::to_string(&memory.attributes)?,  // ✅ JSON字段
+            serde_json::to_string(&memory.relations)?,
+            serde_json::to_string(&memory.metadata)?,
+        )
+        .execute(&self.pool)
+        .await?;
+        
+        Ok(())
+    }
+    
+    async fn search(&self, query: &Query) -> Result<Vec<Memory>> {
+        // ✅ 属性查询转SQL
+        let mut sql = String::from("SELECT * FROM memories WHERE 1=1");
+        
+        for constraint in &query.constraints {
+            match constraint {
+                Constraint::AttributeMatch { key, value } => {
+                    sql.push_str(&format!(
+                        " AND json_extract(attributes, '$.{}.{}') = '{}'",
+                        key.namespace, key.name, value.to_string()
+                    ));
+                }
+                Constraint::TimeRange { start, end } => {
+                    sql.push_str(&format!(
+                        " AND json_extract(metadata, '$.created_at') BETWEEN '{}' AND '{}'",
+                        start.to_rfc3339(), end.to_rfc3339()
+                    ));
+                }
+                _ => {}
+            }
+        }
+        
+        sqlx::query_as::<_, Memory>(&sql)
+            .fetch_all(&self.pool)
+            .await
+    }
+}
+```
+
+### Week 3-4: 🔧 全面配置化
+
+**目标**: 一次性消除所有196个硬编码
+
+#### 统一配置系统
+
+**文件**: `config/agentmem.toml` (新建)
+
+```toml
+[system]
+version = "4.0.0"
+environment = "production"
+
+[search]
+# 搜索引擎权重
+vector_weight = 0.7
+fulltext_weight = 0.3
+bm25_weight = 0.0
+adaptive_learning = true
+
+# RRF融合参数
+rrf_k = 60
+
+# 阈值
+default_threshold = 0.3
+min_threshold = 0.0
+max_threshold = 0.9
+
+[importance]
+# 重要性评估权重
+recency_weight = 0.25
+frequency_weight = 0.20
+relevance_weight = 0.25
+emotional_weight = 0.15
+context_weight = 0.10
+interaction_weight = 0.05
+
+# 动态权重学习
+enable_dynamic_weights = true
+learning_rate = 0.01
+
+[decision]
+# 决策引擎阈值
+importance_threshold = 0.7
+conflict_threshold = 0.75
+merge_similarity = 0.9
+confidence_min = 0.6
+
+[performance]
+# 性能参数
+max_concurrent_searches = 100
+cache_ttl_seconds = 3600
+batch_size = 50
+
+[adaptive]
+# 自适应学习
+enable_bandit = true
+exploration_rate = 0.1
+decay_factor = 0.95
+```
+
+**代码改造**（所有硬编码文件）：
+
+```rust
+// 之前（❌ 硬编码）
+const VECTOR_WEIGHT: f32 = 0.7;
+const FULLTEXT_WEIGHT: f32 = 0.3;
+
+// 之后（✅ 配置）
+let config = Config::load()?;
+let vector_weight = config.search.vector_weight;
+let fulltext_weight = config.search.fulltext_weight;
+```
+
+**批量替换工具**:
+```bash
+# 自动扫描并替换所有硬编码
+cargo run --bin replace-hardcoded --  \
+    --config config/agentmem.toml \
+    --dry-run
+
+# 确认后执行
+cargo run --bin replace-hardcoded -- \
+    --config config/agentmem.toml \
+    --apply
+```
+
+### Week 5-6: 🧠 智能增强
+
+#### 自适应路由（Multi-Armed Bandit）
+
+**文件**: `crates/agent-mem-core/src/search/adaptive_router.rs` (新建)
+
+```rust
+pub struct AdaptiveRouter {
+    config: Arc<Config>,
+    performance_history: Arc<RwLock<PerformanceHistory>>,
+    bandit: Arc<RwLock<ThompsonSampling>>,
+}
+
+impl AdaptiveRouter {
+    pub async fn decide_strategy(
+        &self,
+        query: &Query,
+    ) -> Result<SearchStrategy> {
+        // 1. 提取查询特征
+        let features = self.extract_features(query);
+        
+        // 2. 使用Bandit选择策略
+        let strategy_id = self.bandit.write().await.select(&features);
+        
+        // 3. 构建搜索策略
+        let strategy = self.build_strategy(strategy_id, query).await?;
+        
+        Ok(strategy)
+    }
+    
+    pub async fn record_performance(
+        &self,
+        query: &Query,
+        strategy_id: usize,
+        accuracy: f32,
+        latency_ms: u64,
+    ) {
+        // 更新Bandit
+        let reward = self.calculate_reward(accuracy, latency_ms);
+        self.bandit.write().await.update(strategy_id, reward);
+        
+        // 记录历史
+        self.performance_history.write().await.record(query, strategy_id, reward);
+    }
+}
+```
+
+### Week 7-8: 🚀 性能优化
+
+#### 缓存系统
+
+```rust
+pub struct MemoryCache {
+    l1: Arc<RwLock<LruCache<QueryHash, Vec<Memory>>>>,  // 热点缓存
+    l2: Arc<Redis>,                                       // 分布式缓存
+}
+```
+
+### Week 9-10: ✅ 测试完善
+
+#### E2E测试
+
+```rust
+#[tokio::test]
+async fn test_full_lifecycle_v4() {
+    // 1. 创建记忆（新格式）
+    let memory = Memory::builder()
+        .content("Hello World")
+        .attribute(AttributeKey::system("user_id"), AttributeValue::String("u1"))
+        .build();
+    
+    let id = engine.add_memory(memory).await.unwrap();
+    
+    // 2. 查询（新Query）
+    let query = Query::from_string("Hello");
+    let results = engine.search(&query).await.unwrap();
+    
+    assert!(results.len() > 0);
+    
+    // 3. 更新
+    engine.update_memory(id, updated_memory).await.unwrap();
+    
+    // 4. 删除
+    engine.delete_memory(id).await.unwrap();
+}
+```
+
+### Week 11: 📚 数据迁移工具
+
+```bash
+# 一次性迁移所有数据
+cargo run --bin agentmem-migrate-v4 -- \
+    --from agentmem-v3.db \
+    --to agentmem-v4.db \
+    --config config/agentmem.toml \
+    --force
+
+# 输出：
+# ✅ 迁移 10,000 条记忆
+# ✅ 转换 196 个硬编码为配置
+# ✅ 验证数据完整性
+# ⏱️ 耗时: 3.2秒
+```
+
+### Week 12: 🎉 上线部署
+
+```bash
+# 停机维护（凌晨2点）
+systemctl stop agentmem-v3
+
+# 数据迁移
+./agentmem-migrate-v4 --force
+
+# 启动新版本
+systemctl start agentmem-v4
+
+# 验证
+curl http://localhost:8080/health
+# {"status":"ok","version":"4.0.0"}
+```
+
+---
+
+## 🔄 实施路线图（已废弃 - 渐进式）
+
+### ~~Phase 0: 核心抽象重构（4周）~~
 
 **目标**: 建立新的抽象层，不破坏现有功能
 
