@@ -395,8 +395,8 @@ impl MemoryManager {
             .ok_or_else(|| AgentMemError::memory_error("Memory not found"))?;
 
         let old_content = memory.content.clone();
-        let old_importance = memory.importance;
-        let old_version = memory.version;
+        let old_importance = memory.importance();
+        let old_version = memory.version();
 
         // Update fields
         if let Some(content) = new_content {
@@ -404,7 +404,11 @@ impl MemoryManager {
         }
 
         if let Some(importance) = new_importance {
-            memory.importance = importance.clamp(0.0, 1.0);
+            let clamped = importance.clamp(0.0, 1.0);
+            memory.attributes.set(
+                crate::types::AttributeKey::system("importance"),
+                crate::types::AttributeValue::Number(clamped as f64),
+            );
         }
 
         if let Some(metadata) = new_metadata {
@@ -421,7 +425,7 @@ impl MemoryManager {
                 history.record_content_update(&memory, &old_content, None)?;
             }
 
-            if memory.importance != old_importance {
+            if memory.importance() != old_importance {
                 history.record_importance_change(&memory, old_importance)?;
             }
         }
@@ -757,11 +761,11 @@ impl MemoryManager {
                     memory_type: agent_mem_traits::MemoryType::Episodic, // 默认类型
                     entities: vec![],
                     relations: vec![],
-                    agent_id: memory.agent_id.clone(),
-                    user_id: memory.user_id.clone(),
-                    importance: memory.importance,
+                    agent_id: memory.agent_id(),
+                    user_id: memory.user_id(),
+                    importance: memory.importance(),
                     embedding: None,
-                    last_accessed_at: chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
+                    last_accessed_at: chrono::DateTime::from_timestamp(memory.last_accessed_at(), 0)
                         .unwrap_or_else(chrono::Utc::now),
                     access_count: 0,
                     expires_at: None,

@@ -823,6 +823,15 @@ impl Memory {
             .unwrap_or(1.0) as u32
     }
     
+    /// 获取memory_type（向后兼容）
+    pub fn memory_type(&self) -> MemoryType {
+        self.attributes
+            .get(&AttributeKey::system("memory_type"))
+            .and_then(|v| v.as_string())
+            .and_then(|s| s.parse::<MemoryType>().ok())
+            .unwrap_or(MemoryType::Semantic)
+    }
+    
     /// 获取created_at（向后兼容）
     pub fn created_at(&self) -> i64 {
         self.metadata.created_at.timestamp()
