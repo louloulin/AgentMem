@@ -5,7 +5,7 @@
 //! - expires_at: 过期时间（用于工作记忆）
 //! - version: 版本号（用于乐观锁定）
 
-use agent_mem_core::types::{Memory, MemoryType};
+use agent_mem_core::types::{Memory, MemoryType, AttributeKey, AttributeValue};
 use agent_mem_traits::Vector;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -75,20 +75,28 @@ async fn main() -> anyhow::Result<()> {
 
     // 设置过期时间为1小时后
     let expires_at = Utc::now().timestamp() + 3600; // 1小时 = 3600秒
-    working_memory.set_expiration(expires_at);
+    working_memory.attributes.set(
+        AttributeKey::system("expires_at"),
+        AttributeValue::Number(expires_at as f64),
+    );
 
     println!("✅ 创建带有 expires_at 的工作记忆:");
     println!("   - ID: {}", working_memory.id);
-    println!("   - 内容: {}", working_memory.content);
+    println!("   - 内容: {}", working_memory.content.to_string());
     println!(
         "   - 创建时间: {}",
-        chrono::DateTime::from_timestamp(working_memory.created_at, 0).unwrap()
+        working_memory.created_at()
     );
     println!(
         "   - 过期时间: {}",
         chrono::DateTime::from_timestamp(expires_at, 0).unwrap()
     );
-    println!("   - 是否已过期: {}", working_memory.is_expired());
+    let is_expired = working_memory.attributes
+        .get(&AttributeKey::system("expires_at"))
+        .and_then(|v| v.as_number())
+        .map(|ts| chrono::Utc::now().timestamp() > ts as i64)
+        .unwrap_or(false);
+    println!("   - 是否已过期: {}", is_expired);
     println!();
 
     // 测试过期检查
@@ -99,15 +107,27 @@ async fn main() -> anyhow::Result<()> {
         "这是一段已过期的记忆".to_string(),
         0.5,
     );
-    expired_memory.set_expiration(Utc::now().timestamp() - 3600); // 1小时前
+    let expired_timestamp = Utc::now().timestamp() - 3600; // 1小时前
+    expired_memory.attributes.set(
+        AttributeKey::system("expires_at"),
+        AttributeValue::Number(expired_timestamp as f64),
+    );
 
     println!("✅ 测试已过期的记忆:");
     println!("   - ID: {}", expired_memory.id);
-    println!(
-        "   - 过期时间: {}",
-        chrono::DateTime::from_timestamp(expired_memory.expires_at.unwrap(), 0).unwrap()
-    );
-    println!("   - 是否已过期: {} ⚠️", expired_memory.is_expired());
+    let expired_at = expired_memory.attributes
+        .get(&AttributeKey::system("expires_at"))
+        .and_then(|v| v.as_number())
+        .map(|ts| chrono::DateTime::from_timestamp(ts as i64, 0).unwrap());
+    if let Some(expired_at) = expired_at {
+        println!("   - 过期时间: {}", expired_at);
+    }
+    let is_expired = expired_memory.attributes
+        .get(&AttributeKey::system("expires_at"))
+        .and_then(|v| v.as_number())
+        .map(|ts| chrono::Utc::now().timestamp() > ts as i64)
+        .unwrap_or(false);
+    println!("   - 是否已过期: {} ⚠️", is_expired);
     println!();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -127,21 +147,21 @@ async fn main() -> anyhow::Result<()> {
 
     println!("✅ 创建带有 version 的记忆:");
     println!("   - ID: {}", versioned_memory.id);
-    println!("   - 内容: {}", versioned_memory.content);
-    println!("   - 初始版本: {}", versioned_memory.version);
+    println!("   - 内容: {}", versioned_memory.content.to_string());
+    println!("   - 初始版本: {}", versioned_memory.version());
     println!();
 
     // 模拟更新操作
     println!("📝 执行第一次更新...");
     versioned_memory.update_content("更新后的核心记忆内容 - 版本 2".to_string());
-    println!("   - 新内容: {}", versioned_memory.content);
-    println!("   - 新版本: {}", versioned_memory.version);
+    println!("   - 新内容: {}", versioned_memory.content.to_string());
+    println!("   - 新版本: {}", versioned_memory.version());
     println!();
 
     println!("📝 执行第二次更新...");
     versioned_memory.update_content("再次更新的核心记忆内容 - 版本 3".to_string());
-    println!("   - 新内容: {}", versioned_memory.content);
-    println!("   - 新版本: {}", versioned_memory.version);
+    println!("   - 新内容: {}", versioned_memory.content.to_string());
+    println!("   - 新版本: {}", versioned_memory.version());
     println!();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

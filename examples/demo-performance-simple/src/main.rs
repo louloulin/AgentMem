@@ -105,11 +105,11 @@ async fn test_memory_basic_operations() -> Result<()> {
     };
     result.display();
 
-    // 测试3: clear性能
+    // 测试3: delete_all性能
     println!("\n{}", "▶ 测试 3/3: 清空操作".yellow().bold());
     let start = Instant::now();
     let options = agent_mem::DeleteAllOptions::default();
-    let _ = memory.clear(options).await;
+    let _ = memory.delete_all(options).await;
     let duration = start.elapsed();
 
     println!("\n{}", format!("📊 清空操作").bold().blue());

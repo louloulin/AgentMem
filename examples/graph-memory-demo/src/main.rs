@@ -406,20 +406,14 @@ async fn demo_graph_statistics(
 
 /// 创建测试记忆
 fn create_memory(id: &str, agent_id: &str, content: &str, user_id: &str) -> Memory {
-    let now = chrono::Utc::now().timestamp();
-    Memory {
-        id: id.to_string(),
-        agent_id: agent_id.to_string(),
-        memory_type: agent_mem_core::types::MemoryType::Semantic,
-        content: content.to_string(),
-        importance: 0.8,
-        embedding: None,
-        user_id: Some(user_id.to_string()),
-        metadata: HashMap::new(),
-        created_at: now,
-        last_accessed_at: now,
-        access_count: 0,
-        expires_at: None,
-        version: 1,
-    }
+    use agent_mem_core::types::{AttributeKey, AttributeValue};
+    let mut memory = Memory::new(
+        agent_id.to_string(),
+        Some(user_id.to_string()),
+        agent_mem_core::types::MemoryType::Semantic,
+        content.to_string(),
+        0.8,
+    );
+    memory.id = id.to_string();
+    memory
 }
