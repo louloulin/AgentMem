@@ -35,6 +35,10 @@ pub mod graph_memory;
 /// Graph optimization with compression and query optimization
 pub mod graph_optimization;
 pub mod hierarchy;
+/// Hierarchical memory service with enhanced features
+pub mod hierarchical_service;
+/// Hierarchy manager for advanced memory structure management
+pub mod hierarchy_manager;
 pub mod history;
 pub mod importance_scorer;
 pub mod integration;

@@ -143,17 +143,27 @@ impl InMemoryOperations {
         let mut results = Vec::new();
 
         for memory in memories {
-            if let Some(ref embedding) = memory.embedding {
-                // Calculate cosine similarity
-                let similarity = self.cosine_similarity(&query_vector.values, &embedding.values);
+            // Try to get embedding from attributes
+            if let Some(embedding_attr) = memory.attributes.get(&crate::types::AttributeKey::system("embedding")) {
+                if let Some(embedding_values) = embedding_attr.as_array() {
+                    // Convert AttributeValue array to Vec<f32>
+                    let embedding: Vec<f32> = embedding_values.iter()
+                        .filter_map(|v| v.as_number().map(|n| n as f32))
+                        .collect();
+                    
+                    if !embedding.is_empty() {
+                        // Calculate cosine similarity
+                        let similarity = self.cosine_similarity(&query_vector.values, &embedding);
 
-                if similarity > 0.1 {
-                    // Minimum similarity threshold
-                    results.push(MemorySearchResult {
-                        memory: (*memory).clone(),
-                        score: similarity,
-                        match_type: MatchType::Semantic,
-                    });
+                        if similarity > 0.1 {
+                            // Minimum similarity threshold
+                            results.push(MemorySearchResult {
+                                memory: (*memory).clone(),
+                                score: similarity,
+                                match_type: MatchType::Semantic,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -219,15 +229,19 @@ impl InMemoryOperations {
 
                 // Age filter
                 if let Some(max_age) = query.max_age_seconds {
-                    let age = current_time - memory.created_at;
+                    let age = current_time - memory.created_at().timestamp();
                     if age > max_age {
                         return false;
                     }
                 }
 
-                // Skip expired memories
-                if memory.is_expired() {
-                    return false;
+                // Skip expired memories (check if memory has expiry attribute)
+                if let Some(expiry_attr) = memory.attributes.get(&crate::types::AttributeKey::system("expires_at")) {
+                    if let Some(expiry_ts) = expiry_attr.as_number() {
+                        if current_time > expiry_ts as i64 {
+                            return false;
+                        }
+                    }
                 }
 
                 true
@@ -261,7 +275,7 @@ impl MemoryOperations for InMemoryOperations {
         if let Some(existing) = self.memories.get(&memory_id) {
             // Check if indices need updating
             let needs_reindex =
-                existing.agent_id != memory.agent_id || existing.memory_type != memory.memory_type;
+                existing.agent_id() != memory.agent_id() || existing.memory_type() != memory.memory_type();
 
             if needs_reindex {
                 // Clone the existing memory to avoid borrow issues
@@ -299,7 +313,7 @@ impl MemoryOperations for InMemoryOperations {
                 .into_iter()
                 .map(|memory| MemorySearchResult {
                     memory: memory.clone(),
-                    score: memory.calculate_current_importance(),
+                    score: memory.importance(),
                     match_type: MatchType::Metadata,
                 })
                 .collect()
@@ -323,7 +337,7 @@ impl MemoryOperations for InMemoryOperations {
             .collect();
 
         // Sort by creation time (newest first)
-        memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        memories.sort_by(|a, b| b.created_at().cmp(&a.created_at()));
 
         if let Some(limit) = limit {
             memories.truncate(limit);
@@ -345,7 +359,7 @@ impl MemoryOperations for InMemoryOperations {
         let memories: Vec<Memory> = memory_ids
             .iter()
             .filter_map(|id| self.memories.get(id))
-            .filter(|memory| memory.agent_id == agent_id)
+            .filter(|memory| memory.agent_id() == agent_id)
             .cloned()
             .collect();
 
@@ -356,7 +370,7 @@ impl MemoryOperations for InMemoryOperations {
         let memories: Vec<&Memory> = if let Some(agent_id) = agent_id {
             self.memories
                 .values()
-                .filter(|memory| memory.agent_id == agent_id)
+                .filter(|memory| memory.agent_id() == agent_id)
                 .collect()
         } else {
             self.memories.values().collect()
@@ -395,7 +409,7 @@ impl MemoryOperations for InMemoryOperations {
             {
                 *stats
                     .memories_by_agent
-                    .entry(agent_id)
+                    .entry(agent_id.to_string())
                     .or_insert(0) += 1;
             }
 

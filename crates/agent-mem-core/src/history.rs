@@ -157,7 +157,7 @@ impl MemoryHistory {
             change_type: ChangeType::ImportanceChanged,
             change_description: Some(format!(
                 "Importance changed from {:.2} to {:.2}",
-                old_importance, memory.importance
+                old_importance, memory.importance()
             )),
         };
 
@@ -200,7 +200,7 @@ impl MemoryHistory {
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Accessed,
-            change_description: Some(format!("Memory accessed (count: {})", memory.access_count)),
+            change_description: Some(format!("Memory accessed (count: {})", memory.metadata.accessed_count)),
         };
 
         self.add_history_entry(entry);

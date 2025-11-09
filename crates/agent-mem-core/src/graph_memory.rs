@@ -517,8 +517,10 @@ impl GraphMemoryEngine {
         }
 
         // 基于内容的相似性（简化实现）
-        let content1_words: HashSet<&str> = node1.memory.content.split_whitespace().collect();
-        let content2_words: HashSet<&str> = node2.memory.content.split_whitespace().collect();
+        let content1_str = node1.memory.content.to_string();
+        let content2_str = node2.memory.content.to_string();
+        let content1_words: HashSet<&str> = content1_str.split_whitespace().collect();
+        let content2_words: HashSet<&str> = content2_str.split_whitespace().collect();
 
         let intersection = content1_words.intersection(&content2_words).count();
         let union = content1_words.union(&content2_words).count();
@@ -527,7 +529,7 @@ impl GraphMemoryEngine {
             similarity += (intersection as f32 / union as f32) * 0.7;
         }
 
-        similarity.min(1.0)
+        similarity.min(1.0_f32)
     }
 
     /// 因果路径查找

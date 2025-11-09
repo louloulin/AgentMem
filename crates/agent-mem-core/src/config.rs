@@ -10,7 +10,8 @@ use crate::importance_scorer::ImportanceScorerConfig;
 use crate::intelligence::IntelligenceConfig;
 use crate::orchestrator::memory_integration::MemoryIntegratorConfig;
 use crate::search::adaptive_threshold::AdaptiveThresholdConfig;
-use crate::search::hybrid::HybridSearchConfig;
+// Use EnhancedHybridConfig from enhanced_hybrid_v2 which is always available
+use crate::search::EnhancedHybridConfig as HybridSearchConfig;
 
 /// 主配置 - 整合所有子模块配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
