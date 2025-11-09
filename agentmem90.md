@@ -4923,14 +4923,25 @@ let matching_attrs = memory.attributes.query(&pattern);
 
 7. ✅ Week 11: 架构验证与编译修复
    - ✅ 不需要迁移工具，直接使用V4架构
-   - ✅ 修复编译错误（从104个降至88个）
+   - ✅ 修复编译错误（从104个降至85个，减少19个）
    - ✅ Content添加Display和PartialEq实现
    - ✅ MemoryIntegratorConfig添加Serialize/Deserialize
    - ✅ 添加md5和toml依赖
    - ✅ 修复operations.rs中Memory字段访问（使用attributes）
    - ✅ 修复types.rs生命周期问题
    - ✅ 修复cached_adaptive_engine缓存键构建
-   - ✅ 持续修复中...
+   - ✅ Memory添加向后兼容方法（10个）:
+     - ✅ Memory::new() - 创建新记忆
+     - ✅ importance() - 获取重要性
+     - ✅ agent_id() - 获取AgentID
+     - ✅ user_id() - 获取UserID
+     - ✅ version() - 获取版本号
+     - ✅ created_at() - 获取创建时间
+     - ✅ last_accessed_at() - 获取访问时间
+     - ✅ update_content() - 更新内容
+     - ✅ add_metadata() - 添加元数据
+   - ✅ 导入importance_scorer模块
+   - ✅ 剩余85个错误（主要是方法调用语法）
 
 **下一步**: 
 1. 继续修复剩余编译错误
