@@ -997,8 +997,7 @@ pub async fn search_memories(
                 item.content.contains(&format!("商品ID: {}", request.query)) ||
                 // 检查 metadata 中的 product_id 是否匹配
                 item.metadata
-                    .as_object()
-                    .and_then(|m| m.get("product_id"))
+                    .get("product_id")
                     .and_then(|v| v.as_str())
                     .map(|pid| pid == request.query)
                     .unwrap_or(false)

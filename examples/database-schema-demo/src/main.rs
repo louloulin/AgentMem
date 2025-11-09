@@ -40,7 +40,13 @@ async fn main() -> anyhow::Result<()> {
         values: vec![0.1, 0.2, 0.3, 0.4, 0.5], // 简化示例，实际应为 384 维
         metadata: HashMap::new(),
     };
-    memory_with_embedding.embedding = Some(embedding_vector.clone());
+    // Note: embedding now stored in attributes
+    memory_with_embedding.attributes.set(
+        agent_mem_core::types::AttributeKey::system("embedding"),
+        agent_mem_core::types::AttributeValue::Array(
+            embedding_vector.values.iter().map(|&v| agent_mem_core::types::AttributeValue::Number(v as f64)).collect()
+        ),
+    );
 
     println!("✅ 创建带有 embedding 的记忆:");
     println!("   - ID: {}", memory_with_embedding.id);

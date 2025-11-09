@@ -438,7 +438,7 @@ pub async fn send_chat_message_stream(
 
                     let content_chunk = StreamChunk {
                         chunk_type: "content".to_string(),
-                        content: Some(chunk_content),
+                        content: Some(chunk_content.clone()),
                         tool_call: None,
                         memories_count: None,
                     };

@@ -209,24 +209,21 @@ impl PerformanceBenchmark {
         );
         let embedding = Vector::new((0..1536).map(|_| rng.gen::<f32>()).collect());
 
-        Memory {
-            id: format!("test_memory_{}", id),
-            agent_id: format!("agent_{}", rng.gen_range(1..=100)),
-            user_id: Some(format!("user_{}", rng.gen_range(1..=1000))),
-            memory_type: match rng.gen_range(0..3) {
+        {
+            let memory_type = match rng.gen_range(0..3) {
                 0 => MemoryType::Semantic,
                 1 => MemoryType::Episodic,
                 _ => MemoryType::Procedural,
-            },
-            content,
-            importance: rng.gen::<f32>(),
-            embedding: Some(embedding),
-            created_at: Utc::now().timestamp(),
-            last_accessed_at: Utc::now().timestamp(),
-            access_count: 0,
-            expires_at: None,
-            metadata: HashMap::new(),
-            version: 1,
+            };
+            let mut memory = Memory::new(
+                format!("agent_{}", rng.gen_range(1..=100)),
+                Some(format!("user_{}", rng.gen_range(1..=1000))),
+                memory_type,
+                content,
+                rng.gen::<f32>(),
+            );
+            memory.id = format!("test_memory_{}", id);
+            memory
         }
     }
 
