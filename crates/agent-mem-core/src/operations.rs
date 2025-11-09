@@ -152,16 +152,16 @@ impl InMemoryOperations {
                         .collect();
                     
                     if !embedding.is_empty() {
-                        // Calculate cosine similarity
+                // Calculate cosine similarity
                         let similarity = self.cosine_similarity(&query_vector.values, &embedding);
 
-                        if similarity > 0.1 {
-                            // Minimum similarity threshold
-                            results.push(MemorySearchResult {
-                                memory: (*memory).clone(),
-                                score: similarity,
-                                match_type: MatchType::Semantic,
-                            });
+                if similarity > 0.1 {
+                    // Minimum similarity threshold
+                    results.push(MemorySearchResult {
+                        memory: (*memory).clone(),
+                        score: similarity,
+                        match_type: MatchType::Semantic,
+                    });
                         }
                     }
                 }
@@ -239,7 +239,7 @@ impl InMemoryOperations {
                 if let Some(expiry_attr) = memory.attributes.get(&crate::types::AttributeKey::system("expires_at")) {
                     if let Some(expiry_ts) = expiry_attr.as_number() {
                         if current_time > expiry_ts as i64 {
-                            return false;
+                    return false;
                         }
                     }
                 }

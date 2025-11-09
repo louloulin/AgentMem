@@ -219,7 +219,7 @@ impl PerformanceBenchmark {
                 format!("agent_{}", rng.gen_range(1..=100)),
                 Some(format!("user_{}", rng.gen_range(1..=1000))),
                 memory_type,
-                content,
+            content,
                 rng.gen::<f32>(),
             );
             memory.id = format!("test_memory_{}", id);

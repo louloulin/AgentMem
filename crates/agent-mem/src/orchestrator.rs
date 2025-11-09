@@ -3275,8 +3275,8 @@ impl MemoryOrchestrator {
 
         {
             let mut memory = CoreMemory::new(
-                agent_id,
-                user_id,
+            agent_id,
+            user_id,
                 MemoryType::Semantic,
                 fact.description.clone(),
                 fact.importance,
