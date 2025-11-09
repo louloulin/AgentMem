@@ -141,7 +141,7 @@ impl Default for QueryOptimizerConfig {
             default_ef_search: 100,
             high_precision_ef_search: 200,
             default_nprobe: 10,
-            rerank_threshold: 1_000,
+            rerank_threshold: 10_000,  // 与small_dataset_threshold一致，小数据集不需要重排序
             default_rerank_factor: 3,
         }
     }

@@ -98,7 +98,7 @@ pub struct QueryClassifierConfig {
 impl Default for QueryClassifierConfig {
     fn default() -> Self {
         Self {
-            max_short_query_length: 20,
+            max_short_query_length: 5,  // 降低阈值，单个词或短语才算ShortKeyword
             min_semantic_length: 30,
             enable_regex: true,
         }
@@ -250,21 +250,28 @@ impl QueryClassifier {
         }
         
         let features = self.extract_features(trimmed);
-        
+
         // 3. 检测问题型查询
         if features.is_question {
             return QueryType::Semantic;
         }
-        
+
         // 4. 根据长度分类
-        if features.length <= self.config.max_short_query_length {
+        // 对于中文，使用字符数而不是字节数
+        let effective_length = if features.language == Language::Chinese || features.language == Language::Mixed {
+            trimmed.chars().count()
+        } else {
+            features.length
+        };
+
+        if effective_length <= self.config.max_short_query_length {
             return QueryType::ShortKeyword;
         }
-        
-        if features.length >= self.config.min_semantic_length {
+
+        if effective_length >= self.config.min_semantic_length {
             return QueryType::Semantic;
         }
-        
+
         // 5. 默认为自然语言查询
         QueryType::NaturalLanguage
     }
