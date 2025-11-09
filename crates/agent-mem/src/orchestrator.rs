@@ -1272,7 +1272,7 @@ impl MemoryOrchestrator {
             info!("Step 9: 触发异步聚类分析");
             
             // 异步执行聚类分析（不阻塞主流程）
-            let clusterer = self.dbscan_clusterer.clone().or_else(|| self.kmeans_clusterer.clone());
+            let clusterer = self.dbscan_clusterer.clone();
             if let Some(_clusterer) = clusterer {
                 // 在后台异步执行聚类
                 tokio::spawn(async move {
@@ -1296,7 +1296,7 @@ impl MemoryOrchestrator {
             
             // 异步执行推理关联（不阻塞主流程）
             let reasoner_clone = reasoner.clone();
-            let result_ids: Vec<String> = execution_result.results.iter()
+            let result_ids: Vec<String> = results.results.iter()
                 .map(|r| r.id.clone())
                 .collect();
             
@@ -3273,20 +3273,22 @@ impl MemoryOrchestrator {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        CoreMemory {
-            id: fact.id.clone(),
-            agent_id,
-            user_id,
-            memory_type: MemoryType::Semantic, // StructuredFact 通常是语义记忆
-            content: fact.description.clone(),
-            importance: fact.importance,
-            embedding: None, // TODO: 从 fact 中提取 embedding
-            created_at: now,
-            last_accessed_at: now,
-            access_count: 0,
-            expires_at: None,
-            metadata,
-            version: 1,
+        {
+            let mut memory = CoreMemory::new(
+                agent_id,
+                user_id,
+                MemoryType::Semantic,
+                fact.description.clone(),
+                fact.importance,
+            );
+            memory.id = fact.id.clone();
+            
+            // Add metadata to attributes
+            for (key, value) in metadata {
+                memory.add_metadata(key, value);
+            }
+            
+            memory
         }
     }
 
@@ -3357,20 +3359,22 @@ impl MemoryOrchestrator {
             .map(|dt| dt.timestamp())
             .unwrap_or(now);
 
-        CoreMemory {
-            id: memory.id.clone(),
-            agent_id: "default_agent".to_string(), // ExistingMemory 没有 agent_id 字段
-            user_id: None,                         // ExistingMemory 没有 user_id 字段
-            memory_type: MemoryType::Semantic,     // 默认类型
-            content: memory.content.clone(),
-            importance: memory.importance,
-            embedding: None, // TODO: 从 memory 中提取 embedding
-            created_at,
-            last_accessed_at: now,
-            access_count: 0,
-            expires_at: None,
-            metadata,
-            version: 1,
+        {
+            let mut mem = CoreMemory::new(
+                "default_agent".to_string(),
+                None,
+                MemoryType::Semantic,
+                memory.content.clone(),
+                memory.importance,
+            );
+            mem.id = memory.id.clone();
+            
+            // Add metadata to attributes
+            for (key, value) in metadata {
+                mem.add_metadata(key, value);
+            }
+            
+            mem
         }
     }
 
