@@ -6,6 +6,7 @@ use super::adaptive_search_engine::SearchEngineBackend;
 use super::{SearchQuery, SearchResult};
 use crate::config::AgentMemConfig;
 use crate::performance::cache::{CacheKey, QueryCache, QueryCacheConfig};
+use agent_mem_traits::AgentMemError;
 use anyhow::Result;
 use std::sync::Arc;
 use std::time::Instant;
@@ -186,7 +187,7 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
     
     /// 清空缓存
     pub async fn clear_cache(&self) -> Result<()> {
-        self.cache.clear().await
+        self.cache.clear().await.map_err(|e| anyhow::anyhow!("Cache clear error: {}", e))
     }
     
     /// 预热缓存（批量加载热点查询）

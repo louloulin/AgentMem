@@ -321,4 +321,9 @@ impl CacheStats {
             self.cache_hits as f64 / self.total_requests as f64
         }
     }
+    
+    /// 计算未命中率
+    pub fn miss_rate(&self) -> f64 {
+        1.0 - self.hit_rate()
+    }
 }

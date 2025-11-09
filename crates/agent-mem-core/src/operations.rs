@@ -229,7 +229,7 @@ impl InMemoryOperations {
 
                 // Age filter
                 if let Some(max_age) = query.max_age_seconds {
-                    let age = current_time - memory.created_at().timestamp();
+                    let age = current_time - memory.created_at();
                     if age > max_age {
                         return false;
                     }
@@ -395,7 +395,7 @@ impl MemoryOperations for InMemoryOperations {
             if let Some(memory_type_str) = memory.attributes.get(&crate::types::AttributeKey::system("memory_type"))
                 .and_then(|v| v.as_string())
             {
-                if let Ok(memory_type) = memory_type_str.parse::<agent_mem_traits::MemoryType>() {
+                if let Ok(memory_type) = memory_type_str.parse::<crate::types::MemoryType>() {
                     *stats
                         .memories_by_type
                         .entry(memory_type)

@@ -229,6 +229,7 @@ impl MemoryIntegrator {
                     }
                     
                     // 合并：精确匹配在前
+                    let exact_count = exact_product_memories.len();
                     all_memories.extend(exact_product_memories);
                     all_memories.extend(other_memories);
                     
@@ -236,7 +237,7 @@ impl MemoryIntegrator {
                     if all_memories.len() >= max_count {
                         info!("✅ 商品ID查询完成，返回 {} 条结果 (精确匹配: {})", 
                             all_memories.len(), 
-                            exact_product_memories.len());
+                            exact_count);
                         all_memories.sort_by(|a, b| {
                             b.score
                                 .unwrap_or(0.0)

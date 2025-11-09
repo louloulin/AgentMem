@@ -39,7 +39,18 @@ pub struct EnhancedHybridConfig {
     
     /// RRF常数k
     pub rrf_k: f32,
+    
+    /// 向量搜索权重 (0.0 - 1.0) - 向后兼容
+    #[serde(default = "default_vector_weight")]
+    pub vector_weight: f32,
+    
+    /// 全文搜索权重 (0.0 - 1.0) - 向后兼容
+    #[serde(default = "default_fulltext_weight")]
+    pub fulltext_weight: f32,
 }
+
+fn default_vector_weight() -> f32 { 0.7 }
+fn default_fulltext_weight() -> f32 { 0.3 }
 
 impl Default for EnhancedHybridConfig {
     fn default() -> Self {
@@ -50,6 +61,8 @@ impl Default for EnhancedHybridConfig {
             enable_metrics: true,
             enable_cache: false,
             rrf_k: 60.0,
+            vector_weight: 0.7,
+            fulltext_weight: 0.3,
         }
     }
 }

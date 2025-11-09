@@ -122,6 +122,24 @@ impl std::fmt::Display for MemoryType {
     }
 }
 
+impl std::str::FromStr for MemoryType {
+    type Err = AgentMemError;
+    
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "episodic" => Ok(MemoryType::Episodic),
+            "semantic" => Ok(MemoryType::Semantic),
+            "procedural" => Ok(MemoryType::Procedural),
+            "working" => Ok(MemoryType::Working),
+            "core" => Ok(MemoryType::Core),
+            "resource" => Ok(MemoryType::Resource),
+            "knowledge" => Ok(MemoryType::Knowledge),
+            "contextual" => Ok(MemoryType::Contextual),
+            _ => Err(AgentMemError::validation_error(&format!("Unknown memory type: {}", s))),
+        }
+    }
+}
+
 /// Memory importance level
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
 pub enum ImportanceLevel {
@@ -344,6 +362,14 @@ impl AttributeValue {
     pub fn as_number(&self) -> Option<f64> {
         match self {
             AttributeValue::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+    
+    /// 获取数组
+    pub fn as_array(&self) -> Option<&Vec<AttributeValue>> {
+        match self {
+            AttributeValue::Array(arr) => Some(arr),
             _ => None,
         }
     }
@@ -735,6 +761,20 @@ impl Default for Metadata {
     }
 }
 
+impl Metadata {
+    /// 转换为HashMap用于向后兼容
+    pub fn to_hashmap(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("created_at".to_string(), self.created_at.to_rfc3339());
+        map.insert("updated_at".to_string(), self.updated_at.to_rfc3339());
+        if let Some(last_accessed) = self.last_accessed {
+            map.insert("last_accessed".to_string(), last_accessed.to_rfc3339());
+        }
+        map.insert("accessed_count".to_string(), self.accessed_count.to_string());
+        map
+    }
+}
+
 /// 🆕 V4.0 Memory结构（完全抽象化）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Memory {
@@ -805,6 +845,7 @@ impl Memory {
         self.attributes
             .get(&AttributeKey::system("agent_id"))
             .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
             .unwrap_or_default()
     }
     
@@ -813,6 +854,7 @@ impl Memory {
         self.attributes
             .get(&AttributeKey::system("user_id"))
             .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
     }
     
     /// 获取version（向后兼容）
@@ -2064,7 +2106,7 @@ impl From<LegacyMemory> for MemoryItem {
             expires_at: memory
                 .expires_at
                 .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now)),
-            version: memory.version(),
+            version: memory.version,
         }
     }
 }

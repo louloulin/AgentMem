@@ -421,8 +421,9 @@ impl MemoryManager {
         {
             let mut history = self.history.write().await;
 
-            if memory.content != old_content {
-                history.record_content_update(&memory, &old_content, None)?;
+            if memory.content.to_string() != old_content.to_string() {
+                let old_content_str = old_content.to_string();
+                history.record_content_update(&memory, &old_content_str, None)?;
             }
 
             if memory.importance() != old_importance {
@@ -433,7 +434,7 @@ impl MemoryManager {
         // Record lifecycle update
         {
             let mut lifecycle = self.lifecycle.write().await;
-            lifecycle.record_update(memory_id, old_version, memory.version)?;
+            lifecycle.record_update(memory_id, old_version, memory.version())?;
         }
 
         // Update in storage
@@ -744,16 +745,12 @@ impl MemoryManager {
                     hash: None,
                     metadata,
                     score: Some(result.score),
-                    created_at: chrono::DateTime::from_timestamp(memory.created_at, 0)
-                        .unwrap_or_else(chrono::Utc::now),
-                    updated_at: Some(
-                        chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
-                            .unwrap_or_else(chrono::Utc::now),
-                    ),
+                    created_at: chrono::DateTime::from_timestamp(memory.created_at(), 0).unwrap_or_else(chrono::Utc::now),
+                    updated_at: memory.metadata.last_accessed.or(Some(memory.metadata.updated_at)),
                     session: Session {
-                        id: memory.agent_id.clone(),
-                        user_id: memory.user_id.clone(),
-                        agent_id: Some(memory.agent_id.clone()),
+                        id: memory.agent_id(),
+                        user_id: memory.user_id(),
+                        agent_id: Some(memory.agent_id()),
                         run_id: None,
                         actor_id: None,
                         created_at: chrono::Utc::now(),
