@@ -112,7 +112,8 @@ mod tests {
         let tool = ListAgentsTool;
         let schema = tool.schema();
         assert_eq!(schema.name, "agentmem_list_agents");
-        assert_eq!(schema.parameters.len(), 2);
+        // ParameterSchema 使用 HashMap properties，不是 Vec
+        assert_eq!(schema.parameters.properties.len(), 2);
     }
     
     #[test]

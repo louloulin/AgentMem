@@ -609,21 +609,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_temporal_node() {
-        let memory = Memory {
-            id: "test_mem".to_string(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("user1".to_string()),
-            memory_type: MemoryType::Semantic,
-            content: "Test content".to_string(),
-            importance: 0.8,
-            embedding: Some(Vector::new(vec![0.1, 0.2, 0.3])),
-            created_at: Utc::now().timestamp(),
-            last_accessed_at: Utc::now().timestamp(),
-            access_count: 0,
-            expires_at: None,
-            metadata: HashMap::new(),
-            version: 1,
-        };
+        // 使用V4 API创建Memory
+        let memory = Memory::new(
+            "test_agent".to_string(),
+            Some("user1".to_string()),
+            MemoryType::Semantic,
+            "Test content".to_string(),
+            0.8,
+        );
 
         let node = GraphNode {
             id: "node1".to_string(),

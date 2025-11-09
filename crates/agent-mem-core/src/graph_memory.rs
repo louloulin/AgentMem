@@ -658,38 +658,22 @@ mod tests {
 
         let engine = GraphMemoryEngine::new();
 
-        // 创建测试记忆
-        let memory1 = Memory {
-            id: "mem1".to_string(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("user1".to_string()),
-            memory_type: MemoryType::Semantic,
-            content: "Apple is a fruit".to_string(),
-            importance: 0.8,
-            embedding: Some(Vector::new(vec![0.1, 0.2, 0.3])),
-            created_at: chrono::Utc::now().timestamp(),
-            last_accessed_at: chrono::Utc::now().timestamp(),
-            access_count: 0,
-            expires_at: None,
-            metadata: HashMap::new(),
-            version: 1,
-        };
+        // 创建测试记忆（使用V4 API）
+        let memory1 = Memory::new(
+            "test_agent".to_string(),
+            Some("user1".to_string()),
+            MemoryType::Semantic,
+            "Apple is a fruit".to_string(),
+            0.8,
+        );
 
-        let memory2 = Memory {
-            id: "mem2".to_string(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("user1".to_string()),
-            memory_type: MemoryType::Semantic,
-            content: "Fruit is healthy".to_string(),
-            importance: 0.7,
-            embedding: Some(Vector::new(vec![0.4, 0.5, 0.6])),
-            created_at: chrono::Utc::now().timestamp(),
-            last_accessed_at: chrono::Utc::now().timestamp(),
-            access_count: 0,
-            expires_at: None,
-            metadata: HashMap::new(),
-            version: 1,
-        };
+        let memory2 = Memory::new(
+            "test_agent".to_string(),
+            Some("user1".to_string()),
+            MemoryType::Semantic,
+            "Fruit is healthy".to_string(),
+            0.7,
+        );
 
         // 添加节点
         let node1_id = engine.add_node(memory1, NodeType::Entity).await.unwrap();

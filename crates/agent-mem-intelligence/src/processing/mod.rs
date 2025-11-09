@@ -171,6 +171,7 @@ impl MemoryProcessor {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use agent_mem_traits::MemoryType;
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
         use agent_mem_traits::Session;

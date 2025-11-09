@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn test_memory_request_validation() {
         let request = MemoryRequest {
-            agent_id: "test_agent".to_string(),
+            agent_id: Some("test_agent".to_string()),
             user_id: Some("test_user".to_string()),
             content: "Test memory content".to_string(),
             memory_type: Some(MemoryType::Episodic),
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_memory_request_validation_fails() {
         let request = MemoryRequest {
-            agent_id: "".to_string(), // Empty agent_id should fail
+            agent_id: Some("".to_string()), // Empty agent_id should fail
             user_id: Some("test_user".to_string()),
             content: "Test memory content".to_string(),
             memory_type: Some(MemoryType::Episodic),
