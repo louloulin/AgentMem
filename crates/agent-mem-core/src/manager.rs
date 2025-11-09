@@ -433,7 +433,7 @@ impl MemoryManager {
         // Record lifecycle update
         {
             let mut lifecycle = self.lifecycle.write().await;
-            lifecycle.record_update(memory_id, old_version, memory.version)?;
+            lifecycle.record_update(memory_id, old_version, memory.version())?;
         }
 
         // Update in storage
@@ -743,16 +743,16 @@ impl MemoryManager {
                     hash: None,
                     metadata,
                     score: Some(result.score),
-                    created_at: chrono::DateTime::from_timestamp(memory.created_at, 0)
+                    created_at: chrono::DateTime::from_timestamp(memory.created_at(), 0)
                         .unwrap_or_else(chrono::Utc::now),
                     updated_at: Some(
-                        chrono::DateTime::from_timestamp(memory.last_accessed_at, 0)
+                        chrono::DateTime::from_timestamp(memory.last_accessed_at(), 0)
                             .unwrap_or_else(chrono::Utc::now),
                     ),
                     session: Session {
-                        id: memory.agent_id.clone(),
-                        user_id: memory.user_id.clone(),
-                        agent_id: Some(memory.agent_id.clone()),
+                        id: memory.agent_id(),
+                        user_id: memory.user_id(),
+                        agent_id: Some(memory.agent_id()),
                         run_id: None,
                         actor_id: None,
                         created_at: chrono::Utc::now(),

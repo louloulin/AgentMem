@@ -219,23 +219,23 @@ impl StorageBackend for PostgresStorage {
         )
         .bind(&memory.memory.id)
         .bind("default_org") // TODO: 从上下文获取 organization_id
-        .bind(&memory.memory.user_id.as_ref().unwrap_or(&"default_user".to_string()))
-        .bind(&memory.memory.agent_id)
+        .bind(&memory.memory.user_id().unwrap_or_else(|| "default_user".to_string()))
+        .bind(&memory.memory.agent_id())
         .bind(&memory.memory.content)
         .bind(None::<String>) // hash - not available in Memory struct
         .bind(&metadata_json)
-        .bind(Some(memory.memory.importance)) // score mapped from importance
-        .bind(memory.memory.memory_type.as_str())
+        .bind(Some(memory.memory.importance())) // score mapped from importance
+        .bind(memory.memory.memory_type().as_str())
         .bind(memory.scope.as_str())
         .bind(memory.level.as_str())
-        .bind(&memory.memory.importance)
-        .bind(memory.memory.access_count as i64)
-        .bind(&memory.memory.last_accessed_at)
+        .bind(&memory.memory.importance())
+        .bind(memory.memory.metadata.access_count as i64)
+        .bind(&memory.memory.last_accessed_at())
         .bind(&embedding_json)
         .bind(&expires_at)
-        .bind(memory.memory.version as i32)
-        .bind(&memory.memory.created_at)
-        .bind(&memory.memory.last_accessed_at) // updated_at mapped from last_accessed_at
+        .bind(memory.memory.version() as i32)
+        .bind(&memory.memory.created_at())
+        .bind(&memory.memory.last_accessed_at()) // updated_at mapped from last_accessed_at
         .execute(&self.pool)
         .await
         .map_err(|e| CoreError::Database(format!("Failed to store memory: {}", e)))?;

@@ -104,11 +104,11 @@ impl MemoryHistory {
     pub fn record_creation(&mut self, memory: &Memory) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
-            timestamp: memory.created_at,
+            timestamp: memory.created_at(),
             change_type: ChangeType::Created,
             change_description: Some("Memory created".to_string()),
         };
@@ -126,7 +126,7 @@ impl MemoryHistory {
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
@@ -149,7 +149,7 @@ impl MemoryHistory {
     pub fn record_importance_change(&mut self, memory: &Memory, old_importance: f32) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
@@ -173,7 +173,7 @@ impl MemoryHistory {
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
@@ -194,7 +194,7 @@ impl MemoryHistory {
 
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
@@ -211,7 +211,7 @@ impl MemoryHistory {
     pub fn record_archival(&mut self, memory: &Memory) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),
@@ -228,7 +228,7 @@ impl MemoryHistory {
     pub fn record_restoration(&mut self, memory: &Memory) -> Result<()> {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
-            version: memory.version,
+            version: memory.version(),
             content: memory.content.clone(),
             importance: memory.importance(),
             metadata: memory.metadata.clone(),

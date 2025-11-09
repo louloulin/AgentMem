@@ -65,13 +65,13 @@ impl InMemoryOperations {
     fn update_indices(&mut self, memory: &Memory) {
         // Update agent index
         self.agent_index
-            .entry(memory.agent_id.clone())
+            .entry(memory.agent_id())
             .or_default()
             .push(memory.id.clone());
 
         // Update type index
         self.type_index
-            .entry(memory.memory_type)
+            .entry(memory.memory_type())
             .or_default()
             .push(memory.id.clone());
     }
@@ -79,18 +79,18 @@ impl InMemoryOperations {
     /// Remove from indices when deleting a memory
     fn remove_from_indices(&mut self, memory: &Memory) {
         // Remove from agent index
-        if let Some(agent_memories) = self.agent_index.get_mut(&memory.agent_id) {
+        if let Some(agent_memories) = self.agent_index.get_mut(&memory.agent_id()) {
             agent_memories.retain(|id| id != &memory.id);
             if agent_memories.is_empty() {
-                self.agent_index.remove(&memory.agent_id);
+                self.agent_index.remove(&memory.agent_id());
             }
         }
 
         // Remove from type index
-        if let Some(type_memories) = self.type_index.get_mut(&memory.memory_type) {
+        if let Some(type_memories) = self.type_index.get_mut(&memory.memory_type()) {
             type_memories.retain(|id| id != &memory.id);
             if type_memories.is_empty() {
-                self.type_index.remove(&memory.memory_type);
+                self.type_index.remove(&memory.memory_type());
             }
         }
     }
@@ -101,7 +101,11 @@ impl InMemoryOperations {
         let mut results = Vec::new();
 
         for memory in memories {
-            let content_lower = memory.content.to_lowercase();
+            let content_text = match &memory.content {
+                crate::types::Content::Text(text) => text.clone(),
+                _ => continue, // Skip non-text content
+            };
+            let content_lower = content_text.to_lowercase();
 
             if content_lower.contains(&query_lower) {
                 let match_type = if content_lower == query_lower {
@@ -188,27 +192,27 @@ impl InMemoryOperations {
             .values()
             .filter(|memory| {
                 // Agent ID filter
-                if memory.agent_id != query.agent_id {
+                if memory.agent_id() != query.agent_id {
                     return false;
                 }
 
                 // User ID filter
                 if let Some(ref user_id) = query.user_id {
-                    if memory.user_id.as_ref() != Some(user_id) {
+                    if memory.user_id().as_ref() != Some(user_id) {
                         return false;
                     }
                 }
 
                 // Memory type filter
                 if let Some(memory_type) = query.memory_type {
-                    if memory.memory_type != memory_type {
+                    if memory.memory_type() != memory_type {
                         return false;
                     }
                 }
 
                 // Importance filter
                 if let Some(min_importance) = query.min_importance {
-                    if memory.calculate_current_importance() < min_importance {
+                    if memory.importance() < min_importance {
                         return false;
                     }
                 }

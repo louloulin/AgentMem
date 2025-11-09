@@ -2064,7 +2064,7 @@ impl From<LegacyMemory> for MemoryItem {
             expires_at: memory
                 .expires_at
                 .map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now)),
-            version: memory.version,
+            version: memory.version(),
         }
     }
 }
