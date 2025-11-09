@@ -3,7 +3,8 @@
 
 use agent_mem_core::config::AgentMemConfig;
 use agent_mem_core::performance::cache::QueryCacheConfig;
-use agent_mem_core::search::adaptive_router::{AdaptiveRouter, SearchStrategy};
+use agent_mem_core::search::adaptive_router::AdaptiveRouter;
+use agent_mem_core::search::query_classifier::SearchStrategy;
 use agent_mem_core::search::adaptive_search_engine::SearchEngineBackend;
 use agent_mem_core::search::cached_adaptive_engine::{CachedAdaptiveEngine, ParallelSearchOptimizer};
 use agent_mem_core::search::{SearchQuery, SearchResult};

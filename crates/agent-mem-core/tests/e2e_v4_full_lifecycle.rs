@@ -32,10 +32,10 @@ async fn test_full_lifecycle_v4() {
     // 验证Memory结构
     assert!(!memory.id.is_empty());
     assert!(matches!(memory.content, Content::Text(_)));
-    assert_eq!(
+    assert!(matches!(
         memory.attributes.get(&AttributeKey::system("user_id")),
-        Some(&AttributeValue::String("user_001".to_string()))
-    );
+        Some(AttributeValue::String(s)) if s == "user_001"
+    ));
     
     println!("✅ Step 1: Memory created - ID: {}", memory_id);
 

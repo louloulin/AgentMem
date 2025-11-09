@@ -10,6 +10,7 @@ use anyhow::Result;
 /// 测试Stage：内容预处理
 struct ContentPreprocessStage;
 
+#[async_trait::async_trait]
 impl PipelineStage for ContentPreprocessStage {
     type Input = Memory;
     type Output = Memory;
@@ -29,13 +30,14 @@ impl PipelineStage for ContentPreprocessStage {
             let cleaned = text.trim().to_string();
             output.content = Content::Text(cleaned);
         }
-        Ok(StageResult::Success(output))
+        Ok(StageResult::Continue(output))
     }
 }
 
 /// 测试Stage：去重检查
 struct DeduplicationStage;
 
+#[async_trait::async_trait]
 impl PipelineStage for DeduplicationStage {
     type Input = Memory;
     type Output = Memory;
@@ -51,13 +53,14 @@ impl PipelineStage for DeduplicationStage {
     ) -> Result<StageResult<Self::Output>> {
         // 模拟去重逻辑
         context.set("dedup_checked", true);
-        Ok(StageResult::Success(input))
+        Ok(StageResult::Continue(input))
     }
 }
 
 /// 测试Stage：重要性评估
 struct ImportanceStage;
 
+#[async_trait::async_trait]
 impl PipelineStage for ImportanceStage {
     type Input = Memory;
     type Output = Memory;
@@ -84,7 +87,7 @@ impl PipelineStage for ImportanceStage {
             AttributeValue::Number(importance),
         );
         context.set("importance_calculated", importance);
-        Ok(StageResult::Success(output))
+        Ok(StageResult::Continue(output))
     }
 }
 
@@ -194,6 +197,7 @@ async fn test_pipeline_error_handling() {
     /// 错误Stage：总是失败
     struct FailingStage;
 
+    #[async_trait::async_trait]
     impl PipelineStage for FailingStage {
         type Input = Memory;
         type Output = Memory;
@@ -237,6 +241,7 @@ async fn test_pipeline_stage_skip() {
     /// 可跳过Stage
     struct SkippableStage;
 
+    #[async_trait::async_trait]
     impl PipelineStage for SkippableStage {
         type Input = Memory;
         type Output = Memory;
@@ -251,9 +256,9 @@ async fn test_pipeline_stage_skip() {
             context: &mut PipelineContext,
         ) -> Result<StageResult<Self::Output>> {
             if context.get::<bool>("should_skip") == Some(true) {
-                Ok(StageResult::Skipped)
+                Ok(StageResult::Skip(input.clone()))
             } else {
-                Ok(StageResult::Success(input))
+                Ok(StageResult::Continue(input))
             }
         }
     }

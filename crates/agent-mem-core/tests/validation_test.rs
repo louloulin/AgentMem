@@ -10,6 +10,7 @@ fn test_valid_chat_request() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -24,6 +25,7 @@ fn test_empty_message() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -43,6 +45,7 @@ fn test_whitespace_only_message() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -62,6 +65,7 @@ fn test_message_too_long() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -78,6 +82,7 @@ fn test_empty_agent_id() {
         agent_id: "".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -97,6 +102,7 @@ fn test_agent_id_too_long() {
         agent_id: "a".repeat(256), // 256 characters
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -116,6 +122,7 @@ fn test_empty_user_id() {
         agent_id: "test-agent".to_string(),
         user_id: "".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -135,6 +142,7 @@ fn test_user_id_too_long() {
         agent_id: "test-agent".to_string(),
         user_id: "a".repeat(256), // 256 characters
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -151,6 +159,7 @@ fn test_empty_organization_id() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -170,6 +179,7 @@ fn test_organization_id_too_long() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "a".repeat(256), // 256 characters
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -189,6 +199,7 @@ fn test_max_memories_zero() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 0,
     };
@@ -208,6 +219,7 @@ fn test_max_memories_too_large() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 1001,
     };
@@ -253,6 +265,7 @@ fn test_message_length_boundary() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };
@@ -269,6 +282,7 @@ fn test_id_length_boundary() {
         agent_id: long_id.clone(),
         user_id: long_id.clone(),
         organization_id: long_id,
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 10,
     };

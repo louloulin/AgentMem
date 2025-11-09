@@ -11,6 +11,7 @@ use std::time::Instant;
 /// 简单处理Stage用于性能测试
 struct SimpleProcessingStage;
 
+#[async_trait::async_trait]
 impl PipelineStage for SimpleProcessingStage {
     type Input = Memory;
     type Output = Memory;
@@ -24,7 +25,7 @@ impl PipelineStage for SimpleProcessingStage {
         input: Self::Input,
         _context: &mut PipelineContext,
     ) -> Result<StageResult<Self::Output>> {
-        Ok(StageResult::Success(input))
+        Ok(StageResult::Continue(input))
     }
 }
 

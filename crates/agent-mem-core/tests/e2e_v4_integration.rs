@@ -13,6 +13,7 @@ use anyhow::Result;
 /// 集成Stage：完整的记忆处理流程
 struct FullMemoryProcessingStage;
 
+#[async_trait::async_trait]
 impl PipelineStage for FullMemoryProcessingStage {
     type Input = Memory;
     type Output = Memory;
@@ -56,7 +57,7 @@ impl PipelineStage for FullMemoryProcessingStage {
         }
 
         context.set("processed", true);
-        Ok(StageResult::Success(output))
+        Ok(StageResult::Continue(output))
     }
 }
 
@@ -89,22 +90,21 @@ async fn test_end_to_end_memory_pipeline_query() {
         .attributes
         .get(&AttributeKey::system("importance"))
         .is_some());
-    assert_eq!(
+    assert!(matches!(
         processed_memory
             .attributes
             .get(&AttributeKey::domain("category")),
-        Some(&AttributeValue::String("food".to_string()))
-    );
+        Some(AttributeValue::String(s)) if s == "food"
+    ));
 
     println!("✅ Step 2: Pipeline processed");
 
     // 3. 构建Query
     let query = QueryBuilder::new()
-        .intent(QueryIntent::RetrieveSpecific)
         .text("四川火锅")
         .build();
 
-    assert_eq!(query.intent, QueryIntent::RetrieveSpecific);
+    assert!(matches!(query.intent, QueryIntent::SemanticSearch { .. }));
 
     println!("✅ Step 3: Query constructed");
 
@@ -380,16 +380,16 @@ async fn test_pipeline_query_attributeset_integration() {
     assert_eq!(query.constraints.len(), 2);
 
     // 验证AttributeSet
-    assert_eq!(
+    assert!(matches!(
         processed.attributes.get(&AttributeKey::domain("price")),
-        Some(&AttributeValue::Number(7999.0))
-    );
-    assert_eq!(
+        Some(AttributeValue::Number(n)) if (*n - 7999.0).abs() < 0.01
+    ));
+    assert!(matches!(
         processed
             .attributes
             .get(&AttributeKey::domain("category")),
-        Some(&AttributeValue::String("electronics".to_string()))
-    );
+        Some(AttributeValue::String(s)) if s == "electronics"
+    ));
 
     println!("✅ Pipeline + Query + AttributeSet integration test passed");
     println!("   - AttributeSet: 4 attributes");
