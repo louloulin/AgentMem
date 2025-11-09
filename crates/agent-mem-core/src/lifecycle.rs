@@ -314,7 +314,7 @@ impl MemoryLifecycle {
                 continue;
             }
 
-            let age = current_time - memory.created_at();
+            let age = current_time - memory.created_at().timestamp();
             let current_importance = memory.score.unwrap_or(0.5);
 
             // Auto-delete policy
