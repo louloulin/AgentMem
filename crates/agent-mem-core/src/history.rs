@@ -105,9 +105,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: memory.created_at(),
             change_type: ChangeType::Created,
             change_description: Some("Memory created".to_string()),
@@ -127,16 +127,16 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ContentUpdated,
             change_description: change_description.or_else(|| {
                 Some(format!(
                     "Content updated from '{}' to '{}'",
                     self.truncate_text(old_content, 50),
-                    self.truncate_text(&memory.content, 50)
+                    self.truncate_text(&memory.content.to_string(), 50)
                 ))
             }),
         };
@@ -150,9 +150,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ImportanceChanged,
             change_description: Some(format!(
@@ -174,9 +174,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::MetadataUpdated,
             change_description: Some(format!("Metadata updated: {}", changed_keys.join(", "))),
@@ -195,9 +195,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Accessed,
             change_description: Some(format!("Memory accessed (count: {})", memory.access_count)),
@@ -212,9 +212,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Archived,
             change_description: Some("Memory archived".to_string()),
@@ -229,9 +229,9 @@ impl MemoryHistory {
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.clone(),
             version: memory.version(),
-            content: memory.content.clone(),
+            content: memory.content.to_string(),
             importance: memory.importance(),
-            metadata: memory.metadata.clone(),
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Restored,
             change_description: Some("Memory restored from archive".to_string()),
