@@ -970,6 +970,7 @@ pub async fn search_memories(
     
     // 🔍 Phase 2: 向量语义搜索（降级或默认）
     info!("🔍 使用向量语义搜索: {}", request.query);
+    let query_clone = request.query.clone();  // Clone for later use
     let results = memory_manager
         .search_memories(
             request.query,
@@ -994,12 +995,12 @@ pub async fn search_memories(
         for item in sorted_results {
             let is_exact = {
                 // 检查 content 是否包含 "商品ID: {query}"
-                item.content.contains(&format!("商品ID: {}", request.query)) ||
+                item.content.contains(&format!("商品ID: {}", query_clone)) ||
                 // 检查 metadata 中的 product_id 是否匹配
                 item.metadata
                     .get("product_id")
                     .and_then(|v| v.as_str())
-                    .map(|pid| pid == request.query)
+                    .map(|pid| pid == query_clone)
                     .unwrap_or(false)
             };
             
