@@ -52,7 +52,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         conn.execute(
             "INSERT INTO tools (
                 id, organization_id, name, description, json_schema,
-                source_type, source_code, tags, metadata_,
+                source_type, source_code, tags, metadata,
                 created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             libsql::params![
@@ -83,7 +83,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
 
         let query = "SELECT 
             id, organization_id, name, description, json_schema, 
-            source_type, source_code, tags, metadata_, 
+            source_type, source_code, tags, metadata, 
             created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
         FROM tools WHERE id = ? AND is_deleted = 0";
 
@@ -136,7 +136,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
 
         let query = "SELECT
             id, organization_id, name, description, json_schema,
-            source_type, source_code, tags, metadata_,
+            source_type, source_code, tags, metadata,
             created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
         FROM tools WHERE organization_id = ? AND is_deleted = 0 ORDER BY created_at DESC";
 
@@ -196,7 +196,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         // Tags are stored as JSON array, so we need to check if any tag matches
         let query = "SELECT
             id, organization_id, name, description, json_schema,
-            source_type, source_code, tags, metadata_,
+            source_type, source_code, tags, metadata,
             created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
         FROM tools WHERE organization_id = ? AND is_deleted = 0 ORDER BY created_at DESC";
 
@@ -267,7 +267,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
                 .execute(
                     "UPDATE tools SET
                         organization_id = ?, name = ?, description = ?, json_schema = ?,
-                        source_type = ?, source_code = ?, tags = ?, metadata_ = ?,
+                        source_type = ?, source_code = ?, tags = ?, metadata = ?,
                         updated_at = ?, last_updated_by_id = ?
                     WHERE id = ? AND is_deleted = 0",
                     libsql::params![
@@ -326,7 +326,7 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
 
         let query = "SELECT 
             id, organization_id, name, description, json_schema, 
-            source_type, source_code, tags, metadata_, 
+            source_type, source_code, tags, metadata, 
             created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
         FROM tools WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?";
 

@@ -721,12 +721,13 @@ mod storage_factory_tests {
         let repos = StorageFactory::create(mode).await.unwrap();
 
         // Verify key repositories with list() method are available
-        assert!(repos.users.list(1, 0).await.is_ok());
-        assert!(repos.organizations.list(1, 0).await.is_ok());
-        assert!(repos.agents.list(1, 0).await.is_ok());
-        assert!(repos.tools.list(1, 0).await.is_ok());
-        assert!(repos.api_keys.list(1, 0).await.is_ok());
-        assert!(repos.blocks.list(1, 0).await.is_ok());
+        assert!(repos.users.list(1, 0).await.is_ok(), "users.list failed");
+        assert!(repos.organizations.list(1, 0).await.is_ok(), "organizations.list failed");
+        assert!(repos.agents.list(1, 0).await.is_ok(), "agents.list failed");
+        let tools_result = repos.tools.list(1, 0).await;
+        assert!(tools_result.is_ok(), "tools.list failed: {:?}", tools_result.err());
+        assert!(repos.api_keys.list(1, 0).await.is_ok(), "api_keys.list failed");
+        assert!(repos.blocks.list(1, 0).await.is_ok(), "blocks.list failed");
 
         // Verify all repositories exist (even if they don't have list())
         let _ = &repos.memories;

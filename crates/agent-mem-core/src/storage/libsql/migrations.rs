@@ -693,7 +693,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 12); // 12 migrations (including learning_feedback)
+        assert_eq!(count, 13); // 13 migrations (including learning_feedback and add_session_id_to_memories)
     }
 
     #[tokio::test]
