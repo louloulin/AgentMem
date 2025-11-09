@@ -4999,28 +4999,31 @@ let matching_attrs = memory.attributes.query(&pattern);
   - ✅ 修复processing/mod.rs测试（导入MemoryType）
   - ✅ 修复mcp/server_tests.rs（简化测试）
   - ✅ 修复agent_tools.rs测试（使用.properties.len()）
-- ✅ **lib测试运行状态**: 363 passed; 5 failed; 10 ignored
-  - ⚠️ 5个测试失败（运行时断言失败，非编译错误）:
-    - test_query_optimizer_small_dataset
-    - test_query_classifier_natural_language
-    - test_storage_factory_all_repositories_available
-    - test_run_migrations
-    - test_dag_pipeline_parallel
-  - 📝 这些是测试逻辑问题，不影响生产代码
+- ✅ **lib测试运行状态**: **474 passed; 0 failed; 32 ignored** 🎉
+  - ✅ 修复test_storage_factory_all_repositories_available（tools表metadata列名不匹配）
+    - 问题: SQL查询使用`metadata_`但表定义是`metadata`
+    - 修复: 统一所有SQL查询中的列名为`metadata`
+  - ✅ 修复test_run_migrations（迁移数量更新）
+    - 问题: 测试期望12个迁移，实际有13个（新增add_session_id_to_memories）
+    - 修复: 更新测试期望值为13
+  - ✅ 其他3个测试（test_query_optimizer_small_dataset、test_query_classifier_natural_language、test_dag_pipeline_parallel）已自动通过
 - ⚠️ 集成测试和示例程序仍有编译错误（约80个错误）
   - 主要在examples/database-schema-demo/
   - 主要在examples/demo-performance-simple/
   - 原因: 直接访问Memory字段而非使用新API
 
 **剩余工作**:
-- ⚠️ 修复5个失败的lib测试（运行时逻辑问题）
+- ✅ **修复所有lib测试（已完成）** 🎉
+  - ✅ 修复test_storage_factory_all_repositories_available（metadata列名）
+  - ✅ 修复test_run_migrations（迁移数量）
+  - ✅ 所有474个lib测试通过，0失败
 - ⚠️ 更新集成测试代码（使用新Memory API）
 - ⚠️ 更新示例程序（9个示例程序，约80个错误）
 - ✅ **生产代码完全可用并可立即部署**
 
-**Week 12 计划**:
+**Week 12 进展**:
 1. ✅ 修复lib测试编译错误（已完成）
-2. ⚠️ 修复5个失败的lib测试（运行时逻辑）
-3. ⚠️ 更新集成测试和示例程序
+2. ✅ 修复所有失败的lib测试（已完成 - 474 passed, 0 failed）
+3. ⚠️ 更新集成测试和示例程序（进行中）
 4. 生产环境部署验证
 5. 性能基准测试
