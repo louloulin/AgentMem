@@ -163,7 +163,7 @@ impl PipelineStage for ImportanceEvaluationStage {
     }
 }
 
-/// Stage 4: 实体提取
+/// Stage 4: 实体提取（增强版）
 pub struct EntityExtractionStage {
     /// Enable person name extraction
     pub extract_persons: bool,
@@ -173,6 +173,14 @@ pub struct EntityExtractionStage {
     pub extract_locations: bool,
     /// Enable date extraction
     pub extract_dates: bool,
+    /// Enable money/currency extraction
+    pub extract_money: bool,
+    /// Enable time extraction
+    pub extract_time: bool,
+    /// Enable percentage extraction
+    pub extract_percentage: bool,
+    /// Enable IP address extraction
+    pub extract_ip: bool,
 }
 
 impl Default for EntityExtractionStage {
@@ -182,6 +190,10 @@ impl Default for EntityExtractionStage {
             extract_orgs: true,
             extract_locations: true,
             extract_dates: true,
+            extract_money: true,
+            extract_time: true,
+            extract_percentage: true,
+            extract_ip: true,
         }
     }
 }
@@ -240,11 +252,59 @@ impl PipelineStage for EntityExtractionStage {
             }
         }
         
-        // Extract Chinese person names (simple heuristic: 2-4 Chinese characters preceded by titles)
+        // Extract Chinese person names (simple heuristic: 2-4 Chinese characters preceded by common surnames)
         if self.extract_persons {
             if let Ok(name_pattern) = regex::Regex::new(r"(张|李|王|刘|陈|杨|黄|赵|吴|周)[\p{Han}]{1,3}") {
                 for name in name_pattern.find_iter(&text) {
                     entities.push(format!("PERSON:{}", name.as_str()));
+                }
+            }
+        }
+        
+        // Extract money/currency amounts
+        if self.extract_money {
+            // Match patterns like: $100, ¥200, €50, 100元, 200美元
+            if let Ok(money_pattern) = regex::Regex::new(r"(?:[$¥€£]\s*\d+(?:\.\d{2})?|\d+(?:\.\d{2})?\s*(?:元|美元|欧元|英镑|人民币|USD|CNY|EUR|GBP))") {
+                for money in money_pattern.find_iter(&text) {
+                    entities.push(format!("MONEY:{}", money.as_str()));
+                }
+            }
+        }
+        
+        // Extract time expressions
+        if self.extract_time {
+            // Match patterns like: 10:30, 14:45:30, 上午9点, 下午3点
+            if let Ok(time_pattern) = regex::Regex::new(r"(?:\d{1,2}:\d{2}(?::\d{2})?|(?:上午|下午|早上|晚上)\d{1,2}点)") {
+                for time in time_pattern.find_iter(&text) {
+                    entities.push(format!("TIME:{}", time.as_str()));
+                }
+            }
+        }
+        
+        // Extract percentages
+        if self.extract_percentage {
+            // Match patterns like: 50%, 12.5%, 百分之50
+            if let Ok(percent_pattern) = regex::Regex::new(r"(?:\d+(?:\.\d+)?%|百分之\d+(?:\.\d+)?)") {
+                for percent in percent_pattern.find_iter(&text) {
+                    entities.push(format!("PERCENTAGE:{}", percent.as_str()));
+                }
+            }
+        }
+        
+        // Extract IP addresses
+        if self.extract_ip {
+            // Match IPv4 addresses
+            if let Ok(ip_pattern) = regex::Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}\b") {
+                for ip in ip_pattern.find_iter(&text) {
+                    // Simple validation: each octet should be 0-255
+                    let ip_str = ip.as_str();
+                    let octets: Vec<&str> = ip_str.split('.').collect();
+                    let valid = octets.iter().all(|o| {
+                        o.parse::<u8>().is_ok()
+                    });
+                    if valid {
+                        entities.push(format!("IP:{}", ip_str));
+                    }
                 }
             }
         }
@@ -414,6 +474,147 @@ impl PipelineStage for QueryExpansionStage {
     }
 }
 
+/// Stage 8: 关系建立（自动发现和建立记忆间关系）
+pub struct RelationBuildingStage {
+    /// Enable similarity-based relation detection
+    pub enable_similarity: bool,
+    /// Enable temporal relation detection (nearby in time)
+    pub enable_temporal: bool,
+    /// Enable entity-based relation detection (shared entities)
+    pub enable_entity: bool,
+    /// Similarity threshold for establishing relations (0.0-1.0)
+    pub similarity_threshold: f32,
+    /// Time window for temporal relations (in seconds)
+    pub temporal_window_secs: i64,
+}
+
+impl Default for RelationBuildingStage {
+    fn default() -> Self {
+        Self {
+            enable_similarity: true,
+            enable_temporal: true,
+            enable_entity: true,
+            similarity_threshold: 0.7,
+            temporal_window_secs: 86400, // 24 hours
+        }
+    }
+}
+
+#[async_trait]
+impl PipelineStage for RelationBuildingStage {
+    type Input = (Memory, Vec<Memory>);  // Current memory + existing memories
+    type Output = Memory;
+    
+    fn name(&self) -> &str {
+        "RelationBuilding"
+    }
+    
+    fn is_optional(&self) -> bool {
+        true
+    }
+    
+    async fn execute(
+        &self,
+        input: Self::Input,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<StageResult<Self::Output>> {
+        let (mut current_memory, existing_memories) = input;
+        let mut relations_built = 0;
+        
+        let current_text = current_memory.content.as_text();
+        let current_entities = context.get::<Vec<String>>("entities").unwrap_or_default();
+        
+        for existing in existing_memories.iter().take(100) {  // Limit to 100 recent memories
+            let mut relation_strength = 0.0;
+            let mut relation_reasons = Vec::new();
+            
+            // 1. Entity-based relation (shared entities)
+            if self.enable_entity && !current_entities.is_empty() {
+                if let Some(AttributeValue::Array(existing_entities)) = existing.attributes.get(&AttributeKey::domain("entities")) {
+                    let existing_entity_strs: Vec<String> = existing_entities.iter()
+                        .filter_map(|e| {
+                            if let AttributeValue::String(s) = e {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    
+                    let shared_count = current_entities.iter()
+                        .filter(|e| existing_entity_strs.contains(e))
+                        .count();
+                    
+                    if shared_count > 0 {
+                        let entity_score = (shared_count as f32) * 0.2;
+                        relation_strength += entity_score.min(0.5);
+                        relation_reasons.push(format!("shared_entities:{}", shared_count));
+                    }
+                }
+            }
+            
+            // 2. Temporal relation (nearby in time)
+            if self.enable_temporal {
+                let time_diff = (current_memory.metadata.created_at.timestamp() 
+                    - existing.metadata.created_at.timestamp()).abs();
+                
+                if time_diff < self.temporal_window_secs {
+                    let temporal_score = 1.0 - (time_diff as f32 / self.temporal_window_secs as f32);
+                    relation_strength += temporal_score * 0.3;
+                    relation_reasons.push(format!("temporal_proximity:{:.2}h", time_diff as f32 / 3600.0));
+                }
+            }
+            
+            // 3. Content similarity (Jaccard)
+            if self.enable_similarity {
+                let existing_text = existing.content.as_text();
+                let similarity = calculate_jaccard_similarity(&current_text, &existing_text);
+                
+                if similarity >= self.similarity_threshold {
+                    relation_strength += similarity * 0.5;
+                    relation_reasons.push(format!("content_similarity:{:.2}", similarity));
+                }
+            }
+            
+            // Establish relation if strength is significant
+            if relation_strength >= 0.3 {
+                current_memory.relations.add_relation(crate::types::Relation {
+                    target_id: existing.id.clone(),
+                    relation_type: crate::types::RelationType::Custom(format!("auto_discovered: {}", relation_reasons.join(", "))),
+                    strength: relation_strength.min(1.0),
+                });
+                relations_built += 1;
+            }
+        }
+        
+        let _ = context.set("relations_built", relations_built);
+        let _ = context.set("relation_discovery_enabled", true);
+        
+        Ok(StageResult::Continue(current_memory))
+    }
+}
+
+/// Calculate Jaccard similarity between two texts
+fn calculate_jaccard_similarity(text1: &str, text2: &str) -> f32 {
+    use std::collections::HashSet;
+    
+    let words1: HashSet<&str> = text1.split_whitespace().collect();
+    let words2: HashSet<&str> = text2.split_whitespace().collect();
+    
+    if words1.is_empty() && words2.is_empty() {
+        return 1.0;
+    }
+    
+    let intersection = words1.intersection(&words2).count();
+    let union = words1.union(&words2).count();
+    
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
 /// Stage 3: 约束验证
 pub struct ConstraintValidationStage;
 
@@ -504,6 +705,10 @@ mod tests {
             extract_orgs: true,
             extract_locations: true,
             extract_dates: true,
+            extract_money: false,
+            extract_time: false,
+            extract_percentage: false,
+            extract_ip: false,
         };
         
         let memory = MemoryBuilder::new()
@@ -518,6 +723,43 @@ mod tests {
             assert_eq!(entities.len(), 2);
             assert_eq!(entities[0], "ID:P000257");
             assert_eq!(entities[1], "ID:P000123");
+        } else {
+            panic!("Expected Continue");
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_entity_extraction_enhanced() {
+        let stage = EntityExtractionStage {
+            extract_persons: false,
+            extract_orgs: false,
+            extract_locations: false,
+            extract_dates: true,
+            extract_money: true,
+            extract_time: true,
+            extract_percentage: true,
+            extract_ip: true,
+        };
+        
+        let memory = MemoryBuilder::new()
+            .text("Price is $100.50 or ¥200元, growth rate 15.5%, server IP 192.168.1.100, meeting at 14:30 on 2024-12-25")
+            .build();
+        
+        let mut context = PipelineContext::new();
+        let result = stage.execute(memory, &mut context).await.unwrap();
+        
+        if let StageResult::Continue(_mem) = result {
+            let entities = context.get::<Vec<String>>("entities").unwrap();
+            
+            // Should extract: DATE, MONEY (2), PERCENTAGE, IP, TIME
+            assert!(entities.len() >= 5, "Expected at least 5 entities, got {}", entities.len());
+            
+            // Verify entity types exist
+            assert!(entities.iter().any(|e| e.starts_with("DATE:")), "Should have DATE entity");
+            assert!(entities.iter().any(|e| e.starts_with("MONEY:")), "Should have MONEY entity");
+            assert!(entities.iter().any(|e| e.starts_with("PERCENTAGE:")), "Should have PERCENTAGE entity");
+            assert!(entities.iter().any(|e| e.starts_with("IP:")), "Should have IP entity");
+            assert!(entities.iter().any(|e| e.starts_with("TIME:")), "Should have TIME entity");
         } else {
             panic!("Expected Continue");
         }
@@ -569,6 +811,48 @@ mod tests {
         let mut context2 = PipelineContext::new();
         let result2 = stage.execute(invalid_query, &mut context2).await.unwrap();
         assert!(matches!(result2, StageResult::Abort(_)));
+    }
+    
+    #[tokio::test]
+    async fn test_relation_building_stage() {
+        let stage = RelationBuildingStage {
+            enable_similarity: true,
+            enable_temporal: true,
+            enable_entity: true,
+            similarity_threshold: 0.5,
+            temporal_window_secs: 86400,
+        };
+        
+        // Create current memory
+        let current_memory = MemoryBuilder::new()
+            .text("Product P000257 price increased by 15%")
+            .build();
+        
+        // Create existing memories
+        let existing1 = MemoryBuilder::new()
+            .text("Product P000257 is now available")
+            .build();
+        
+        let existing2 = MemoryBuilder::new()
+            .text("Unrelated content without any connection")
+            .build();
+        
+        let mut context = PipelineContext::new();
+        // Simulate entity extraction results
+        let entities = vec!["ID:P000257".to_string(), "PERCENTAGE:15%".to_string()];
+        let _ = context.set("entities", entities);
+        
+        let result = stage.execute((current_memory, vec![existing1, existing2]), &mut context).await.unwrap();
+        
+        if let StageResult::Continue(memory) = result {
+            let relations_built = context.get::<usize>("relations_built").unwrap_or(0);
+            assert!(relations_built > 0, "Should have built at least one relation");
+            
+            // Check that relation was established
+            assert!(!memory.relations.relations().is_empty(), "Should have established relations");
+        } else {
+            panic!("Expected Continue");
+        }
     }
     
     #[tokio::test]
