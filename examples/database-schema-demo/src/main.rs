@@ -180,14 +180,18 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // 添加 embedding
-    comprehensive_memory.embedding = Some(Vector {
-        id: "embedding-002".to_string(),
-        values: vec![0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2],
-        metadata: HashMap::new(),
-    });
+    let embedding_values = vec![0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2];
+    comprehensive_memory.attributes.set(
+        AttributeKey::system("embedding"),
+        AttributeValue::Array(embedding_values.clone()),
+    );
 
     // 添加 expires_at
-    comprehensive_memory.set_expiration(Utc::now().timestamp() + 7200); // 2小时后
+    let expires_timestamp = Utc::now().timestamp() + 7200; // 2小时后
+    comprehensive_memory.attributes.set(
+        AttributeKey::system("expires_at"),
+        AttributeValue::Number(expires_timestamp as f64),
+    );
 
     // 添加 metadata
     comprehensive_memory.add_metadata("source".to_string(), "user_conversation".to_string());
@@ -195,30 +199,28 @@ async fn main() -> anyhow::Result<()> {
 
     println!("✅ 综合记忆详情:");
     println!("   - ID: {}", comprehensive_memory.id);
-    println!("   - Agent ID: {}", comprehensive_memory.agent_id);
-    println!("   - User ID: {:?}", comprehensive_memory.user_id);
-    println!("   - 类型: {:?}", comprehensive_memory.memory_type);
-    println!("   - 内容: {}", comprehensive_memory.content);
-    println!("   - 重要性: {}", comprehensive_memory.importance);
-    println!(
-        "   - Embedding: {:?} ({}维)",
-        comprehensive_memory
-            .embedding
-            .as_ref()
-            .map(|e| &e.values[..3.min(e.values.len())]),
-        comprehensive_memory
-            .embedding
-            .as_ref()
-            .map(|e| e.values.len())
-            .unwrap_or(0)
-    );
-    println!(
-        "   - 过期时间: {}",
-        chrono::DateTime::from_timestamp(comprehensive_memory.expires_at.unwrap(), 0).unwrap()
-    );
-    println!("   - 版本: {}", comprehensive_memory.version);
-    println!("   - 访问次数: {}", comprehensive_memory.access_count);
-    println!("   - Metadata: {:?}", comprehensive_memory.metadata);
+    println!("   - Agent ID: {}", comprehensive_memory.agent_id());
+    println!("   - User ID: {:?}", comprehensive_memory.user_id());
+    println!("   - 类型: {:?}", comprehensive_memory.memory_type());
+    println!("   - 内容: {}", comprehensive_memory.content.to_string());
+    println!("   - 重要性: {}", comprehensive_memory.importance());
+    let embedding_info = comprehensive_memory.attributes
+        .get(&AttributeKey::system("embedding"))
+        .and_then(|v| v.as_array())
+        .map(|arr| (arr.len(), arr.iter().take(3).map(|x| format!("{:.2}", x)).collect::<Vec<_>>().join(", ")));
+    if let Some((len, preview)) = embedding_info {
+        println!("   - Embedding: [{}...] ({}维)", preview, len);
+    }
+    let expires_at = comprehensive_memory.attributes
+        .get(&AttributeKey::system("expires_at"))
+        .and_then(|v| v.as_number())
+        .map(|ts| chrono::DateTime::from_timestamp(ts as i64, 0).unwrap());
+    if let Some(expires_at) = expires_at {
+        println!("   - 过期时间: {}", expires_at);
+    }
+    println!("   - 版本: {}", comprehensive_memory.version());
+    println!("   - 访问次数: {}", comprehensive_memory.metadata.accessed_count);
+    println!("   - Metadata: {:?}", comprehensive_memory.metadata.to_hashmap());
     println!();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
