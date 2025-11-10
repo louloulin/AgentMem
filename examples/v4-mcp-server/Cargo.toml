@@ -1,0 +1,28 @@
+[package]
+name = "v4-mcp-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-config = { path = "../../crates/agent-mem-config" }
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-storage = { path = "../../crates/agent-mem-storage" }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+

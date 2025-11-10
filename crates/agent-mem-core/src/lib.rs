@@ -9,6 +9,8 @@
 
 /// Agent state management and lifecycle
 pub mod agent_state;
+/// V4 migration utilities
+// pub mod v4_migration;  // 临时禁用，等核心功能完成后再修复
 /// Specialized memory agents for different cognitive memory types
 pub mod agents;
 /// Background agent processing system

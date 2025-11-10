@@ -8,6 +8,7 @@ pub mod memory;
 pub mod storage;
 pub mod agentmem_config;
 pub mod validation;
+pub mod v4_config;
 
 pub use database::{DatabaseBackend, DatabaseConfig};
 pub use factory::ConfigFactory;
@@ -17,3 +18,4 @@ pub use storage::{
     VectorStoreConfig,
 };
 pub use validation::*;
+pub use v4_config::*;

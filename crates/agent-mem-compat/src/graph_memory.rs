@@ -181,13 +181,9 @@ impl GraphMemoryManager {
                             && content.contains(&entity2.name)
                         {
                             let relation = Relation {
-                                id: format!(
-                                    "{}_{}_{}_{}",
-                                    entity1.id, relation_type, entity2.id, pattern
-                                ),
+                                relation_type: relation_type.to_string(),
                                 source: entity1.id.clone(),
                                 target: entity2.id.clone(),
-                                relation: relation_type.to_string(),
                                 confidence: 0.7,
                             };
                             relations.push(relation);
@@ -376,7 +372,7 @@ impl GraphMemoryManager {
 
         if !relations.is_empty() {
             summary.push_str(&format!("发现 {} 个关系: ", relations.len()));
-            let relation_types: Vec<&str> = relations.iter().map(|r| r.relation.as_str()).collect();
+            let relation_types: Vec<&str> = relations.iter().map(|r| r.relation_type.as_str()).collect();
             summary.push_str(&relation_types.join(", "));
             summary.push('.');
         }

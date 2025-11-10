@@ -253,7 +253,7 @@ impl Neo4jStore {
         );
         params.insert(
             "relation_type".to_string(),
-            serde_json::Value::String(relation.relation.clone()),
+            serde_json::Value::String(relation.relation_type.clone()),
         );
         params.insert(
             "confidence".to_string(),
@@ -369,10 +369,9 @@ impl GraphStore for Neo4jStore {
                                     rel_map.get("confidence").and_then(|v| v.as_f64()),
                                 ) {
                                     relations.push(Relation {
-                                        id: format!("{source}_{target}"),
+                                        relation_type: rel_type.to_string(),
                                         source: source.to_string(),
                                         target: target.to_string(),
-                                        relation: rel_type.to_string(),
                                         confidence: confidence as f32,
                                     });
                                 }

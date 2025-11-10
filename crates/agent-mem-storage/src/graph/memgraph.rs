@@ -245,7 +245,7 @@ impl MemgraphStore {
         );
         params.insert(
             "relation_type".to_string(),
-            serde_json::Value::String(relation.relation.clone()),
+            serde_json::Value::String(relation.relation_type.clone()),
         );
         params.insert(
             "confidence".to_string(),

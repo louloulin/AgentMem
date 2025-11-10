@@ -3,6 +3,7 @@
 //! Core traits and abstractions for the AgentMem memory platform.
 //! This crate defines the fundamental interfaces that all components must implement.
 
+pub mod abstractions;
 pub mod batch;
 pub mod cache;
 pub mod embedder;
@@ -47,4 +48,15 @@ pub use types::{
     BatchResult, EnhancedAddRequest, EnhancedSearchRequest, FilterBuilder, HealthStatus,
     MemorySearchResult, Messages, MetadataBuilder, PerformanceReport, ProcessingOptions,
     ProcessingResult, SystemMetrics,
+};
+
+// Re-export V4.0 abstractions
+pub use abstractions::{
+    AttributeKey, AttributeSet, AttributeType, AttributeValue, AttributeSchema,
+    ComparisonOperator, Constraint, Content, DiversityPreference, FusionStrategy,
+    LogicalOperator, Memory as MemoryV4, MemoryId, Metadata as MetadataV4,
+    Predicate, Preference, PreferenceType, Query, QueryContext, QueryIntent,
+    QueryIntentType, RelationGraph, RelationV4, RelevancePreference, RetrievalContext,
+    RetrievalEngine, RetrievalExplanation, RetrievalMetrics, RetrievalResult,
+    ScopeConstraint, ScoredMemory, TemporalPreference, TimeRange,
 };

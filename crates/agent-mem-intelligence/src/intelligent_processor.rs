@@ -828,9 +828,8 @@ impl EnhancedIntelligentProcessor {
                     .relations
                     .iter()
                     .map(|r| agent_mem_traits::Relation {
-                        id: format!("rel_{}", r.subject_id),
+                        relation_type: r.predicate.clone(),
                         source: r.subject.clone(),
-                        relation: r.predicate.clone(),
                         target: r.object.clone(),
                         confidence: r.confidence,
                     })
@@ -890,9 +889,8 @@ impl EnhancedIntelligentProcessor {
                     .relations
                     .iter()
                     .map(|r| agent_mem_traits::Relation {
-                        id: format!("rel_{}", r.subject_id),
+                        relation_type: r.predicate.clone(),
                         source: r.subject.clone(),
-                        relation: r.predicate.clone(),
                         target: r.object.clone(),
                         confidence: r.confidence,
                     })

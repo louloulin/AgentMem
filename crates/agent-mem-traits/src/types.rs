@@ -296,12 +296,19 @@ pub struct Entity {
 }
 
 /// A relation between entities
+/// V4: Simplified and aligned with graph model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Relation {
-    pub id: String,
+    /// Relation type (user-defined)
+    pub relation_type: String,
+    
+    /// Source entity ID (for backward compatibility)
     pub source: String,
-    pub relation: String,
+    
+    /// Target entity ID
     pub target: String,
+    
+    /// Strength/confidence (0.0-1.0)
     pub confidence: f32,
 }
 
