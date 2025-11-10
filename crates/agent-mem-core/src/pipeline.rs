@@ -424,7 +424,12 @@ mod tests {
     
     #[tokio::test]
     async fn test_entity_extraction_stage() {
-        let stage = EntityExtractionStage;
+        let stage = EntityExtractionStage {
+            extract_persons: true,
+            extract_orgs: true,
+            extract_locations: true,
+            extract_dates: true,
+        };
         
         let memory = MemoryBuilder::new()
             .text("Product P000257 and P000123 are available")
@@ -436,8 +441,8 @@ mod tests {
         if let StageResult::Continue(mem) = result {
             let entities = context.get::<Vec<String>>("entities").unwrap();
             assert_eq!(entities.len(), 2);
-            assert_eq!(entities[0], "P000257");
-            assert_eq!(entities[1], "P000123");
+            assert_eq!(entities[0], "ID:P000257");
+            assert_eq!(entities[1], "ID:P000123");
         } else {
             panic!("Expected Continue");
         }
