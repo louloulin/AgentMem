@@ -3,7 +3,7 @@
 //! 定义所有 repository 的 trait 接口，支持多种后端实现（PostgreSQL, LibSQL 等）
 
 use crate::storage::models::*;
-use agent_mem_traits::Result;
+use agent_mem_traits::{MemoryV4 as Memory, Result};
 use async_trait::async_trait;
 
 /// User repository trait
