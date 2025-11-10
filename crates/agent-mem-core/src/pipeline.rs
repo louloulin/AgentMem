@@ -755,6 +755,302 @@ impl PipelineStage for ImportanceReassessmentStage {
     }
 }
 
+/// Stage 10: 记忆压缩（自动合并相似记忆）
+pub struct MemoryCompressionStage {
+    /// Enable content-based compression
+    pub enable_content_compression: bool,
+    /// Enable attribute-based compression
+    pub enable_attribute_compression: bool,
+    /// Similarity threshold for compression (0.0-1.0)
+    pub similarity_threshold: f32,
+    /// Maximum compression ratio (how many memories can be merged into one)
+    pub max_compression_ratio: usize,
+    /// Merge strategy: "newest" | "highest_importance" | "longest"
+    pub merge_strategy: String,
+    /// Preserve all unique entities
+    pub preserve_unique_entities: bool,
+}
+
+impl Default for MemoryCompressionStage {
+    fn default() -> Self {
+        Self {
+            enable_content_compression: true,
+            enable_attribute_compression: true,
+            similarity_threshold: 0.85,  // High threshold for compression
+            max_compression_ratio: 5,    // Max 5 memories merge into 1
+            merge_strategy: "highest_importance".to_string(),
+            preserve_unique_entities: true,
+        }
+    }
+}
+
+#[async_trait]
+impl PipelineStage for MemoryCompressionStage {
+    type Input = Vec<Memory>;
+    type Output = Vec<Memory>;
+    
+    fn name(&self) -> &str {
+        "MemoryCompression"
+    }
+    
+    fn is_optional(&self) -> bool {
+        true
+    }
+    
+    async fn execute(
+        &self,
+        input: Self::Input,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<StageResult<Self::Output>> {
+        if input.is_empty() {
+            return Ok(StageResult::Continue(input));
+        }
+        
+        let mut compressed_memories = Vec::new();
+        let mut merged_groups = Vec::new();
+        let mut processed_indices = std::collections::HashSet::new();
+        
+        // Find similar memory groups
+        for i in 0..input.len() {
+            if processed_indices.contains(&i) {
+                continue;
+            }
+            
+            let mut group = vec![i];
+            let base_memory = &input[i];
+            
+            // Find similar memories
+            for j in (i + 1)..input.len() {
+                if processed_indices.contains(&j) {
+                    continue;
+                }
+                
+                let candidate_memory = &input[j];
+                
+                // Calculate similarity
+                let similarity = self.calculate_similarity(base_memory, candidate_memory);
+                
+                if similarity >= self.similarity_threshold {
+                    group.push(j);
+                    
+                    // Respect max compression ratio
+                    if group.len() >= self.max_compression_ratio {
+                        break;
+                    }
+                }
+            }
+            
+            // If group has multiple memories, merge them
+            if group.len() > 1 {
+                let memories_to_merge: Vec<_> = group.iter()
+                    .map(|&idx| &input[idx])
+                    .collect();
+                
+                let merged_memory = self.merge_memories(&memories_to_merge);
+                compressed_memories.push(merged_memory);
+                
+                // Mark all as processed
+                for &idx in &group {
+                    processed_indices.insert(idx);
+                }
+                
+                merged_groups.push(group.len());
+            } else {
+                // Single memory, keep as is
+                compressed_memories.push(base_memory.clone());
+                processed_indices.insert(i);
+            }
+        }
+        
+        // Record compression stats
+        let original_count = input.len();
+        let compressed_count = compressed_memories.len();
+        let compression_ratio = if original_count > 0 {
+            compressed_count as f32 / original_count as f32
+        } else {
+            1.0
+        };
+        
+        let _ = context.set("original_memory_count", original_count);
+        let _ = context.set("compressed_memory_count", compressed_count);
+        let _ = context.set("compression_ratio", compression_ratio);
+        let _ = context.set("merged_groups", merged_groups.clone());
+        let _ = context.set("memories_saved", original_count - compressed_count);
+        
+        Ok(StageResult::Continue(compressed_memories))
+    }
+}
+
+impl MemoryCompressionStage {
+    /// Calculate similarity between two memories
+    fn calculate_similarity(&self, mem1: &Memory, mem2: &Memory) -> f32 {
+        let mut total_similarity = 0.0;
+        let mut weight_sum = 0.0;
+        
+        // 1. Content similarity (weight: 0.6)
+        if self.enable_content_compression {
+            let content_sim = self.calculate_content_similarity(mem1, mem2);
+            total_similarity += content_sim * 0.6;
+            weight_sum += 0.6;
+        }
+        
+        // 2. Attribute similarity (weight: 0.4)
+        if self.enable_attribute_compression {
+            let attr_sim = self.calculate_attribute_similarity(mem1, mem2);
+            total_similarity += attr_sim * 0.4;
+            weight_sum += 0.4;
+        }
+        
+        if weight_sum > 0.0 {
+            total_similarity / weight_sum
+        } else {
+            0.0
+        }
+    }
+    
+    /// Calculate content similarity using Jaccard
+    fn calculate_content_similarity(&self, mem1: &Memory, mem2: &Memory) -> f32 {
+        let text1 = mem1.content.to_string();
+        let text2 = mem2.content.to_string();
+        calculate_jaccard_similarity(&text1, &text2)
+    }
+    
+    /// Calculate attribute similarity
+    fn calculate_attribute_similarity(&self, mem1: &Memory, mem2: &Memory) -> f32 {
+        // Compare important system attributes
+        let mut matches = 0;
+        let mut total = 0;
+        
+        // Check agent_id
+        let agent1 = mem1.attributes.get(&crate::types::AttributeKey::system("agent_id"))
+            .and_then(|v| v.as_string());
+        let agent2 = mem2.attributes.get(&crate::types::AttributeKey::system("agent_id"))
+            .and_then(|v| v.as_string());
+        if agent1.is_some() || agent2.is_some() {
+            total += 1;
+            if agent1 == agent2 {
+                matches += 1;
+            }
+        }
+        
+        // Check user_id
+        let user1 = mem1.attributes.get(&crate::types::AttributeKey::system("user_id"))
+            .and_then(|v| v.as_string());
+        let user2 = mem2.attributes.get(&crate::types::AttributeKey::system("user_id"))
+            .and_then(|v| v.as_string());
+        if user1.is_some() || user2.is_some() {
+            total += 1;
+            if user1 == user2 {
+                matches += 1;
+            }
+        }
+        
+        // Check memory_type
+        let type1 = mem1.attributes.get(&crate::types::AttributeKey::system("memory_type"))
+            .and_then(|v| v.as_string());
+        let type2 = mem2.attributes.get(&crate::types::AttributeKey::system("memory_type"))
+            .and_then(|v| v.as_string());
+        if type1.is_some() || type2.is_some() {
+            total += 1;
+            if type1 == type2 {
+                matches += 1;
+            }
+        }
+        
+        if total > 0 {
+            matches as f32 / total as f32
+        } else {
+            1.0  // No attributes to compare, consider similar
+        }
+    }
+    
+    /// Merge multiple memories into one
+    fn merge_memories(&self, memories: &[&Memory]) -> Memory {
+        if memories.is_empty() {
+            panic!("Cannot merge empty memory list");
+        }
+        
+        // Select base memory according to strategy
+        let base_memory = match self.merge_strategy.as_str() {
+            "newest" => {
+                // Select the newest one
+                memories.iter()
+                    .max_by_key(|m| m.metadata.created_at)
+                    .unwrap()
+            }
+            "highest_importance" => {
+                // Select the most important one
+                memories.iter()
+                    .max_by(|a, b| {
+                        a.importance().partial_cmp(&b.importance()).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .unwrap()
+            }
+            "longest" => {
+                // Select the longest content
+                memories.iter()
+                    .max_by_key(|m| m.content.to_string().len())
+                    .unwrap()
+            }
+            _ => memories[0]  // Default to first
+        };
+        
+        let mut merged = (*base_memory).clone();
+        
+        // Merge content: combine unique information
+        if memories.len() > 1 {
+            let all_texts: Vec<String> = memories.iter()
+                .map(|m| m.content.to_string())
+                .collect();
+            
+            // Simple merge: join with separator
+            let merged_text = all_texts.join(" | ");
+            merged.content = crate::types::Content::Text(merged_text);
+        }
+        
+        // Merge entities if preserve_unique_entities is enabled
+        if self.preserve_unique_entities {
+            let mut all_entities = std::collections::HashSet::new();
+            for memory in memories {
+                if let Some(entities) = memory.attributes.get(&crate::types::AttributeKey::system("entities")) {
+                    if let Some(entity_str) = entities.as_string() {
+                        for entity in entity_str.split(',') {
+                            all_entities.insert(entity.trim().to_string());
+                        }
+                    }
+                }
+            }
+            
+            if !all_entities.is_empty() {
+                let entities_str = all_entities.into_iter().collect::<Vec<_>>().join(",");
+                merged.attributes.set(
+                    crate::types::AttributeKey::system("entities"),
+                    crate::types::AttributeValue::String(entities_str),
+                );
+            }
+        }
+        
+        // Record merge info
+        merged.attributes.set(
+            crate::types::AttributeKey::system("merged_from_count"),
+            crate::types::AttributeValue::Number(memories.len() as f64),
+        );
+        
+        // Boost importance for merged memories
+        let avg_importance: f32 = memories.iter()
+            .map(|m| m.importance())
+            .sum::<f32>() / memories.len() as f32;
+        let boosted_importance = (avg_importance * 1.1).min(1.0);  // 10% boost, cap at 1.0
+        
+        merged.attributes.set(
+            crate::types::AttributeKey::system("importance"),
+            crate::types::AttributeValue::Number(boosted_importance as f64),
+        );
+        
+        merged
+    }
+}
+
 /// Stage 3: 约束验证
 pub struct ConstraintValidationStage;
 
@@ -990,6 +1286,69 @@ mod tests {
             
             // Check that relation was established
             assert!(!memory.relations.relations().is_empty(), "Should have established relations");
+        } else {
+            panic!("Expected Continue");
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_memory_compression_stage() {
+        let stage = MemoryCompressionStage {
+            enable_content_compression: true,
+            enable_attribute_compression: true,
+            similarity_threshold: 0.7,  // Lower threshold for testing
+            max_compression_ratio: 3,
+            merge_strategy: "highest_importance".to_string(),
+            preserve_unique_entities: true,
+        };
+        
+        // Create similar memories
+        let mem1 = MemoryBuilder::new()
+            .text("Product P000257 price is $100")
+            .build();
+        
+        let mem2 = MemoryBuilder::new()
+            .text("Product P000257 price increased to $120")
+            .build();
+        
+        let mem3 = MemoryBuilder::new()
+            .text("Product P000257 now costs $120")
+            .build();
+        
+        // Create a dissimilar memory
+        let mem4 = MemoryBuilder::new()
+            .text("Weather forecast shows sunny day tomorrow")
+            .build();
+        
+        let memories = vec![mem1, mem2, mem3, mem4];
+        let original_count = memories.len();
+        
+        let mut context = PipelineContext::new();
+        let result = stage.execute(memories, &mut context).await.unwrap();
+        
+        if let StageResult::Continue(compressed) = result {
+            // Should have compressed similar memories
+            assert!(
+                compressed.len() < original_count,
+                "Should have compressed some memories"
+            );
+            
+            // Check compression stats
+            let compressed_count = context.get::<usize>("compressed_memory_count").unwrap();
+            let memories_saved = context.get::<usize>("memories_saved").unwrap();
+            let ratio = context.get::<f32>("compression_ratio").unwrap();
+            
+            assert_eq!(compressed_count, compressed.len());
+            assert_eq!(memories_saved, original_count - compressed_count);
+            assert!(ratio < 1.0, "Compression ratio should be < 1.0");
+            
+            // Check merged memory has boost
+            let merged_memory = compressed.iter()
+                .find(|m| {
+                    m.attributes.get(&crate::types::AttributeKey::system("merged_from_count")).is_some()
+                });
+            
+            assert!(merged_memory.is_some(), "Should have at least one merged memory");
         } else {
             panic!("Expected Continue");
         }
