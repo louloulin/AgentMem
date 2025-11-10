@@ -5,8 +5,10 @@
 use super::SearchQuery;
 use super::SearchResult;
 use agent_mem_traits::Result;
+use agent_mem_config::agentmem_config::{AgentMemConfig, SearchConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// 查询特征
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,54 +126,57 @@ impl SearchWeights {
 pub struct WeightPredictor {
     /// 学习到的权重映射
     learned_weights: HashMap<String, SearchWeights>,
+    /// 配置（从配置文件加载，非硬编码）
+    config: Arc<SearchConfig>,
 }
 
 impl WeightPredictor {
-    /// 创建新的权重预测器
-    pub fn new() -> Self {
+    /// 创建新的权重预测器（使用配置）
+    pub fn new(config: Arc<SearchConfig>) -> Self {
         Self {
             learned_weights: HashMap::new(),
+            config,
         }
     }
 
-    /// 基于查询特征预测最优权重
+    /// 基于查询特征预测最优权重（使用配置值，非硬编码）
     pub fn predict(&self, features: &QueryFeatures) -> SearchWeights {
-        let mut vector_weight: f32 = 0.5;
-        let mut fulltext_weight: f32 = 0.5;
-        let mut confidence: f32 = 0.7;
+        let mut vector_weight = self.config.vector_weight;
+        let mut fulltext_weight = self.config.fulltext_weight;
+        let mut confidence = self.config.confidence_base;
 
         // 规则1: 精确匹配查询 → 提高全文权重
         if features.has_exact_terms {
-            fulltext_weight += 0.25;
-            confidence += 0.1;
+            fulltext_weight += self.config.keyword_match_boost;
+            confidence += self.config.confidence_boost;
         }
 
         // 规则2: 语义复杂查询 → 提高向量权重
         if features.semantic_complexity > 0.6 {
-            vector_weight += 0.2 * features.semantic_complexity;
-            confidence += 0.05;
+            vector_weight += self.config.semantic_complexity_boost * features.semantic_complexity;
+            confidence += self.config.confidence_boost * 0.5;
         }
 
         // 规则3: 简单查询 → 提高全文权重
         if features.query_length < 20 && !features.is_question {
-            fulltext_weight += 0.15;
+            fulltext_weight += self.config.exact_match_boost;
         }
 
         // 规则4: 问句查询 → 提高向量权重（语义理解更重要）
         if features.is_question {
-            vector_weight += 0.15;
-            confidence += 0.05;
+            vector_weight += self.config.exact_match_boost;
+            confidence += self.config.confidence_boost * 0.5;
         }
 
         // 规则5: 包含实体 → 平衡权重
         if features.entity_count > 0 {
-            let entity_boost = (features.entity_count as f32 * 0.05).min(0.15);
+            let entity_boost = (features.entity_count as f32 * 0.05).min(self.config.exact_match_boost);
             fulltext_weight += entity_boost;
         }
 
         // 规则6: 时间相关查询 → 稍微提高向量权重（时序推理）
         if features.has_temporal_indicator {
-            vector_weight += 0.1;
+            vector_weight += self.config.confidence_boost;
         }
 
         let mut weights = SearchWeights {
@@ -195,7 +200,8 @@ impl WeightPredictor {
 
 impl Default for WeightPredictor {
     fn default() -> Self {
-        Self::new()
+        let config = Arc::new(AgentMemConfig::default().search);
+        Self::new(config)
     }
 }
 
@@ -204,16 +210,31 @@ pub struct AdaptiveSearchOptimizer {
     /// 权重预测器
     weight_predictor: WeightPredictor,
 
-    /// 是否启用学习
+    /// 是否启用学习（从配置读取）
     enable_learning: bool,
+    
+    /// 配置
+    config: Arc<SearchConfig>,
 }
 
 impl AdaptiveSearchOptimizer {
-    /// 创建新的自适应搜索优化器
-    pub fn new(enable_learning: bool) -> Self {
+    /// 创建新的自适应搜索优化器（使用配置）
+    pub fn new(config: Arc<SearchConfig>) -> Self {
+        let enable_learning = config.adaptive_learning;
         Self {
-            weight_predictor: WeightPredictor::new(),
+            weight_predictor: WeightPredictor::new(config.clone()),
             enable_learning,
+            config,
+        }
+    }
+    
+    /// 创建新的自适应搜索优化器（向后兼容）
+    pub fn new_with_learning(enable_learning: bool) -> Self {
+        let config = Arc::new(AgentMemConfig::default().search);
+        Self {
+            weight_predictor: WeightPredictor::new(config.clone()),
+            enable_learning,
+            config,
         }
     }
 
@@ -240,7 +261,8 @@ impl AdaptiveSearchOptimizer {
 
 impl Default for AdaptiveSearchOptimizer {
     fn default() -> Self {
-        Self::new(true)
+        let config = Arc::new(AgentMemConfig::default().search);
+        Self::new(config)
     }
 }
 

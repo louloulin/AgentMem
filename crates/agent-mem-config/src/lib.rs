@@ -6,6 +6,7 @@ pub mod database;
 pub mod factory;
 pub mod memory;
 pub mod storage;
+pub mod agentmem_config;
 pub mod validation;
 
 pub use database::{DatabaseBackend, DatabaseConfig};
