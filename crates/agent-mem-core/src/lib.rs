@@ -56,6 +56,8 @@ pub mod orchestrator;
 pub mod pipeline;
 /// Configuration loader (Week 3-4: eliminate hardcoding)
 pub mod config;
+/// Query abstraction (V4.0: replace String queries)
+pub mod query;
 /// Performance optimization system with caching, batching, and benchmarking
 pub mod performance;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
@@ -97,6 +99,12 @@ pub use message_queue::{AgentMessage as QueueMessage, MessageAccumulator, Messag
 pub use agents::{
     AgentConfig, AgentStats, BaseAgent, ContextualAgent, CoreAgent, EpisodicAgent, KnowledgeAgent,
     MemoryAgent, ProceduralAgent, ResourceAgent, SemanticAgent, WorkingAgent,
+};
+
+// Re-export Query abstraction
+pub use query::{
+    Query, QueryBuilder, QueryId, QueryIntent, QueryContext, QueryFeatures, QueryComplexity,
+    Constraint, Preference, AggregationOp,
 };
 pub use coordination::{
     AgentMessage, AgentStatus, CoordinationError, CoordinationResult, CoordinationStats,

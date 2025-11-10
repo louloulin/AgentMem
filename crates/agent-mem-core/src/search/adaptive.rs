@@ -358,7 +358,8 @@ mod tests {
 
     #[test]
     fn test_weight_prediction() {
-        let predictor = WeightPredictor::new();
+        let config = Arc::new(agent_mem_config::search::SearchConfig::default());
+        let predictor = WeightPredictor::new(config);
 
         // 精确匹配查询应该提高全文权重
         let features1 = QueryFeatures {

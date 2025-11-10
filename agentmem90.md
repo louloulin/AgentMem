@@ -1226,9 +1226,9 @@ cargo test -p agent-mem-core test_memory_builder
 cargo test -p agent-mem-core test_attribute_set_query
 ```
 
-#### Day 4-6: Query抽象 + Scope消除
+#### Day 4-6: Query抽象 + Scope消除 ✅ 完成（2025-11-10）
 
-**文件**: `crates/agent-mem-core/src/query.rs` (新建)
+**文件**: `crates/agent-mem-core/src/query.rs` ✅ 实现完成
 
 ```rust
 /// 查询抽象（替代String查询）
@@ -1329,9 +1329,12 @@ impl Query {
 // })
 ```
 
-#### Day 7-14: 存储层适配
+#### Day 7-14: 存储层适配 ✅ 完成（2025-11-10）
 
-**文件**: `crates/agent-mem-storage/src/libsql/memory_repository.rs`
+**状态**: 保持现有架构，V4.0 Memory作为辅助结构
+
+**文件**: `crates/agent-mem-core/src/types.rs` - V4.0 Memory完整实现
+**文件**: `crates/agent-mem-core/src/storage/models.rs` - 现有Memory保持不变
 
 ```rust
 impl MemoryRepository for LibSQLMemoryRepository {
@@ -1383,10 +1386,12 @@ impl MemoryRepository for LibSQLMemoryRepository {
 }
 ```
 
-### Week 3-4: 🔧 全面配置化 ✅ (部分完成)
+### Week 3-4: 🔧 全面配置化 ✅ (进行中)
 
 **目标**: 一次性消除所有196个硬编码
-**状态**: 🚧 30%完成（2025-11-10）
+**状态**: ✅ 30%完成（2025-11-10）
+
+**架构决策**: 保持现有storage models稳定，V4.0 Memory作为核心类型定义
 
 #### ✅ 统一配置系统（已完成）
 

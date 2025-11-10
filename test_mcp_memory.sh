@@ -14,12 +14,12 @@ echo ""
 
 # 构建MCP服务器
 echo "1. 构建MCP服务器..."
-cargo build --bin mcp-stdio-server --release
+cargo build --bin agentmem-mcp-server --release
 
 # 测试基本记忆存储
 echo ""
 echo "2. 测试记忆存储..."
-cat <<EOF | cargo run --bin mcp-stdio-server --release 2>/dev/null
+cat <<EOF | cargo run --bin agentmem-mcp-server --release 2>/dev/null
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1.0","clientInfo":{"name":"test","version":"1.0"}}}
 {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"add_memory","arguments":{"agent_id":"test-agent","content":"这是一个测试记忆","memory_type":"semantic"}}}
