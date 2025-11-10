@@ -48,7 +48,7 @@ regex = "1.10"
 num_cpus = "1.0"
 
 # Enterprise security dependencies
-jsonwebtoken = "8.0"
+jsonwebtoken = "9.2"
 bcrypt = "0.14"
 aes-gcm = "0.10"
 base64 = "0.21"
