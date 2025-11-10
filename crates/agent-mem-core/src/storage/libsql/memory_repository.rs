@@ -10,7 +10,7 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::storage::models::Memory;
+use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
 
 /// LibSQL implementation of Memory repository
@@ -24,8 +24,8 @@ impl LibSqlMemoryRepository {
         Self { conn }
     }
 
-    /// Helper function to convert row to Memory
-    fn row_to_memory(row: &libsql::Row) -> Result<Memory> {
+    /// Helper function to convert row to DbMemory
+    fn row_to_memory(row: &libsql::Row) -> Result<DbMemory> {
         // Column order from SELECT:
         // 0: id, 1: organization_id, 2: user_id, 3: agent_id, 4: content, 5: hash, 6: metadata,
         // 7: score, 8: memory_type, 9: scope, 10: level, 11: importance, 12: access_count, 13: last_accessed,
@@ -60,7 +60,7 @@ impl LibSqlMemoryRepository {
             .get(11)
             .map_err(|e| AgentMemError::StorageError(format!("Failed to get importance: {e}")))?;
 
-        Ok(Memory {
+        Ok(DbMemory {
             id: row
                 .get(0)
                 .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,

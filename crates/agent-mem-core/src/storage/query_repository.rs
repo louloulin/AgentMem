@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use super::models::Memory;
+use super::models::DbMemory;
 use crate::query::{Query, QueryIntent, Constraint, Preference, AttributeKey};
 use crate::{CoreError, CoreResult};
 
@@ -20,7 +20,7 @@ impl QueryBasedRepository {
     }
 
     /// 使用Query抽象进行检索（取代Scope）
-    pub async fn retrieve(&self, query: &Query) -> CoreResult<Vec<Memory>> {
+    pub async fn retrieve(&self, query: &Query) -> CoreResult<Vec<DbMemory>> {
         // 根据Query构建SQL
         let mut sql = String::from("SELECT * FROM memories WHERE is_deleted = FALSE");
         let mut conditions = Vec::new();

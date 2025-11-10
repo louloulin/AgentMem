@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{PgPool, Row};
 
-use super::models::Memory;
+use super::models::DbMemory;
 use super::repository::Repository;
 use crate::{CoreError, CoreResult};
 
@@ -24,11 +24,11 @@ impl MemoryRepository {
         agent_id: &str,
         limit: Option<i64>,
         offset: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND is_deleted = FALSE
@@ -52,11 +52,11 @@ impl MemoryRepository {
         user_id: &str,
         limit: Option<i64>,
         offset: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE user_id = $1 AND is_deleted = FALSE
@@ -80,10 +80,10 @@ impl MemoryRepository {
         agent_id: &str,
         memory_type: &str,
         limit: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND memory_type = $2 AND is_deleted = FALSE

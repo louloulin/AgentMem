@@ -178,10 +178,11 @@ impl Tool {
     }
 }
 
-/// Memory model - enhanced version with agent and user relationships
+/// Database Memory model - enhanced version with agent and user relationships
+/// This is the database representation, separate from business model (crate::Memory)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "postgres", derive(FromRow))]
-pub struct Memory {
+pub struct DbMemory {
     pub id: String,
     pub organization_id: String,
     pub user_id: String,
