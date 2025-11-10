@@ -309,6 +309,25 @@ pub enum AttributeValue {
     Object(HashMap<String, AttributeValue>),
 }
 
+impl std::fmt::Display for AttributeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttributeValue::String(s) => write!(f, "{}", s),
+            AttributeValue::Number(n) => write!(f, "{}", n),
+            AttributeValue::Boolean(b) => write!(f, "{}", b),
+            AttributeValue::Timestamp(t) => write!(f, "{}", t.to_rfc3339()),
+            AttributeValue::Array(arr) => {
+                let items: Vec<String> = arr.iter().map(|v| v.to_string()).collect();
+                write!(f, "[{}]", items.join(", "))
+            },
+            AttributeValue::Object(obj) => {
+                let items: Vec<String> = obj.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
+                write!(f, "{{{}}}", items.join(", "))
+            },
+        }
+    }
+}
+
 impl AttributeValue {
     /// 从JSON转换
     pub fn from_json(value: serde_json::Value) -> Self {

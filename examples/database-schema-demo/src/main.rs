@@ -183,7 +183,9 @@ async fn main() -> anyhow::Result<()> {
     let embedding_values = vec![0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2];
     comprehensive_memory.attributes.set(
         AttributeKey::system("embedding"),
-        AttributeValue::Array(embedding_values.clone()),
+        AttributeValue::Array(
+            embedding_values.iter().map(|&v| AttributeValue::Number(v as f64)).collect()
+        ),
     );
 
     // 添加 expires_at
