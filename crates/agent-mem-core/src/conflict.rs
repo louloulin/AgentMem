@@ -57,7 +57,7 @@ impl ConflictDetector {
     fn check_conflict(&self, m1: &Memory, m2: &Memory) -> Option<ConflictType> {
         // Check time proximity
         let time_diff = (m1.metadata.created_at - m2.metadata.created_at).abs();
-        if time_diff > self.time_window_secs {
+        if time_diff > chrono::TimeDelta::seconds(self.time_window_secs) {
             return None;
         }
 

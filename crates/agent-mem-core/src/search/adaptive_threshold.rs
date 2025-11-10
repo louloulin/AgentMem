@@ -171,7 +171,7 @@ impl AdaptiveThresholdCalculator {
     }
     
     /// 计算查询复杂度 (0.0 - 1.0)
-    fn calculate_complexity(&self, query: &str, features: &QueryFeatures) -> f32 {
+    fn calculate_complexity(&self, _query: &str, features: &QueryFeatures) -> f32 {
         let mut score = 0.0;
         
         // 1. 词数贡献 (最多0.4)

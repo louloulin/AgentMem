@@ -121,7 +121,7 @@ impl ContextAnalyzer {
         while i < words.len() {
             if words[i].chars().next().is_some_and(|c| c.is_uppercase()) {
                 let mut entity_text = words[i].to_string();
-                let start = i;
+                let _start = i;
                 i += 1;
 
                 // 继续收集连续的大写词

@@ -254,7 +254,7 @@ impl SearchReranker {
     }
 
     /// 重排序搜索结果（基于多因素）
-    pub fn rerank(&self, mut results: Vec<SearchResult>, query: &SearchQuery) -> Vec<SearchResult> {
+    pub fn rerank(&self, mut results: Vec<SearchResult>, _query: &SearchQuery) -> Vec<SearchResult> {
         // 为每个结果计算综合得分
         for result in &mut results {
             let mut final_score = result.score;

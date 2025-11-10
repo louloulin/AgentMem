@@ -28,7 +28,7 @@ impl PipelineStage for ContentPreprocessStage {
     
     async fn execute(
         &self,
-        mut input: Self::Input,
+        input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
         // 获取文本内容
@@ -91,10 +91,9 @@ impl PipelineStage for DeduplicationStage {
                     let _ = context.set("is_duplicate", true);
                     let _ = context.set("duplicate_of", existing.id.clone());
                     let _ = context.set("duplicate_similarity", similarity);
+                    let _ = context.set("skip_reason", format!("Duplicate memory detected (similarity: {:.2})", similarity));
                     
-                    return Ok(StageResult::Skip(
-                        format!("Duplicate memory detected (similarity: {:.2})", similarity)
-                    ));
+                    return Ok(StageResult::Skip(input));
                 }
             }
         }
@@ -147,7 +146,7 @@ impl PipelineStage for ImportanceEvaluationStage {
     
     async fn execute(
         &self,
-        mut input: Self::Input,
+        input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
         // 简化：使用默认重要性或从attributes中读取
@@ -323,7 +322,7 @@ impl PipelineStage for QueryExpansionStage {
     
     async fn execute(
         &self,
-        mut input: Self::Input,
+        input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
         // TODO: 实现同义词扩展、关系扩展

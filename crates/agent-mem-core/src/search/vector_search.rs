@@ -732,14 +732,14 @@ pub fn build_vector_search_sql(
     table: &str,
     column: &str,
     operator: VectorDistanceOperator,
-    limit: usize,
+    _limit: usize,
     threshold: Option<f32>,
 ) -> String {
     let op = operator.to_sql();
 
     if let Some(threshold) = threshold {
         // 将相似度阈值转换为距离阈值
-        let distance_threshold = operator.similarity_to_distance(threshold);
+        let _distance_threshold = operator.similarity_to_distance(threshold);
 
         // 根据操作符类型构建不同的 WHERE 子句
         let where_clause = match operator {
@@ -802,7 +802,7 @@ pub fn build_hybrid_vector_search_sql(
     columns: &[&str],
     weights: &[f32],
     operator: VectorDistanceOperator,
-    limit: usize,
+    _limit: usize,
 ) -> (String, usize) {
     assert_eq!(
         columns.len(),
@@ -817,7 +817,7 @@ pub fn build_hybrid_vector_search_sql(
     let mut similarity_parts = Vec::new();
     let mut param_index = 1;
 
-    for (i, (column, weight)) in columns.iter().zip(weights.iter()).enumerate() {
+    for (_i, (column, weight)) in columns.iter().zip(weights.iter()).enumerate() {
         // 将距离转换为相似度，然后乘以权重
         let similarity_expr = match operator {
             VectorDistanceOperator::Cosine => {

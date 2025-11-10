@@ -367,8 +367,8 @@ impl HierarchicalMemoryService {
     /// Check if memory matches search filters
     fn matches_filters(
         &self,
-        memory: &HierarchicalMemoryRecord,
-        filters: &HierarchicalSearchFilters,
+        _memory: &HierarchicalMemoryRecord,
+        _filters: &HierarchicalSearchFilters,
     ) -> bool {
         // Implementation would check various filter conditions
         true
