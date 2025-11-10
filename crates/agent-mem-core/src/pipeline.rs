@@ -77,19 +77,57 @@ impl PipelineStage for DeduplicationStage {
         input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
-        // TODO: 实现实际的去重逻辑（需要向量搜索）
-        // 这里简化处理：检查content hash
+        // 检查context中是否有历史memories
+        if let Some(existing_memories) = context.get::<Vec<Memory>>("existing_memories") {
+            let input_text = input.content.to_string();
+            
+            // 基于内容的简单去重逻辑
+            for existing in existing_memories {
+                let existing_text = existing.content.to_string();
+                let similarity = self.calculate_text_similarity(&input_text, &existing_text);
+                
+                if similarity >= self.similarity_threshold {
+                    // 发现重复
+                    let _ = context.set("is_duplicate", true);
+                    let _ = context.set("duplicate_of", existing.id.clone());
+                    let _ = context.set("duplicate_similarity", similarity);
+                    
+                    return Ok(StageResult::Skip(
+                        format!("Duplicate memory detected (similarity: {:.2})", similarity)
+                    ));
+                }
+            }
+        }
+        
+        // 计算content hash作为备用去重标识
         let content_hash = format!("{:x}", md5::compute(input.content.as_text()));
-        
-        // 存储hash到context
         let _ = context.set("content_hash", &content_hash);
+        let _ = context.set("is_duplicate", false);
         
-        // 简化：假设不重复
         Ok(StageResult::Continue(input))
     }
     
     fn is_optional(&self) -> bool {
         true // 去重失败不应该中止pipeline
+    }
+}
+
+impl DeduplicationStage {
+    /// Calculate text similarity using Jaccard index
+    fn calculate_text_similarity(&self, text1: &str, text2: &str) -> f32 {
+        use std::collections::HashSet;
+        
+        let words1: HashSet<&str> = text1.split_whitespace().collect();
+        let words2: HashSet<&str> = text2.split_whitespace().collect();
+        
+        let intersection = words1.intersection(&words2).count();
+        let union = words1.union(&words2).count();
+        
+        if union == 0 {
+            0.0
+        } else {
+            intersection as f32 / union as f32
+        }
     }
 }
 
@@ -126,7 +164,27 @@ impl PipelineStage for ImportanceEvaluationStage {
 }
 
 /// Stage 4: 实体提取
-pub struct EntityExtractionStage;
+pub struct EntityExtractionStage {
+    /// Enable person name extraction
+    pub extract_persons: bool,
+    /// Enable organization extraction  
+    pub extract_orgs: bool,
+    /// Enable location extraction
+    pub extract_locations: bool,
+    /// Enable date extraction
+    pub extract_dates: bool,
+}
+
+impl Default for EntityExtractionStage {
+    fn default() -> Self {
+        Self {
+            extract_persons: true,
+            extract_orgs: true,
+            extract_locations: true,
+            extract_dates: true,
+        }
+    }
+}
 
 #[async_trait]
 impl PipelineStage for EntityExtractionStage {
@@ -142,16 +200,56 @@ impl PipelineStage for EntityExtractionStage {
         mut input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
-        // TODO: 实现实际的实体提取（需要NER模型）
-        // 简化处理：提取简单的ID模式
         let text = input.content.as_text();
-        let entity_pattern = regex::Regex::new(r"[A-Z]\d{6}").unwrap();
-        let entities: Vec<String> = entity_pattern
-            .find_iter(&text)
-            .map(|m| m.as_str().to_string())
-            .collect();
+        let mut entities = Vec::new();
         
-        // 存储entities到attributes
+        // Extract IDs (e.g., A123456)
+        if let Ok(id_pattern) = regex::Regex::new(r"[A-Z]\d{6}") {
+            for id_match in id_pattern.find_iter(&text) {
+                entities.push(format!("ID:{}", id_match.as_str()));
+            }
+        }
+        
+        // Extract emails
+        if let Ok(email_pattern) = regex::Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b") {
+            for email in email_pattern.find_iter(&text) {
+                entities.push(format!("EMAIL:{}", email.as_str()));
+            }
+        }
+        
+        // Extract URLs
+        if let Ok(url_pattern) = regex::Regex::new(r"https?://[^\s]+") {
+            for url in url_pattern.find_iter(&text) {
+                entities.push(format!("URL:{}", url.as_str()));
+            }
+        }
+        
+        // Extract dates (ISO format)
+        if self.extract_dates {
+            if let Ok(date_pattern) = regex::Regex::new(r"\d{4}-\d{2}-\d{2}") {
+                for date in date_pattern.find_iter(&text) {
+                    entities.push(format!("DATE:{}", date.as_str()));
+                }
+            }
+        }
+        
+        // Extract phone numbers (simple pattern)
+        if let Ok(phone_pattern) = regex::Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b") {
+            for phone in phone_pattern.find_iter(&text) {
+                entities.push(format!("PHONE:{}", phone.as_str()));
+            }
+        }
+        
+        // Extract Chinese person names (simple heuristic: 2-4 Chinese characters preceded by titles)
+        if self.extract_persons {
+            if let Ok(name_pattern) = regex::Regex::new(r"(张|李|王|刘|陈|杨|黄|赵|吴|周)[\p{Han}]{1,3}") {
+                for name in name_pattern.find_iter(&text) {
+                    entities.push(format!("PERSON:{}", name.as_str()));
+                }
+            }
+        }
+        
+        // Store entities to attributes
         if !entities.is_empty() {
             input.attributes.set(
                 AttributeKey::domain("entities"),
