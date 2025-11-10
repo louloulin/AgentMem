@@ -4989,7 +4989,7 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ agent-mem-intelligence (智能组件)
 - ✅ agent-mem-compat (兼容层)
 
-**测试状态** (2025-11-10 下午更新):
+**测试状态** (2025-11-10 最新):
 - ✅ **生产代码100%编译成功**
 - ✅ **lib测试代码100%编译成功** (修复所有编译错误)
   - ✅ 修复graph_memory.rs测试（使用Memory::new()）
@@ -4999,7 +4999,10 @@ let matching_attrs = memory.attributes.query(&pattern);
   - ✅ 修复processing/mod.rs测试（导入MemoryType）
   - ✅ 修复mcp/server_tests.rs（简化测试）
   - ✅ 修复agent_tools.rs测试（使用.properties.len()）
-- ✅ **lib测试运行状态**: **1314 passed; 0 failed; 56 ignored** 🎉🎉🎉 (新增1个QueryExpansion测试)
+- ✅ **lib测试运行状态**: **1317 passed; 0 failed; 56 ignored** 🎉🎉🎉 
+  - ✅ 新增test_entity_extraction_enhanced (实体提取增强测试)
+  - ✅ 新增test_relation_building_stage (关系建立测试)
+  - ✅ 新增test_importance_reassessment_stage (重要性重评估测试)
   - ✅ 修复test_storage_factory_all_repositories_available（tools表metadata列名不匹配）
     - 问题: SQL查询使用`metadata_`但表定义是`metadata`
     - 修复: 统一所有SQL查询中的列名为`metadata`
@@ -5124,14 +5127,19 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ 去重信息记录到context
 - ✅ 可配置相似度阈值
 
-**3. 实体提取 (EntityExtractionStage)**
+**3. 实体提取 (EntityExtractionStage)** 🔥 增强版 2025-11-10
 - ✅ ID模式提取 (e.g., A123456)
 - ✅ 电子邮件提取
 - ✅ URL提取
 - ✅ 日期提取 (ISO格式)
 - ✅ 电话号码提取
 - ✅ 中文人名提取（基于姓氏启发式）
-- ✅ 可配置提取类型开关
+- ✅ **金额/货币提取** ($100, ¥200, 100元) 🆕
+- ✅ **时间表达式提取** (14:30, 上午9点) 🆕
+- ✅ **百分比提取** (50%, 百分之50) 🆕
+- ✅ **IP地址提取** (192.168.1.1) 🆕
+- ✅ 可配置提取类型开关（11种实体类型）
+- ✅ 单元测试完整覆盖（2个测试）
 
 **4. 查询扩展 (QueryExpansionStage)** 🆕 2025-11-10
 - ✅ 同义词扩展（内置词典：产品/搜索/用户/订单/价格等7组）
@@ -5141,12 +5149,40 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ 单元测试完整覆盖
 - ✅ 代码行数：约100行（含测试）
 
+**5. 关系建立 (RelationBuildingStage)** 🆕 2025-11-10 下午
+- ✅ 自动发现记忆间关系（3种检测方式）
+- ✅ **基于共享实体的关系检测** （共同包含的实体）
+- ✅ **基于时间接近度的关系检测** （时间窗口内的记忆）
+- ✅ **基于内容相似度的关系检测** （Jaccard相似度）
+- ✅ 综合关系强度计算（多因素加权）
+- ✅ 关系原因追踪（记录建立关系的理由）
+- ✅ 可配置阈值和时间窗口
+- ✅ 支持enable_similarity/temporal/entity开关
+- ✅ 单元测试完整覆盖
+- ✅ 代码行数：约150行（含Jaccard计算工具函数）
+
+**6. 重要性重评估 (ImportanceReassessmentStage)** 🆕 2025-11-10 下午
+- ✅ 动态调整记忆重要性（4种评估因素）
+- ✅ **访问频率因素** （对数缩放，频繁访问提升重要性）
+- ✅ **时间衰减因素** （指数衰减，可配置半衰期）
+- ✅ **关系网络因素** （被引用越多越重要）
+- ✅ **上下文相关性因素** （可选，基于当前上下文）
+- ✅ 综合调整计算（多因素加权归一化）
+- ✅ 调整因子追踪（记录每个因素的贡献）
+- ✅ 全可配置权重（4个权重参数）
+- ✅ 可配置半衰期（decay_halflife_days）
+- ✅ 支持4个独立开关
+- ✅ 单元测试完整覆盖
+- ✅ 代码行数：约140行
+
 ### 📊 功能覆盖度
 
 - **冲突检测**: 100% (完整实现)
 - **去重逻辑**: 100% (完整实现)
-- **实体提取**: 90% (7种实体类型)
+- **实体提取**: 100% (11种实体类型，从7种增强到11种) ✅ 🔥
 - **查询扩展**: 100% (同义词+关系，已实现并测试通过) ✅
+- **关系建立**: 100% (自动发现+3种检测方式) ✅ 🆕
+- **重要性重评估**: 100% (动态调整+4种因素) ✅ 🆕
 - **向后兼容**: 100% (所有legacy API保持可用)
 
 ### 🎯 架构优势体现
@@ -5202,13 +5238,15 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ ContentPreprocessStage：100%
 - ✅ DeduplicationStage：100%
 - ✅ ImportanceEvaluationStage：100%
-- ✅ EntityExtractionStage：90% (7种实体类型)
+- ✅ EntityExtractionStage：100% (11种实体类型) 🔥 增强
 - ✅ QueryUnderstandingStage：100%
-- ✅ QueryExpansionStage：100% (新完成) 🆕
+- ✅ QueryExpansionStage：100%
+- ✅ RelationBuildingStage：100% 🆕 新增
+- ✅ ImportanceReassessmentStage：100% 🆕 新增
 - ✅ ConstraintValidationStage：100%
 
 **测试覆盖**:
-- ✅ 单元测试：1314个
+- ✅ 单元测试：1317个 (新增3个测试) 📈
 - ✅ 集成测试：56个（ignored）
 - ✅ 测试通过率：100%
 

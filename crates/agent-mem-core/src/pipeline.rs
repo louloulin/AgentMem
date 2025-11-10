@@ -615,6 +615,146 @@ fn calculate_jaccard_similarity(text1: &str, text2: &str) -> f32 {
     }
 }
 
+/// Stage 9: 重要性重评估（动态调整记忆重要性）
+pub struct ImportanceReassessmentStage {
+    /// Enable access frequency factor
+    pub enable_access_freq: bool,
+    /// Enable temporal decay factor
+    pub enable_temporal_decay: bool,
+    /// Enable relation network factor (referenced by other memories)
+    pub enable_relation_boost: bool,
+    /// Enable context relevance factor
+    pub enable_context_relevance: bool,
+    /// Weight for access frequency (0.0-1.0)
+    pub access_freq_weight: f32,
+    /// Weight for temporal decay (0.0-1.0)
+    pub temporal_decay_weight: f32,
+    /// Weight for relation network (0.0-1.0)
+    pub relation_boost_weight: f32,
+    /// Weight for context relevance (0.0-1.0)
+    pub context_relevance_weight: f32,
+    /// Time decay half-life in days (how many days for importance to halve)
+    pub decay_halflife_days: f32,
+}
+
+impl Default for ImportanceReassessmentStage {
+    fn default() -> Self {
+        Self {
+            enable_access_freq: true,
+            enable_temporal_decay: true,
+            enable_relation_boost: true,
+            enable_context_relevance: false,  // Optional, needs context
+            access_freq_weight: 0.3,
+            temporal_decay_weight: 0.25,
+            relation_boost_weight: 0.25,
+            context_relevance_weight: 0.2,
+            decay_halflife_days: 30.0,  // 30 days half-life
+        }
+    }
+}
+
+#[async_trait]
+impl PipelineStage for ImportanceReassessmentStage {
+    type Input = Memory;
+    type Output = Memory;
+    
+    fn name(&self) -> &str {
+        "ImportanceReassessment"
+    }
+    
+    fn is_optional(&self) -> bool {
+        true
+    }
+    
+    async fn execute(
+        &self,
+        mut input: Self::Input,
+        context: &mut PipelineContext,
+    ) -> anyhow::Result<StageResult<Self::Output>> {
+        // Get original importance
+        let original_importance = input.importance();
+        let mut adjustment_factors = Vec::new();
+        let mut total_adjustment = 0.0;
+        let mut total_weight = 0.0;
+        
+        // 1. Access frequency factor
+        if self.enable_access_freq {
+            let access_count = input.metadata.accessed_count;
+            // Logarithmic scale: frequent access = higher importance
+            // log(1+x) to avoid log(0) and smooth scaling
+            let freq_score = if access_count > 0 {
+                ((access_count as f32).ln_1p() / 10.0).min(1.0)  // Cap at 1.0
+            } else {
+                0.0
+            };
+            
+            adjustment_factors.push(format!("access_freq:{:.2}", freq_score));
+            total_adjustment += freq_score * self.access_freq_weight;
+            total_weight += self.access_freq_weight;
+        }
+        
+        // 2. Temporal decay factor
+        if self.enable_temporal_decay {
+            let now = chrono::Utc::now();
+            let age_secs = (now - input.metadata.created_at).num_seconds() as f32;
+            let age_days = age_secs / 86400.0;
+            
+            // Exponential decay: importance = initial * 0.5^(age/halflife)
+            // We calculate the decay multiplier
+            let decay_multiplier = 0.5_f32.powf(age_days / self.decay_halflife_days);
+            
+            adjustment_factors.push(format!("temporal_decay:{:.2}", decay_multiplier));
+            // Negative adjustment if old (decay_multiplier < 1.0)
+            total_adjustment += (decay_multiplier - 1.0) * self.temporal_decay_weight;
+            total_weight += self.temporal_decay_weight;
+        }
+        
+        // 3. Relation network boost
+        if self.enable_relation_boost {
+            let relation_count = input.relations.relations().len();
+            // More relations = more important (reference count)
+            let relation_score = (relation_count as f32 / 10.0).min(1.0);  // Normalize, cap at 1.0
+            
+            adjustment_factors.push(format!("relation_boost:{:.2}", relation_score));
+            total_adjustment += relation_score * self.relation_boost_weight;
+            total_weight += self.relation_boost_weight;
+        }
+        
+        // 4. Context relevance (optional, needs context data)
+        if self.enable_context_relevance {
+            if let Some(relevance_score) = context.get::<f32>("context_relevance") {
+                adjustment_factors.push(format!("context_relevance:{:.2}", relevance_score));
+                total_adjustment += relevance_score * self.context_relevance_weight;
+                total_weight += self.context_relevance_weight;
+            }
+        }
+        
+        // Calculate new importance
+        // Normalize adjustment to [-1.0, 1.0] range, then apply
+        let normalized_adjustment = if total_weight > 0.0 {
+            total_adjustment / total_weight
+        } else {
+            0.0
+        };
+        
+        let new_importance = (original_importance + normalized_adjustment).clamp(0.0, 1.0);
+        
+        // Update importance in memory attributes
+        input.attributes.set(
+            crate::types::AttributeKey::system("importance"),
+            crate::types::AttributeValue::Number(new_importance as f64),
+        );
+        
+        // Record reassessment info
+        let _ = context.set("original_importance", original_importance);
+        let _ = context.set("new_importance", new_importance);
+        let _ = context.set("importance_change", new_importance - original_importance);
+        let _ = context.set("adjustment_factors", adjustment_factors.join(", "));
+        
+        Ok(StageResult::Continue(input))
+    }
+}
+
 /// Stage 3: 约束验证
 pub struct ConstraintValidationStage;
 
@@ -850,6 +990,69 @@ mod tests {
             
             // Check that relation was established
             assert!(!memory.relations.relations().is_empty(), "Should have established relations");
+        } else {
+            panic!("Expected Continue");
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_importance_reassessment_stage() {
+        let stage = ImportanceReassessmentStage {
+            enable_access_freq: true,
+            enable_temporal_decay: true,
+            enable_relation_boost: true,
+            enable_context_relevance: false,
+            access_freq_weight: 0.3,
+            temporal_decay_weight: 0.25,
+            relation_boost_weight: 0.25,
+            context_relevance_weight: 0.2,
+            decay_halflife_days: 30.0,
+        };
+        
+        // Create a memory with some access history and relations
+        let mut memory = MemoryBuilder::new()
+            .text("Important product information P000257")
+            .build();
+        
+        // Simulate some access history
+        memory.metadata.accessed_count = 10;
+        
+        // Add some relations to boost importance
+        memory.relations.add_relation(crate::types::Relation {
+            target_id: "rel1".to_string(),
+            relation_type: crate::types::RelationType::References,
+            strength: 0.8,
+        });
+        memory.relations.add_relation(crate::types::Relation {
+            target_id: "rel2".to_string(),
+            relation_type: crate::types::RelationType::SimilarTo,
+            strength: 0.6,
+        });
+        
+        let original_importance = memory.importance();
+        let mut context = PipelineContext::new();
+        
+        let result = stage.execute(memory, &mut context).await.unwrap();
+        
+        if let StageResult::Continue(updated_memory) = result {
+            let new_importance = updated_memory.importance();
+            
+            // Importance should change based on access freq and relations
+            // (temporal decay should be minimal for recent memories)
+            assert!(
+                (new_importance - original_importance).abs() > 0.001,
+                "Importance should have changed"
+            );
+            
+            // Check context recorded the change
+            assert!(context.get::<f32>("original_importance").is_some());
+            assert!(context.get::<f32>("new_importance").is_some());
+            assert!(context.get::<f32>("importance_change").is_some());
+            assert!(context.get::<String>("adjustment_factors").is_some());
+            
+            let factors = context.get::<String>("adjustment_factors").unwrap();
+            assert!(factors.contains("access_freq"), "Should have access frequency factor");
+            assert!(factors.contains("relation_boost"), "Should have relation boost factor");
         } else {
             panic!("Expected Continue");
         }
