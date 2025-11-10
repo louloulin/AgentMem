@@ -4999,10 +4999,11 @@ let matching_attrs = memory.attributes.query(&pattern);
   - ✅ 修复processing/mod.rs测试（导入MemoryType）
   - ✅ 修复mcp/server_tests.rs（简化测试）
   - ✅ 修复agent_tools.rs测试（使用.properties.len()）
-- ✅ **lib测试运行状态**: **1317 passed; 0 failed; 56 ignored** 🎉🎉🎉 
+- ✅ **lib测试运行状态**: **1318 passed; 0 failed; 56 ignored** 🎉🎉🎉 
   - ✅ 新增test_entity_extraction_enhanced (实体提取增强测试)
   - ✅ 新增test_relation_building_stage (关系建立测试)
   - ✅ 新增test_importance_reassessment_stage (重要性重评估测试)
+  - ✅ 新增test_memory_compression_stage (记忆压缩测试)
   - ✅ 修复test_storage_factory_all_repositories_available（tools表metadata列名不匹配）
     - 问题: SQL查询使用`metadata_`但表定义是`metadata`
     - 修复: 统一所有SQL查询中的列名为`metadata`
@@ -5175,6 +5176,21 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ 单元测试完整覆盖
 - ✅ 代码行数：约140行
 
+**7. 记忆压缩 (MemoryCompressionStage)** 🆕 2025-11-10 晚上
+- ✅ 自动合并相似记忆（减少冗余）
+- ✅ **内容相似度检测** （Jaccard相似度，权重0.6）
+- ✅ **属性相似度检测** （agent_id/user_id/memory_type匹配，权重0.4）
+- ✅ **3种合并策略** （newest/highest_importance/longest）
+- ✅ 智能内容合并（join with separator）
+- ✅ 唯一实体保留（preserve_unique_entities）
+- ✅ 重要性提升（merged memories boost 10%）
+- ✅ 压缩统计追踪（原始数量/压缩数量/压缩比/节省数量）
+- ✅ 全可配置参数（6个配置项）
+- ✅ 可配置相似度阈值（similarity_threshold: 0.85）
+- ✅ 可配置最大压缩比（max_compression_ratio: 5）
+- ✅ 单元测试完整覆盖
+- ✅ 代码行数：约200行
+
 ### 📊 功能覆盖度
 
 - **冲突检测**: 100% (完整实现)
@@ -5183,6 +5199,7 @@ let matching_attrs = memory.attributes.query(&pattern);
 - **查询扩展**: 100% (同义词+关系，已实现并测试通过) ✅
 - **关系建立**: 100% (自动发现+3种检测方式) ✅ 🆕
 - **重要性重评估**: 100% (动态调整+4种因素) ✅ 🆕
+- **记忆压缩**: 100% (自动合并+3种策略) ✅ 🆕
 - **向后兼容**: 100% (所有legacy API保持可用)
 
 ### 🎯 架构优势体现
@@ -5243,10 +5260,11 @@ let matching_attrs = memory.attributes.query(&pattern);
 - ✅ QueryExpansionStage：100%
 - ✅ RelationBuildingStage：100% 🆕 新增
 - ✅ ImportanceReassessmentStage：100% 🆕 新增
+- ✅ MemoryCompressionStage：100% 🆕 新增
 - ✅ ConstraintValidationStage：100%
 
 **测试覆盖**:
-- ✅ 单元测试：1317个 (新增3个测试) 📈
+- ✅ 单元测试：1318个 (新增4个测试) 📈
 - ✅ 集成测试：56个（ignored）
 - ✅ 测试通过率：100%
 
