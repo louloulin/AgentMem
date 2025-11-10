@@ -58,6 +58,12 @@ impl Default for MemoryId {
     }
 }
 
+impl std::fmt::Display for MemoryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Content abstraction (multi-modal)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Content {
@@ -89,6 +95,23 @@ impl Content {
     pub fn vector(v: Vec<f32>) -> Self {
         Content::Vector(v)
     }
+    
+    /// Check if content contains a substring (for text content)
+    pub fn contains(&self, pattern: &str) -> bool {
+        match self {
+            Content::Text(t) => t.contains(pattern),
+            Content::Structured(v) => v.to_string().contains(pattern),
+            _ => false,
+        }
+    }
+    
+    /// Get text representation
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Content::Text(t) => Some(t),
+            _ => None,
+        }
+    }
 }
 
 /// Attribute set (completely open)
@@ -119,6 +142,11 @@ impl AttributeSet {
         self.attributes.insert(key, value);
     }
     
+    /// Alias for set() for backward compatibility
+    pub fn insert(&mut self, key: AttributeKey, value: AttributeValue) {
+        self.set(key, value);
+    }
+    
     pub fn remove(&mut self, key: &AttributeKey) -> Option<AttributeValue> {
         self.attributes.remove(key)
     }
@@ -145,6 +173,11 @@ impl AttributeKey {
     /// Create a core attribute (system namespace)
     pub fn core(name: impl Into<String>) -> Self {
         Self::new("core", name)
+    }
+    
+    /// Create a system attribute (for system-managed metadata)
+    pub fn system(name: impl Into<String>) -> Self {
+        Self::new("system", name)
     }
     
     /// Create a user attribute
@@ -710,6 +743,163 @@ impl Query {
     /// Create query from simple string (backward compatibility)
     pub fn from_string(s: impl Into<String>) -> Self {
         Self::new(QueryIntent::natural_language(s))
+    }
+}
+
+// Memory Extension Methods for Legacy Compatibility
+impl Memory {
+    /// Get agent_id from attributes
+    pub fn agent_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("agent_id"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get user_id from attributes
+    pub fn user_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("user_id"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get memory_type from attributes
+    pub fn memory_type(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("memory_type"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get importance from attributes
+    pub fn importance(&self) -> Option<f64> {
+        self.attributes
+            .get(&AttributeKey::system("importance"))
+            .and_then(|v| v.as_number())
+    }
+    
+    /// Get score from attributes
+    pub fn score(&self) -> Option<f64> {
+        self.attributes
+            .get(&AttributeKey::system("score"))
+            .and_then(|v| v.as_number())
+    }
+    
+    /// Get hash from attributes
+    pub fn hash(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::system("hash"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get access_count from metadata
+    pub fn access_count(&self) -> u32 {
+        self.metadata.access_count
+    }
+    
+    /// Get created_at from metadata
+    pub fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.metadata.created_at
+    }
+    
+    /// Get updated_at from metadata
+    pub fn updated_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.metadata.updated_at
+    }
+    
+    /// Get last_accessed from metadata
+    pub fn last_accessed(&self) -> chrono::DateTime<chrono::Utc> {
+        self.metadata.accessed_at
+    }
+    
+    /// Set agent_id attribute
+    pub fn set_agent_id(&mut self, agent_id: impl Into<String>) {
+        self.attributes.insert(
+            AttributeKey::core("agent_id"),
+            AttributeValue::String(agent_id.into())
+        );
+    }
+    
+    /// Set user_id attribute
+    pub fn set_user_id(&mut self, user_id: impl Into<String>) {
+        self.attributes.insert(
+            AttributeKey::core("user_id"),
+            AttributeValue::String(user_id.into())
+        );
+    }
+    
+    /// Set memory_type attribute
+    pub fn set_memory_type(&mut self, memory_type: impl Into<String>) {
+        self.attributes.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String(memory_type.into())
+        );
+    }
+    
+    /// Set importance attribute
+    pub fn set_importance(&mut self, importance: f64) {
+        self.attributes.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance)
+        );
+    }
+    
+    /// Set score attribute
+    pub fn set_score(&mut self, score: f64) {
+        self.attributes.insert(
+            AttributeKey::system("score"),
+            AttributeValue::Number(score)
+        );
+    }
+    
+    /// Get organization_id from attributes
+    pub fn organization_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("organization_id"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get scope from attributes
+    pub fn scope(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("scope"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get level from attributes
+    pub fn level(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::core("level"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get is_deleted from attributes
+    pub fn is_deleted(&self) -> bool {
+        self.attributes
+            .get(&AttributeKey::system("is_deleted"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    }
+    
+    /// Get created_by_id from attributes
+    pub fn created_by_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::system("created_by_id"))
+            .and_then(|v| v.as_string())
+            .cloned()
+    }
+    
+    /// Get last_updated_by_id from attributes
+    pub fn last_updated_by_id(&self) -> Option<String> {
+        self.attributes
+            .get(&AttributeKey::system("last_updated_by_id"))
+            .and_then(|v| v.as_string())
+            .cloned()
     }
 }
 

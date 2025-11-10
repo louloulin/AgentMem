@@ -2,7 +2,7 @@
 //!
 //! Provides LibSQL implementation of MemoryRepositoryTrait
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::{AgentMemError, MemoryV4 as Memory, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use libsql::Connection;
