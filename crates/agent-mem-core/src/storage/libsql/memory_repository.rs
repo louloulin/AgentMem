@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
+use crate::storage::conversion::{memory_to_db, db_to_memory};
 
 /// LibSQL implementation of Memory repository
 pub struct LibSqlMemoryRepository {
@@ -107,7 +108,10 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     async fn create(&self, memory: &Memory) -> Result<Memory> {
         let conn = self.conn.lock().await;
 
-        let metadata_json = serde_json::to_string(&memory.metadata).map_err(|e| {
+        // Convert V4 Memory to DbMemory
+        let db_memory = memory_to_db(memory);
+
+        let metadata_json = serde_json::to_string(&db_memory.metadata).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to serialize metadata: {e}"))
         })?;
 
@@ -118,25 +122,25 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                 created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             libsql::params![
-                memory.id.clone(),
-                memory.organization_id.clone(),
-                memory.user_id.clone(),
-                memory.agent_id.clone(),
-                memory.content.clone(),
-                memory.hash.clone(),
+                db_memory.id,
+                db_memory.organization_id,
+                db_memory.user_id,
+                db_memory.agent_id,
+                db_memory.content,
+                db_memory.hash,
                 metadata_json,
-                memory.score,
-                memory.memory_type.clone(),
-                memory.scope.clone(),
-                memory.level.clone(),
-                memory.importance,
-                memory.access_count,
-                memory.last_accessed.map(|dt| dt.timestamp()),
-                memory.created_at.timestamp(),
-                memory.updated_at.timestamp(),
-                if memory.is_deleted { 1 } else { 0 },
-                memory.created_by_id.clone(),
-                memory.last_updated_by_id.clone(),
+                db_memory.score,
+                db_memory.memory_type,
+                db_memory.scope,
+                db_memory.level,
+                db_memory.importance,
+                db_memory.access_count,
+                db_memory.last_accessed.map(|dt| dt.timestamp()),
+                db_memory.created_at.timestamp(),
+                db_memory.updated_at.timestamp(),
+                if db_memory.is_deleted { 1 } else { 0 },
+                db_memory.created_by_id,
+                db_memory.last_updated_by_id,
             ],
         )
         .await
@@ -170,7 +174,9 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            Ok(Some(Self::row_to_memory(&row)?))
+            let db_memory = Self::row_to_memory(&row)?;
+            let memory = db_to_memory(&db_memory)?;
+            Ok(Some(memory))
         } else {
             Ok(None)
         }
@@ -197,16 +203,18 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {e}")))?;
 
-        let mut memories = Vec::new();
+        let mut db_memories = Vec::new();
         while let Some(row) = rows
             .next()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            memories.push(Self::row_to_memory(&row)?);
+            db_memories.push(Self::row_to_memory(&row)?);
         }
 
-        Ok(memories)
+        // Convert DbMemory to Memory V4
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        memories
     }
 
     async fn find_by_user_id(&self, user_id: &str, limit: i64) -> Result<Vec<Memory>> {
@@ -230,16 +238,18 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to query memories: {e}")))?;
 
-        let mut memories = Vec::new();
+        let mut db_memories = Vec::new();
         while let Some(row) = rows
             .next()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            memories.push(Self::row_to_memory(&row)?);
+            db_memories.push(Self::row_to_memory(&row)?);
         }
 
-        Ok(memories)
+        // Convert DbMemory to Memory V4
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        memories
     }
 
     async fn search(&self, query: &str, limit: i64) -> Result<Vec<Memory>> {
@@ -265,22 +275,27 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {e}")))?;
 
-        let mut memories = Vec::new();
+        let mut db_memories = Vec::new();
         while let Some(row) = rows
             .next()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            memories.push(Self::row_to_memory(&row)?);
+            db_memories.push(Self::row_to_memory(&row)?);
         }
 
-        Ok(memories)
+        // Convert DbMemory to Memory V4
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        memories
     }
 
     async fn update(&self, memory: &Memory) -> Result<Memory> {
         let conn = self.conn.lock().await;
 
-        let metadata_json = serde_json::to_string(&memory.metadata).map_err(|e| {
+        // Convert V4 Memory to DbMemory
+        let db_memory = memory_to_db(memory);
+
+        let metadata_json = serde_json::to_string(&db_memory.metadata).map_err(|e| {
             AgentMemError::StorageError(format!("Failed to serialize metadata: {e}"))
         })?;
 
@@ -292,22 +307,22 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                 last_updated_by_id = ?
              WHERE id = ? AND is_deleted = 0",
             libsql::params![
-                memory.organization_id.clone(),
-                memory.user_id.clone(),
-                memory.agent_id.clone(),
-                memory.content.clone(),
-                memory.hash.clone(),
+                db_memory.organization_id,
+                db_memory.user_id,
+                db_memory.agent_id,
+                db_memory.content,
+                db_memory.hash,
                 metadata_json,
-                memory.score,
-                memory.memory_type.clone(),
-                memory.scope.clone(),
-                memory.level.clone(),
-                memory.importance,
-                memory.access_count,
-                memory.last_accessed.map(|dt| dt.timestamp()),
-                memory.updated_at.timestamp(),
-                memory.last_updated_by_id.clone(),
-                memory.id.clone(),
+                db_memory.score,
+                db_memory.memory_type,
+                db_memory.scope,
+                db_memory.level,
+                db_memory.importance,
+                db_memory.access_count,
+                db_memory.last_accessed.map(|dt| dt.timestamp()),
+                db_memory.updated_at.timestamp(),
+                db_memory.last_updated_by_id,
+                db_memory.id,
             ],
         )
         .await
@@ -363,16 +378,18 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories: {e}")))?;
 
-        let mut memories = Vec::new();
+        let mut db_memories = Vec::new();
         while let Some(row) = rows
             .next()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            memories.push(Self::row_to_memory(&row)?);
+            db_memories.push(Self::row_to_memory(&row)?);
         }
 
-        Ok(memories)
+        // Convert DbMemory to Memory V4
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        memories
     }
 }
 
@@ -421,26 +438,36 @@ mod tests {
     }
 
     fn create_test_memory(id: &str) -> Memory {
+        use agent_mem_traits::{
+            MemoryId, Content, AttributeKey, AttributeValue, AttributeSet, 
+            MetadataV4, RelationGraph
+        };
+        
+        let mut attributes = AttributeSet::new();
+        attributes.insert(AttributeKey::core("organization_id"), AttributeValue::String("org1".to_string()));
+        attributes.insert(AttributeKey::core("user_id"), AttributeValue::String("user1".to_string()));
+        attributes.insert(AttributeKey::core("agent_id"), AttributeValue::String("agent1".to_string()));
+        attributes.insert(AttributeKey::core("memory_type"), AttributeValue::String("episodic".to_string()));
+        attributes.insert(AttributeKey::core("scope"), AttributeValue::String("session".to_string()));
+        attributes.insert(AttributeKey::core("level"), AttributeValue::String("high".to_string()));
+        attributes.insert(AttributeKey::system("hash"), AttributeValue::String("hash123".to_string()));
+        attributes.insert(AttributeKey::system("score"), AttributeValue::Number(0.95));
+        attributes.insert(AttributeKey::system("importance"), AttributeValue::Number(0.8));
+        attributes.insert(AttributeKey::system("created_by_id"), AttributeValue::String("user1".to_string()));
+        
         Memory {
-            id: id.to_string(),
-            organization_id: "org1".to_string(),
-            user_id: "user1".to_string(),
-            agent_id: "agent1".to_string(),
-            content: format!("Test memory content {id}"),
-            hash: Some("hash123".to_string()),
-            metadata: json!({"key": "value"}),
-            score: Some(0.95),
-            memory_type: "episodic".to_string(),
-            scope: "session".to_string(),
-            level: "high".to_string(),
-            importance: 0.8,
-            access_count: 0,
-            last_accessed: None,
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(format!("Test memory content {id}")),
+            attributes,
+            relations: RelationGraph::new(),
+            metadata: MetadataV4 {
             created_at: Utc::now(),
             updated_at: Utc::now(),
-            is_deleted: false,
-            created_by_id: Some("user1".to_string()),
-            last_updated_by_id: None,
+                accessed_at: Utc::now(),
+                access_count: 0,
+                version: 1,
+                hash: None,
+            },
         }
     }
 
@@ -454,8 +481,12 @@ mod tests {
 
         assert!(result.is_ok());
         let created = result.unwrap();
-        assert_eq!(created.id, "mem1");
-        assert_eq!(created.content, "Test memory content mem1");
+        assert_eq!(created.id.as_str(), "mem1");
+        if let agent_mem_traits::Content::Text(text) = &created.content {
+            assert_eq!(text, "Test memory content mem1");
+        } else {
+            panic!("Expected text content");
+        }
     }
 
     #[tokio::test]
@@ -470,7 +501,7 @@ mod tests {
         assert!(result.is_ok());
         let found = result.unwrap();
         assert!(found.is_some());
-        assert_eq!(found.unwrap().id, "mem2");
+        assert_eq!(found.unwrap().id.as_str(), "mem2");
     }
 
     #[tokio::test]
@@ -501,7 +532,7 @@ mod tests {
         assert!(result.is_ok());
         let memories = result.unwrap();
         assert_eq!(memories.len(), 1);
-        assert_eq!(memories[0].id, "mem5");
+        assert_eq!(memories[0].id.as_str(), "mem5");
     }
 
     #[tokio::test]
@@ -526,14 +557,18 @@ mod tests {
         let mut memory = create_test_memory("mem7");
         repo.create(&memory).await.unwrap();
 
-        memory.content = "Updated content".to_string();
-        memory.importance = 0.9;
+        memory.content = agent_mem_traits::Content::Text("Updated content".to_string());
+        memory.set_importance(0.9);
         let result = repo.update(&memory).await;
 
         assert!(result.is_ok());
         let updated = repo.find_by_id("mem7").await.unwrap().unwrap();
-        assert_eq!(updated.content, "Updated content");
-        assert_eq!(updated.importance, 0.9);
+        if let agent_mem_traits::Content::Text(text) = &updated.content {
+            assert_eq!(text, "Updated content");
+        } else {
+            panic!("Expected text content");
+        }
+        assert!((updated.importance().unwrap() - 0.9).abs() < 0.01);
     }
 
     #[tokio::test]

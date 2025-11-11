@@ -122,31 +122,31 @@ impl ImportanceScorer for DefaultImportanceScorer {
 
         // Calculate recency score (more recent = higher score)
         // Uses exponential decay: score = e^(-decay_rate * hours)
-        let age_hours = (now - memory.created_at).num_hours() as f64;
-        let decay_rate = 0.01; // Slower decay for longer-term relevance
+        let age_hours = (now - memory.metadata.created_at).num_hours() as f64;
+        let decay_rate = 0.01_f64; // Slower decay for longer-term relevance
         let recency_score = (-decay_rate * age_hours).exp().max(0.0).min(1.0);
 
         // Calculate frequency score based on access patterns
         // Uses logarithmic scale to normalize access frequency
-        let days_since_creation = (now - memory.created_at).num_days().max(1) as f64;
-        let access_frequency = memory.access_count as f64 / days_since_creation;
-        let frequency_score = (1.0 + access_frequency).ln() / (1.0 + 100.0_f64).ln();
+        let days_since_creation = (now - memory.metadata.created_at).num_days().max(1) as f64;
+        let access_frequency = memory.metadata.access_count as f64 / days_since_creation;
+        let frequency_score = (1.0_f64 + access_frequency).ln() / (1.0_f64 + 100.0_f64).ln();
         let frequency_score = frequency_score.max(0.0).min(1.0);
 
         // Calculate relevance score based on existing importance and score
         // Combines the memory's base importance with its semantic score
-        let base_importance = memory.importance as f64;
-        let semantic_score = memory.score.unwrap_or(0.5) as f64;
+        let base_importance = memory.importance().unwrap_or(0.5);
+        let semantic_score = memory.score().unwrap_or(0.5);
         let relevance_score = (base_importance * 0.6 + semantic_score * 0.4)
             .max(0.0)
             .min(1.0);
 
         // Calculate interaction score based on access count and recency
         // Recent accesses are weighted more heavily
-        let hours_since_access = (now - memory.last_accessed_at).num_hours() as f64;
-        let access_recency = (-0.02 * hours_since_access).exp();
-        let access_count_normalized = (memory.access_count as f64
-            / (memory.access_count as f64 + 10.0))
+        let hours_since_access = (now - memory.metadata.accessed_at).num_hours() as f64;
+        let access_recency = (-0.02_f64 * hours_since_access).exp();
+        let access_count_normalized = (memory.metadata.access_count as f64
+            / (memory.metadata.access_count as f64 + 10.0))
             .max(0.0)
             .min(1.0);
         let interaction_score = (access_recency * 0.5 + access_count_normalized * 0.5)
@@ -274,9 +274,17 @@ impl ConflictResolver for DefaultConflictResolver {
         // Simple duplicate detection based on content similarity
         for (i, memory1) in memories.iter().enumerate() {
             for memory2 in memories.iter().skip(i + 1) {
-                if self.are_similar(&memory1.content, &memory2.content) {
+                let content1 = match &memory1.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    _ => "",
+                };
+                let content2 = match &memory2.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    _ => "",
+                };
+                if self.are_similar(content1, content2) {
                     conflicts.push(ConflictInfo {
-                        memory_ids: vec![memory1.id.clone(), memory2.id.clone()],
+                        memory_ids: vec![memory1.id.to_string(), memory2.id.to_string()],
                         conflict_type: ConflictType::Duplicate,
                         confidence: 0.8,
                         suggested_resolution: ResolutionStrategy::KeepImportant,
@@ -305,8 +313,8 @@ impl ConflictResolver for DefaultConflictResolver {
                         let mut best_importance = -1.0;
 
                         for memory_id in &conflict.memory_ids {
-                            if let Some(memory) = memories.iter().find(|m| m.id == *memory_id) {
-                                let importance = memory.score.unwrap_or(0.0) as f64;
+                            if let Some(memory) = memories.iter().find(|m| m.id.as_str() == memory_id.as_str()) {
+                                let importance = memory.score().unwrap_or(0.0);
                                 if importance > best_importance {
                                     best_importance = importance;
                                     best_memory = Some(memory_id.clone());
@@ -330,7 +338,7 @@ impl ConflictResolver for DefaultConflictResolver {
         }
 
         // Remove conflicted memories
-        resolved_memories.retain(|m| !to_remove.contains(&m.id));
+        resolved_memories.retain(|m| !to_remove.contains(&m.id.to_string()));
 
         Ok(resolved_memories)
     }

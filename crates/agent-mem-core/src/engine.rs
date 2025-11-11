@@ -1,13 +1,15 @@
 //! Memory Engine - Core orchestration and management
 
-use crate::{hierarchy::MemoryScope, Memory};
+use crate::hierarchy::MemoryScope;
 use crate::{
     hierarchy::{DefaultHierarchyManager, HierarchyConfig, HierarchyManager, MemoryLevel},
     intelligence::{
         ConflictResolver, DefaultConflictResolver, DefaultImportanceScorer, ImportanceScorer,
         IntelligenceConfig,
     },
+    storage::conversion::{db_to_memory, memory_to_db, v4_to_legacy, legacy_to_v4},
 };
+use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -115,20 +117,20 @@ impl MemoryEngine {
         // Calculate importance if auto-processing is enabled
         if self.config.auto_processing {
             let importance_factors = self.importance_scorer.calculate_importance(&memory).await?;
-            memory.score = Some(importance_factors.final_score as f32);
+            memory.set_score(importance_factors.final_score);
 
             debug!(
                 "Calculated importance {} for memory {}",
-                memory.score.unwrap_or(0.0),
-                memory.id
+                memory.score().unwrap_or(0.0),
+                memory.id.as_str()
             );
         }
 
         // Add to hierarchy
         let hierarchical_memory = self.hierarchy_manager.add_memory(memory).await?;
 
-        info!("Added memory {} to engine", hierarchical_memory.memory.id);
-        Ok(hierarchical_memory.memory.id)
+        info!("Added memory {} to engine", hierarchical_memory.memory.id.as_str());
+        Ok(hierarchical_memory.memory.id.as_str().to_string())
     }
 
     /// Get memory by ID
@@ -145,11 +147,12 @@ impl MemoryEngine {
         // Recalculate importance if auto-processing is enabled
         if self.config.auto_processing {
             let importance_factors = self.importance_scorer.calculate_importance(&memory).await?;
-            memory.score = Some(importance_factors.final_score as f32);
+            memory.set_score(importance_factors.final_score);
         }
 
         // Get current hierarchical memory
-        if let Some(mut hierarchical_memory) = self.hierarchy_manager.get_memory(&memory.id).await?
+        let memory_id = memory.id.as_str().to_string();
+        if let Some(mut hierarchical_memory) = self.hierarchy_manager.get_memory(&memory_id).await?
         {
             hierarchical_memory.memory = memory;
 
@@ -239,7 +242,12 @@ impl MemoryEngine {
                         // 如果查询不为空，过滤包含查询的记忆
                         if !query.trim().is_empty() {
                             user_memories.into_iter()
-                                .filter(|m| m.content.contains(query))
+                                .filter(|m| {
+                                    match &m.content {
+                                        agent_mem_traits::Content::Text(t) => t.contains(query),
+                                        _ => false,
+                                    }
+                                })
                                 .take(fetch_limit as usize)
                                 .collect()
                         } else {
@@ -275,81 +283,50 @@ impl MemoryEngine {
                 Regex::new(r"P\d{6}").unwrap().is_match(query)
             };
 
-            // 转换为 Memory (MemoryItem) 类型并计算相关性
+            // 🆕 V4: db_memories already are Vec<Memory> (V4)
             let mut scored_memories: Vec<(Memory, f64)> = db_memories
                 .into_iter()
-                .filter(|db_mem| {
+                .filter(|memory| {
                     // 🔧 修复: 对于商品ID查询，过滤工作记忆
                     if is_product_query {
+                        let mem_type = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
                         !matches!(
-                            db_mem.memory_type.as_str(),
+                            mem_type.as_str(),
                             "working" | "Working"
                         )
                     } else {
                         true  // 非商品查询，不过滤
                     }
                 })
-                .map(|db_mem| {
-                    use std::collections::HashMap;
-                    use chrono::Utc;
-                    
-                    // 解析 metadata JSON
-                    let metadata: HashMap<String, serde_json::Value> = if let serde_json::Value::Object(map) = &db_mem.metadata {
-                        map.iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
-                    } else {
-                        HashMap::new()
-                    };
-                    
-                    // 转换 storage::models::Memory -> MemoryItem
-                    let memory = Memory {
-                        id: db_mem.id.clone(),
-                        agent_id: db_mem.agent_id.clone(),
-                        user_id: Some(db_mem.user_id.clone()),
-                        content: db_mem.content.clone(),
-                        hash: db_mem.hash.clone(),
-                        metadata,
-                        score: db_mem.score,
-                        created_at: db_mem.created_at,
-                        updated_at: Some(db_mem.updated_at),
-                        memory_type: db_mem.memory_type.parse().unwrap_or(agent_mem_traits::MemoryType::Semantic),
-                        importance: db_mem.importance,
-                        // 默认值字段
-                        session: agent_mem_traits::Session {
-                            id: format!("session-{}", db_mem.id),
-                            user_id: Some(db_mem.user_id.clone()),
-                            agent_id: Some(db_mem.agent_id.clone()),
-                            run_id: None,
-                            actor_id: None,
-                            created_at: db_mem.created_at,
-                            metadata: HashMap::new(),
-                        },
-                        entities: vec![],
-                        relations: vec![],
-                        embedding: None,
-                        last_accessed_at: db_mem.last_accessed.unwrap_or_else(|| Utc::now()),
-                        access_count: db_mem.access_count as u32,
-                        expires_at: None,
-                        version: 1,
-                    };
-                    
+                .map(|memory| {
                     // 计算内容相关性分数
-                    let relevance_score = self.calculate_relevance_score(&memory, query);
+                    let legacy = v4_to_legacy(&memory);
+                    let relevance_score = self.calculate_relevance_score(&legacy, query);
                     
                     // ✅ 计算时间衰减权重（指数衰减，半衰期24小时）
                     let now = chrono::Utc::now();
-                    let age_hours = (now - memory.created_at).num_hours() as f64;
-                    let time_decay = if memory.memory_type == agent_mem_traits::MemoryType::Working {
+                    let age_hours = (now - memory.metadata.created_at).num_hours() as f64;
+                    
+                    let memory_type_str = memory.attributes
+                        .get(&agent_mem_traits::AttributeKey::core("memory_type"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or(&String::from(""))
+                        .clone();
+                    
+                    let time_decay = if memory_type_str == "working" || memory_type_str == "Working" {
                         1.0  // Working memory不衰减
                     } else {
                         (-age_hours / 24.0).exp()  // 长期记忆：e^(-t/24)
                     };
                     
-                    // ✅ 计算用户匹配权重
-                    let user_match_boost = if let Some(ref mem_user_id) = memory.user_id {
+                    // ✅ 计算用户匹配权重 (V4: 使用属性访问)
+                    let mem_user_id = memory.attributes
+                        .get(&agent_mem_traits::AttributeKey::core("user_id"))
+                        .and_then(|v| v.as_string());
+                    
+                    let user_match_boost = if let Some(ref mem_user_id) = mem_user_id {
                         if let Some(target_uid) = target_user_id {
-                            if mem_user_id == target_uid {
+                            if mem_user_id.as_str() == target_uid {
                                 2.0  // 同一用户：加倍权重
                             } else {
                                 0.3  // 不同用户：大幅降权
@@ -361,18 +338,29 @@ impl MemoryEngine {
                         1.0
                     };
                     
-                    // ✅ 综合权重计算
-                    let final_score = relevance_score * time_decay * user_match_boost * (0.5 + 0.5 * memory.importance as f64);
+                    // ✅ 综合权重计算 (V4: 使用 importance 属性)
+                    let importance = memory.attributes
+                        .get(&agent_mem_traits::AttributeKey::system("importance"))
+                        .and_then(|v| v.as_number())
+                        .unwrap_or(0.5);
                     
-                    // 日志（安全截取字符串）
-                    let content_preview: String = memory.content.chars().take(30).collect();
+                    let final_score = relevance_score * time_decay * user_match_boost * (0.5 + 0.5 * importance);
+                    
+                    // 日志（安全截取字符串） (V4: 使用 content 访问)
+                    let content_text = match &memory.content {
+                        agent_mem_traits::Content::Text(t) => t.clone(),
+                        agent_mem_traits::Content::Structured(v) => v.to_string(),
+                        _ => String::new(),
+                    };
+                    let content_preview: String = content_text.chars().take(30).collect();
+                    
                     info!("🔍 Memory: user={:?} age={}h relevance={:.2} decay={:.2} user_boost={:.1} importance={:.2} → final={:.3} | '{}'", 
-                          memory.user_id.as_ref().map(|s| s.chars().take(8).collect::<String>()), 
+                          mem_user_id.as_ref().map(|s| s.chars().take(8).collect::<String>()), 
                           age_hours,
                           relevance_score,
                           time_decay,
                           user_match_boost,
-                          memory.importance,
+                          importance,
                           final_score,
                           content_preview);
                     
@@ -392,16 +380,23 @@ impl MemoryEngine {
             };
             
             scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
-                // 辅助函数：检查是否是精确商品匹配
+                // 辅助函数：检查是否是精确商品匹配 (V4: 使用 Content 和 attributes 访问)
                 let is_exact_product_match = |mem: &Memory, q: &str| -> bool {
                     if let Some(product_id) = {
                         use regex::Regex;
                         Regex::new(r"P\d{6}").unwrap().find(q).map(|m| m.as_str())
                     } {
-                        mem.content.contains(&format!("商品ID: {}", product_id)) ||
-                        mem.metadata
-                            .get("product_id")
-                            .and_then(|v| v.as_str())
+                        // V4: 检查 content
+                        let content_text = match &mem.content {
+                            agent_mem_traits::Content::Text(t) => t.clone(),
+                            agent_mem_traits::Content::Structured(v) => v.to_string(),
+                            _ => String::new(),
+                        };
+                        
+                        content_text.contains(&format!("商品ID: {}", product_id)) ||
+                        mem.attributes
+                            .get(&agent_mem_traits::AttributeKey::user("product_id"))
+                            .and_then(|v| v.as_string())
                             .map(|pid| pid == product_id)
                             .unwrap_or(false)
                     } else {
@@ -420,15 +415,17 @@ impl MemoryEngine {
                         _ => {}
                     }
                     
-                    // 2. 工作记忆降权（虽然已经过滤，但保留逻辑以防万一）
-                    let a_working = matches!(
-                        mem_a.memory_type,
-                        agent_mem_traits::MemoryType::Working
-                    );
-                    let b_working = matches!(
-                        mem_b.memory_type,
-                        agent_mem_traits::MemoryType::Working
-                    );
+                    // 2. 工作记忆降权（虽然已经过滤，但保留逻辑以防万一）(V4: 使用属性访问)
+                    let get_memory_type = |mem: &Memory| -> String {
+                        mem.attributes
+                            .get(&agent_mem_traits::AttributeKey::core("memory_type"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or(&String::from("episodic"))
+                            .clone()
+                    };
+                    
+                    let a_working = get_memory_type(mem_a).to_lowercase() == "working";
+                    let b_working = get_memory_type(mem_b).to_lowercase() == "working";
                     
                     match (a_working, b_working) {
                         (true, false) => return std::cmp::Ordering::Greater,  // a 排在后面
@@ -443,12 +440,15 @@ impl MemoryEngine {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 
-            // 应用限制并设置分数
+            // 应用限制并设置分数 (V4: 使用属性设置 score)
             let final_memories: Vec<Memory> = scored_memories
                 .into_iter()
                 .take(limit.unwrap_or(10))
                 .map(|(mut mem, score)| {
-                    mem.score = Some(score as f32);
+                    mem.attributes.insert(
+                        agent_mem_traits::AttributeKey::system("score"),
+                        agent_mem_traits::AttributeValue::Number(score)
+                    );
                     mem
                 })
                 .collect();
@@ -501,7 +501,8 @@ impl MemoryEngine {
         let mut scored_memories: Vec<(Memory, f64)> = filtered_memories
             .into_iter()
             .filter_map(|memory| {
-                let score = self.calculate_relevance_score(&memory, query);
+                let legacy = v4_to_legacy(&memory);
+                let score = self.calculate_relevance_score(&legacy, query);
                 if score > 0.0 {
                     Some((memory, score))
                 } else {
@@ -512,8 +513,8 @@ impl MemoryEngine {
 
         // Sort by score (descending) and importance
         scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
-            let combined_a = score_a + (mem_a.score.unwrap_or(0.0) as f64 * 0.3);
-            let combined_b = score_b + (mem_b.score.unwrap_or(0.0) as f64 * 0.3);
+            let combined_a = score_a + (mem_a.score().unwrap_or(0.0) * 0.3);
+            let combined_b = score_b + (mem_b.score().unwrap_or(0.0) * 0.3);
             combined_b
                 .partial_cmp(&combined_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -535,11 +536,11 @@ impl MemoryEngine {
     fn matches_scope(&self, memory: &Memory, scope: &MemoryScope) -> bool {
         match scope {
             MemoryScope::Global => true,
-            MemoryScope::Agent(agent_id) => &memory.agent_id == agent_id,
+            MemoryScope::Agent(agent_id) => memory.agent_id().as_ref() == Some(agent_id),
             MemoryScope::User { agent_id, user_id } => {
-                &memory.agent_id == agent_id
+                memory.agent_id().as_ref() == Some(agent_id)
                     && memory
-                        .user_id
+                        .user_id()
                         .as_ref()
                         .map(|uid| uid == user_id)
                         .unwrap_or(false)
@@ -549,15 +550,16 @@ impl MemoryEngine {
                 user_id,
                 session_id,
             } => {
-                &memory.agent_id == agent_id
+                memory.agent_id().as_ref() == Some(agent_id)
                     && memory
-                        .user_id
+                        .user_id()
                         .as_ref()
                         .map(|uid| uid == user_id)
                         .unwrap_or(false)
                     && memory
-                        .metadata
-                        .get("session_id")
+                        .attributes
+                        .get(&agent_mem_traits::AttributeKey::core("session_id"))
+                        .and_then(|v| v.as_string())
                         .map(|sid| sid == session_id)
                         .unwrap_or(false)
             }
@@ -565,7 +567,7 @@ impl MemoryEngine {
     }
 
     /// Calculate relevance score for a memory based on query
-    fn calculate_relevance_score(&self, memory: &Memory, query: &str) -> f64 {
+    fn calculate_relevance_score(&self, memory: &LegacyMemory, query: &str) -> f64 {
         use regex::Regex;
         
         // 🔧 修复: 检测商品ID查询，优先处理精确ID匹配

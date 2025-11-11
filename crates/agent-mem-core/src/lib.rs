@@ -144,8 +144,14 @@ pub use cache::{
 };
 
 // Re-export from traits
+// V4 Architecture: Memory now points to the new V4 abstraction
 pub use agent_mem_traits::{
-    AgentMemError, MemoryItem as Memory, MemoryType, Result as MemoryResult, Session,
+    AgentMemError, 
+    MemoryV4 as Memory,  // V4: Primary Memory type
+    MemoryItem,           // Legacy: Kept for backward compatibility
+    MemoryType, 
+    Result as MemoryResult, 
+    Session,
 };
 
 // Re-export simple memory API

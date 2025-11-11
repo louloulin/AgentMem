@@ -4,7 +4,10 @@
 
 use crate::{engine::MemoryEngine, Memory};
 use agent_mem_llm::LLMClient;
-use agent_mem_traits::{MemoryType, Message, Result, Session};
+use agent_mem_traits::{
+    MemoryType, Message, Result, Session, MemoryId, Content, 
+    AttributeSet, RelationGraph, MetadataV4 as Metadata
+};
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -170,27 +173,24 @@ impl MemoryExtractor {
                             .unwrap_or(0.5) as f32;
 
                         let now = Utc::now();
-                        let memory = Memory {
-                            id: Uuid::new_v4().to_string(),
-                            content: content.to_string(),
-                            hash: None,
-                            metadata: HashMap::new(),
-                            score: Some(importance),
+                        let mut memory = Memory {
+                            id: MemoryId::from_string(Uuid::new_v4().to_string()),
+                            content: Content::Text(content.to_string()),
+                            attributes: AttributeSet::new(),
+                            relations: RelationGraph::new(),
+                            metadata: Metadata {
                             created_at: now,
-                            updated_at: Some(now),
-                            session: Session::new(),
-                            memory_type: memory_type.unwrap_or(MemoryType::Episodic),
-                            entities: Vec::new(),
-                            relations: Vec::new(),
-                            agent_id: agent_id.to_string(),
-                            user_id: Some(user_id.to_string()),
-                            importance,
-                            embedding: None,
-                            last_accessed_at: now,
+                                updated_at: now,
+                                accessed_at: now,
                             access_count: 0,
-                            expires_at: None,
                             version: 1,
+                                hash: None,
+                            },
                         };
+                        memory.set_agent_id(agent_id);
+                        memory.set_user_id(user_id);
+                        memory.set_importance(importance as f64);
+                        memory.set_score(importance as f64);
                         memories.push(memory);
                     }
                 }
@@ -237,27 +237,27 @@ impl MemoryExtractor {
         let now = Utc::now();
         text.lines()
             .filter(|line| !line.trim().is_empty() && line.len() > 10)
-            .take(5) // 最多提取 5 条
-            .map(|line| Memory {
-                id: Uuid::new_v4().to_string(),
-                content: line.trim().to_string(),
-                hash: None,
-                metadata: HashMap::new(),
-                score: Some(0.5),
+            .take(5)
+            .map(|line| {
+                let mut memory = Memory {
+                    id: MemoryId::from_string(Uuid::new_v4().to_string()),
+                    content: Content::Text(line.trim().to_string()),
+                    attributes: AttributeSet::new(),
+                    relations: RelationGraph::new(),
+                    metadata: Metadata {
                 created_at: now,
-                updated_at: Some(now),
-                session: Session::new(),
-                memory_type: MemoryType::Episodic,
-                entities: Vec::new(),
-                relations: Vec::new(),
-                agent_id: agent_id.to_string(),
-                user_id: Some(user_id.to_string()),
-                importance: 0.5,
-                embedding: None,
-                last_accessed_at: now,
+                        updated_at: now,
+                        accessed_at: now,
                 access_count: 0,
-                expires_at: None,
                 version: 1,
+                        hash: None,
+                    },
+                };
+                memory.set_agent_id(agent_id);
+                memory.set_user_id(user_id);
+                memory.set_importance(0.5);
+                memory.set_score(0.5);
+                memory
             })
             .collect()
     }
@@ -277,10 +277,10 @@ impl MemoryExtractor {
             // 使用 MemoryEngine 保存记忆
             match self.memory_engine.add_memory(memory.clone()).await {
                 Ok(_) => {
-                    debug!("Successfully saved memory: {}", memory.content);
+                    debug!("Successfully saved memory: {:?}", memory.content);
                 }
                 Err(e) => {
-                    warn!("Failed to save memory '{}': {}", memory.content, e);
+                    warn!("Failed to save memory '{:?}': {}", memory.content, e);
                     // 继续保存其他记忆，不中断整个流程
                 }
             }

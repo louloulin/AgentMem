@@ -125,7 +125,7 @@ impl MemoryIntegrator {
         // 过滤低相关性记忆（基于 importance score）
         let filtered_memories: Vec<Memory> = memories
             .into_iter()
-            .filter(|m| m.score.unwrap_or(0.0) >= self.config.relevance_threshold)
+            .filter(|m| m.score().unwrap_or(0.0) >= self.config.relevance_threshold as f64)
             .collect();
 
         info!(
@@ -197,31 +197,36 @@ impl MemoryIntegrator {
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 检查是否是精确匹配的商品记忆
+                            let content_str = match &memory.content {
+                                agent_mem_traits::Content::Text(t) => t.as_str(),
+                                agent_mem_traits::Content::Structured(v) => "",
+                                _ => "",
+                            };
                             let is_exact_product = {
-                                memory.content.contains(&format!("商品ID: {}", product_id)) ||
-                                memory.metadata
-                                    .get("product_id")
-                                    .and_then(|v| v.as_str())
+                                content_str.contains(&format!("商品ID: {}", product_id)) ||
+                                memory.attributes
+                                    .get(&agent_mem_traits::AttributeKey::core("product_id"))
+                                    .and_then(|v| v.as_string())
                                     .map(|pid| pid == product_id)
                                     .unwrap_or(false)
                             };
                             
                             // 排除工作记忆
-                            let is_working_memory = matches!(
-                                memory.memory_type,
-                                agent_mem_traits::MemoryType::Working
-                            );
+                            let mem_type_opt = memory.memory_type();
+                            let is_working_memory = mem_type_opt.as_ref()
+                                .map(|t| t.to_lowercase() == "working")
+                                .unwrap_or(false);
                             
                             if is_exact_product && !is_working_memory {
                                 // 精确匹配的商品记忆，权重提升
-                                if let Some(score) = memory.score {
-                                    memory.score = Some(score * 2.0);  // 大幅提升权重
+                                if let Some(score) = memory.score() {
+                                    memory.set_score(score * 2.0);  // 大幅提升权重
                                 }
                                 exact_product_memories.push(memory);
                             } else if !is_working_memory {
                                 // 其他相关记忆
-                            if let Some(score) = memory.score {
-                                    memory.score = Some(score * 1.2);  // 适度提升权重
+                            if let Some(score) = memory.score() {
+                                    memory.set_score(score * 1.2);  // 适度提升权重
                                 }
                                 other_memories.push(memory);
                             }
@@ -239,9 +244,9 @@ impl MemoryIntegrator {
                             all_memories.len(), 
                             exact_count);
                         all_memories.sort_by(|a, b| {
-                            b.score
+                            b.score()
                                 .unwrap_or(0.0)
-                                .partial_cmp(&a.score.unwrap_or(0.0))
+                                .partial_cmp(&a.score().unwrap_or(0.0))
                                 .unwrap_or(std::cmp::Ordering::Equal)
                         });
                         return Ok(all_memories.into_iter().take(max_count).collect());
@@ -277,8 +282,8 @@ impl MemoryIntegrator {
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 🎯 Episodic Memory 权重 (可配置，基于Adaptive Framework)
-                            if let Some(score) = memory.score {
-                                memory.score = Some(score * self.config.episodic_weight);
+                        if let Some(score) = memory.score() {
+                            memory.set_score(score * self.config.episodic_weight as f64);
                             }
                             all_memories.push(memory);
                         }
@@ -346,8 +351,8 @@ impl MemoryIntegrator {
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 🎯 Semantic Memory 权重 (可配置，降低因为范围更广)
-                            if let Some(score) = memory.score {
-                                memory.score = Some(score * self.config.semantic_weight);
+                            if let Some(score) = memory.score() {
+                                memory.set_score(score * self.config.semantic_weight as f64);
                             }
                             all_memories.push(memory);
                             added += 1;
@@ -386,8 +391,8 @@ impl MemoryIntegrator {
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 🎯 Global Memory 权重 (可配置，降低因为范围最广)
-                            if let Some(score) = memory.score {
-                                memory.score = Some(score * self.config.semantic_weight);
+                            if let Some(score) = memory.score() {
+                                memory.set_score(score * self.config.semantic_weight as f64);
                             }
                             all_memories.push(memory);
                             added += 1;
@@ -410,12 +415,12 @@ impl MemoryIntegrator {
             .iter()
             .filter(|m| {
                 // 简单判断：包含user_id但不包含session的是Episodic
-                m.metadata.contains_key("user_id") && !m.id.contains("session")
+                m.user_id().is_some() && !m.id.as_str().contains("session")
             })
             .count();
         let working_count = all_memories
             .iter()
-            .filter(|m| m.id.contains("session"))
+            .filter(|m| m.id.as_str().contains("session"))
             .count();
         let semantic_count = final_count - episodic_count - working_count;
 
@@ -426,9 +431,9 @@ impl MemoryIntegrator {
 
         // 按调整后的score排序
         all_memories.sort_by(|a, b| {
-            b.score
+            b.score()
                 .unwrap_or(0.0)
-                .partial_cmp(&a.score.unwrap_or(0.0))
+                .partial_cmp(&a.score().unwrap_or(0.0))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -452,22 +457,36 @@ impl MemoryIntegrator {
             prompt.push_str(&format!("{}. ", i + 1));
 
             // 添加记忆类型标签
+            // Get memory type from attributes
+            let mem_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+            let mem_type = match mem_type_str.to_lowercase().as_str() {
+                "episodic" => agent_mem_traits::MemoryType::Episodic,
+                "semantic" => agent_mem_traits::MemoryType::Semantic,
+                "procedural" => agent_mem_traits::MemoryType::Procedural,
+                "working" => agent_mem_traits::MemoryType::Working,
+                _ => agent_mem_traits::MemoryType::Episodic,
+            };
             prompt.push_str(&format!(
                 "[{}] ",
-                self.format_memory_type(&memory.memory_type)
+                self.format_memory_type(&mem_type)
             ));
 
             // 添加记忆内容
-            prompt.push_str(&memory.content);
+            let content_str = match &memory.content {
+                agent_mem_traits::Content::Text(t) => t.as_str(),
+                agent_mem_traits::Content::Structured(_) => "[structured data]",
+                _ => "[unknown content]",
+            };
+            prompt.push_str(content_str);
 
             // 添加时间戳（如果启用）
             if self.config.include_timestamp {
-                let time_str = memory.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+                let time_str = memory.metadata.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
                 prompt.push_str(&format!(" ({time_str})"));
             }
 
             // 添加重要性分数（如果有）
-            if memory.importance > 0.7 {
+            if memory.importance().unwrap_or(0.0) > 0.7 {
                 prompt.push_str(" [Important]");
             }
 
@@ -499,8 +518,9 @@ impl MemoryIntegrator {
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
             memories.sort_by(|a, b| {
-                b.importance
-                    .partial_cmp(&a.importance)
+                b.importance()
+                    .unwrap_or(0.0)
+                    .partial_cmp(&a.importance().unwrap_or(0.0))
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
@@ -518,10 +538,11 @@ impl MemoryIntegrator {
         let filtered: Vec<Memory> = memories
             .into_iter()
             .filter(|m| {
-                let keep = m.importance >= self.config.relevance_threshold;
+                let importance = m.importance().unwrap_or(0.0);
+                let keep = importance >= self.config.relevance_threshold as f64;
                 info!(
                     "  Memory importance={:.3}, threshold={:.3}, keep={}",
-                    m.importance, self.config.relevance_threshold, keep
+                    importance, self.config.relevance_threshold, keep
                 );
                 keep
             })

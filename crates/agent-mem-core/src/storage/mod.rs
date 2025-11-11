@@ -7,6 +7,9 @@ pub mod traits;
 // Models (always available for LibSQL and PostgreSQL)
 pub mod models;
 
+// Conversion layer between Memory V4 and DbMemory
+pub mod conversion;
+
 // Repository factory (always available)
 pub mod factory;
 

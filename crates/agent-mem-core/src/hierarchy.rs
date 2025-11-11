@@ -355,13 +355,13 @@ impl HierarchicalMemoryManager {
                         let mut inherited_memory = memory.clone();
 
                         // Apply inheritance decay
-                        let current_score = inherited_memory.memory.score.unwrap_or(0.5);
-                        inherited_memory.memory.score = Some(
+                        let current_score = inherited_memory.memory.score().unwrap_or(0.5);
+                        inherited_memory.memory.set_score(
                             current_score
-                                * memory
+                                * (memory
                                     .hierarchy_metadata
                                     .inheritance
-                                    .decay_factor
+                                    .decay_factor as f64)
                                     .powi(level),
                         );
 
@@ -411,7 +411,7 @@ impl HierarchicalMemoryManager {
     ) -> Result<()> {
         if let Some(memories) = self.memories.get_mut(scope) {
             for memory in memories {
-                if memory.memory.id == memory_id {
+                if memory.memory.id.as_str() == memory_id {
                     if memory.hierarchy_metadata.permissions.writable {
                         memory.hierarchy_metadata.permissions = permissions;
                         return Ok(());
@@ -428,7 +428,7 @@ impl HierarchicalMemoryManager {
     /// Delete memory from scope
     pub fn delete_memory(&mut self, memory_id: &str, scope: &MemoryScope) -> Result<()> {
         if let Some(memories) = self.memories.get_mut(scope) {
-            if let Some(pos) = memories.iter().position(|m| m.memory.id == memory_id) {
+            if let Some(pos) = memories.iter().position(|m| m.memory.id.as_str() == memory_id) {
                 let memory = &memories[pos];
                 if memory.hierarchy_metadata.permissions.deletable {
                     memories.remove(pos);
@@ -454,26 +454,29 @@ impl HierarchicalMemoryManager {
             for memory in memories {
                 scope_stats.total_memories += 1;
 
-                match memory.memory.memory_type {
+                let mem_type_str = memory.memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+                match mem_type_str.to_lowercase().as_str() {
                     // Legacy type
-                    MemoryType::Factual => scope_stats.semantic_memories += 1,
+                    "factual" => scope_stats.semantic_memories += 1,
                     // Basic cognitive memories
-                    MemoryType::Episodic => scope_stats.episodic_memories += 1,
-                    MemoryType::Semantic => scope_stats.semantic_memories += 1,
-                    MemoryType::Procedural => scope_stats.procedural_memories += 1,
-                    MemoryType::Working => scope_stats.untyped_memories += 1,
+                    "episodic" => scope_stats.episodic_memories += 1,
+                    "semantic" => scope_stats.semantic_memories += 1,
+                    "procedural" => scope_stats.procedural_memories += 1,
+                    "working" => scope_stats.untyped_memories += 1,
                     // Advanced cognitive memories (AgentMem 7.0)
-                    MemoryType::Core => scope_stats.semantic_memories += 1, // Core memories are semantic-like
-                    MemoryType::Resource => scope_stats.untyped_memories += 1, // Resource memories are untyped
-                    MemoryType::Knowledge => scope_stats.semantic_memories += 1, // Knowledge memories are semantic-like
-                    MemoryType::Contextual => scope_stats.episodic_memories += 1, // Contextual memories are episodic-like
+                    "core" => scope_stats.semantic_memories += 1, // Core memories are semantic-like
+                    "resource" => scope_stats.untyped_memories += 1, // Resource memories are untyped
+                    "knowledge" => scope_stats.semantic_memories += 1, // Knowledge memories are semantic-like
+                    // Default case for any other types
+                    _ => scope_stats.episodic_memories += 1,
+                    "contextual" => scope_stats.episodic_memories += 1, // Contextual memories are episodic-like
                 }
 
                 if memory.hierarchy_metadata.inheritance.inherited {
                     scope_stats.inherited_memories += 1;
                 }
 
-                let importance = memory.memory.score.unwrap_or(0.5);
+                let importance = memory.memory.score().unwrap_or(0.5) as f32;
                 scope_stats.total_importance += importance;
                 if importance > scope_stats.max_importance {
                     scope_stats.max_importance = importance;
@@ -687,21 +690,23 @@ impl DefaultHierarchyManager {
 impl HierarchyManager for DefaultHierarchyManager {
     async fn add_memory(&self, memory: Memory) -> crate::CoreResult<HierarchicalMemory> {
         // Determine appropriate level based on importance
-        let level = if memory.score.unwrap_or(0.0) > 0.8 {
+        let score = memory.score().unwrap_or(0.0);
+        let level = if score > 0.8 {
             MemoryLevel::Strategic
-        } else if memory.score.unwrap_or(0.0) > 0.6 {
+        } else if score > 0.6 {
             MemoryLevel::Tactical
-        } else if memory.score.unwrap_or(0.0) > 0.4 {
+        } else if score > 0.4 {
             MemoryLevel::Operational
         } else {
             MemoryLevel::Contextual
         };
 
-        // Determine scope from memory metadata or default to Global
+        // Determine scope from memory attributes or default to Global
         let scope = memory
-            .metadata
-            .get("scope")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .attributes
+            .get(&agent_mem_traits::AttributeKey::core("scope"))
+            .and_then(|v| v.as_string())
+            .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or(MemoryScope::Global);
 
         let hierarchical_memory = HierarchicalMemory {
@@ -711,12 +716,12 @@ impl HierarchyManager for DefaultHierarchyManager {
             hierarchy_metadata: HierarchyMetadata::default(),
         };
 
-        let memory_id = hierarchical_memory.memory.id.clone();
+        let memory_id = hierarchical_memory.memory.id.as_str().to_string();
 
         // Store in memory
         {
             let mut memories = self.memories.write().await;
-            memories.insert(memory_id.clone(), hierarchical_memory.clone());
+            memories.insert(memory_id.to_string(), hierarchical_memory.clone());
         }
 
         // Update scope index
@@ -754,7 +759,7 @@ impl HierarchyManager for DefaultHierarchyManager {
         // Update in memory storage
         {
             let mut memories = self.memories.write().await;
-            memories.insert(memory_id, memory.clone());
+            memories.insert(memory_id.to_string(), memory.clone());
         }
 
         Ok(memory)
@@ -824,7 +829,7 @@ impl HierarchyManager for DefaultHierarchyManager {
             let total_importance: f64 = memory_ids
                 .iter()
                 .filter_map(|id| memories.get(id))
-                .map(|memory| memory.memory.score.unwrap_or(0.0) as f64)
+                .map(|memory| memory.memory.score().unwrap_or(0.0))
                 .sum();
 
             let avg_importance = if count > 0 {
@@ -880,15 +885,20 @@ impl HierarchyManager for DefaultHierarchyManager {
                 }
 
                 // Simple text search in content
-                memory.memory.content.to_lowercase().contains(&query_lower)
+                let content_str = match &memory.memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => "",
+                    _ => "",
+                };
+                content_str.to_lowercase().contains(&query_lower)
             })
             .cloned()
             .collect();
 
         // Sort by importance score (descending)
         results.sort_by(|a, b| {
-            let score_a = a.memory.score.unwrap_or(0.0);
-            let score_b = b.memory.score.unwrap_or(0.0);
+            let score_a = a.memory.score().unwrap_or(0.0);
+            let score_b = b.memory.score().unwrap_or(0.0);
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -1045,7 +1055,7 @@ mod tests {
 
         // 测试添加记忆
         let hierarchical_memory = manager.add_memory(memory.clone()).await.unwrap();
-        assert_eq!(hierarchical_memory.memory.id, memory.id);
+        assert_eq!(hierarchical_memory.memory.id.as_str(), memory.id.as_str());
 
         // 测试获取记忆
         let retrieved = manager.get_memory(&memory.id).await.unwrap();
