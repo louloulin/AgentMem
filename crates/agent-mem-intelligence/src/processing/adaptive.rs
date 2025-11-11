@@ -142,7 +142,7 @@ impl AdaptiveMemoryManager {
                     archived_count += 1;
                 }
                 LifecycleAction::Delete => {
-                    memories[i].content = String::new(); // Mark for deletion
+                    memories[i].content = agent_mem_traits::Content::Text(String::new()); // Mark for deletion
                     deleted_count += 1;
                 }
                 LifecycleAction::Compress => {
@@ -232,13 +232,13 @@ impl AdaptiveMemoryManager {
         memory: &Memory,
         current_time: i64,
     ) -> Result<LifecycleAction> {
-        let age = current_time - memory.created_at.timestamp();
+        let age = current_time - memory.metadata.created_at.timestamp();
         let time_since_access =
-            current_time - memory.updated_at.unwrap_or(memory.created_at).timestamp();
+            current_time - memory.metadata.updated_at.timestamp();
 
         // Check for deletion conditions
         if age > self.thresholds.delete_age_threshold
-            || (memory.score.unwrap_or(0.5) < self.thresholds.min_importance
+            || (memory.score().unwrap_or(0.5) < self.thresholds.min_importance
                 && self.get_access_count(memory) < self.thresholds.min_access_count)
         {
             return Ok(LifecycleAction::Delete);
@@ -252,7 +252,12 @@ impl AdaptiveMemoryManager {
         }
 
         // Check for compression conditions
-        if memory.content.len() > self.thresholds.max_memory_size {
+        let content_len = match &memory.content {
+            agent_mem_traits::Content::Text(t) => t.len(),
+            agent_mem_traits::Content::Structured(v) => v.to_string().len(),
+            _ => 0,
+        };
+        if content_len > self.thresholds.max_memory_size {
             return Ok(LifecycleAction::Compress);
         }
 
