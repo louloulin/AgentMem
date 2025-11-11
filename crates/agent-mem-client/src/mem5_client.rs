@@ -298,16 +298,41 @@ impl Mem5Client {
                             .map(|m| m.into_iter().map(|(k, v)| (k, v.to_string())).collect()),
                     };
 
-                    // Convert to core memory type and add
-                    let core_memory = agent_mem_core::types::Memory::new(
-                        memory.agent_id.clone(),
-                        memory.user_id.clone(),
-                        agent_mem_core::types::MemoryType::Episodic,
-                        memory.content.clone(),
-                        memory.importance.unwrap_or(0.5),
-                    );
+                    // Convert to V4 memory directly using MemoryItem
+                    use agent_mem_traits::MemoryItem;
+                    let memory_item = MemoryItem {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        content: memory.content.clone(),
+                        hash: None,
+                        metadata: HashMap::new(),
+                        score: memory.importance,
+                        created_at: chrono::Utc::now(),
+                        updated_at: None,
+                        session: agent_mem_traits::Session {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            user_id: memory.user_id.clone(),
+                            agent_id: Some(memory.agent_id.clone()),
+                            run_id: None,
+                            actor_id: None,
+                            created_at: chrono::Utc::now(),
+                            metadata: HashMap::new(),
+                        },
+                        memory_type: agent_mem_traits::MemoryType::Episodic,
+                        entities: Vec::new(),
+                        relations: Vec::new(),
+                        agent_id: memory.agent_id.clone(),
+                        user_id: memory.user_id.clone(),
+                        importance: memory.importance.unwrap_or(0.5),
+                        embedding: None,
+                        last_accessed_at: chrono::Utc::now(),
+                        access_count: 0,
+                        expires_at: None,
+                        version: 1,
+                    };
+                    
+                    let v4_memory = agent_mem_core::storage::conversion::legacy_to_v4(&memory_item);
 
-                    engine.add_memory(core_memory.into()).await.map_err(|e| {
+                    engine.add_memory(v4_memory).await.map_err(|e| {
                         ClientError::InternalError(format!("Memory engine error: {}", e))
                     })
                 })
@@ -414,17 +439,26 @@ impl Mem5Client {
 
         debug!("Search operation completed in {:?}", duration);
 
-        // Convert agent_mem_traits::MemoryItem to agent_mem_traits::MemorySearchResult
+        // Convert MemoryV4 to MemorySearchResult
         result.map(|memories| {
             memories
                 .into_iter()
-                .map(|memory| MemorySearchResult {
-                    id: memory.id,
-                    content: memory.content,
-                    importance: Some(memory.importance as f64),
-                    score: memory.importance,
-                    metadata: memory.metadata,
-                    created_at: memory.created_at,
+                .map(|memory| {
+                    let content_str = match &memory.content {
+                        agent_mem_traits::Content::Text(t) => t.clone(),
+                        agent_mem_traits::Content::Structured(v) => v.to_string(),
+                        _ => String::new(),
+                    };
+                    let importance = memory.importance().unwrap_or(0.5);
+                    
+                    MemorySearchResult {
+                        id: memory.id.to_string(),
+                        content: content_str,
+                        importance: Some(importance as f64),
+                        score: importance as f32,
+                        metadata: HashMap::new(), // TODO: Convert metadata properly
+                        created_at: memory.metadata.created_at,
+                    }
                 })
                 .collect()
         })

@@ -186,7 +186,7 @@ impl MemoryConsolidator {
         };
 
         // Consider temporal proximity (memories created close in time are more likely to be related)
-        let time_diff = (memory1.created_at - memory2.created_at)
+        let time_diff = (memory1.metadata.created_at - memory2.metadata.created_at)
             .num_seconds()
             .abs() as f32;
         let max_time_diff = 24.0 * 60.0 * 60.0; // 24 hours in seconds
@@ -214,16 +214,21 @@ impl MemoryConsolidator {
             .iter()
             .max_by(|&&a, &&b| {
                 memories[a]
-                    .score
+                    .score()
                     .unwrap_or(0.5)
-                    .partial_cmp(&memories[b].score.unwrap_or(0.5))
+                    .partial_cmp(&memories[b].score().unwrap_or(0.5))
                     .unwrap()
             })
             .copied()
             .unwrap();
 
-        let mut merged_content = memories[base_idx].content.clone();
-        let mut merged_importance = memories[base_idx].score.unwrap_or(0.5);
+        let base_content_str = match &memories[base_idx].content {
+            agent_mem_traits::Content::Text(t) => t.clone(),
+            agent_mem_traits::Content::Structured(v) => v.to_string(),
+            _ => String::new(),
+        };
+        let mut merged_content = base_content_str;
+        let mut merged_importance = memories[base_idx].score().unwrap_or(0.5);
         let mut merged_access_count = self.get_access_count(&memories[base_idx]);
 
         // Merge content and aggregate statistics
@@ -233,40 +238,42 @@ impl MemoryConsolidator {
             }
 
             let memory = &memories[idx];
+            let mem_content_str = match &memory.content {
+                agent_mem_traits::Content::Text(t) => t.as_str(),
+                agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                _ => "",
+            };
 
             // Append unique content
-            if !merged_content.contains(&memory.content) {
+            if !merged_content.contains(mem_content_str) {
                 merged_content.push_str("\n\n");
-                merged_content.push_str(&memory.content);
+                merged_content.push_str(mem_content_str);
             }
 
             // Aggregate importance (weighted average)
-            merged_importance = (merged_importance + memory.score.unwrap_or(0.5)) / 2.0;
+            merged_importance = (merged_importance + memory.score().unwrap_or(0.5)) / 2.0;
 
             // Sum access counts
             merged_access_count += self.get_access_count(memory);
         }
 
         // Update the base memory
-        memories[base_idx].content = merged_content;
-        memories[base_idx].score = Some(merged_importance);
-        memories[base_idx].metadata.insert(
-            "access_count".to_string(),
-            serde_json::Value::Number(serde_json::Number::from(merged_access_count)),
-        );
-        memories[base_idx].updated_at = Some(chrono::Utc::now());
+        memories[base_idx].content = agent_mem_traits::Content::Text(merged_content);
+        memories[base_idx].set_score(merged_importance as f64);
+        memories[base_idx].metadata.access_count = merged_access_count;
+        memories[base_idx].metadata.updated_at = chrono::Utc::now();
 
         // Mark other memories for removal (set empty content as marker)
         for &idx in group {
             if idx != base_idx {
-                memories[idx].content = String::new(); // Mark for removal
+                memories[idx].content = agent_mem_traits::Content::Text(String::new()); // Mark for removal
             }
         }
 
         debug!(
             "Merged {} memories into memory {}",
             group.len(),
-            memories[base_idx].id
+            memories[base_idx].id.as_str()
         );
         Ok(true)
     }
@@ -286,15 +293,15 @@ impl MemoryConsolidator {
             .iter()
             .max_by(|&&a, &&b| {
                 memories[a]
-                    .score
+                    .score()
                     .unwrap_or(0.5)
-                    .partial_cmp(&memories[b].score.unwrap_or(0.5))
+                    .partial_cmp(&memories[b].score().unwrap_or(0.5))
                     .unwrap()
             })
             .copied()
             .unwrap();
 
-        let primary_id = memories[primary_idx].id.clone();
+        let primary_id = memories[primary_idx].id.to_string();
 
         // Add references to other memories
         for &idx in group {
@@ -358,7 +365,12 @@ impl MemoryConsolidator {
 
     /// Clean up memories marked for removal
     pub fn cleanup_removed_memories(&self, memories: &mut Vec<Memory>) {
-        memories.retain(|memory| !memory.content.is_empty());
+        memories.retain(|memory| {
+            match &memory.content {
+                agent_mem_traits::Content::Text(t) => !t.is_empty(),
+                _ => true,
+            }
+        });
     }
 }
 

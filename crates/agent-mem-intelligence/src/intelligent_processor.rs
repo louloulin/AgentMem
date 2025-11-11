@@ -804,7 +804,7 @@ impl EnhancedIntelligentProcessor {
 
         // 为每个事实创建临时记忆进行评估
         for (i, fact) in structured_facts.iter().enumerate() {
-            let temp_memory = Memory {
+            let temp_memory_item = MemoryItem {
                 id: format!("temp_memory_{i}"),
                 content: fact.description.clone(),
                 hash: None,
@@ -843,6 +843,8 @@ impl EnhancedIntelligentProcessor {
                 expires_at: None,
                 version: 1,
             };
+            
+            let temp_memory = agent_mem_core::storage::conversion::legacy_to_v4(&temp_memory_item);
 
             let evaluation = self
                 .importance_evaluator
@@ -862,10 +864,10 @@ impl EnhancedIntelligentProcessor {
 
         // 3. 冲突检测阶段
         let conflict_start = std::time::Instant::now();
-        let temp_memories: Vec<Memory> = structured_facts
+        let temp_memory_items: Vec<MemoryItem> = structured_facts
             .iter()
             .enumerate()
-            .map(|(i, fact)| Memory {
+            .map(|(i, fact)| MemoryItem {
                 id: format!("temp_memory_{i}"),
                 content: fact.description.clone(),
                 hash: None,
@@ -904,6 +906,11 @@ impl EnhancedIntelligentProcessor {
                 expires_at: None,
                 version: 1,
             })
+            .collect();
+        
+        let temp_memories: Vec<Memory> = temp_memory_items
+            .iter()
+            .map(|item| agent_mem_core::storage::conversion::legacy_to_v4(item))
             .collect();
 
         let conflict_detections = self

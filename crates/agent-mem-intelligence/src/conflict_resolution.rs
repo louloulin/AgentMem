@@ -202,7 +202,7 @@ impl ConflictResolver {
                 );
                 // 取最新的记忆
                 let mut sorted_memories = existing_memories.to_vec();
-                sorted_memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                sorted_memories.sort_by(|a, b| b.metadata.created_at.cmp(&a.metadata.created_at));
                 sorted_memories[..self.config.max_consideration_memories].to_vec()
             } else {
                 existing_memories.to_vec()
@@ -262,9 +262,20 @@ impl ConflictResolver {
         for new_memory in new_memories {
             for existing_memory in existing_memories {
                 // 计算语义相似度
+                let new_content_str = match &new_memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                    _ => "",
+                };
+                let existing_content_str = match &existing_memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                    _ => "",
+                };
+                
                 let similarity = self
                     .similarity
-                    .calculate_similarity(&new_memory.content, &existing_memory.content)
+                    .calculate_similarity(new_content_str, existing_content_str)
                     .await?;
 
                 // 如果相似度高但内容不同，可能存在冲突
@@ -277,11 +288,11 @@ impl ConflictResolver {
                         let conflict = ConflictDetection {
                             id: format!("semantic_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Semantic,
-                            memory_ids: vec![new_memory.id.clone(), existing_memory.id.clone()],
+                            memory_ids: vec![new_memory.id.to_string(), existing_memory.id.to_string()],
                             description: format!(
                                 "语义冲突：新记忆 '{}' 与现有记忆 '{}' 存在矛盾",
-                                new_memory.content.chars().take(50).collect::<String>(),
-                                existing_memory.content.chars().take(50).collect::<String>()
+                                new_content_str.chars().take(50).collect::<String>(),
+                                existing_content_str.chars().take(50).collect::<String>()
                             ),
                             severity: conflict_severity,
                             confidence: similarity,
@@ -313,17 +324,28 @@ impl ConflictResolver {
         // 简化的时间冲突检测逻辑
         for new_memory in new_memories {
             for existing_memory in existing_memories {
-                let time_diff = (new_memory.created_at - existing_memory.created_at)
+                let time_diff = (new_memory.metadata.created_at - existing_memory.metadata.created_at)
                     .num_hours()
                     .abs();
 
                 if time_diff <= self.config.temporal_conflict_window_hours {
+                    let new_content_str = match &new_memory.content {
+                        agent_mem_traits::Content::Text(t) => t.as_str(),
+                        agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                        _ => "",
+                    };
+                    let existing_content_str = match &existing_memory.content {
+                        agent_mem_traits::Content::Text(t) => t.as_str(),
+                        agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                        _ => "",
+                    };
+                    
                     // 检查是否存在时间相关的冲突
-                    if self.has_temporal_conflict(&new_memory.content, &existing_memory.content) {
+                    if self.has_temporal_conflict(new_content_str, existing_content_str) {
                         let conflict = ConflictDetection {
                             id: format!("temporal_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Temporal,
-                            memory_ids: vec![new_memory.id.clone(), existing_memory.id.clone()],
+                            memory_ids: vec![new_memory.id.to_string(), existing_memory.id.to_string()],
                             description: "时间冲突：记忆中的时间信息不一致".to_string(),
                             severity: 0.7,
                             confidence: 0.8,

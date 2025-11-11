@@ -106,14 +106,14 @@ impl ImportanceScorer {
         let current_time = chrono::Utc::now().timestamp();
 
         for memory in memories.iter_mut() {
-            let old_importance = memory.score.unwrap_or(0.5);
+            let old_importance = memory.score().unwrap_or(0.5);
             let new_importance = self
                 .calculate_importance_score(memory, current_time)
                 .await?;
 
             if (new_importance - old_importance).abs() > 0.01 {
-                memory.score = Some(new_importance);
-                memory.updated_at = Some(chrono::Utc::now());
+                memory.set_score(new_importance as f64);
+                memory.metadata.updated_at = chrono::Utc::now();
                 updated_count += 1;
             }
         }
@@ -129,9 +129,9 @@ impl ImportanceScorer {
             .calculate_importance_score(memory, current_time)
             .await?;
 
-        if (new_importance - memory.score.unwrap_or(0.5)).abs() > 0.01 {
-            memory.score = Some(new_importance);
-            memory.updated_at = Some(chrono::Utc::now());
+        if (new_importance - memory.score().unwrap_or(0.5)).abs() > 0.01 {
+            memory.set_score(new_importance as f64);
+            memory.metadata.updated_at = chrono::Utc::now();
         }
 
         Ok(())
@@ -174,7 +174,7 @@ impl ImportanceScorer {
 
         // Apply decay based on time since last access
         let time_since_access =
-            current_time - memory.updated_at.unwrap_or(memory.created_at).timestamp();
+            current_time - memory.metadata.accessed_at.timestamp();
         let decay_factor = self
             .decay_rate
             .powf(time_since_access as f32 / (24.0 * 60.0 * 60.0)); // Daily decay
@@ -184,7 +184,7 @@ impl ImportanceScorer {
 
     /// Calculate recency score (newer memories are more important)
     fn calculate_recency_score(&self, memory: &Memory, current_time: i64) -> f32 {
-        let age_seconds = current_time - memory.created_at.timestamp();
+        let age_seconds = current_time - memory.metadata.created_at.timestamp();
         let max_age = 30.0 * 24.0 * 60.0 * 60.0; // 30 days in seconds
 
         if age_seconds <= 0 {
@@ -198,14 +198,20 @@ impl ImportanceScorer {
     /// Calculate frequency score (more accessed memories are more important)
     fn calculate_frequency_score(&self, memory: &Memory) -> f32 {
         let max_access_count = 100.0; // Normalize to this maximum
-        let access_count = memory.access_count as f32;
+        let access_count = memory.metadata.access_count as f32;
         (access_count / max_access_count).clamp(0.0, 1.0)
     }
 
     /// Calculate relevance score based on content length and complexity
     fn calculate_relevance_score(&self, memory: &Memory) -> f32 {
-        let content_length = memory.content.len() as f32;
-        let word_count = memory.content.split_whitespace().count() as f32;
+        let content_str = match &memory.content {
+            agent_mem_traits::Content::Text(t) => t.as_str(),
+            agent_mem_traits::Content::Structured(v) => &v.to_string(),
+            _ => "",
+        };
+        
+        let content_length = content_str.len() as f32;
+        let word_count = content_str.split_whitespace().count() as f32;
 
         // Longer, more detailed memories are generally more important
         let length_score = (content_length / 1000.0).clamp(0.0, 1.0);
@@ -216,7 +222,12 @@ impl ImportanceScorer {
 
     /// Calculate emotional score based on emotional keywords
     fn calculate_emotional_score(&self, memory: &Memory) -> f32 {
-        let content_lower = memory.content.to_lowercase();
+        let content_str = match &memory.content {
+            agent_mem_traits::Content::Text(t) => t.as_str(),
+            agent_mem_traits::Content::Structured(v) => &v.to_string(),
+            _ => "",
+        };
+        let content_lower = content_str.to_lowercase();
         let mut emotional_score = 0.0;
         let mut keyword_count = 0;
 
@@ -236,7 +247,12 @@ impl ImportanceScorer {
 
     /// Calculate context score based on context keywords
     fn calculate_context_score(&self, memory: &Memory) -> f32 {
-        let content_lower = memory.content.to_lowercase();
+        let content_str = match &memory.content {
+            agent_mem_traits::Content::Text(t) => t.as_str(),
+            agent_mem_traits::Content::Structured(v) => &v.to_string(),
+            _ => "",
+        };
+        let content_lower = content_str.to_lowercase();
         let mut context_score = 0.0;
         let mut keyword_count = 0;
 
