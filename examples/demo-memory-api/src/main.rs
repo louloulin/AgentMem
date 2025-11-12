@@ -6,7 +6,7 @@
 //! 3. 获取所有记忆
 //! 4. 删除记忆
 
-use agent_mem::{Memory, MemoryBuilder};
+use agent_mem::{GetAllOptions, Memory, MemoryBuilder};
 use anyhow::Result;
 
 #[tokio::main]
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
     ];
 
     for content in &memories {
-        match memory.add(content).await {
+        match memory.add(*content).await {
             Ok(result) => {
                 if let Some(first) = result.results.first() {
                     println!("  ✅ 添加成功: {} (ID: {})", content, &first.id[..8]);
@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
 
     for (query, description) in &queries {
         println!("\n  🔍 {}: \"{}\"", description, query);
-        match memory.search(query).await {
+        match memory.search(*query).await {
             Ok(results) => {
                 if results.is_empty() {
                     println!("    ℹ️  未找到匹配的记忆");
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
 
     // 4. 获取所有记忆
     println!("4️⃣ 获取所有记忆...");
-    match memory.get_all().await {
+    match memory.get_all(GetAllOptions::default()).await {
         Ok(all_memories) => {
             println!("  ✅ 共有 {} 条记忆:", all_memories.len());
             for (i, mem) in all_memories.iter().enumerate() {
@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
 
     // 5. 删除特定记忆
     println!("5️⃣ 删除记忆...");
-    match memory.get_all().await {
+    match memory.get_all(GetAllOptions::default()).await {
         Ok(all_memories) => {
             if let Some(first) = all_memories.first() {
                 let id_to_delete = first.id.clone();
@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
 
     // 6. 验证删除
     println!("6️⃣ 验证删除后的记忆数量...");
-    match memory.get_all().await {
+    match memory.get_all(GetAllOptions::default()).await {
         Ok(all_memories) => {
             println!("  ✅ 现在有 {} 条记忆（已删除1条）", all_memories.len());
         }

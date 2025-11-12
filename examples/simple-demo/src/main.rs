@@ -4,7 +4,7 @@
 //! including memory creation, storage, and retrieval.
 
 use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::{MemoryItem, MemoryType, Session};
+use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session};
 use chrono::Utc;
 use std::collections::HashMap;
 use tracing::{error, info};
@@ -30,7 +30,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Add memories to the engine
     for memory in memories {
-        match engine.add_memory(memory.clone()).await {
+        let memory_v4 = MemoryV4::from_legacy_item(&memory);
+        match engine.add_memory(memory_v4).await {
             Ok(id) => {
                 info!("Added memory with ID: {}", id);
             }

@@ -233,8 +233,8 @@ fn create_sample_image_content() -> MultimodalContent {
         mime_type: Some("image/png".to_string()),
         size: Some(156789),
         metadata,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        extracted_text: None,
+        processing_status: agent_mem_intelligence::multimodal::ProcessingStatus::Pending,
     }
 }
 
@@ -259,8 +259,8 @@ fn create_sample_audio_content() -> MultimodalContent {
         mime_type: Some("audio/mp3".to_string()),
         size: Some(3456789),
         metadata,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        extracted_text: None,
+        processing_status: agent_mem_intelligence::multimodal::ProcessingStatus::Pending,
     }
 }
 
@@ -287,7 +287,7 @@ fn create_sample_video_content() -> MultimodalContent {
         mime_type: Some("video/mp4".to_string()),
         size: Some(45678901),
         metadata,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        extracted_text: None,
+        processing_status: agent_mem_intelligence::multimodal::ProcessingStatus::Pending,
     }
 }

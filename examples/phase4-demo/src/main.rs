@@ -16,7 +16,7 @@ use agent_mem_intelligence::{
 };
 use agent_mem_llm::factory::{LLMFactory, RealLLMFactory};
 use agent_mem_traits::{
-    LLMConfig, MemoryItem, MemoryType, Message, MessageRole, ProcessingResult, Session,
+    LLMConfig, MemoryItem, MemoryType, MemoryV4, Message, MessageRole, ProcessingResult, Session,
 };
 use anyhow::Result;
 use chrono::Utc;
@@ -237,9 +237,13 @@ async fn demo_conflict_resolution() -> Result<()> {
         create_test_memory("用户年龄：25岁", 0.6),
     ];
 
+    // 转换为 MemoryV4
+    let new_memories_v4: Vec<MemoryV4> = new_memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
+    let existing_memories_v4: Vec<MemoryV4> = existing_memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
+
     // 检测冲突
     let conflicts = conflict_resolver
-        .detect_conflicts(&new_memories, &existing_memories)
+        .detect_conflicts(&new_memories_v4, &existing_memories_v4)
         .await?;
 
     info!("检测到 {} 个潜在冲突:", conflicts.len());
@@ -266,10 +270,11 @@ async fn demo_importance_evaluation() -> Result<()> {
 
     // 创建测试记忆
     let memory = create_test_memory("用户是资深软件工程师，有10年经验", 0.8);
+    let memory_v4 = MemoryV4::from_legacy_item(&memory);
 
     // 评估重要性
     let evaluation = importance_evaluator
-        .evaluate_importance(&memory, &[], &[])
+        .evaluate_importance(&memory_v4, &[], &[])
         .await?;
 
     info!("重要性评估结果:");
@@ -333,8 +338,9 @@ async fn demo_integrated_processing() -> Result<()> {
         .iter()
         .map(|m| create_test_memory(&m.content, m.importance))
         .collect();
+    let memories_v4: Vec<MemoryV4> = memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
     let conflict_detections = conflict_resolver
-        .detect_conflicts(&memories, &memories)
+        .detect_conflicts(&memories_v4, &memories_v4)
         .await?;
 
     let processing_time = start_time.elapsed().as_millis() as f64;
