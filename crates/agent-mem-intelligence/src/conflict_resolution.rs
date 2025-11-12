@@ -428,6 +428,17 @@ impl ConflictResolver {
 
     /// 分析语义冲突严重程度
     async fn analyze_semantic_conflict(&self, memory1: &Memory, memory2: &Memory) -> Result<f32> {
+        let content1_str = match &memory1.content {
+            agent_mem_traits::Content::Text(t) => t.clone(),
+            agent_mem_traits::Content::Structured(v) => v.to_string(),
+            _ => String::new(),
+        };
+        let content2_str = match &memory2.content {
+            agent_mem_traits::Content::Text(t) => t.clone(),
+            agent_mem_traits::Content::Structured(v) => v.to_string(),
+            _ => String::new(),
+        };
+
         let prompt = format!(
             r#"请分析以下两段记忆内容是否存在语义冲突，并评估冲突严重程度（0.0-1.0）：
 
@@ -442,16 +453,7 @@ impl ConflictResolver {
 }}
 
 只返回JSON，不要其他解释："#,
-            match &memory1.content {
-                agent_mem_traits::Content::Text(t) => t,
-                agent_mem_traits::Content::Structured(v) => &v.to_string(),
-                _ => "",
-            },
-            match &memory2.content {
-                agent_mem_traits::Content::Text(t) => t,
-                agent_mem_traits::Content::Structured(v) => &v.to_string(),
-                _ => "",
-            }
+            content1_str, content2_str
         );
 
         // P0 优化: 添加超时控制
@@ -551,18 +553,21 @@ impl ConflictResolver {
                 // 找到最新的记忆，删除其他的
                 let conflict_memories: Vec<&Memory> = memories
                     .iter()
-                    .filter(|m| conflict.memory_ids.contains(&m.id))
+                    .filter(|m| {
+                        let id_str = m.id.as_str().to_string();
+                        conflict.memory_ids.contains(&id_str)
+                    })
                     .collect();
 
-                if let Some(latest) = conflict_memories.iter().max_by_key(|m| m.created_at) {
+                if let Some(latest) = conflict_memories.iter().max_by_key(|m| m.metadata.created_at) {
                     let to_delete: Vec<String> = conflict_memories
                         .iter()
-                        .filter(|m| m.id != latest.id)
-                        .map(|m| m.id.clone())
+                        .filter(|m| m.id.as_str() != latest.id.as_str())
+                        .map(|m| m.id.as_str().to_string())
                         .collect();
 
                     ResolutionResult::Success {
-                        updated_memories: vec![latest.id.clone()],
+                        updated_memories: vec![latest.id.as_str().to_string()],
                         deleted_memories: to_delete,
                     }
                 } else {
@@ -604,8 +609,16 @@ impl ConflictResolver {
     fn rule_based_conflict_detection(&self, memory1: &Memory, memory2: &Memory) -> f32 {
         info!("使用基于规则的冲突检测（降级方案）");
 
-        let content1 = memory1.content.to_lowercase();
-        let content2 = memory2.content.to_lowercase();
+        let content1 = match &memory1.content {
+            agent_mem_traits::Content::Text(t) => t.to_lowercase(),
+            agent_mem_traits::Content::Structured(v) => v.to_string().to_lowercase(),
+            _ => String::new(),
+        };
+        let content2 = match &memory2.content {
+            agent_mem_traits::Content::Text(t) => t.to_lowercase(),
+            agent_mem_traits::Content::Structured(v) => v.to_string().to_lowercase(),
+            _ => String::new(),
+        };
 
         // 规则1: 检测否定词冲突（"不"、"没有" vs "是"、"有"）
         let has_negation1 =

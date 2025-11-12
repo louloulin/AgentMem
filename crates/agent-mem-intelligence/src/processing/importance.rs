@@ -280,7 +280,7 @@ impl ImportanceScorer {
         context: f32,
     ) -> f32 {
 
-        let memory_type_str = memory.memory_type().unwrap_or("episodic");
+        let memory_type_str = memory.memory_type().unwrap_or("episodic".to_string());
         match memory_type_str.as_str() {
             "episodic" => {
                 // Episodic memories: prioritize recency and emotional content
