@@ -2219,11 +2219,15 @@ impl MemoryOrchestrator {
 
             for fact in structured_facts {
                 // 将 StructuredFact 转换为 MemoryItem
-                let memory = Self::structured_fact_to_memory_item(
+                let memory_item = Self::structured_fact_to_memory_item(
                     fact,
                     agent_id.to_string(),
                     user_id.clone(),
                 );
+
+                // 转换为 MemoryV4
+                use agent_mem_traits::MemoryV4;
+                let memory = MemoryV4::from_legacy_item(&memory_item);
 
                 // 调用 EnhancedImportanceEvaluator
                 let evaluation = evaluator
@@ -2420,9 +2424,21 @@ impl MemoryOrchestrator {
                 .map(Self::existing_memory_to_memory_item)
                 .collect();
 
+            // 转换为 MemoryV4
+            use agent_mem_traits::MemoryV4;
+            let new_memories_v4: Vec<MemoryV4> = new_memory_items
+                .iter()
+                .map(|item| MemoryV4::from_legacy_item(item))
+                .collect();
+
+            let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
+                .iter()
+                .map(|item| MemoryV4::from_legacy_item(item))
+                .collect();
+
             // 调用 ConflictResolver
             let conflicts = resolver
-                .detect_conflicts(&new_memory_items, &existing_memory_items)
+                .detect_conflicts(&new_memories_v4, &existing_memories_v4)
                 .await?;
 
             info!("冲突检测完成，检测到 {} 个冲突", conflicts.len());
@@ -2452,17 +2468,22 @@ impl MemoryOrchestrator {
             );
 
             // 将 ExistingMemory 转换为 MemoryItem
-            // 注意：DecisionContext.existing_memories 的类型是 Vec<agent_mem_core::Memory>
-            // 而 agent_mem_core::Memory 实际上是 agent_mem_traits::MemoryItem 的别名
             let existing_memory_items: Vec<MemoryItem> = existing_memories
                 .iter()
                 .map(Self::existing_memory_to_memory_item)
                 .collect();
 
+            // 转换为 MemoryV4
+            use agent_mem_traits::MemoryV4;
+            let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
+                .iter()
+                .map(|item| MemoryV4::from_legacy_item(item))
+                .collect();
+
             // 构建 DecisionContext
             let context = DecisionContext {
                 new_facts: structured_facts.to_vec(),
-                existing_memories: existing_memory_items,
+                existing_memories: existing_memories_v4,
                 importance_evaluations: importance_evaluations.to_vec(),
                 conflict_detections: conflicts.to_vec(),
                 user_preferences: HashMap::new(),

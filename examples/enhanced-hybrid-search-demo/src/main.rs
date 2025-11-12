@@ -103,6 +103,8 @@ async fn main() -> anyhow::Result<()> {
         enable_metrics: true,
         enable_cache: false,
         rrf_k: 60.0,
+        vector_weight: 0.7,
+        fulltext_weight: 0.3,
     };
 
     let engine = EnhancedHybridSearchEngineV2::new(config)
