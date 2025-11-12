@@ -240,6 +240,7 @@ fn test_max_memories_boundary_values() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 1,
     };
@@ -251,6 +252,7 @@ fn test_max_memories_boundary_values() {
         agent_id: "test-agent".to_string(),
         user_id: "test-user".to_string(),
         organization_id: "test-org".to_string(),
+        session_id: "test-session".to_string(),
         stream: false,
         max_memories: 1000,
     };

@@ -914,10 +914,11 @@ impl HierarchyManager for DefaultHierarchyManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_mem_traits::MemoryItem;
 
     fn create_test_memory(id: &str, content: &str) -> Memory {
         use agent_mem_traits::Session;
-        Memory {
+        let item = MemoryItem {
             id: id.to_string(),
             content: content.to_string(),
             hash: None,
@@ -937,7 +938,8 @@ mod tests {
             access_count: 0,
             expires_at: None,
             version: 1,
-        }
+        };
+        Memory::from_legacy_item(&item)
     }
 
     #[test]

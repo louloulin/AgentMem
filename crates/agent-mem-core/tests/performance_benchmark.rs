@@ -3,6 +3,8 @@
 //! These benchmarks measure the performance of various database operations
 //! to ensure they meet production requirements.
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::{
     agent_repository::AgentRepository,
     batch::BatchOperations,

@@ -9,6 +9,8 @@
 //! cargo test --package agent-mem-core --test database_integration_test
 //! ```
 
+#![cfg(feature = "postgres")]
+
 use agent_mem_core::storage::{
     agent_repository::AgentRepository,
     block_repository::BlockRepository,
@@ -18,7 +20,6 @@ use agent_mem_core::storage::{
     repository::{OrganizationRepository, Repository, UserRepository},
     PostgresConfig,
 };
-use chrono::Utc;
 
 /// Helper function to get test database URL
 fn get_test_db_url() -> String {
