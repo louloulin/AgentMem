@@ -221,7 +221,7 @@ impl MemoryManager {
             .map(|a| a.organization_id.clone())
             .unwrap_or_else(|| "default-org".to_string());
 
-        let memory = agent_mem_core::storage::models::Memory {
+        let db_memory = agent_mem_core::storage::models::DbMemory {
             id: memory_id.clone(),
             organization_id, // 使用Agent的organization_id或默认值
             user_id: "default".to_string(), // 使用默认user (TODO: 应该从auth获取实际user)
@@ -245,6 +245,11 @@ impl MemoryManager {
             created_by_id: None,
             last_updated_by_id: None,
         };
+
+        // 转换为 MemoryV4 以便调用 repository.create
+        use agent_mem_core::storage::conversion::db_to_memory;
+        let memory = db_to_memory(&db_memory)
+            .map_err(|e| format!("Failed to convert to MemoryV4: {}", e))?;
 
         repositories
             .memories
@@ -829,13 +834,20 @@ async fn search_by_libsql_exact(
     {
         Ok(memories) if !memories.is_empty() => {
             info!("✅ LibSQL查询成功: 找到 {} 条记忆", memories.len());
-            
+
+            // 🔧 修复: 将 MemoryV4 转换为 MemoryItem 以便访问字段
+            use agent_mem_traits::MemoryV4;
+            let memory_items: Vec<_> = memories
+                .into_iter()
+                .map(|m| m.to_legacy_item())
+                .collect();
+
             // 🔧 修复: 优先返回精确匹配的商品记忆
             // 1. 分离精确匹配和模糊匹配
             let mut exact_matches = Vec::new();
             let mut fuzzy_matches = Vec::new();
-            
-            for mem in memories {
+
+            for mem in memory_items {
                 let is_exact = {
                     // 检查 content 是否包含 "商品ID: {query}"
                     mem.content.contains(&format!("商品ID: {}", query)) ||
@@ -846,31 +858,37 @@ async fn search_by_libsql_exact(
                         .map(|pid| pid == query)
                         .unwrap_or(false)
                 };
-                
+
                 // 排除工作记忆（working memory），它们通常是LLM的回复
-                let is_working_memory = matches!(mem.memory_type.as_str(), "working" | "Working");
-                
+                let memory_type_str = format!("{:?}", mem.memory_type);
+                let is_working_memory = matches!(memory_type_str.as_str(), "Working");
+
                 if is_exact && !is_working_memory {
                     exact_matches.push(mem);
                 } else if !is_working_memory {
                     fuzzy_matches.push(mem);
                 }
             }
-            
+
             info!("📊 精确匹配: {} 条, 模糊匹配: {} 条", exact_matches.len(), fuzzy_matches.len());
-            
+
             // 2. 合并结果：精确匹配在前，模糊匹配在后
             let mut sorted_memories = exact_matches;
             sorted_memories.extend(fuzzy_matches);
-            
+
             // 3. 限制返回数量
             sorted_memories.truncate(limit);
-            
+
             for mem in &sorted_memories {
-                debug!("  - ID: {}, Type: {}, Content: {}...", 
-                    mem.id, mem.memory_type, &mem.content[..50.min(mem.content.len())]);
+                let content_preview = if mem.content.len() > 50 {
+                    &mem.content[..50]
+                } else {
+                    &mem.content
+                };
+                debug!("  - ID: {}, Type: {:?}, Content: {}...",
+                    mem.id, mem.memory_type, content_preview);
             }
-            
+
             // 直接转换为JSON
             let json_results: Vec<serde_json::Value> = sorted_memories
                 .into_iter()
@@ -880,10 +898,10 @@ async fn search_by_libsql_exact(
                         "agent_id": m.agent_id,
                         "user_id": m.user_id,
                         "content": m.content,
-                        "memory_type": m.memory_type,
+                        "memory_type": format!("{:?}", m.memory_type),
                         "importance": m.importance,
-                        "created_at": m.created_at,
-                        "updated_at": m.updated_at,
+                        "created_at": m.created_at.to_rfc3339(),
+                        "updated_at": m.updated_at.map(|dt| dt.to_rfc3339()),
                         "access_count": m.access_count,
                         "metadata": m.metadata,
                         "hash": m.hash,

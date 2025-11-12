@@ -265,10 +265,12 @@ pub async fn get_dashboard_stats(
                 }
                 total_memories += count as i64;
 
-                // 统计 memory 类型分布
+                // 统计 memory 类型分布 - 将 MemoryV4 转换为 MemoryItem
                 for memory in agent_memories {
+                    let memory_item = memory.to_legacy_item();
+                    let memory_type_str = format!("{:?}", memory_item.memory_type);
                     *memories_by_type_map
-                        .entry(memory.memory_type.clone())
+                        .entry(memory_type_str)
                         .or_insert(0) += 1;
                 }
             }
