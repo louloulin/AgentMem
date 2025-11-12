@@ -10,9 +10,8 @@
 
 use crate::fact_extraction::{ExtractedFact, StructuredFact};
 use crate::importance_evaluator::ImportanceEvaluation;
-use agent_mem_core::Memory;
+use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use agent_mem_llm::LLMProvider;
-use agent_mem_traits::{Message, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -306,7 +305,8 @@ impl MemoryDecisionEngine {
         let mut processed_ids = std::collections::HashSet::new();
 
         for (i, memory) in memories.iter().enumerate() {
-            if processed_ids.contains(&memory.id) {
+            let memory_id_str = memory.id.as_str();
+            if processed_ids.contains(memory_id_str) {
                 continue;
             }
 
@@ -314,12 +314,14 @@ impl MemoryDecisionEngine {
 
             // 查找相似记忆
             for (j, other_memory) in memories.iter().enumerate() {
-                if i != j && !processed_ids.contains(&other_memory.id) {
-                    let similarity =
-                        self.calculate_content_similarity(&memory.content, &other_memory.content);
+                let other_id_str = other_memory.id.as_str();
+                if i != j && !processed_ids.contains(other_id_str) {
+                    let content1 = &memory.content;
+                    let content2 = &other_memory.content;
+                    let similarity = self.calculate_content_similarity(content1, content2);
                     if similarity >= threshold {
                         similar_memories.push(other_memory.clone());
-                        processed_ids.insert(other_memory.id.clone());
+                        processed_ids.insert(other_id_str.to_string());
                     }
                 }
             }
@@ -329,11 +331,11 @@ impl MemoryDecisionEngine {
                 let merged_content = self.generate_merged_content(&similar_memories).await?;
                 let primary_memory = &similar_memories[0];
                 let secondary_ids: Vec<String> =
-                    similar_memories[1..].iter().map(|m| m.id.clone()).collect();
+                    similar_memories[1..].iter().map(|m| m.id.as_str().to_string()).collect();
 
                 decisions.push(MemoryDecision {
                     action: MemoryAction::Merge {
-                        primary_memory_id: primary_memory.id.clone(),
+                        primary_memory_id: primary_memory.id.as_str().to_string(),
                         secondary_memory_ids: secondary_ids.clone(),
                         merged_content,
                     },
@@ -342,11 +344,11 @@ impl MemoryDecisionEngine {
                         "Found {} similar memories that can be merged",
                         similar_memories.len()
                     ),
-                    affected_memories: similar_memories.iter().map(|m| m.id.clone()).collect(),
+                    affected_memories: similar_memories.iter().map(|m| m.id.as_str().to_string()).collect(),
                     estimated_impact: 0.7,
                 });
 
-                processed_ids.insert(primary_memory.id.clone());
+                processed_ids.insert(primary_memory.id.as_str().to_string());
             }
         }
 
@@ -509,7 +511,9 @@ Resolution strategies:
 
     /// 生成合并后的内容
     async fn generate_merged_content(&self, memories: &[ExistingMemory]) -> Result<String> {
-        let contents: Vec<String> = memories.iter().map(|m| m.content.clone()).collect();
+        let contents: Vec<String> = memories.iter()
+            .map(|m| m.content.clone())
+            .collect();
 
         let _prompt = format!(
             r#"Merge these similar memory contents into one coherent text. Return only the merged content.
@@ -542,10 +546,12 @@ Requirements:
 
         // 检查是否与现有记忆相关
         for memory in context {
-            let similarity = self.calculate_content_similarity(&fact.content, &memory.content);
+            let memory_content = &memory.content;
+            let similarity = self.calculate_content_similarity(&fact.content, memory_content);
             if similarity > 0.3 {
                 // 相关记忆越重要，新事实的重要性提升越大
-                context_boost += similarity * memory.importance * 0.1;
+                let importance = memory.importance as f32;
+                context_boost += similarity * importance * 0.1;
             }
         }
 

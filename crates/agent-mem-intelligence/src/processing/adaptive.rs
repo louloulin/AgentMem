@@ -3,8 +3,7 @@
 //! Implements intelligent memory lifecycle management including
 //! archiving, deletion, and capacity management.
 
-use agent_mem_core::Memory;
-use agent_mem_traits::Result;
+use agent_mem_traits::{MemoryV4 as Memory, Result, AttributeKey, AttributeValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
@@ -192,20 +191,12 @@ impl AdaptiveMemoryManager {
 
     /// Get access count from memory metadata
     fn get_access_count(&self, memory: &Memory) -> u32 {
-        memory
-            .metadata
-            .get("access_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32
+        memory.metadata.access_count
     }
 
     /// Get last accessed timestamp from memory metadata
     fn get_last_accessed(&self, memory: &Memory) -> i64 {
-        memory
-            .metadata
-            .get("last_accessed_at")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(memory.created_at.timestamp())
+        memory.metadata.accessed_at.timestamp()
     }
 
     /// Determine lifecycle actions for all memories
@@ -238,7 +229,7 @@ impl AdaptiveMemoryManager {
 
         // Check for deletion conditions
         if age > self.thresholds.delete_age_threshold
-            || (memory.score().unwrap_or(0.5) < self.thresholds.min_importance
+            || (memory.score().unwrap_or(0.5) < self.thresholds.min_importance as f64
                 && self.get_access_count(memory) < self.thresholds.min_access_count)
         {
             return Ok(LifecycleAction::Delete);
@@ -278,7 +269,7 @@ impl AdaptiveMemoryManager {
                 }
             }
             AdaptiveStrategy::ImportanceBased => {
-                if memory.score.unwrap_or(0.5) < 0.3 {
+                if memory.score().unwrap_or(0.5) < 0.3 {
                     Ok(LifecycleAction::Archive)
                 } else {
                     Ok(LifecycleAction::Keep)
@@ -286,7 +277,7 @@ impl AdaptiveMemoryManager {
             }
             AdaptiveStrategy::Hybrid => {
                 // Combine multiple factors
-                let importance_factor = memory.score.unwrap_or(0.5);
+                let importance_factor = memory.score().unwrap_or(0.5) as f32;
                 let recency_factor =
                     1.0 - (time_since_access as f32 / self.retention_period as f32).min(1.0);
                 let frequency_factor = (self.get_access_count(memory) as f32 / 10.0).min(1.0);
@@ -305,20 +296,24 @@ impl AdaptiveMemoryManager {
 
     /// Archive a memory
     async fn archive_memory(&self, memory: &mut Memory) -> Result<()> {
-        memory
-            .metadata
-            .insert("archived".to_string(), serde_json::Value::Bool(true));
-        memory.metadata.insert(
-            "archived_at".to_string(),
-            serde_json::Value::Number(serde_json::Number::from(chrono::Utc::now().timestamp())),
+        // Mark as archived in attributes
+        memory.attributes.insert(
+            AttributeKey::system("archived"),
+            AttributeValue::Boolean(true),
+        );
+        memory.attributes.insert(
+            AttributeKey::system("archived_at"),
+            AttributeValue::Number(chrono::Utc::now().timestamp() as f64),
         );
 
         // Reduce importance slightly for archived memories
-        memory.importance *= 0.8;
-        if let Some(score) = memory.score {
-            memory.score = Some(score * 0.8);
+        if let Some(importance) = memory.importance() {
+            memory.set_importance(importance * 0.8);
         }
-        memory.updated_at = Some(chrono::Utc::now());
+        if let Some(score) = memory.score() {
+            memory.set_score(score * 0.8);
+        }
+        memory.metadata.updated_at = chrono::Utc::now();
 
         debug!("Archived memory: {}", memory.id);
         Ok(())
@@ -326,14 +321,15 @@ impl AdaptiveMemoryManager {
 
     /// Compress a memory by reducing content size
     async fn compress_memory(&self, memory: &mut Memory) -> Result<()> {
-        let original_size = memory.content.len();
+        let content_text = memory.content.as_text().unwrap_or("");
+        let original_size = content_text.len();
 
         // Simple compression: keep first and last parts, summarize middle
         if original_size > self.thresholds.max_memory_size {
             let keep_size = self.thresholds.max_memory_size / 3;
-            let start_part = &memory.content[..keep_size.min(original_size)];
+            let start_part = &content_text[..keep_size.min(original_size)];
             let end_part = if original_size > keep_size * 2 {
-                &memory.content[original_size - keep_size..]
+                &content_text[original_size - keep_size..]
             } else {
                 ""
             };
@@ -349,21 +345,27 @@ impl AdaptiveMemoryManager {
                 start_part.to_string()
             };
 
-            memory.content = compressed_content;
-            memory
-                .metadata
-                .insert("compressed".to_string(), serde_json::Value::Bool(true));
-            memory.metadata.insert(
-                "original_size".to_string(),
-                serde_json::Value::Number(serde_json::Number::from(original_size)),
+            memory.content = agent_mem_traits::Content::Text(compressed_content);
+            memory.attributes.insert(
+                AttributeKey::system("compressed"),
+                AttributeValue::Boolean(true),
             );
-            memory.updated_at = Some(chrono::Utc::now());
+            memory.attributes.insert(
+                AttributeKey::system("original_size"),
+                AttributeValue::Number(original_size as f64),
+            );
+            memory.metadata.updated_at = chrono::Utc::now();
 
+            let new_size = match &memory.content {
+                agent_mem_traits::Content::Text(t) => t.len(),
+                agent_mem_traits::Content::Structured(v) => v.to_string().len(),
+                _ => 0,
+            };
             debug!(
                 "Compressed memory {} from {} to {} bytes",
                 memory.id,
                 original_size,
-                memory.content.len()
+                new_size
             );
         }
 
@@ -396,13 +398,13 @@ impl AdaptiveMemoryManager {
                         -(current_time - self.get_last_accessed(memory)) as f32
                     }
                     AdaptiveStrategy::LFU => -(self.get_access_count(memory) as f32),
-                    AdaptiveStrategy::ImportanceBased => -memory.score.unwrap_or(0.5),
+                    AdaptiveStrategy::ImportanceBased => -memory.score().unwrap_or(0.5) as f32,
                     AdaptiveStrategy::Hybrid => {
                         let current_time = chrono::Utc::now().timestamp();
                         let recency =
                             -(current_time - self.get_last_accessed(memory)) as f32 / 86400.0; // Days
                         let frequency = -(self.get_access_count(memory) as f32);
-                        let importance = -memory.score.unwrap_or(0.5);
+                        let importance = -memory.score().unwrap_or(0.5) as f32;
                         recency * 0.3 + frequency * 0.3 + importance * 0.4
                     }
                 };
@@ -416,9 +418,9 @@ impl AdaptiveMemoryManager {
         // Mark worst memories for deletion
         let mut deleted_count = 0;
         for (i, _) in memory_scores.iter().take(excess_count) {
-            if !memories[*i].content.is_empty() {
+            if memories[*i].content.as_text().map(|s| !s.is_empty()).unwrap_or(true) {
                 // Don't double-delete
-                memories[*i].content = String::new(); // Mark for deletion
+                memories[*i].content = agent_mem_traits::Content::Text(String::new()); // Mark for deletion
                 deleted_count += 1;
             }
         }
@@ -440,42 +442,43 @@ impl AdaptiveMemoryManager {
 
     /// Clean up memories marked for deletion
     pub fn cleanup_deleted_memories(&self, memories: &mut Vec<Memory>) {
-        memories.retain(|memory| !memory.content.is_empty());
+        memories.retain(|memory| {
+            memory.content.as_text().map(|s| !s.is_empty()).unwrap_or(true)
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_core::MemoryType;
+    use agent_mem_traits::MemoryV4 as Memory;
     use chrono::Utc;
     use std::collections::HashMap;
 
     fn create_test_memory(id: &str, importance: f32, access_count: u32, age_days: i64) -> Memory {
-        use agent_mem_traits::Session;
+        use agent_mem_traits::{MemoryId, Content, AttributeSet, AttributeKey, AttributeValue, RelationGraph, MetadataV4 as Metadata};
         let current_time = Utc::now();
         let age_duration = chrono::Duration::days(age_days);
-        Memory {
-            id: id.to_string(),
-            content: format!("Test memory content for {}", id),
-            hash: None,
-            metadata: HashMap::new(),
-            score: Some(importance),
-            created_at: current_time - age_duration,
-            updated_at: None,
-            session: Session::new(),
-            memory_type: MemoryType::Episodic,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            importance,
-            embedding: None,
-            last_accessed_at: current_time - age_duration / 2,
-            access_count,
-            expires_at: None,
-            version: 1,
-        }
+        let created_at = current_time - age_duration;
+        let mut memory = Memory {
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(format!("Test memory content for {}", id)),
+            attributes: AttributeSet::new(),
+            relations: RelationGraph::new(),
+            metadata: Metadata {
+                created_at,
+                updated_at: created_at,
+                accessed_at: current_time - age_duration / 2,
+                access_count,
+                version: 1,
+                hash: None,
+            },
+        };
+        memory.set_agent_id("test_agent");
+        memory.set_user_id("test_user");
+        memory.set_importance(importance as f64);
+        memory.set_score(importance as f64);
+        memory
     }
 
     #[tokio::test]
@@ -514,25 +517,25 @@ mod tests {
         manager.archive_memory(&mut memory).await.unwrap();
 
         assert_eq!(
-            memory.metadata.get("archived"),
-            Some(&serde_json::Value::Bool(true))
+            memory.attributes.get(&AttributeKey::system("archived")),
+            Some(&AttributeValue::Boolean(true))
         );
-        assert!(memory.importance < 0.5); // Should be reduced
+        assert!(memory.importance().unwrap_or(0.0) < 0.5); // Should be reduced
     }
 
     #[tokio::test]
     async fn test_memory_compression() {
         let manager = AdaptiveMemoryManager::new(100, 30 * 24 * 60 * 60);
         let mut memory = create_test_memory("test", 0.5, 5, 1);
-        memory.content = "A".repeat(15000); // Large content
+        memory.content = agent_mem_traits::Content::Text("A".repeat(15000)); // Large content
 
-        let original_size = memory.content.len();
+        let original_size = memory.content.as_text().unwrap_or("").len();
         manager.compress_memory(&mut memory).await.unwrap();
 
-        assert!(memory.content.len() < original_size);
+        assert!(memory.content.as_text().unwrap_or("").len() < original_size);
         assert_eq!(
-            memory.metadata.get("compressed"),
-            Some(&serde_json::Value::Bool(true))
+            memory.attributes.get(&AttributeKey::system("compressed")),
+            Some(&AttributeValue::Boolean(true))
         );
     }
 

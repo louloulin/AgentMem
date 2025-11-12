@@ -14,7 +14,11 @@
       "mcp__agentmem__agentmem_add_memory",
       "mcp__agentmem__agentmem_list_agents",
       "Bash(find:*)",
-      "mcp__agentmem__agentmem_chat"
+      "mcp__agentmem__agentmem_chat",
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__onboarding",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__search_for_pattern"
     ],
     "deny": [],
     "ask": []

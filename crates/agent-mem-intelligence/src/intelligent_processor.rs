@@ -17,9 +17,8 @@ use crate::fact_extraction::{AdvancedFactExtractor, ExtractedFact, FactExtractor
 use crate::importance_evaluator::{
     ImportanceEvaluation, ImportanceEvaluator, ImportanceEvaluatorConfig,
 };
-use agent_mem_core::Memory;
+use agent_mem_traits::{MemoryV4 as Memory, LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
 use agent_mem_llm::{factory::RealLLMFactory, LLMProvider};
-use agent_mem_traits::{LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -263,9 +262,22 @@ impl IntelligentMemoryProcessor {
             })
             .collect();
 
+        // Convert MemoryItem to MemoryV4 for conflict detection
+        use agent_mem_traits::MemoryV4;
+
+        let new_memories_v4: Vec<MemoryV4> = new_memories
+            .iter()
+            .map(|item| MemoryV4::from_legacy_item(item))
+            .collect();
+
+        let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
+            .iter()
+            .map(|item| MemoryV4::from_legacy_item(item))
+            .collect();
+
         let conflict_detections = self
             .conflict_resolver
-            .detect_conflicts(&new_memories, &existing_memory_items)
+            .detect_conflicts(&new_memories_v4, &existing_memories_v4)
             .await?;
 
         // 6. 生成记忆决策
@@ -337,25 +349,28 @@ impl IntelligentMemoryProcessor {
         // 分析记忆质量
         for memory in existing_memories {
             if memory.importance < 0.3 {
-                report.low_importance_memories.push(memory.id.clone());
+                report.low_importance_memories.push(memory.id.as_str().to_string());
             }
 
-            if memory.content.len() < 20 {
-                report.short_memories.push(memory.id.clone());
+            let content_len = memory.content.len();
+            if content_len < 20 {
+                report.short_memories.push(memory.id.as_str().to_string());
             }
         }
 
         // 检测重复记忆
         for (i, memory1) in existing_memories.iter().enumerate() {
             for memory2 in existing_memories.iter().skip(i + 1) {
+                let content1 = &memory1.content;
+                let content2 = &memory2.content;
                 let similarity = self
                     .decision_engine
-                    .calculate_content_similarity(&memory1.content, &memory2.content);
+                    .calculate_content_similarity(content1, content2);
 
                 if similarity > 0.8 {
                     report
                         .duplicate_memories
-                        .push((memory1.id.clone(), memory2.id.clone()));
+                        .push((memory1.id.as_str().to_string(), memory2.id.as_str().to_string()));
                 }
             }
         }

@@ -11,10 +11,9 @@
 use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     hierarchy::MemoryScope,
-    Memory,
 };
 use agent_mem_performance::telemetry::{ProductionTelemetryConfig, ProductionTelemetrySystem};
-use agent_mem_traits::{MemoryType, Session};
+use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session, Content};
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -90,7 +89,7 @@ async fn demonstrate_memory_operations(
             metadata: HashMap::new(),
         };
 
-        let memory = Memory {
+        let memory_item = MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: format!("This is test message {i} for telemetry demonstration"),
             hash: None,
@@ -112,7 +111,8 @@ async fn demonstrate_memory_operations(
             version: 1,
         };
 
-        // Add memory with telemetry tracking
+        // Convert to MemoryV4 and add memory with telemetry tracking
+        let memory = MemoryV4::from_legacy_item(&memory_item);
         let memory_result = engine.add_memory(memory).await;
 
         let duration = start.elapsed();

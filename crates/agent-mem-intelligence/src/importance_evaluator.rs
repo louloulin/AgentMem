@@ -7,9 +7,8 @@
 //! - 用户行为分析
 
 use crate::fact_extraction::{EntityType, RelationType, StructuredFact};
-use agent_mem_core::Memory;
+use agent_mem_traits::{MemoryV4 as Memory, Result};
 use agent_mem_llm::LLMProvider;
-use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -137,7 +136,7 @@ impl ImportanceEvaluator {
         let reasoning = self.generate_reasoning(&factors, importance_score).await?;
 
         Ok(ImportanceEvaluation {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.as_str().to_string(),
             importance_score,
             confidence,
             factors,
@@ -158,7 +157,7 @@ impl ImportanceEvaluator {
         let mut evaluations = Vec::new();
 
         for memory in memories {
-            let facts = facts_map.get(&memory.id).cloned().unwrap_or_default();
+            let facts = facts_map.get(memory.id.as_str()).cloned().unwrap_or_default();
             let evaluation = self
                 .evaluate_importance(memory, &facts, context_memories)
                 .await?;
@@ -179,7 +178,8 @@ impl ImportanceEvaluator {
         let mut factors = ImportanceFactors::default();
 
         // 1. 内容复杂度分析
-        factors.content_complexity = self.analyze_content_complexity(&memory.content).await?;
+        let content_text = memory.content.as_text().unwrap_or("");
+        factors.content_complexity = self.analyze_content_complexity(content_text).await?;
 
         // 2. 实体重要性分析
         factors.entity_importance = self.analyze_entity_importance(facts);
@@ -199,7 +199,8 @@ impl ImportanceEvaluator {
             .await?;
 
         // 7. 情感强度分析
-        factors.emotional_intensity = self.analyze_emotional_intensity(&memory.content).await?;
+        let content_text = memory.content.as_text().unwrap_or("");
+        factors.emotional_intensity = self.analyze_emotional_intensity(content_text).await?;
 
         Ok(factors)
     }
@@ -309,7 +310,7 @@ impl ImportanceEvaluator {
     /// 分析时间相关性
     fn analyze_temporal_relevance(&self, memory: &Memory) -> f32 {
         let now = chrono::Utc::now();
-        let age_days = (now - memory.created_at).num_days() as f32;
+        let age_days = (now - memory.metadata.created_at).num_days() as f32;
 
         // 应用时间衰减
 
@@ -324,7 +325,7 @@ impl ImportanceEvaluator {
         let base_score = 0.5;
 
         // 如果有用户ID，说明是用户特定的记忆，重要性更高
-        if memory.metadata.contains_key("user_id") {
+        if memory.user_id().is_some() {
             base_score + 0.3
         } else {
             base_score
@@ -347,8 +348,9 @@ impl ImportanceEvaluator {
 
         for context_memory in context_memories.iter().take(10) {
             // 限制比较数量
-            let relevance =
-                self.calculate_content_similarity(&memory.content, &context_memory.content);
+            let content1 = memory.content.as_text().unwrap_or("");
+            let content2 = context_memory.content.as_text().unwrap_or("");
+            let relevance = self.calculate_content_similarity(content1, content2);
             total_relevance += relevance;
             count += 1;
         }

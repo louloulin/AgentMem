@@ -3,8 +3,7 @@
 //! Implements intelligent importance scoring based on multiple factors
 //! including recency, frequency, relevance, and context.
 
-use agent_mem_core::Memory;
-use agent_mem_traits::Result;
+use agent_mem_traits::{MemoryV4 as Memory, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
@@ -106,7 +105,7 @@ impl ImportanceScorer {
         let current_time = chrono::Utc::now().timestamp();
 
         for memory in memories.iter_mut() {
-            let old_importance = memory.score().unwrap_or(0.5);
+            let old_importance = memory.score().unwrap_or(0.5) as f32;
             let new_importance = self
                 .calculate_importance_score(memory, current_time)
                 .await?;
@@ -129,7 +128,7 @@ impl ImportanceScorer {
             .calculate_importance_score(memory, current_time)
             .await?;
 
-        if (new_importance - memory.score().unwrap_or(0.5)).abs() > 0.01 {
+        if (new_importance - (memory.score().unwrap_or(0.5) as f32)).abs() > 0.01 {
             memory.set_score(new_importance as f64);
             memory.metadata.updated_at = chrono::Utc::now();
         }
@@ -280,44 +279,48 @@ impl ImportanceScorer {
         emotional: f32,
         context: f32,
     ) -> f32 {
-        use agent_mem_core::MemoryType;
 
-        match memory.memory_type {
-            MemoryType::Episodic => {
+        let memory_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+        match memory_type_str.as_str() {
+            "episodic" => {
                 // Episodic memories: prioritize recency and emotional content
                 recency * 0.4 + emotional * 0.3 + frequency * 0.2 + relevance * 0.1
             }
-            MemoryType::Semantic => {
+            "semantic" => {
                 // Semantic memories: prioritize relevance and context
                 relevance * 0.4 + context * 0.3 + frequency * 0.2 + recency * 0.1
             }
-            MemoryType::Procedural => {
+            "procedural" => {
                 // Procedural memories: prioritize frequency and context
                 frequency * 0.4 + context * 0.3 + relevance * 0.2 + recency * 0.1
             }
-            MemoryType::Working => {
+            "working" => {
                 // Working memories: prioritize recency heavily
                 recency * 0.6 + frequency * 0.2 + relevance * 0.1 + emotional * 0.1
             }
-            MemoryType::Factual => {
+            "factual" => {
                 // Factual memories: prioritize relevance and context
                 relevance * 0.4 + context * 0.3 + frequency * 0.2 + recency * 0.1
             }
-            MemoryType::Core => {
+            "core" => {
                 // Core memories: prioritize all factors equally with high base importance
                 (relevance + context + frequency + recency + emotional) / 5.0 * 1.2
             }
-            MemoryType::Resource => {
+            "resource" => {
                 // Resource memories: prioritize relevance and frequency
                 relevance * 0.4 + frequency * 0.3 + context * 0.2 + recency * 0.1
             }
-            MemoryType::Knowledge => {
+            "knowledge" => {
                 // Knowledge memories: prioritize relevance and context
                 relevance * 0.5 + context * 0.3 + frequency * 0.15 + recency * 0.05
             }
-            MemoryType::Contextual => {
+            "contextual" => {
                 // Contextual memories: prioritize context and recency
                 context * 0.4 + recency * 0.3 + relevance * 0.2 + frequency * 0.1
+            }
+            _ => {
+                // Default: balanced approach
+                (relevance + context + frequency + recency + emotional) / 5.0
             }
         }
     }

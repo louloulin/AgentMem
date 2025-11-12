@@ -11,8 +11,7 @@ pub use adaptive::*;
 pub use consolidation::*;
 pub use importance::*;
 
-use agent_mem_core::Memory;
-use agent_mem_traits::Result;
+use agent_mem_traits::{MemoryV4 as Memory, Result};
 use serde::{Deserialize, Serialize};
 
 /// Memory processing configuration
@@ -174,29 +173,27 @@ mod tests {
     use agent_mem_traits::MemoryType;
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
-        use agent_mem_traits::Session;
+        use agent_mem_traits::{MemoryId, Content, AttributeSet, RelationGraph, MetadataV4 as Metadata};
         let now = Utc::now();
-        Memory {
-            id: id.to_string(),
-            content: content.to_string(),
-            hash: None,
-            metadata: std::collections::HashMap::new(),
-            score: Some(importance),
-            created_at: now,
-            updated_at: None,
-            session: Session::new(),
-            memory_type: MemoryType::Episodic,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            importance,
-            embedding: None,
-            last_accessed_at: now,
-            access_count: 0,
-            expires_at: None,
-            version: 1,
-        }
+        let mut memory = Memory {
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(content.to_string()),
+            attributes: AttributeSet::new(),
+            relations: RelationGraph::new(),
+            metadata: Metadata {
+                created_at: now,
+                updated_at: now,
+                accessed_at: now,
+                access_count: 0,
+                version: 1,
+                hash: None,
+            },
+        };
+        memory.set_agent_id("test_agent");
+        memory.set_user_id("test_user");
+        memory.set_importance(importance as f64);
+        memory.set_score(importance as f64);
+        memory
     }
 
     #[tokio::test]

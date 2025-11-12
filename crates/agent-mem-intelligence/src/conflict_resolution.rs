@@ -7,9 +7,8 @@
 //! - 置信度评估
 
 use crate::similarity::SemanticSimilarity;
-use agent_mem_core::Memory;
+use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use agent_mem_llm::LLMProvider;
-use agent_mem_traits::{Message, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -288,7 +287,7 @@ impl ConflictResolver {
                         let conflict = ConflictDetection {
                             id: format!("semantic_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Semantic,
-                            memory_ids: vec![new_memory.id.to_string(), existing_memory.id.to_string()],
+                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
                             description: format!(
                                 "语义冲突：新记忆 '{}' 与现有记忆 '{}' 存在矛盾",
                                 new_content_str.chars().take(50).collect::<String>(),
@@ -345,7 +344,7 @@ impl ConflictResolver {
                         let conflict = ConflictDetection {
                             id: format!("temporal_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Temporal,
-                            memory_ids: vec![new_memory.id.to_string(), existing_memory.id.to_string()],
+                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
                             description: "时间冲突：记忆中的时间信息不一致".to_string(),
                             severity: 0.7,
                             confidence: 0.8,
@@ -371,30 +370,49 @@ impl ConflictResolver {
 
         for new_memory in new_memories {
             for existing_memory in existing_memories {
+                let new_content_str = match &new_memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                    _ => "",
+                };
+                let existing_content_str = match &existing_memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                    _ => "",
+                };
                 let similarity = self
                     .similarity
-                    .calculate_similarity(&new_memory.content, &existing_memory.content)
+                    .calculate_similarity(new_content_str, existing_content_str)
                     .await?;
 
                 // 高相似度且内容长度相近，可能是重复
                 if similarity > 0.95 {
-                    let length_ratio =
-                        (new_memory.content.len() as f32) / (existing_memory.content.len() as f32);
+                    let new_len = match &new_memory.content {
+                        agent_mem_traits::Content::Text(t) => t.len(),
+                        agent_mem_traits::Content::Structured(v) => v.to_string().len(),
+                        _ => 0,
+                    };
+                    let existing_len = match &existing_memory.content {
+                        agent_mem_traits::Content::Text(t) => t.len(),
+                        agent_mem_traits::Content::Structured(v) => v.to_string().len(),
+                        _ => 0,
+                    };
+                    let length_ratio = (new_len as f32) / (existing_len.max(1) as f32);
                     if length_ratio > 0.8 && length_ratio < 1.2 {
                         let conflict = ConflictDetection {
                             id: format!("duplicate_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Duplicate,
-                            memory_ids: vec![new_memory.id.clone(), existing_memory.id.clone()],
+                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
                             description: "重复内容：发现相似的记忆内容".to_string(),
                             severity: 0.6,
                             confidence: similarity,
                             suggested_resolution: ResolutionStrategy::RemoveDuplicates {
-                                keep_memory_id: if new_memory.created_at
-                                    > existing_memory.created_at
+                                keep_memory_id: if new_memory.metadata.created_at
+                                    > existing_memory.metadata.created_at
                                 {
-                                    new_memory.id.clone()
+                                    new_memory.id.as_str().to_string()
                                 } else {
-                                    existing_memory.id.clone()
+                                    existing_memory.id.as_str().to_string()
                                 },
                             },
                             detected_at: chrono::Utc::now(),
@@ -424,7 +442,7 @@ impl ConflictResolver {
 }}
 
 只返回JSON，不要其他解释："#,
-            memory1.content, memory2.content
+            format!("{:?}", memory1.content), format!("{:?}", memory2.content)
         );
 
         // P0 优化: 添加超时控制
@@ -490,7 +508,7 @@ impl ConflictResolver {
                     let newer = &memories[0];
                     let older = &memories[1];
 
-                    if newer.created_at > older.created_at {
+                    if newer.metadata.created_at > older.metadata.created_at {
                         Ok(ResolutionStrategy::KeepLatest)
                     } else {
                         Ok(ResolutionStrategy::KeepHighestConfidence)
@@ -501,9 +519,9 @@ impl ConflictResolver {
             }
             ConflictType::Temporal => Ok(ResolutionStrategy::KeepLatest),
             ConflictType::Duplicate => {
-                if let Some(latest) = memories.iter().max_by_key(|m| m.created_at) {
+                if let Some(latest) = memories.iter().max_by_key(|m| m.metadata.created_at) {
                     Ok(ResolutionStrategy::RemoveDuplicates {
-                        keep_memory_id: latest.id.clone(),
+                        keep_memory_id: latest.id.to_string(),
                     })
                 } else {
                     Ok(ResolutionStrategy::MarkForManualReview)
@@ -524,18 +542,18 @@ impl ConflictResolver {
                 // 找到最新的记忆，删除其他的
                 let conflict_memories: Vec<&Memory> = memories
                     .iter()
-                    .filter(|m| conflict.memory_ids.contains(&m.id))
+                    .filter(|m| conflict.memory_ids.contains(&m.id.to_string()))
                     .collect();
 
-                if let Some(latest) = conflict_memories.iter().max_by_key(|m| m.created_at) {
+                if let Some(latest) = conflict_memories.iter().max_by_key(|m| m.metadata.created_at) {
                     let to_delete: Vec<String> = conflict_memories
                         .iter()
-                        .filter(|m| m.id != latest.id)
-                        .map(|m| m.id.clone())
+                        .filter(|m| m.id.to_string() != latest.id.to_string())
+                        .map(|m| m.id.to_string())
                         .collect();
 
                     ResolutionResult::Success {
-                        updated_memories: vec![latest.id.clone()],
+                        updated_memories: vec![latest.id.to_string()],
                         deleted_memories: to_delete,
                     }
                 } else {
@@ -577,8 +595,18 @@ impl ConflictResolver {
     fn rule_based_conflict_detection(&self, memory1: &Memory, memory2: &Memory) -> f32 {
         info!("使用基于规则的冲突检测（降级方案）");
 
-        let content1 = memory1.content.to_lowercase();
-        let content2 = memory2.content.to_lowercase();
+        let content1_str = match &memory1.content {
+            agent_mem_traits::Content::Text(t) => t.to_lowercase(),
+            agent_mem_traits::Content::Structured(v) => v.to_string().to_lowercase(),
+            _ => String::new(),
+        };
+        let content2_str = match &memory2.content {
+            agent_mem_traits::Content::Text(t) => t.to_lowercase(),
+            agent_mem_traits::Content::Structured(v) => v.to_string().to_lowercase(),
+            _ => String::new(),
+        };
+        let content1 = content1_str;
+        let content2 = content2_str;
 
         // 规则1: 检测否定词冲突（"不"、"没有" vs "是"、"有"）
         let has_negation1 =

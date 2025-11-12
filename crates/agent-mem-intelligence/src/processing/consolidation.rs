@@ -3,8 +3,7 @@
 //! Implements intelligent memory consolidation to reduce redundancy
 //! and improve memory organization.
 
-use agent_mem_core::Memory;
-use agent_mem_traits::Result;
+use agent_mem_traits::{MemoryV4 as Memory, Result, AttributeKey, AttributeValue};
 use agent_mem_utils::text::jaccard_similarity;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -74,11 +73,7 @@ impl MemoryConsolidator {
 
     /// Get access count from memory metadata
     fn get_access_count(&self, memory: &Memory) -> u32 {
-        memory
-            .metadata
-            .get("access_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32
+        memory.metadata.access_count
     }
 
     /// Consolidate a batch of memories
@@ -165,10 +160,12 @@ impl MemoryConsolidator {
 
     /// Calculate similarity between two memories
     async fn calculate_similarity(&mut self, memory1: &Memory, memory2: &Memory) -> Result<f32> {
-        let key = if memory1.id < memory2.id {
-            (memory1.id.clone(), memory2.id.clone())
+        let id1 = memory1.id.as_str();
+        let id2 = memory2.id.as_str();
+        let key = if id1 < id2 {
+            (id1.to_string(), id2.to_string())
         } else {
-            (memory2.id.clone(), memory1.id.clone())
+            (id2.to_string(), id1.to_string())
         };
 
         if let Some(&cached_similarity) = self.similarity_cache.get(&key) {
@@ -176,10 +173,14 @@ impl MemoryConsolidator {
         }
 
         // Calculate text similarity
-        let text_similarity = jaccard_similarity(&memory1.content, &memory2.content);
+        let content1 = memory1.content.as_text().unwrap_or("");
+        let content2 = memory2.content.as_text().unwrap_or("");
+        let text_similarity = jaccard_similarity(content1, content2);
 
         // Consider memory type similarity
-        let type_similarity = if memory1.memory_type == memory2.memory_type {
+        let type1 = memory1.memory_type().unwrap_or_else(|| "episodic".to_string());
+        let type2 = memory2.memory_type().unwrap_or_else(|| "episodic".to_string());
+        let type_similarity = if type1 == type2 {
             1.0
         } else {
             0.5
@@ -301,7 +302,7 @@ impl MemoryConsolidator {
             .copied()
             .unwrap();
 
-        let primary_id = memories[primary_idx].id.to_string();
+        let primary_id = memories[primary_idx].id.as_str().to_string();
 
         // Add references to other memories
         for &idx in group {
@@ -309,13 +310,13 @@ impl MemoryConsolidator {
                 continue;
             }
 
-            memories[idx].metadata.insert(
-                "consolidated_with".to_string(),
-                serde_json::Value::String(primary_id.clone()),
+            memories[idx].attributes.insert(
+                AttributeKey::system("consolidated_with"),
+                AttributeValue::String(primary_id.clone()),
             );
-            memories[idx].metadata.insert(
-                "consolidation_type".to_string(),
-                serde_json::Value::String("reference".to_string()),
+            memories[idx].attributes.insert(
+                AttributeKey::system("consolidation_type"),
+                AttributeValue::String("reference".to_string()),
             );
         }
 
@@ -323,12 +324,12 @@ impl MemoryConsolidator {
         let reference_ids: Vec<String> = group
             .iter()
             .filter(|&&idx| idx != primary_idx)
-            .map(|&idx| memories[idx].id.clone())
+            .map(|&idx| memories[idx].id.as_str().to_string())
             .collect();
 
-        memories[primary_idx].metadata.insert(
-            "references".to_string(),
-            serde_json::Value::String(reference_ids.join(",")),
+        memories[primary_idx].attributes.insert(
+            AttributeKey::system("references"),
+            AttributeValue::String(reference_ids.join(",")),
         );
 
         debug!("Created references for {} memories", group.len());
@@ -345,13 +346,13 @@ impl MemoryConsolidator {
 
         // Add group metadata to all memories in the group
         for &idx in group {
-            memories[idx].metadata.insert(
-                "memory_group".to_string(),
-                serde_json::Value::String(group_id.clone()),
+            memories[idx].attributes.insert(
+                AttributeKey::system("memory_group"),
+                AttributeValue::String(group_id.clone()),
             );
-            memories[idx].metadata.insert(
-                "group_size".to_string(),
-                serde_json::Value::Number(serde_json::Number::from(group.len())),
+            memories[idx].attributes.insert(
+                AttributeKey::system("group_size"),
+                AttributeValue::Number(group.len() as f64),
             );
         }
 
@@ -377,42 +378,29 @@ impl MemoryConsolidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_core::MemoryType;
+    use agent_mem_traits::{MemoryId, Content, AttributeSet, AttributeKey, AttributeValue, RelationGraph, MetadataV4 as Metadata};
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
-        use agent_mem_traits::Session;
-
-        let session = Session {
-            id: "test_session".to_string(),
-            agent_id: Some("test_agent".to_string()),
-            user_id: Some("test_user".to_string()),
-            actor_id: Some("test_actor".to_string()),
-            run_id: Some("test_run".to_string()),
-            created_at: chrono::Utc::now(),
-            metadata: std::collections::HashMap::new(),
+        let now = chrono::Utc::now();
+        let mut memory = Memory {
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(content.to_string()),
+            attributes: AttributeSet::new(),
+            relations: RelationGraph::new(),
+            metadata: Metadata {
+                created_at: now,
+                updated_at: now,
+                accessed_at: now,
+                access_count: 0,
+                version: 1,
+                hash: Some("test_hash".to_string()),
+            },
         };
-
-        Memory {
-            id: id.to_string(),
-            content: content.to_string(),
-            hash: Some("test_hash".to_string()),
-            metadata: std::collections::HashMap::new(),
-            score: Some(importance),
-            memory_type: MemoryType::Episodic,
-            created_at: chrono::Utc::now(),
-            updated_at: None,
-            session,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            importance,
-            embedding: None,
-            last_accessed_at: chrono::Utc::now(),
-            access_count: 0,
-            expires_at: None,
-            version: 1,
-        }
+        memory.set_agent_id("test_agent");
+        memory.set_user_id("test_user");
+        memory.set_importance(importance as f64);
+        memory.set_score(importance as f64);
+        memory
     }
 
     #[tokio::test]

@@ -1,5 +1,5 @@
-use agent_mem_core::{Memory, MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::{MemoryType, Session};
+use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
+use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session, Content};
 use chrono::Utc;
 use std::collections::HashMap;
 use tracing::{error, info};
@@ -23,8 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let memories = create_test_memories();
     let mut memory_ids = Vec::new();
 
-    for memory in memories {
-        let id = memory.id.clone();
+    for memory_item in memories {
+        let id = memory_item.id.clone();
+        let memory = MemoryV4::from_legacy_item(&memory_item);
         match engine.add_memory(memory).await {
             Ok(_) => {
                 info!("✅ Added memory: {}", id);
@@ -41,7 +42,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for id in &memory_ids {
         match engine.get_memory(id).await {
             Ok(Some(memory)) => {
-                info!("✅ Retrieved memory: {} - {}", id, memory.content);
+                let content_str = match &memory.content {
+                    Content::Text(t) => t.clone(),
+                    Content::Structured(v) => v.to_string(),
+                    _ => String::from("(binary content)"),
+                };
+                info!("✅ Retrieved memory: {} - {}", id, content_str);
             }
             Ok(None) => {
                 error!("❌ Memory not found: {}", id);
@@ -56,8 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("📋 Test 4: Memory Update");
     if let Some(first_id) = memory_ids.first() {
         if let Ok(Some(mut memory)) = engine.get_memory(first_id).await {
-            memory.content = "Updated content for comprehensive test".to_string();
-            memory.updated_at = Some(Utc::now());
+            memory.content = Content::Text("Updated content for comprehensive test".to_string());
+            memory.metadata.updated_at = Utc::now();
 
             match engine.update_memory(memory).await {
                 Ok(_) => info!("✅ Updated memory: {}", first_id),
@@ -115,11 +121,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn create_test_memories() -> Vec<Memory> {
+fn create_test_memories() -> Vec<MemoryItem> {
     let now = Utc::now();
 
     vec![
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "High priority task: Implement authentication system".to_string(),
             hash: None,
@@ -151,7 +157,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "User John prefers dark mode interface".to_string(),
             hash: None,
@@ -183,7 +189,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "The capital of France is Paris".to_string(),
             hash: None,
@@ -212,7 +218,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "Current working on feature branch: auth-system".to_string(),
             hash: None,
@@ -244,7 +250,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "Meeting scheduled with client at 3 PM tomorrow".to_string(),
             hash: None,
