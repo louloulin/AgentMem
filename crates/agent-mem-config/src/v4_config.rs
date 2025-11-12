@@ -392,12 +392,13 @@ mod tests {
             [search]
             vector_weight = 0.8
             fulltext_weight = 0.2
-            
+            graph_weight = 0.0
+
             [importance]
             recency_weight = 0.3
             frequency_weight = 0.2
         "#;
-        
+
         let config = AgentMemConfig::from_str(toml_str).unwrap();
         assert_eq!(config.search.vector_weight, 0.8);
         assert_eq!(config.search.fulltext_weight, 0.2);

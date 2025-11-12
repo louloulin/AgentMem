@@ -516,10 +516,12 @@ mod tests {
 
         manager.archive_memory(&mut memory).await.unwrap();
 
-        assert_eq!(
-            memory.attributes.get(&AttributeKey::system("archived")),
-            Some(&AttributeValue::Boolean(true))
-        );
+        // Check if archived attribute is set to true
+        if let Some(AttributeValue::Boolean(archived)) = memory.attributes.get(&AttributeKey::system("archived")) {
+            assert!(*archived);
+        } else {
+            panic!("Expected archived attribute to be Boolean(true)");
+        }
         assert!(memory.importance().unwrap_or(0.0) < 0.5); // Should be reduced
     }
 
@@ -533,10 +535,12 @@ mod tests {
         manager.compress_memory(&mut memory).await.unwrap();
 
         assert!(memory.content.as_text().unwrap_or("").len() < original_size);
-        assert_eq!(
-            memory.attributes.get(&AttributeKey::system("compressed")),
-            Some(&AttributeValue::Boolean(true))
-        );
+        // Check if compressed attribute is set to true
+        if let Some(AttributeValue::Boolean(compressed)) = memory.attributes.get(&AttributeKey::system("compressed")) {
+            assert!(*compressed);
+        } else {
+            panic!("Expected compressed attribute to be Boolean(true)");
+        }
     }
 
     #[tokio::test]

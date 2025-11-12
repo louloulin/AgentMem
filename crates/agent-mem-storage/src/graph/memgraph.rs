@@ -517,10 +517,9 @@ mod tests {
         properties.insert("strength".to_string(), "high".to_string());
 
         let relation = Relation {
-            id: "rel1".to_string(),
+            relation_type: "KNOWS".to_string(),
             source: "person1".to_string(),
             target: "person2".to_string(),
-            relation: "KNOWS".to_string(),
             confidence: 0.9,
         };
 
