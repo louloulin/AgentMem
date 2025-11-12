@@ -137,7 +137,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📋 测试 5: 获取所有记忆");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let all_memories = mem.get_all(None).await?;
+    use agent_mem::GetAllOptions;
+    let all_memories = mem.get_all(GetAllOptions::default()).await?;
     println!("✅ 总记忆数: {} 条", all_memories.len());
     println!();
 

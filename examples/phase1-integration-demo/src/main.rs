@@ -152,10 +152,9 @@ async fn run_full_demo() -> Result<(), Box<dyn std::error::Error>> {
 
     // 创建关系
     let relations = vec![Relation {
-        id: "rel-1".to_string(),
+        relation_type: "朋友".to_string(),
         source: "person-1".to_string(),
         target: "person-2".to_string(),
-        relation: "朋友".to_string(),
         confidence: 0.9,
     }];
 

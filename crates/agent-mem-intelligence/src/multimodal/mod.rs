@@ -28,6 +28,11 @@ pub mod unified_retrieval;
 // 性能优化模块
 pub mod optimization;
 
+// 重新导出处理器类型
+pub use audio::AudioProcessor;
+pub use image::ImageProcessor;
+pub use video::VideoProcessor;
+
 // 重新导出 AI 模型相关类型（需要 multimodal feature）
 #[cfg(feature = "multimodal")]
 pub use ai_models::*;

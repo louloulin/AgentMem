@@ -95,7 +95,8 @@ async fn main() -> Result<()> {
 
     // 展示所有记忆
     println!("=== 查看完整对话历史 ===\n");
-    let all_memories = memory.get_all().await?;
+    use agent_mem::GetAllOptions;
+    let all_memories = memory.get_all(GetAllOptions::default()).await?;
     println!("📚 共保存了 {} 条记忆：", all_memories.len());
     for (i, mem) in all_memories.iter().enumerate() {
         println!("   {}. {}", i + 1, mem.content);

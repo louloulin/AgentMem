@@ -3,8 +3,8 @@
 //! This example demonstrates basic usage of the AgentMem core functionality,
 //! including memory creation, storage, and retrieval.
 
-use agent_mem_core::{Memory, MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::{MemoryType, Session};
+use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
+use agent_mem_traits::{MemoryItem, MemoryType, Session};
 use chrono::Utc;
 use std::collections::HashMap;
 use tracing::{error, info};
@@ -76,11 +76,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn create_test_memories() -> Vec<Memory> {
+fn create_test_memories() -> Vec<MemoryItem> {
     let now = Utc::now();
 
     vec![
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "Remember to implement the new authentication system".to_string(),
             hash: None,
@@ -112,7 +112,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "User John Doe prefers dark mode interface".to_string(),
             hash: None,
@@ -144,7 +144,7 @@ fn create_test_memories() -> Vec<Memory> {
             expires_at: None,
             version: 1,
         },
-        Memory {
+        MemoryItem {
             id: Uuid::new_v4().to_string(),
             content: "The capital of France is Paris".to_string(),
             hash: None,

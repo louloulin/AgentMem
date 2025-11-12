@@ -93,7 +93,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 搜索成功，找到 {} 条记忆:\n", results.len());
 
     for (i, result) in results.iter().enumerate() {
-        println!("  {}. {} (相关性: {:.2})", i + 1, result.content, result.score);
+        let score_str = result.score.map(|s| format!("{:.2}", s)).unwrap_or_else(|| "N/A".to_string());
+        println!("  {}. {} (相关性: {})", i + 1, result.content, score_str);
     }
 
     // ========================================
@@ -101,7 +102,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================
     println!("\n📚 步骤 5: 获取所有记忆");
 
-    let all_memories = mem.get_all().await?;
+    use agent_mem::GetAllOptions;
+    let all_memories = mem.get_all(GetAllOptions::default()).await?;
     println!("✅ 共有 {} 条记忆:\n", all_memories.len());
 
     for (i, memory) in all_memories.iter().enumerate() {

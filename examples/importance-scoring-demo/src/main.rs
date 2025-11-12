@@ -8,7 +8,7 @@
 use agent_mem_core::intelligence::{
     AccessType, DefaultImportanceScorer, ImportanceScorer, IntelligenceConfig,
 };
-use agent_mem_traits::{MemoryItem, MemoryType, Session};
+use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session};
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -52,7 +52,8 @@ async fn demo_new_memory(
         0.5,        // 基础重要性
     );
 
-    let factors = scorer.calculate_importance(&memory).await?;
+    let memory_v4 = MemoryV4::from_legacy_item(&memory);
+    let factors = scorer.calculate_importance(&memory_v4).await?;
 
     println!("记忆内容: {}", memory.content);
     println!(
@@ -85,7 +86,8 @@ async fn demo_frequently_accessed_memory(
         0.8,                             // 高重要性
     );
 
-    let factors = scorer.calculate_importance(&memory).await?;
+    let memory_v4 = MemoryV4::from_legacy_item(&memory);
+    let factors = scorer.calculate_importance(&memory_v4).await?;
 
     println!("记忆内容: {}", memory.content);
     println!(
@@ -134,7 +136,8 @@ async fn demo_old_memory_decay(
             0.5,              // 固定基础重要性
         );
 
-        let factors = scorer.calculate_importance(&memory).await?;
+        let memory_v4 = MemoryV4::from_legacy_item(&memory);
+        let factors = scorer.calculate_importance(&memory_v4).await?;
 
         println!(
             "{}\t{:.3}\t{:.3}\t{:.3}",
