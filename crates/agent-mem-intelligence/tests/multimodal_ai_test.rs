@@ -1,4 +1,8 @@
 //! 多模态 AI 集成测试
+//!
+//! 注意：这些测试需要 multimodal feature，当前被禁用
+
+#![cfg(feature = "multimodal")]
 
 use agent_mem_intelligence::multimodal::{
     AIModelConfig, AIModelProvider, AudioFormat, AudioTranscriptionRequest, DetailLevel,

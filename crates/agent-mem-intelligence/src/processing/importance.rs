@@ -368,28 +368,36 @@ mod tests {
     use std::collections::HashMap;
 
     fn create_test_memory(id: &str, content: &str, access_count: u32) -> Memory {
-        use agent_mem_traits::Session;
+        use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4, RelationGraph};
         let now = Utc::now();
+
+        let mut attributes = AttributeSet::new();
+        attributes.insert(
+            AttributeKey::core("agent_id"),
+            AttributeValue::String("test_agent".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("user_id"),
+            AttributeValue::String("test_user".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(0.5),
+        );
+
         Memory {
-            id: id.to_string(),
-            content: content.to_string(),
-            hash: None,
-            metadata: HashMap::new(),
-            score: Some(0.5),
-            created_at: now - chrono::Duration::hours(1),
-            updated_at: None,
-            session: Session::new(),
-            memory_type: MemoryType::Episodic,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            importance: 0.5,
-            embedding: None,
-            last_accessed_at: now - chrono::Duration::minutes(30),
-            access_count,
-            expires_at: None,
-            version: 1,
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(content.to_string()),
+            attributes,
+            relations: RelationGraph::new(),
+            metadata: MetadataV4 {
+                created_at: now - chrono::Duration::hours(1),
+                updated_at: now,
+                accessed_at: now - chrono::Duration::minutes(30),
+                access_count,
+                version: 1,
+                hash: None,
+            },
         }
     }
 
@@ -405,10 +413,9 @@ mod tests {
         let current_time = Utc::now().timestamp();
 
         let recent_memory = create_test_memory("1", "Recent memory", 1);
-        let old_memory = Memory {
-            created_at: Utc::now() - chrono::Duration::days(7), // 7 days ago
-            ..create_test_memory("2", "Old memory", 1)
-        };
+        let mut old_memory = create_test_memory("2", "Old memory", 1);
+        // 修改 created_at 为 7 天前
+        old_memory.metadata.created_at = Utc::now() - chrono::Duration::days(7);
 
         let recent_score = scorer.calculate_recency_score(&recent_memory, current_time);
         let old_score = scorer.calculate_recency_score(&old_memory, current_time);
