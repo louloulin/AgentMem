@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_weight_prediction() {
-        let config = Arc::new(agent_mem_config::search::SearchConfig::default());
+        let config = Arc::new(AgentMemConfig::default().search);
         let predictor = WeightPredictor::new(config);
 
         // 精确匹配查询应该提高全文权重

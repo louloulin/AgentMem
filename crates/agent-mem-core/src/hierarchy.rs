@@ -1033,7 +1033,7 @@ mod tests {
 
         // 创建测试记忆
         let now = Utc::now();
-        let memory = Memory {
+        let memory_item = MemoryItem {
             id: "test-memory-1".to_string(),
             content: "This is a test memory".to_string(),
             hash: None,
@@ -1054,13 +1054,14 @@ mod tests {
             expires_at: None,
             version: 1,
         };
+        let memory = Memory::from_legacy_item(&memory_item);
 
         // 测试添加记忆
         let hierarchical_memory = manager.add_memory(memory.clone()).await.unwrap();
         assert_eq!(hierarchical_memory.memory.id.as_str(), memory.id.as_str());
 
         // 测试获取记忆
-        let retrieved = manager.get_memory(&memory.id).await.unwrap();
+        let retrieved = manager.get_memory(memory.id.as_str()).await.unwrap();
         assert!(retrieved.is_some());
 
         // 测试搜索记忆
@@ -1071,7 +1072,7 @@ mod tests {
         assert!(!search_results.is_empty());
 
         // 测试删除记忆
-        let removed = manager.remove_memory(&memory.id).await.unwrap();
+        let removed = manager.remove_memory(memory.id.as_str()).await.unwrap();
         assert!(removed);
     }
 
@@ -1110,6 +1111,7 @@ mod tests {
 
         // Check score decay (0.8 * 0.8^2 = 0.512)
         let expected_score = 0.8 * 0.8_f32.powi(2);
-        assert!((inherited[0].memory.score.unwrap_or(0.0) - expected_score).abs() < 0.001);
+        let actual_score = inherited[0].memory.score().unwrap_or(0.0) as f32;
+        assert!((actual_score - expected_score).abs() < 0.001);
     }
 }
