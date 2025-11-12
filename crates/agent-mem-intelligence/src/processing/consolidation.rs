@@ -178,8 +178,8 @@ impl MemoryConsolidator {
         let text_similarity = jaccard_similarity(content1, content2);
 
         // Consider memory type similarity
-        let type1 = memory1.memory_type().unwrap_or_else(|| "episodic".to_string());
-        let type2 = memory2.memory_type().unwrap_or_else(|| "episodic".to_string());
+        let type1 = memory1.memory_type().unwrap_or("episodic".to_string());
+        let type2 = memory2.memory_type().unwrap_or("episodic".to_string());
         let type_similarity = if type1 == type2 {
             1.0
         } else {
@@ -393,7 +393,7 @@ mod tests {
                 accessed_at: now,
                 access_count: 0,
                 version: 1,
-                hash: Some("test_hash".to_string()),
+            hash: Some("test_hash".to_string()),
             },
         };
         memory.set_agent_id("test_agent");

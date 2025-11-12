@@ -550,7 +550,7 @@ Requirements:
             let similarity = self.calculate_content_similarity(&fact.content, memory_content);
             if similarity > 0.3 {
                 // 相关记忆越重要，新事实的重要性提升越大
-                let importance = memory.importance as f32;
+                let importance = memory.importance().unwrap_or(0.5) as f32;
                 context_boost += similarity * importance * 0.1;
             }
         }

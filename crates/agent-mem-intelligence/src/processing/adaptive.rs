@@ -359,7 +359,9 @@ impl AdaptiveMemoryManager {
             let new_size = match &memory.content {
                 agent_mem_traits::Content::Text(t) => t.len(),
                 agent_mem_traits::Content::Structured(v) => v.to_string().len(),
-                _ => 0,
+                agent_mem_traits::Content::Vector(_) => 0,
+                agent_mem_traits::Content::Binary(b) => b.len(),
+                agent_mem_traits::Content::Multimodal(_) => 0,
             };
             debug!(
                 "Compressed memory {} from {} to {} bytes",
@@ -469,8 +471,8 @@ mod tests {
                 created_at,
                 updated_at: created_at,
                 accessed_at: current_time - age_duration / 2,
-                access_count,
-                version: 1,
+            access_count,
+            version: 1,
                 hash: None,
             },
         };
@@ -516,12 +518,10 @@ mod tests {
 
         manager.archive_memory(&mut memory).await.unwrap();
 
-        // Check if archived attribute is set to true
-        if let Some(AttributeValue::Boolean(archived)) = memory.attributes.get(&AttributeKey::system("archived")) {
-            assert!(*archived);
-        } else {
-            panic!("Expected archived attribute to be Boolean(true)");
-        }
+        assert_eq!(
+            memory.attributes.get(&AttributeKey::system("archived")),
+            Some(&AttributeValue::Boolean(true))
+        );
         assert!(memory.importance().unwrap_or(0.0) < 0.5); // Should be reduced
     }
 
@@ -535,12 +535,10 @@ mod tests {
         manager.compress_memory(&mut memory).await.unwrap();
 
         assert!(memory.content.as_text().unwrap_or("").len() < original_size);
-        // Check if compressed attribute is set to true
-        if let Some(AttributeValue::Boolean(compressed)) = memory.attributes.get(&AttributeKey::system("compressed")) {
-            assert!(*compressed);
-        } else {
-            panic!("Expected compressed attribute to be Boolean(true)");
-        }
+        assert_eq!(
+            memory.attributes.get(&AttributeKey::system("compressed")),
+            Some(&AttributeValue::Boolean(true))
+        );
     }
 
     #[tokio::test]

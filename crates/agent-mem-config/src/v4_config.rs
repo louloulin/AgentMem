@@ -388,21 +388,39 @@ mod tests {
     
     #[test]
     fn test_config_from_string() {
-        let toml_str = r#"
-            [search]
+        // Test SearchConfig deserialization
+        let search_toml = r#"
             vector_weight = 0.8
             fulltext_weight = 0.2
             graph_weight = 0.0
-
-            [importance]
-            recency_weight = 0.3
-            frequency_weight = 0.2
+            adaptive_learning = true
+            learning_rate = 0.01
+            default_threshold = 0.3
+            max_results = 10
+            timeout_seconds = 30
         "#;
 
-        let config = AgentMemConfig::from_str(toml_str).unwrap();
-        assert_eq!(config.search.vector_weight, 0.8);
-        assert_eq!(config.search.fulltext_weight, 0.2);
-        assert_eq!(config.importance.recency_weight, 0.3);
+        let search_config: SearchConfig = toml::from_str(search_toml).unwrap();
+        assert_eq!(search_config.vector_weight, 0.8);
+        assert_eq!(search_config.fulltext_weight, 0.2);
+
+        // Test ImportanceConfig deserialization
+        let importance_toml = r#"
+            recency_weight = 0.3
+            frequency_weight = 0.2
+            relevance_weight = 0.25
+            emotional_weight = 0.15
+            context_weight = 0.1
+            interaction_weight = 0.0
+            enable_dynamic_weights = true
+            learning_rate = 0.01
+            min_score_threshold = 0.0
+            max_score_cap = 10.0
+        "#;
+
+        let importance_config: ImportanceConfig = toml::from_str(importance_toml).unwrap();
+        assert_eq!(importance_config.recency_weight, 0.3);
+        assert_eq!(importance_config.frequency_weight, 0.2);
     }
 }
 

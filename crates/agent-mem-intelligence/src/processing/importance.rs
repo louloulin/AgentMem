@@ -280,7 +280,7 @@ impl ImportanceScorer {
         context: f32,
     ) -> f32 {
 
-        let memory_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+        let memory_type_str = memory.memory_type().unwrap_or("episodic");
         match memory_type_str.as_str() {
             "episodic" => {
                 // Episodic memories: prioritize recency and emotional content
@@ -368,9 +368,9 @@ mod tests {
     use std::collections::HashMap;
 
     fn create_test_memory(id: &str, content: &str, access_count: u32) -> Memory {
-        use agent_mem_traits::{Session, MemoryItem};
+        use agent_mem_traits::Session;
         let now = Utc::now();
-        let item = MemoryItem {
+        Memory {
             id: id.to_string(),
             content: content.to_string(),
             hash: None,
@@ -390,8 +390,7 @@ mod tests {
             access_count,
             expires_at: None,
             version: 1,
-        };
-        Memory::from_legacy_item(&item)
+        }
     }
 
     #[tokio::test]
@@ -406,32 +405,10 @@ mod tests {
         let current_time = Utc::now().timestamp();
 
         let recent_memory = create_test_memory("1", "Recent memory", 1);
-
-        // Create old memory with modified created_at
-        use agent_mem_traits::{Session, MemoryItem};
-        let now = Utc::now();
-        let old_item = MemoryItem {
-            id: "2".to_string(),
-            content: "Old memory".to_string(),
-            hash: None,
-            metadata: HashMap::new(),
-            score: Some(0.5),
-            created_at: now - chrono::Duration::days(7), // 7 days ago
-            updated_at: None,
-            session: Session::new(),
-            memory_type: MemoryType::Episodic,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            importance: 0.5,
-            embedding: None,
-            last_accessed_at: now - chrono::Duration::minutes(30),
-            access_count: 1,
-            expires_at: None,
-            version: 1,
+        let old_memory = Memory {
+            created_at: Utc::now() - chrono::Duration::days(7), // 7 days ago
+            ..create_test_memory("2", "Old memory", 1)
         };
-        let old_memory = Memory::from_legacy_item(&old_item);
 
         let recent_score = scorer.calculate_recency_score(&recent_memory, current_time);
         let old_score = scorer.calculate_recency_score(&old_memory, current_time);

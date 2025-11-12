@@ -17,7 +17,7 @@ use crate::fact_extraction::{AdvancedFactExtractor, ExtractedFact, FactExtractor
 use crate::importance_evaluator::{
     ImportanceEvaluation, ImportanceEvaluator, ImportanceEvaluatorConfig,
 };
-use agent_mem_traits::{MemoryV4 as Memory, LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
+use agent_mem_traits::{MemoryV4 as Memory, MetadataV4, LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
 use agent_mem_llm::{factory::RealLLMFactory, LLMProvider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -183,101 +183,90 @@ impl IntelligentMemoryProcessor {
             extracted_facts.truncate(self.config.max_facts_per_message);
         }
 
-        // 5. 冲突检测
-        let new_memories: Vec<MemoryItem> = extracted_facts
+        // 5. 冲突检测 - 转换为 Memory (V4)
+        let new_memories: Vec<Memory> = extracted_facts
             .iter()
-            .map(|fact| MemoryItem {
-                id: uuid::Uuid::new_v4().to_string(),
-                content: fact.content.clone(),
-                hash: None,
-                metadata: fact
-                    .metadata
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect(),
-                score: Some(fact.confidence),
-                created_at: chrono::Utc::now(),
-                updated_at: None,
-                session: Session::default(),
-                memory_type: MemoryType::Episodic,
-                entities: fact
-                    .entities
-                    .iter()
-                    .map(|e| agent_mem_traits::Entity {
-                        id: e.id.clone(),
-                        name: e.name.clone(),
-                        entity_type: format!("{:?}", e.entity_type),
-                        attributes: e
-                            .attributes
-                            .iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect(),
-                    })
-                    .collect(),
-                relations: vec![], // 简化处理，暂时为空
-                agent_id: "default".to_string(),
-                user_id: None,
-                importance: fact.confidence,
-                embedding: None,
-                last_accessed_at: chrono::Utc::now(),
-                access_count: 0,
-                expires_at: None,
-                version: 1,
+            .map(|fact| {
+                use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph};
+
+                let mut attributes = AttributeSet::new();
+                attributes.insert(
+                    AttributeKey::core("agent_id"),
+                    AttributeValue::String("default".to_string())
+                );
+                attributes.insert(
+                    AttributeKey::system("importance"),
+                    AttributeValue::Number(fact.confidence as f64)
+                );
+
+                for (k, v) in &fact.metadata {
+                    attributes.insert(
+                        AttributeKey::user(k.clone()),
+                        AttributeValue::String(v.to_string())
+                    );
+                }
+
+                Memory {
+                    id: MemoryId::new(),
+                    content: Content::Text(fact.content.clone()),
+                    attributes,
+                    relations: RelationGraph::new(),
+                    metadata: MetadataV4 {
+                        created_at: chrono::Utc::now(),
+                        updated_at: chrono::Utc::now(),
+                        accessed_at: chrono::Utc::now(),
+                        access_count: 0,
+                        version: 1,
+                        hash: None,
+                    },
+                }
             })
             .collect();
 
-        // 转换 ExistingMemory 到 MemoryItem
-        let existing_memory_items: Vec<MemoryItem> = existing_memories
+        // 转换 ExistingMemory 到 Memory (V4)
+        let existing_memory_v4: Vec<Memory> = existing_memories
             .iter()
-            .map(|mem| MemoryItem {
-                id: mem.id.clone(),
-                content: mem.content.clone(),
-                hash: None,
-                metadata: mem
-                    .metadata
-                    .iter()
-                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                    .collect(),
-                score: Some(mem.importance),
-                created_at: chrono::DateTime::parse_from_rfc3339(&mem.created_at)
-                    .unwrap_or_else(|_| chrono::Utc::now().into())
-                    .with_timezone(&chrono::Utc),
-                updated_at: mem.updated_at.as_ref().and_then(|s| {
-                    chrono::DateTime::parse_from_rfc3339(s)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&chrono::Utc))
-                }),
-                session: Session::default(),
-                memory_type: MemoryType::Episodic,
-                entities: vec![],
-                relations: vec![],
-                agent_id: "default".to_string(),
-                user_id: None,
-                importance: mem.importance,
-                embedding: None,
-                last_accessed_at: chrono::Utc::now(),
-                access_count: 0,
-                expires_at: None,
-                version: 1,
+            .map(|mem| {
+                use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph};
+
+                let mut attributes = AttributeSet::new();
+                attributes.insert(
+                    AttributeKey::core("agent_id"),
+                    AttributeValue::String("default".to_string())
+                );
+
+                for (k, v) in &mem.metadata {
+                    attributes.insert(
+                        AttributeKey::user(k.clone()),
+                        AttributeValue::String(v.clone())
+                    );
+                }
+
+                Memory {
+                    id: MemoryId::from_string(mem.id.clone()),
+                    content: Content::Text(mem.content.clone()),
+                    attributes,
+                    relations: RelationGraph::new(),
+                    metadata: MetadataV4 {
+                        created_at: chrono::DateTime::parse_from_rfc3339(&mem.created_at)
+                            .unwrap_or_else(|_| chrono::Utc::now().into())
+                            .with_timezone(&chrono::Utc),
+                        updated_at: mem.updated_at.as_ref()
+                            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                            .map(|dt| dt.with_timezone(&chrono::Utc))
+                            .unwrap_or_else(chrono::Utc::now),
+                        accessed_at: chrono::Utc::now(),
+                        access_count: 0,
+                        version: 1,
+                        hash: None,
+                    },
+                }
             })
-            .collect();
-
-        // Convert MemoryItem to MemoryV4 for conflict detection
-        use agent_mem_traits::MemoryV4;
-
-        let new_memories_v4: Vec<MemoryV4> = new_memories
-            .iter()
-            .map(|item| MemoryV4::from_legacy_item(item))
-            .collect();
-
-        let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
-            .iter()
-            .map(|item| MemoryV4::from_legacy_item(item))
             .collect();
 
         let conflict_detections = self
             .conflict_resolver
-            .detect_conflicts(&new_memories_v4, &existing_memories_v4)
+            .detect_conflicts(&new_memories, &existing_memory_v4)
             .await?;
 
         // 6. 生成记忆决策
@@ -349,12 +338,12 @@ impl IntelligentMemoryProcessor {
         // 分析记忆质量
         for memory in existing_memories {
             if memory.importance < 0.3 {
-                report.low_importance_memories.push(memory.id.as_str().to_string());
+                report.low_importance_memories.push(memory.id.clone());
             }
 
             let content_len = memory.content.len();
             if content_len < 20 {
-                report.short_memories.push(memory.id.as_str().to_string());
+                report.short_memories.push(memory.id.clone());
             }
         }
 
@@ -370,7 +359,7 @@ impl IntelligentMemoryProcessor {
                 if similarity > 0.8 {
                     report
                         .duplicate_memories
-                        .push((memory1.id.as_str().to_string(), memory2.id.as_str().to_string()));
+                        .push((memory1.id.clone(), memory2.id.clone()));
                 }
             }
         }

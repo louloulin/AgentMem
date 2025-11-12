@@ -181,11 +181,11 @@ mod tests {
             attributes: AttributeSet::new(),
             relations: RelationGraph::new(),
             metadata: Metadata {
-                created_at: now,
+            created_at: now,
                 updated_at: now,
                 accessed_at: now,
-                access_count: 0,
-                version: 1,
+            access_count: 0,
+            version: 1,
                 hash: None,
             },
         };
