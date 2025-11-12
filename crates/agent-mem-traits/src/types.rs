@@ -157,6 +157,87 @@ impl Message {
 }
 
 /// A memory item stored in the system
+///
+/// # Deprecated
+///
+/// **此结构已弃用，请使用 `MemoryV4` (alias `Memory`) 代替。**
+///
+/// `MemoryItem` 是 V3 架构的遗留类型，将在未来版本中移除。
+/// 新代码应该使用 V4 架构的 `Memory` 类型，它提供了更强大和灵活的抽象：
+///
+/// - **多模态内容**：支持 Text, Structured, Vector, Binary, Multimodal
+/// - **开放属性集**：通过 `AttributeSet` 支持任意扩展
+/// - **关系网络**：通过 `RelationGraph` 管理记忆间的关系
+/// - **类型安全**：更好的类型系统和编译时检查
+///
+/// ## 迁移指南
+///
+/// ### V3 (MemoryItem) → V4 (Memory)
+///
+/// ```rust
+/// use agent_mem_traits::{
+///     AttributeKey, AttributeSet, AttributeValue,
+///     Content, MemoryId, MemoryV4 as Memory,
+///     MetadataV4, RelationGraph,
+/// };
+///
+/// // V3: 使用 MemoryItem
+/// let old_memory = MemoryItem {
+///     id: "mem-123".to_string(),
+///     content: "用户喜欢苹果".to_string(),
+///     agent_id: "agent-1".to_string(),
+///     user_id: Some("user-1".to_string()),
+///     importance: 0.8,
+///     // ... 其他字段
+/// };
+///
+/// // V4: 使用 Memory
+/// let mut attributes = AttributeSet::new();
+/// attributes.insert(
+///     AttributeKey::core("agent_id"),
+///     AttributeValue::String("agent-1".to_string()),
+/// );
+/// attributes.insert(
+///     AttributeKey::core("user_id"),
+///     AttributeValue::String("user-1".to_string()),
+/// );
+/// attributes.insert(
+///     AttributeKey::system("importance"),
+///     AttributeValue::Number(0.8),
+/// );
+///
+/// let new_memory = Memory {
+///     id: MemoryId::from_string("mem-123".to_string()),
+///     content: Content::Text("用户喜欢苹果".to_string()),
+///     attributes,
+///     relations: RelationGraph::new(),
+///     metadata: MetadataV4::default(),
+/// };
+/// ```
+///
+/// ### 转换函数
+///
+/// 如果需要在 V3 和 V4 之间转换，可以使用 `agent_mem_core::v4_migration` 模块：
+///
+/// ```rust
+/// use agent_mem_core::v4_migration::{legacy_to_v4, v4_to_legacy};
+///
+/// // MemoryItem → Memory
+/// let v4_memory = legacy_to_v4(&legacy_item)?;
+///
+/// // Memory → MemoryItem
+/// let legacy_item = v4_to_legacy(&v4_memory);
+/// ```
+///
+/// ## 参考文档
+///
+/// - V4 架构设计：`docs/agentmem91.md`
+/// - Memory V4 API：`agent_mem_traits::abstractions::MemoryV4`
+/// - 迁移指南：`docs/migration/v3_to_v4.md`
+#[deprecated(
+    since = "4.0.0",
+    note = "使用 MemoryV4 (alias Memory) 代替。参见 agent_mem_traits::abstractions::MemoryV4"
+)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryItem {
     pub id: String,

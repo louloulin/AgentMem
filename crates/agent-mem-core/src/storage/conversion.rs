@@ -93,32 +93,44 @@ pub fn memory_to_db(memory: &Memory) -> DbMemory {
 /// Convert Database Memory to V4 Memory
 pub fn db_to_memory(db: &DbMemory) -> Result<Memory> {
     let mut attributes = AttributeSet::new();
-    
-    // 填充核心属性
-    attributes.insert(
-        AttributeKey::core("organization_id"),
-        AttributeValue::String(db.organization_id.clone()),
-    );
-    attributes.insert(
-        AttributeKey::core("user_id"),
-        AttributeValue::String(db.user_id.clone()),
-    );
-    attributes.insert(
-        AttributeKey::core("agent_id"),
-        AttributeValue::String(db.agent_id.clone()),
-    );
-    attributes.insert(
-        AttributeKey::core("memory_type"),
-        AttributeValue::String(db.memory_type.clone()),
-    );
-    attributes.insert(
-        AttributeKey::core("scope"),
-        AttributeValue::String(db.scope.clone()),
-    );
-    attributes.insert(
-        AttributeKey::core("level"),
-        AttributeValue::String(db.level.clone()),
-    );
+
+    // 填充核心属性（只在非空时插入）
+    if !db.organization_id.is_empty() {
+        attributes.insert(
+            AttributeKey::core("organization_id"),
+            AttributeValue::String(db.organization_id.clone()),
+        );
+    }
+    if !db.user_id.is_empty() {
+        attributes.insert(
+            AttributeKey::core("user_id"),
+            AttributeValue::String(db.user_id.clone()),
+        );
+    }
+    if !db.agent_id.is_empty() {
+        attributes.insert(
+            AttributeKey::core("agent_id"),
+            AttributeValue::String(db.agent_id.clone()),
+        );
+    }
+    if !db.memory_type.is_empty() {
+        attributes.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String(db.memory_type.clone()),
+        );
+    }
+    if !db.scope.is_empty() {
+        attributes.insert(
+            AttributeKey::core("scope"),
+            AttributeValue::String(db.scope.clone()),
+        );
+    }
+    if !db.level.is_empty() {
+        attributes.insert(
+            AttributeKey::core("level"),
+            AttributeValue::String(db.level.clone()),
+        );
+    }
     
     // 填充系统属性
     if let Some(score) = db.score {
@@ -147,15 +159,19 @@ pub fn db_to_memory(db: &DbMemory) -> Result<Memory> {
             AttributeValue::String(last_updated_by_id.clone()),
         );
     }
-    
-    // 构造 Metadata
-    let metadata = Metadata {
-        created_at: db.created_at,
-        updated_at: db.updated_at,
-        accessed_at: db.last_accessed.unwrap_or_else(Utc::now),
-        access_count: db.access_count as u32,
-        version: 1,
-        hash: db.hash.clone(),
+
+    // 构造 Metadata（尝试从 JSON 反序列化，失败则使用默认值）
+    let metadata = if let Ok(meta) = serde_json::from_value::<Metadata>(db.metadata.clone()) {
+        meta
+    } else {
+        Metadata {
+            created_at: db.created_at,
+            updated_at: db.updated_at,
+            accessed_at: db.last_accessed.unwrap_or_else(Utc::now),
+            access_count: db.access_count as u32,
+            version: 1,
+            hash: db.hash.clone(),
+        }
     };
     
     // 构造Memory

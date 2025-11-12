@@ -659,7 +659,15 @@ impl Memory {
             AttributeKey::core("importance"),
             AttributeValue::Number(item.importance as f64),
         );
-        
+
+        // Add score if present
+        if let Some(score) = item.score {
+            attributes.set(
+                AttributeKey::system("score"),
+                AttributeValue::Number(score as f64),
+            );
+        }
+
         // Add metadata fields
         for (k, v) in &item.metadata {
             attributes.set(

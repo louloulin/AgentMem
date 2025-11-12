@@ -1,10 +1,60 @@
 #!/bin/bash
 
 # AgentMem 服务器启动脚本 - 禁用认证版本
+# 支持自动构建 server 和 MCP
 
 set -e
 
 cd "$(dirname "$0")"
+
+# 解析命令行参数
+BUILD_SERVER=false
+BUILD_MCP=false
+SKIP_BUILD=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --build-server)
+            BUILD_SERVER=true
+            shift
+            ;;
+        --build-mcp)
+            BUILD_MCP=true
+            shift
+            ;;
+        --build-all)
+            BUILD_SERVER=true
+            BUILD_MCP=true
+            shift
+            ;;
+        --skip-build)
+            SKIP_BUILD=true
+            shift
+            ;;
+        -h|--help)
+            echo "用法: $0 [选项]"
+            echo ""
+            echo "选项:"
+            echo "  --build-server    构建 agent-mem-server"
+            echo "  --build-mcp       构建 MCP 示例"
+            echo "  --build-all       构建所有组件"
+            echo "  --skip-build      跳过构建检查，直接启动"
+            echo "  -h, --help        显示此帮助信息"
+            echo ""
+            echo "示例:"
+            echo "  $0                      # 检查并启动（如需要则自动构建）"
+            echo "  $0 --build-all          # 强制重新构建所有组件"
+            echo "  $0 --build-server       # 仅重新构建 server"
+            echo "  $0 --skip-build         # 跳过构建检查"
+            exit 0
+            ;;
+        *)
+            echo "未知选项: $1"
+            echo "使用 -h 或 --help 查看帮助"
+            exit 1
+            ;;
+    esac
+done
 
 echo "🔧 配置 ONNX Runtime 库路径"
 
@@ -24,7 +74,37 @@ fi
 
 echo "✅ 找到 ONNX Runtime 1.22.0 库"
 
+# 构建检查和编译
+if [ "$SKIP_BUILD" = false ]; then
+    echo ""
+    echo "📦 检查构建状态..."
+
+    # 检查 server 是否需要构建
+    if [ "$BUILD_SERVER" = true ] || [ ! -f "./target/release/agent-mem-server" ]; then
+        echo ""
+        echo "🔨 构建 agent-mem-server..."
+        cargo build --release --bin agent-mem-server --exclude agent-mem-python
+        echo "✅ agent-mem-server 构建完成"
+    else
+        echo "✅ agent-mem-server 已存在"
+    fi
+
+    # 检查 MCP 示例是否需要构建
+    if [ "$BUILD_MCP" = true ]; then
+        echo ""
+        echo "🔨 构建 MCP 示例..."
+        if cargo build --release --example mcp-stdio-server 2>&1 | grep -q "Finished"; then
+            echo "✅ MCP 示例构建完成"
+        else
+            echo "⚠️  MCP 示例构建失败或不存在"
+        fi
+    fi
+else
+    echo "⏭️  跳过构建检查"
+fi
+
 # 停止旧进程
+echo ""
 echo "🛑 停止旧的服务进程..."
 pkill -f "agent-mem-server" 2>/dev/null || true
 sleep 2
