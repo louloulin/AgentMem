@@ -177,6 +177,75 @@ impl FullTextSearchEngine {
     }
 }
 
+// ============================================================================
+// SearchEngine Trait 实现 (V4)
+// ============================================================================
+
+use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use async_trait::async_trait;
+
+#[async_trait]
+impl SearchEngine for FullTextSearchEngine {
+    /// 执行搜索查询（V4 Query 接口）
+    async fn search(&self, query: &Query) -> Result<Vec<agent_mem_traits::SearchResultV4>> {
+        // 1. 提取查询文本
+        let query_text = match &query.intent {
+            QueryIntent::NaturalLanguage { text, .. } => text.clone(),
+            QueryIntent::Hybrid { intents, .. } => {
+                // 从混合查询中提取自然语言意图
+                intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::NaturalLanguage { text, .. } = intent {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_default()
+            }
+            _ => {
+                return Err(AgentMemError::validation_error(
+                    format!("Unsupported query intent for FullTextSearchEngine: {:?}. Use NaturalLanguage or Hybrid intent.", query.intent)
+                ));
+            }
+        };
+
+        // 2. 转换 Query V4 到 SearchQuery
+        let mut search_query = SearchQuery::from_query_v4(query);
+        search_query.query = query_text;
+
+        // 3. 执行全文搜索（使用现有的 search 方法）
+        let (results, _elapsed) = self.search(&search_query).await?;
+
+        // 4. 转换 SearchResult 到 SearchResultV4
+        let v4_results = results.into_iter()
+            .map(|r| agent_mem_traits::SearchResultV4 {
+                id: r.id,
+                content: r.content,
+                score: r.score,
+                vector_score: r.vector_score,
+                fulltext_score: r.fulltext_score,
+                metadata: r.metadata,
+            })
+            .collect();
+
+        Ok(v4_results)
+    }
+
+    /// 获取引擎名称
+    fn name(&self) -> &str {
+        "FullTextSearchEngine"
+    }
+
+    /// 获取支持的查询意图类型
+    fn supported_intents(&self) -> Vec<QueryIntentType> {
+        vec![
+            QueryIntentType::NaturalLanguage, // 主要支持自然语言查询
+            QueryIntentType::Hybrid, // 也支持混合查询（提取文本部分）
+        ]
+    }
+}
+
 /// 全文搜索统计信息
 #[derive(Debug, Clone)]
 pub struct FullTextSearchStats {

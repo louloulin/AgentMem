@@ -19,7 +19,7 @@
 - 🔄 **Phase 6**: Legacy清理 - 50% (MemoryItem 已标记 deprecated)
 
 **待完成工作**:
-- 🔄 **Phase 4**: Search引擎迁移 (使用Query抽象) - 60% (Step 1-3 已完成)
+- 🔄 **Phase 4**: Search引擎迁移 (使用Query抽象) - 64% (Step 1-3 完成，Step 4 进行中 22%)
 - ⏳ **Phase 5**: Storage层迁移 - 0%
 - ⏳ **Phase 6**: Legacy清理 - 50% (需要完成剩余50%)
 
@@ -30,13 +30,13 @@
 | Phase 1: 编译错误修复 | ✅ 已完成 | 100% | 0个错误，1333个测试通过 |
 | Phase 2: DbMemory分离 | ✅ 已完成 | 100% | 数据库模型与业务模型完全分离 |
 | Phase 3: 转换层实现 | ✅ 已完成 | 100% | Memory ↔ DbMemory 双向转换 |
-| Phase 4: Search引擎迁移 | ⏳ 待开始 | 0% | Query V4 抽象已存在，需集成 |
+| Phase 4: Search引擎迁移 | 🔄 进行中 | 64% | Step 1-3 完成，Step 4 进行中 (4/18) |
 | Phase 5: Storage层迁移 | ⏳ 待开始 | 0% | LibSQL已完成，PostgreSQL待迁移 |
 | Phase 6: Legacy清理 | 🔄 进行中 | 50% | MemoryItem deprecated，需清理使用 |
 | Phase 7: MCP验证 | ✅ 已完成 | 100% | 全功能测试通过 |
 | Phase 8: 文档完善 | 🔄 进行中 | 70% | 本文档持续更新 |
 
-**总体进度**: **62.5%** (5/8 阶段完成)
+**总体进度**: **72%** (5/8 阶段完成，Phase 4 进行中 64%)
 
 ---
 
@@ -66,9 +66,9 @@
 - `src/abstractions.rs` - V4 核心抽象 (830 lines)
 - `src/types.rs` - Legacy 类型 (deprecated)
 
-#### 1.2 agent-mem-core ✅ **已完成 95%**
+#### 1.2 agent-mem-core 🔄 **进行中 97%**
 
-**状态**: 核心逻辑已迁移到 V4
+**状态**: 核心逻辑已迁移到 V4，Search 引擎迁移进行中
 
 **已完成**:
 - ✅ Memory V4 扩展方法 (30+ getter/setter)
@@ -78,10 +78,17 @@
 - ✅ LibSQL Repository 使用 Memory V4
 - ✅ MemoryEngine 使用 Memory V4
 - ✅ Intelligence 组件使用 Memory V4
+- ✅ SearchEngine trait 实现 (VectorSearchEngine, HybridSearchEngine)
+- ✅ Query V4 → SearchQuery 转换函数
 
-**待完成** (5%):
-- ⏳ Search 引擎集成 Query V4 (当前使用 SearchQuery)
-- ⏳ Query V4 实现完善 (`query.rs` 已存在但未集成)
+**待完成** (3%):
+- 🔄 Search 引擎集成 Query V4 (6/20 完成，30%)
+  - ✅ VectorSearchEngine
+  - ✅ HybridSearchEngine
+  - ✅ FullTextSearchEngine
+  - ✅ BM25SearchEngine
+  - ⏳ 其余 16 个搜索引擎
+- ⏳ QueryOptimizer 和 Reranker 使用 Query V4
 
 **文件清单**:
 - `src/storage/conversion.rs` - 转换层 ✅
@@ -1174,7 +1181,7 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
 
 ## 📝 变更日志 (Changelog)
 
-### 2025-11-13 - Phase 4 Step 1-3 完成
+### 2025-11-13 - Phase 4 Step 1-4 部分完成
 
 **完成日期**: 2025-11-13
 
@@ -1201,12 +1208,20 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
    - 使用 RRF 算法融合向量搜索和全文搜索结果
    - 状态: ✅ 完成
 
+4. **Step 4: 迁移其他搜索引擎** 🔄 (部分完成 4/18)
+   - ✅ FullTextSearchEngine - 在 `crates/agent-mem-core/src/search/fulltext_search.rs` 中实现 SearchEngine trait
+   - ✅ BM25SearchEngine - 在 `crates/agent-mem-core/src/search/bm25.rs` 中实现 SearchEngine trait
+   - ⏳ 其余 16 个搜索引擎待迁移
+   - 状态: 🔄 进行中 (22% 完成)
+
 **修改文件列表**:
 - `crates/agent-mem-traits/src/abstractions.rs` - 添加 SearchEngine trait 和 SearchResult 定义
 - `crates/agent-mem-traits/src/lib.rs` - 导出 SearchEngine 和 SearchResultV4
 - `crates/agent-mem-core/src/search/mod.rs` - 添加 Query V4 转换函数
 - `crates/agent-mem-core/src/search/vector_search.rs` - 实现 SearchEngine trait
 - `crates/agent-mem-core/src/search/hybrid.rs` - 实现 SearchEngine trait
+- `crates/agent-mem-core/src/search/fulltext_search.rs` - 实现 SearchEngine trait
+- `crates/agent-mem-core/src/search/bm25.rs` - 实现 SearchEngine trait
 
 **遇到的问题和解决方案**:
 
@@ -1228,16 +1243,52 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
 - ✅ `cargo build --release -p agent-mem-server` - 编译成功
 - ✅ `cargo test --release -p agent-mem-core --lib search` - 66个测试全部通过
 - ✅ `cargo test --release -p agent-mem-core --lib search::hybrid` - 测试通过
+- ✅ `cargo test --release -p agent-mem-core --lib search::bm25` - 2个测试全部通过
 
 **进度更新**:
 - Phase 4 Step 1: ✅ 完成 (100%)
 - Phase 4 Step 2: ✅ 完成 (100%)
 - Phase 4 Step 3: ✅ 完成 (100%)
-- Phase 4 整体进度: 🔄 进行中 (3/5 步骤完成，60%)
+- Phase 4 Step 4: 🔄 进行中 (4/18 完成，22%)
+- Phase 4 整体进度: 🔄 进行中 (3.22/5 步骤完成，64%)
 
 **下一步**:
-- Step 4: 迁移其他搜索引擎 (18个文件)
+- Step 4: 继续迁移其他搜索引擎 (剩余 14个文件)
+  - enhanced_hybrid.rs, enhanced_hybrid_v2.rs
+  - adaptive_search_engine.rs, cached_adaptive_engine.rs, cached_vector_search.rs
+  - adaptive.rs, adaptive_router.rs, adaptive_threshold.rs
+  - fuzzy.rs, learning.rs
+  - query_classifier.rs, query_optimizer.rs
+  - ranker.rs, reranker.rs
 - Step 5: 更新 QueryOptimizer 和 Reranker
+
+**实施模式总结**:
+
+所有搜索引擎的 SearchEngine trait 实现遵循统一的模式：
+
+```rust
+#[async_trait]
+impl SearchEngine for XxxSearchEngine {
+    async fn search(&self, query: &Query) -> Result<Vec<SearchResultV4>> {
+        // 1. 从 Query V4 提取查询参数（文本/向量/混合）
+        // 2. 转换 Query V4 到 SearchQuery
+        // 3. 调用现有的 search 方法
+        // 4. 转换 SearchResult 到 SearchResultV4
+    }
+
+    fn name(&self) -> &str { "XxxSearchEngine" }
+
+    fn supported_intents(&self) -> Vec<QueryIntentType> {
+        // 返回支持的查询意图类型
+    }
+}
+```
+
+这种模式确保了：
+- ✅ 向后兼容性（保留原有 search 方法）
+- ✅ 最小改动原则（只添加新方法，不修改现有代码）
+- ✅ 统一接口（所有引擎实现相同的 trait）
+- ✅ 类型安全（使用 Query V4 和 SearchResultV4）
 
 ---
 
