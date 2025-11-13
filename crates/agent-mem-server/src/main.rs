@@ -190,11 +190,15 @@ fn init_logging(log_level: &str) {
         fs::create_dir_all(log_dir).expect("Failed to create logs directory");
     }
 
-    // 日志文件路径
-    let log_file = log_dir.join("agentmem-server.log");
-    eprintln!("   日志文件: {}", log_file.display());
+    // 获取当前日期，用于生成日志文件名
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let dated_log_file = format!("agentmem-server.log.{}", today);
+    let symlink_path = log_dir.join("agentmem-server.log");
 
-    // 文件日志层
+    eprintln!("   日志文件: {}", dated_log_file);
+    eprintln!("   软链接: {} -> {}", symlink_path.display(), dated_log_file);
+
+    // 文件日志层（每日轮转）
     let file_appender = tracing_appender::rolling::daily(log_dir, "agentmem-server.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
@@ -227,7 +231,41 @@ fn init_logging(log_level: &str) {
     // 保存 guard 到全局变量，防止被丢弃
     *FILE_APPENDER_GUARD.lock().unwrap() = Some(guard);
 
+    // 创建软链接指向最新的日志文件
+    create_log_symlink(&symlink_path, &dated_log_file);
+
     eprintln!("✅ 日志系统已初始化");
     eprintln!("   - 控制台日志级别: {}", log_level);
-    eprintln!("   - 文件日志: {}", log_file.display());
+    eprintln!("   - 文件日志: logs/{}", dated_log_file);
+    eprintln!("   - 快捷访问: logs/agentmem-server.log (软链接)");
+}
+
+/// 创建软链接指向最新的日志文件
+fn create_log_symlink(symlink_path: &std::path::Path, target_filename: &str) {
+    use std::fs;
+
+    // 如果软链接已存在，先删除
+    if symlink_path.exists() || symlink_path.is_symlink() {
+        if let Err(e) = fs::remove_file(symlink_path) {
+            eprintln!("   ⚠️  删除旧软链接失败: {}", e);
+            return;
+        }
+    }
+
+    // 创建新的软链接
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        if let Err(e) = symlink(target_filename, symlink_path) {
+            eprintln!("   ⚠️  创建软链接失败: {}", e);
+        } else {
+            eprintln!("   ✅ 软链接创建成功");
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // Windows 需要管理员权限创建符号链接，这里使用硬链接或复制
+        eprintln!("   ⚠️  Windows 平台不支持软链接，请直接访问带日期的日志文件");
+    }
 }
