@@ -34,24 +34,32 @@ impl MemoryManager {
         embedder_provider: Option<String>,
         embedder_model: Option<String>,
     ) -> ServerResult<Self> {
+        use tracing::warn;
+
+        info!("========================================");
+        info!("🧠 初始化 Memory 组件");
+        info!("========================================");
+
         // 🔧 修复：使用builder模式显式指定LibSQL存储，而不是默认的内存存储
         let db_path =
             std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
 
-        info!("Initializing Memory with LibSQL storage: {}", db_path);
+        info!("📦 配置存储层");
+        info!("  - 数据库类型: LibSQL (SQLite)");
+        info!("  - 数据库路径: {}", db_path);
 
         let mut builder = Memory::builder().with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
 
         // 🔑 关键修复 #2：配置Embedder（P0问题）
-        if let (Some(provider), Some(model)) = (embedder_provider, embedder_model) {
-            info!(
-                "Configuring embedder: provider={}, model={}",
-                provider, model
-            );
+        info!("🔌 配置 Embedder (向量嵌入)");
+        if let (Some(provider), Some(model)) = (embedder_provider.clone(), embedder_model.clone()) {
+            info!("  - Provider: {}", provider);
+            info!("  - Model: {}", model);
             builder = builder.with_embedder(provider, model);
         } else {
             // 使用默认FastEmbed配置
-            info!("No embedder config provided, using default FastEmbed");
+            info!("  - Provider: fastembed (默认)");
+            info!("  - Model: BAAI/bge-small-en-v1.5");
             builder = builder.with_embedder("fastembed", "BAAI/bge-small-en-v1.5");
         }
 
@@ -59,16 +67,24 @@ impl MemoryManager {
         // 修复: 之前向量只在内存中，重启后丢失
         // 注意: LanceDB需要协议前缀 "lancedb://"，路径需要以.lance结尾
         let vector_store_url = "lancedb://./data/vectors.lance";
-        info!("Configuring vector store: {}", vector_store_url);
+        info!("📊 配置向量存储");
+        info!("  - 类型: LanceDB");
+        info!("  - 路径: {}", vector_store_url);
         builder = builder.with_vector_store(vector_store_url);
+
+        info!("⏳ 构建 Memory 实例...");
+        warn!("⚠️  首次运行时，FastEmbed 会下载模型文件（约 100MB）");
+        warn!("⚠️  这可能需要几分钟时间，请耐心等待...");
+        warn!("⚠️  下载进度不会显示，但程序正在运行中");
 
         let memory = builder.build().await.map_err(|e| {
             ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e))
         })?;
 
-        info!("Memory initialized successfully with LibSQL persistence");
+        info!("✅ Memory 实例构建成功");
 
         // 🆕 Fix 2: 初始化QueryOptimizer和Reranker
+        info!("🔍 初始化搜索优化组件...");
         let query_optimizer = {
             use std::sync::RwLock;
             let stats = Arc::new(RwLock::new(
@@ -79,7 +95,10 @@ impl MemoryManager {
 
         let reranker = agent_mem_core::search::ResultReranker::with_default_config();
 
-        info!("✅ QueryOptimizer and Reranker initialized");
+        info!("✅ QueryOptimizer 和 Reranker 初始化完成");
+        info!("========================================");
+        info!("✅ Memory 组件初始化完成！");
+        info!("========================================");
 
         Ok(Self {
             memory: Arc::new(memory),

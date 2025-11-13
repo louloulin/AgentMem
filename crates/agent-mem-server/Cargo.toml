@@ -41,7 +41,8 @@ reqwest = { version = "0.11", features = ["json"] }
 
 # Logging and tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-appender = "0.2"
 
 # Error handling
 anyhow = "1.0"
