@@ -1,14 +1,10 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Home } from "lucide-react";
 
-// Disable static generation for this page
-export const dynamic = 'force-dynamic';
-
-// 分离使用useSearchParams的组件
 function NotFoundContent() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">

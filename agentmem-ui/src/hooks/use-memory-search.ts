@@ -34,7 +34,7 @@ export function useMemorySearch({
   const [memories, setMemories] = useState<MemoryDisplayItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastQuery, setLastQuery] = useState('');
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const searchMemories = useCallback(async (query: string) => {
     // Don't search if disabled or query is empty/unchanged

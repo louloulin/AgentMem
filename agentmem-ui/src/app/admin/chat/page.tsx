@@ -1,12 +1,12 @@
 /**
  * Chat Interface Page
- * 
+ *
  * Provides a chat interface to interact with agents.
  */
 
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Send, Bot, User, Loader2, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -29,7 +29,8 @@ interface Message {
   isStreaming?: boolean; // 标识是否正在流式接收
 }
 
-export default function ChatPage() {
+// 内部组件：使用 useSearchParams
+function ChatPageInner() {
   const searchParams = useSearchParams();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
@@ -649,4 +650,18 @@ function MessageBubble({ message }: MessageBubbleProps) {
   );
 }
 
-
+// 导出组件：使用 Suspense 包裹
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600 dark:text-gray-400">Loading chat...</p>
+        </div>
+      </div>
+    }>
+      <ChatPageInner />
+    </Suspense>
+  );
+}

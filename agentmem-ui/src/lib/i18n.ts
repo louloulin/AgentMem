@@ -63,6 +63,7 @@ export interface TranslationKeys {
     docs: string;
     demo: string;
     about: string;
+    solutions: string;
     pricing: string;
     blog: string;
     support: string;

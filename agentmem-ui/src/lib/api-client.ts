@@ -85,6 +85,7 @@ export interface AgentStateResponse {
 export interface ChatMessageRequest {
   message: string;
   user_id?: string;
+  session_id?: string;
   stream?: boolean;
   metadata?: Record<string, unknown>;
 }

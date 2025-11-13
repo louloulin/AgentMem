@@ -28,6 +28,8 @@ const nextConfig: NextConfig = {
     // 即使有警告也继续构建
     ignoreDuringBuilds: true,
   },
+  // 输出配置
+  output: 'standalone',
 };
 
 export default nextConfig;
