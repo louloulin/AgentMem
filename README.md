@@ -651,6 +651,102 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ 提供开箱即用的智能体验
 - ✅ 用户仍可通过 `infer: false` 禁用（向后兼容）
 
+---
+
+### 🆕 Memory V4 架构
+
+AgentMem 4.0 引入了全新的 **Memory V4 架构**，提供更强大和灵活的记忆管理能力：
+
+#### 核心特性
+
+| 特性 | V3 (MemoryItem) | V4 (Memory) |
+|------|----------------|-------------|
+| **内容类型** | 仅文本 | 多模态 (Text, Structured, Vector, Binary, Multimodal) |
+| **元数据** | 固定字段 | 开放属性系统 (AttributeSet with namespaces) |
+| **关系** | 简单列表 | 关系图谱 (RelationGraph) |
+| **查询** | 字符串查询 | 强类型查询 (Query V4) |
+
+#### 快速开始
+
+```rust
+use agent_mem::{MemoryV4, Content, AttributeSet, AttributeKey, AttributeValue};
+
+// 创建多模态记忆
+let memory = MemoryV4 {
+    id: Default::default(),
+    content: Content::Text("用户喜欢披萨".to_string()),
+    attributes: AttributeSet::new()
+        .with(AttributeKey::user("user_id"), AttributeValue::String("U123".to_string()))
+        .with(AttributeKey::system("importance"), AttributeValue::Number(0.8))
+        .with(AttributeKey::domain("category"), AttributeValue::String("preference".to_string())),
+    relations: Default::default(),
+    metadata: Default::default(),
+};
+```
+
+#### 多模态内容支持
+
+```rust
+// 文本内容
+let text_memory = MemoryV4 {
+    content: Content::Text("这是文本".to_string()),
+    // ...
+};
+
+// 结构化数据
+let structured_memory = MemoryV4 {
+    content: Content::Structured(json!({
+        "type": "user_profile",
+        "name": "张三",
+        "preferences": ["coffee", "tea"]
+    })),
+    // ...
+};
+
+// 向量数据
+let vector_memory = MemoryV4 {
+    content: Content::Vector(vec![0.1, 0.2, 0.3, /* ... */]),
+    // ...
+};
+
+// 多模态内容
+let multimodal_memory = MemoryV4 {
+    content: Content::Multimodal(vec![
+        Content::Text("图片描述".to_string()),
+        Content::Binary(image_data),
+    ]),
+    // ...
+};
+```
+
+#### 强类型查询
+
+```rust
+use agent_mem::{Query, QueryIntent, Constraint, ComparisonOperator};
+
+// 简单查询
+let query = Query::from_string("查找披萨相关的记忆");
+
+// 结构化查询
+let query = Query::new(QueryIntent::natural_language("查找披萨"))
+    .with_constraint(Constraint::Attribute {
+        key: AttributeKey::user("preference"),
+        operator: ComparisonOperator::Equals,
+        value: AttributeValue::String("pizza".to_string()),
+    })
+    .with_limit(10);
+```
+
+#### 迁移指南
+
+- 📖 [V3 到 V4 迁移指南](docs/migration/v3_to_v4.md)
+- 📖 [Memory V4 最佳实践](docs/guides/memory-v4-best-practices.md)
+- 📖 [API 参考文档](docs/api/memory-v4.md)
+
+**注意**: V3 API (`MemoryItem`) 仍然可用但已标记为 `deprecated`，建议新项目使用 Memory V4。
+
+---
+
 **P1 新功能: 灵活的 MemoryScope** 🆕
 
 支持多种记忆隔离模式，适用于不同的应用场景：

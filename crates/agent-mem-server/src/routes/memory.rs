@@ -6,6 +6,8 @@
 //! - 统一的接口
 //! - 自动的智能功能
 //! - 更好的类型处理
+//!
+//! 注意：本模块内部使用 MemoryItem 用于向后兼容，未来版本将迁移到 Memory V4
 
 use crate::{
     error::{ServerError, ServerResult},
@@ -15,6 +17,9 @@ use crate::{
     },
 };
 use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions};
+
+// 内部使用 MemoryItem 用于向后兼容（已废弃，未来将迁移到 Memory V4）
+#[allow(deprecated)]
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
 use std::sync::Arc;

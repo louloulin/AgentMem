@@ -149,7 +149,7 @@ impl BatchOperations {
     }
 
     /// Batch insert memories
-    pub async fn batch_insert_memories(&self, memories: &[Memory]) -> CoreResult<u64> {
+    pub async fn batch_insert_memories(&self, memories: &[DbMemory]) -> CoreResult<u64> {
         if memories.is_empty() {
             return Ok(0);
         }

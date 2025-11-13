@@ -37,7 +37,7 @@ impl OptimizedBatchOperations {
     /// - Allows database-level optimizations
     ///
     /// Performance: ~2-3x faster than looping inserts
-    pub async fn batch_insert_memories_optimized(&self, memories: &[Memory]) -> CoreResult<u64> {
+    pub async fn batch_insert_memories_optimized(&self, memories: &[DbMemory]) -> CoreResult<u64> {
         if memories.is_empty() {
             return Ok(0);
         }
@@ -55,7 +55,7 @@ impl OptimizedBatchOperations {
     }
 
     /// Insert a chunk of memories using a single multi-row INSERT
-    async fn insert_memory_chunk(&self, chunk: &[Memory]) -> CoreResult<u64> {
+    async fn insert_memory_chunk(&self, chunk: &[DbMemory]) -> CoreResult<u64> {
         let pool = self.pool.clone();
         let chunk = chunk.to_vec();
 

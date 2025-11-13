@@ -33,6 +33,8 @@ pub mod hybrid_manager;
 #[cfg(feature = "postgres")]
 pub mod memory_repository;
 #[cfg(feature = "postgres")]
+pub mod postgres_memory_repository;
+#[cfg(feature = "postgres")]
 pub mod memory_tables_migration;
 #[cfg(feature = "postgres")]
 pub mod message_repository;

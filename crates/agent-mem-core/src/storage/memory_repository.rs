@@ -107,10 +107,10 @@ impl MemoryRepository {
         agent_id: &str,
         scope: &str,
         limit: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND scope = $2 AND is_deleted = FALSE
@@ -134,10 +134,10 @@ impl MemoryRepository {
         agent_id: &str,
         level: &str,
         limit: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND level = $2 AND is_deleted = FALSE
@@ -161,10 +161,10 @@ impl MemoryRepository {
         agent_id: &str,
         query: &str,
         limit: Option<i64>,
-    ) -> CoreResult<Vec<Memory>> {
+    ) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 
@@ -185,8 +185,8 @@ impl MemoryRepository {
     }
 
     /// Get most important memories
-    pub async fn get_most_important(&self, agent_id: &str, limit: i64) -> CoreResult<Vec<Memory>> {
-        let results = sqlx::query_as::<_, Memory>(
+    pub async fn get_most_important(&self, agent_id: &str, limit: i64) -> CoreResult<Vec<DbMemory>> {
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND is_deleted = FALSE
@@ -210,8 +210,8 @@ impl MemoryRepository {
         &self,
         agent_id: &str,
         limit: i64,
-    ) -> CoreResult<Vec<Memory>> {
-        let results = sqlx::query_as::<_, Memory>(
+    ) -> CoreResult<Vec<DbMemory>> {
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE agent_id = $1 AND is_deleted = FALSE AND last_accessed IS NOT NULL
@@ -251,7 +251,7 @@ impl MemoryRepository {
     }
 
     /// Batch create memories
-    pub async fn batch_create(&self, memories: &[Memory]) -> CoreResult<Vec<Memory>> {
+    pub async fn batch_create(&self, memories: &[DbMemory]) -> CoreResult<Vec<DbMemory>> {
         let mut created_memories = Vec::new();
 
         for memory in memories {
@@ -319,9 +319,9 @@ impl MemoryRepository {
 }
 
 #[async_trait]
-impl Repository<Memory> for MemoryRepository {
-    async fn create(&self, memory: &Memory) -> CoreResult<Memory> {
-        let result = sqlx::query_as::<_, Memory>(
+impl Repository<DbMemory> for MemoryRepository {
+    async fn create(&self, memory: &DbMemory) -> CoreResult<DbMemory> {
+        let result = sqlx::query_as::<_, DbMemory>(
             r#"
             INSERT INTO memories (
                 id, organization_id, user_id, agent_id, content,
@@ -360,8 +360,8 @@ impl Repository<Memory> for MemoryRepository {
         Ok(result)
     }
 
-    async fn read(&self, id: &str) -> CoreResult<Option<Memory>> {
-        let result = sqlx::query_as::<_, Memory>(
+    async fn read(&self, id: &str) -> CoreResult<Option<DbMemory>> {
+        let result = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE id = $1 AND is_deleted = FALSE
@@ -375,8 +375,8 @@ impl Repository<Memory> for MemoryRepository {
         Ok(result)
     }
 
-    async fn update(&self, memory: &Memory) -> CoreResult<Memory> {
-        let result = sqlx::query_as::<_, Memory>(
+    async fn update(&self, memory: &DbMemory) -> CoreResult<DbMemory> {
+        let result = sqlx::query_as::<_, DbMemory>(
             r#"
             UPDATE memories
             SET content = $2, hash = $3, metadata = $4, score = $5,
@@ -435,11 +435,11 @@ impl Repository<Memory> for MemoryRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn list(&self, limit: Option<i64>, offset: Option<i64>) -> CoreResult<Vec<Memory>> {
+    async fn list(&self, limit: Option<i64>, offset: Option<i64>) -> CoreResult<Vec<DbMemory>> {
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
 
-        let results = sqlx::query_as::<_, Memory>(
+        let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories
             WHERE is_deleted = FALSE
