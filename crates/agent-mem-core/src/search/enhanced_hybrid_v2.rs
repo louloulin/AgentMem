@@ -518,6 +518,80 @@ impl EnhancedHybridSearchEngine {
     }
 }
 
+// ============================================================================
+// SearchEngine Trait 实现 (V4)
+// ============================================================================
+
+use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use async_trait::async_trait;
+
+#[async_trait]
+impl SearchEngine for EnhancedHybridSearchEngine {
+    /// 执行搜索查询（V4 Query 接口）
+    async fn search(&self, query: &Query) -> Result<Vec<agent_mem_traits::SearchResultV4>> {
+        // 1. 提取查询文本
+        let query_text = match &query.intent {
+            QueryIntent::NaturalLanguage { text, .. } => text.clone(),
+            QueryIntent::Hybrid { intents, .. } => {
+                // 从混合查询中提取自然语言意图
+                intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::NaturalLanguage { text, .. } = intent {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_default()
+            }
+            QueryIntent::Vector { .. } => {
+                // V2 引擎需要文本查询
+                return Err(AgentMemError::validation_error(
+                    "EnhancedHybridSearchEngineV2 requires text query. Use NaturalLanguage or Hybrid intent with text."
+                ));
+            }
+            _ => {
+                return Err(AgentMemError::validation_error(
+                    format!("Unsupported query intent for EnhancedHybridSearchEngineV2: {:?}", query.intent)
+                ));
+            }
+        };
+
+        // 2. 提取 limit 参数
+        let limit = super::SearchQuery::from_query_v4(query).limit;
+
+        // 3. 执行搜索（使用现有的 search 方法）
+        let enhanced_result = self.search(&query_text, limit).await?;
+
+        // 4. 转换 SearchResult 到 SearchResultV4
+        let v4_results = enhanced_result.results.into_iter()
+            .map(|r| agent_mem_traits::SearchResultV4 {
+                id: r.id,
+                content: r.content,
+                score: r.score,
+                vector_score: r.vector_score,
+                fulltext_score: r.fulltext_score,
+                metadata: r.metadata,
+            })
+            .collect();
+
+        Ok(v4_results)
+    }
+
+    /// 获取引擎名称
+    fn name(&self) -> &str {
+        "EnhancedHybridSearchEngineV2"
+    }
+
+    /// 获取支持的查询意图类型
+    fn supported_intents(&self) -> Vec<QueryIntentType> {
+        vec![
+            QueryIntentType::NaturalLanguage, // 主要支持自然语言查询
+            QueryIntentType::Hybrid, // 也支持混合查询（提取文本部分）
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

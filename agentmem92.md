@@ -19,7 +19,7 @@
 - 🔄 **Phase 6**: Legacy清理 - 50% (MemoryItem 已标记 deprecated)
 
 **待完成工作**:
-- 🔄 **Phase 4**: Search引擎迁移 (使用Query抽象) - 64% (Step 1-3 完成，Step 4 进行中 22%)
+- 🔄 **Phase 4**: Search引擎迁移 (使用Query抽象) - 67% (Step 1-3 完成，Step 4 进行中 33%)
 - ⏳ **Phase 5**: Storage层迁移 - 0%
 - ⏳ **Phase 6**: Legacy清理 - 50% (需要完成剩余50%)
 
@@ -30,13 +30,13 @@
 | Phase 1: 编译错误修复 | ✅ 已完成 | 100% | 0个错误，1333个测试通过 |
 | Phase 2: DbMemory分离 | ✅ 已完成 | 100% | 数据库模型与业务模型完全分离 |
 | Phase 3: 转换层实现 | ✅ 已完成 | 100% | Memory ↔ DbMemory 双向转换 |
-| Phase 4: Search引擎迁移 | 🔄 进行中 | 64% | Step 1-3 完成，Step 4 进行中 (4/18) |
+| Phase 4: Search引擎迁移 | 🔄 进行中 | 67% | Step 1-3 完成，Step 4 进行中 (6/18) |
 | Phase 5: Storage层迁移 | ⏳ 待开始 | 0% | LibSQL已完成，PostgreSQL待迁移 |
 | Phase 6: Legacy清理 | 🔄 进行中 | 50% | MemoryItem deprecated，需清理使用 |
 | Phase 7: MCP验证 | ✅ 已完成 | 100% | 全功能测试通过 |
 | Phase 8: 文档完善 | 🔄 进行中 | 70% | 本文档持续更新 |
 
-**总体进度**: **72%** (5/8 阶段完成，Phase 4 进行中 64%)
+**总体进度**: **73%** (5/8 阶段完成，Phase 4 进行中 67%)
 
 ---
 
@@ -82,12 +82,14 @@
 - ✅ Query V4 → SearchQuery 转换函数
 
 **待完成** (3%):
-- 🔄 Search 引擎集成 Query V4 (6/20 完成，30%)
+- 🔄 Search 引擎集成 Query V4 (8/20 完成，40%)
   - ✅ VectorSearchEngine
   - ✅ HybridSearchEngine
   - ✅ FullTextSearchEngine
   - ✅ BM25SearchEngine
-  - ⏳ 其余 16 个搜索引擎
+  - ✅ EnhancedHybridSearchEngine
+  - ✅ EnhancedHybridSearchEngineV2
+  - ⏳ 其余 14 个搜索引擎（部分为辅助组件）
 - ⏳ QueryOptimizer 和 Reranker 使用 Query V4
 
 **文件清单**:
@@ -1208,11 +1210,13 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
    - 使用 RRF 算法融合向量搜索和全文搜索结果
    - 状态: ✅ 完成
 
-4. **Step 4: 迁移其他搜索引擎** 🔄 (部分完成 4/18)
+4. **Step 4: 迁移其他搜索引擎** 🔄 (部分完成 6/18)
    - ✅ FullTextSearchEngine - 在 `crates/agent-mem-core/src/search/fulltext_search.rs` 中实现 SearchEngine trait
    - ✅ BM25SearchEngine - 在 `crates/agent-mem-core/src/search/bm25.rs` 中实现 SearchEngine trait
-   - ⏳ 其余 16 个搜索引擎待迁移
-   - 状态: 🔄 进行中 (22% 完成)
+   - ✅ EnhancedHybridSearchEngine - 在 `crates/agent-mem-core/src/search/enhanced_hybrid.rs` 中实现 SearchEngine trait
+   - ✅ EnhancedHybridSearchEngineV2 - 在 `crates/agent-mem-core/src/search/enhanced_hybrid_v2.rs` 中实现 SearchEngine trait
+   - ⏳ 其余 14 个搜索引擎待迁移（需要特殊处理的泛型引擎）
+   - 状态: 🔄 进行中 (33% 完成)
 
 **修改文件列表**:
 - `crates/agent-mem-traits/src/abstractions.rs` - 添加 SearchEngine trait 和 SearchResult 定义
@@ -1222,6 +1226,8 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
 - `crates/agent-mem-core/src/search/hybrid.rs` - 实现 SearchEngine trait
 - `crates/agent-mem-core/src/search/fulltext_search.rs` - 实现 SearchEngine trait
 - `crates/agent-mem-core/src/search/bm25.rs` - 实现 SearchEngine trait
+- `crates/agent-mem-core/src/search/enhanced_hybrid.rs` - 实现 SearchEngine trait
+- `crates/agent-mem-core/src/search/enhanced_hybrid_v2.rs` - 实现 SearchEngine trait
 
 **遇到的问题和解决方案**:
 
@@ -1249,18 +1255,39 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
 - Phase 4 Step 1: ✅ 完成 (100%)
 - Phase 4 Step 2: ✅ 完成 (100%)
 - Phase 4 Step 3: ✅ 完成 (100%)
-- Phase 4 Step 4: 🔄 进行中 (4/18 完成，22%)
-- Phase 4 整体进度: 🔄 进行中 (3.22/5 步骤完成，64%)
+- Phase 4 Step 4: 🔄 进行中 (6/18 完成，33%)
+- Phase 4 整体进度: 🔄 进行中 (3.33/5 步骤完成，67%)
 
 **下一步**:
-- Step 4: 继续迁移其他搜索引擎 (剩余 14个文件)
-  - enhanced_hybrid.rs, enhanced_hybrid_v2.rs
-  - adaptive_search_engine.rs, cached_adaptive_engine.rs, cached_vector_search.rs
-  - adaptive.rs, adaptive_router.rs, adaptive_threshold.rs
-  - fuzzy.rs, learning.rs
-  - query_classifier.rs, query_optimizer.rs
-  - ranker.rs, reranker.rs
+- Step 4: 继续迁移其他搜索引擎 (剩余 12个文件)
+  - ⚠️ **需要特殊处理的泛型引擎**:
+    - adaptive_search_engine.rs (泛型 `AdaptiveSearchEngine<S>`)
+    - cached_adaptive_engine.rs (泛型 `CachedAdaptiveEngine<S>`)
+    - cached_vector_search.rs (条件编译 `#[cfg(feature = "redis-cache")]`)
+  - ⏳ **辅助组件** (可能不需要 SearchEngine trait):
+    - adaptive.rs (AdaptiveSearchOptimizer, SearchReranker)
+    - adaptive_router.rs (AdaptiveRouter)
+    - adaptive_threshold.rs (AdaptiveThresholdCalculator)
+    - fuzzy.rs (FuzzyMatchEngine)
+    - learning.rs (LearningEngine)
+    - query_classifier.rs (QueryClassifier)
+    - query_optimizer.rs (QueryOptimizer)
+    - ranker.rs (Ranker)
+    - reranker.rs (Reranker)
 - Step 5: 更新 QueryOptimizer 和 Reranker
+
+**技术挑战分析**:
+
+1. **泛型搜索引擎**: `AdaptiveSearchEngine<S>` 和 `CachedAdaptiveEngine<S>` 使用泛型参数 `S: SearchEngineBackend`
+   - 需要为泛型类型实现 SearchEngine trait
+   - 可能需要添加 trait bound: `where S: SearchEngineBackend + SearchEngine`
+
+2. **条件编译**: `CachedVectorSearchEngine` 使用 `#[cfg(feature = "redis-cache")]`
+   - 需要确保在不同 feature 配置下都能编译
+
+3. **辅助组件**: 很多文件是辅助组件而非独立的搜索引擎
+   - 需要评估哪些组件需要实现 SearchEngine trait
+   - 哪些只是内部使用的工具类
 
 **实施模式总结**:
 

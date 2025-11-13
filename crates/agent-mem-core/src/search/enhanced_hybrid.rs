@@ -220,6 +220,102 @@ impl EnhancedHybridSearchEngine {
     }
 }
 
+// ============================================================================
+// SearchEngine Trait 实现 (V4)
+// ============================================================================
+
+use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use async_trait::async_trait;
+
+#[async_trait]
+impl SearchEngine for EnhancedHybridSearchEngine {
+    /// 执行搜索查询（V4 Query 接口）
+    async fn search(&self, query: &Query) -> Result<Vec<agent_mem_traits::SearchResultV4>> {
+        // 1. 提取查询向量和文本
+        let (query_vector, query_text) = match &query.intent {
+            QueryIntent::Hybrid { intents, .. } => {
+                // 从混合查询中提取向量和文本
+                let vector = intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::Vector { embedding } = intent {
+                            Some(embedding.clone())
+                        } else {
+                            None
+                        }
+                    });
+
+                let text = intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::NaturalLanguage { text, .. } = intent {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_default();
+
+                let vector = vector.ok_or_else(|| agent_mem_traits::AgentMemError::validation_error(
+                    "Hybrid query must contain at least one Vector intent"
+                ))?;
+
+                (vector, text)
+            }
+            QueryIntent::Vector { embedding } => {
+                // 纯向量查询
+                (embedding.clone(), String::new())
+            }
+            QueryIntent::NaturalLanguage { text, .. } => {
+                // 纯文本查询需要先生成 embedding
+                return Err(agent_mem_traits::AgentMemError::validation_error(
+                    "EnhancedHybridSearchEngine requires pre-computed embedding for vector search. Use QueryIntent::Hybrid with both Vector and NaturalLanguage intents."
+                ));
+            }
+            _ => {
+                return Err(agent_mem_traits::AgentMemError::validation_error(
+                    format!("Unsupported query intent for EnhancedHybridSearchEngine: {:?}", query.intent)
+                ));
+            }
+        };
+
+        // 2. 转换 Query V4 到 SearchQuery
+        let mut search_query = SearchQuery::from_query_v4(query);
+        // 确保查询文本被设置
+        if !query_text.is_empty() {
+            search_query.query = query_text;
+        }
+
+        // 3. 执行增强混合搜索（使用现有的 search 方法）
+        let results = self.search(query_vector, search_query).await?;
+
+        // 4. 转换 SearchResult 到 SearchResultV4
+        let v4_results = results.into_iter()
+            .map(|r| agent_mem_traits::SearchResultV4 {
+                id: r.id,
+                content: r.content,
+                score: r.score,
+                vector_score: r.vector_score,
+                fulltext_score: r.fulltext_score,
+                metadata: r.metadata,
+            })
+            .collect();
+
+        Ok(v4_results)
+    }
+
+    /// 获取引擎名称
+    fn name(&self) -> &str {
+        "EnhancedHybridSearchEngine"
+    }
+
+    /// 获取支持的查询意图类型
+    fn supported_intents(&self) -> Vec<QueryIntentType> {
+        vec![
+            QueryIntentType::Hybrid, // 主要支持混合查询
+            QueryIntentType::Vector, // 也支持纯向量查询
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
