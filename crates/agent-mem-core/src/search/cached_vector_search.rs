@@ -161,6 +161,76 @@ impl CachedVectorSearchEngine {
     }
 }
 
+// ============================================================================
+// SearchEngine Trait 实现 (V4)
+// ============================================================================
+
+use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use async_trait::async_trait;
+
+#[async_trait]
+impl SearchEngine for CachedVectorSearchEngine {
+    /// 执行搜索查询（V4 Query 接口）
+    async fn search(&self, query: &Query) -> Result<Vec<agent_mem_traits::SearchResultV4>> {
+        // 1. 提取查询向量
+        let query_vector = match &query.intent {
+            QueryIntent::Vector { embedding } => embedding.clone(),
+            QueryIntent::Hybrid { intents, .. } => {
+                // 从混合查询中提取向量意图
+                intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::Vector { embedding } = intent {
+                            Some(embedding.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| agent_mem_traits::AgentMemError::validation_error(
+                        "Hybrid query must contain at least one Vector intent"
+                    ))?
+            }
+            _ => {
+                return Err(agent_mem_traits::AgentMemError::validation_error(
+                    format!("Unsupported query intent for CachedVectorSearchEngine: {:?}. Use Vector or Hybrid intent.", query.intent)
+                ));
+            }
+        };
+
+        // 2. 转换 Query V4 到 SearchQuery
+        let search_query = SearchQuery::from_query_v4(query);
+
+        // 3. 执行缓存向量搜索（使用现有的 search 方法）
+        let (results, _elapsed) = self.search(query_vector, &search_query).await?;
+
+        // 4. 转换 SearchResult 到 SearchResultV4
+        let v4_results = results.into_iter()
+            .map(|r| agent_mem_traits::SearchResultV4 {
+                id: r.id,
+                content: r.content,
+                score: r.score,
+                vector_score: r.vector_score,
+                fulltext_score: r.fulltext_score,
+                metadata: r.metadata,
+            })
+            .collect();
+
+        Ok(v4_results)
+    }
+
+    /// 获取引擎名称
+    fn name(&self) -> &str {
+        "CachedVectorSearchEngine"
+    }
+
+    /// 获取支持的查询意图类型
+    fn supported_intents(&self) -> Vec<QueryIntentType> {
+        vec![
+            QueryIntentType::Vector, // 主要支持向量查询
+            QueryIntentType::Hybrid, // 也支持混合查询（提取向量部分）
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
