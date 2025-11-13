@@ -317,7 +317,7 @@ let part: String = chars[0..1].iter().collect();
 ## 🙏 致谢
 
 - **使用工具：** Cursor + Playwright MCP
-- **LLM Provider：** Zhipu AI (glm-4-plus)
+- **LLM Provider：** Zhipu AI (glm-4.6)
 - **Embedding：** FastEmbed (multilingual-e5-small)
 - **Framework：** Next.js 15, React 18, Rust, Axum
 

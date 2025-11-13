@@ -31,7 +31,7 @@ default_provider = "zhipu"
 
 [llm.zhipu]
 api_key = "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
-model = "glm-4-plus"
+model = "glm-4.6"
 base_url = "https://open.bigmodel.cn/api/paas/v4"
 max_tokens = 4096
 temperature = 0.7
@@ -45,7 +45,7 @@ temperature = 0.7
 ```bash
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 ```
 
 ✅ **启动脚本正确**
@@ -100,7 +100,7 @@ curl http://localhost:8080/health
 ```
 ✅ ZHIPU_API_KEY=99a311...*** (已设置)
 ✅ LLM_PROVIDER=zhipu
-✅ LLM_MODEL=glm-4-plus
+✅ LLM_MODEL=glm-4.6
 ✅ EMBEDDER_PROVIDER=fastembed
 ✅ EMBEDDER_MODEL=BAAI/bge-small-en-v1.5
 ✅ ENABLE_AUTH=false
@@ -154,7 +154,7 @@ curl -X POST http://localhost:8080/api/v1/chat \
 |--------|-----|------|
 | Zhipu API Key | `99a311...***` | ✅ 已配置 |
 | LLM Provider | `zhipu` | ✅ 已配置 |
-| LLM Model | `glm-4-plus` | ✅ 已配置 |
+| LLM Model | `glm-4.6` | ✅ 已配置 |
 | Base URL | `https://open.bigmodel.cn/api/paas/v4` | ✅ 已配置 |
 | Embedder Provider | `fastembed` | ✅ 已配置 |
 | Embedder Model | `BAAI/bge-small-en-v1.5` | ✅ 已配置 |

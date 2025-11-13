@@ -36,7 +36,7 @@
 | 服务器 | agent-mem-server (v0.1.0) |
 | 数据库 | LibSQL (data/agentmem.db) |
 | Agent ID | `agent-7bd801e2-c8da-42e4-b10f-c2ef7f610235` |
-| LLM Provider | Zhipu AI (GLM-4-Plus) |
+| LLM Provider | Zhipu AI (glm-4.6) |
 | Session ID | `test-session-1762123949` |
 | User ID | `user-test-working-memory` |
 

@@ -371,7 +371,7 @@ impl LLMProvider for ZhipuProvider {
 ```toml
 [llm.zhipu]
 api_key = "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
-model = "glm-4-plus"
+model = "glm-4.6"
 base_url = "https://open.bigmodel.cn/api/paas/v4"
 max_tokens = 4096
 temperature = 0.7

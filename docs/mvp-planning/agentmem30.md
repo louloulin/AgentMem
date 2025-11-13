@@ -1219,7 +1219,7 @@ cargo test --package agent-mem --test intelligence_real_test -- --ignored --noca
     - 更新测试优先级（Zhipu > OpenAI > Anthropic > Ollama）
     - 添加自动配置检测（ZHIPU_API_KEY）
     - 修复 ExtractedFact 和 Entity 的 metadata/attributes 类型
-    - 支持 glm-4-plus 模型
+    - 支持 glm-4.6 模型
   - [x] **修复智谱 AI 多值实体类型解析问题** ✅ (commit 1736774)
     - 在 clean_json_response() 中添加 entity_type 多值处理
     - 将 "Language|Technology" 拆分为 "Language"（取第一个值）

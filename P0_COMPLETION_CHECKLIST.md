@@ -43,7 +43,7 @@
 - [x] 验证降级策略
 
 **验证环境**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (multilingual-e5-small, 384维)
 - 代理: http://127.0.0.1:4780
 

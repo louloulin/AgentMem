@@ -1134,7 +1134,7 @@ LLM Provider 自动选择流程:
     ↓
 1. 优先级 1: 智谱 AI (Zhipu)
    检查: ZHIPU_API_KEY 环境变量
-   模型: glm-4-plus
+   模型: glm-4.6
    成功 → 使用
    失败 → 下一个
     ↓

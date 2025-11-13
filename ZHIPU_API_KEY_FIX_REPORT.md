@@ -122,7 +122,7 @@ let api_key = match provider.to_lowercase().as_str() {
 ```bash
 export ZHIPU_API_KEY="your-zhipu-api-key"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 ```
 
 ### 2. 重启服务
@@ -140,7 +140,7 @@ pkill -f "agent-mem-server"
 
 启动后应该看到：
 ```
-✅ 成功创建 LLM Provider: zhipu (glm-4-plus)
+✅ 成功创建 LLM Provider: zhipu (glm-4.6)
 ```
 
 而不是：

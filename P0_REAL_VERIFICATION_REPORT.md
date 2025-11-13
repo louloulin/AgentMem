@@ -7,7 +7,7 @@
 - **操作系统**: macOS
 - **Rust 版本**: 1.x
 - **代理设置**: http://127.0.0.1:4780
-- **LLM Provider**: Zhipu AI (glm-4-plus)
+- **LLM Provider**: Zhipu AI (glm-4.6)
 - **Embedder**: FastEmbed (multilingual-e5-small, 384维)
 - **ZHIPU API Key**: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 

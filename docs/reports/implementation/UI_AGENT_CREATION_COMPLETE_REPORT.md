@@ -29,7 +29,7 @@
 ```typescript
 // 1. LLM配置状态
 const [llmProvider, setLlmProvider] = useState('zhipu');
-const [llmModel, setLlmModel] = useState('glm-4-plus');
+const [llmModel, setLlmModel] = useState('glm-4.6');
 const [showAdvanced, setShowAdvanced] = useState(true);
 
 // 2. LLM Provider选择器
@@ -49,11 +49,11 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   id="llmModel"
   value={llmModel}
   onChange={(e) => setLlmModel(e.target.value)}
-  placeholder="e.g., glm-4-plus"
+  placeholder="e.g., glm-4.6"
 />
 
 // 4. 智能推荐提示
-{llmProvider === 'zhipu' && 'Recommended: glm-4-plus, glm-4'}
+{llmProvider === 'zhipu' && 'Recommended: glm-4.6, glm-4'}
 {llmProvider === 'openai' && 'Recommended: gpt-4, gpt-3.5-turbo'}
 ...
 ```
@@ -161,10 +161,10 @@ pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
 {
   "id": "agent-a23bfd10-b1be-4848-8b4e-f3d34f4aae0e",
   "name": "智谱AI助手",
-  "description": "使用Zhipu GLM-4-Plus的智能助手",
+  "description": "使用Zhipu glm-4.6的智能助手",
   "llm_config": {
     "provider": "zhipu",
-    "model": "glm-4-plus"
+    "model": "glm-4.6"
   }
 }
 ```
@@ -268,7 +268,7 @@ http://localhost:3001/admin/agents
 **步骤4**: 配置LLM
 - 展开"LLM Configuration"区域（默认已展开）
 - Provider: 选择`zhipu` / `openai` / `anthropic` / `deepseek`
-- Model: 输入模型名称（如`glm-4-plus`）
+- Model: 输入模型名称（如`glm-4.6`）
 - 查看智能推荐提示
 
 **步骤5**: 创建Agent
@@ -287,7 +287,7 @@ http://localhost:3001/admin/agents
 ```bash
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export EMBEDDER_PROVIDER="fastembed"
 export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 ```
@@ -363,10 +363,10 @@ curl -X POST http://localhost:8080/api/v1/agents \
   -H "X-Organization-ID: default-org" \
   -d '{
     "name": "我的AI助手",
-    "description": "使用Zhipu GLM-4-Plus",
+    "description": "使用Zhipu glm-4.6",
     "llm_config": {
       "provider": "zhipu",
-      "model": "glm-4-plus"
+      "model": "glm-4.6"
     }
   }'
 ```

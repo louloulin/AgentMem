@@ -342,7 +342,7 @@ export EMBEDDER_MODEL=${EMBEDDER_MODEL:-"BAAI/bge-small-en-v1.5"}
 # 配置 LLM Provider (可选)
 # 支持的 Provider: openai, zhipu, ollama 等
 # export LLM_PROVIDER="zhipu"
-# export LLM_MODEL="glm-4-plus"
+# export LLM_MODEL="glm-4.6"
 # export ZHIPU_API_KEY="your_api_key_here"
 #
 # 或使用 OpenAI:
@@ -419,7 +419,7 @@ export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 # 配置 LLM Provider (智谱 AI)
 export ZHIPU_API_KEY="your_zhipu_api_key_here"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 
 # 🔓 禁用认证（用于测试）
 export ENABLE_AUTH="false"
@@ -528,7 +528,7 @@ export NEXT_PUBLIC_API_URL=http://your-server-ip:8080
 使用智谱 AI:
 ```bash
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export ZHIPU_API_KEY="your_api_key_here"
 ```
 
@@ -578,7 +578,7 @@ cd server
 export EMBEDDER_PROVIDER="fastembed"
 export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export ZHIPU_API_KEY="your_api_key_here"
 export ENABLE_AUTH="false"  # 禁用认证（测试用）
 ./start.sh
@@ -616,6 +616,16 @@ WorkingDirectory=/opt/agentmem/server
 Environment="RUST_LOG=info"
 Environment="SERVER_HOST=0.0.0.0"
 Environment="SERVER_PORT=8080"
+Environment="DATABASE_URL=sqlite://agentmem.db"
+Environment="LD_LIBRARY_PATH=/opt/agentmem/server/lib"
+Environment="ORT_DYLIB_PATH=/opt/agentmem/server/lib/libonnxruntime.so.1.22.0"
+Environment="EMBEDDER_PROVIDER=fastembed"
+Environment="EMBEDDER_MODEL=BAAI/bge-small-en-v1.5"
+Environment="ENABLE_AUTH=true"
+# 可选: LLM 配置
+# Environment="LLM_PROVIDER=zhipu"
+# Environment="LLM_MODEL=glm-4.6"
+# Environment="ZHIPU_API_KEY=your_api_key_here"
 ExecStart=/opt/agentmem/server/agent-mem-server
 Restart=always
 

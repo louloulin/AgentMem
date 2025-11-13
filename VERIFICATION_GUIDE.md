@@ -37,7 +37,7 @@ export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib"
 ```bash
 export ZHIPU_API_KEY="your-api-key-here"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 ```
 
 #### OpenAI
@@ -122,7 +122,7 @@ export http_proxy=http://127.0.0.1:4780
 export https_proxy=http://127.0.0.1:4780
 export ZHIPU_API_KEY="your-api-key-here"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export EMBEDDER_PROVIDER="fastembed"
 export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 
@@ -184,7 +184,7 @@ export HTTPS_PROXY=http://127.0.0.1:4780
 # 设置 LLM Provider
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 
 # 设置 Embedder
 export EMBEDDER_PROVIDER="fastembed"

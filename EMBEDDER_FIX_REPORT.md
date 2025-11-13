@@ -65,7 +65,7 @@ export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 # 配置 LLM Provider
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 ```
 
 #### 更新脚本
@@ -89,7 +89,7 @@ export LLM_MODEL="glm-4-plus"
 | `ORT_DYLIB_PATH` | `lib/libonnxruntime.1.22.0.dylib` | ONNX Runtime 库路径 |
 | `DYLD_LIBRARY_PATH` | `lib:target/release` | 动态库搜索路径 (macOS) |
 | `LLM_PROVIDER` | `zhipu` | LLM 提供商 |
-| `LLM_MODEL` | `glm-4-plus` | LLM 模型名称 |
+| `LLM_MODEL` | `glm-4.6` | LLM 模型名称 |
 | `RUST_BACKTRACE` | `1` | Rust 错误回溯 |
 
 ### 配置优先级

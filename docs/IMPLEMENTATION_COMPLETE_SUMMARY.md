@@ -222,7 +222,7 @@ cd agentmem-ui && npm run dev
 **Agent**:
 - ID: `agent-6812f152-16c0-4637-8fc0-714efee147f3`
 - 名称: "Just Test Agent"
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 
 **Session**:
 - ID: `ui-test-1762175032`

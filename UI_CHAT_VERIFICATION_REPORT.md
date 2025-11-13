@@ -20,7 +20,7 @@
 - 认证: 已禁用（测试模式）
 
 **配置**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (BAAI/bge-small-en-v1.5)
 - API Key: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 - 代理: http://127.0.0.1:4780

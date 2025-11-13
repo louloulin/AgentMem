@@ -41,7 +41,7 @@ export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 # 配置 LLM Provider
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 
 # 服务器配置
 export ENABLE_AUTH="false"

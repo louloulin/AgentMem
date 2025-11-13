@@ -39,7 +39,7 @@ pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {
    - 填写Name和Description
    - **展开"LLM Configuration"区域**
    - 选择Provider: `zhipu`
-   - 输入Model: `glm-4-plus`
+   - 输入Model: `glm-4.6`
    - 点击"Create Agent"
 
 3. **在聊天页面使用新Agent**:
@@ -56,10 +56,10 @@ curl -X POST http://localhost:8080/api/v1/agents \
   -H "X-Organization-ID: default-org" \
   -d '{
     "name": "智谱AI助手",
-    "description": "使用Zhipu GLM-4-Plus的智能助手",
+    "description": "使用Zhipu glm-4.6的智能助手",
     "llm_config": {
       "provider": "zhipu",
-      "model": "glm-4-plus"
+      "model": "glm-4.6"
     }
   }'
 ```
@@ -79,7 +79,7 @@ curl -X PATCH http://localhost:8080/api/v1/agents/{agent_id} \
   -d '{
     "llm_config": {
       "provider": "zhipu",
-      "model": "glm-4-plus"
+      "model": "glm-4.6"
     }
   }'
 ```
@@ -113,7 +113,7 @@ curl -X PATCH http://localhost:8080/api/v1/agents/{agent_id} \
 ```typescript
 // CreateAgentDialog组件增强
 const [llmProvider, setLlmProvider] = useState('zhipu');
-const [llmModel, setLlmModel] = useState('glm-4-plus');
+const [llmModel, setLlmModel] = useState('glm-4.6');
 
 // 提交时包含LLM配置
 const llm_config = llmProvider && llmModel ? {
@@ -140,7 +140,7 @@ curl -s http://localhost:8080/api/v1/agents/{agent_id} \
 ```json
 {
   "provider": "zhipu",
-  "model": "glm-4-plus"
+  "model": "glm-4.6"
 }
 ```
 
@@ -176,7 +176,7 @@ curl -X POST http://localhost:8080/api/v1/agents/{agent_id}/chat \
 ```bash
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export EMBEDDER_PROVIDER="fastembed"
 export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
 ```
@@ -215,7 +215,7 @@ for agent_id in $(上面的ID列表); do
     -H "Content-Type: application/json" \
     -H "X-User-ID: test-user" \
     -H "X-Organization-ID: default-org" \
-    -d '{"llm_config": {"provider": "zhipu", "model": "glm-4-plus"}}'
+    -d '{"llm_config": {"provider": "zhipu", "model": "glm-4.6"}}'
 done
 ```
 
@@ -230,9 +230,9 @@ agent-a23bfd10-b1be-4848-8b4e-f3d34f4aae0e
 
 **配置详情**:
 - Name: 智谱AI助手
-- Description: 使用Zhipu GLM-4-Plus的智能助手
+- Description: 使用Zhipu glm-4.6的智能助手
 - LLM Provider: zhipu
-- LLM Model: glm-4-plus
+- LLM Model: glm-4.6
 
 **直接测试链接**:
 ```

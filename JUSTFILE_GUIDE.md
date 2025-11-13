@@ -335,7 +335,7 @@ RUST_BACKTRACE=1
 
 # LLM 配置
 LLM_PROVIDER=zhipu
-LLM_MODEL=glm-4-plus
+LLM_MODEL=glm-4.6
 ZHIPU_API_KEY=<your-api-key>
 
 # Embedder 配置

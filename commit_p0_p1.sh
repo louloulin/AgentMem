@@ -64,7 +64,7 @@ P0 优化（API 易用性）:
 - 对标 Mem0 的默认行为（infer=True），提升用户体验
 - 用户从 5 行代码减少到 1 行代码即可使用智能功能
 - 所有测试通过（12/12 默认行为测试 + 17/17 智能组件测试）
-- 真实验证通过（使用 Zhipu AI glm-4-plus）
+- 真实验证通过（使用 Zhipu AI glm-4.6）
 - 向后兼容性良好（用户仍可通过 infer: false 禁用智能功能）
 
 P1 优化（Session 管理灵活性）:
@@ -85,7 +85,7 @@ P1 优化（Session 管理灵活性）:
 
 总代码改动: ~180 行新增，2 行修改
 测试结果: 33/33 通过
-验证环境: Zhipu AI (glm-4-plus) + FastEmbed
+验证环境: Zhipu AI (glm-4.6) + FastEmbed
 实施耗时: 约 1.5 小时
 
 Breaking Changes: 无

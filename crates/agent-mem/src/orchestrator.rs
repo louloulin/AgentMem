@@ -523,7 +523,7 @@ impl MemoryOrchestrator {
                 
                 // 检测 Zhipu
                 if let Ok(zhipu_key) = std::env::var("ZHIPU_API_KEY") {
-                    let zhipu_model = std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4-plus".to_string());
+                    let zhipu_model = std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4.6".to_string());
                     info!("✅ 检测到 ZHIPU_API_KEY，自动切换到 zhipu provider");
                     return Self::create_llm_provider_with_config("zhipu", &zhipu_model, Some(zhipu_key)).await;
                 }

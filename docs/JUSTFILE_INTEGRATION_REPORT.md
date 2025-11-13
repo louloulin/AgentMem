@@ -189,7 +189,7 @@ export RUST_BACKTRACE := "1"
 
 # LLM 配置
 export LLM_PROVIDER := "zhipu"
-export LLM_MODEL := "glm-4-plus"
+export LLM_MODEL := "glm-4.6"
 export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 
 # Embedder 配置

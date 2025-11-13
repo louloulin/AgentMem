@@ -166,7 +166,7 @@ curl -X PUT "http://localhost:8080/api/v1/agents/agent-6812f152-16c0-4637-8fc0-7
     "name": "Just Test Agent",
     "llm_config": {
       "provider": "zhipu",
-      "model": "glm-4-plus",
+      "model": "glm-4.6",
       "api_key": "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k",
       "temperature": 0.7,
       "max_tokens": 2000
@@ -178,7 +178,7 @@ curl -X PUT "http://localhost:8080/api/v1/agents/agent-6812f152-16c0-4637-8fc0-7
 
 **LLM 配置**:
 - Provider: zhipu
-- Model: glm-4-plus
+- Model: glm-4.6
 - Temperature: 0.7
 - Max Tokens: 2000
 

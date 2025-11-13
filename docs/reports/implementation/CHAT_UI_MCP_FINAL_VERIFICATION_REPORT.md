@@ -31,7 +31,7 @@ Backend API: http://localhost:8080 (✅ Running)
 Frontend UI: http://localhost:3001 (✅ Running)  
 Agent: Working Memory Test Agent
 Agent ID: agent-7bd801e2-c8da-42e4-b10f-c2ef7f610235
-LLM: Zhipu AI (GLM-4-Plus)
+LLM: Zhipu AI (glm-4.6)
 Database: LibSQL (data/agentmem.db)
 ```
 

@@ -43,7 +43,7 @@ print_success "代理已设置: $http_proxy"
 print_step "设置 LLM Provider..."
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 print_success "LLM Provider: $LLM_PROVIDER ($LLM_MODEL)"
 
 # 设置 Embedder

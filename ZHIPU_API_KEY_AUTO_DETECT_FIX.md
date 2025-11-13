@@ -60,7 +60,7 @@ if let Some(key) = api_key {
     // 3. 自动检测其他可用的 provider
     if let Ok(zhipu_key) = env::var("ZHIPU_API_KEY") {
         // 自动切换到 zhipu
-        return create_llm_provider_with_config("zhipu", "glm-4-plus", Some(zhipu_key));
+        return create_llm_provider_with_config("zhipu", "glm-4.6", Some(zhipu_key));
     }
     // 继续检测其他 provider...
 }
@@ -144,7 +144,7 @@ pkill -f "agent-mem-server"
 ```
 INFO 当前 provider (openai) 的 API Key 未找到，尝试自动检测其他可用的 provider
 INFO ✅ 检测到 ZHIPU_API_KEY，自动切换到 zhipu provider
-INFO 成功创建 LLM Provider: zhipu (glm-4-plus)
+INFO 成功创建 LLM Provider: zhipu (glm-4.6)
 ```
 
 而不是：
@@ -159,7 +159,7 @@ WARN LLM API Key 未配置，LLM Provider 将不可用
 
 | Provider | 环境变量 | 默认 Model |
 |----------|---------|-----------|
-| Zhipu | `ZHIPU_API_KEY` | `glm-4-plus` |
+| Zhipu | `ZHIPU_API_KEY` | `glm-4.6` |
 | OpenAI | `OPENAI_API_KEY` | `gpt-4` |
 | Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-20241022` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` |

@@ -1,5 +1,5 @@
 //! Zhipu AI (智谱AI) LLM提供商实现
-//! 支持 GLM-4, GLM-4-Plus, GLM-4-Air 等模型
+//! 支持 GLM-4, glm-4.6, GLM-4-Air 等模型
 
 use agent_mem_traits::llm::{FunctionCall, FunctionCallResponse, FunctionDefinition};
 use agent_mem_traits::{

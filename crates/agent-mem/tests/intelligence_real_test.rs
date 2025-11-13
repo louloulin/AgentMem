@@ -33,7 +33,7 @@ async fn create_llm_provider() -> Option<Arc<dyn agent_mem_traits::LLMProvider +
         println!("🔧 使用智谱 AI (Zhipu) Provider");
         let config = LLMConfig {
             provider: "zhipu".to_string(),
-            model: "glm-4-plus".to_string(),
+            model: "glm-4.6".to_string(),
             api_key: Some(api_key),
             base_url: Some("https://open.bigmodel.cn/api/paas/v4".to_string()),
             temperature: Some(0.7),

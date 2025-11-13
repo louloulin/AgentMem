@@ -346,7 +346,7 @@ function CreateAgentDialog({ onClose, onCreate }: CreateAgentDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [llmProvider, setLlmProvider] = useState('zhipu');
-  const [llmModel, setLlmModel] = useState('glm-4-plus');
+  const [llmModel, setLlmModel] = useState('glm-4.6');
   const [showAdvanced, setShowAdvanced] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -421,11 +421,11 @@ function CreateAgentDialog({ onClose, onCreate }: CreateAgentDialogProps) {
                     id="llmModel"
                     value={llmModel}
                     onChange={(e) => setLlmModel(e.target.value)}
-                    placeholder="e.g., glm-4-plus"
+                    placeholder="e.g., glm-4.6"
                     className="text-sm"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {llmProvider === 'zhipu' && 'Recommended: glm-4-plus, glm-4'}
+                    {llmProvider === 'zhipu' && 'Recommended: glm-4.6, glm-4'}
                     {llmProvider === 'openai' && 'Recommended: gpt-4, gpt-3.5-turbo'}
                     {llmProvider === 'anthropic' && 'Recommended: claude-3-opus, claude-3-sonnet'}
                     {llmProvider === 'deepseek' && 'Recommended: deepseek-chat'}

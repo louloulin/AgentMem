@@ -77,7 +77,7 @@ impl Default for AddMemoryOptions {
 #### 3. 真实验证
 
 **验证环境**:
-- LLM Provider: Zhipu AI (glm-4-plus)
+- LLM Provider: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (BAAI/bge-small-en-v1.5)
 - API Key: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 - 代理: http://127.0.0.1:4780
@@ -364,7 +364,7 @@ cargo test --package agent-mem --test p1_session_flexibility_test
 ### 4. 真实验证
 
 **验证环境**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (BAAI/bge-small-en-v1.5)
 - API Key: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 
@@ -464,7 +464,7 @@ cargo check --package agent-mem
    
    总代码改动: ~180 行新增，2 行修改
    测试结果: 33/33 通过
-   验证环境: Zhipu AI (glm-4-plus) + FastEmbed"
+   验证环境: Zhipu AI (glm-4.6) + FastEmbed"
    ```
 
 2. **更新 README.md**:

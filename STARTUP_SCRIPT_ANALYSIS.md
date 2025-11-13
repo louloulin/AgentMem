@@ -29,7 +29,7 @@ at ChatPage.useCallback[handleStreamingMessage] (page.tsx:206:23)
 # 配置 LLM Provider (Zhipu AI)
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 
 # 配置 Embedder
 export EMBEDDER_PROVIDER="fastembed"
@@ -105,7 +105,7 @@ export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib"
 # LLM 配置 (Zhipu AI)
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 export LLM_BASE_URL="https://open.bigmodel.cn/api/paas/v4"
 
 # Embedder 配置

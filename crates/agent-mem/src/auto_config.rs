@@ -65,7 +65,7 @@ impl AutoConfig {
     fn detect_llm_provider() -> Option<(String, String)> {
         // 检测智谱 AI (Zhipu)
         if env::var("ZHIPU_API_KEY").is_ok() {
-            let model = env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4-plus".to_string());
+            let model = env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4.6".to_string());
             return Some(("zhipu".to_string(), model));
         }
 

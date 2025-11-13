@@ -155,7 +155,7 @@ cargo test --package agent-mem --test default_behavior_test
 ```
 
 **验证环境**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (multilingual-e5-small, 384维)
 - 代理: http://127.0.0.1:4780
 - API Key: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k

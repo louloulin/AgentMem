@@ -43,7 +43,7 @@
 **配置**:
 - 数据库: LibSQL at `./data/agentmem.db`
 - 端口: 8080
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - CORS: 已启用
 
 **验证结果**:

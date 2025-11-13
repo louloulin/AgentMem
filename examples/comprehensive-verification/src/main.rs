@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 设置环境变量
     env::set_var("ZHIPU_API_KEY", "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k");
     env::set_var("LLM_PROVIDER", "zhipu");
-    env::set_var("LLM_MODEL", "glm-4-plus");
+    env::set_var("LLM_MODEL", "glm-4.6");
     env::set_var("EMBEDDER_PROVIDER", "fastembed");
     env::set_var("EMBEDDER_MODEL", "BAAI/bge-small-en-v1.5");
     env::set_var("http_proxy", "http://127.0.0.1:4780");

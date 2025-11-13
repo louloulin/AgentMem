@@ -36,7 +36,7 @@ AGENT_RESPONSE=$(curl -s -X POST "$API_URL/api/v1/agents" \
     "description": "使用Zhipu AI的智能助手",
     "llm_config": {
       "provider": "zhipu",
-      "model": "glm-4-plus"
+      "model": "glm-4.6"
     }
   }')
 

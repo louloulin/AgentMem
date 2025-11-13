@@ -234,7 +234,7 @@ POST /api/v1/agents
 {
   "name": "最终测试助手",
   "description": "用于完整功能验证",
-  "llm_config": {"provider": "zhipu", "model": "glm-4-plus"}
+  "llm_config": {"provider": "zhipu", "model": "glm-4.6"}
 }
 ```
 

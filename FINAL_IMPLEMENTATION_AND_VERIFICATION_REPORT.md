@@ -188,7 +188,7 @@ cargo test --package agent-mem --test orchestrator_intelligence_test
 ### 2. 真实环境验证
 
 **环境**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (BAAI/bge-small-en-v1.5)
 - API Key: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 
@@ -298,7 +298,7 @@ cargo run
 
 ### 真实验证环境
 
-- **LLM**: Zhipu AI (glm-4-plus)
+- **LLM**: Zhipu AI (glm-4.6)
 - **Embedder**: FastEmbed (BAAI/bge-small-en-v1.5)
 - **API Key**: 99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k
 - **代理**: http://127.0.0.1:4780

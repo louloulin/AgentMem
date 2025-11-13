@@ -122,7 +122,7 @@ echo "✅ Embedder配置: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
 # 配置 LLM Provider (Zhipu AI)
 export ZHIPU_API_KEY="99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 export LLM_PROVIDER="zhipu"
-export LLM_MODEL="glm-4-plus"
+export LLM_MODEL="glm-4.6"
 
 # 🔓 禁用认证（用于测试）
 export ENABLE_AUTH="false"

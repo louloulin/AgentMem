@@ -55,7 +55,7 @@ test result: ok. 12 passed; 0 failed; 0 ignored
 #### 2. 真实验证（4/4 通过）
 
 **环境**:
-- LLM: Zhipu AI (glm-4-plus)
+- LLM: Zhipu AI (glm-4.6)
 - Embedder: FastEmbed (multilingual-e5-small, 384维)
 - 代理: http://127.0.0.1:4780
 

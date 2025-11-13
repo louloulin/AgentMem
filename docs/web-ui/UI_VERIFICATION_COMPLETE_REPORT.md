@@ -31,7 +31,7 @@
 - **数据库**: LibSQL (SQLite) at `./data/agentmem.db`
 - **端口**: 8080
 - **CORS**: 已启用（允许所有来源）
-- **LLM提供商**: Zhipu AI (glm-4-plus)
+- **LLM提供商**: Zhipu AI (glm-4.6)
 
 #### API健康检查
 ```json
@@ -337,7 +337,7 @@ lsof -ti:8080,3001 | xargs kill -9
 ### 后端
 - **框架**: Axum 0.7
 - **数据库**: LibSQL (SQLite-compatible)
-- **LLM**: Zhipu AI (glm-4-plus)
+- **LLM**: Zhipu AI (glm-4.6)
 - **日志**: tracing + tracing-subscriber
 - **CORS**: 已启用
 
