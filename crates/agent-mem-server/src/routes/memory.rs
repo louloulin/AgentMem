@@ -587,6 +587,20 @@ impl MemoryManager {
     }
 }
 
+// ==================== 辅助函数 ====================
+
+/// 安全地截取字符串到指定字符数（使用字符边界，避免UTF-8 panic）
+/// 
+/// 这个函数确保在字符边界处截取，而不是字节边界，避免在多字节UTF-8字符中间切片
+/// 
+/// # 性能说明
+/// 使用 `chars().take()` 直接截取，只遍历需要的字符，对长字符串高效
+fn truncate_string_at_char_boundary(s: &str, max_chars: usize) -> String {
+    // 使用 chars() 迭代器按字符截取，然后重新组合
+    // 如果字符串长度 <= max_chars，take 会取完所有字符，结果与原字符串相同
+    s.chars().take(max_chars).collect()
+}
+
 // ==================== 路由处理器函数 ====================
 // 以下是实际的HTTP路由处理器函数
 
@@ -880,11 +894,8 @@ async fn search_by_libsql_exact(
             sorted_memories.truncate(limit);
 
             for mem in &sorted_memories {
-                let content_preview = if mem.content.len() > 50 {
-                    &mem.content[..50]
-                } else {
-                    &mem.content
-                };
+                // 🔧 修复: 使用字符边界而不是字节边界，避免UTF-8字符中间切片导致panic
+                let content_preview = truncate_string_at_char_boundary(&mem.content, 50);
                 debug!("  - ID: {}, Type: {:?}, Content: {}...",
                     mem.id, mem.memory_type, content_preview);
             }

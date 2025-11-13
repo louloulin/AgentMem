@@ -487,29 +487,96 @@ impl MemoryOrchestrator {
             }
         };
 
-        // 获取 API Key
-        let api_key = match std::env::var("OPENAI_API_KEY")
-            .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
-            .or_else(|_| std::env::var("LLM_API_KEY"))
-        {
-            Ok(key) => Some(key),
-            Err(_) => {
+        // 🔧 修复：智能检测 API Key - 如果当前 provider 的 API Key 不存在，自动检测其他可用的 provider
+        let (final_provider, final_model, api_key) = {
+            // 首先尝试当前 provider 的 API Key
+            let api_key = match provider.to_lowercase().as_str() {
+                "zhipu" => std::env::var("ZHIPU_API_KEY")
+                    .or_else(|_| std::env::var("LLM_API_KEY"))
+                    .ok(),
+                "openai" => std::env::var("OPENAI_API_KEY")
+                    .or_else(|_| std::env::var("LLM_API_KEY"))
+                    .ok(),
+                "anthropic" => std::env::var("ANTHROPIC_API_KEY")
+                    .or_else(|_| std::env::var("LLM_API_KEY"))
+                    .ok(),
+                "deepseek" => std::env::var("DEEPSEEK_API_KEY")
+                    .or_else(|_| std::env::var("LLM_API_KEY"))
+                    .ok(),
+                _ => {
+                    // 对于未知的 provider，尝试所有常见的 API Key 环境变量
+                    std::env::var("ZHIPU_API_KEY")
+                        .or_else(|_| std::env::var("OPENAI_API_KEY"))
+                        .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
+                        .or_else(|_| std::env::var("DEEPSEEK_API_KEY"))
+                        .or_else(|_| std::env::var("LLM_API_KEY"))
+                        .ok()
+                }
+            };
+
+            // 如果找到了 API Key，直接返回
+            if let Some(key) = api_key {
+                (provider.clone(), model.clone(), Some(key))
+            } else {
+                // 🔧 自动检测其他可用的 provider（按优先级）
+                info!("当前 provider ({}) 的 API Key 未找到，尝试自动检测其他可用的 provider", provider);
+                
+                // 检测 Zhipu
+                if let Ok(zhipu_key) = std::env::var("ZHIPU_API_KEY") {
+                    let zhipu_model = std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4-plus".to_string());
+                    info!("✅ 检测到 ZHIPU_API_KEY，自动切换到 zhipu provider");
+                    return Self::create_llm_provider_with_config("zhipu", &zhipu_model, Some(zhipu_key)).await;
+                }
+                
+                // 检测 OpenAI
+                if let Ok(openai_key) = std::env::var("OPENAI_API_KEY") {
+                    let openai_model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
+                    info!("✅ 检测到 OPENAI_API_KEY，自动切换到 openai provider");
+                    return Self::create_llm_provider_with_config("openai", &openai_model, Some(openai_key)).await;
+                }
+                
+                // 检测 Anthropic
+                if let Ok(anthropic_key) = std::env::var("ANTHROPIC_API_KEY") {
+                    let anthropic_model = std::env::var("ANTHROPIC_MODEL")
+                        .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
+                    info!("✅ 检测到 ANTHROPIC_API_KEY，自动切换到 anthropic provider");
+                    return Self::create_llm_provider_with_config("anthropic", &anthropic_model, Some(anthropic_key)).await;
+                }
+                
+                // 检测 DeepSeek
+                if let Ok(deepseek_key) = std::env::var("DEEPSEEK_API_KEY") {
+                    let deepseek_model = std::env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string());
+                    info!("✅ 检测到 DEEPSEEK_API_KEY，自动切换到 deepseek provider");
+                    return Self::create_llm_provider_with_config("deepseek", &deepseek_model, Some(deepseek_key)).await;
+                }
+                
+                // 检测通用 LLM_API_KEY
+                if let Ok(llm_key) = std::env::var("LLM_API_KEY") {
+                    info!("✅ 检测到 LLM_API_KEY，使用当前 provider ({})", provider);
+                    return Self::create_llm_provider_with_config(&provider, &model, Some(llm_key)).await;
+                }
+                
+                // 所有检测都失败
+                let env_vars = match provider.to_lowercase().as_str() {
+                    "zhipu" => "ZHIPU_API_KEY 或 LLM_API_KEY",
+                    "openai" => "OPENAI_API_KEY 或 LLM_API_KEY",
+                    "anthropic" => "ANTHROPIC_API_KEY 或 LLM_API_KEY",
+                    "deepseek" => "DEEPSEEK_API_KEY 或 LLM_API_KEY",
+                    _ => "ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY 或 LLM_API_KEY",
+                };
                 warn!(
-                    "未找到 LLM API Key 环境变量 (OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_API_KEY)"
+                    "未找到任何 LLM API Key 环境变量 (当前 provider: {}, 需要: {})",
+                    provider, env_vars
                 );
-                None
+                warn!("LLM API Key 未配置，LLM Provider 将不可用");
+                return Ok(None);
             }
         };
 
-        if api_key.is_none() {
-            warn!("LLM API Key 未配置，LLM Provider 将不可用");
-            return Ok(None);
-        }
-
         // 创建 LLM Config
         let llm_config = LLMConfig {
-            provider: provider.clone(),
-            model: model.clone(),
+            provider: final_provider.clone(),
+            model: final_model.clone(),
             api_key,
             base_url: None,
             max_tokens: Some(4096),
@@ -521,6 +588,37 @@ impl MemoryOrchestrator {
         };
 
         // 使用 LLMFactory 创建 Provider
+        match LLMFactory::create_provider(&llm_config) {
+            Ok(llm_provider) => {
+                info!("成功创建 LLM Provider: {} ({})", final_provider, final_model);
+                Ok(Some(llm_provider))
+            }
+            Err(e) => {
+                warn!("创建 LLM Provider 失败: {}", e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// 辅助函数：使用指定的配置创建 LLM Provider
+    async fn create_llm_provider_with_config(
+        provider: &str,
+        model: &str,
+        api_key: Option<String>,
+    ) -> Result<Option<Arc<dyn LLMProvider + Send + Sync>>> {
+        let llm_config = LLMConfig {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            api_key,
+            base_url: None,
+            max_tokens: Some(4096),
+            temperature: Some(0.7),
+            top_p: Some(1.0),
+            frequency_penalty: Some(0.0),
+            presence_penalty: Some(0.0),
+            response_format: None,
+        };
+
         match LLMFactory::create_provider(&llm_config) {
             Ok(llm_provider) => {
                 info!("成功创建 LLM Provider: {} ({})", provider, model);

@@ -18,7 +18,9 @@
       "mcp__serena__check_onboarding_performed",
       "mcp__serena__onboarding",
       "mcp__serena__get_symbols_overview",
-      "mcp__serena__search_for_pattern"
+      "mcp__serena__search_for_pattern",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [],
     "ask": []

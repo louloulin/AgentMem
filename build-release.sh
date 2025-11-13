@@ -279,7 +279,19 @@ build_server() {
     # 复制二进制文件
     log_info "复制后端二进制文件..."
     cp "$BINARY_PATH" "$DIST_DIR/server/"
-    
+
+    # 复制 ONNX Runtime 库文件
+    log_info "复制 ONNX Runtime 库文件..."
+    mkdir -p "$DIST_DIR/server/lib"
+
+    # 检查并复制 lib 目录下的所有库文件
+    if [ -d "lib" ]; then
+        cp -r lib/* "$DIST_DIR/server/lib/" 2>/dev/null || true
+        log_success "已复制 lib 目录下的库文件"
+    else
+        log_warning "未找到 lib 目录，跳过库文件复制"
+    fi
+
     # 创建配置文件示例
     cat > "$DIST_DIR/server/config.example.toml" << 'EOF'
 # AgentMem Server 配置文件
@@ -309,17 +321,132 @@ export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
 export SERVER_PORT=${SERVER_PORT:-8080}
 export DATABASE_URL=${DATABASE_URL:-sqlite://agentmem.db}
 
-echo "启动 AgentMem Server..."
+# 获取绝对路径
+LIB_DIR="$(pwd)/lib"
+
+# 设置库路径（macOS 使用 DYLD_LIBRARY_PATH，Linux 使用 LD_LIBRARY_PATH）
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export DYLD_LIBRARY_PATH="$LIB_DIR:$DYLD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
+else
+    export LD_LIBRARY_PATH="$LIB_DIR:$LD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.so.1.22.0"
+fi
+
+export RUST_BACKTRACE=1
+
+# 配置 Embedder (使用 FastEmbed) - 推荐配置
+export EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-"fastembed"}
+export EMBEDDER_MODEL=${EMBEDDER_MODEL:-"BAAI/bge-small-en-v1.5"}
+
+# 配置 LLM Provider (可选)
+# 支持的 Provider: openai, zhipu, ollama 等
+# export LLM_PROVIDER="zhipu"
+# export LLM_MODEL="glm-4-plus"
+# export ZHIPU_API_KEY="your_api_key_here"
+#
+# 或使用 OpenAI:
+# export LLM_PROVIDER="openai"
+# export LLM_MODEL="gpt-4"
+# export OPENAI_API_KEY="your_api_key_here"
+
+# 认证配置（默认启用）
+export ENABLE_AUTH=${ENABLE_AUTH:-"true"}
+export SERVER_ENABLE_AUTH=${SERVER_ENABLE_AUTH:-"true"}
+
+# 代理配置（如需要）
+# export http_proxy=http://127.0.0.1:4780
+# export https_proxy=http://127.0.0.1:4780
+
+echo "========================================="
+echo "🚀 启动 AgentMem Server"
+echo "========================================="
 echo "主机: $SERVER_HOST"
 echo "端口: $SERVER_PORT"
 echo "数据库: $DATABASE_URL"
+echo "Embedder: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
+echo "认证: $ENABLE_AUTH"
+
+if [ -n "$LLM_PROVIDER" ]; then
+    echo "LLM Provider: $LLM_PROVIDER / $LLM_MODEL"
+else
+    echo "⚠️  LLM Provider 未配置，Intelligence 组件将不可用"
+fi
+
+if [ -d "$LIB_DIR" ]; then
+    echo "库目录: $LIB_DIR"
+else
+    echo "⚠️  警告: 未找到 lib 目录，ONNX Runtime 可能无法加载"
+fi
+
+echo "========================================="
 
 # 启动服务
 ./agent-mem-server
 EOF
     
     chmod +x "$DIST_DIR/server/start.sh"
-    
+
+    # 创建带完整配置的启动脚本示例
+    cat > "$DIST_DIR/server/start-with-zhipu.sh" << 'EOF'
+#!/bin/bash
+# AgentMem Server 启动脚本 (智谱 AI 配置示例)
+
+# 设置环境变量
+export RUST_LOG=${RUST_LOG:-info}
+export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+export SERVER_PORT=${SERVER_PORT:-8080}
+export DATABASE_URL=${DATABASE_URL:-sqlite://agentmem.db}
+
+# 获取绝对路径
+LIB_DIR="$(pwd)/lib"
+
+# 设置库路径
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export DYLD_LIBRARY_PATH="$LIB_DIR:$DYLD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
+else
+    export LD_LIBRARY_PATH="$LIB_DIR:$LD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.so.1.22.0"
+fi
+
+export RUST_BACKTRACE=1
+
+# 配置 Embedder (使用 FastEmbed)
+export EMBEDDER_PROVIDER="fastembed"
+export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
+
+# 配置 LLM Provider (智谱 AI)
+export ZHIPU_API_KEY="your_zhipu_api_key_here"
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4-plus"
+
+# 🔓 禁用认证（用于测试）
+export ENABLE_AUTH="false"
+export SERVER_ENABLE_AUTH="false"
+
+# 代理配置（如需要）
+# export http_proxy=http://127.0.0.1:4780
+# export https_proxy=http://127.0.0.1:4780
+
+echo "========================================="
+echo "🚀 启动 AgentMem Server (智谱 AI)"
+echo "========================================="
+echo "主机: $SERVER_HOST"
+echo "端口: $SERVER_PORT"
+echo "数据库: $DATABASE_URL"
+echo "Embedder: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
+echo "LLM Provider: $LLM_PROVIDER / $LLM_MODEL"
+echo "认证: $ENABLE_AUTH (禁用)"
+echo "库目录: $LIB_DIR"
+echo "========================================="
+
+# 启动服务
+./agent-mem-server
+EOF
+
+    chmod +x "$DIST_DIR/server/start-with-zhipu.sh"
+
     log_success "后端发布包已生成: $DIST_DIR/server"
 }
 
@@ -340,9 +467,12 @@ dist/
 │   ├── package.json
 │   └── start.sh     # 启动脚本
 ├── server/          # 后端服务
-│   ├── agent-mem-server  # 二进制文件
-│   ├── config.example.toml
-│   └── start.sh     # 启动脚本
+│   ├── agent-mem-server       # 二进制文件
+│   ├── lib/                   # ONNX Runtime 库文件
+│   │   └── libonnxruntime.*   # ONNX Runtime 动态库
+│   ├── config.example.toml    # 配置文件示例
+│   ├── start.sh               # 基础启动脚本
+│   └── start-with-zhipu.sh    # 智谱 AI 配置示例
 └── README.md        # 本文件
 ```
 
@@ -383,17 +513,92 @@ export NEXT_PUBLIC_API_URL=http://your-server-ip:8080
 
 #### 后端环境变量
 
+**基础配置:**
 - `SERVER_HOST`: 服务器主机地址（默认: 0.0.0.0）
 - `SERVER_PORT`: 服务器端口（默认: 8080）
 - `DATABASE_URL`: 数据库连接字符串（默认: sqlite://agentmem.db）
 - `RUST_LOG`: 日志级别（默认: info）
+
+**Embedder 配置（必需）:**
+- `EMBEDDER_PROVIDER`: Embedder 提供商（推荐: fastembed）
+- `EMBEDDER_MODEL`: Embedder 模型（推荐: BAAI/bge-small-en-v1.5）
+
+**LLM 配置（可选）:**
+
+使用智谱 AI:
+```bash
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4-plus"
+export ZHIPU_API_KEY="your_api_key_here"
+```
+
+使用 OpenAI:
+```bash
+export LLM_PROVIDER="openai"
+export LLM_MODEL="gpt-4"
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+**认证配置:**
+- `ENABLE_AUTH`: 是否启用认证（默认: true）
+- `SERVER_ENABLE_AUTH`: 服务器认证开关（默认: true）
+
+**库路径配置（自动设置）:**
+- macOS: `DYLD_LIBRARY_PATH` 和 `ORT_DYLIB_PATH`
+- Linux: `LD_LIBRARY_PATH` 和 `ORT_DYLIB_PATH`
 
 #### 前端环境变量
 
 - `PORT`: 前端端口（默认: 3000）
 - `NEXT_PUBLIC_API_URL`: 后端 API 地址（默认: http://localhost:8080）
 
-### 4. 使用 systemd 管理服务（推荐）
+### 4. 快速启动示例
+
+#### 使用基础配置启动（仅 Embedder）
+
+```bash
+cd server
+./start.sh
+```
+
+#### 使用智谱 AI 配置启动
+
+```bash
+cd server
+# 编辑 start-with-zhipu.sh，设置你的 API Key
+vim start-with-zhipu.sh
+# 启动
+./start-with-zhipu.sh
+```
+
+#### 自定义配置启动
+
+```bash
+cd server
+export EMBEDDER_PROVIDER="fastembed"
+export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4-plus"
+export ZHIPU_API_KEY="your_api_key_here"
+export ENABLE_AUTH="false"  # 禁用认证（测试用）
+./start.sh
+```
+
+### 5. 库文件说明
+
+后端服务依赖 ONNX Runtime 库文件，构建脚本会自动从项目根目录的 `lib/` 目录复制到 `dist/server/lib/`。
+
+**macOS:**
+- `libonnxruntime.1.22.0.dylib`
+
+**Linux:**
+- `libonnxruntime.so.1.22.0`
+
+如果启动时提示找不到库文件，请确保：
+1. `lib/` 目录存在且包含正确的库文件
+2. 启动脚本正确设置了 `DYLD_LIBRARY_PATH` (macOS) 或 `LD_LIBRARY_PATH` (Linux)
+
+### 6. 使用 systemd 管理服务（推荐）
 
 #### 后端服务
 
