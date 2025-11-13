@@ -319,7 +319,7 @@ EOF
 export RUST_LOG=${RUST_LOG:-info}
 export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
 export SERVER_PORT=${SERVER_PORT:-8080}
-export DATABASE_URL=${DATABASE_URL:-sqlite://agentmem.db}
+export DATABASE_URL=${DATABASE_URL:-file:./data/agentmem.db}
 
 # 获取绝对路径
 LIB_DIR="$(pwd)/lib"
@@ -380,6 +380,11 @@ else
 fi
 
 echo "========================================="
+echo ""
+echo "⏳ 正在启动服务器..."
+echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
+echo "   这可能需要几分钟时间，请耐心等待..."
+echo ""
 
 # 启动服务
 ./agent-mem-server
@@ -396,7 +401,7 @@ EOF
 export RUST_LOG=${RUST_LOG:-info}
 export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
 export SERVER_PORT=${SERVER_PORT:-8080}
-export DATABASE_URL=${DATABASE_URL:-sqlite://agentmem.db}
+export DATABASE_URL=${DATABASE_URL:-file:./data/agentmem.db}
 
 # 获取绝对路径
 LIB_DIR="$(pwd)/lib"
@@ -440,6 +445,11 @@ echo "LLM Provider: $LLM_PROVIDER / $LLM_MODEL"
 echo "认证: $ENABLE_AUTH (禁用)"
 echo "库目录: $LIB_DIR"
 echo "========================================="
+echo ""
+echo "⏳ 正在启动服务器..."
+echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
+echo "   这可能需要几分钟时间，请耐心等待..."
+echo ""
 
 # 启动服务
 ./agent-mem-server
