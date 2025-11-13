@@ -6,6 +6,8 @@ use agent_mem_traits::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -67,9 +69,21 @@ impl HistoryManager {
     pub async fn new(db_path: &str) -> Result<Self> {
         info!("创建历史记录管理器: {}", db_path);
 
-        let pool = SqlitePool::connect(db_path).await.map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!("连接数据库失败: {}", e))
-        })?;
+        // 使用 SqliteConnectOptions 并设置 create_if_missing(true)
+        // 这样 SQLx 会自动创建数据库文件（如果不存在）
+        let options = SqliteConnectOptions::from_str(db_path)
+            .map_err(|e| {
+                agent_mem_traits::AgentMemError::storage_error(&format!("解析数据库路径失败: {}", e))
+            })?
+            .create_if_missing(true);
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect_with(options)
+            .await
+            .map_err(|e| {
+                agent_mem_traits::AgentMemError::storage_error(&format!("连接数据库失败: {}", e))
+            })?;
 
         let manager = Self {
             pool: Arc::new(pool),
