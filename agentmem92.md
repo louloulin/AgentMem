@@ -19,7 +19,7 @@
 - 🔄 **Phase 6**: Legacy清理 - 50% (MemoryItem 已标记 deprecated)
 
 **待完成工作**:
-- ⏳ **Phase 4**: Search引擎迁移 (使用Query抽象) - 0%
+- 🔄 **Phase 4**: Search引擎迁移 (使用Query抽象) - 60% (Step 1-3 已完成)
 - ⏳ **Phase 5**: Storage层迁移 - 0%
 - ⏳ **Phase 6**: Legacy清理 - 50% (需要完成剩余50%)
 
@@ -1172,8 +1172,77 @@ let cache = Arc::new(RwLock::new(HashMap::new()));
 
 ---
 
+## 📝 变更日志 (Changelog)
+
+### 2025-11-13 - Phase 4 Step 1-3 完成
+
+**完成日期**: 2025-11-13
+
+**完成工作**:
+
+1. **Step 1: 实现 SearchEngine Trait** ✅
+   - 在 `crates/agent-mem-traits/src/abstractions.rs` 中添加 SearchEngine trait 定义 (lines 562-578)
+   - 定义 SearchResult 结构体 (lines 545-560)
+   - 更新 `crates/agent-mem-traits/src/lib.rs` 导出 SearchEngine 和 SearchResultV4
+   - 状态: ✅ 完成
+
+2. **Step 2: 实现 VectorSearchEngine** ✅
+   - 在 `crates/agent-mem-core/src/search/mod.rs` 中添加 Query V4 → SearchQuery 转换函数 (lines 104-237)
+   - 实现 `SearchQuery::from_query_v4()` 方法，支持从 Query V4 提取查询参数
+   - 实现 `SearchQuery::extract_filters()` 辅助方法，从约束中提取过滤条件
+   - 在 `crates/agent-mem-core/src/search/vector_search.rs` 中实现 SearchEngine trait (lines 523-591)
+   - 支持 QueryIntent::Vector 和 QueryIntent::Hybrid
+   - 状态: ✅ 完成
+
+3. **Step 3: 实现 HybridSearchEngine** ✅
+   - 在 `crates/agent-mem-core/src/search/hybrid.rs` 中实现 SearchEngine trait (lines 295-382)
+   - 支持 QueryIntent::Hybrid 和 QueryIntent::Vector
+   - 从混合查询中提取向量和文本意图
+   - 使用 RRF 算法融合向量搜索和全文搜索结果
+   - 状态: ✅ 完成
+
+**修改文件列表**:
+- `crates/agent-mem-traits/src/abstractions.rs` - 添加 SearchEngine trait 和 SearchResult 定义
+- `crates/agent-mem-traits/src/lib.rs` - 导出 SearchEngine 和 SearchResultV4
+- `crates/agent-mem-core/src/search/mod.rs` - 添加 Query V4 转换函数
+- `crates/agent-mem-core/src/search/vector_search.rs` - 实现 SearchEngine trait
+- `crates/agent-mem-core/src/search/hybrid.rs` - 实现 SearchEngine trait
+
+**遇到的问题和解决方案**:
+
+1. **问题**: SearchResult 类型命名冲突
+   - **原因**: `agent_mem_traits::types::SearchResult` 和 `agent_mem_traits::abstractions::SearchResult` 同时存在
+   - **解决方案**: 在 lib.rs 中将 abstractions::SearchResult 重命名为 SearchResultV4 导出
+
+2. **问题**: AttributeValue::Array 不存在
+   - **原因**: AttributeValue 使用的是 `List` 而不是 `Array`
+   - **解决方案**: 修改 SearchQuery::extract_filters() 中的代码，使用 `AttributeValue::List`
+
+3. **问题**: Query V4 到 SearchQuery 的转换逻辑
+   - **原因**: Query V4 的结构比 SearchQuery 更复杂，需要提取和转换
+   - **解决方案**: 实现 `from_query_v4()` 方法，从 QueryIntent 提取查询文本，从 Constraint 提取限制和过滤条件
+
+**测试结果**:
+- ✅ `cargo build --release -p agent-mem-traits` - 编译成功
+- ✅ `cargo build --release -p agent-mem-core` - 编译成功
+- ✅ `cargo build --release -p agent-mem-server` - 编译成功
+- ✅ `cargo test --release -p agent-mem-core --lib search` - 66个测试全部通过
+- ✅ `cargo test --release -p agent-mem-core --lib search::hybrid` - 测试通过
+
+**进度更新**:
+- Phase 4 Step 1: ✅ 完成 (100%)
+- Phase 4 Step 2: ✅ 完成 (100%)
+- Phase 4 Step 3: ✅ 完成 (100%)
+- Phase 4 整体进度: 🔄 进行中 (3/5 步骤完成，60%)
+
+**下一步**:
+- Step 4: 迁移其他搜索引擎 (18个文件)
+- Step 5: 更新 QueryOptimizer 和 Reranker
+
+---
+
 **文档维护**: 本文档将持续更新，反映最新的实施进展和架构决策。
 
-**最后更新**: 2025-11-13 by AI Assistant
-**下次更新**: Phase 4 启动后
+**最后更新**: 2025-11-13 by AI Assistant (Phase 4 Step 1-3 完成)
+**下次更新**: Phase 4 Step 4 完成后
 

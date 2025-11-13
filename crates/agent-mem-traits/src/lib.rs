@@ -58,5 +58,6 @@ pub use abstractions::{
     Predicate, Preference, PreferenceType, Query, QueryContext, QueryIntent,
     QueryIntentType, RelationGraph, RelationV4, RelevancePreference, RetrievalContext,
     RetrievalEngine, RetrievalExplanation, RetrievalMetrics, RetrievalResult,
-    ScopeConstraint, ScoredMemory, TemporalPreference, TimeRange,
+    ScopeConstraint, ScoredMemory, SearchEngine, SearchResult as SearchResultV4,
+    TemporalPreference, TimeRange,
 };

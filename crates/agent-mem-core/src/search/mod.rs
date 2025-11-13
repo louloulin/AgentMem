@@ -72,6 +72,7 @@ pub use vector_search::{
 };
 
 use serde::{Deserialize, Serialize};
+use agent_mem_traits::{Query, QueryIntent, Constraint, ComparisonOperator, AttributeKey, AttributeValue};
 
 /// 搜索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +100,138 @@ impl Default for SearchQuery {
             vector_weight: 0.7,
             fulltext_weight: 0.3,
             filters: None,
+        }
+    }
+}
+
+impl SearchQuery {
+    /// 从 Query V4 转换到 SearchQuery（向后兼容）
+    pub fn from_query_v4(query: &Query) -> Self {
+        // 提取查询文本
+        let query_text = match &query.intent {
+            QueryIntent::NaturalLanguage { text, .. } => text.clone(),
+            QueryIntent::Vector { .. } => String::new(), // 向量查询没有文本
+            QueryIntent::Structured { .. } => String::new(), // 结构化查询需要特殊处理
+            QueryIntent::Hybrid { intents, .. } => {
+                // 从混合查询中提取第一个自然语言查询
+                intents.iter()
+                    .find_map(|intent| {
+                        if let QueryIntent::NaturalLanguage { text, .. } = intent {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_default()
+            }
+        };
+
+        // 提取限制
+        let limit = query.constraints.iter()
+            .find_map(|c| {
+                if let Constraint::Attribute { key, operator, value } = c {
+                    if key.name == "limit" && matches!(operator, ComparisonOperator::Equals) {
+                        if let AttributeValue::Number(n) = value {
+                            return Some(*n as usize);
+                        }
+                    }
+                }
+                None
+            })
+            .unwrap_or(10);
+
+        // 提取阈值
+        let threshold = query.constraints.iter()
+            .find_map(|c| {
+                if let Constraint::Attribute { key, operator, value } = c {
+                    if key.name == "threshold" && matches!(operator, ComparisonOperator::GreaterOrEqual) {
+                        if let AttributeValue::Number(n) = value {
+                            return Some(*n as f32);
+                        }
+                    }
+                }
+                None
+            });
+
+        // 提取过滤条件
+        let filters = Self::extract_filters(query);
+
+        Self {
+            query: query_text,
+            limit,
+            threshold,
+            vector_weight: 0.7, // 默认权重
+            fulltext_weight: 0.3,
+            filters,
+        }
+    }
+
+    /// 从 Query V4 约束中提取过滤条件
+    fn extract_filters(query: &Query) -> Option<SearchFilters> {
+        let mut user_id = None;
+        let mut agent_id = None;
+        let mut organization_id = None;
+        let mut start_time = None;
+        let mut end_time = None;
+        let mut tags = None;
+
+        for constraint in &query.constraints {
+            match constraint {
+                Constraint::Attribute { key, operator, value } => {
+                    if matches!(operator, ComparisonOperator::Equals) {
+                        match key.name.as_str() {
+                            "user_id" => {
+                                if let AttributeValue::String(s) = value {
+                                    user_id = Some(s.clone());
+                                }
+                            }
+                            "agent_id" => {
+                                if let AttributeValue::String(s) = value {
+                                    agent_id = Some(s.clone());
+                                }
+                            }
+                            "organization_id" => {
+                                if let AttributeValue::String(s) = value {
+                                    organization_id = Some(s.clone());
+                                }
+                            }
+                            "tags" => {
+                                if let AttributeValue::List(arr) = value {
+                                    tags = Some(arr.iter()
+                                        .filter_map(|v| {
+                                            if let AttributeValue::String(s) = v {
+                                                Some(s.clone())
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect());
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Constraint::Temporal { time_range } => {
+                    start_time = time_range.start;
+                    end_time = time_range.end;
+                }
+                _ => {}
+            }
+        }
+
+        if user_id.is_some() || agent_id.is_some() || organization_id.is_some()
+            || start_time.is_some() || end_time.is_some() || tags.is_some() {
+            Some(SearchFilters {
+                user_id,
+                organization_id,
+                agent_id,
+                start_time,
+                end_time,
+                tags,
+            })
+        } else {
+            None
         }
     }
 }

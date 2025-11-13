@@ -539,6 +539,45 @@ pub struct QueryContext {
 }
 
 // ============================================================================
+// Search Abstraction
+// ============================================================================
+
+/// 搜索结果（底层搜索引擎返回）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    /// 记忆 ID
+    pub id: String,
+    /// 记忆内容
+    pub content: String,
+    /// 相似度分数 (0.0 - 1.0)
+    pub score: f32,
+    /// 向量搜索分数
+    pub vector_score: Option<f32>,
+    /// 全文搜索分数
+    pub fulltext_score: Option<f32>,
+    /// 元数据
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// 搜索引擎 trait（底层搜索抽象）
+#[async_trait]
+pub trait SearchEngine: Send + Sync {
+    /// 执行搜索查询
+    async fn search(&self, query: &Query) -> Result<Vec<SearchResult>>;
+
+    /// 获取引擎名称
+    fn name(&self) -> &str;
+
+    /// 获取支持的查询意图类型
+    fn supported_intents(&self) -> Vec<QueryIntentType>;
+
+    /// 检查是否支持指定的查询意图
+    fn supports_intent(&self, intent_type: &QueryIntentType) -> bool {
+        self.supported_intents().contains(intent_type)
+    }
+}
+
+// ============================================================================
 // Retrieval Abstraction
 // ============================================================================
 
@@ -551,10 +590,10 @@ pub trait RetrievalEngine: Send + Sync {
         query: &Query,
         context: &RetrievalContext,
     ) -> Result<RetrievalResult>;
-    
+
     /// Engine name
     fn name(&self) -> &str;
-    
+
     /// Supported query types
     fn supported_intents(&self) -> Vec<QueryIntentType>;
 }
