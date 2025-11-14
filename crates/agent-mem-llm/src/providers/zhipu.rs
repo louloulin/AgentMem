@@ -206,7 +206,7 @@ impl LLMProvider for ZhipuProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}***", &api_key[..10]))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()

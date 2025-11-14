@@ -257,44 +257,59 @@ impl FactExtractor {
         info!("   响应长度: {} 字符", response_text.len());
 
         // 尝试提取 JSON 部分
+        info!("🔵 提取 JSON 响应...");
         let json_text = self.extract_json_from_response(&response_text)?;
+        info!("   JSON 长度: {} 字符", json_text.len());
 
         // 调试：打印 JSON 文本
         debug!("Extracted JSON: {}", json_text);
 
         // P1 优化 #3: 解析失败时使用规则提取降级
+        info!("🔵 解析事实...");
         let mut facts = match serde_json::from_str::<FactExtractionResponse>(&json_text) {
             Ok(response) => {
-                debug!("✅ LLM事实提取成功");
+                info!("✅ LLM 事实提取成功，提取到 {} 个事实", response.facts.len());
                 response.facts
             }
             Err(e) => {
-                warn!("LLM事实提取JSON解析失败: {}, 降级到规则提取", e);
-                warn!("JSON text: {}", json_text);
+                warn!("❌ LLM 事实提取 JSON 解析失败: {}, 降级到规则提取", e);
+                warn!("   JSON text: {}", json_text);
 
                 // P1 优化 #3: 降级到基于规则的提取
-                self.rule_based_fact_extraction(messages)?
+                info!("🔵 使用规则提取...");
+                let rule_facts = self.rule_based_fact_extraction(messages)?;
+                info!("✅ 规则提取完成，提取到 {} 个事实", rule_facts.len());
+                rule_facts
             }
         };
 
         // 后处理：实体识别和时间信息提取
+        info!("🔵 增强事实（实体识别 + 时间信息）...");
         self.enhance_facts_with_entities(&mut facts).await?;
         self.enhance_facts_with_temporal_info(&mut facts).await?;
+        info!("✅ 事实增强完成");
 
         // 验证和过滤
+        info!("🔵 验证和过滤事实...");
+        let before_filter = facts.len();
         facts = self.validate_and_filter_facts(facts);
+        info!("✅ 过滤完成，保留 {}/{} 个事实", facts.len(), before_filter);
 
         // 合并相似事实
+        info!("🔵 合并相似事实...");
+        let before_merge = facts.len();
         facts = self.merge_similar_facts(facts);
+        info!("✅ 合并完成，最终 {}/{} 个事实", facts.len(), before_merge);
 
         // P1 优化 #1: 写入缓存
         if let Some(cache) = &self.cache {
             let conversation = self.format_conversation(messages);
             let cache_key = LruCacheWrapper::<Vec<ExtractedFact>>::compute_key(&conversation);
             cache.put(cache_key, facts.clone());
-            debug!("✅ 事实已缓存");
+            info!("✅ 事实已缓存");
         }
 
+        info!("✅ 事实提取完成，共 {} 个事实", facts.len());
         Ok(facts)
     }
 
