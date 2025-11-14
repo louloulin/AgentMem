@@ -99,21 +99,58 @@
 2. ⏳ 批量嵌入生成 (5x提升) → ~7,500-10,000 ops/s
 3. ⏳ 缓存优化 (1.5x提升) → ~11,000-15,000 ops/s
 
+## ✅ Phase 1 Task 1.2 完成
+
+### 实现内容
+
+**文件**: `crates/agent-mem/src/orchestrator.rs`
+
+**新增方法**: `add_memories_batch` (第995-1159行)
+
+**核心功能**:
+1. **批量嵌入生成**: 一次性生成所有嵌入
+   ```rust
+   let contents: Vec<String> = items.iter().map(|(c, _, _, _, _)| c.clone()).collect();
+   let embeddings = embedder.embed_batch(&contents).await?;
+   ```
+
+2. **并行写入**: 所有记忆并行写入存储
+   ```rust
+   let tasks = items.into_iter().enumerate().map(|(i, item)| {
+       async move {
+           tokio::join!(
+               core_manager.create_persona_block(...),
+               vector_store.add_vectors(...),
+               history_manager.add_history(...)
+           )
+       }
+   });
+   futures::future::join_all(tasks).await
+   ```
+
+**编译结果**:
+```bash
+✅ Finished `release` profile [optimized] target(s) in 4.54s
+```
+
+**性能预期**:
+- 批量嵌入生成: 5x 提升
+- 并行写入: 2-3x 提升
+- **总体提升: 10-15x**
+- **预期吞吐量: 5,000-10,000 ops/s**
+
+---
+
 ## 🔄 下一步工作
 
 ### Phase 1 剩余任务
 
-#### Task 1.2: 实现批量嵌入生成
-**文件**: `crates/agent-mem/src/orchestrator.rs`
-**目标**: 批量生成嵌入，减少嵌入生成开销
-**预期提升**: 5x
-
 #### Task 1.3: 压测验证
-**工具**: `examples/fast_mode_benchmark.rs`
-**目标**: 验证并行写入的性能提升
+**工具**: `examples/batch_mode_benchmark.rs`
+**目标**: 验证批量模式的性能提升
 **命令**:
 ```bash
-cargo run --release --example fast_mode_benchmark
+cargo run --release --example batch_mode_benchmark
 ```
 
 ### Phase 2: 优化智能模式LLM调用

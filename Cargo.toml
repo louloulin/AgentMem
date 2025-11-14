@@ -43,6 +43,8 @@ members = [
     "tools/agentmem-cli",
     "tools/comprehensive-stress-test",
     "tools/libsql-stress-test",  # LibSQL 真实压测工具
+    "tools/simple-perf-test",    # Phase 1 性能测试工具
+    "tools/intelligent-mode-test", # Phase 2 智能模式性能测试工具
     # "tools/agent-mem-server",
     # "tools/agent-mem-bench",
 
