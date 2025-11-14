@@ -1,0 +1,23 @@
+{
+  "total_operations": 10000,
+  "successful_operations": 10000,
+  "failed_operations": 0,
+  "duration_seconds": 42.3527985,
+  "throughput": 236.1119065130962,
+  "latency_min": 1.0,
+  "latency_max": 17.0,
+  "latency_mean": 3.9545000000000003,
+  "latency_p50": 2.0,
+  "latency_p90": 12.0,
+  "latency_p95": 12.0,
+  "latency_p99": 12.0,
+  "latency_p999": 13.0,
+  "avg_cpu_usage": 18.586041428322016,
+  "peak_cpu_usage": 36.60189437866211,
+  "avg_memory_mb": 12.345930232558139,
+  "peak_memory_mb": 12.46875,
+  "error_rate": 0.0,
+  "errors_by_type": [],
+  "start_time": "2025-11-14T01:13:22.070517+00:00",
+  "end_time": "2025-11-14T01:13:22.070531+00:00"
+}

@@ -41,6 +41,7 @@ members = [
 
     # 工具和应用
     "tools/agentmem-cli",
+    "tools/comprehensive-stress-test",
     # "tools/agent-mem-server",
     # "tools/agent-mem-bench",
 
