@@ -9,6 +9,7 @@
 //! - 错误处理和重试机制
 //! - 特性门控支持
 
+pub mod cache;
 pub mod client;
 pub mod factory;
 pub mod metrics;
@@ -16,6 +17,7 @@ pub mod prompts;
 pub mod providers;
 pub mod retry;
 
+pub use cache::{CacheStats, CachedResult, LLMCache};
 pub use client::LLMClient;
 pub use factory::LLMFactory;
 pub use metrics::{LLMMetrics, LLMMonitor, LLMStats};

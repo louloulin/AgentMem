@@ -207,6 +207,14 @@ pub struct MemoryOrchestrator {
     llm_provider: Option<Arc<dyn LLMProvider + Send + Sync>>,
     embedder: Option<Arc<dyn Embedder + Send + Sync>>,
 
+    // ========== Phase 2: LLM 缓存（Task 2.2）==========
+    /// 事实提取缓存
+    facts_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<ExtractedFact>>>>,
+    /// 结构化事实提取缓存
+    structured_facts_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<StructuredFact>>>>,
+    /// 重要性评估缓存
+    importance_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<ImportanceEvaluation>>>>,
+
     // ========== Phase 6: 核心功能补齐 ==========
     /// 向量存储（通过 VectorStore trait 统一抽象）
     vector_store: Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>,
@@ -314,6 +322,32 @@ impl MemoryOrchestrator {
             Self::create_history_manager(&config).await?
         };
 
+        // ========== Step 10: 创建 LLM 缓存 (Phase 2 Task 2.2) ==========
+        let (facts_cache, structured_facts_cache, importance_cache) = if config.enable_intelligent_features {
+            info!("Phase 2: 创建 LLM 缓存...");
+            use std::time::Duration;
+
+            // 创建缓存实例（TTL: 1小时，最大条目: 1000）
+            let facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                Duration::from_secs(3600),
+                1000,
+            )));
+            let structured_facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                Duration::from_secs(3600),
+                1000,
+            )));
+            let importance_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                Duration::from_secs(3600),
+                1000,
+            )));
+
+            info!("✅ LLM 缓存创建成功（TTL: 1小时，最大条目: 1000）");
+            (facts_cache, structured_facts_cache, importance_cache)
+        } else {
+            info!("智能功能已禁用，跳过 LLM 缓存创建");
+            (None, None, None)
+        };
+
         Ok(Self {
             // Managers
             core_manager,
@@ -362,6 +396,11 @@ impl MemoryOrchestrator {
             // 辅助组件
             llm_provider,
             embedder,
+
+            // Phase 2: LLM 缓存
+            facts_cache,
+            structured_facts_cache,
+            importance_cache,
 
             // Phase 6: 向量存储和历史记录
             vector_store,
@@ -2711,33 +2750,79 @@ impl MemoryOrchestrator {
 
     // ========== 智能添加流水线辅助方法 ==========
 
-    /// Step 1: 事实提取
+    /// Step 1: 事实提取（带缓存）
     async fn extract_facts(&self, content: &str) -> Result<Vec<ExtractedFact>> {
         if let Some(fact_extractor) = &self.fact_extractor {
-            // 将内容转换为 Message 格式
-            let messages = vec![agent_mem_llm::Message::user(content)];
-            fact_extractor.extract_facts_internal(&messages).await
+            // Phase 2 Task 2.2: 使用缓存
+            if let Some(cache) = &self.facts_cache {
+                let cache_key = agent_mem_llm::LLMCache::<Vec<ExtractedFact>>::generate_key(content);
+
+                // 尝试从缓存获取
+                if let Some(cached_facts) = cache.get(&cache_key).await {
+                    debug!("✅ 从缓存获取事实提取结果（命中）");
+                    return Ok(cached_facts);
+                }
+
+                // 缓存未命中，调用 LLM
+                debug!("⚠️ 缓存未命中，调用 LLM 进行事实提取");
+                let messages = vec![agent_mem_llm::Message::user(content)];
+                let facts = fact_extractor.extract_facts_internal(&messages).await?;
+
+                // 缓存结果
+                cache.set(cache_key, facts.clone()).await;
+                debug!("✅ 事实提取结果已缓存");
+
+                Ok(facts)
+            } else {
+                // 无缓存，直接调用
+                let messages = vec![agent_mem_llm::Message::user(content)];
+                fact_extractor.extract_facts_internal(&messages).await
+            }
         } else {
             warn!("FactExtractor 未初始化");
             Ok(Vec::new())
         }
     }
 
-    /// Step 2-3: 结构化事实提取
+    /// Step 2-3: 结构化事实提取（带缓存）
     async fn extract_structured_facts(&self, content: &str) -> Result<Vec<StructuredFact>> {
         if let Some(advanced_fact_extractor) = &self.advanced_fact_extractor {
-            // 将内容转换为 Message 格式
-            let messages = vec![agent_mem_llm::Message::user(content)];
-            advanced_fact_extractor
-                .extract_structured_facts(&messages)
-                .await
+            // Phase 2 Task 2.2: 使用缓存
+            if let Some(cache) = &self.structured_facts_cache {
+                let cache_key = agent_mem_llm::LLMCache::<Vec<StructuredFact>>::generate_key(content);
+
+                // 尝试从缓存获取
+                if let Some(cached_facts) = cache.get(&cache_key).await {
+                    debug!("✅ 从缓存获取结构化事实提取结果（命中）");
+                    return Ok(cached_facts);
+                }
+
+                // 缓存未命中，调用 LLM
+                debug!("⚠️ 缓存未命中，调用 LLM 进行结构化事实提取");
+                let messages = vec![agent_mem_llm::Message::user(content)];
+                let facts = advanced_fact_extractor
+                    .extract_structured_facts(&messages)
+                    .await?;
+
+                // 缓存结果
+                cache.set(cache_key, facts.clone()).await;
+                debug!("✅ 结构化事实提取结果已缓存");
+
+                Ok(facts)
+            } else {
+                // 无缓存，直接调用
+                let messages = vec![agent_mem_llm::Message::user(content)];
+                advanced_fact_extractor
+                    .extract_structured_facts(&messages)
+                    .await
+            }
         } else {
             warn!("AdvancedFactExtractor 未初始化");
             Ok(Vec::new())
         }
     }
 
-    /// Step 4: 重要性评估
+    /// Step 4: 重要性评估（带缓存）
     async fn evaluate_importance(
         &self,
         structured_facts: &[StructuredFact],
@@ -2749,6 +2834,25 @@ impl MemoryOrchestrator {
                 "使用 EnhancedImportanceEvaluator 评估 {} 个事实的重要性",
                 structured_facts.len()
             );
+
+            // Phase 2 Task 2.2: 使用缓存
+            if let Some(cache) = &self.importance_cache {
+                // 生成缓存键（基于所有事实的内容）
+                let cache_content = structured_facts
+                    .iter()
+                    .map(|f| format!("{}:{}", f.description, f.fact_type))
+                    .collect::<Vec<_>>()
+                    .join("|");
+                let cache_key = agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(&cache_content);
+
+                // 尝试从缓存获取
+                if let Some(cached_evaluations) = cache.get(&cache_key).await {
+                    debug!("✅ 从缓存获取重要性评估结果（命中）");
+                    return Ok(cached_evaluations);
+                }
+
+                debug!("⚠️ 缓存未命中，调用 LLM 进行重要性评估");
+            }
 
             let mut evaluations = Vec::new();
 
@@ -2773,6 +2877,19 @@ impl MemoryOrchestrator {
             }
 
             info!("重要性评估完成，生成 {} 个评估结果", evaluations.len());
+
+            // Phase 2 Task 2.2: 缓存结果
+            if let Some(cache) = &self.importance_cache {
+                let cache_content = structured_facts
+                    .iter()
+                    .map(|f| format!("{}:{}", f.description, f.fact_type))
+                    .collect::<Vec<_>>()
+                    .join("|");
+                let cache_key = agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(&cache_content);
+                cache.set(cache_key, evaluations.clone()).await;
+                debug!("✅ 重要性评估结果已缓存");
+            }
+
             Ok(evaluations)
         } else {
             // 降级：使用简化的重要性评估逻辑
