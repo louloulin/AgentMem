@@ -35,8 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     info!("✅ SDK 初始化完成");
 
-    // 2. 记忆创建压测
-    info!("\n📝 测试 1: 记忆创建性能");
+    // 2. 记忆创建压测（单条）
+    info!("\n📝 测试 1: 记忆创建性能（单条模式）");
     info!("{}", "-".repeat(60));
     let create_count = 100;
     let start = Instant::now();
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for i in 0..create_count {
         let content = format!("Test memory {} - Created at {}", i, chrono::Utc::now());
-        
+
         match memory.add_with_options(content, AddMemoryOptions::default()).await {
             Ok(result) => {
                 if !result.results.is_empty() {
@@ -68,13 +68,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let duration_secs = duration.as_secs_f64();
     let throughput = create_count as f64 / duration_secs;
 
-    info!("✅ 记忆创建完成:");
+    info!("✅ 记忆创建完成（单条模式）:");
     info!("   总数: {}", create_count);
     info!("   成功: {}", success);
     info!("   失败: {}", failed);
     info!("   耗时: {:.2}s", duration_secs);
     info!("   吞吐量: {:.2} ops/s", throughput);
     info!("   平均延迟: {:.2}ms", duration_secs * 1000.0 / create_count as f64);
+
+    // 2.5. 记忆创建压测（批量优化版）
+    info!("\n📝 测试 1.5: 记忆创建性能（批量优化版）");
+    info!("{}", "-".repeat(60));
+    let batch_count = 100;
+    let contents: Vec<String> = (0..batch_count)
+        .map(|i| format!("Batch test memory {} - Created at {}", i, chrono::Utc::now()))
+        .collect();
+
+    let start = Instant::now();
+    match memory.add_batch_optimized(contents, AddMemoryOptions::default()).await {
+        Ok(results) => {
+            let duration = start.elapsed();
+            let duration_secs = duration.as_secs_f64();
+            let throughput = batch_count as f64 / duration_secs;
+
+            info!("✅ 批量记忆创建完成（优化版）:");
+            info!("   总数: {}", batch_count);
+            info!("   成功: {}", results.len());
+            info!("   失败: {}", batch_count - results.len());
+            info!("   耗时: {:.2}s", duration_secs);
+            info!("   吞吐量: {:.2} ops/s", throughput);
+            info!("   平均延迟: {:.2}ms", duration_secs * 1000.0 / batch_count as f64);
+            info!("   🚀 性能提升: {:.2}x", throughput / (create_count as f64 / duration_secs));
+        }
+        Err(e) => {
+            warn!("批量记忆创建失败: {}", e);
+        }
+    }
 
     // 3. 记忆检索压测
     info!("\n🔍 测试 2: 记忆检索性能");
