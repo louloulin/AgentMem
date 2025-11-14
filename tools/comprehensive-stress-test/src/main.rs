@@ -19,12 +19,14 @@ use tracing::{info, warn};
 
 mod config;
 mod monitor;
+mod real_config;
 mod scenarios;
 mod stats;
 mod report;
 
 use config::StressTestConfig;
 use monitor::SystemMonitor;
+use real_config::{RealStressTestConfig, RealStressTestEnv};
 use scenarios::*;
 use stats::StressTestStats;
 use report::ReportGenerator;
@@ -59,27 +61,35 @@ struct Cli {
 enum Commands {
     /// 运行所有压测场景
     All,
-    
-    /// 场景 1: 记忆构建压测
+
+    /// 场景 1: 记忆构建压测（真实实现）
     MemoryCreation {
         /// 并发数
         #[arg(short, long, default_value = "100")]
         concurrency: usize,
-        
+
         /// 总记忆数
         #[arg(short, long, default_value = "10000")]
         total: usize,
+
+        /// 使用真实 SDK（默认启用）
+        #[arg(long, default_value = "true")]
+        real: bool,
     },
     
-    /// 场景 2: 记忆检索压测
+    /// 场景 2: 记忆检索压测（真实实现）
     MemoryRetrieval {
         /// 数据集大小
         #[arg(short, long, default_value = "100000")]
         dataset_size: usize,
-        
+
         /// 查询并发数
         #[arg(short, long, default_value = "100")]
         concurrency: usize,
+
+        /// 使用真实 SDK（默认启用）
+        #[arg(long, default_value = "true")]
+        real: bool,
     },
     
     /// 场景 3: 并发操作压测
@@ -118,11 +128,15 @@ enum Commands {
         cache_size_mb: usize,
     },
     
-    /// 场景 7: 批量操作压测
+    /// 场景 7: 批量操作压测（真实实现）
     BatchOperations {
         /// 批量大小
         #[arg(short, long, default_value = "100")]
         batch_size: usize,
+
+        /// 使用真实 SDK（默认启用）
+        #[arg(long, default_value = "true")]
+        real: bool,
     },
     
     /// 场景 8: 长时间稳定性测试
@@ -161,13 +175,37 @@ async fn main() -> Result<()> {
     println!("{} {}", ROCKET, style("AgentMem 综合压测工具").bold().cyan());
     println!();
 
+    // 初始化真实压测环境（如果需要）
+    let real_env = match &cli.command {
+        Commands::MemoryCreation { real, .. }
+        | Commands::MemoryRetrieval { real, .. }
+        | Commands::BatchOperations { real, .. } if *real => {
+            info!("🔧 初始化真实压测环境...");
+            let real_config = RealStressTestConfig::default();
+            Some(RealStressTestEnv::new(real_config).await?)
+        }
+        _ => None,
+    };
+
     match cli.command {
         Commands::All => run_all_scenarios(&config, &cli.output).await?,
-        Commands::MemoryCreation { concurrency, total } => {
-            run_memory_creation_test(concurrency, total, &cli.output).await?
+        Commands::MemoryCreation { concurrency, total, real } => {
+            if real {
+                if let Some(env) = &real_env {
+                    run_memory_creation_test_real(env, concurrency, total, &cli.output).await?
+                }
+            } else {
+                run_memory_creation_test(concurrency, total, &cli.output).await?
+            }
         }
-        Commands::MemoryRetrieval { dataset_size, concurrency } => {
-            run_memory_retrieval_test(dataset_size, concurrency, &cli.output).await?
+        Commands::MemoryRetrieval { dataset_size, concurrency, real } => {
+            if real {
+                if let Some(env) = &real_env {
+                    run_memory_retrieval_test_real(env, dataset_size, concurrency, &cli.output).await?
+                }
+            } else {
+                run_memory_retrieval_test(dataset_size, concurrency, &cli.output).await?
+            }
         }
         Commands::ConcurrentOps { users, duration } => {
             run_concurrent_ops_test(users, duration, &cli.output).await?
@@ -181,14 +219,28 @@ async fn main() -> Result<()> {
         Commands::CachePerformance { cache_size_mb } => {
             run_cache_performance_test(cache_size_mb, &cli.output).await?
         }
-        Commands::BatchOperations { batch_size } => {
-            run_batch_operations_test(batch_size, &cli.output).await?
+        Commands::BatchOperations { batch_size, real } => {
+            if real {
+                if let Some(env) = &real_env {
+                    run_batch_operations_test_real(env, batch_size, &cli.output).await?
+                }
+            } else {
+                run_batch_operations_test(batch_size, &cli.output).await?
+            }
         }
         Commands::StabilityTest { hours } => {
             run_stability_test(hours, &cli.output).await?
         }
         Commands::Report { results_dir } => {
             generate_report(&results_dir, &cli.output).await?
+        }
+    }
+
+    // 清理真实环境
+    if let Some(env) = real_env {
+        info!("🧹 清理测试数据...");
+        if let Err(e) = env.cleanup().await {
+            warn!("清理失败: {}", e);
         }
     }
 
@@ -277,13 +329,13 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     Ok(())
 }
 
-/// 运行记忆构建压测
+/// 运行记忆构建压测（Mock 版本）
 async fn run_memory_creation_test(
     concurrency: usize,
     total: usize,
     output_dir: &str,
 ) -> Result<()> {
-    println!("{} {}", FIRE, style("记忆构建压测").bold().yellow());
+    println!("{} {}", FIRE, style("记忆构建压测 (Mock)").bold().yellow());
     println!("  并发数: {}", concurrency);
     println!("  总记忆数: {}", total);
     println!();
@@ -293,7 +345,7 @@ async fn run_memory_creation_test(
 
     // 保存结果
     let report_gen = ReportGenerator::new(output_dir);
-    report_gen.save_scenario_stats("memory_creation", &stats).await?;
+    report_gen.save_scenario_stats("memory_creation_mock", &stats).await?;
 
     // 打印摘要
     print_stats_summary(&stats);
@@ -301,13 +353,64 @@ async fn run_memory_creation_test(
     Ok(())
 }
 
-// 其他场景的运行函数（简化版）
+/// 运行记忆构建压测（真实版本）
+async fn run_memory_creation_test_real(
+    env: &RealStressTestEnv,
+    concurrency: usize,
+    total: usize,
+    output_dir: &str,
+) -> Result<()> {
+    println!("{} {}", FIRE, style("记忆构建压测 (真实 SDK)").bold().green());
+    println!("  并发数: {}", concurrency);
+    println!("  总记忆数: {}", total);
+    println!("  数据库: PostgreSQL");
+    println!();
+
+    let multi_progress = MultiProgress::new();
+    let stats = memory_creation::run_test_real(env, concurrency, total, &multi_progress).await?;
+
+    // 保存结果
+    let report_gen = ReportGenerator::new(output_dir);
+    report_gen.save_scenario_stats("memory_creation_real", &stats).await?;
+
+    // 打印摘要
+    print_stats_summary(&stats);
+
+    // 打印数据库统计
+    if let Ok(db_stats) = env.get_db_stats().await {
+        println!();
+        println!("📊 数据库统计:");
+        println!("  记忆总数: {}", db_stats.memory_count);
+        println!("  向量总数: {}", db_stats.vector_count);
+        println!("  连接池大小: {}", db_stats.pool_size);
+        println!("  空闲连接: {}", db_stats.pool_idle);
+    }
+
+    Ok(())
+}
+
+// 其他场景的运行函数
 async fn run_memory_retrieval_test(dataset_size: usize, concurrency: usize, output_dir: &str) -> Result<()> {
-    println!("{} {}", FIRE, style("记忆检索压测").bold().yellow());
+    println!("{} {}", FIRE, style("记忆检索压测 (Mock)").bold().yellow());
     let multi_progress = MultiProgress::new();
     let stats = memory_retrieval::run_test(dataset_size, concurrency, &multi_progress).await?;
     let report_gen = ReportGenerator::new(output_dir);
-    report_gen.save_scenario_stats("memory_retrieval", &stats).await?;
+    report_gen.save_scenario_stats("memory_retrieval_mock", &stats).await?;
+    print_stats_summary(&stats);
+    Ok(())
+}
+
+async fn run_memory_retrieval_test_real(
+    env: &RealStressTestEnv,
+    dataset_size: usize,
+    concurrency: usize,
+    output_dir: &str,
+) -> Result<()> {
+    println!("{} {}", FIRE, style("记忆检索压测 (真实 SDK)").bold().green());
+    let multi_progress = MultiProgress::new();
+    let stats = memory_retrieval::run_test_real(env, dataset_size, concurrency, &multi_progress).await?;
+    let report_gen = ReportGenerator::new(output_dir);
+    report_gen.save_scenario_stats("memory_retrieval_real", &stats).await?;
     print_stats_summary(&stats);
     Ok(())
 }
@@ -353,11 +456,25 @@ async fn run_cache_performance_test(cache_size_mb: usize, output_dir: &str) -> R
 }
 
 async fn run_batch_operations_test(batch_size: usize, output_dir: &str) -> Result<()> {
-    println!("{} {}", FIRE, style("批量操作压测").bold().yellow());
+    println!("{} {}", FIRE, style("批量操作压测 (Mock)").bold().yellow());
     let multi_progress = MultiProgress::new();
     let stats = batch_operations::run_test(batch_size, &multi_progress).await?;
     let report_gen = ReportGenerator::new(output_dir);
-    report_gen.save_scenario_stats("batch_operations", &stats).await?;
+    report_gen.save_scenario_stats("batch_operations_mock", &stats).await?;
+    print_stats_summary(&stats);
+    Ok(())
+}
+
+async fn run_batch_operations_test_real(
+    env: &RealStressTestEnv,
+    batch_size: usize,
+    output_dir: &str,
+) -> Result<()> {
+    println!("{} {}", FIRE, style("批量操作压测 (真实 SDK)").bold().green());
+    let multi_progress = MultiProgress::new();
+    let stats = batch_operations::run_test_real(env, batch_size, &multi_progress).await?;
+    let report_gen = ReportGenerator::new(output_dir);
+    report_gen.save_scenario_stats("batch_operations_real", &stats).await?;
     print_stats_summary(&stats);
     Ok(())
 }

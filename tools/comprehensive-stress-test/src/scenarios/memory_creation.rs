@@ -1,4 +1,4 @@
-//! 场景 1: 记忆构建压测
+//! 场景 1: 记忆构建压测 - 真实实现
 
 use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -6,16 +6,25 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 use crate::monitor::SystemMonitor;
+use crate::real_config::RealStressTestEnv;
 use crate::stats::{StatsCollector, StressTestStats};
 
-pub async fn run_test(
+use agent_mem::AddMemoryOptions;
+
+/// 真实记忆创建压测
+///
+/// 使用 AgentMem SDK 真实创建记忆，替代 Mock 实现
+pub async fn run_test_real(
+    env: &RealStressTestEnv,
     concurrency: usize,
     total_memories: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("开始记忆构建压测: 并发={}, 总数={}", concurrency, total_memories);
+    info!("🚀 开始真实记忆构建压测: 并发={}, 总数={}", concurrency, total_memories);
+    info!("📊 使用真实 AgentMem SDK + PostgreSQL");
 
     // 创建进度条
     let pb = multi_progress.add(ProgressBar::new(total_memories as u64));
@@ -51,13 +60,14 @@ pub async fn run_test(
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let pb_clone = pb.clone();
         let stats_clone = stats_collector.clone();
+        let memory_clone = env.memory.clone();
 
         let handle = tokio::spawn(async move {
             let _permit = permit;
             let op_start = Instant::now();
 
-            // 模拟记忆创建操作
-            let success = simulate_memory_creation(i).await;
+            // ✅ 真实记忆创建 - 使用 AgentMem SDK
+            let success = real_memory_creation(&memory_clone, i).await;
 
             let duration = op_start.elapsed();
             stats_clone.record_operation(duration, success).await;
@@ -92,12 +102,40 @@ pub async fn run_test(
     Ok(stats)
 }
 
-async fn simulate_memory_creation(index: usize) -> bool {
-    // 模拟记忆创建的延迟
-    let delay_ms = 5 + (index % 20) as u64; // 5-25ms
-    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+/// 真实记忆创建
+///
+/// 使用 AgentMem SDK 真实创建记忆到 PostgreSQL
+async fn real_memory_creation(memory: &agent_mem::Memory, index: usize) -> bool {
+    let content = format!(
+        "Test memory content {} - Created at {} - UUID: {}",
+        index,
+        chrono::Utc::now().to_rfc3339(),
+        Uuid::new_v4()
+    );
 
-    // 模拟 99% 成功率
+    let options = AddMemoryOptions::default();
+
+    match memory.add_with_options(content, options).await {
+        Ok(result) => {
+            // 成功创建记忆
+            !result.results.is_empty()
+        }
+        Err(e) => {
+            // 记录错误但不中断测试
+            if index % 100 == 0 {
+                warn!("记忆创建失败 (index={}): {}", index, e);
+            }
+            false
+        }
+    }
+}
+
+/// 保留旧的 Mock 实现用于对比
+#[allow(dead_code)]
+async fn simulate_memory_creation_mock(index: usize) -> bool {
+    // ❌ Mock 实现 - 仅用于性能对比
+    let delay_ms = 5 + (index % 20) as u64;
+    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     index % 100 != 0
 }
 

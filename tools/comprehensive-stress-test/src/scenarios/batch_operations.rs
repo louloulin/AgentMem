@@ -1,19 +1,28 @@
-//! 场景 7: 批量操作压测
+//! 场景 7: 批量操作压测 - 真实实现
 
 use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::info;
+use tracing::{info, warn};
+use uuid::Uuid;
 
 use crate::monitor::SystemMonitor;
+use crate::real_config::RealStressTestEnv;
 use crate::stats::{StatsCollector, StressTestStats};
 
-pub async fn run_test(
+use agent_mem::AddMemoryOptions;
+
+/// 真实批量操作压测
+///
+/// 使用 AgentMem SDK 真实批量添加记忆，替代 Mock 实现
+pub async fn run_test_real(
+    env: &RealStressTestEnv,
     batch_size: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("开始批量操作压测: 批量大小={}", batch_size);
+    info!("🚀 开始真实批量操作压测: 批量大小={}", batch_size);
+    info!("📊 使用真实 AgentMem SDK 批量 API");
 
     let total_batches = 100;
     let pb = multi_progress.add(ProgressBar::new(total_batches as u64));
@@ -39,9 +48,11 @@ pub async fn run_test(
 
     for i in 0..total_batches {
         let op_start = Instant::now();
-        let success = simulate_batch_operation(batch_size, i).await;
+
+        // ✅ 真实批量操作 - 使用 AgentMem SDK
+        let success = real_batch_operation(&env.memory, batch_size, i).await;
+
         let duration = op_start.elapsed();
-        
         stats_collector.record_operation(duration, success).await;
         pb.inc(1);
     }
@@ -62,3 +73,38 @@ async fn simulate_batch_operation(batch_size: usize, _batch_index: usize) -> boo
     true
 }
 
+/// 真实批量操作
+///
+/// 使用 AgentMem SDK 批量添加记忆
+async fn real_batch_operation(
+    memory: &agent_mem::Memory,
+    batch_size: usize,
+    batch_index: usize,
+) -> bool {
+    // 生成批量内容
+    let mut contents = Vec::with_capacity(batch_size);
+    for i in 0..batch_size {
+        contents.push(format!(
+            "Batch {} item {} - UUID: {} - Timestamp: {}",
+            batch_index,
+            i,
+            Uuid::new_v4(),
+            chrono::Utc::now().to_rfc3339()
+        ));
+    }
+
+    let options = AddMemoryOptions::default();
+
+    match memory.add_batch(contents, options).await {
+        Ok(results) => {
+            // 成功批量添加
+            results.len() == batch_size
+        }
+        Err(e) => {
+            if batch_index % 10 == 0 {
+                warn!("批量操作失败 (batch={}): {}", batch_index, e);
+            }
+            false
+        }
+    }
+}

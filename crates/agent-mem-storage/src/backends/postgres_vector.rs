@@ -520,12 +520,23 @@ impl VectorStore for PostgresVectorStore {
 
     async fn health_check(&self) -> Result<HealthStatus> {
         // 检查数据库连接
-        sqlx::query("SELECT 1")
+        match sqlx::query("SELECT 1")
             .fetch_one(self.pool.as_ref())
             .await
-            .map_err(|e| AgentMemError::storage_error(&format!("Health check failed: {}", e)))?;
-
-        Ok(HealthStatus::Healthy)
+        {
+            Ok(_) => Ok(HealthStatus {
+                status: "healthy".to_string(),
+                message: "PostgreSQL vector store is operational".to_string(),
+                timestamp: chrono::Utc::now(),
+                details: std::collections::HashMap::new(),
+            }),
+            Err(e) => Ok(HealthStatus {
+                status: "unhealthy".to_string(),
+                message: format!("Health check failed: {}", e),
+                timestamp: chrono::Utc::now(),
+                details: std::collections::HashMap::new(),
+            }),
+        }
     }
 
     async fn get_stats(&self) -> Result<VectorStoreStats> {
@@ -534,7 +545,7 @@ impl VectorStore for PostgresVectorStore {
         Ok(VectorStoreStats {
             total_vectors: count,
             dimension: self.config.dimension,
-            index_type: self.config.index_type.clone(),
+            index_size: 0, // TODO: 实现索引大小计算
         })
     }
 
