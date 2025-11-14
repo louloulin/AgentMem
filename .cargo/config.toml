@@ -1,0 +1,12 @@
+# Cargo 构建配置
+
+[env]
+# 强制 ort crate 下载 ONNX Runtime 二进制文件
+# 这样可以避免使用系统中不兼容的版本
+ORT_STRATEGY = "download"
+ORT_USE_SYSTEM_LIB = "0"
+
+[build]
+# 增加并行编译任务数
+jobs = 8
+
