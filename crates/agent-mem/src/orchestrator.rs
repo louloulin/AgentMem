@@ -694,9 +694,25 @@ impl MemoryOrchestrator {
             "fastembed" => {
                 #[cfg(feature = "fastembed")]
                 {
-                    match EmbeddingFactory::create_default().await {
+                    // 获取模型名称（从配置或环境变量）
+                    let model = match &config.embedder_model {
+                        Some(m) => m.clone(),
+                        None => {
+                            // 尝试从环境变量获取
+                            match std::env::var("FASTEMBED_MODEL") {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    info!("未配置 Embedder Model，使用默认值: multilingual-e5-small");
+                                    "multilingual-e5-small".to_string()
+                                }
+                            }
+                        }
+                    };
+
+                    match EmbeddingFactory::create_fastembed(&model).await {
                         Ok(embedder) => {
-                            info!("成功创建 FastEmbed Embedder (multilingual-e5-small, 384维)");
+                            let dim = embedder.dimension();
+                            info!("成功创建 FastEmbed Embedder ({}, {}维)", model, dim);
                             Ok(Some(embedder))
                         }
                         Err(e) => {
