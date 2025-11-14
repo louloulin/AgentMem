@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         llm_provider: None,
         llm_model: None,
         embedder_provider: Some("fastembed".to_string()),
-        embedder_model: Some("bge-small-en-v1.5".to_string()),
+        embedder_model: Some("all-MiniLM-L6-v2".to_string()), // 更快的嵌入模型
         vector_store_url: Some("./data/perf_lancedb".to_string()),
         enable_intelligent_features: false,
     };
