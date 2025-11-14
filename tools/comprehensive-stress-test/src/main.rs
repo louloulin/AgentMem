@@ -382,8 +382,6 @@ async fn run_memory_creation_test_real(
         println!("📊 数据库统计:");
         println!("  记忆总数: {}", db_stats.memory_count);
         println!("  向量总数: {}", db_stats.vector_count);
-        println!("  连接池大小: {}", db_stats.pool_size);
-        println!("  空闲连接: {}", db_stats.pool_idle);
     }
 
     Ok(())

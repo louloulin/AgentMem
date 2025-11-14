@@ -991,6 +991,163 @@ impl MemoryOrchestrator {
         }
     }
 
+    /// 添加记忆 (快速模式，并行写入)
+    ///
+    /// Phase 1 优化: 并行写入 CoreMemoryManager、VectorStore 和 HistoryManager
+    /// 目标: 10,000+ ops/s
+    pub async fn add_memory_fast(
+        &self,
+        content: String,
+        agent_id: String,
+        user_id: Option<String>,
+        memory_type: Option<MemoryType>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<String> {
+        info!(
+            "添加记忆 (快速模式): content={}, agent_id={}",
+            content, agent_id
+        );
+
+        let memory_id = uuid::Uuid::new_v4().to_string();
+
+        // Step 1: 生成向量嵌入
+        let embedding = if let Some(embedder) = &self.embedder {
+            match embedder.embed(&content).await {
+                Ok(emb) => {
+                    debug!("✅ 生成嵌入向量，维度: {}", emb.len());
+                    emb
+                }
+                Err(e) => {
+                    error!("生成嵌入失败: {}, 中止操作", e);
+                    return Err(agent_mem_traits::AgentMemError::EmbeddingError(format!(
+                        "Failed to generate embedding: {}",
+                        e
+                    )));
+                }
+            }
+        } else {
+            error!("Embedder 未初始化，中止操作");
+            return Err(agent_mem_traits::AgentMemError::embedding_error(
+                "Embedder not initialized",
+            ));
+        };
+
+        // Step 2: 准备 metadata
+        use agent_mem_utils::hash::compute_content_hash;
+        let content_hash = compute_content_hash(&content);
+
+        let mut full_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+        full_metadata.insert("data".to_string(), serde_json::json!(content.clone()));
+        full_metadata.insert("hash".to_string(), serde_json::json!(content_hash));
+        full_metadata.insert(
+            "created_at".to_string(),
+            serde_json::json!(chrono::Utc::now().to_rfc3339()),
+        );
+
+        let actual_user_id = user_id.unwrap_or_else(|| "default".to_string());
+        full_metadata.insert("user_id".to_string(), serde_json::json!(actual_user_id));
+        full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
+
+        let scope_type = infer_scope_type(&actual_user_id, &agent_id, &metadata);
+        full_metadata.insert("scope_type".to_string(), serde_json::json!(scope_type));
+
+        if let Some(custom_meta) = metadata {
+            for (k, v) in custom_meta {
+                full_metadata.insert(k, v);
+            }
+        }
+
+        // Step 3: 并行写入 CoreMemoryManager、VectorStore 和 HistoryManager
+        let core_manager = self.core_manager.clone();
+        let vector_store = self.vector_store.clone();
+        let history_manager = self.history_manager.clone();
+
+        let (core_result, vector_result, history_result) = tokio::join!(
+            // 并行任务 1: 存储到 CoreMemoryManager
+            async move {
+                let content_clone = content.clone();
+                if let Some(manager) = core_manager {
+                    manager.create_persona_block(content_clone, None).await.map(|_| ()).map_err(|e| e.to_string())
+                } else {
+                    Ok::<(), String>(())
+                }
+            },
+            // 并行任务 2: 存储到 VectorStore
+            async move {
+                let memory_id_clone = memory_id.clone();
+                let embedding_clone = embedding.clone();
+                let full_metadata_clone = full_metadata.clone();
+
+                if let Some(store) = vector_store {
+                    let string_metadata: HashMap<String, String> = full_metadata_clone
+                        .iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect();
+
+                    let vector_data = agent_mem_traits::VectorData {
+                        id: memory_id_clone,
+                        vector: embedding_clone,
+                        metadata: string_metadata,
+                    };
+
+                    store.add_vectors(vec![vector_data]).await.map(|_| ()).map_err(|e| e.to_string())
+                } else {
+                    Ok::<(), String>(())
+                }
+            },
+            // 并行任务 3: 记录历史
+            async move {
+                let content_clone = content.clone();
+                let memory_id_clone = memory_id.clone();
+
+                if let Some(history) = history_manager {
+                    let entry = crate::history::HistoryEntry {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        memory_id: memory_id_clone,
+                        old_memory: None,
+                        new_memory: Some(content_clone),
+                        event: "ADD".to_string(),
+                        created_at: chrono::Utc::now(),
+                        updated_at: None,
+                        is_deleted: false,
+                        actor_id: None,
+                        role: Some("user".to_string()),
+                    };
+
+                    history.add_history(entry).await.map(|_| ()).map_err(|e| e.to_string())
+                } else {
+                    Ok::<(), String>(())
+                }
+            }
+        );
+
+        // 检查结果
+        if let Err(e) = core_result {
+            error!("存储到 CoreMemoryManager 失败: {:?}", e);
+            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
+                "Failed to store to CoreMemoryManager: {:?}",
+                e
+            )));
+        }
+
+        if let Err(e) = vector_result {
+            error!("存储到 VectorStore 失败: {}", e);
+            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
+                "Failed to store to VectorStore: {}",
+                e
+            )));
+        }
+
+        if let Err(e) = history_result {
+            error!("记录历史失败: {}", e);
+            // 历史记录失败不影响主流程，只记录警告
+            warn!("历史记录失败，但记忆已成功添加: {}", e);
+        }
+
+        info!("✅ 记忆添加完成（并行写入）: {}", memory_id);
+        Ok(memory_id)
+    }
+
     /// 添加记忆 (简单模式，不使用智能推理)
     ///
     /// 直接添加原始内容，不进行事实提取、去重等智能处理
@@ -1891,8 +2048,8 @@ impl MemoryOrchestrator {
             self.add_memory_intelligent(content, agent_id, user_id, metadata)
                 .await
         } else {
-            // infer=false: 使用简单模式（直接添加原始内容）
-            info!("使用简单模式 (infer=false)");
+            // infer=false: 使用快速模式（并行写入，无LLM调用）
+            info!("使用快速模式 (infer=false)");
 
             // 解析 memory_type 字符串
             let mem_type = if let Some(type_str) = memory_type {
@@ -1907,9 +2064,9 @@ impl MemoryOrchestrator {
                 None
             };
 
-            // 调用简单添加方法
+            // 调用快速添加方法（Phase 1 优化：并行写入）
             let memory_id = self
-                .add_memory(
+                .add_memory_fast(
                     content.clone(),
                     agent_id.clone(),
                     user_id.clone(),

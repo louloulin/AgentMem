@@ -5,15 +5,14 @@ edition = "2021"
 
 [dependencies]
 # AgentMem dependencies - 使用真实 SDK
-agent-mem = { path = "../../crates/agent-mem", features = ["postgres", "libsql", "fastembed"] }
+agent-mem = { path = "../../crates/agent-mem", features = ["libsql", "fastembed"] }
 agent-mem-traits = { path = "../../crates/agent-mem-traits" }
-agent-mem-core = { path = "../../crates/agent-mem-core", features = ["postgres"] }
+agent-mem-core = { path = "../../crates/agent-mem-core" }
 agent-mem-performance = { path = "../../crates/agent-mem-performance" }
-agent-mem-storage = { path = "../../crates/agent-mem-storage", features = ["postgres", "libsql"] }
+agent-mem-storage = { path = "../../crates/agent-mem-storage", features = ["libsql"] }
 agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings", features = ["fastembed"] }
 
 # Database - 使用与 agent-mem 相同的版本
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 libsql = "0.6"
 
 # UUID
