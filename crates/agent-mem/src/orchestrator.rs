@@ -1449,91 +1449,102 @@ impl MemoryOrchestrator {
             }
         }
 
-        // Step 4: 存储到 CoreMemoryManager（带事务支持）
-        // P0修复: 记录每个成功的步骤，失败时回滚
-        if let Some(core_manager) = &self.core_manager {
-            info!("Commit Phase 1/3: 存储到 CoreMemoryManager");
-            match core_manager
-                .create_persona_block(content.clone(), None)
-                .await
-            {
-                Ok(_) => {
-                    completed_steps.push("core_manager");
-                    info!("✅ 已存储到 CoreMemoryManager");
+        // ========== Phase 3: 并行存储优化 ==========
+        // Step 4-6: 并行执行三个独立的存储操作
+        // 目标: 从顺序执行70ms降到并行执行20ms
+        info!("🚀 Phase 3: 并行执行存储操作 (CoreManager + VectorStore + History)");
+
+        // 准备向量数据
+        let string_metadata: HashMap<String, String> = full_metadata
+            .iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect();
+
+        let vector_data = agent_mem_traits::VectorData {
+            id: memory_id.clone(),
+            vector: embedding,
+            metadata: string_metadata,
+        };
+
+        // 准备历史记录
+        let history_entry = crate::history::HistoryEntry {
+            id: uuid::Uuid::new_v4().to_string(),
+            memory_id: memory_id.clone(),
+            old_memory: None,
+            new_memory: Some(content.clone()),
+            event: "ADD".to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: None,
+            is_deleted: false,
+            actor_id: None,
+            role: Some("user".to_string()),
+        };
+
+        // 并行执行三个存储操作
+        let (core_result, vector_result, history_result) = tokio::join!(
+            // Task 1: 存储到 CoreMemoryManager
+            async {
+                if let Some(core_manager) = &self.core_manager {
+                    info!("并行任务 1/3: 存储到 CoreMemoryManager");
+                    core_manager.create_persona_block(content.clone(), None).await
+                } else {
+                    Ok(())
                 }
-                Err(e) => {
-                    error!("存储到 CoreMemoryManager 失败: {:?}", e);
-                    return self
-                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
-                        .await;
+            },
+            // Task 2: 存储到向量库
+            async {
+                if let Some(vector_store) = &self.vector_store {
+                    info!("并行任务 2/3: 存储到向量库");
+                    vector_store.add_vectors(vec![vector_data]).await
+                } else {
+                    debug!("向量存储未初始化，跳过向量存储");
+                    Ok(())
+                }
+            },
+            // Task 3: 记录历史
+            async {
+                if let Some(history) = &self.history_manager {
+                    info!("并行任务 3/3: 记录操作历史");
+                    history.add_history(history_entry).await
+                } else {
+                    debug!("历史管理器未初始化，跳过历史记录");
+                    Ok(())
                 }
             }
-        }
+        );
 
-        // Step 5: 存储到向量库（带事务支持）
-        if let Some(vector_store) = &self.vector_store {
-            info!("Commit Phase 2/3: 存储到向量库");
-
-            // 转换 metadata: HashMap<String, Value> -> HashMap<String, String>
-            let string_metadata: HashMap<String, String> = full_metadata
-                .iter()
-                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                .collect();
-
-            let vector_data = agent_mem_traits::VectorData {
-                id: memory_id.clone(),
-                vector: embedding,
-                metadata: string_metadata,
-            };
-
-            match vector_store.add_vectors(vec![vector_data]).await {
-                Ok(_) => {
-                    completed_steps.push("vector_store");
-                    info!("✅ 已存储到向量库");
-                }
-                Err(e) => {
-                    error!("存储到向量库失败: {}", e);
-                    return self
-                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
-                        .await;
-                }
-            }
+        // 检查结果并处理错误
+        if let Err(e) = core_result {
+            error!("存储到 CoreMemoryManager 失败: {:?}", e);
+            return self
+                .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                .await;
         } else {
-            debug!("向量存储未初始化，跳过向量存储");
+            completed_steps.push("core_manager");
+            info!("✅ 已存储到 CoreMemoryManager");
         }
 
-        // Step 6: 记录历史（带事务支持）
-        if let Some(history) = &self.history_manager {
-            info!("Commit Phase 3/3: 记录操作历史");
-
-            let entry = crate::history::HistoryEntry {
-                id: uuid::Uuid::new_v4().to_string(),
-                memory_id: memory_id.clone(),
-                old_memory: None,
-                new_memory: Some(content.clone()),
-                event: "ADD".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: None,
-                is_deleted: false,
-                actor_id: None,
-                role: Some("user".to_string()),
-            };
-
-            match history.add_history(entry).await {
-                Ok(_) => {
-                    completed_steps.push("history_manager");
-                    info!("✅ 已记录操作历史");
-                }
-                Err(e) => {
-                    error!("记录历史失败: {}", e);
-                    return self
-                        .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
-                        .await;
-                }
-            }
+        if let Err(e) = vector_result {
+            error!("存储到向量库失败: {}", e);
+            return self
+                .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                .await;
         } else {
-            debug!("历史管理器未初始化，跳过历史记录");
+            completed_steps.push("vector_store");
+            info!("✅ 已存储到向量库");
         }
+
+        if let Err(e) = history_result {
+            error!("记录历史失败: {}", e);
+            return self
+                .rollback_add_memory(completed_steps, memory_id.clone(), e.to_string())
+                .await;
+        } else {
+            completed_steps.push("history_manager");
+            info!("✅ 已记录操作历史");
+        }
+
+        info!("✅ Phase 3 并行存储完成");
 
         info!("✅ 记忆添加完成（事务提交成功）: {}", memory_id);
         Ok(memory_id)
