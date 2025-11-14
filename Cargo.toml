@@ -45,6 +45,8 @@ members = [
     "tools/libsql-stress-test",  # LibSQL 真实压测工具
     "tools/simple-perf-test",    # Phase 1 性能测试工具
     "tools/intelligent-mode-test", # Phase 2 智能模式性能测试工具
+    "tools/phase3-parallel-test", # Phase 3 并行存储性能测试工具
+    "tools/batch-mode-test",     # Phase 4 批量模式性能测试工具
     # "tools/agent-mem-server",
     # "tools/agent-mem-bench",
 

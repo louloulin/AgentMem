@@ -1486,29 +1486,38 @@ impl MemoryOrchestrator {
             async {
                 if let Some(core_manager) = &self.core_manager {
                     info!("并行任务 1/3: 存储到 CoreMemoryManager");
-                    core_manager.create_persona_block(content.clone(), None).await
+                    core_manager.create_persona_block(content.clone(), None)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
-                    Ok(())
+                    Ok::<(), String>(())
                 }
             },
             // Task 2: 存储到向量库
             async {
                 if let Some(vector_store) = &self.vector_store {
                     info!("并行任务 2/3: 存储到向量库");
-                    vector_store.add_vectors(vec![vector_data]).await
+                    vector_store.add_vectors(vec![vector_data])
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
                     debug!("向量存储未初始化，跳过向量存储");
-                    Ok(())
+                    Ok::<(), String>(())
                 }
             },
             // Task 3: 记录历史
             async {
                 if let Some(history) = &self.history_manager {
                     info!("并行任务 3/3: 记录操作历史");
-                    history.add_history(history_entry).await
+                    history.add_history(history_entry)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
                     debug!("历史管理器未初始化，跳过历史记录");
-                    Ok(())
+                    Ok::<(), String>(())
                 }
             }
         );
