@@ -28,7 +28,7 @@ Cargo.lock
 zig-cache/
 zig-out/
 .zig-cache/
-
+source/
 # Zig build artifacts
 build/
 dist/
