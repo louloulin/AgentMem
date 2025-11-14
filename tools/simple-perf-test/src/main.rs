@@ -124,8 +124,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   吞吐量: {:.2} ops/s", throughput);
     println!();
 
-    // 测试 4: 性能对比
-    println!("📊 测试 4: 性能对比（单个 vs 批量）");
+    // 测试 4: 批量添加 1000 个记忆（Task 1.2 验证 - 大批量）
+    println!("📊 测试 4: 批量添加 1000 个记忆（Task 1.2 验证）");
+    println!("─────────────────────────────────────");
+
+    let items: Vec<_> = (0..1000)
+        .map(|i| {
+            (
+                format!("Large batch test memory {}", i),
+                "test_agent".to_string(),
+                Some("test_user".to_string()),
+                Some(MemoryType::Core),
+                None,
+            )
+        })
+        .collect();
+
+    let start = Instant::now();
+    let memory_ids = orchestrator.add_memories_batch(items).await?;
+    let duration = start.elapsed();
+
+    let throughput_1000 = 1000000.0 / duration.as_millis() as f64;
+    let avg_latency_1000 = duration.as_micros() as f64 / 1000.0;
+
+    println!("✅ 测试完成");
+    println!("   记忆数量: {}", memory_ids.len());
+    println!("   总时间: {:?}", duration);
+    println!("   平均延迟: {:.2}ms", avg_latency_1000 / 1000.0);
+    println!("   吞吐量: {:.2} ops/s", throughput_1000);
+    println!();
+
+    // 测试 5: 性能对比（单个 vs 批量）
+    println!("📊 测试 5: 性能对比（单个 vs 批量）");
     println!("─────────────────────────────────────");
     
     // 单个添加 10 次
@@ -180,10 +210,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Task 1.1 (单个添加): {:.2} ops/s", throughput * 10.0);
     println!("   Task 1.2 (批量10个): {:.2} ops/s", batch_throughput);
     println!("   Task 1.2 (批量100个): 见测试3结果");
+    println!("   Task 1.2 (批量1000个): {:.2} ops/s", throughput_1000);
     println!();
     println!("🎯 目标达成情况:");
-    if batch_throughput >= 500.0 {
-        println!("   ✅ 批量模式已达到预期性能");
+    if throughput_1000 >= 10000.0 {
+        println!("   ✅ 批量模式达到 10,000+ ops/s 目标！");
+    } else if throughput_1000 >= 5000.0 {
+        println!("   ✅ 批量模式达到 5,000+ ops/s 目标！");
+    } else if throughput_1000 >= 1000.0 {
+        println!("   ⚠️  批量模式达到 1,000+ ops/s，但未达到 10,000+ ops/s 目标");
     } else {
         println!("   ⚠️  批量模式未达到预期性能，需要进一步优化");
     }
