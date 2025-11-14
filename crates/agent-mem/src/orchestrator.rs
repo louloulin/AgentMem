@@ -1062,31 +1062,34 @@ impl MemoryOrchestrator {
         let vector_store = self.vector_store.clone();
         let history_manager = self.history_manager.clone();
 
+        // 为每个async块准备独立的clone
+        let content_for_core = content.clone();
+        let content_for_history = content.clone();
+        let memory_id_for_vector = memory_id.clone();
+        let memory_id_for_history = memory_id.clone();
+        let embedding_for_vector = embedding.clone();
+        let full_metadata_for_vector = full_metadata.clone();
+
         let (core_result, vector_result, history_result) = tokio::join!(
             // 并行任务 1: 存储到 CoreMemoryManager
             async move {
-                let content_clone = content.clone();
                 if let Some(manager) = core_manager {
-                    manager.create_persona_block(content_clone, None).await.map(|_| ()).map_err(|e| e.to_string())
+                    manager.create_persona_block(content_for_core, None).await.map(|_| ()).map_err(|e| e.to_string())
                 } else {
                     Ok::<(), String>(())
                 }
             },
             // 并行任务 2: 存储到 VectorStore
             async move {
-                let memory_id_clone = memory_id.clone();
-                let embedding_clone = embedding.clone();
-                let full_metadata_clone = full_metadata.clone();
-
                 if let Some(store) = vector_store {
-                    let string_metadata: HashMap<String, String> = full_metadata_clone
+                    let string_metadata: HashMap<String, String> = full_metadata_for_vector
                         .iter()
                         .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                         .collect();
 
                     let vector_data = agent_mem_traits::VectorData {
-                        id: memory_id_clone,
-                        vector: embedding_clone,
+                        id: memory_id_for_vector,
+                        vector: embedding_for_vector,
                         metadata: string_metadata,
                     };
 
@@ -1097,15 +1100,12 @@ impl MemoryOrchestrator {
             },
             // 并行任务 3: 记录历史
             async move {
-                let content_clone = content.clone();
-                let memory_id_clone = memory_id.clone();
-
                 if let Some(history) = history_manager {
                     let entry = crate::history::HistoryEntry {
                         id: uuid::Uuid::new_v4().to_string(),
-                        memory_id: memory_id_clone,
+                        memory_id: memory_id_for_history,
                         old_memory: None,
-                        new_memory: Some(content_clone),
+                        new_memory: Some(content_for_history),
                         event: "ADD".to_string(),
                         created_at: chrono::Utc::now(),
                         updated_at: None,
