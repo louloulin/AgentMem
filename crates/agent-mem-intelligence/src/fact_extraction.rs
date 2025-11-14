@@ -211,31 +211,50 @@ impl FactExtractor {
 
     /// 从消息中提取事实（增强版本）- 内部实现
     pub async fn extract_facts_internal(&self, messages: &[Message]) -> Result<Vec<ExtractedFact>> {
+        info!("🔵 开始提取事实，消息数量: {}", messages.len());
+
         if messages.is_empty() {
+            info!("⚠️  消息为空，跳过提取");
             return Ok(vec![]);
         }
 
         let conversation = self.format_conversation(messages);
+        info!("   对话长度: {} 字符", conversation.len());
 
         // P1 优化 #1: 检查缓存
         if let Some(cache) = &self.cache {
             let cache_key = LruCacheWrapper::<Vec<ExtractedFact>>::compute_key(&conversation);
             if let Some(cached_facts) = cache.get(&cache_key) {
-                info!("✅ 缓存命中，直接返回事实");
+                info!("✅ 缓存命中，直接返回 {} 个事实", cached_facts.len());
                 return Ok(cached_facts);
             }
+            info!("   缓存未命中");
         }
 
         let prompt = self.build_enhanced_extraction_prompt(&conversation);
+        info!("   Prompt 长度: {} 字符", prompt.len());
+        debug!("   Prompt 内容: {}", prompt);
 
         // P0 优化 #2: 添加超时控制
+        info!("🔵 调用 LLM 提取事实（超时: {}秒）...", self.timeout_config.fact_extraction_timeout_secs);
+        let llm_start = std::time::Instant::now();
+
         let llm = self.llm.clone();
         let response_text = with_timeout(
-            async move { llm.generate(&[Message::user(&prompt)]).await },
+            async move {
+                info!("   LLM 调用开始...");
+                let result = llm.generate(&[Message::user(&prompt)]).await;
+                info!("   LLM 调用完成");
+                result
+            },
             self.timeout_config.fact_extraction_timeout_secs,
             "fact_extraction",
         )
         .await?;
+
+        let llm_duration = llm_start.elapsed();
+        info!("✅ LLM 调用完成，耗时: {:?}", llm_duration);
+        info!("   响应长度: {} 字符", response_text.len());
 
         // 尝试提取 JSON 部分
         let json_text = self.extract_json_from_response(&response_text)?;

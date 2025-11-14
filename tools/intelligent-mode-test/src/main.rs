@@ -16,12 +16,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("================================\n");
 
     // 创建 Orchestrator（启用智能功能）
+    // 优先使用 Zhipu AI，如果没有配置则使用 OpenAI
+    let (llm_provider, llm_model) = if std::env::var("ZHIPU_API_KEY").is_ok() {
+        println!("🔧 使用 Zhipu AI (GLM-4.6)");
+        ("zhipu".to_string(), "glm-4.6".to_string())
+    } else if std::env::var("OPENAI_API_KEY").is_ok() {
+        println!("🔧 使用 OpenAI (GPT-3.5-Turbo)");
+        ("openai".to_string(), "gpt-3.5-turbo".to_string())
+    } else {
+        println!("⚠️  未配置 LLM API Key，将自动降级到快速模式");
+        ("openai".to_string(), "gpt-3.5-turbo".to_string())
+    };
+
     let config = OrchestratorConfig {
         storage_url: Some("libsql://./data/intelligent_test.db".to_string()),
-        llm_provider: Some("openai".to_string()),
-        llm_model: Some("gpt-3.5-turbo".to_string()),
+        llm_provider: Some(llm_provider),
+        llm_model: Some(llm_model),
         embedder_provider: Some("fastembed".to_string()),
-        embedder_model: Some("bge-small-en-v1.5".to_string()),
+        embedder_model: Some("all-MiniLM-L6-v2".to_string()),
         vector_store_url: Some("./data/intelligent_lancedb".to_string()),
         enable_intelligent_features: true,
     };

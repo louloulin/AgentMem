@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::{debug, info, warn};
 
 /// Zhipu AI API请求结构
 #[derive(Debug, Serialize)]
@@ -166,6 +167,8 @@ impl ZhipuProvider {
 #[async_trait]
 impl LLMProvider for ZhipuProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
+        let start_time = std::time::Instant::now();
+
         let api_key = self.config.api_key.as_ref().ok_or_else(|| {
             AgentMemError::ConfigError("Zhipu API key not configured".to_string())
         })?;
@@ -178,6 +181,12 @@ impl LLMProvider for ZhipuProvider {
 
         let url = format!("{base_url}/chat/completions");
 
+        info!("🔵 Zhipu API 请求开始");
+        info!("   模型: {}", self.config.model);
+        info!("   URL: {}", url);
+        info!("   消息数量: {}", messages.len());
+        debug!("   消息内容: {:?}", messages);
+
         let request = ZhipuRequest {
             model: self.config.model.clone(),
             messages: self.convert_messages(messages),
@@ -189,21 +198,38 @@ impl LLMProvider for ZhipuProvider {
             tool_choice: None,
         };
 
+        debug!("   请求体: {:?}", serde_json::to_string(&request).unwrap_or_default());
+
+        info!("🔵 发送 HTTP 请求...");
+        let http_start = std::time::Instant::now();
+
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Authorization", format!("Bearer {}***", &api_key[..10]))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {e}")))?;
+            .map_err(|e| {
+                warn!("❌ HTTP 请求失败: {}", e);
+                AgentMemError::LLMError(format!("Failed to send request: {e}"))
+            })?;
 
-        if !response.status().is_success() {
+        let http_duration = http_start.elapsed();
+        info!("✅ HTTP 响应收到，耗时: {:?}", http_duration);
+
+        let status = response.status();
+        info!("   HTTP 状态码: {}", status);
+
+        if !status.is_success() {
+            warn!("❌ HTTP 状态码错误: {}", status);
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
+
+            warn!("   错误响应: {}", error_text);
 
             if let Ok(error_response) = serde_json::from_str::<ZhipuErrorResponse>(&error_text) {
                 return Err(AgentMemError::LLMError(format!(
@@ -217,16 +243,42 @@ impl LLMProvider for ZhipuProvider {
             )));
         }
 
+        info!("🔵 解析 JSON 响应...");
+        let parse_start = std::time::Instant::now();
+
         let zhipu_response: ZhipuResponse = response
             .json()
             .await
-            .map_err(|e| AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}")))?;
+            .map_err(|e| {
+                warn!("❌ JSON 解析失败: {}", e);
+                AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
+            })?;
 
-        zhipu_response
+        let parse_duration = parse_start.elapsed();
+        info!("✅ JSON 解析完成，耗时: {:?}", parse_duration);
+
+        let total_duration = start_time.elapsed();
+        info!("✅ Zhipu API 调用完成，总耗时: {:?}", total_duration);
+        info!("   Token 使用: prompt={}, completion={}, total={}",
+            zhipu_response.usage.prompt_tokens,
+            zhipu_response.usage.completion_tokens,
+            zhipu_response.usage.total_tokens);
+
+        let result = zhipu_response
             .choices
             .first()
-            .map(|choice| choice.message.content.clone())
-            .ok_or_else(|| AgentMemError::LLMError("No response from Zhipu".to_string()))
+            .map(|choice| {
+                let content = choice.message.content.clone();
+                info!("   响应长度: {} 字符", content.len());
+                debug!("   响应内容: {}", content);
+                content
+            })
+            .ok_or_else(|| {
+                warn!("❌ Zhipu 响应中没有内容");
+                AgentMemError::LLMError("No response from Zhipu".to_string())
+            })?;
+
+        Ok(result)
     }
 
     async fn generate_with_functions(
