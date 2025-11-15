@@ -44,9 +44,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         orchestrator
             .add_memory_v2(
                 content,
-                false, // 快速模式
                 "test_agent".to_string(),
                 Some("test_user".to_string()),
+                None,
+                None,
+                false, // 快速模式，不使用推理
                 None,
                 None,
             )
@@ -88,9 +90,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let task = async move {
                 orch.add_memory_v2(
                     content,
-                    false,
                     "test_agent".to_string(),
                     Some("test_user".to_string()),
+                    None,
+                    None,
+                    false, // 快速模式，不使用推理
                     None,
                     None,
                 )

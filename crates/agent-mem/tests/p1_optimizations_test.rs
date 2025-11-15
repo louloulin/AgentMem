@@ -15,6 +15,7 @@ mod p1_optimizations_tests {
     use agent_mem_llm::{LLMProvider, Message, ModelInfo};
     use agent_mem_traits::{Embedder, Result as TraitResult};
     use async_trait::async_trait;
+    use futures::stream;
     use std::sync::Arc;
 
     // Mock implementations for testing
@@ -34,11 +35,21 @@ mod p1_optimizations_tests {
 
         fn get_model_info(&self) -> ModelInfo {
             ModelInfo {
+                provider: "mock".to_string(),
                 model: "mock-model".to_string(),
                 max_tokens: 1000,
                 supports_streaming: false,
                 supports_functions: false,
             }
+        }
+
+        async fn generate_stream(
+            &self,
+            _messages: &[Message],
+        ) -> TraitResult<Box<dyn futures::Stream<Item = TraitResult<String>> + Send + Unpin>> {
+            use futures::stream;
+            let items = vec![Ok("Mock stream response".to_string())];
+            Ok(Box::new(stream::iter(items)))
         }
 
         async fn validate_config(&self) -> TraitResult<()> {
@@ -62,16 +73,24 @@ mod p1_optimizations_tests {
             Ok(vec![0.0; self.dimension])
         }
 
-        async fn embed_batch(&self, texts: &[&str]) -> TraitResult<Vec<Vec<f32>>> {
+        async fn embed_batch(&self, texts: &[String]) -> TraitResult<Vec<Vec<f32>>> {
             Ok(vec![vec![0.0; self.dimension]; texts.len()])
         }
 
-        fn dimensions(&self) -> usize {
+        fn dimension(&self) -> usize {
             self.dimension
         }
 
-        async fn health_check(&self) -> TraitResult<()> {
-            Ok(())
+        fn provider_name(&self) -> &str {
+            "mock"
+        }
+
+        fn model_name(&self) -> &str {
+            "mock-model"
+        }
+
+        async fn health_check(&self) -> TraitResult<bool> {
+            Ok(true)
         }
     }
 
