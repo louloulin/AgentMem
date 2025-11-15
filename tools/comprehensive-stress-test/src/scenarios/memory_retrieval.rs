@@ -155,6 +155,60 @@ async fn real_vector_search(memory: &agent_mem::Memory, query_index: usize) -> b
     }
 }
 
+/// Mock 版本的 run_test（用于对比测试）
+///
+/// 这个函数用于在没有真实环境的情况下运行测试
+pub async fn run_test(
+    dataset_size: usize,
+    concurrency: usize,
+    multi_progress: &MultiProgress,
+) -> Result<StressTestStats> {
+    info!("🚀 开始 Mock 记忆检索压测: 数据集={}, 并发={}", dataset_size, concurrency);
+    
+    let total_queries = 1000;
+    let pb = multi_progress.add(ProgressBar::new(total_queries as u64));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.green/blue} {pos}/{len} ({per_sec}) {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+
+    let stats_collector = Arc::new(StatsCollector::new());
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut handles = Vec::new();
+
+    for i in 0..total_queries {
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let pb_clone = pb.clone();
+        let stats_clone = stats_collector.clone();
+
+        let handle = tokio::spawn(async move {
+            let _permit = permit;
+            let op_start = Instant::now();
+
+            // Mock 实现
+            let success = simulate_vector_search_mock(dataset_size, i).await;
+
+            let duration = op_start.elapsed();
+            stats_clone.record_operation(duration, success).await;
+
+            pb_clone.inc(1);
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await?;
+    }
+
+    pb.finish_with_message("Mock 检索压测完成");
+    let stats = stats_collector.get_stats().await;
+
+    Ok(stats)
+}
+
 /// 保留旧的 Mock 实现用于对比
 #[allow(dead_code)]
 async fn simulate_vector_search_mock(dataset_size: usize, query_index: usize) -> bool {

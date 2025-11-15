@@ -10,6 +10,7 @@ async fn test_chat_request_serialization() {
     let request = ChatMessageRequest {
         message: "Hello, agent!".to_string(),
         user_id: Some("user-123".to_string()),
+        session_id: None,
         stream: false,
         metadata: Some(json!({"key": "value"})),
     };

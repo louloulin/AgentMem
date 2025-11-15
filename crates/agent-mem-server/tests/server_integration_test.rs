@@ -17,7 +17,7 @@ async fn test_01_memory_manager_creation() {
     println!("║  测试 1: MemoryManager创建                      ║");
     println!("╚════════════════════════════════════════════════╝");
 
-    let result = MemoryManager::new().await;
+    let result = MemoryManager::new(None, None).await;
 
     match result {
         Ok(_) => {
@@ -81,7 +81,7 @@ async fn test_04_type_compatibility() {
 
     // 验证MemoryRequest可以正确构造
     let request = MemoryRequest {
-        agent_id: "test-agent".to_string(),
+        agent_id: Some("test-agent".to_string()),
         user_id: Some("alice".to_string()),
         content: "Test content".to_string(),
         memory_type: Some(MemoryType::Episodic),
@@ -90,7 +90,7 @@ async fn test_04_type_compatibility() {
     };
 
     println!("✅ MemoryRequest类型兼容");
-    println!("   Agent ID: {}", request.agent_id);
+    println!("   Agent ID: {:?}", request.agent_id);
     println!("   User ID: {:?}", request.user_id);
     println!("   Content: {}", request.content);
 

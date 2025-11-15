@@ -66,6 +66,43 @@ pub async fn run_test_real(
     Ok(stats)
 }
 
+/// Mock 版本的 run_test（用于对比测试）
+///
+/// 这个函数用于在没有真实环境的情况下运行测试
+pub async fn run_test(
+    batch_size: usize,
+    multi_progress: &MultiProgress,
+) -> Result<StressTestStats> {
+    info!("🚀 开始 Mock 批量操作压测: 批量大小={}", batch_size);
+    
+    let total_batches = 100;
+    let pb = multi_progress.add(ProgressBar::new(total_batches as u64));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.white/blue} {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+
+    let stats_collector = Arc::new(StatsCollector::new());
+
+    for i in 0..total_batches {
+        let op_start = Instant::now();
+
+        // Mock 实现
+        let success = simulate_batch_operation(batch_size, i).await;
+
+        let duration = op_start.elapsed();
+        stats_collector.record_operation(duration, success).await;
+        pb.inc(1);
+    }
+
+    pb.finish_with_message("Mock 批量操作压测完成");
+    let stats = stats_collector.get_stats().await;
+
+    Ok(stats)
+}
+
 async fn simulate_batch_operation(batch_size: usize, _batch_index: usize) -> bool {
     // 批量操作延迟与批量大小相关，但有优化效果
     let delay_ms = (batch_size as f64 * 0.5) as u64; // 每个操作 0.5ms

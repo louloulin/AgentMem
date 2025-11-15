@@ -218,8 +218,8 @@ async fn test_importance_evaluator_real() {
     let config = ImportanceEvaluatorConfig::default();
     let evaluator = EnhancedImportanceEvaluator::new(llm_provider.clone(), config);
 
-    // 创建测试用的 MemoryItem
-    use agent_mem_traits::{MemoryItem, MemoryType, Session};
+    // 创建测试用的 MemoryItem 并转换为 MemoryV4
+    use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session};
     use chrono::Utc;
 
     let memory_item = MemoryItem {
@@ -252,8 +252,11 @@ async fn test_importance_evaluator_real() {
         version: 1,
     };
 
+    // 转换为 MemoryV4
+    let memory_v4 = MemoryV4::from_legacy_item(&memory_item);
+
     println!("📝 评估重要性中...");
-    match evaluator.evaluate_importance(&memory_item, &[], &[]).await {
+    match evaluator.evaluate_importance(&memory_v4, &[], &[]).await {
         Ok(evaluation) => {
             println!("✅ 重要性评估成功:\n");
             println!("  重要性分数: {:.2}", evaluation.importance_score);

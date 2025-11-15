@@ -8,7 +8,7 @@
 //! ```
 
 use comprehensive_stress_test::{LibSQLStressTestConfig, LibSQLStressTestEnv};
-use agent_mem_traits::AddMemoryOptions;
+use agent_mem::AddMemoryOptions;
 use std::time::Instant;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     info!("🚀 AgentMem LibSQL 真实压测开始");
-    info!("=" .repeat(60));
+    info!("{}", "=".repeat(60));
 
     // 1. 初始化环境
     let config = LibSQLStressTestConfig::default();
@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. 记忆创建压测
     info!("\n📝 测试 1: 记忆创建性能");
-    info!("-".repeat(60));
+    info!("{}", "-".repeat(60));
     let create_result = test_memory_creation(&env, 100).await?;
     info!("✅ 记忆创建完成:");
     info!("   总数: {}", create_result.total);
@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. 记忆检索压测
     info!("\n🔍 测试 2: 记忆检索性能");
-    info!("-".repeat(60));
+    info!("{}", "-".repeat(60));
     let search_result = test_memory_search(&env, 50).await?;
     info!("✅ 记忆检索完成:");
     info!("   总数: {}", search_result.total);
@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. 批量操作压测
     info!("\n📦 测试 3: 批量操作性能");
-    info!("-".repeat(60));
+    info!("{}", "-".repeat(60));
     let batch_result = test_batch_operations(&env, 10, 20).await?;
     info!("✅ 批量操作完成:");
     info!("   总批次: {}", batch_result.total);
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. 获取统计信息
     info!("\n📊 数据库统计:");
-    info!("-".repeat(60));
+    info!("{}", "-".repeat(60));
     let stats = env.get_stats().await?;
     info!("   记忆总数: {}", stats.total_memories);
     info!("   向量总数: {}", stats.total_vectors);
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env.cleanup().await?;
 
     info!("\n✅ LibSQL 真实压测完成!");
-    info!("=" .repeat(60));
+    info!("{}", "=".repeat(60));
 
     Ok(())
 }

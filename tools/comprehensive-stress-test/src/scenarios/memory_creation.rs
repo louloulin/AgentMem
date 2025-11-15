@@ -130,6 +130,59 @@ async fn real_memory_creation(memory: &agent_mem::Memory, index: usize) -> bool 
     }
 }
 
+/// Mock 版本的 run_test（用于对比测试）
+///
+/// 这个函数用于在没有真实环境的情况下运行测试
+pub async fn run_test(
+    concurrency: usize,
+    total_memories: usize,
+    multi_progress: &MultiProgress,
+) -> Result<StressTestStats> {
+    info!("🚀 开始 Mock 记忆构建压测: 并发={}, 总数={}", concurrency, total_memories);
+    
+    let pb = multi_progress.add(ProgressBar::new(total_memories as u64));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({per_sec}) {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+
+    let stats_collector = Arc::new(StatsCollector::new());
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut handles = Vec::new();
+
+    for i in 0..total_memories {
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let pb_clone = pb.clone();
+        let stats_clone = stats_collector.clone();
+
+        let handle = tokio::spawn(async move {
+            let _permit = permit;
+            let op_start = Instant::now();
+
+            // Mock 实现
+            let success = simulate_memory_creation_mock(i).await;
+
+            let duration = op_start.elapsed();
+            stats_clone.record_operation(duration, success).await;
+
+            pb_clone.inc(1);
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await?;
+    }
+
+    pb.finish_with_message("Mock 记忆构建完成");
+    let stats = stats_collector.get_stats().await;
+
+    Ok(stats)
+}
+
 /// 保留旧的 Mock 实现用于对比
 #[allow(dead_code)]
 async fn simulate_memory_creation_mock(index: usize) -> bool {
@@ -142,15 +195,25 @@ async fn simulate_memory_creation_mock(index: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::real_config::{RealStressTestConfig, RealStressTestEnv};
 
     #[tokio::test]
+    #[ignore] // 需要真实环境，默认跳过
     async fn test_memory_creation() {
+        // 初始化真实环境
+        let config = RealStressTestConfig::default();
+        let env = RealStressTestEnv::new(config).await.unwrap();
         let multi_progress = MultiProgress::new();
-        let stats = run_test(10, 100, &multi_progress).await.unwrap();
+        
+        // 运行真实测试
+        let stats = run_test_real(&env, 10, 100, &multi_progress).await.unwrap();
 
         assert!(stats.total_operations == 100);
         assert!(stats.successful_operations >= 95); // 至少 95% 成功
         assert!(stats.throughput > 0.0);
+        
+        // 清理
+        env.cleanup().await.unwrap();
     }
 }
 
