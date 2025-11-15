@@ -1,11 +1,11 @@
-# AgentMem V4 架构完善计划 - 基于Mem0功能复用
+# AgentMem V4 架构完善计划 - 基于Mem0功能复用（多轮综合分析）
 
 ## 1. 执行摘要
 
-本文档全面分析了 AgentMem V4 架构和 Mem0 的核心功能，制定了基于现有代码最小改动的实现计划，**删除 SimpleMemory，仅保留 V4 架构**，通过功能复用完善整个记忆平台。
+本文档通过**多轮深入分析**，全面对比了 AgentMem V4 架构和 Mem0 的核心功能，制定了基于现有代码最小改动的实现计划，**删除 SimpleMemory，仅保留 V4 架构**，通过功能复用完善整个记忆平台。
 
 **关键决策：**
-- ✅ **删除 SimpleMemory**：统一使用 Memory V4 架构
+- ✅ **删除 SimpleMemory**：统一使用 Memory V4 架构（546行代码，71个文件引用）
 - ✅ **保留 V4 架构**：多模态内容、开放属性系统、关系图谱、强类型查询
 - ✅ **复用 Mem0 功能**：元数据过滤、重排序、图记忆等
 - ✅ **保持高内聚低耦合**：模块化设计，清晰职责分离
@@ -18,9 +18,257 @@
 
 ---
 
-## 2. Memory V4 架构深度分析
+## 2. 多轮分析总结
 
-### 2.1 V4 架构核心设计
+### 2.1 第一轮：核心存储和检索流程分析
+
+#### AgentMem 存储流程（真实执行代码）
+
+**MemoryOrchestrator::add_memory_v2()** (orchestrator.rs:2291-2402)
+```rust
+add_memory_v2(content, agent_id, user_id, run_id, metadata, infer, memory_type, prompt)
+├── 检查infer参数
+│   ├── infer=true → add_memory_intelligent()
+│   │   ├── 并行LLM调用（Step 1-4）
+│   │   │   ├── 事实提取（FactExtractor）
+│   │   │   ├── 结构化事实提取（AdvancedFactExtractor）
+│   │   │   └── 重要性评估（EnhancedImportanceEvaluator）
+│   │   ├── 查找相似记忆（search_similar_memories）
+│   │   ├── 冲突检测（ConflictDetection）
+│   │   ├── 智能决策（EnhancedDecisionEngine）
+│   │   └── 执行决策（execute_decisions）
+│   └── infer=false → add_memory_fast()
+│       ├── 生成embedding
+│       ├── 创建Memory对象
+│       └── 存储到vector_store
+└── 返回AddResult
+```
+
+**关键代码位置：**
+- `crates/agent-mem/src/orchestrator.rs:1643-1833` (add_memory_intelligent)
+- `crates/agent-mem/src/orchestrator.rs:1223-1377` (add_memory_fast)
+- `crates/agent-mem/src/orchestrator.rs:2291-2402` (add_memory_v2)
+
+#### AgentMem 检索流程（真实执行代码）
+
+**MemoryOrchestrator::search_memories_hybrid()** (orchestrator.rs:1883-1948)
+```rust
+search_memories_hybrid(query, user_id, limit, threshold, filters)
+├── 查询预处理（preprocess_query）
+├── 动态阈值调整（calculate_dynamic_threshold）
+├── 生成查询向量（generate_query_embedding）
+├── 构建SearchQuery
+├── HybridSearchEngine.search()
+│   ├── 向量搜索（VectorSearchEngine）
+│   ├── 全文搜索（FullTextSearchEngine）
+│   └── RRF融合（RRFRanker）
+├── 转换为MemoryItem
+└── 上下文感知重排序（context_aware_rerank）
+```
+
+**关键代码位置：**
+- `crates/agent-mem/src/orchestrator.rs:1883-1948` (search_memories_hybrid)
+- `crates/agent-mem/src/orchestrator.rs:1956-2100` (非postgres版本)
+- `crates/agent-mem-core/src/search/hybrid.rs`
+
+#### Mem0 存储流程（真实执行代码）
+
+**Memory.add()** (main.py:281-384, async:1331-1408)
+```python
+Memory.add(messages, user_id, agent_id, run_id, infer=True)
+├── _build_filters_and_metadata()  # 构建过滤器和元数据
+├── 并行执行（asyncio.gather）：
+│   ├── _add_to_vector_store()  # 向量存储
+│   │   ├── infer=True → 智能提取
+│   │   │   ├── parse_messages()  # 解析消息
+│   │   │   ├── get_fact_retrieval_messages()  # 构建提示词
+│   │   │   ├── llm.generate_response()  # LLM提取事实
+│   │   │   ├── 并行搜索相似记忆（asyncio.gather）
+│   │   │   ├── get_update_memory_messages()  # 构建更新提示词
+│   │   │   ├── llm.generate_response()  # LLM决策
+│   │   │   └── 并行执行操作（asyncio.gather）
+│   │   └── infer=False → 直接存储
+│   └── _add_to_graph()  # 图存储（可选）
+└── 返回结果
+```
+
+**关键代码位置：**
+- `source/mem0/mem0/memory/main.py:281-384` (同步版本)
+- `source/mem0/mem0/memory/main.py:1331-1408` (异步版本)
+- `source/mem0/mem0/memory/main.py:1410-1650` (_add_to_vector_store异步)
+
+#### Mem0 检索流程（真实执行代码）
+
+**Memory.search()** (main.py:758-856, async:1807-1912)
+```python
+Memory.search(query, user_id, agent_id, run_id, limit=100, threshold=None, rerank=True)
+├── _build_filters_and_metadata()  # 构建过滤器
+├── _has_advanced_operators()  # 检测高级操作符
+├── _process_metadata_filters()  # 处理元数据过滤（如果存在）
+├── 并行执行（asyncio.gather）：
+│   ├── _search_vector_store()  # 向量搜索
+│   │   ├── embedding_model.embed(query, "search")  # 生成查询向量
+│   │   ├── vector_store.search(query, vectors, limit, filters)  # 向量搜索
+│   │   └── 应用threshold过滤
+│   └── graph.search()  # 图搜索（可选）
+├── reranker.rerank()  # 重排序（可选，asyncio.to_thread）
+└── 返回结果
+```
+
+**关键代码位置：**
+- `source/mem0/mem0/memory/main.py:758-856` (同步版本)
+- `source/mem0/mem0/memory/main.py:1807-1912` (异步版本)
+- `source/mem0/mem0/memory/main.py:2010-2048` (_search_vector_store异步)
+- `source/mem0/mem0/memory/main.py:858-952` (_process_metadata_filters)
+
+### 2.2 第二轮：Mem0关键功能深入分析
+
+#### 元数据过滤系统（Mem0核心优势）
+
+**实现位置：** `source/mem0/mem0/memory/main.py:858-952`
+
+**核心方法：**
+1. **`_has_advanced_operators()`** (927-952行)
+   - 检测是否包含高级操作符（AND, OR, NOT, eq, ne, gt等）
+   - 返回布尔值
+
+2. **`_process_metadata_filters()`** (858-925行)
+   - 处理高级操作符
+   - 支持逻辑操作符（AND, OR, NOT）
+   - 支持比较操作符（eq, ne, gt, gte, lt, lte）
+   - 支持集合操作符（in, nin）
+   - 支持字符串操作符（contains, icontains）
+
+**操作符映射：**
+```python
+operator_map = {
+    "eq": "eq", "ne": "ne", "gt": "gt", "gte": "gte",
+    "lt": "lt", "lte": "lte", "in": "in", "nin": "nin",
+    "contains": "contains", "icontains": "icontains"
+}
+```
+
+#### 重排序系统（Mem0核心优势）
+
+**实现位置：** `source/mem0/mem0/reranker/`
+
+**核心类：**
+1. **`BaseReranker`** (base.py:4-20)
+   - 抽象基类
+   - `rerank(query, documents, top_k)` 方法
+
+2. **`CohereReranker`** (cohere_reranker.py:13-85)
+   - Cohere API集成
+   - 支持rerank_score字段
+   - 失败时降级到原始顺序
+
+3. **其他实现：**
+   - `SentenceTransformerReranker`
+   - `LLMReranker`
+   - `HuggingFaceReranker`
+   - `ZeroEntropyReranker`
+
+**集成位置：** `source/mem0/mem0/memory/main.py:1898-1907`
+```python
+if rerank and self.reranker and original_memories:
+    reranked_memories = await asyncio.to_thread(
+        self.reranker.rerank, query, original_memories, limit
+    )
+    original_memories = reranked_memories
+```
+
+#### 图记忆系统（Mem0核心优势）
+
+**实现位置：** `source/mem0/mem0/memory/graph_memory.py`
+
+**核心方法：**
+1. **`add(data, filters)`** (76-94行)
+   - 提取实体（_retrieve_nodes_from_data）
+   - 建立关系（_establish_nodes_relations_from_data）
+   - 搜索图数据库（_search_graph_db）
+   - 删除旧实体（_get_delete_entities_from_search_output, _delete_entities）
+   - 添加新实体（_add_entities）
+
+2. **`search(query, filters, limit=100)`** (96-130行)
+   - 提取实体
+   - 搜索图数据库
+   - BM25重排序
+   - 返回关系结果
+
+3. **`delete_all(filters)`** (132-150行)
+   - Cypher查询删除所有节点和关系
+
+4. **`get_all(filters, limit=100)`** (152-194行)
+   - Cypher查询获取所有关系
+
+### 2.3 第三轮：代码复用和改造详细分析
+
+#### AgentMem现有重排序实现
+
+**当前状态：**
+- `crates/agent-mem-core/src/search/reranker.rs` - ResultReranker（多因素重排序）
+- `crates/agent-mem-core/src/search/adaptive.rs` - SearchReranker（简单重排序）
+- `crates/agent-mem-server/src/routes/memory.rs:495-542` - apply_reranking（部分实现）
+
+**差距分析：**
+- ✅ 已有基础重排序实现
+- ❌ 缺少外部API集成（Cohere, Jina等）
+- ❌ 缺少统一的Reranker trait
+- ⚠️ 集成不完整（server中部分实现）
+
+#### AgentMem现有图记忆实现
+
+**当前状态：**
+- `crates/agent-mem-core/src/graph_memory.rs` - GraphMemoryEngine（606行完整实现）
+- 支持节点、边、图遍历、路径查找、关系推理
+
+**差距分析：**
+- ✅ 已有完整图记忆实现
+- ❌ 未集成到MemoryOrchestrator
+- ❌ 缺少与Neo4j等外部图数据库的集成
+- ⚠️ 需要完善API以对标Mem0
+
+#### AgentMem现有元数据过滤实现
+
+**当前状态：**
+- `crates/agent-mem-compat/src/types.rs:361-407` - MemoryFilter（基础过滤）
+- `crates/agent-mem-core/src/search/mod.rs:169-237` - SearchFilters（基础过滤）
+- `crates/agent-mem-storage/src/backends/lancedb_store.rs:567-614` - 基础过滤逻辑
+
+**差距分析：**
+- ✅ 已有基础过滤实现
+- ❌ 缺少高级操作符（eq, ne, gt, in, contains等）
+- ❌ 缺少逻辑操作符（AND, OR, NOT）
+- ⚠️ 需要统一过滤接口
+
+### 2.4 第四轮：综合分析
+
+#### 代码复用率分析
+
+| 模块 | 复用率 | 说明 |
+|------|--------|------|
+| **存储层** | 100% | 完全可直接复用 |
+| **搜索层** | 100% | 完全可直接复用 |
+| **V4架构** | 100% | 完全可直接复用 |
+| **重排序** | 60% | 需要添加外部API集成 |
+| **图记忆** | 80% | 需要集成到Orchestrator |
+| **元数据过滤** | 40% | 需要添加高级操作符 |
+
+#### 功能差距总结
+
+| 功能 | AgentMem | Mem0 | 差距 | 复用方案 |
+|------|----------|------|------|----------|
+| **元数据过滤** | 基础过滤 | 高级操作符 | **大** | 复用Mem0逻辑，实现MetadataFilter |
+| **重排序** | 部分实现 | 完整实现 | **中** | 复用Mem0设计，添加外部API |
+| **图记忆** | 完整实现 | 完整实现 | **小** | 集成现有实现到Orchestrator |
+| **异步支持** | 原生async | 部分async | AgentMem更优 | - |
+| **类型安全** | Rust强类型 | Python动态类型 | AgentMem更优 | - |
+
+---
+
+## 3. Memory V4 架构深度分析
+
+### 3.1 V4 架构核心设计
 
 **Memory V4 结构：**
 ```rust
@@ -33,17 +281,48 @@ pub struct Memory {
 }
 ```
 
-**核心优势：**
-1. **多模态内容支持**：Text, Structured, Vector, Binary, Multimodal
-2. **开放属性系统**：命名空间隔离（core, system, user, agent, domain）
-3. **关系图谱**：内置关系管理，支持复杂记忆网络
-4. **强类型查询**：Query V4 支持语义化查询
+**Content 类型：**
+```rust
+pub enum Content {
+    Text(String),                    // 文本内容
+    Structured(serde_json::Value),   // 结构化数据
+    Vector(Vec<f32>),                // 向量嵌入
+    Binary(Vec<u8>),                 // 二进制数据
+    Multimodal(Vec<Content>),        // 多模态组合
+}
+```
 
-### 2.2 V4 架构与存储层集成
+**AttributeSet 设计：**
+```rust
+pub struct AttributeSet {
+    pub attributes: HashMap<AttributeKey, AttributeValue>,
+    pub schema: Option<AttributeSchema>,
+}
+
+// 命名空间隔离
+AttributeKey::core("user_id")      // 核心属性
+AttributeKey::system("importance") // 系统属性
+AttributeKey::user("preference")   // 用户属性
+AttributeKey::agent("behavior")    // Agent属性
+AttributeKey::domain("category")   // 领域属性
+```
+
+**RelationGraph 设计：**
+```rust
+pub struct RelationGraph {
+    pub outgoing: Vec<RelationV4>,  // 出边
+    pub incoming: Vec<RelationV4>, // 入边
+}
+```
+
+**关键代码位置：**
+- `crates/agent-mem-traits/src/abstractions.rs:18-300`
+
+### 3.2 V4 架构与存储层集成
 
 **转换层：**
-- `storage/conversion.rs`: Memory V4 ↔ DbMemory 转换
-- `v4_migration.rs`: Legacy MemoryItem ↔ Memory V4 迁移
+- `storage/conversion.rs`: Memory V4 ↔ DbMemory 转换（完整实现）
+- `v4_migration.rs`: Legacy MemoryItem ↔ Memory V4 迁移（完整实现）
 
 **存储流程：**
 ```rust
@@ -52,12 +331,13 @@ DbMemory → db_to_memory() → Memory V4
 ```
 
 **关键代码位置：**
-- `crates/agent-mem-core/src/storage/conversion.rs:15-185`
-- `crates/agent-mem-core/src/v4_migration.rs:42-122`
+- `crates/agent-mem-core/src/storage/conversion.rs:15-185` (memory_to_db, db_to_memory)
+- `crates/agent-mem-core/src/storage/libsql/memory_repository.rs:184-330` (create, read, update, delete)
+- `crates/agent-mem-core/src/storage/memory_repository.rs:323-472` (PostgreSQL实现)
 
-### 2.3 V4 架构与搜索层集成
+### 3.3 V4 架构与搜索层集成
 
-**查询抽象：**
+**Query V4 抽象：**
 ```rust
 pub struct Query {
     pub intent: QueryIntent,        // NaturalLanguage, Structured, Vector, Hybrid
@@ -67,115 +347,271 @@ pub struct Query {
 }
 ```
 
-**检索引擎：**
-- `RetrievalEngine` trait：可组合的检索引擎模式
-- `RetrievalResult`：包含解释和评分分解
-- `ScoredMemory`：评分记忆结果
+**检索流程：**
+```rust
+Query V4 → SearchQuery → HybridSearchEngine → SearchResult → ScoredMemory
+```
 
 **关键代码位置：**
-- `crates/agent-mem-traits/src/abstractions.rs:300-650`
-- `crates/agent-mem-core/src/search/mod.rs`
+- `crates/agent-mem-traits/src/abstractions.rs:300-650` (Query定义)
+- `crates/agent-mem-core/src/search/mod.rs:109-167` (SearchQuery::from_query_v4)
+
+### 3.4 V4 架构与Memory API集成
+
+**Memory API（已实现V4支持）：**
+```rust
+Memory::new() → MemoryOrchestrator → 使用V4架构
+Memory::add() → add_memory_v2() → Memory V4
+Memory::search() → search_memories_hybrid() → Query V4
+```
+
+**关键代码位置：**
+- `crates/agent-mem/src/memory.rs:104-235` (Memory::new, add_with_options)
+- `crates/agent-mem/src/orchestrator.rs:2291-2402` (add_memory_v2)
 
 ---
 
-## 3. Mem0 核心功能分析
+## 4. Mem0 核心功能深度分析
 
-### 3.1 Mem0 存储实现
+### 4.1 Mem0 存储实现（真实执行代码）
 
 **核心类：`Memory` (main.py:172-2326行)**
 
-**存储流程：**
+**同步版本：** `Memory.add()` (281-384行)
+**异步版本：** `Memory.add()` (1331-1408行)
+
+**存储流程（异步版本，更完整）：**
 ```python
 Memory.add(messages, user_id, agent_id, run_id, infer=True)
 ├── _build_filters_and_metadata()  # 构建过滤器和元数据
-├── 并行执行：
+├── 并行执行（asyncio.gather）：
 │   ├── _add_to_vector_store()  # 向量存储
 │   │   ├── infer=True → 智能提取
+│   │   │   ├── parse_messages()  # 解析消息
 │   │   │   ├── get_fact_retrieval_messages()  # 构建提示词
-│   │   │   ├── llm.generate()  # LLM提取事实
-│   │   │   ├── 查找相似记忆
-│   │   │   ├── 决策（ADD/UPDATE/DELETE）
-│   │   │   └── 执行操作
+│   │   │   ├── llm.generate_response()  # LLM提取事实
+│   │   │   ├── 并行搜索相似记忆（asyncio.gather）
+│   │   │   │   └── process_fact_for_search()  # 每个事实并行搜索
+│   │   │   ├── get_update_memory_messages()  # 构建更新提示词
+│   │   │   ├── llm.generate_response()  # LLM决策
+│   │   │   └── 并行执行操作（asyncio.gather）
+│   │   │       ├── _create_memory()  # ADD操作
+│   │   │       ├── _update_memory()  # UPDATE操作
+│   │   │       └── _delete_memory()  # DELETE操作
 │   │   └── infer=False → 直接存储
 │   └── _add_to_graph()  # 图存储（可选）
 └── 返回结果
 ```
 
-**关键特性：**
-- ✅ 支持多种向量数据库（Pinecone, Qdrant, Chroma, FAISS等）
-- ✅ SQLite历史记录存储
-- ✅ 可选图数据库（Memgraph, Kuzu）
-- ✅ 智能事实提取（LLM驱动）
+**关键代码位置：**
+- `source/mem0/mem0/memory/main.py:1331-1408` (异步add)
+- `source/mem0/mem0/memory/main.py:1410-1650` (_add_to_vector_store异步)
+- `source/mem0/mem0/memory/main.py:1499-1512` (并行搜索相似记忆)
+- `source/mem0/mem0/memory/main.py:1554-1600` (并行执行操作)
 
-### 3.2 Mem0 检索实现
+### 4.2 Mem0 检索实现（真实执行代码）
 
-**搜索流程：**
+**同步版本：** `Memory.search()` (758-856行)
+**异步版本：** `Memory.search()` (1807-1912行)
+
+**检索流程（异步版本，更完整）：**
 ```python
 Memory.search(query, user_id, agent_id, run_id, limit=100, threshold=None, rerank=True)
 ├── _build_filters_and_metadata()  # 构建过滤器
-├── 并行执行：
+├── _has_advanced_operators()  # 检测高级操作符
+├── _process_metadata_filters()  # 处理元数据过滤（如果存在）
+├── 并行执行（asyncio.gather）：
 │   ├── _search_vector_store()  # 向量搜索
-│   │   ├── embedding_model.embed(query)  # 生成查询向量
+│   │   ├── embedding_model.embed(query, "search")  # 生成查询向量
 │   │   ├── vector_store.search(query, vectors, limit, filters)  # 向量搜索
 │   │   └── 应用threshold过滤
-│   └── graph.search()  # 图搜索（可选）
-├── reranker.rerank()  # 重排序（可选）
+│   └── graph.search()  # 图搜索（可选，asyncio.to_thread）
+├── reranker.rerank()  # 重排序（可选，asyncio.to_thread）
 └── 返回结果
 ```
 
-**关键特性：**
-- ✅ 高级元数据过滤（eq, ne, gt, in, contains, AND, OR, NOT）
-- ✅ 可选重排序器（RerankerFactory）
-- ✅ 图关系搜索（可选）
-- ✅ 阈值过滤
+**关键代码位置：**
+- `source/mem0/mem0/memory/main.py:1807-1912` (异步search)
+- `source/mem0/mem0/memory/main.py:2010-2048` (_search_vector_store异步)
+- `source/mem0/mem0/memory/main.py:1898-1907` (重排序集成)
 
-### 3.3 Mem0 元数据过滤系统
+### 4.3 Mem0 元数据过滤系统（核心优势）
 
-**高级操作符：**
+**实现位置：** `source/mem0/mem0/memory/main.py:858-952`
+
+**核心方法：**
+
+1. **`_has_advanced_operators()`** (1983-2008行)
 ```python
-# 比较操作符
-{"key": {"eq": "value"}}    # 等于
-{"key": {"ne": "value"}}    # 不等于
-{"key": {"gt": 10}}         # 大于
-{"key": {"gte": 10}}        # 大于等于
-{"key": {"lt": 10}}         # 小于
-{"key": {"lte": 10}}        # 小于等于
-
-# 集合操作符
-{"key": {"in": ["val1", "val2"]}}      # 在列表中
-{"key": {"nin": ["val1", "val2"]}}     # 不在列表中
-
-# 字符串操作符
-{"key": {"contains": "text"}}          # 包含文本
-{"key": {"icontains": "text"}}         # 不区分大小写包含
-
-# 逻辑操作符
-{"AND": [filter1, filter2]}            # 逻辑与
-{"OR": [filter1, filter2]}             # 逻辑或
-{"NOT": [filter1]}                      # 逻辑非
+def _has_advanced_operators(self, filters: Dict[str, Any]) -> bool:
+    # 检查逻辑操作符
+    if key in ["AND", "OR", "NOT"]:
+        return True
+    # 检查比较操作符
+    if isinstance(value, dict):
+        for op in value.keys():
+            if op in ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin", "contains", "icontains"]:
+                return True
+    # 检查通配符
+    if value == "*":
+        return True
 ```
 
-**关键代码位置：**
-- `source/mem0/mem0/memory/main.py:858-952` (`_process_metadata_filters`)
-- `source/mem0/mem0/memory/main.py:927-952` (`_has_advanced_operators`)
+2. **`_process_metadata_filters()`** (1914-1981行)
+```python
+def _process_metadata_filters(self, metadata_filters: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理简单条件
+    def process_condition(key: str, condition: Any) -> Dict[str, Any]:
+        if not isinstance(condition, dict):
+            return {key: condition}
+        # 处理操作符
+        operator_map = {
+            "eq": "eq", "ne": "ne", "gt": "gt", "gte": "gte",
+            "lt": "lt", "lte": "lte", "in": "in", "nin": "nin",
+            "contains": "contains", "icontains": "icontains"
+        }
+        # ...
+    
+    # 处理逻辑操作符
+    for key, value in metadata_filters.items():
+        if key == "AND":
+            # 合并多个条件
+        elif key == "OR":
+            # 存储OR条件
+            processed_filters["$or"] = []
+        elif key == "NOT":
+            # 存储NOT条件
+            processed_filters["$not"] = []
+        else:
+            # 处理单个条件
+```
+
+**支持的操作符：**
+- **比较操作符**：eq, ne, gt, gte, lt, lte
+- **集合操作符**：in, nin
+- **字符串操作符**：contains, icontains
+- **逻辑操作符**：AND, OR, NOT
+- **通配符**：*
+
+### 4.4 Mem0 重排序系统（核心优势）
+
+**实现位置：** `source/mem0/mem0/reranker/`
+
+**核心类：**
+
+1. **`BaseReranker`** (base.py:4-20)
+```python
+class BaseReranker(ABC):
+    @abstractmethod
+    def rerank(self, query: str, documents: List[Dict[str, Any]], top_k: int = None) -> List[Dict[str, Any]]:
+        """重排序文档"""
+        pass
+```
+
+2. **`CohereReranker`** (cohere_reranker.py:13-85)
+```python
+class CohereReranker(BaseReranker):
+    def rerank(self, query: str, documents: List[Dict[str, Any]], top_k: int = None):
+        # 提取文本内容
+        doc_texts = [doc.get('memory') or doc.get('text') or doc.get('content') for doc in documents]
+        
+        # 调用Cohere API
+        response = self.client.rerank(
+            model=self.model,
+            query=query,
+            documents=doc_texts,
+            top_n=top_k or len(documents),
+        )
+        
+        # 添加rerank_score
+        for result in response.results:
+            original_doc = documents[result.index].copy()
+            original_doc['rerank_score'] = result.relevance_score
+            reranked_docs.append(original_doc)
+        
+        return reranked_docs
+```
+
+**集成位置：** `source/mem0/mem0/memory/main.py:1898-1907`
+```python
+if rerank and self.reranker and original_memories:
+    reranked_memories = await asyncio.to_thread(
+        self.reranker.rerank, query, original_memories, limit
+    )
+    original_memories = reranked_memories
+```
+
+### 4.5 Mem0 图记忆系统（核心优势）
+
+**实现位置：** `source/mem0/mem0/memory/graph_memory.py`
+
+**核心方法：**
+
+1. **`add(data, filters)`** (76-94行)
+```python
+def add(self, data, filters):
+    # 1. 提取实体
+    entity_type_map = self._retrieve_nodes_from_data(data, filters)
+    
+    # 2. 建立关系
+    to_be_added = self._establish_nodes_relations_from_data(data, filters, entity_type_map)
+    
+    # 3. 搜索图数据库
+    search_output = self._search_graph_db(node_list=list(entity_type_map.keys()), filters=filters)
+    
+    # 4. 获取要删除的实体
+    to_be_deleted = self._get_delete_entities_from_search_output(search_output, data, filters)
+    
+    # 5. 删除旧实体
+    deleted_entities = self._delete_entities(to_be_deleted, filters)
+    
+    # 6. 添加新实体
+    added_entities = self._add_entities(to_be_added, filters, entity_type_map)
+    
+    return {"deleted_entities": deleted_entities, "added_entities": added_entities}
+```
+
+2. **`search(query, filters, limit=100)`** (96-130行)
+```python
+def search(self, query, filters, limit=100):
+    # 1. 提取实体
+    entity_type_map = self._retrieve_nodes_from_data(query, filters)
+    
+    # 2. 搜索图数据库
+    search_output = self._search_graph_db(node_list=list(entity_type_map.keys()), filters=filters)
+    
+    # 3. BM25重排序
+    bm25 = BM25Okapi(search_outputs_sequence)
+    reranked_results = bm25.get_top_n(tokenized_query, search_outputs_sequence, n=5)
+    
+    return search_results
+```
+
+**关键特性：**
+- ✅ 实体提取（LLM驱动）
+- ✅ 关系建立（LLM驱动）
+- ✅ 向量相似度搜索（Neo4j向量索引）
+- ✅ BM25重排序
+- ✅ 智能删除（LLM决策）
 
 ---
 
-## 4. 功能对比与差距分析
+## 5. 功能对比与差距分析
 
-### 4.1 存储功能对比
+### 5.1 存储功能对比
 
 | 功能 | AgentMem V4 | Mem0 | 差距 | 优先级 |
 |------|-------------|------|------|--------|
 | **基础存储** | ✅ LibSQL/PostgreSQL | ✅ Vector Store + SQLite | 无 | - |
 | **V4架构支持** | ✅ 完整实现 | ❌ 无 | AgentMem更优 | - |
-| **多模态内容** | ✅ Text/Structured/Vector/Binary | ⚠️ 基础支持 | AgentMem更优 | - |
+| **多模态内容** | ✅ Text/Structured/Vector/Binary/Multimodal | ⚠️ 基础支持 | AgentMem更优 | - |
 | **关系图谱** | ✅ RelationGraph | ✅ Graph Store | 无 | - |
 | **批量操作** | ✅ batch_create/delete | ❌ 不支持 | AgentMem更优 | - |
 | **事务支持** | ✅ PostgreSQL事务 | ❌ 无 | AgentMem更优 | - |
 | **历史记录** | ✅ MemoryHistory | ✅ SQLiteManager | 无 | - |
+| **并行处理** | ✅ 部分并行 | ✅ 完整并行（asyncio.gather） | Mem0更优 | P2 |
 
-### 4.2 检索功能对比
+### 5.2 检索功能对比
 
 | 功能 | AgentMem V4 | Mem0 | 差距 | 优先级 |
 |------|-------------|------|------|--------|
@@ -187,58 +623,73 @@ Memory.search(query, user_id, agent_id, run_id, limit=100, threshold=None, reran
 | **元数据过滤** | ⚠️ 基础过滤 | ✅ 高级操作符 | **Mem0更优** | **P0** |
 | **重排序** | ⚠️ 部分支持 | ✅ RerankerFactory | **Mem0更优** | **P1** |
 | **Query V4** | ✅ 强类型查询 | ❌ 无 | AgentMem更优 | - |
+| **图搜索** | ✅ 基础实现 | ✅ 完整实现 | Mem0更优 | P2 |
 
-### 4.3 API设计对比
+### 5.3 API设计对比
 
 | 特性 | AgentMem V4 | Mem0 | 差距 | 优先级 |
 |------|-------------|------|------|--------|
 | **API简洁性** | ⚠️ 需要理解V4架构 | ✅ 简洁直观 | Mem0更优 | - |
-| **默认行为** | ⚠️ 需要显式配置 | ✅ 智能默认 | Mem0更优 | - |
-| **infer参数** | ✅ 支持 | ✅ 默认True | 无 | - |
+| **默认行为** | ✅ 零配置（Memory::new()） | ✅ 智能默认 | 无 | - |
+| **infer参数** | ✅ 支持（默认true） | ✅ 默认True | 无 | - |
 | **错误处理** | ✅ 强类型错误 | ⚠️ 异常处理 | AgentMem更优 | - |
 | **异步支持** | ✅ 原生async | ⚠️ 部分async | AgentMem更优 | - |
 | **类型安全** | ✅ Rust强类型 | ⚠️ Python动态类型 | AgentMem更优 | - |
+| **并行处理** | ⚠️ 部分并行 | ✅ 完整并行 | Mem0更优 | P2 |
+
+### 5.4 智能功能对比
+
+| 功能 | AgentMem V4 | Mem0 | 差距 | 优先级 |
+|------|-------------|------|------|--------|
+| **事实提取** | ✅ FactExtractor + AdvancedFactExtractor | ✅ LLM提取 | 无 | - |
+| **决策引擎** | ✅ EnhancedDecisionEngine | ✅ 内置决策 | 无 | - |
+| **去重** | ✅ MemoryDeduplicator | ✅ 内置去重 | 无 | - |
+| **冲突解决** | ✅ ConflictResolver | ⚠️ 基础支持 | AgentMem更优 | - |
+| **重要性评分** | ✅ EnhancedImportanceEvaluator | ⚠️ 基础支持 | AgentMem更优 | - |
+| **并行LLM调用** | ✅ 部分并行 | ✅ 完整并行 | Mem0更优 | P2 |
 
 ---
 
-## 5. 代码复用分析
+## 6. 代码复用分析
 
-### 5.1 可直接复用的代码
+### 6.1 可直接复用的代码（100%复用）
 
-#### 5.1.1 存储层（100%复用）
-- ✅ **`storage/memory_repository.rs`**: PostgreSQL存储实现完整
-- ✅ **`storage/libsql/memory_repository.rs`**: LibSQL存储实现完整
-- ✅ **`storage/conversion.rs`**: V4 ↔ DbMemory 转换完整
-- ✅ **`storage/postgres.rs`**: PostgreSQL后端抽象完整
+#### 6.1.1 存储层
+- ✅ **`storage/memory_repository.rs`**: PostgreSQL存储实现完整（472行）
+- ✅ **`storage/libsql/memory_repository.rs`**: LibSQL存储实现完整（699行）
+- ✅ **`storage/conversion.rs`**: V4 ↔ DbMemory 转换完整（572行）
+- ✅ **`storage/postgres.rs`**: PostgreSQL后端抽象完整（463行）
 
-#### 5.1.2 搜索层（100%复用）
+#### 6.1.2 搜索层
 - ✅ **`search/vector_search.rs`**: 向量搜索实现完整
 - ✅ **`search/bm25.rs`**: BM25搜索实现完整（315行）
 - ✅ **`search/hybrid.rs`**: 混合搜索实现完整
 - ✅ **`search/fulltext_search.rs`**: 全文搜索实现完整
 - ✅ **`search/fuzzy.rs`**: 模糊匹配实现完整
 
-#### 5.1.3 V4架构核心（100%复用）
-- ✅ **`agent-mem-traits/src/abstractions.rs`**: V4抽象定义完整
-- ✅ **`v4_migration.rs`**: 迁移工具完整
-- ✅ **`storage/conversion.rs`**: 转换层完整
+#### 6.1.3 V4架构核心
+- ✅ **`agent-mem-traits/src/abstractions.rs`**: V4抽象定义完整（953行）
+- ✅ **`v4_migration.rs`**: 迁移工具完整（368行）
+- ✅ **`storage/conversion.rs`**: 转换层完整（572行）
 
-### 5.2 需要增强的代码
+### 6.2 需要增强的代码
 
-#### 5.2.1 元数据过滤系统（P0优先级）
+#### 6.2.1 元数据过滤系统（P0优先级）
 
 **当前状态：**
-- 只支持基础过滤（user_id, agent_id等）
-- 缺少高级操作符
+- `crates/agent-mem-compat/src/types.rs:361-407` - MemoryFilter（基础过滤）
+- `crates/agent-mem-core/src/search/mod.rs:169-237` - SearchFilters（基础过滤）
+- `crates/agent-mem-storage/src/backends/lancedb_store.rs:567-614` - 基础过滤逻辑
 
 **需要实现：**
 ```rust
 // 新建文件
 crates/agent-mem-core/src/search/metadata_filter.rs
 ├── MetadataFilter 结构
-├── FilterOperator 枚举（eq, ne, gt, in, contains等）
+├── FilterOperator 枚举（eq, ne, gt, gte, lt, lte, in, nin, contains, icontains）
 ├── LogicalOperator 枚举（AND, OR, NOT）
-└── 过滤逻辑实现
+├── has_advanced_operators() 方法
+└── process_metadata_filters() 方法
 
 // 修改文件
 crates/agent-mem-core/src/search/mod.rs
@@ -249,237 +700,540 @@ crates/agent-mem-core/src/search/mod.rs
 crates/agent-mem-core/src/storage/memory_repository.rs
 ├── 实现高级过滤逻辑
 └── 支持操作符查询
+
+crates/agent-mem-core/src/storage/libsql/memory_repository.rs
+├── 实现高级过滤逻辑
+└── 支持操作符查询
 ```
 
 **参考实现：**
-- Mem0: `source/mem0/mem0/memory/main.py:858-952`
+- Mem0: `source/mem0/mem0/memory/main.py:858-952` (_process_metadata_filters)
+- Mem0: `source/mem0/mem0/memory/main.py:1983-2008` (_has_advanced_operators)
 
-#### 5.2.2 重排序器集成（P1优先级）
+#### 6.2.2 重排序器集成（P1优先级）
 
 **当前状态：**
-- 无独立的重排序器模块
-- 搜索中有部分重排序逻辑
+- `crates/agent-mem-core/src/search/reranker.rs` - ResultReranker（多因素重排序）
+- `crates/agent-mem-core/src/search/adaptive.rs` - SearchReranker（简单重排序）
+- `crates/agent-mem-server/src/routes/memory.rs:495-542` - apply_reranking（部分实现）
 
 **需要实现：**
 ```rust
 // 新建文件
-crates/agent-mem-core/src/search/reranker.rs
-├── Reranker trait
-├── CohereReranker
-├── JinaReranker（可选）
+crates/agent-mem-core/src/search/external_reranker.rs
+├── Reranker trait（统一接口）
+├── CohereReranker（Cohere API集成）
+├── JinaReranker（Jina API集成，可选）
 └── 集成到搜索流程
 
 // 修改文件
-crates/agent-mem-core/src/manager.rs
+crates/agent-mem-core/src/search/reranker.rs
+├── 重构为统一的Reranker trait
+└── 保留ResultReranker作为默认实现
+
+// 修改文件
+crates/agent-mem/src/orchestrator.rs
 ├── 添加reranker字段
-└── 在search_memories()中集成重排序
+└── 在search_memories_hybrid()中集成重排序
 
 // 修改文件
 crates/agent-mem/src/memory.rs
 ├── 添加with_reranker()方法
+└── 支持Builder模式配置
 ```
 
 **参考实现：**
-- Mem0: `mem0/reranker/` 目录
+- Mem0: `source/mem0/mem0/reranker/base.py` (BaseReranker)
+- Mem0: `source/mem0/mem0/reranker/cohere_reranker.py` (CohereReranker)
+- Mem0: `source/mem0/mem0/memory/main.py:1898-1907` (集成位置)
 
-#### 5.2.3 Memory API简化（P2优先级）
+#### 6.2.3 图记忆完善（P2优先级）
 
 **当前状态：**
-- `Memory::new()` 已实现零配置
-- 但需要理解V4架构
+- `crates/agent-mem-core/src/graph_memory.rs` - GraphMemoryEngine（606行完整实现）
+- 支持节点、边、图遍历、路径查找、关系推理
 
-**需要优化：**
+**需要实现：**
 ```rust
-// 优化 Memory::new()
-Memory::new()
-├── 自动检测环境变量
-├── 默认启用智能功能（infer=true）
-├── 默认使用持久化存储（LibSQL）
-└── 简化配置流程
+// 完善文件
+crates/agent-mem-core/src/graph_memory.rs
+├── 添加add()方法（对标Mem0）
+├── 添加search()方法（对标Mem0）
+├── 添加delete_all()方法（对标Mem0）
+├── 添加get_all()方法（对标Mem0）
+└── 集成BM25重排序（可选）
 
-// 添加便捷方法
-Memory::add_text(content)  // 文本内容
-Memory::add_structured(data)  // 结构化数据
-Memory::add_multimodal(contents)  // 多模态内容
+// 修改文件
+crates/agent-mem/src/orchestrator.rs
+├── 添加graph_memory字段
+├── 在add_memory_v2()中集成图存储
+└── 在search_memories_hybrid()中集成图搜索
+
+// 新建文件（可选）
+crates/agent-mem-storage/src/graph/neo4j.rs
+├── Neo4j图数据库集成
+└── 支持Cypher查询
 ```
 
-### 5.3 需要删除的代码
+**参考实现：**
+- Mem0: `source/mem0/mem0/memory/graph_memory.py:76-94` (add)
+- Mem0: `source/mem0/mem0/memory/graph_memory.py:96-130` (search)
+- Mem0: `source/mem0/mem0/memory/graph_memory.py:132-150` (delete_all)
+- Mem0: `source/mem0/mem0/memory/graph_memory.py:152-194` (get_all)
 
-#### 5.3.1 SimpleMemory模块（P0优先级）
+### 6.3 需要删除的代码
+
+#### 6.3.1 SimpleMemory模块（P0优先级）
 
 **删除清单：**
 - [ ] `crates/agent-mem-core/src/simple_memory.rs` (546行)
-- [ ] `crates/agent-mem-core/src/lib.rs` 中的 `simple_memory` 导出
-- [ ] 所有使用 `SimpleMemory` 的示例代码
-- [ ] 文档中关于 `SimpleMemory` 的引用
+- [ ] `crates/agent-mem-core/src/lib.rs:158` (导出语句)
+- [ ] 所有使用 `SimpleMemory` 的示例代码（71个文件引用）
+
+**影响范围：**
+- 71个文件引用 `SimpleMemory` 或 `simple_memory`
+- 需要迁移所有示例代码到 V4 架构
 
 **迁移路径：**
 ```rust
 // 旧代码（删除）
 use agent_mem_core::SimpleMemory;
 let mem = SimpleMemory::new().await?;
+mem.add("I love pizza").await?;
 
 // 新代码（V4架构）
 use agent_mem::Memory;
 let mem = Memory::new().await?;
+mem.add("I love pizza").await?;
 ```
 
-**影响范围：**
-- 71个文件引用 `SimpleMemory` 或 `simple_memory`
-- 需要迁移所有示例代码到 V4 架构
-
-#### 5.3.2 Legacy MemoryItem（可选，P3优先级）
-
-**保留原因：**
-- 向后兼容性
-- 迁移工具需要
-
-**处理方式：**
-- 标记为 `deprecated`
-- 保留迁移工具
-- 新代码强制使用 V4
+**需要迁移的文件：**
+- `examples/simple-memory-demo/src/main.rs`
+- `examples/simple-api-test/src/main.rs`
+- `examples/production-memory-demo/src/main.rs`
+- 其他68个文件
 
 ---
 
-## 6. Mem0功能复用计划
+## 7. Mem0功能复用详细计划
 
-### 6.1 元数据过滤系统复用（P0）
+### 7.1 元数据过滤系统复用（P0）
 
 **Mem0实现分析：**
-- `_process_metadata_filters()`: 处理高级操作符
-- `_has_advanced_operators()`: 检测高级操作符
+- `_process_metadata_filters()`: 处理高级操作符（124行）
+- `_has_advanced_operators()`: 检测高级操作符（25行）
 - 支持 eq, ne, gt, in, contains, AND, OR, NOT
 
 **AgentMem实现计划：**
+
+**步骤1：新建metadata_filter.rs**
 ```rust
-// 1. 新建 metadata_filter.rs
+// crates/agent-mem-core/src/search/metadata_filter.rs
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// 过滤操作符
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FilterOperator {
+    /// 等于
+    Eq,
+    /// 不等于
+    Ne,
+    /// 大于
+    Gt,
+    /// 大于等于
+    Gte,
+    /// 小于
+    Lt,
+    /// 小于等于
+    Lte,
+    /// 在列表中
+    In,
+    /// 不在列表中
+    Nin,
+    /// 包含文本
+    Contains,
+    /// 不区分大小写包含
+    IContains,
+}
+
+/// 过滤值
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FilterValue {
+    String(String),
+    Number(f64),
+    Integer(i64),
+    Boolean(bool),
+    List(Vec<FilterValue>),
+    Wildcard, // *
+}
+
+/// 元数据过滤条件
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetadataFilter {
     pub field: String,
     pub operator: FilterOperator,
     pub value: FilterValue,
 }
 
-pub enum FilterOperator {
-    Eq, Ne, Gt, Gte, Lt, Lte,
-    In, Nin,
-    Contains, IContains,
-}
-
+/// 逻辑操作符
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LogicalOperator {
+    /// 逻辑与
     And(Vec<MetadataFilter>),
+    /// 逻辑或
     Or(Vec<MetadataFilter>),
+    /// 逻辑非
     Not(Box<MetadataFilter>),
 }
 
-// 2. 集成到 SearchQuery
+/// 元数据过滤系统
+pub struct MetadataFilterSystem;
+
+impl MetadataFilterSystem {
+    /// 检测是否包含高级操作符
+    pub fn has_advanced_operators(filters: &HashMap<String, serde_json::Value>) -> bool {
+        for (key, value) in filters {
+            // 检查逻辑操作符
+            if key == "AND" || key == "OR" || key == "NOT" {
+                return true;
+            }
+            
+            // 检查比较操作符
+            if let Some(obj) = value.as_object() {
+                for op in obj.keys() {
+                    if matches!(op.as_str(), "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "nin" | "contains" | "icontains") {
+                        return true;
+                    }
+                }
+            }
+            
+            // 检查通配符
+            if value.as_str() == Some("*") {
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// 处理元数据过滤
+    pub fn process_metadata_filters(
+        filters: &HashMap<String, serde_json::Value>
+    ) -> Result<Vec<MetadataFilter>, String> {
+        let mut result = Vec::new();
+        
+        for (key, value) in filters {
+            if key == "AND" {
+                // 处理AND逻辑
+                // ...
+            } else if key == "OR" {
+                // 处理OR逻辑
+                // ...
+            } else if key == "NOT" {
+                // 处理NOT逻辑
+                // ...
+            } else {
+                // 处理单个条件
+                // ...
+            }
+        }
+        
+        Ok(result)
+    }
+    
+    /// 检查记忆是否匹配过滤条件
+    pub fn matches(memory: &agent_mem_traits::MemoryV4, filter: &MetadataFilter) -> bool {
+        // 实现过滤逻辑
+        // ...
+    }
+}
+```
+
+**步骤2：集成到SearchQuery**
+```rust
+// crates/agent-mem-core/src/search/mod.rs
+
 pub struct SearchQuery {
     // ... existing fields
-    pub metadata_filters: Option<LogicalOperator>,
+    pub metadata_filters: Option<LogicalOperator>,  // 新增
 }
+```
 
-// 3. 实现过滤逻辑
-impl MetadataFilter {
-    pub fn matches(&self, memory: &Memory) -> bool {
-        // 实现过滤逻辑
+**步骤3：存储层支持**
+```rust
+// crates/agent-mem-core/src/storage/memory_repository.rs
+
+impl MemoryRepository {
+    pub async fn search_with_metadata_filters(
+        &self,
+        query: &str,
+        filters: &LogicalOperator,
+        limit: i64,
+    ) -> CoreResult<Vec<DbMemory>> {
+        // 实现SQL查询生成
+        // 支持操作符转换（eq → =, gt → >, etc.）
     }
 }
 ```
 
 **预计工作量：** 3-4天
 
-### 6.2 重排序器复用（P1）
+### 7.2 重排序器复用（P1）
 
 **Mem0实现分析：**
-- `RerankerFactory`: 工厂模式创建重排序器
-- 支持 Cohere, Jina 等
-- `reranker.rerank(query, memories, limit)`
+- `BaseReranker`: 抽象基类
+- `CohereReranker`: Cohere API集成（85行）
+- `RerankerFactory`: 工厂模式创建
 
 **AgentMem实现计划：**
+
+**步骤1：新建external_reranker.rs**
 ```rust
-// 1. 新建 reranker.rs
+// crates/agent-mem-core/src/search/external_reranker.rs
+
+use async_trait::async_trait;
+use agent_mem_traits::Result;
+
+/// 重排序器trait
 #[async_trait]
 pub trait Reranker: Send + Sync {
     async fn rerank(
         &self,
         query: &str,
-        memories: Vec<ScoredMemory>,
-        limit: usize,
+        documents: Vec<ScoredMemory>,
+        top_k: Option<usize>,
     ) -> Result<Vec<ScoredMemory>>;
 }
 
+/// Cohere重排序器
 pub struct CohereReranker {
     api_key: String,
     model: String,
+    client: cohere::Client,
 }
 
-pub struct JinaReranker {
-    api_key: String,
+impl CohereReranker {
+    pub fn new(api_key: String, model: String) -> Result<Self> {
+        let client = cohere::Client::new(cohere::Config::new(api_key.clone()))?;
+        Ok(Self { api_key, model, client })
+    }
 }
 
-// 2. 集成到 MemoryManager
-pub struct MemoryManager {
-    // ... existing fields
-    reranker: Option<Arc<dyn Reranker>>,
-}
-
-// 3. 在搜索流程中集成
-impl MemoryManager {
-    pub async fn search_memories(&self, query: Query) -> Result<Vec<ScoredMemory>> {
-        let results = self.vector_search(query).await?;
+#[async_trait]
+impl Reranker for CohereReranker {
+    async fn rerank(
+        &self,
+        query: &str,
+        documents: Vec<ScoredMemory>,
+        top_k: Option<usize>,
+    ) -> Result<Vec<ScoredMemory>> {
+        // 提取文本内容
+        let doc_texts: Vec<String> = documents.iter()
+            .map(|doc| doc.memory.content.as_text().unwrap_or("").to_string())
+            .collect();
         
-        if let Some(reranker) = &self.reranker {
-            reranker.rerank(&query.text, results, query.limit).await
-        } else {
-            Ok(results)
+        // 调用Cohere API
+        let response = self.client.rerank(
+            &cohere::RerankRequest {
+                model: self.model.clone(),
+                query: query.to_string(),
+                documents: doc_texts,
+                top_n: top_k.unwrap_or(documents.len()),
+                return_documents: false,
+            }
+        ).await?;
+        
+        // 添加rerank_score并重新排序
+        let mut reranked: Vec<ScoredMemory> = response.results.iter()
+            .map(|result| {
+                let mut doc = documents[result.index].clone();
+                doc.score = result.relevance_score as f32;
+                doc
+            })
+            .collect();
+        
+        reranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        
+        Ok(reranked)
+    }
+}
+```
+
+**步骤2：集成到MemoryOrchestrator**
+```rust
+// crates/agent-mem/src/orchestrator.rs
+
+pub struct MemoryOrchestrator {
+    // ... existing fields
+    reranker: Option<Arc<dyn Reranker>>,  // 新增
+}
+
+impl MemoryOrchestrator {
+    pub async fn search_memories_hybrid(
+        &self,
+        query: String,
+        user_id: String,
+        limit: usize,
+        threshold: Option<f32>,
+        filters: Option<HashMap<String, String>>,
+        rerank: bool,  // 新增参数
+    ) -> Result<Vec<MemoryItem>> {
+        // ... existing search logic
+        
+        // 应用重排序
+        if rerank && self.reranker.is_some() && !memory_items.is_empty() {
+            let reranker = self.reranker.as_ref().unwrap();
+            let scored_memories: Vec<ScoredMemory> = memory_items.iter()
+                .map(|item| ScoredMemory::from(item))
+                .collect();
+            
+            let reranked = reranker.rerank(&query, scored_memories, Some(limit)).await?;
+            memory_items = reranked.iter()
+                .map(|sm| MemoryItem::from(sm))
+                .collect();
         }
+        
+        Ok(memory_items)
+    }
+}
+```
+
+**步骤3：集成到Memory API**
+```rust
+// crates/agent-mem/src/memory.rs
+
+impl Memory {
+    pub fn with_reranker(mut self, reranker: Arc<dyn Reranker>) -> Self {
+        // 设置reranker
+        self
     }
 }
 ```
 
 **预计工作量：** 2-3天
 
-### 6.3 图记忆功能复用（P2）
+### 7.3 图记忆功能复用（P2）
 
 **Mem0实现分析：**
-- `graph_memory.py`: 图记忆抽象
-- `memgraph_memory.py`: Memgraph实现
-- `kuzu_memory.py`: Kuzu实现
-- 支持 `add()`, `search()`, `delete_all()`, `get_all()`
+- `MemoryGraph.add()`: 实体提取 + 关系建立 + 图存储
+- `MemoryGraph.search()`: 实体提取 + 图搜索 + BM25重排序
+- `MemoryGraph.delete_all()`: Cypher查询删除
+- `MemoryGraph.get_all()`: Cypher查询获取
 
 **AgentMem现状：**
-- `graph_memory.rs`: 已有基础实现
-- 需要完善和集成
+- `graph_memory.rs`: 已有完整实现（606行）
+- 需要完善API以对标Mem0
 
 **实现计划：**
+
+**步骤1：完善graph_memory.rs**
 ```rust
-// 1. 完善 graph_memory.rs
-pub struct GraphMemory {
+// crates/agent-mem-core/src/graph_memory.rs
+
+impl GraphMemoryEngine {
+    /// 添加数据到图（对标Mem0的add方法）
+    pub async fn add(
+        &self,
+        data: &str,
+        filters: &HashMap<String, String>,
+    ) -> Result<GraphAddResult> {
+        // 1. 提取实体（使用LLM）
+        let entities = self.extract_entities(data, filters).await?;
+        
+        // 2. 建立关系（使用LLM）
+        let relations = self.extract_relations(data, &entities, filters).await?;
+        
+        // 3. 搜索图数据库
+        let existing = self.search_graph(&entities, filters).await?;
+        
+        // 4. 获取要删除的实体（使用LLM决策）
+        let to_delete = self.get_delete_entities(&existing, data, filters).await?;
+        
+        // 5. 删除旧实体
+        let deleted = self.delete_entities(&to_delete, filters).await?;
+        
+        // 6. 添加新实体
+        let added = self.add_entities(&relations, filters).await?;
+        
+        Ok(GraphAddResult { deleted, added })
+    }
+    
+    /// 搜索图（对标Mem0的search方法）
+    pub async fn search(
+        &self,
+        query: &str,
+        filters: &HashMap<String, String>,
+        limit: usize,
+    ) -> Result<Vec<GraphRelation>> {
+        // 1. 提取实体
+        let entities = self.extract_entities(query, filters).await?;
+        
+        // 2. 搜索图数据库
+        let results = self.search_graph(&entities, filters).await?;
+        
+        // 3. BM25重排序（可选）
+        let reranked = self.bm25_rerank(query, &results, limit).await?;
+        
+        Ok(reranked)
+    }
+    
+    /// 删除所有（对标Mem0的delete_all方法）
+    pub async fn delete_all(&self, filters: &HashMap<String, String>) -> Result<()> {
+        // 实现删除逻辑
+    }
+    
+    /// 获取所有（对标Mem0的get_all方法）
+    pub async fn get_all(
+        &self,
+        filters: &HashMap<String, String>,
+        limit: usize,
+    ) -> Result<Vec<GraphRelation>> {
+        // 实现获取逻辑
+    }
+}
+```
+
+**步骤2：集成到MemoryOrchestrator**
+```rust
+// crates/agent-mem/src/orchestrator.rs
+
+pub struct MemoryOrchestrator {
     // ... existing fields
+    graph_memory: Option<Arc<GraphMemoryEngine>>,  // 新增
 }
 
-impl GraphMemory {
-    pub async fn add(&self, memory: &Memory, filters: &Filters) -> Result<()>;
-    pub async fn search(&self, query: &str, filters: &Filters, limit: usize) -> Result<Vec<Memory>>;
-    pub async fn delete_all(&self, filters: &Filters) -> Result<()>;
-    pub async fn get_all(&self, filters: &Filters, limit: usize) -> Result<Vec<Memory>>;
-}
-
-// 2. 集成到 MemoryManager
-pub struct MemoryManager {
-    // ... existing fields
-    graph_memory: Option<Arc<GraphMemory>>,
-}
-
-// 3. 在add/search中集成
-impl MemoryManager {
-    pub async fn add_memory(&self, memory: Memory) -> Result<String> {
+impl MemoryOrchestrator {
+    pub async fn add_memory_v2(
+        &self,
+        // ... parameters
+    ) -> Result<AddResult> {
         // ... existing logic
         
+        // 并行执行图存储
         if let Some(graph) = &self.graph_memory {
-            graph.add(&memory, &filters).await?;
+            let graph_filters = self.build_graph_filters(user_id, agent_id, run_id);
+            let graph_result = graph.add(&content, &graph_filters).await?;
+            // 添加到relations
         }
         
-        Ok(memory_id)
+        // ...
+    }
+    
+    pub async fn search_memories_hybrid(
+        &self,
+        // ... parameters
+    ) -> Result<Vec<MemoryItem>> {
+        // ... existing logic
+        
+        // 并行执行图搜索
+        if let Some(graph) = &self.graph_memory {
+            let graph_filters = self.build_graph_filters(user_id, agent_id, run_id);
+            let graph_results = graph.search(&query, &graph_filters, limit).await?;
+            // 合并到结果
+        }
+        
+        // ...
     }
 }
 ```
@@ -488,32 +1242,67 @@ impl MemoryManager {
 
 ---
 
-## 7. 最小改动实现计划
+## 8. 最小改动实现计划
 
-### 7.1 阶段1：删除SimpleMemory，统一V4架构（P0）
+### 8.1 阶段1：删除SimpleMemory，统一V4架构（P0）
 
 **目标：** 删除SimpleMemory，统一使用Memory V4架构
 
 **任务清单：**
 
 1. **删除SimpleMemory代码**
-   - [ ] 删除 `crates/agent-mem-core/src/simple_memory.rs`
-   - [ ] 从 `crates/agent-mem-core/src/lib.rs` 移除导出
+   - [ ] 删除 `crates/agent-mem-core/src/simple_memory.rs` (546行)
+   - [ ] 从 `crates/agent-mem-core/src/lib.rs:158` 移除导出
    - [ ] 更新所有文档引用
 
 2. **迁移示例代码**
-   - [ ] 迁移 `examples/simple-memory-demo/` 到 V4
-   - [ ] 迁移 `examples/simple-api-test/` 到 V4
-   - [ ] 更新所有示例使用 `Memory::new()`
+   - [ ] 迁移 `examples/simple-memory-demo/src/main.rs` 到 V4
+   - [ ] 迁移 `examples/simple-api-test/src/main.rs` 到 V4
+   - [ ] 迁移 `examples/production-memory-demo/src/main.rs` 到 V4
+   - [ ] 迁移其他68个文件引用
 
 3. **优化Memory API**
    - [ ] 确保 `Memory::new()` 零配置可用
    - [ ] 添加便捷方法（`add_text`, `add_structured`等）
    - [ ] 完善文档和示例
 
+**详细步骤：**
+
+**步骤1.1：删除simple_memory.rs**
+```bash
+# 删除文件
+rm crates/agent-mem-core/src/simple_memory.rs
+
+# 从lib.rs移除导出
+# 修改 crates/agent-mem-core/src/lib.rs
+# 删除: pub use simple_memory::SimpleMemory;
+```
+
+**步骤1.2：迁移示例代码**
+```rust
+// 旧代码（examples/simple-memory-demo/src/main.rs）
+use agent_mem_core::SimpleMemory;
+
+let mem = SimpleMemory::new().await?;
+let id = mem.add("I love pizza").await?;
+let results = mem.search("What do you know about me?").await?;
+
+// 新代码（V4架构）
+use agent_mem::Memory;
+
+let mem = Memory::new().await?;
+let result = mem.add("I love pizza").await?;
+let results = mem.search("What do you know about me?").await?;
+```
+
+**步骤1.3：更新文档**
+- [ ] 更新 README.md，移除SimpleMemory引用
+- [ ] 更新所有示例文档
+- [ ] 更新API文档
+
 **预计工作量：** 2-3天
 
-### 7.2 阶段2：元数据过滤系统增强（P0）
+### 8.2 阶段2：元数据过滤系统增强（P0）
 
 **目标：** 实现Mem0级别的高级元数据过滤
 
@@ -523,39 +1312,132 @@ impl MemoryManager {
    - [ ] 实现 `MetadataFilter` 结构
    - [ ] 实现 `FilterOperator` 枚举
    - [ ] 实现 `LogicalOperator` 枚举
-   - [ ] 实现过滤逻辑
+   - [ ] 实现 `has_advanced_operators()` 方法
+   - [ ] 实现 `process_metadata_filters()` 方法
+   - [ ] 实现 `matches()` 方法
 
 2. **集成到搜索系统**
-   - [ ] 修改 `SearchQuery` 结构
-   - [ ] 修改 `SearchFilters` 结构
-   - [ ] 更新搜索流程
+   - [ ] 修改 `SearchQuery` 结构，添加 `metadata_filters` 字段
+   - [ ] 修改 `SearchFilters` 结构，支持逻辑操作符
+   - [ ] 更新搜索流程，应用元数据过滤
 
 3. **存储层支持**
-   - [ ] 在 `memory_repository.rs` 中实现过滤
-   - [ ] 在 `libsql/memory_repository.rs` 中实现过滤
-   - [ ] 支持SQL查询生成
+   - [ ] 在 `memory_repository.rs` 中实现过滤逻辑
+   - [ ] 在 `libsql/memory_repository.rs` 中实现过滤逻辑
+   - [ ] 支持SQL查询生成（操作符转换）
 
 4. **测试和文档**
    - [ ] 编写单元测试
    - [ ] 编写集成测试
    - [ ] 更新API文档
 
+**详细实现：**
+
+**步骤2.1：新建metadata_filter.rs**
+```rust
+// crates/agent-mem-core/src/search/metadata_filter.rs
+// 完整实现见7.1节
+```
+
+**步骤2.2：集成到SearchQuery**
+```rust
+// crates/agent-mem-core/src/search/mod.rs
+
+pub struct SearchQuery {
+    // ... existing fields
+    pub metadata_filters: Option<LogicalOperator>,  // 新增
+}
+
+impl SearchQuery {
+    pub fn from_query_v4_with_filters(query: &Query, filters: Option<LogicalOperator>) -> Self {
+        let mut sq = Self::from_query_v4(query);
+        sq.metadata_filters = filters;
+        sq
+    }
+}
+```
+
+**步骤2.3：存储层支持**
+```rust
+// crates/agent-mem-core/src/storage/memory_repository.rs
+
+impl MemoryRepository {
+    pub async fn search_with_metadata_filters(
+        &self,
+        agent_id: &str,
+        query: &str,
+        filters: &LogicalOperator,
+        limit: i64,
+    ) -> CoreResult<Vec<DbMemory>> {
+        // 构建SQL WHERE子句
+        let where_clause = self.build_where_clause(filters)?;
+        
+        let sql = format!(
+            "SELECT * FROM memories WHERE agent_id = $1 AND {} LIMIT $2",
+            where_clause
+        );
+        
+        // 执行查询
+        // ...
+    }
+    
+    fn build_where_clause(&self, filters: &LogicalOperator) -> CoreResult<String> {
+        match filters {
+            LogicalOperator::And(conditions) => {
+                let clauses: Vec<String> = conditions.iter()
+                    .map(|c| self.build_condition_clause(c))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("({})", clauses.join(" AND ")))
+            }
+            LogicalOperator::Or(conditions) => {
+                let clauses: Vec<String> = conditions.iter()
+                    .map(|c| self.build_condition_clause(c))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("({})", clauses.join(" OR ")))
+            }
+            LogicalOperator::Not(condition) => {
+                let clause = self.build_condition_clause(condition)?;
+                Ok(format!("NOT ({})", clause))
+            }
+        }
+    }
+    
+    fn build_condition_clause(&self, filter: &MetadataFilter) -> CoreResult<String> {
+        let op = match filter.operator {
+            FilterOperator::Eq => "=",
+            FilterOperator::Ne => "!=",
+            FilterOperator::Gt => ">",
+            FilterOperator::Gte => ">=",
+            FilterOperator::Lt => "<",
+            FilterOperator::Lte => "<=",
+            FilterOperator::In => "IN",
+            FilterOperator::Nin => "NOT IN",
+            FilterOperator::Contains => "LIKE",
+            FilterOperator::IContains => "ILIKE",
+        };
+        
+        // 构建SQL条件
+        // ...
+    }
+}
+```
+
 **预计工作量：** 3-4天
 
-### 7.3 阶段3：重排序器集成（P1）
+### 8.3 阶段3：重排序器集成（P1）
 
 **目标：** 添加可选的重排序功能
 
 **任务清单：**
 
-1. **新建reranker.rs**
+1. **新建external_reranker.rs**
    - [ ] 定义 `Reranker` trait
    - [ ] 实现 `CohereReranker`
    - [ ] 实现 `JinaReranker`（可选）
 
-2. **集成到MemoryManager**
+2. **集成到MemoryOrchestrator**
    - [ ] 添加 `reranker` 字段
-   - [ ] 在 `search_memories()` 中集成
+   - [ ] 在 `search_memories_hybrid()` 中集成重排序
    - [ ] 支持配置启用/禁用
 
 3. **集成到Memory API**
@@ -567,32 +1449,149 @@ impl MemoryManager {
    - [ ] 编写集成测试
    - [ ] 更新API文档
 
+**详细实现：**
+
+**步骤3.1：新建external_reranker.rs**
+```rust
+// crates/agent-mem-core/src/search/external_reranker.rs
+// 完整实现见7.2节
+```
+
+**步骤3.2：集成到MemoryOrchestrator**
+```rust
+// crates/agent-mem/src/orchestrator.rs
+
+pub struct MemoryOrchestrator {
+    // ... existing fields
+    reranker: Option<Arc<dyn Reranker>>,  // 新增
+}
+
+impl MemoryOrchestrator {
+    pub async fn search_memories_hybrid(
+        &self,
+        query: String,
+        user_id: String,
+        limit: usize,
+        threshold: Option<f32>,
+        filters: Option<HashMap<String, String>>,
+        rerank: bool,  // 新增参数
+    ) -> Result<Vec<MemoryItem>> {
+        // ... existing search logic
+        
+        // 应用重排序
+        if rerank && self.reranker.is_some() && !memory_items.is_empty() {
+            let reranker = self.reranker.as_ref().unwrap();
+            let scored_memories: Vec<ScoredMemory> = memory_items.iter()
+                .map(|item| ScoredMemory::from(item))
+                .collect();
+            
+            let reranked = reranker.rerank(&query, scored_memories, Some(limit)).await?;
+            memory_items = reranked.iter()
+                .map(|sm| MemoryItem::from(sm))
+                .collect();
+        }
+        
+        Ok(memory_items)
+    }
+}
+```
+
 **预计工作量：** 2-3天
 
-### 7.4 阶段4：图记忆完善（P2）
+### 8.4 阶段4：图记忆完善（P2）
 
 **目标：** 完善图记忆功能，对标Mem0
 
 **任务清单：**
 
 1. **完善graph_memory.rs**
-   - [ ] 实现完整的图操作API
-   - [ ] 支持图搜索
-   - [ ] 支持关系查询
+   - [ ] 实现 `add()` 方法（对标Mem0）
+   - [ ] 实现 `search()` 方法（对标Mem0）
+   - [ ] 实现 `delete_all()` 方法（对标Mem0）
+   - [ ] 实现 `get_all()` 方法（对标Mem0）
+   - [ ] 集成BM25重排序（可选）
 
-2. **集成到MemoryManager**
+2. **集成到MemoryOrchestrator**
    - [ ] 添加 `graph_memory` 字段
-   - [ ] 在 `add_memory()` 中集成
-   - [ ] 在 `search_memories()` 中集成
+   - [ ] 在 `add_memory_v2()` 中集成图存储
+   - [ ] 在 `search_memories_hybrid()` 中集成图搜索
 
 3. **测试和文档**
    - [ ] 编写单元测试
    - [ ] 编写集成测试
    - [ ] 更新API文档
 
+**详细实现：**
+
+**步骤4.1：完善graph_memory.rs**
+```rust
+// crates/agent-mem-core/src/graph_memory.rs
+// 完整实现见7.3节
+```
+
+**步骤4.2：集成到MemoryOrchestrator**
+```rust
+// crates/agent-mem/src/orchestrator.rs
+
+pub struct MemoryOrchestrator {
+    // ... existing fields
+    graph_memory: Option<Arc<GraphMemoryEngine>>,  // 新增
+}
+
+impl MemoryOrchestrator {
+    pub async fn add_memory_v2(
+        &self,
+        content: String,
+        agent_id: String,
+        user_id: Option<String>,
+        run_id: Option<String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        infer: bool,
+        memory_type: Option<MemoryType>,
+        prompt: Option<String>,
+    ) -> Result<AddResult> {
+        // ... existing vector store logic
+        
+        // 并行执行图存储
+        let graph_result = if let Some(graph) = &self.graph_memory {
+            let graph_filters = self.build_graph_filters(user_id.clone(), agent_id.clone(), run_id.clone());
+            Some(graph.add(&content, &graph_filters).await?)
+        } else {
+            None
+        };
+        
+        // 合并结果
+        // ...
+    }
+    
+    pub async fn search_memories_hybrid(
+        &self,
+        query: String,
+        user_id: String,
+        limit: usize,
+        threshold: Option<f32>,
+        filters: Option<HashMap<String, String>>,
+        rerank: bool,
+    ) -> Result<Vec<MemoryItem>> {
+        // ... existing vector search logic
+        
+        // 并行执行图搜索
+        let graph_results = if let Some(graph) = &self.graph_memory {
+            let graph_filters = self.build_graph_filters(Some(user_id.clone()), None, None);
+            Some(graph.search(&query, &graph_filters, limit).await?)
+        } else {
+            None
+        };
+        
+        // 合并结果
+        // ...
+    }
+}
+```
+
 **预计工作量：** 3-5天
 
-### 7.5 阶段5：代码清理和优化（P2）
+### 8.5 阶段5：代码清理和优化（P2）
 
 **目标：** 删除不需要的代码，保持高内聚低耦合
 
@@ -604,7 +1603,7 @@ impl MemoryManager {
    - [ ] 标记过时代码
 
 2. **删除冗余代码**
-   - [ ] 删除未使用的agent实现
+   - [ ] 删除未使用的agent实现（如果存在）
    - [ ] 合并重复的存储实现
    - [ ] 统一搜索接口
 
@@ -617,9 +1616,9 @@ impl MemoryManager {
 
 ---
 
-## 8. 实施优先级和时间表
+## 9. 实施优先级和时间表
 
-### 8.1 优先级排序
+### 9.1 优先级排序
 
 1. **P0（必须）**: 阶段1 - 删除SimpleMemory，统一V4架构
 2. **P0（必须）**: 阶段2 - 元数据过滤系统增强
@@ -627,7 +1626,7 @@ impl MemoryManager {
 4. **P2（可选）**: 阶段5 - 代码清理和优化
 5. **P2（可选）**: 阶段4 - 图记忆完善
 
-### 8.2 时间表
+### 9.2 时间表
 
 | 阶段 | 优先级 | 预计时间 | 开始时间 | 完成时间 |
 |------|--------|----------|----------|----------|
@@ -641,9 +1640,9 @@ impl MemoryManager {
 
 ---
 
-## 9. 理论基础和参考文献
+## 10. 理论基础和参考文献
 
-### 9.1 认知心理学理论
+### 10.1 认知心理学理论
 
 **记忆模型：**
 - **Episodic Memory（情景记忆）**: 特定时间和地点的事件记忆
@@ -656,7 +1655,7 @@ impl MemoryManager {
 2. Tulving, E. (1972). "Episodic and semantic memory"
 3. Baddeley, A. D. (2000). "The episodic buffer: a new component of working memory?"
 
-### 9.2 向量数据库和语义检索
+### 10.2 向量数据库和语义检索
 
 **技术原理：**
 - **向量嵌入（Embedding）**: 将文本转换为高维向量
@@ -668,7 +1667,7 @@ impl MemoryManager {
 2. Johnson, J., et al. (2019). "Billion-scale similarity search with GPUs"
 3. Douze, M., et al. (2024). "The Faiss library"
 
-### 9.3 知识图谱和关系推理
+### 10.3 知识图谱和关系推理
 
 **技术原理：**
 - **图数据库**: 存储实体和关系
@@ -680,7 +1679,7 @@ impl MemoryManager {
 2. Hogan, A., et al. (2021). "Knowledge graphs"
 3. Hamilton, W. L. (2020). "Graph representation learning"
 
-### 9.4 稀疏分布式存储器
+### 10.4 稀疏分布式存储器
 
 **技术原理：**
 - **稀疏编码**: 使用稀疏向量表示记忆
@@ -691,11 +1690,22 @@ impl MemoryManager {
 1. Kanerva, P. (1988). "Sparse distributed memory"
 2. Gallant, S. I., & Okaywe, T. W. (2013). "Representing objects, relations, and sequences"
 
+### 10.5 重排序和检索优化
+
+**技术原理：**
+- **重排序（Reranking）**: 对初步检索结果进行精确评分
+- **交叉编码器（Cross-Encoder）**: 同时编码查询和文档
+- **学习排序（Learning to Rank）**: 机器学习优化排序
+
+**参考论文：**
+1. Nogueira, R., & Cho, K. (2019). "Passage re-ranking with BERT"
+2. Xiong, L., et al. (2020). "Approximate nearest neighbor negative contrastive learning for dense text retrieval"
+
 ---
 
-## 10. 技术债务和风险
+## 11. 技术债务和风险
 
-### 10.1 技术债务
+### 11.1 技术债务
 
 1. **API不一致**
    - SimpleMemory和Memory API不一致
@@ -709,7 +1719,11 @@ impl MemoryManager {
    - V4架构文档不完整
    - **解决方案**: 补充完整文档和使用示例
 
-### 10.2 风险
+4. **并行处理不完整**
+   - AgentMem部分并行，Mem0完整并行
+   - **解决方案**: 优化并行处理（P2优先级）
+
+### 11.2 风险
 
 1. **向后兼容性**
    - 删除SimpleMemory可能破坏现有代码
@@ -723,61 +1737,91 @@ impl MemoryManager {
    - 新功能需要完整测试
    - **缓解措施**: 确保测试覆盖率 > 80%
 
+4. **外部依赖**
+   - Cohere API需要API密钥
+   - **缓解措施**: 可选功能，失败时降级
+
 ---
 
-## 11. 成功标准
+## 12. 成功标准
 
-### 11.1 功能完整性
+### 12.1 功能完整性
 
 - [ ] SimpleMemory已删除，统一使用V4架构
-- [ ] 元数据过滤支持所有Mem0操作符
-- [ ] 重排序器集成完成
+- [ ] 元数据过滤支持所有Mem0操作符（eq, ne, gt, in, contains, AND, OR, NOT）
+- [ ] 重排序器集成完成（Cohere + 可选Jina）
 - [ ] 图记忆功能完善（可选）
 
-### 11.2 代码质量
+### 12.2 代码质量
 
 - [ ] 所有新代码通过clippy检查
 - [ ] 测试覆盖率 > 80%
 - [ ] 文档完整，包含使用示例
 - [ ] 高内聚低耦合，模块职责清晰
 
-### 11.3 性能指标
+### 12.3 性能指标
 
 - [ ] 搜索延迟 < 100ms（P95）
 - [ ] 存储延迟 < 50ms（P95）
 - [ ] 内存占用 < 2GB（idle）
+- [ ] 重排序延迟 < 500ms（P95）
 
 ---
 
-## 12. 附录
+## 13. 附录
 
-### 12.1 关键文件清单
+### 13.1 关键文件清单
 
 **AgentMem V4核心文件：**
-- `crates/agent-mem-traits/src/abstractions.rs` - V4抽象定义
-- `crates/agent-mem-core/src/storage/conversion.rs` - V4 ↔ DbMemory转换
-- `crates/agent-mem-core/src/v4_migration.rs` - 迁移工具
-- `crates/agent-mem/src/memory.rs` - Memory API
-- `crates/agent-mem-core/src/manager.rs` - 核心管理器
+- `crates/agent-mem-traits/src/abstractions.rs` - V4抽象定义（953行）
+- `crates/agent-mem-core/src/storage/conversion.rs` - V4 ↔ DbMemory转换（572行）
+- `crates/agent-mem-core/src/v4_migration.rs` - 迁移工具（368行）
+- `crates/agent-mem/src/memory.rs` - Memory API（1259行）
+- `crates/agent-mem/src/orchestrator.rs` - MemoryOrchestrator（4701行）
+- `crates/agent-mem-core/src/manager.rs` - 核心管理器（942行）
 
 **Mem0核心文件：**
-- `source/mem0/mem0/memory/main.py` - 核心Memory类
-- `source/mem0/mem0/memory/storage.py` - SQLite存储
-- `source/mem0/mem0/reranker/` - 重排序器
+- `source/mem0/mem0/memory/main.py` - 核心Memory类（2326行）
+- `source/mem0/mem0/memory/storage.py` - SQLite存储（218行）
+- `source/mem0/mem0/memory/graph_memory.py` - 图记忆（700行）
+- `source/mem0/mem0/reranker/` - 重排序器（7个文件）
 
-### 12.2 需要删除的文件
+### 13.2 需要删除的文件
 
 - `crates/agent-mem-core/src/simple_memory.rs` (546行)
-- 所有使用SimpleMemory的示例代码
+- 所有使用SimpleMemory的示例代码（71个文件引用）
 
-### 12.3 需要新建的文件
+### 13.3 需要新建的文件
 
 - `crates/agent-mem-core/src/search/metadata_filter.rs` - 元数据过滤
-- `crates/agent-mem-core/src/search/reranker.rs` - 重排序器
+- `crates/agent-mem-core/src/search/external_reranker.rs` - 外部重排序器
+
+### 13.4 需要修改的文件
+
+**阶段1：**
+- `crates/agent-mem-core/src/lib.rs` - 移除SimpleMemory导出
+- `examples/simple-memory-demo/src/main.rs` - 迁移到V4
+- `examples/simple-api-test/src/main.rs` - 迁移到V4
+- 其他68个文件引用
+
+**阶段2：**
+- `crates/agent-mem-core/src/search/mod.rs` - 集成MetadataFilter
+- `crates/agent-mem-core/src/storage/memory_repository.rs` - 实现高级过滤
+- `crates/agent-mem-core/src/storage/libsql/memory_repository.rs` - 实现高级过滤
+
+**阶段3：**
+- `crates/agent-mem-core/src/search/reranker.rs` - 重构为统一trait
+- `crates/agent-mem/src/orchestrator.rs` - 集成重排序器
+- `crates/agent-mem/src/memory.rs` - 添加with_reranker方法
+
+**阶段4：**
+- `crates/agent-mem-core/src/graph_memory.rs` - 完善API
+- `crates/agent-mem/src/orchestrator.rs` - 集成图记忆
 
 ---
 
-**文档版本：** 2.0  
+**文档版本：** 3.0  
 **创建日期：** 2024-12-19  
 **最后更新：** 2024-12-19  
-**状态：** 待实施
+**状态：** 待实施  
+**分析轮次：** 4轮综合分析完成
