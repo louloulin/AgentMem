@@ -423,6 +423,202 @@ impl PartialEq<FilterValue> for serde_json::Value {
     }
 }
 
+impl MetadataFilterSystem {
+    /// 构建SQL WHERE子句（PostgreSQL版本）
+    ///
+    /// 将LogicalOperator转换为PostgreSQL兼容的SQL WHERE子句
+    pub fn build_sql_where_clause(
+        filters: &LogicalOperator,
+        param_offset: usize,
+    ) -> Result<(String, Vec<serde_json::Value>), String> {
+        let mut params = Vec::new();
+        let clause = Self::build_sql_clause_recursive(filters, &mut params, param_offset)?;
+        Ok((clause, params))
+    }
+
+    /// 递归构建SQL子句
+    fn build_sql_clause_recursive(
+        filter: &LogicalOperator,
+        params: &mut Vec<serde_json::Value>,
+        param_offset: usize,
+    ) -> Result<String, String> {
+        match filter {
+            LogicalOperator::And(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_condition_clause(c, params, param_offset + params.len()))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" AND ")))
+            }
+            LogicalOperator::Or(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_condition_clause(c, params, param_offset + params.len()))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" OR ")))
+            }
+            LogicalOperator::Not(condition) => {
+                let clause = Self::build_condition_clause(condition, params, param_offset + params.len())?;
+                Ok(format!("NOT ({})", clause))
+            }
+            LogicalOperator::Single(condition) => {
+                Self::build_condition_clause(condition, params, param_offset)
+            }
+        }
+    }
+
+    /// 构建单个条件的SQL子句
+    fn build_condition_clause(
+        filter: &MetadataFilter,
+        params: &mut Vec<serde_json::Value>,
+        param_index: usize,
+    ) -> Result<String, String> {
+        let field_path = format!("metadata->>'{}'", filter.field);
+        let param_placeholder = format!("${}", param_index + 1);
+
+        let sql_op = match filter.operator {
+            FilterOperator::Eq => "=",
+            FilterOperator::Ne => "!=",
+            FilterOperator::Gt => ">",
+            FilterOperator::Gte => ">=",
+            FilterOperator::Lt => "<",
+            FilterOperator::Lte => "<=",
+            FilterOperator::In => "IN",
+            FilterOperator::Nin => "NOT IN",
+            FilterOperator::Contains => "LIKE",
+            FilterOperator::IContains => "ILIKE",
+        };
+
+        let value = match &filter.value {
+            FilterValue::String(s) => serde_json::Value::String(s.clone()),
+            FilterValue::Number(n) => serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?),
+            FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
+            FilterValue::List(list) => {
+                // 对于IN/NIN操作符，需要特殊处理
+                let values: Vec<String> = list.iter().map(|v| {
+                    match v {
+                        FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
+                        FilterValue::Number(n) => n.to_string(),
+                        FilterValue::Integer(i) => i.to_string(),
+                        FilterValue::Boolean(b) => b.to_string().to_uppercase(),
+                        _ => "NULL".to_string(),
+                    }
+                }).collect();
+                return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
+            }
+            FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
+        };
+
+        params.push(value);
+
+        match filter.operator {
+            FilterOperator::Contains | FilterOperator::IContains => {
+                // 对于LIKE/ILIKE，需要添加通配符
+                Ok(format!("{} {} {}", field_path, sql_op, param_placeholder))
+            }
+            _ => {
+                Ok(format!("{} {} {}", field_path, sql_op, param_placeholder))
+            }
+        }
+    }
+
+    /// 构建SQL WHERE子句（LibSQL版本）
+    ///
+    /// LibSQL使用?作为参数占位符，而不是$1, $2
+    pub fn build_libsql_where_clause(
+        filters: &LogicalOperator,
+    ) -> Result<(String, Vec<serde_json::Value>), String> {
+        let mut params = Vec::new();
+        let clause = Self::build_libsql_clause_recursive(filters, &mut params)?;
+        Ok((clause, params))
+    }
+
+    /// 递归构建LibSQL子句
+    fn build_libsql_clause_recursive(
+        filter: &LogicalOperator,
+        params: &mut Vec<serde_json::Value>,
+    ) -> Result<String, String> {
+        match filter {
+            LogicalOperator::And(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_libsql_condition_clause(c, params))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" AND ")))
+            }
+            LogicalOperator::Or(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_libsql_condition_clause(c, params))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" OR ")))
+            }
+            LogicalOperator::Not(condition) => {
+                let clause = Self::build_libsql_condition_clause(condition, params)?;
+                Ok(format!("NOT ({})", clause))
+            }
+            LogicalOperator::Single(condition) => {
+                Self::build_libsql_condition_clause(condition, params)
+            }
+        }
+    }
+
+    /// 构建LibSQL单个条件的SQL子句
+    fn build_libsql_condition_clause(
+        filter: &MetadataFilter,
+        params: &mut Vec<serde_json::Value>,
+    ) -> Result<String, String> {
+        // LibSQL使用json_extract函数
+        let field_path = format!("json_extract(metadata, '$.{}')", filter.field);
+
+        let sql_op = match filter.operator {
+            FilterOperator::Eq => "=",
+            FilterOperator::Ne => "!=",
+            FilterOperator::Gt => ">",
+            FilterOperator::Gte => ">=",
+            FilterOperator::Lt => "<",
+            FilterOperator::Lte => "<=",
+            FilterOperator::In => "IN",
+            FilterOperator::Nin => "NOT IN",
+            FilterOperator::Contains => "LIKE",
+            FilterOperator::IContains => "LIKE", // LibSQL不区分大小写LIKE
+        };
+
+        let value = match &filter.value {
+            FilterValue::String(s) => {
+                match filter.operator {
+                    FilterOperator::Contains | FilterOperator::IContains => {
+                        // 添加通配符
+                        return Ok(format!("{} {} ?", field_path, sql_op));
+                    }
+                    _ => serde_json::Value::String(s.clone()),
+                }
+            }
+            FilterValue::Number(n) => serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?),
+            FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
+            FilterValue::List(list) => {
+                // 对于IN/NIN操作符
+                let values: Vec<String> = list.iter().map(|v| {
+                    match v {
+                        FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
+                        FilterValue::Number(n) => n.to_string(),
+                        FilterValue::Integer(i) => i.to_string(),
+                        FilterValue::Boolean(b) => b.to_string().to_uppercase(),
+                        _ => "NULL".to_string(),
+                    }
+                }).collect();
+                return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
+            }
+            FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
+        };
+
+        params.push(value);
+        Ok(format!("{} {} ?", field_path, sql_op))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

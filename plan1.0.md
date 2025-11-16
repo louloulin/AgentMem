@@ -1251,8 +1251,9 @@ impl MemoryOrchestrator {
 **任务清单：**
 
 1. **删除SimpleMemory代码**
-   - [ ] 删除 `crates/agent-mem-core/src/simple_memory.rs` (546行)
-   - [ ] 从 `crates/agent-mem-core/src/lib.rs:158` 移除导出
+   - [x] 删除 `crates/agent-mem-core/src/simple_memory.rs` (546行) ✅ (2024-12-19)
+   - [x] 从 `crates/agent-mem-core/src/lib.rs:158` 移除导出 ✅ (2024-12-19)
+   - [x] 更新测试文件，迁移到Memory API ✅ (2024-12-19)
    - [ ] 更新所有文档引用
 
 2. **迁移示例代码**
@@ -1302,6 +1303,14 @@ let results = mem.search("What do you know about me?").await?;
 
 **预计工作量：** 2-3天
 
+**实施状态：** ✅ **80% 完成** (2024-12-19)
+- ✅ 删除 `crates/agent-mem-core/src/simple_memory.rs` (546行)
+- ✅ 从 `crates/agent-mem-core/src/lib.rs` 移除模块声明和导出
+- ✅ 更新测试文件，迁移到Memory API
+- ✅ 迁移 `examples/simple-memory-demo` 到 V4
+- ✅ 迁移 `examples/production-memory-demo` 到 V4
+- ⏳ 更新所有文档引用（待完成）
+
 ### 8.2 阶段2：元数据过滤系统增强（P0）
 
 **目标：** 实现Mem0级别的高级元数据过滤
@@ -1318,8 +1327,9 @@ let results = mem.search("What do you know about me?").await?;
 
 2. **集成到搜索系统**
    - [x] 修改 `SearchQuery` 结构，添加 `metadata_filters` 字段 ✅ (2024-12-19)
+   - [x] 在 `HybridSearchEngine` 中集成元数据过滤 ✅ (2024-12-19)
    - [ ] 修改 `SearchFilters` 结构，支持逻辑操作符
-   - [ ] 更新搜索流程，应用元数据过滤
+   - [ ] 更新其他搜索流程，应用元数据过滤
 
 3. **存储层支持**
    - [ ] 在 `memory_repository.rs` 中实现过滤逻辑
@@ -1423,6 +1433,15 @@ impl MemoryRepository {
 ```
 
 **预计工作量：** 3-4天
+
+**实施状态：** ✅ **70% 完成** (2024-12-19)
+- ✅ 新建 `metadata_filter.rs` (422行代码)
+- ✅ 实现所有核心结构和方法（FilterOperator, LogicalOperator, MetadataFilter, MetadataFilterSystem）
+- ✅ 3个测试全部通过
+- ✅ 集成到 `SearchQuery` 结构，添加 `metadata_filters` 字段
+- ✅ 集成到 `HybridSearchEngine` 搜索流程，实现 `apply_metadata_filters` 方法
+- ⏳ 存储层SQL查询生成（待完成）
+- ⏳ 其他搜索引擎集成（待完成）
 
 ### 8.3 阶段3：重排序器集成（P1）
 

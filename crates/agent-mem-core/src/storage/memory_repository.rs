@@ -7,6 +7,7 @@ use sqlx::{PgPool, Row};
 use super::models::DbMemory;
 use super::repository::Repository;
 use crate::{CoreError, CoreResult};
+use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
 
 /// Memory repository with enhanced multi-tenant support
 pub struct MemoryRepository {

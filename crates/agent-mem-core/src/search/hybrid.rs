@@ -4,10 +4,11 @@
 
 use super::{
     FullTextSearchEngine, RRFRanker, SearchQuery, SearchResult, SearchResultRanker, SearchStats,
-    VectorSearchEngine,
+    VectorSearchEngine, MetadataFilterSystem, LogicalOperator,
 };
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -168,8 +169,13 @@ impl HybridSearchEngine {
 
         // 融合搜索结果
         let fusion_start = Instant::now();
-        let fused_results = self.fuse_results(vector_results.clone(), fulltext_results.clone())?;
+        let mut fused_results = self.fuse_results(vector_results.clone(), fulltext_results.clone())?;
         let fusion_time = fusion_start.elapsed().as_millis() as u64;
+
+        // 应用元数据过滤（阶段2：高级过滤）
+        if let Some(metadata_filters) = &query.metadata_filters {
+            fused_results = Self::apply_metadata_filters(fused_results, metadata_filters)?;
+        }
 
         // 限制结果数量
         let final_results: Vec<SearchResult> =
@@ -375,6 +381,38 @@ impl SearchEngine for HybridSearchEngine {
             QueryIntentType::Hybrid, // 主要支持混合查询
             QueryIntentType::Vector, // 也支持纯向量查询
         ]
+    }
+
+    /// 应用元数据过滤到搜索结果
+    ///
+    /// 根据metadata_filters过滤搜索结果，只保留匹配的记忆
+    fn apply_metadata_filters(
+        results: Vec<SearchResult>,
+        filters: &LogicalOperator,
+    ) -> Result<Vec<SearchResult>> {
+        let mut filtered = Vec::new();
+
+        for result in results {
+            // 将result的metadata转换为HashMap
+            let metadata: HashMap<String, serde_json::Value> = if let Some(meta) = &result.metadata {
+                if let Some(obj) = meta.as_object() {
+                    obj.iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect()
+                } else {
+                    HashMap::new()
+                }
+            } else {
+                HashMap::new()
+            };
+
+            // 检查是否匹配过滤条件
+            if MetadataFilterSystem::matches(filters, &metadata) {
+                filtered.push(result);
+            }
+        }
+
+        Ok(filtered)
     }
 }
 

@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
 use crate::storage::conversion::{memory_to_db, db_to_memory};
+use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
 
 /// LibSQL implementation of Memory repository
 pub struct LibSqlMemoryRepository {
@@ -363,6 +364,83 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         // Convert DbMemory to Memory V4
         let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
         memories
+    }
+
+    /// 使用元数据过滤搜索记忆（阶段2：高级过滤）
+    ///
+    /// 支持高级操作符和逻辑操作符的元数据过滤（LibSQL版本）
+    /// 注意：这是一个辅助方法，不在trait中定义
+    pub async fn search_with_metadata_filters(
+        &self,
+        agent_id: &str,
+        query: &str,
+        filters: &LogicalOperator,
+        limit: i64,
+    ) -> Result<Vec<Memory>> {
+        // 简化实现：先获取所有结果，然后在内存中过滤
+        // TODO: 优化为SQL级别的过滤
+        let conn = self.conn.lock().await;
+
+        let search_pattern = if query.is_empty() {
+            String::new()
+        } else {
+            format!("%{}%", query)
+        };
+
+        let mut sql = String::from(
+            "SELECT id, organization_id, user_id, agent_id, content, hash, metadata,
+                    score, memory_type, scope, level, importance, access_count, last_accessed,
+                    created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
+             FROM memories WHERE agent_id = ? AND is_deleted = 0",
+        );
+
+        if !query.is_empty() {
+            sql.push_str(" AND content LIKE ?");
+        }
+
+        sql.push_str(" ORDER BY importance DESC, created_at DESC LIMIT ?");
+
+        let mut stmt = conn
+            .prepare(&sql)
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+
+        let mut rows = if query.is_empty() {
+            stmt.query(libsql::params![agent_id, limit])
+                .await
+        } else {
+            stmt.query(libsql::params![agent_id, search_pattern, limit])
+                .await
+        }
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {e}")))?;
+
+        let mut db_memories = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
+        {
+            db_memories.push(Self::row_to_memory(&row)?);
+        }
+
+        // Convert DbMemory to Memory V4
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        let mut memories = memories?;
+
+        // 在内存中应用元数据过滤
+        let mut filtered = Vec::new();
+        for memory in memories {
+            let metadata: std::collections::HashMap<String, serde_json::Value> = 
+                memory.metadata().iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+            
+            if MetadataFilterSystem::matches(filters, &metadata) {
+                filtered.push(memory);
+            }
+        }
+
+        Ok(filtered)
     }
 
     async fn update(&self, memory: &Memory) -> Result<Memory> {
