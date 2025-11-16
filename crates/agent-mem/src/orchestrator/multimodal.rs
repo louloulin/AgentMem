@@ -239,7 +239,7 @@ impl MultimodalModule {
 
         let simple_description_clone = simple_description.clone();
         let user_id_clone = user_id.clone();
-        
+
         let memory_id = StorageModule::add_memory_fast(
             orchestrator,
             simple_description,
@@ -361,7 +361,7 @@ impl MultimodalModule {
 
         let simple_description_clone = simple_description.clone();
         let user_id_clone = user_id.clone();
-        
+
         let memory_id = StorageModule::add_memory_fast(
             orchestrator,
             simple_description,

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use agent_mem_core::types::MemoryType;
+use agent_mem_core::storage::conversion::v4_to_legacy;
 use agent_mem_traits::{MemoryItem, Result};
 use agent_mem_utils::hash::compute_content_hash;
 
@@ -298,13 +299,17 @@ impl StorageModule {
         // 1. 先获取记忆内容用于历史记录
         let old_memory = Self::get_memory(orchestrator, memory_id).await.ok();
 
-        // 2. 从 CoreMemoryManager 删除
-        // Note: CoreMemoryManager 不提供 delete_memory 方法
-        // 如果需要删除功能，应该使用 MemoryManager 而不是 CoreMemoryManager
-        // TODO: 实现使用 MemoryManager 删除记忆的功能
-        if let Some(_manager) = &orchestrator.core_manager {
-            // CoreMemoryManager 不支持此方法，需要改用 MemoryManager
-            // 暂时跳过，避免编译错误
+        // 2. 使用 MemoryManager 删除记忆
+        if let Some(manager) = &orchestrator.memory_manager {
+            manager
+                .delete_memory(memory_id)
+                .await
+                .map_err(|e| {
+                    agent_mem_traits::AgentMemError::storage_error(&format!(
+                        "Failed to delete memory from MemoryManager: {}",
+                        e
+                    ))
+                })?;
         }
 
         // 3. 从向量存储删除
@@ -355,10 +360,18 @@ impl StorageModule {
     ) -> Result<MemoryItem> {
         debug!("获取记忆: {}", memory_id);
 
-        // 优先从 CoreMemoryManager 获取
-        // Note: CoreMemoryManager 不提供 get_memory 方法
-        // 如果需要获取功能，应该使用 MemoryManager 而不是 CoreMemoryManager
-        // TODO: 实现使用 MemoryManager 获取记忆的功能
+        // 优先从 MemoryManager 获取
+        if let Some(manager) = &orchestrator.memory_manager {
+            if let Some(memory) = manager.get_memory(memory_id).await.map_err(|e| {
+                agent_mem_traits::AgentMemError::storage_error(&format!(
+                    "Failed to get memory from MemoryManager: {}",
+                    e
+                ))
+            })? {
+                // 转换为 MemoryItem
+                return Ok(v4_to_legacy(&memory));
+            }
+        }
 
         // 降级：从向量存储获取
         if let Some(vector_store) = &orchestrator.vector_store {

@@ -639,6 +639,66 @@ impl InitializationModule {
         }
     }
 
+    /// 创建 Search 组件
+    #[cfg(feature = "postgres")]
+    pub async fn create_search_components(
+        config: &OrchestratorConfig,
+        vector_store: Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>,
+        embedder: Option<Arc<dyn agent_mem_traits::Embedder + Send + Sync>>,
+    ) -> Result<(
+        Option<Arc<agent_mem_core::search::HybridSearchEngine>>,
+        Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
+        Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
+    )> {
+        use agent_mem_core::search::{HybridSearchEngine, VectorSearchEngine, FullTextSearchEngine};
+        use std::sync::Arc;
+
+        info!("创建 Search 组件...");
+
+        // 创建 VectorSearchEngine
+        let vector_search_engine = if let Some(store) = &vector_store {
+            if let Some(emb) = &embedder {
+                let dimension = emb.dimension();
+                Some(Arc::new(VectorSearchEngine::new(store.clone(), dimension)))
+            } else {
+                warn!("Embedder 未配置，VectorSearchEngine 将不可用");
+                None
+            }
+        } else {
+            warn!("VectorStore 未配置，VectorSearchEngine 将不可用");
+            None
+        };
+
+        // 创建 FullTextSearchEngine
+        // 注意：FullTextSearchEngine需要PgPool，如果storage_url是PostgreSQL连接，可以创建
+        // 这里暂时返回None，因为需要PostgreSQL连接池，这需要额外的配置
+        let fulltext_search_engine = if let Some(_storage_url) = &config.storage_url {
+            // TODO: 如果storage_url是PostgreSQL连接，创建PgPool并初始化FullTextSearchEngine
+            // 需要检查storage_url是否是PostgreSQL格式，然后创建连接池
+            warn!("FullTextSearchEngine 需要PostgreSQL连接池，当前暂不支持自动创建");
+            None
+        } else {
+            warn!("存储URL未配置，FullTextSearchEngine 将不可用");
+            None
+        };
+
+        // 创建 HybridSearchEngine
+        let hybrid_search_engine = if let (Some(vector_engine), Some(fulltext_engine)) = 
+            (vector_search_engine.clone(), fulltext_search_engine.clone()) {
+            let hybrid_engine = HybridSearchEngine::with_default_config(
+                vector_engine,
+                fulltext_engine,
+            );
+            info!("✅ HybridSearchEngine 创建成功");
+            Some(Arc::new(hybrid_engine))
+        } else {
+            warn!("VectorSearchEngine 或 FullTextSearchEngine 未配置，HybridSearchEngine 将不可用");
+            None
+        };
+
+        Ok((hybrid_search_engine, vector_search_engine, fulltext_search_engine))
+    }
+
     /// 创建历史记录管理器
     pub async fn create_history_manager(
         _config: &OrchestratorConfig,
