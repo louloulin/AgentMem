@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 agent-mem-core = { path = "../../crates/agent-mem-core" }
-agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem = { path = "../../crates/agent-mem" }
 tokio = { version = "1.42", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -9,7 +9,7 @@
 //! 4. 对比 SimpleMemory（内存存储）和 Agent（持久化存储）
 
 use agent_mem_core::agents::{CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
-use agent_mem_core::SimpleMemory;
+use agent_mem::Memory;
 use tracing::{error, info};
 
 #[tokio::main]
@@ -22,8 +22,8 @@ async fn main() {
     info!("🚀 AgentMem 生产环境演示");
     info!("============================================================");
 
-    // 演示 1: SimpleMemory（开发/测试用）
-    demo_simple_memory().await;
+    // 演示 1: Memory（开发/测试用）
+    demo_memory().await;
 
     info!("");
     info!("============================================================");
@@ -36,30 +36,36 @@ async fn main() {
     info!("✅ 演示完成！");
     info!("");
     info!("📝 总结：");
-    info!("  - SimpleMemory: 适合开发和测试，数据存储在内存中");
+    info!("  - Memory: 适合开发和测试，数据存储在内存中（零配置）");
     info!("  - Agent API: 适合生产环境，数据持久化到数据库");
     info!("  - 默认使用 LibSQL 嵌入式数据库（agentmem.db）");
     info!("  - 可通过环境变量配置 PostgreSQL 等其他数据库");
 }
 
-/// 演示 SimpleMemory（内存存储）
-async fn demo_simple_memory() {
-    info!("📦 演示 1: SimpleMemory（开发/测试模式）");
+/// 演示 Memory（内存存储）
+async fn demo_memory() {
+    info!("📦 演示 1: Memory（开发/测试模式）");
     info!("------------------------------------------------------------");
 
-    match SimpleMemory::new().await {
+    match Memory::new().await {
         Ok(mem) => {
-            info!("✅ SimpleMemory 创建成功");
+            info!("✅ Memory 创建成功");
             info!("⚠️  注意：数据存储在内存中，进程退出后会丢失");
 
             // 添加一些测试数据
             match mem.add("我喜欢吃披萨").await {
-                Ok(id) => info!("✅ 添加记忆成功: {}", id),
+                Ok(result) => {
+                    let id = result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+                    info!("✅ 添加记忆成功: {}", id);
+                }
                 Err(e) => error!("❌ 添加记忆失败: {}", e),
             }
 
             match mem.add("我的生日是 1990-01-01").await {
-                Ok(id) => info!("✅ 添加记忆成功: {}", id),
+                Ok(result) => {
+                    let id = result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+                    info!("✅ 添加记忆成功: {}", id);
+                }
                 Err(e) => error!("❌ 添加记忆失败: {}", e),
             }
 
@@ -77,7 +83,7 @@ async fn demo_simple_memory() {
             info!("⚠️  这些数据在进程退出后会丢失！");
         }
         Err(e) => {
-            error!("❌ SimpleMemory 创建失败: {}", e);
+            error!("❌ Memory 创建失败: {}", e);
         }
     }
 }
