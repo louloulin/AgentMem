@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use agent_mem_core::managers::CoreMemoryManager;
+use agent_mem_core::manager::MemoryManager;
 use agent_mem_traits::{MemoryItem, Result};
 
 use super::initialization::IntelligenceComponents;
@@ -78,6 +79,8 @@ pub enum CompletedOperation {
 pub struct MemoryOrchestrator {
     // ========== Managers ==========
     pub(crate) core_manager: Option<Arc<CoreMemoryManager>>,
+    /// MemoryManager - 用于提供update_memory, delete_memory, get_memory等功能
+    pub(crate) memory_manager: Option<Arc<MemoryManager>>,
 
     #[cfg(feature = "postgres")]
     pub(crate) semantic_manager: Option<Arc<agent_mem_core::managers::SemanticMemoryManager>>,
@@ -157,6 +160,10 @@ impl MemoryOrchestrator {
         info!("创建 Managers...");
         let core_manager = Some(Arc::new(CoreMemoryManager::new()));
         info!("✅ CoreMemoryManager 创建成功");
+        
+        // 创建 MemoryManager 用于提供完整的CRUD功能
+        let memory_manager = Some(Arc::new(MemoryManager::new()));
+        info!("✅ MemoryManager 创建成功");
 
         #[cfg(feature = "postgres")]
         let semantic_manager = None;
@@ -257,6 +264,7 @@ impl MemoryOrchestrator {
         Ok(Self {
             // Managers
             core_manager,
+            memory_manager,
 
             #[cfg(feature = "postgres")]
             semantic_manager,

@@ -215,13 +215,17 @@ impl StorageModule {
                     .collect()
             });
 
-        // 1. 从 CoreMemoryManager 更新
-        // Note: CoreMemoryManager 不提供 update_memory 方法
-        // 如果需要更新功能，应该使用 MemoryManager 而不是 CoreMemoryManager
-        // TODO: 实现使用 MemoryManager 更新记忆的功能
-        if let Some(_manager) = &orchestrator.core_manager {
-            // CoreMemoryManager 不支持此方法，需要改用 MemoryManager
-            // 暂时跳过，避免编译错误
+        // 1. 使用 MemoryManager 更新记忆
+        if let Some(manager) = &orchestrator.memory_manager {
+            manager
+                .update_memory(memory_id, new_content.clone(), new_importance, new_metadata.clone())
+                .await
+                .map_err(|e| {
+                    agent_mem_traits::AgentMemError::storage_error(&format!(
+                        "Failed to update memory in MemoryManager: {}",
+                        e
+                    ))
+                })?;
         }
 
         // 2. 如果内容更新，需要更新向量存储
