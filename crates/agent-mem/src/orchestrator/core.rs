@@ -660,6 +660,7 @@ impl MemoryOrchestrator {
             avg_add_latency_ms: 0.0,
             avg_search_latency_ms: 0.0,
             queries_per_second: 0.0,
+            memory_usage_mb: 0.0,
         })
     }
 

@@ -584,14 +584,14 @@ impl IntelligenceModule {
             orchestrator,
             &structured_facts,
             &agent_id_for_importance,
-            user_id_for_importance.as_deref(),
+            user_id_for_importance.clone(),
         )
         .await?;
         info!("完成 {} 个事实的重要性评估", importance_evaluations.len());
 
         // Step 5: 搜索相似记忆
         info!("Step 5: 搜索相似记忆");
-        let existing_memories = Self::search_similar_memories(orchestrator, &content, &agent_id, 10)
+        let existing_memories = Self::search_similar_memories_internal(orchestrator, &content, &agent_id, 10)
             .await?;
         info!("找到 {} 个相似记忆", existing_memories.len());
 
@@ -637,8 +637,8 @@ impl IntelligenceModule {
         Ok(results)
     }
 
-    /// 搜索相似记忆
-    async fn search_similar_memories(
+    /// 搜索相似记忆（内部辅助方法）
+    async fn search_similar_memories_internal(
         orchestrator: &MemoryOrchestrator,
         content: &str,
         agent_id: &str,
