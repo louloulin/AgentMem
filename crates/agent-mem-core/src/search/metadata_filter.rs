@@ -266,10 +266,30 @@ impl MetadataFilterSystem {
 
         match &filter.operator {
             FilterOperator::Eq => {
-                Self::compare_values(field_value, &filter.value, |a, b| a == b)
+                Self::compare_values(field_value, &filter.value, |a, b| {
+                    match (a, b) {
+                        (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                        (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                        (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                        (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                        (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                        (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                        _ => false,
+                    }
+                })
             }
             FilterOperator::Ne => {
-                !Self::compare_values(field_value, &filter.value, |a, b| a == b)
+                !Self::compare_values(field_value, &filter.value, |a, b| {
+                    match (a, b) {
+                        (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                        (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                        (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                        (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                        (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                        (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                        _ => false,
+                    }
+                })
             }
             FilterOperator::Gt => {
                 Self::compare_numeric(field_value, &filter.value, |a, b| a > b)
@@ -311,12 +331,40 @@ impl MetadataFilterSystem {
     /// 比较值
     fn compare_values<F>(field_value: Option<&serde_json::Value>, filter_value: &FilterValue, cmp: F) -> bool
     where
-        F: Fn(&serde_json::Value, &FilterValue) -> bool,
+        F: Fn(&FilterValue, &FilterValue) -> bool,
     {
         if let Some(fv) = field_value {
-            cmp(fv, filter_value)
+            if let Some(fv_converted) = Self::json_to_filter_value(fv) {
+                cmp(&fv_converted, filter_value)
+            } else {
+                false
+            }
         } else {
             false
+        }
+    }
+
+    /// 将serde_json::Value转换为可比较的值
+    fn json_to_filter_value(value: &serde_json::Value) -> Option<FilterValue> {
+        match value {
+            serde_json::Value::String(s) => Some(FilterValue::String(s.clone())),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Some(FilterValue::Integer(i))
+                } else if let Some(f) = n.as_f64() {
+                    Some(FilterValue::Number(f))
+                } else {
+                    None
+                }
+            }
+            serde_json::Value::Bool(b) => Some(FilterValue::Boolean(*b)),
+            serde_json::Value::Array(arr) => {
+                let list: Result<Vec<FilterValue>, String> =
+                    arr.iter().map(|v| Self::parse_filter_value(v)).collect();
+                list.ok().map(FilterValue::List)
+            }
+            serde_json::Value::Null => Some(FilterValue::Null),
+            _ => None,
         }
     }
 

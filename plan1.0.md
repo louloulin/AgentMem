@@ -1257,8 +1257,8 @@ impl MemoryOrchestrator {
 
 2. **迁移示例代码**
    - [x] 迁移 `examples/simple-memory-demo/src/main.rs` 到 V4 ✅ (2024-12-19)
+   - [x] 迁移 `examples/production-memory-demo/src/main.rs` 到 V4 ✅ (2024-12-19)
    - [ ] 迁移 `examples/simple-api-test/src/main.rs` 到 V4 (注：这是mock实现，可能不需要迁移)
-   - [ ] 迁移 `examples/production-memory-demo/src/main.rs` 到 V4
    - [ ] 迁移其他68个文件引用
 
 3. **优化Memory API**
@@ -1309,15 +1309,15 @@ let results = mem.search("What do you know about me?").await?;
 **任务清单：**
 
 1. **新建metadata_filter.rs**
-   - [ ] 实现 `MetadataFilter` 结构
-   - [ ] 实现 `FilterOperator` 枚举
-   - [ ] 实现 `LogicalOperator` 枚举
-   - [ ] 实现 `has_advanced_operators()` 方法
-   - [ ] 实现 `process_metadata_filters()` 方法
-   - [ ] 实现 `matches()` 方法
+   - [x] 实现 `MetadataFilter` 结构 ✅ (2024-12-19)
+   - [x] 实现 `FilterOperator` 枚举 ✅ (2024-12-19)
+   - [x] 实现 `LogicalOperator` 枚举 ✅ (2024-12-19)
+   - [x] 实现 `has_advanced_operators()` 方法 ✅ (2024-12-19)
+   - [x] 实现 `process_metadata_filters()` 方法 ✅ (2024-12-19)
+   - [x] 实现 `matches()` 方法 ✅ (2024-12-19)
 
 2. **集成到搜索系统**
-   - [ ] 修改 `SearchQuery` 结构，添加 `metadata_filters` 字段
+   - [x] 修改 `SearchQuery` 结构，添加 `metadata_filters` 字段 ✅ (2024-12-19)
    - [ ] 修改 `SearchFilters` 结构，支持逻辑操作符
    - [ ] 更新搜索流程，应用元数据过滤
 

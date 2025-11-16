@@ -18,6 +18,8 @@ pub mod adaptive_search_engine;
 /// Week 7-8: Cached adaptive engine with parallel search
 pub mod cached_adaptive_engine;
 pub mod bm25;
+/// 元数据过滤系统（阶段2实现）
+pub mod metadata_filter;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
 #[cfg(feature = "postgres")]
@@ -73,6 +75,7 @@ pub use vector_search::{
 
 use serde::{Deserialize, Serialize};
 use agent_mem_traits::{Query, QueryIntent, Constraint, ComparisonOperator, AttributeKey, AttributeValue};
+pub use metadata_filter::{FilterOperator, FilterValue, LogicalOperator, MetadataFilter, MetadataFilterSystem};
 
 /// 搜索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +92,8 @@ pub struct SearchQuery {
     pub fulltext_weight: f32,
     /// 过滤条件
     pub filters: Option<SearchFilters>,
+    /// 元数据过滤条件（阶段2：高级过滤）
+    pub metadata_filters: Option<LogicalOperator>,
 }
 
 impl Default for SearchQuery {
@@ -100,6 +105,7 @@ impl Default for SearchQuery {
             vector_weight: 0.7,
             fulltext_weight: 0.3,
             filters: None,
+            metadata_filters: None,
         }
     }
 }
@@ -163,6 +169,7 @@ impl SearchQuery {
             vector_weight: 0.7, // 默认权重
             fulltext_weight: 0.3,
             filters,
+            metadata_filters: None,
         }
     }
 
