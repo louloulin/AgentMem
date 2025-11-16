@@ -669,7 +669,7 @@ impl MemoryOrchestrator {
             
             // 转换为 MemoryItem
             // MemoryManager返回的是agent_mem_core::types::Memory，可以直接转换为MemoryItem
-            for memory in memories {
+                for memory in memories {
                 all_memories.push(MemoryItem::from(memory));
             }
         }

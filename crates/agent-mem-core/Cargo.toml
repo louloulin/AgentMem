@@ -52,6 +52,7 @@ libsql = { version = "0.6", optional = true }
 tempfile.workspace = true
 tokio-test = "0.4"
 agent-mem-storage = { path = "../agent-mem-storage", features = ["memory"] }
+agent-mem = { path = "../agent-mem" }
 criterion.workspace = true
 
 [features]

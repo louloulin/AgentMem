@@ -2,12 +2,12 @@
 //!
 //! Tests the newly implemented memory search functionality
 
-use agent_mem_core::SimpleMemory;
+use agent_mem::Memory;
 
 #[tokio::test]
 async fn test_memory_search_basic() {
-    // Create SimpleMemory instance
-    let memory = SimpleMemory::new().await.unwrap();
+    // Create Memory instance (V4架构)
+    let memory = Memory::new().await.unwrap();
 
     // Add some test memories
     memory.add("I love pizza and pasta").await.unwrap();
@@ -57,8 +57,8 @@ async fn test_memory_search_basic() {
 
 #[tokio::test]
 async fn test_memory_search_relevance_scoring() {
-    // Create SimpleMemory instance
-    let memory = SimpleMemory::new().await.unwrap();
+    // Create Memory instance (V4架构)
+    let memory = Memory::new().await.unwrap();
 
     // Add memories with different relevance to query
     memory

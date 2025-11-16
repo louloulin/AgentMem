@@ -67,7 +67,7 @@ pub mod retrieval;
 pub mod search;
 pub mod security;
 /// Simplified Memory API (Mem0-style)
-pub mod simple_memory;
+// simple_memory模块已删除，统一使用Memory V4架构
 pub mod storage;
 /// Temporal graph memory with time-aware knowledge graphs
 pub mod temporal_graph;
@@ -154,8 +154,8 @@ pub use agent_mem_traits::{
     Session,
 };
 
-// Re-export simple memory API
-pub use simple_memory::SimpleMemory;
+// SimpleMemory已删除，统一使用Memory V4架构
+// 迁移路径：使用 agent_mem::Memory 代替 agent_mem_core::SimpleMemory
 
 /// Core error types
 #[derive(Debug, Clone, thiserror::Error)]
