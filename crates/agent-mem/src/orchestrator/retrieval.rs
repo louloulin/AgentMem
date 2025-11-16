@@ -60,15 +60,84 @@ impl RetrievalModule {
         };
 
         // Step 4: 构建SearchQuery
-        // TODO: 实现SearchQuery构建逻辑
+        use agent_mem_core::search::{SearchQuery, SearchFilters};
+        let mut search_filters = SearchFilters::default();
+        
+        // 添加用户ID过滤
+        search_filters.user_id = Some(user_id.clone());
+        
+        // 添加自定义过滤条件
+        if let Some(filters) = filters {
+            for (k, v) in filters {
+                search_filters.metadata.insert(k, v);
+            }
+        }
+
+        let search_query = SearchQuery {
+            query: processed_query.clone(),
+            limit,
+            threshold: Some(dynamic_threshold),
+            vector_weight: 0.7,
+            fulltext_weight: 0.3,
+            filters: Some(search_filters),
+        };
 
         // Step 5: 执行搜索
-        // TODO: 实现搜索逻辑
+        // 如果有 HybridSearchEngine 组件，使用混合搜索
+        #[cfg(feature = "postgres")]
+        if let Some(hybrid_search_engine) = &orchestrator.hybrid_search_engine {
+            let (search_results, _elapsed) = hybrid_search_engine
+                .search(&search_query)
+                .await
+                .map_err(|e| {
+                    agent_mem_traits::AgentMemError::storage_error(&format!(
+                        "Search failed: {}",
+                        e
+                    ))
+                })?;
 
-        // Step 6: 转换结果
-        // TODO: 实现结果转换逻辑
+            // Step 6: 转换结果
+            let memory_items = UtilsModule::convert_search_results_to_memory_items(search_results);
+            info!("✅ 混合搜索完成: {} 个结果", memory_items.len());
+            Ok(memory_items)
+        } else {
+            // 降级：仅使用向量搜索
+            warn!("Search 组件未初始化，降级到向量搜索");
+            if let Some(vector_store) = &orchestrator.vector_store {
+                let mut filter_map: HashMap<String, serde_json::Value> = HashMap::new();
+                filter_map.insert("user_id".to_string(), serde_json::json!(user_id));
+                
+                if let Some(filters) = filters {
+                    for (k, v) in filters {
+                        filter_map.insert(k, serde_json::json!(v));
+                    }
+                }
 
-        Ok(Vec::new())
+                let search_results = vector_store
+                    .search_with_filters(query_vector, limit, &filter_map, Some(dynamic_threshold))
+                    .await?;
+
+                let memory_items = UtilsModule::convert_search_results_to_memory_items(
+                    search_results
+                        .into_iter()
+                        .map(|r| agent_mem_core::search::SearchResult {
+                            id: r.id,
+                            content: r.metadata.get("data").unwrap_or(&String::new()).clone(),
+                            score: r.similarity,
+                            vector_score: Some(r.similarity),
+                            fulltext_score: None,
+                            metadata: Some(r.metadata),
+                        })
+                        .collect(),
+                );
+                
+                Ok(memory_items)
+            } else {
+                Err(agent_mem_traits::AgentMemError::ConfigError(
+                    "Neither Search engine nor VectorStore is configured".to_string(),
+                ))
+            }
+        }
     }
 
     /// 混合搜索记忆（非 postgres 版本）
