@@ -172,16 +172,43 @@ impl BatchModule {
 
     /// 批量优化添加记忆
     pub async fn add_memory_batch_optimized(
-        _orchestrator: &MemoryOrchestrator,
-        _contents: Vec<String>,
-        _agent_id: String,
-        _user_id: Option<String>,
-        _metadata: HashMap<String, String>,
+        orchestrator: &MemoryOrchestrator,
+        contents: Vec<String>,
+        agent_id: String,
+        user_id: Option<String>,
+        metadata: HashMap<String, String>,
     ) -> Result<Vec<String>> {
-        // TODO: 实现批量优化添加逻辑
-        todo!("add_memory_batch_optimized not yet implemented in batch module")
+        if contents.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        info!("批量优化添加 {} 个记忆", contents.len());
+
+        // 转换 metadata 类型: HashMap<String, String> -> HashMap<String, serde_json::Value>
+        let metadata_json: HashMap<String, serde_json::Value> = metadata
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::String(v)))
+            .collect();
+
+        // 构建批量添加项
+        let items: Vec<(String, String, Option<String>, Option<MemoryType>, Option<HashMap<String, serde_json::Value>>)> = contents
+            .into_iter()
+            .map(|content| {
+                (
+                    content,
+                    agent_id.clone(),
+                    user_id.clone(),
+                    None,
+                    Some(metadata_json.clone()),
+                )
+            })
+            .collect();
+
+        // 使用批量添加方法
+        Self::add_memories_batch(orchestrator, items).await
     }
 }
+
 
 
 

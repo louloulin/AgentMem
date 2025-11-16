@@ -865,17 +865,39 @@ impl Memory {
 
         let orchestrator = self.orchestrator.read().await;
 
+        // 先提取 agent_id，避免移动
+        let agent_id = options
+            .agent_id
+            .clone()
+            .unwrap_or_else(|| self.default_agent_id.clone());
+
         // 调用 orchestrator 的批量添加方法
-        orchestrator
+        let memory_ids = orchestrator
             .add_memory_batch_optimized(
                 contents,
-                options
-                    .agent_id
-                    .unwrap_or_else(|| self.default_agent_id.clone()),
+                agent_id.clone(),
                 options.user_id.or_else(|| self.default_user_id.clone()),
                 options.metadata,
             )
-            .await
+            .await?;
+
+        // 转换为 AddResult
+        use crate::types::MemoryEvent;
+        let results: Vec<AddResult> = memory_ids
+            .into_iter()
+            .map(|id| AddResult {
+                results: vec![MemoryEvent {
+                    id,
+                    memory: String::new(), // 批量操作不返回内容
+                    event: "ADD".to_string(),
+                    actor_id: Some(agent_id.clone()),
+                    role: None,
+                }],
+                relations: None,
+            })
+            .collect();
+
+        Ok(results)
     }
 
     /// 带缓存的搜索 (Phase 4.2)

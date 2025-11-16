@@ -503,14 +503,12 @@ impl MemoryOrchestrator {
         user_id: Option<String>,
         metadata: HashMap<String, String>,
     ) -> Result<Vec<String>> {
-        // 转换 metadata 类型
-        let metadata_converted: HashMap<String, String> = metadata.into_iter().collect();
         super::batch::BatchModule::add_memory_batch_optimized(
             self,
             contents,
             agent_id,
             user_id,
-            metadata_converted,
+            metadata,
         )
         .await
     }
@@ -627,9 +625,10 @@ impl MemoryOrchestrator {
         agent_id: String,
         user_id: Option<String>,
         _run_id: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         // TODO: 实现删除所有记忆逻辑
-        Ok(())
+        // 暂时返回0，表示删除了0个记忆
+        Ok(0)
     }
 
     /// 重置

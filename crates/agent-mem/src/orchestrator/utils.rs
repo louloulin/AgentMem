@@ -258,7 +258,7 @@ impl UtilsModule {
     ) -> CoreMemory {
         use chrono::Utc;
 
-        let now = Utc::now().timestamp();
+        let _now = Utc::now().timestamp();
 
         // 将 StructuredFact 的 metadata 转换为 HashMap<String, String>
         let metadata: HashMap<String, String> = fact.metadata.clone();
@@ -343,7 +343,7 @@ impl UtilsModule {
         let metadata: HashMap<String, String> = memory.metadata.clone();
 
         // 解析 created_at 字符串为时间戳
-        let created_at = chrono::DateTime::parse_from_rfc3339(&memory.created_at)
+        let _created_at = chrono::DateTime::parse_from_rfc3339(&memory.created_at)
             .map(|dt| dt.timestamp())
             .unwrap_or(now);
 
