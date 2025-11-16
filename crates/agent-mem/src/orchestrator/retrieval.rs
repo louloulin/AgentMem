@@ -234,20 +234,61 @@ impl RetrievalModule {
 
     /// 上下文感知重排序
     pub async fn context_aware_rerank(
-        _orchestrator: &MemoryOrchestrator,
+        orchestrator: &MemoryOrchestrator,
         memories: Vec<MemoryItem>,
-        _query: &str,
-        _user_id: &str,
+        query: &str,
+        user_id: &str,
     ) -> Result<Vec<MemoryItem>> {
-        // 基础实现：按重要性排序
-        // TODO: 实现更复杂的上下文感知重排序逻辑
-        let mut sorted = memories;
-        sorted.sort_by(|a, b| {
-            b.importance
-                .partial_cmp(&a.importance)
-                .unwrap_or(std::cmp::Ordering::Equal)
+        // 实现更复杂的上下文感知重排序逻辑
+        let mut scored_memories: Vec<(MemoryItem, f32)> = memories
+            .into_iter()
+            .map(|mem| {
+                let mut score = mem.importance;
+                
+                // 1. 重要性权重 (40%)
+                let importance_score = mem.importance * 0.4;
+                
+                // 2. 相关性权重 (30%) - 基于内容匹配
+                let relevance_score = if mem.content.to_lowercase().contains(&query.to_lowercase()) {
+                    0.3
+                } else {
+                    0.1
+                };
+                
+                // 3. 时间衰减权重 (20%) - 最近访问的记忆得分更高
+                let time_score = if let Some(updated_at) = mem.updated_at {
+                    let age_days = (chrono::Utc::now() - updated_at).num_days();
+                    let decay_factor = (1.0 / (1.0 + age_days as f32 / 30.0)).min(1.0);
+                    decay_factor * 0.2
+                } else {
+                    0.1
+                };
+                
+                // 4. 访问频率权重 (10%) - 访问次数多的记忆得分更高
+                let access_score = {
+                    let access_factor = (mem.access_count as f32 / 100.0).min(1.0);
+                    access_factor * 0.1
+                };
+                
+                // 5. 用户相关性权重 - 如果记忆属于当前用户，得分更高
+                let user_score = if mem.user_id.as_ref().map(|s| s.as_str()) == Some(user_id) {
+                    0.1
+                } else {
+                    0.0
+                };
+                
+                score = importance_score + relevance_score + time_score + access_score + user_score;
+                (mem, score)
+            })
+            .collect();
+        
+        // 按综合得分排序
+        scored_memories.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
         });
-        Ok(sorted)
+        
+        // 返回排序后的记忆（去掉得分）
+        Ok(scored_memories.into_iter().map(|(mem, _)| mem).collect())
     }
 }
 

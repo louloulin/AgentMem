@@ -7,7 +7,6 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use agent_mem_core::types::MemoryType;
-use agent_mem_core::storage::conversion::v4_to_legacy;
 use agent_mem_traits::{MemoryItem, Result};
 use agent_mem_utils::hash::compute_content_hash;
 
@@ -369,7 +368,8 @@ impl StorageModule {
                 ))
             })? {
                 // 转换为 MemoryItem
-                return Ok(v4_to_legacy(&memory));
+                // MemoryManager返回的是agent_mem_core::types::Memory，可以直接转换为MemoryItem
+                return Ok(MemoryItem::from(memory));
             }
         }
 

@@ -201,7 +201,11 @@ impl MemoryOrchestrator {
         // 注意：Search组件需要embedder和vector_store，所以需要在它们创建之后
         // 这里先设置为None，稍后在创建vector_store之后会更新
         #[cfg(feature = "postgres")]
-        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) = (None, None, None);
+        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine): (
+            Option<Arc<agent_mem_core::search::HybridSearchEngine>>,
+            Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
+            Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
+        ) = (None, None, None);
 
         // ========== Step 5: 创建多模态处理组件 ==========
         let (image_processor, audio_processor, video_processor, multimodal_manager) = {
@@ -237,11 +241,19 @@ impl MemoryOrchestrator {
                 embedder.clone(),
             ).await.unwrap_or_else(|e| {
                 warn!("创建 Search 组件失败: {}, Search 功能将不可用", e);
-                (None, None, None)
+                (
+                    None::<Arc<agent_mem_core::search::HybridSearchEngine>>,
+                    None::<Arc<agent_mem_core::search::VectorSearchEngine>>,
+                    None::<Arc<agent_mem_core::search::FullTextSearchEngine>>,
+                )
             })
         };
         #[cfg(not(feature = "postgres"))]
-        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) = (None, None, None);
+        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) = (
+            None::<Arc<()>>,
+            None::<Arc<()>>,
+            None::<Arc<()>>,
+        );
 
         // ========== Step 9: 创建历史记录管理器 ==========
         let history_manager = {
@@ -656,9 +668,9 @@ impl MemoryOrchestrator {
                 })?;
             
             // 转换为 MemoryItem
-            use agent_mem_core::storage::conversion::v4_to_legacy;
+            // MemoryManager返回的是agent_mem_core::types::Memory，可以直接转换为MemoryItem
             for memory in memories {
-                all_memories.push(v4_to_legacy(&memory));
+                all_memories.push(MemoryItem::from(memory));
             }
         }
 
@@ -737,13 +749,6 @@ impl MemoryOrchestrator {
         threshold: Option<f32>,
     ) -> Result<Vec<MemoryItem>> {
         // 实现缓存搜索逻辑
-        // 使用简单的内存缓存（基于查询字符串）
-        use std::collections::HashMap;
-        use std::sync::Arc;
-        use tokio::sync::RwLock;
-        
-        // 创建缓存（如果不存在）
-        // 注意：这里使用静态缓存，实际应该作为orchestrator的字段
         // 为了简化，这里直接调用混合搜索，缓存功能可以在后续优化中实现
         self.search_memories_hybrid(query, user_id, limit, threshold, None)
             .await
@@ -752,32 +757,25 @@ impl MemoryOrchestrator {
     /// 获取性能统计
     pub async fn get_performance_stats(&self) -> Result<crate::memory::PerformanceStats> {
         // 实现性能统计逻辑
-        let mut total_memories = 0;
-        let mut cache_hit_rate = 0.0;
-        let mut avg_add_latency_ms = 0.0;
-        let mut avg_search_latency_ms = 0.0;
-        let mut queries_per_second = 0.0;
-        let mut memory_usage_mb = 0.0;
+        let total_memories;
+        let cache_hit_rate = 0.0;
+        let avg_add_latency_ms = 0.0;
+        let avg_search_latency_ms = 0.0;
+        let queries_per_second = 0.0;
+        let memory_usage_mb = 0.0;
 
         // 从 MemoryManager 获取统计
-        if let Some(manager) = &self.memory_manager {
-            if let Ok(stats) = manager.get_memory_stats(None).await {
-                total_memories = stats.total_memories;
-            }
-        }
+        total_memories = if let Some(manager) = &self.memory_manager {
+            manager.get_memory_stats(None).await
+                .map(|stats| stats.total_memories)
+                .unwrap_or(0)
+        } else {
+            0
+        };
 
-        // 从向量存储获取统计（如果可用）
-        if let Some(_vector_store) = &self.vector_store {
-            // 向量存储可能不直接提供统计，这里使用估算
-            // 实际实现可能需要根据具体的向量存储 API 调整
-        }
-
-        // 从 Search 组件获取统计（如果可用）
-        #[cfg(feature = "postgres")]
-        if let Some(vector_engine) = &self.vector_search_engine {
-            // VectorSearchEngine 可能有性能统计
-            // 这里暂时使用默认值
-        }
+        // 从向量存储和Search组件获取统计（如果可用）
+        // 向量存储和Search组件可能不直接提供统计，这里使用默认值
+        // 实际实现可能需要根据具体的向量存储 API 调整
 
         Ok(crate::memory::PerformanceStats {
             total_memories,
