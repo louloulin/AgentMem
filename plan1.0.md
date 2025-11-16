@@ -1332,9 +1332,11 @@ let results = mem.search("What do you know about me?").await?;
    - [ ] 更新其他搜索流程，应用元数据过滤
 
 3. **存储层支持**
-   - [ ] 在 `memory_repository.rs` 中实现过滤逻辑
-   - [ ] 在 `libsql/memory_repository.rs` 中实现过滤逻辑
-   - [ ] 支持SQL查询生成（操作符转换）
+   - [x] 在 `memory_repository.rs` 中实现过滤逻辑 ✅ (2024-12-19)
+   - [x] 在 `libsql/memory_repository.rs` 中实现过滤逻辑 ✅ (2024-12-19)
+   - [x] 支持SQL查询生成（操作符转换）✅ (2024-12-19)
+     - PostgreSQL: `build_sql_where_clause()` 方法
+     - LibSQL: `build_libsql_where_clause()` 方法
 
 4. **测试和文档**
    - [ ] 编写单元测试
