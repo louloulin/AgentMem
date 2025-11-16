@@ -381,7 +381,7 @@ impl IntelligenceModule {
         importance_evaluations: &[ImportanceEvaluation],
         conflicts: &[ConflictDetection],
         agent_id: &str,
-        user_id: Option<String>,
+        _user_id: Option<String>,
     ) -> Result<Vec<MemoryDecision>> {
         if let Some(engine) = &orchestrator.enhanced_decision_engine {
             info!(
@@ -477,18 +477,132 @@ impl IntelligenceModule {
 
     /// 执行决策
     ///
-    /// 注意：这个方法需要访问storage模块，所以暂时保留在orchestrator中
-    /// 或者可以通过回调函数的方式实现
+    /// 执行智能决策引擎生成的决策，包括 ADD、UPDATE、DELETE 等操作
     pub async fn execute_decisions(
-        _orchestrator: &MemoryOrchestrator,
-        _decisions: Vec<MemoryDecision>,
-        _agent_id: String,
-        _user_id: Option<String>,
-        _metadata: Option<HashMap<String, serde_json::Value>>,
+        orchestrator: &MemoryOrchestrator,
+        decisions: Vec<MemoryDecision>,
+        agent_id: String,
+        user_id: Option<String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AddResult> {
-        // TODO: 实现决策执行逻辑
-        // 这个方法需要访问storage模块，可能需要重构
-        todo!("execute_decisions needs access to storage module")
+        use crate::types::MemoryEvent;
+        use super::storage::StorageModule;
+
+        info!("执行 {} 个决策", decisions.len());
+
+        let mut results = Vec::new();
+        let mut relations = None;
+
+        for decision in decisions {
+            match &decision.action {
+                MemoryAction::Add { content, importance: _, metadata: action_metadata } => {
+                    info!(
+                        "执行 ADD 决策: content={}, confidence={:.2}",
+                        content, decision.confidence
+                    );
+
+                    // 合并元数据
+                    let mut merged_metadata = metadata.clone().unwrap_or_default();
+                    for (k, v) in action_metadata {
+                        merged_metadata.insert(k.clone(), serde_json::Value::String(v.clone()));
+                    }
+
+                    // 调用存储模块添加记忆
+                    let memory_id = StorageModule::add_memory(
+                        orchestrator,
+                        content.clone(),
+                        agent_id.clone(),
+                        user_id.clone(),
+                        None,
+                        Some(merged_metadata),
+                    )
+                    .await?;
+
+                    results.push(MemoryEvent {
+                        id: memory_id,
+                        memory: content.clone(),
+                        event: "ADD".to_string(),
+                        actor_id: Some(agent_id.clone()),
+                        role: None,
+                    });
+                }
+                MemoryAction::Update { memory_id, new_content, merge_strategy: _, change_reason: _ } => {
+                    info!(
+                        "执行 UPDATE 决策: memory_id={}, confidence={:.2}",
+                        memory_id, decision.confidence
+                    );
+
+                    let mut update_data = HashMap::new();
+                    update_data.insert("content".to_string(), serde_json::Value::String(new_content.clone()));
+
+                    // 调用存储模块更新记忆
+                    let _updated = StorageModule::update_memory(orchestrator, memory_id, update_data).await?;
+
+                    results.push(MemoryEvent {
+                        id: memory_id.clone(),
+                        memory: new_content.clone(),
+                        event: "UPDATE".to_string(),
+                        actor_id: Some(agent_id.clone()),
+                        role: None,
+                    });
+                }
+                MemoryAction::Delete { memory_id, deletion_reason: _ } => {
+                    info!(
+                        "执行 DELETE 决策: memory_id={}, confidence={:.2}",
+                        memory_id, decision.confidence
+                    );
+
+                    // 调用存储模块删除记忆
+                    StorageModule::delete_memory(orchestrator, memory_id).await?;
+
+                    results.push(MemoryEvent {
+                        id: memory_id.clone(),
+                        memory: String::new(),
+                        event: "DELETE".to_string(),
+                        actor_id: Some(agent_id.clone()),
+                        role: None,
+                    });
+                }
+                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
+                    info!(
+                        "执行 MERGE 决策: primary={}, secondaries={:?}, confidence={:.2}",
+                        primary_memory_id, secondary_memory_ids, decision.confidence
+                    );
+
+                    // 更新主记忆内容
+                    let mut update_data = HashMap::new();
+                    update_data.insert("content".to_string(), serde_json::Value::String(merged_content.clone()));
+                    let _updated = StorageModule::update_memory(orchestrator, primary_memory_id, update_data).await?;
+
+                    // 删除次要记忆
+                    for secondary_id in secondary_memory_ids {
+                        let _ = StorageModule::delete_memory(orchestrator, secondary_id).await;
+                    }
+
+                    results.push(MemoryEvent {
+                        id: primary_memory_id.clone(),
+                        memory: merged_content.clone(),
+                        event: "MERGE".to_string(),
+                        actor_id: Some(agent_id.clone()),
+                        role: None,
+                    });
+                }
+                MemoryAction::NoAction { reason } => {
+                    info!(
+                        "跳过操作: reason={}, confidence={:.2}",
+                        reason, decision.confidence
+                    );
+                    // 不执行任何操作
+                }
+            }
+        }
+
+        info!("决策执行完成，共处理 {} 个操作", results.len());
+
+        Ok(AddResult {
+            results,
+            relations,
+        })
     }
 
     /// 智能添加记忆（完整的10步流水线）

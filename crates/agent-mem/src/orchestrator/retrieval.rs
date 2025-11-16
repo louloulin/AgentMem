@@ -3,7 +3,7 @@
 //! 负责所有检索相关操作，包括搜索、重排序等
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use agent_mem_traits::{MemoryItem, Result};
 
@@ -18,15 +18,16 @@ pub struct RetrievalModule;
 impl RetrievalModule {
     /// 搜索记忆
     pub async fn search_memories(
-        _orchestrator: &MemoryOrchestrator,
-        _query: String,
-        _agent_id: String,
-        _user_id: Option<String>,
-        _limit: usize,
+        orchestrator: &MemoryOrchestrator,
+        query: String,
+        agent_id: String,
+        user_id: Option<String>,
+        limit: usize,
         _memory_type: Option<agent_mem_core::types::MemoryType>,
     ) -> Result<Vec<MemoryItem>> {
-        // TODO: 实现搜索逻辑
-        todo!("search_memories not yet implemented in retrieval module")
+        // 使用混合搜索作为基础实现
+        let user_id_str = user_id.unwrap_or_else(|| "default".to_string());
+        Self::search_memories_hybrid(orchestrator, query, user_id_str, limit, None, None).await
     }
 
     /// 混合搜索记忆
@@ -165,12 +166,19 @@ impl RetrievalModule {
     /// 上下文感知重排序
     pub async fn context_aware_rerank(
         _orchestrator: &MemoryOrchestrator,
-        _memories: Vec<MemoryItem>,
+        memories: Vec<MemoryItem>,
         _query: &str,
         _user_id: &str,
     ) -> Result<Vec<MemoryItem>> {
-        // TODO: 实现重排序逻辑
-        todo!("context_aware_rerank not yet implemented in retrieval module")
+        // 基础实现：按重要性排序
+        // TODO: 实现更复杂的上下文感知重排序逻辑
+        let mut sorted = memories;
+        sorted.sort_by(|a, b| {
+            b.importance
+                .partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        Ok(sorted)
     }
 }
 
