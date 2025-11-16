@@ -52,7 +52,7 @@ mod p1_optimizations_tests {
             Ok(Box::new(stream::iter(items)))
         }
 
-        async fn validate_config(&self) -> TraitResult<()> {
+        fn validate_config(&self) -> TraitResult<()> {
             Ok(())
         }
     }
