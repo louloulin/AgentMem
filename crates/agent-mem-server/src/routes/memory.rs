@@ -1620,7 +1620,7 @@ mod tests {
             .await;
 
         if let Ok(mem) = memory {
-            let manager = MemoryManager::with_config(mem).await;
+            let _manager = MemoryManager::with_config(mem).await;
             println!("MemoryManager with config created successfully");
         }
     }
