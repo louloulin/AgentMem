@@ -8,6 +8,7 @@
 //! 5. 执行语义搜索
 //! 6. 验证数据持久化（进程重启后数据仍然存在）
 
+#[path = "shared/simple_memory_adapter.rs"]
 mod simple_memory_adapter;
 use simple_memory_adapter::SimpleMemory;
 

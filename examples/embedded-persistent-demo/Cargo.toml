@@ -8,6 +8,7 @@ agent-mem-core = { path = "../../crates/agent-mem-core", features = ["libsql"] }
 agent-mem-traits = { path = "../../crates/agent-mem-traits" }
 agent-mem-storage = { path = "../../crates/agent-mem-storage", features = ["libsql", "lancedb"] }
 agent-mem-config = { path = "../../crates/agent-mem-config" }
+chrono.workspace = true
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

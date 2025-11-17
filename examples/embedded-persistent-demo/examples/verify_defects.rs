@@ -2,7 +2,9 @@
 //!
 //! 这个示例通过实际运行来验证 SIMPLEMEMORY_ARCHITECTURE_DEFECTS_ANALYSIS.md 中的分析
 
-use agent_mem_core::SimpleMemory;
+#[path = "shared/simple_memory_adapter.rs"]
+mod simple_memory_adapter;
+use simple_memory_adapter::SimpleMemory;
 use agent_mem_traits::Result;
 
 #[tokio::main]

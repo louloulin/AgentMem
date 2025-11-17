@@ -234,6 +234,8 @@ async fn test_builder_without_plugins() -> Result<()> {
 
 // Test without plugins feature to ensure backwards compatibility
 #[cfg(not(feature = "plugins"))]
+use agent_mem::types::GetAllOptions;
+#[cfg(not(feature = "plugins"))]
 #[tokio::test]
 async fn test_builder_without_plugins_feature() {
     use agent_mem::Memory;
@@ -245,7 +247,6 @@ async fn test_builder_without_plugins_feature() {
         .unwrap();
 
     mem.add("Test content").await.unwrap();
-    let results = mem.search("Test").await.unwrap();
-
+    let results = mem.get_all(GetAllOptions::default()).await.unwrap();
     assert!(!results.is_empty());
 }

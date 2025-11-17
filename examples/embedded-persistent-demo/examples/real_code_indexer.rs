@@ -7,7 +7,9 @@
 //! 4. 执行语义搜索验证
 //! 5. 性能分析和统计
 
-use agent_mem_core::SimpleMemory;
+#[path = "shared/simple_memory_adapter.rs"]
+mod simple_memory_adapter;
+use simple_memory_adapter::SimpleMemory;
 use agent_mem_traits::Result;
 use regex::Regex;
 use std::collections::HashMap;

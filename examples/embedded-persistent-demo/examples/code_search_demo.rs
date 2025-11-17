@@ -6,7 +6,9 @@
 //! 3. 按编程语言和代码类型过滤
 //! 4. 性能分析和统计
 
-use agent_mem_core::SimpleMemory;
+#[path = "shared/simple_memory_adapter.rs"]
+mod simple_memory_adapter;
+use simple_memory_adapter::SimpleMemory;
 use agent_mem_traits::Result;
 use std::collections::HashMap;
 use std::time::Instant;
