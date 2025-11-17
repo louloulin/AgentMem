@@ -1,15 +1,10 @@
 //! 工具调用集成测试
 
-use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest, OrchestratorConfig};
-use agent_mem_core::{
-    engine::{MemoryEngine, MemoryEngineConfig},
-    storage::message_repository::MessageRepository,
-};
-use agent_mem_llm::LLMClient;
+use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_tools::{ExecutionContext, Tool, ToolExecutor, ToolResult, ToolSchema};
 use agent_mem_traits::{
     llm::{FunctionCall, FunctionCallResponse, FunctionDefinition},
-    LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result,
+    LLMProvider, Message, ModelInfo, Result,
 };
 use async_trait::async_trait;
 use serde_json::{json, Value};

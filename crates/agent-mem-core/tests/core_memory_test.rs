@@ -1,3 +1,5 @@
+#![cfg(feature = "postgres")]
+
 //! Core Memory 系统集成测试
 
 use agent_mem_core::core_memory::{

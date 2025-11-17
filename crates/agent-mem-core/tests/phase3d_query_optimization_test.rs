@@ -1,9 +1,8 @@
 // Phase 3-D: 查询优化与智能重排序集成测试
 
-use agent_mem_core::search::{
-    IndexStatistics, OptimizedSearchPlan, QueryOptimizer, QueryOptimizerConfig, RerankConfig,
-    ResultReranker, SearchQuery, SearchResult, SearchStrategy,
-};
+use agent_mem_core::search::{IndexStatistics, QueryOptimizer, SearchQuery, SearchResult};
+use agent_mem_core::search::query_optimizer::SearchStrategy;
+use agent_mem_core::search::reranker::{cosine_similarity_exact, ResultReranker, RerankConfig};
 use std::sync::{Arc, RwLock};
 
 /// 测试查询优化器 - 小数据集
@@ -175,8 +174,6 @@ async fn test_result_reranker_basic() {
 /// 测试余弦相似度计算
 #[test]
 fn test_cosine_similarity() {
-    use agent_mem_core::search::cosine_similarity_exact;
-
     // 测试1：相同向量
     let vec1 = vec![1.0, 0.0, 0.0];
     let vec2 = vec![1.0, 0.0, 0.0];
