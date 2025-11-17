@@ -7,34 +7,54 @@ use agent_mem_core::{
     orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     Memory, MemoryType,
 };
-use agent_mem_traits::Session;
+use agent_mem_traits::{AttributeKey, AttributeValue, Content, MemoryId};
+use agent_mem_traits::abstractions::Metadata;
 use chrono::Utc;
-use std::collections::HashMap;
 use std::sync::Arc;
-use uuid::Uuid;
 
-// 辅助函数：创建测试用的 Memory
+// 辅助函数：创建测试用的 Memory (V4)
 fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
+    let mut attributes = agent_mem_traits::AttributeSet::new();
+    let importance = score.unwrap_or(0.5) as f64;
+    
+    // 设置属性
+    attributes.set(
+        AttributeKey::core("agent_id"),
+        AttributeValue::String("test-agent".to_string()),
+    );
+    attributes.set(
+        AttributeKey::core("user_id"),
+        AttributeValue::String("test-user".to_string()),
+    );
+    attributes.set(
+        AttributeKey::core("memory_type"),
+        AttributeValue::String(memory_type.as_str().to_string()),
+    );
+    attributes.set(
+        AttributeKey::system("importance"),
+        AttributeValue::Number(importance),
+    );
+    
+    if let Some(score_val) = score {
+        attributes.set(
+            AttributeKey::system("score"),
+            AttributeValue::Number(score_val as f64),
+        );
+    }
+    
     Memory {
-        id: Uuid::new_v4().to_string(),
-        content: content.to_string(),
-        hash: None,
-        metadata: HashMap::new(),
-        score,
-        created_at: Utc::now(),
-        updated_at: Some(Utc::now()),
-        session: Session::new(),
-        memory_type,
-        entities: vec![],
-        relations: vec![],
-        agent_id: "test-agent".to_string(),
-        user_id: Some("test-user".to_string()),
-        importance: score.unwrap_or(0.5), // 使用 score 作为 importance
-        embedding: None,
-        last_accessed_at: Utc::now(),
-        access_count: 0,
-        expires_at: None,
-        version: 1,
+        id: MemoryId::new(),
+        content: Content::text(content.to_string()),
+        attributes,
+        relations: agent_mem_traits::RelationGraph::new(),
+        metadata: Metadata {
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            accessed_at: Utc::now(),
+            access_count: 0,
+            version: 1,
+            hash: None,
+        },
     }
 }
 
@@ -42,7 +62,15 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
 async fn test_memory_integrator_inject_memories() {
     // 1. 创建 MemoryEngine 和 MemoryIntegrator
     let memory_engine = Arc::new(MemoryEngine::new(MemoryEngineConfig::default()));
-    let config = MemoryIntegratorConfig::default();
+    let config = MemoryIntegratorConfig {
+        max_memories: 10,
+        relevance_threshold: 0.1,
+        include_timestamp: true,
+        sort_by_importance: true,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
+    };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     // 2. 创建测试记忆
@@ -55,12 +83,12 @@ async fn test_memory_integrator_inject_memories() {
     let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证格式化结果
-    assert!(formatted.contains("Semantic"), "Should contain memory type");
+    assert!(formatted.contains("Semantic") || formatted.contains("semantic"), "Should contain memory type");
     assert!(
         formatted.contains("coffee"),
         "Should contain memory content"
     );
-    assert!(formatted.contains("Episodic"), "Should contain memory type");
+    assert!(formatted.contains("Episodic") || formatted.contains("episodic"), "Should contain memory type");
     assert!(formatted.contains("John"), "Should contain memory content");
 
     println!("✅ test_memory_integrator_inject_memories passed");
@@ -75,6 +103,9 @@ async fn test_memory_integrator_filter_by_relevance() {
         relevance_threshold: 0.7,
         include_timestamp: true,
         sort_by_importance: true,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -95,11 +126,11 @@ async fn test_memory_integrator_filter_by_relevance() {
         "Should filter out low relevance memories"
     );
     assert!(
-        filtered[0].importance >= 0.7,
+        filtered[0].importance().unwrap_or(0.0) >= 0.7,
         "All filtered memories should have importance >= 0.7"
     );
     assert!(
-        filtered[1].importance >= 0.7,
+        filtered[1].importance().unwrap_or(0.0) >= 0.7,
         "All filtered memories should have importance >= 0.7"
     );
 
@@ -110,7 +141,15 @@ async fn test_memory_integrator_filter_by_relevance() {
 async fn test_memory_integrator_sort_memories() {
     // 1. 创建 MemoryIntegrator
     let memory_engine = Arc::new(MemoryEngine::new(MemoryEngineConfig::default()));
-    let config = MemoryIntegratorConfig::default();
+    let config = MemoryIntegratorConfig {
+        max_memories: 10,
+        relevance_threshold: 0.1,
+        include_timestamp: true,
+        sort_by_importance: true,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
+    };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     // 2. 创建测试记忆（不同的分数）
@@ -126,19 +165,19 @@ async fn test_memory_integrator_sort_memories() {
     // 4. 验证排序结果（应该按 importance 降序）
     assert_eq!(sorted.len(), 3, "Should have all memories");
     assert!(
-        sorted[0].importance >= sorted[1].importance,
+        sorted[0].importance().unwrap_or(0.0) >= sorted[1].importance().unwrap_or(0.0),
         "Should be sorted by importance descending"
     );
     assert!(
-        sorted[1].importance >= sorted[2].importance,
+        sorted[1].importance().unwrap_or(0.0) >= sorted[2].importance().unwrap_or(0.0),
         "Should be sorted by importance descending"
     );
     assert_eq!(
-        sorted[0].content, "High score",
+        sorted[0].content.as_text().unwrap_or(""), "High score",
         "Highest importance should be first"
     );
     assert_eq!(
-        sorted[2].content, "Low score",
+        sorted[2].content.as_text().unwrap_or(""), "Low score",
         "Lowest importance should be last"
     );
 
@@ -149,7 +188,15 @@ async fn test_memory_integrator_sort_memories() {
 async fn test_memory_integrator_empty_memories() {
     // 1. 创建 MemoryIntegrator
     let memory_engine = Arc::new(MemoryEngine::new(MemoryEngineConfig::default()));
-    let config = MemoryIntegratorConfig::default();
+    let config = MemoryIntegratorConfig {
+        max_memories: 10,
+        relevance_threshold: 0.1,
+        include_timestamp: true,
+        sort_by_importance: true,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
+    };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     // 2. 测试空记忆列表
@@ -176,6 +223,9 @@ async fn test_memory_integrator_no_score() {
         relevance_threshold: 0.7,
         include_timestamp: true,
         sort_by_importance: true,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -195,7 +245,7 @@ async fn test_memory_integrator_no_score() {
         "Should filter out memories with low importance"
     );
     assert!(
-        filtered[0].importance >= 0.7,
+        filtered[0].importance().unwrap_or(0.0) >= 0.7,
         "Filtered memories should have importance >= 0.7"
     );
 
@@ -211,8 +261,8 @@ async fn test_memory_integrator_config() {
         "Default max memories should be 10"
     );
     assert_eq!(
-        default_config.relevance_threshold, 0.5,
-        "Default threshold should be 0.5"
+        default_config.relevance_threshold, 0.1,
+        "Default threshold should be 0.1 (lowered to support broader matching)"
     );
     assert!(
         default_config.include_timestamp,
@@ -229,6 +279,9 @@ async fn test_memory_integrator_config() {
         max_memories: 20,
         include_timestamp: false,
         sort_by_importance: false,
+        episodic_weight: 1.2,
+        working_weight: 1.0,
+        semantic_weight: 0.9,
     };
     assert_eq!(custom_config.relevance_threshold, 0.8);
     assert_eq!(custom_config.max_memories, 20);
@@ -254,7 +307,8 @@ async fn test_memory_types() {
 
     for memory_type in memory_types {
         let memory = create_test_memory("Test content", memory_type.clone(), Some(0.8));
-        assert_eq!(memory.memory_type, memory_type, "Memory type should match");
+        let mem_type_str = memory.memory_type().unwrap_or_default();
+        assert_eq!(mem_type_str, memory_type.as_str(), "Memory type should match");
     }
 
     println!("✅ test_memory_types passed");
