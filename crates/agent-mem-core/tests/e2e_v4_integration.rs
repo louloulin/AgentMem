@@ -6,7 +6,7 @@ use agent_mem_core::performance::cache::QueryCacheConfig;
 use agent_mem_core::search::adaptive_router::AdaptiveRouter;
 use agent_mem_core::types::{
     AttributeKey, AttributeValue, Content, Memory, MemoryBuilder, Pipeline, PipelineContext,
-    PipelineStage, Query, QueryBuilder, QueryIntent, StageResult,
+    PipelineStage, QueryBuilder, QueryIntent, StageResult,
 };
 use anyhow::Result;
 
@@ -138,6 +138,7 @@ async fn test_adaptive_router_config_cache_integration() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     let (strategy, weights) = router.decide_strategy(&query).await.unwrap();
@@ -359,22 +360,23 @@ async fn test_pipeline_query_attributeset_integration() {
     let processed = pipeline.execute(memory, &mut context).await.unwrap();
 
     // 3. Query with constraints
-    use agent_mem_core::types::{Constraint, ComparisonOperator};
+    use agent_mem_core::types::{ComparisonOperator, Constraint};
 
-    let query = QueryBuilder::new()
-        .intent(QueryIntent::RetrieveSpecific)
-        .text("iPhone")
-        .add_constraint(Constraint::Range {
+    let mut query = QueryBuilder::new().text("iPhone").build();
+    query
+        .constraints
+        .push(Constraint::AttributeRange {
             key: AttributeKey::domain("price"),
             min: 5000.0,
             max: 10000.0,
-        })
-        .add_constraint(Constraint::AttributeMatch {
+        });
+    query
+        .constraints
+        .push(Constraint::AttributeMatch {
             key: AttributeKey::domain("category"),
-            operator: ComparisonOperator::Equals,
+            operator: ComparisonOperator::Equal,
             value: AttributeValue::String("electronics".to_string()),
-        })
-        .build();
+        });
 
     // 验证Query约束
     assert_eq!(query.constraints.len(), 2);

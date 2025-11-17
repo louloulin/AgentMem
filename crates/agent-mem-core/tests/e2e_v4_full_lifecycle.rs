@@ -2,8 +2,8 @@
 //! Week 9-10: 完整生命周期测试（Memory V4 + Query V4 + Pipeline + Adaptive）
 
 use agent_mem_core::types::{
-    AttributeKey, AttributeValue, Content, Memory, MemoryBuilder, Query, QueryBuilder,
-    QueryIntent, Constraint, ComparisonOperator, Preference, PreferenceType,
+    AttributeKey, AttributeValue, ComparisonOperator, Content, Memory, MemoryBuilder, PreferenceType,
+    Query, QueryBuilder, QueryIntent, RelevancePreference, TemporalPreference,
 };
 use chrono::Utc;
 
@@ -47,7 +47,10 @@ async fn test_full_lifecycle_v4() {
             ComparisonOperator::Equal,
             AttributeValue::String("user_001".to_string()),
         )
-        .prefer(PreferenceType::Relevance, 0.8)
+        .prefer(
+            PreferenceType::Relevance(RelevancePreference::Semantic { threshold: 0.75 }),
+            0.8,
+        )
         .build();
 
     // 验证Query结构
@@ -65,10 +68,13 @@ async fn test_full_lifecycle_v4() {
     );
     updated_memory.metadata.updated_at = Utc::now();
 
-    assert_eq!(
-        updated_memory.attributes.get(&AttributeKey::user("spice_level")),
-        Some(&AttributeValue::String("extra_hot".to_string()))
-    );
+    match updated_memory
+        .attributes
+        .get(&AttributeKey::user("spice_level"))
+    {
+        Some(AttributeValue::String(value)) => assert_eq!(value, "extra_hot"),
+        other => panic!("spice_level 属性缺失或类型不匹配: {:?}", other),
+    }
     
     println!("✅ Step 3: Memory updated - spice_level: extra_hot");
 
@@ -80,10 +86,13 @@ async fn test_full_lifecycle_v4() {
         AttributeValue::Boolean(true),
     );
 
-    assert_eq!(
-        deleted_memory.attributes.get(&AttributeKey::system("deleted")),
-        Some(&AttributeValue::Boolean(true))
-    );
+    match deleted_memory
+        .attributes
+        .get(&AttributeKey::system("deleted"))
+    {
+        Some(AttributeValue::Boolean(flag)) => assert!(*flag, "删除标记应为 true"),
+        other => panic!("deleted 属性缺失或类型不匹配: {:?}", other),
+    }
     
     println!("✅ Step 4: Memory soft-deleted");
 
@@ -201,8 +210,14 @@ async fn test_advanced_query_features() {
     // 3. 多偏好组合
     let multi_pref_query = QueryBuilder::new()
         .text("最新且相关的记忆")
-        .prefer(PreferenceType::Relevance, 0.6)
-        .prefer(PreferenceType::Temporal, 0.4)
+        .prefer(
+            PreferenceType::Relevance(RelevancePreference::Semantic { threshold: 0.7 }),
+            0.6,
+        )
+        .prefer(
+            PreferenceType::Temporal(TemporalPreference::Recent { within_days: 7 }),
+            0.4,
+        )
         .build();
     assert_eq!(multi_pref_query.preferences.len(), 2);
 
@@ -229,10 +244,13 @@ async fn test_relation_graph() {
         strength: 0.85,
     });
 
-    assert_eq!(memory2.relations.count(), 1);
-    assert!(memory2
+    assert_eq!(memory2.relations.relations().len(), 1);
+    let has_relation = memory2
         .relations
-        .has_relation(&memory1.id, &RelationType::SimilarTo));
+        .find_by_target(&memory1.id)
+        .iter()
+        .any(|relation| relation.relation_type == RelationType::SimilarTo);
+    assert!(has_relation, "关系图应包含 SimilarTo 关系");
 
     println!("✅ Relation graph test passed");
 }
@@ -268,20 +286,31 @@ async fn test_legacy_migration() {
     // 验证迁移结果
     assert_eq!(new_memory.id, legacy.id);
     assert!(matches!(new_memory.content, Content::Text(_)));
-    assert_eq!(
-        new_memory.attributes.get(&AttributeKey::system("agent_id")),
-        Some(&AttributeValue::String(legacy.agent_id.clone()))
-    );
-    if let Some(user_id) = &legacy.user_id {
-        assert_eq!(
-            new_memory.attributes.get(&AttributeKey::system("user_id")),
-            Some(&AttributeValue::String(user_id.clone()))
-        );
+    match new_memory
+        .attributes
+        .get(&AttributeKey::system("agent_id"))
+    {
+        Some(AttributeValue::String(agent_id)) => assert_eq!(agent_id, &legacy.agent_id),
+        other => panic!("agent_id 属性缺失或类型不匹配: {:?}", other),
     }
-    assert_eq!(
-        new_memory.attributes.get(&AttributeKey::system("importance")),
-        Some(&AttributeValue::Number(legacy.importance as f64))
-    );
+    if let Some(user_id) = &legacy.user_id {
+        match new_memory
+            .attributes
+            .get(&AttributeKey::system("user_id"))
+        {
+            Some(AttributeValue::String(found_user_id)) => assert_eq!(found_user_id, user_id),
+            other => panic!("user_id 属性缺失或类型不匹配: {:?}", other),
+        }
+    }
+    match new_memory
+        .attributes
+        .get(&AttributeKey::system("importance"))
+    {
+        Some(AttributeValue::Number(importance)) => {
+            assert_eq!(*importance, legacy.importance as f64)
+        }
+        other => panic!("importance 属性缺失或类型不匹配: {:?}", other),
+    }
 
     println!("✅ Legacy migration test passed");
 }
@@ -313,7 +342,6 @@ async fn test_batch_operations() {
     let queries: Vec<Query> = (0..10)
         .map(|i| {
             QueryBuilder::new()
-                .intent(QueryIntent::RetrieveSpecific)
                 .text(&format!("记忆内容 {}", i))
                 .build()
         })

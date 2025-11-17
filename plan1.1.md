@@ -13,6 +13,14 @@
 
 ---
 
+## 0. 已完成里程碑（2025-11-17）
+
+- [x] 将 `orchestrator.rs` 按照核心/初始化/存储/检索/智能/多模态/批量/工具八个模块拆分，并更新 `mod.rs` 统一导出
+- [x] 为拆分后的模块补充基础回归测试（`crates/agent-mem/src/orchestrator/tests.rs`），覆盖初始化、存储与工具能力
+- [x] 修复 `crates/agent-mem-core/tests/e2e_v4_full_lifecycle.rs` 与 `e2e_v4_integration.rs` 的 Memory V4 / Query V4 用例，确保 `cargo test` 全量通过
+
+---
+
 ## 1. 阶段1：删除SimpleMemory，统一V4架构（剩余20%）
 
 ### 1.1 文档更新（P1优先级）
