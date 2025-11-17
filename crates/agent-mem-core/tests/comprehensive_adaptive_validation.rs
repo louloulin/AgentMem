@@ -2,6 +2,8 @@
 //!
 //! 包含更多真实场景和边界情况的验证
 
+use std::sync::Arc;
+use agent_mem_config::agentmem_config::AgentMemConfig;
 use agent_mem_core::search::{
     AdaptiveSearchOptimizer, QueryFeatures, SearchQuery, SearchReranker, SearchResult,
     SearchWeights, WeightPredictor,
@@ -21,7 +23,8 @@ fn test_multilingual_query_support() {
         ("@John mentioned #project", "英文实体"),
     ];
 
-    let optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = AdaptiveSearchOptimizer::new(config);
 
     println!("\n=== 多语言查询支持测试 ===\n");
 
@@ -50,7 +53,8 @@ fn test_multilingual_query_support() {
 /// 测试极端长度查询
 #[test]
 fn test_extreme_length_queries() {
-    let optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = AdaptiveSearchOptimizer::new(config);
 
     // 极短查询
     let very_short = vec!["a", "x", "?", "!", "@"];
@@ -106,7 +110,8 @@ fn test_special_characters() {
         ("emoji 😀 👍 🎉", "表情符号"),
     ];
 
-    let optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = AdaptiveSearchOptimizer::new(config);
 
     println!("\n=== 特殊字符测试 ===\n");
 
@@ -131,7 +136,8 @@ fn test_special_characters() {
 /// 测试权重一致性
 #[test]
 fn test_weight_consistency() {
-    let optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = AdaptiveSearchOptimizer::new(config);
 
     // 相同查询应该得到相同的权重
     let query_text = "How does machine learning work?";
@@ -219,7 +225,8 @@ async fn test_concurrent_optimization() {
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
-    let optimizer = Arc::new(RwLock::new(AdaptiveSearchOptimizer::new(true)));
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = Arc::new(RwLock::new(AdaptiveSearchOptimizer::new(config)));
 
     let queries = vec![
         "user@example.com",
@@ -267,7 +274,8 @@ async fn test_concurrent_optimization() {
 /// 测试性能退化检测
 #[test]
 fn test_performance_degradation() {
-    let optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let optimizer = AdaptiveSearchOptimizer::new(config);
 
     use std::time::Instant;
 
@@ -358,7 +366,8 @@ fn test_feature_extraction_accuracy() {
 /// 测试权重预测的合理性
 #[test]
 fn test_weight_prediction_rationality() {
-    let predictor = WeightPredictor::new();
+    let config = Arc::new(AgentMemConfig::default().search);
+    let predictor = WeightPredictor::new(config);
 
     println!("\n=== 权重预测合理性测试 ===\n");
 
@@ -418,7 +427,8 @@ fn test_weight_prediction_rationality() {
 /// 测试学习机制
 #[test]
 fn test_learning_mechanism() {
-    let mut optimizer = AdaptiveSearchOptimizer::new(true);
+    let config = Arc::new(AgentMemConfig::default().search);
+    let mut optimizer = AdaptiveSearchOptimizer::new(config);
 
     let query = "test query";
     let good_weights = SearchWeights {
