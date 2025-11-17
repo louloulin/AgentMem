@@ -646,6 +646,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### 🆕 便捷 API（MemoryScope 友好）
+
+```rust
+use agent_mem::Memory;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mem = Memory::new().await?;
+
+    // 文本便捷方法：自动填充 Agent/User 上下文
+    mem.add_text("用户喜欢拿铁拉花", "support-bot", Some("user-42")).await?;
+
+    // 结构化便捷方法：直接写入 JSON，并在 metadata 中标记 content_format
+    mem.add_structured(
+        json!({
+            "type": "user_profile",
+            "name": "Alice",
+            "preferences": ["coffee", "latte art"]
+        }),
+        "support-bot",
+        Some("user-42"),
+    ).await?;
+
+    Ok(())
+}
+```
+
+> 便捷 API 会自动开启智能推理（`infer = true`）并将结构化内容序列化存储，方便与现有 Mem0 生态兼容。
+
 **为什么默认启用智能功能？**
 - ✅ 对标 Mem0 的 API 设计（`infer=True` 默认）
 - ✅ 提供开箱即用的智能体验

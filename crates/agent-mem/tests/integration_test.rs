@@ -1,6 +1,9 @@
 //! 集成测试 - Memory 统一 API
 
+use agent_mem::types::GetAllOptions;
 use agent_mem::Memory;
+use chrono::Utc;
+use serde_json::json;
 
 #[tokio::test]
 async fn test_zero_config_initialization() {
@@ -70,7 +73,6 @@ async fn test_get_all_memories() {
     mem.add("Memory 3").await.expect("添加失败");
 
     // 获取所有记忆
-    use agent_mem::types::GetAllOptions;
     let result = mem.get_all(GetAllOptions::default()).await;
     assert!(result.is_ok(), "get_all() 应该成功");
 
@@ -95,4 +97,82 @@ async fn test_get_stats() {
     println!("✅ 获取统计信息成功:");
     println!("   - 总记忆数: {}", stats.total_memories);
     println!("   - 平均重要性: {:.2}", stats.average_importance);
+}
+
+#[tokio::test]
+async fn test_add_text_convenience_api() {
+    let mem = Memory::new().await.expect("初始化失败");
+
+    let user_id = format!("user-text-{}", Utc::now().timestamp_nanos_opt().unwrap());
+    let agent_id = format!("agent-text-{}", Utc::now().timestamp_millis());
+
+    let result = mem
+        .add_text("User loves latte art", &agent_id, Some(&user_id))
+        .await;
+    assert!(result.is_ok(), "add_text() 应该成功");
+
+    let options = GetAllOptions {
+        user_id: Some(user_id.clone()),
+        agent_id: Some(agent_id.clone()),
+        run_id: None,
+        limit: None,
+    };
+
+    let memories = mem.get_all(options).await.expect("get_all 失败");
+    assert!(
+        memories.iter().any(|m| m.content.contains("latte art")),
+        "应当找到 add_text 写入的内容"
+    );
+    assert!(
+        memories.iter().all(|m| m.user_id.as_deref() == Some(&user_id)),
+        "返回结果应绑定到指定 user_id"
+    );
+    assert!(
+        memories.iter().all(|m| m.agent_id == agent_id),
+        "返回结果应绑定到指定 agent_id"
+    );
+}
+
+#[tokio::test]
+async fn test_add_structured_convenience_api() {
+    let mem = Memory::new().await.expect("初始化失败");
+
+    let user_id = format!(
+        "user-structured-{}",
+        Utc::now().timestamp_nanos_opt().unwrap()
+    );
+    let agent_id = format!("agent-structured-{}", Utc::now().timestamp_millis());
+    let payload = json!({
+        "type": "user_profile",
+        "name": "Alice",
+        "preferences": ["coffee", "latte"]
+    });
+
+    let result = mem
+        .add_structured(payload.clone(), &agent_id, Some(&user_id))
+        .await;
+    assert!(result.is_ok(), "add_structured() 应该成功");
+
+    let options = GetAllOptions {
+        user_id: Some(user_id.clone()),
+        agent_id: Some(agent_id.clone()),
+        run_id: None,
+        limit: Some(10),
+    };
+
+    let memories = mem.get_all(options).await.expect("get_all 失败");
+    assert!(
+        memories.iter().any(|m| m.content.contains("user_profile")),
+        "应当包含结构化内容被序列化后的字段"
+    );
+
+    let structured_metadata = memories
+        .iter()
+        .flat_map(|m| m.metadata.get("content_format"))
+        .find(|value| value.as_str() == Some("structured_json"));
+
+    assert!(
+        structured_metadata.is_some(),
+        "metadata 中应包含 content_format=structured_json"
+    );
 }

@@ -5,10 +5,11 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use serde_json::Value;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use agent_mem_traits::{AgentMemError, MemoryItem, MemoryType, Result};
+use agent_mem_traits::{AgentMemError, MemoryItem, Result};
 
 use crate::builder::MemoryBuilder;
 use crate::orchestrator::MemoryOrchestrator;
@@ -232,6 +233,44 @@ impl Memory {
                 options.prompt,
             )
             .await
+    }
+
+    /// 便捷方法：添加纯文本记忆
+    ///
+    /// 相比 `add_with_options`，该方法自动填充 Agent/User 信息并保留智能判断的默认行为。
+    pub async fn add_text(
+        &self,
+        text: &str,
+        agent_id: &str,
+        user_id: Option<&str>,
+    ) -> Result<AddResult> {
+        let mut options = AddMemoryOptions::default();
+        options.agent_id = Some(agent_id.to_string());
+        options.user_id = user_id.map(|u| u.to_string());
+
+        self.add_with_options(text.to_string(), options).await
+    }
+
+    /// 便捷方法：添加结构化（JSON）记忆
+    ///
+    /// 会在元数据中标记 `content_format=structured_json`，方便下游检索逻辑做差异化处理。
+    pub async fn add_structured(
+        &self,
+        data: Value,
+        agent_id: &str,
+        user_id: Option<&str>,
+    ) -> Result<AddResult> {
+        let mut options = AddMemoryOptions::default();
+        options.agent_id = Some(agent_id.to_string());
+        options.user_id = user_id.map(|u| u.to_string());
+        options
+            .metadata
+            .insert("content_format".to_string(), "structured_json".to_string());
+
+        let serialized = serde_json::to_string(&data)
+            .map_err(|err| AgentMemError::internal_error(format!("结构化记忆序列化失败: {err}")))?;
+
+        self.add_with_options(serialized, options).await
     }
 
     /// 获取单个记忆（mem0 兼容）

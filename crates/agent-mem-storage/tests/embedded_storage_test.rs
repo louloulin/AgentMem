@@ -3,10 +3,18 @@
 //! 测试 LibSQL + LanceDB 嵌入式存储方案
 
 use agent_mem_storage::backends::{LibSQLStore, MemoryVectorStore};
-use agent_mem_traits::{VectorData, VectorStore};
+use agent_mem_traits::{VectorData, VectorStore, VectorStoreConfig};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::TempDir;
+
+fn memory_store_config(dimension: usize) -> VectorStoreConfig {
+    VectorStoreConfig {
+        provider: "memory".to_string(),
+        dimension: Some(dimension),
+        ..Default::default()
+    }
+}
 
 #[tokio::test]
 async fn test_libsql_basic_operations() {
@@ -89,7 +97,7 @@ async fn test_libsql_search() {
 
     // 测试搜索
     let results = store
-        .search("agent-1", Some("user-1"), None, Some(3))
+        .search(Some("agent-1"), Some("user-1"), None, 3)
         .await
         .unwrap();
     assert_eq!(results.len(), 3);
@@ -124,7 +132,9 @@ async fn test_libsql_memory_mode() {
 #[tokio::test]
 async fn test_memory_vector_store_basic() {
     // 测试内存向量存储
-    let store = MemoryVectorStore::new();
+    let store = MemoryVectorStore::new(memory_store_config(3))
+        .await
+        .unwrap();
 
     // 创建测试向量
     let vectors = vec![
@@ -178,7 +188,9 @@ async fn test_memory_vector_store_basic() {
 
 #[tokio::test]
 async fn test_memory_vector_store_search_with_filters() {
-    let store = MemoryVectorStore::new();
+    let store = MemoryVectorStore::new(memory_store_config(2))
+        .await
+        .unwrap();
 
     // 创建带元数据的向量
     let mut metadata1 = HashMap::new();

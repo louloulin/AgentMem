@@ -2,7 +2,8 @@
 //!
 //! 本示例演示为什么某些搜索查询返回 0 结果，以及如何改进
 
-use agent_mem_core::SimpleMemory;
+mod simple_memory_adapter;
+use simple_memory_adapter::SimpleMemory;
 use agent_mem_traits::Result;
 use std::collections::HashMap;
 

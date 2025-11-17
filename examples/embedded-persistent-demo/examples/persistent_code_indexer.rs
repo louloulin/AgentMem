@@ -8,7 +8,9 @@
 //! 5. 执行语义搜索
 //! 6. 验证数据持久化（进程重启后数据仍然存在）
 
-use agent_mem_core::SimpleMemory;
+mod simple_memory_adapter;
+use simple_memory_adapter::SimpleMemory;
+
 use agent_mem_traits::Result;
 use regex::Regex;
 use std::collections::HashMap;

@@ -5,16 +5,22 @@
 use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
-    types::{AttributeKey, AttributeValue, Content, Memory, MemoryBuilder, MemoryType},
+    types::{
+        AttributeKey, AttributeValue, Content as LegacyContent, MemoryBuilder, MemoryType,
+    },
+    Memory as V4Memory,
+    MemoryItem,
 };
+use agent_mem_traits::Content as V4Content;
 use std::sync::Arc;
 
 // 辅助函数：创建测试用的 Memory
-fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
+#[allow(deprecated)]
+fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> V4Memory {
     // importance 和 score 保持一致
     let importance = score.unwrap_or(0.5);
     let mut memory = MemoryBuilder::new()
-        .content(Content::Text(content.to_string()))
+        .content(LegacyContent::Text(content.to_string()))
         .attribute(
             AttributeKey::system("agent_id"),
             AttributeValue::String("test-agent".to_string()),
@@ -40,7 +46,9 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
         );
     }
     
-    memory.build()
+    let legacy_memory = memory.build();
+    let legacy_item: MemoryItem = legacy_memory.into();
+    V4Memory::from_legacy_item(&legacy_item)
 }
 
 #[tokio::test]
@@ -125,13 +133,13 @@ async fn test_memory_integrator_sort_memories() {
     // 4. 验证排序结果（按分数降序）
     assert_eq!(sorted.len(), 3, "Should have 3 memories");
     // 检查内容（需要从Content::Text中提取）
-    if let Content::Text(ref text) = sorted[0].content {
+    if let V4Content::Text(ref text) = sorted[0].content {
         assert!(text.contains("High"), "First should be highest score");
     }
-    if let Content::Text(ref text) = sorted[1].content {
+    if let V4Content::Text(ref text) = sorted[1].content {
         assert!(text.contains("Medium"), "Second should be medium score");
     }
-    if let Content::Text(ref text) = sorted[2].content {
+    if let V4Content::Text(ref text) = sorted[2].content {
         assert!(text.contains("Low"), "Third should be lowest score");
     }
 
@@ -146,7 +154,7 @@ async fn test_memory_integrator_empty_memories() {
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     // 2. 测试空记忆列表
-    let memories: Vec<Memory> = vec![];
+    let memories: Vec<V4Memory> = vec![];
 
     // 3. 格式化空记忆
     let formatted = integrator.inject_memories_to_prompt(&memories);
@@ -202,9 +210,9 @@ async fn test_memory_integrator_no_score() {
 async fn test_memory_integrator_config() {
     // 1. 测试默认配置
     let default_config = MemoryIntegratorConfig::default();
-    assert_eq!(
-        default_config.relevance_threshold, 0.5,
-        "Default threshold should be 0.5"
+    assert!(
+        (default_config.relevance_threshold - 0.1).abs() < f32::EPSILON,
+        "Default threshold 应与配置保持一致 (0.1)"
     );
     assert_eq!(
         default_config.max_memories, 10,
@@ -217,6 +225,9 @@ async fn test_memory_integrator_config() {
         max_memories: 20,
         include_timestamp: true,
         sort_by_importance: true,
+        episodic_weight: 1.1,
+        working_weight: 0.95,
+        semantic_weight: 0.85,
     };
     assert_eq!(custom_config.relevance_threshold, 0.8);
     assert_eq!(custom_config.max_memories, 20);
@@ -244,7 +255,10 @@ async fn test_memory_types() {
             memory_type.clone(),
             Some(0.8),
         );
-        assert_eq!(memory.memory_type(), memory_type);
+        assert_eq!(
+            memory.memory_type(),
+            Some(memory_type.as_str().to_string())
+        );
     }
 
     println!("✅ test_memory_types passed");
