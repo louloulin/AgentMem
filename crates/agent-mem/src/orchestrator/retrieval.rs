@@ -98,8 +98,42 @@ impl RetrievalModule {
                 })?;
 
             // Step 6: 转换结果
-            let memory_items = UtilsModule::convert_search_results_to_memory_items(search_results);
+            let mut memory_items = UtilsModule::convert_search_results_to_memory_items(search_results);
             info!("✅ 混合搜索完成: {} 个结果", memory_items.len());
+            
+            // Step 7: 应用重排序（如果启用）
+            if let Some(reranker) = &orchestrator.reranker {
+                info!("应用重排序...");
+                let search_results_for_rerank: Vec<agent_mem_core::search::SearchResult> = memory_items
+                    .iter()
+                    .map(|item| agent_mem_core::search::SearchResult {
+                        id: item.id.clone(),
+                        content: item.content.clone(),
+                        score: item.score.unwrap_or(0.0),
+                        vector_score: item.score,
+                        fulltext_score: None,
+                        metadata: item.metadata.clone().map(|m| {
+                            serde_json::json!(m)
+                        }),
+                    })
+                    .collect();
+                
+                match reranker.rerank(
+                    &processed_query,
+                    Some(&query_vector),
+                    search_results_for_rerank,
+                    &search_query,
+                ).await {
+                    Ok(reranked_results) => {
+                        memory_items = UtilsModule::convert_search_results_to_memory_items(reranked_results);
+                        info!("✅ 重排序完成: {} 个结果", memory_items.len());
+                    }
+                    Err(e) => {
+                        warn!("重排序失败: {}, 使用原始结果", e);
+                    }
+                }
+            }
+            
             Ok(memory_items)
         } else {
             // 降级：仅使用向量搜索

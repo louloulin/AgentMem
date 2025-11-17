@@ -111,6 +111,9 @@ pub struct MemoryOrchestrator {
     pub(crate) vector_search_engine: Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
     #[cfg(feature = "postgres")]
     pub(crate) fulltext_search_engine: Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
+    
+    // ========== 重排序器 ==========
+    pub(crate) reranker: Option<Arc<dyn agent_mem_core::search::Reranker>>,
 
     // ========== 多模态处理组件 ==========
     pub(crate) image_processor: Option<Arc<agent_mem_intelligence::multimodal::image::ImageProcessor>>,
@@ -255,6 +258,12 @@ impl MemoryOrchestrator {
             None::<Arc<()>>,
         );
 
+        // ========== Step 8.5: 创建重排序器 ==========
+        let reranker = {
+            info!("创建重排序器...");
+            super::initialization::InitializationModule::create_reranker()
+        };
+
         // ========== Step 9: 创建历史记录管理器 ==========
         let history_manager = {
             info!("Phase 6: 创建历史记录管理器...");
@@ -320,6 +329,9 @@ impl MemoryOrchestrator {
             vector_search_engine,
             #[cfg(feature = "postgres")]
             fulltext_search_engine,
+            
+            // 重排序器
+            reranker,
 
             // 多模态组件
             image_processor,

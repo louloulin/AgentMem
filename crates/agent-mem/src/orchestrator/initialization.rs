@@ -699,6 +699,20 @@ impl InitializationModule {
         Ok((hybrid_search_engine, vector_search_engine, fulltext_search_engine))
     }
 
+    /// 创建重排序器
+    pub fn create_reranker() -> Option<Arc<dyn agent_mem_core::search::Reranker>> {
+        use agent_mem_core::search::{RerankerFactory, InternalReranker};
+        use std::sync::Arc;
+        
+        info!("创建重排序器...");
+        
+        // 默认使用内部重排序器
+        let reranker = InternalReranker::new();
+        info!("✅ 重排序器创建成功（内部实现）");
+        
+        Some(Arc::new(reranker))
+    }
+
     /// 创建历史记录管理器
     pub async fn create_history_manager(
         _config: &OrchestratorConfig,

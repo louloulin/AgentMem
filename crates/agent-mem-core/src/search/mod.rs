@@ -28,12 +28,15 @@ pub mod enhanced_hybrid_v2;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
 pub mod fuzzy;
+/// 外部重排序器（Cohere等）
+pub mod external_reranker;
 #[cfg(feature = "postgres")]
 pub mod hybrid;
 pub mod learning;
 pub mod query_classifier;
 pub mod query_optimizer;
 pub mod ranker;
+pub mod reranker;
 pub mod vector_search;
 
 pub use adaptive::{
@@ -67,6 +70,7 @@ pub use learning::{
     QueryPattern,
 };
 pub use query_optimizer::{IndexStatistics, QueryOptimizer, ResultReranker};
+pub use external_reranker::{Reranker, InternalReranker, RerankerFactory};
 pub use ranker::{RRFRanker, SearchResultRanker};
 pub use vector_search::{
     build_hybrid_vector_search_sql, build_vector_search_sql, VectorDistanceOperator,
