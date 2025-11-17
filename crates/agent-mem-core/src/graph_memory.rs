@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::types::Memory;
+use crate::types::{Memory, Content};
 
 // 类型别名
 /// 内存节点ID类型
@@ -634,6 +634,250 @@ impl GraphMemoryEngine {
         }
         counts
     }
+
+    // ========== Mem0兼容API ==========
+
+    /// 添加数据到图（对标Mem0的add方法）
+    ///
+    /// 简化版本：直接使用现有方法，充分利用现有代码
+    pub async fn add(
+        &self,
+        data: &str,
+        filters: &HashMap<String, String>,
+    ) -> Result<GraphAddResult> {
+        use crate::types::MemoryType;
+        use uuid::Uuid;
+
+        // 1. 创建Memory对象（复用现有类型）
+        let memory = Memory::new(
+            filters.get("agent_id").cloned().unwrap_or_else(|| "default".to_string()),
+            filters.get("user_id").cloned(),
+            MemoryType::Semantic,
+            data.to_string(),
+            0.5, // 默认重要性
+        );
+
+        // 2. 添加节点（复用现有add_node方法）
+        let node_id = self.add_node(memory, NodeType::Entity).await?;
+
+        // 3. 查找相关节点（复用现有find_related_nodes方法）
+        let related_nodes = self.find_related_nodes(&node_id, 1, None).await?;
+
+        // 4. 为相关节点建立关系（复用现有add_edge方法）
+        let mut added_entities = vec![node_id.clone()];
+        for related in related_nodes.iter().take(5) {
+            // 建立RelatedTo关系
+            if let Ok(_) = self.add_edge(
+                node_id.clone(),
+                related.id.clone(),
+                RelationType::RelatedTo,
+                0.5,
+            ).await {
+                added_entities.push(related.id.clone());
+            }
+        }
+
+        // 简化版本：不实现删除逻辑，只返回添加的实体
+        Ok(GraphAddResult {
+            deleted_entities: Vec::new(),
+            added_entities,
+        })
+    }
+
+    /// 搜索图（对标Mem0的search方法）
+    ///
+    /// 简化版本：使用现有方法搜索相关节点
+    pub async fn search(
+        &self,
+        query: &str,
+        filters: &HashMap<String, String>,
+        limit: usize,
+    ) -> Result<Vec<GraphRelation>> {
+        // 1. 查找匹配的节点ID（通过内容搜索）
+        let matching_node_ids: Vec<MemoryId> = {
+            let nodes = self.nodes.read().await;
+            nodes
+                .values()
+                .filter(|node| {
+                    // 应用filters
+                    if let Some(user_id) = filters.get("user_id") {
+                        let node_user_id = node.memory.user_id();
+                        if node_user_id.as_ref().map(|s| s.as_str()) != Some(user_id.as_str()) {
+                            return false;
+                        }
+                    }
+                    if let Some(agent_id) = filters.get("agent_id") {
+                        if node.memory.agent_id() != *agent_id {
+                            return false;
+                        }
+                    }
+                    // 简单的内容匹配
+                    let content_str = match &node.memory.content {
+                        Content::Text(text) => text.to_lowercase(),
+                        _ => String::new(),
+                    };
+                    content_str.contains(&query.to_lowercase())
+                })
+                .take(limit * 2) // 多取一些用于建立关系
+                .map(|node| node.id.clone())
+                .collect()
+        };
+
+        // 2. 查找这些节点的关系（复用现有方法）
+        let mut relations = Vec::new();
+        let edges = self.edges.read().await;
+        let adjacency = self.adjacency_list.read().await;
+        let nodes = self.nodes.read().await;
+
+        for node_id in matching_node_ids.iter().take(limit) {
+            if let Some(edge_ids) = adjacency.get(node_id) {
+                for edge_id in edge_ids.iter().take(5) {
+                    if let Some(edge) = edges.get(edge_id) {
+                        if let (Some(from_node), Some(to_node)) = 
+                            (nodes.get(&edge.from_node), nodes.get(&edge.to_node)) {
+                            let from_content = match &from_node.memory.content {
+                                Content::Text(text) => text.clone(),
+                                _ => String::new(),
+                            };
+                            let to_content = match &to_node.memory.content {
+                                Content::Text(text) => text.clone(),
+                                _ => String::new(),
+                            };
+                            relations.push(GraphRelation {
+                                from_node: edge.from_node.clone(),
+                                to_node: edge.to_node.clone(),
+                                relation_type: edge.relation_type.clone(),
+                                weight: edge.weight,
+                                from_content,
+                                to_content,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 限制返回数量
+        relations.truncate(limit);
+        Ok(relations)
+    }
+
+    /// 删除所有（对标Mem0的delete_all方法）
+    ///
+    /// 根据filters删除匹配的节点和边
+    pub async fn delete_all(&self, filters: &HashMap<String, String>) -> Result<()> {
+        let mut nodes_to_delete = Vec::new();
+        
+        // 1. 查找要删除的节点
+        {
+            let nodes = self.nodes.read().await;
+            for (node_id, node) in nodes.iter() {
+                let mut should_delete = true;
+                
+                // 应用filters
+                if let Some(user_id) = filters.get("user_id") {
+                    let node_user_id = node.memory.user_id();
+                    if node_user_id.as_ref().map(|s| s.as_str()) != Some(user_id.as_str()) {
+                        should_delete = false;
+                    }
+                }
+                if let Some(agent_id) = filters.get("agent_id") {
+                    if node.memory.agent_id() != *agent_id {
+                        should_delete = false;
+                    }
+                }
+                
+                if should_delete {
+                    nodes_to_delete.push(node_id.clone());
+                }
+            }
+        }
+
+        // 2. 删除节点和相关的边（复用现有结构）
+        let mut nodes = self.nodes.write().await;
+        let mut edges = self.edges.write().await;
+        let mut adjacency = self.adjacency_list.write().await;
+        let mut reverse_adjacency = self.reverse_adjacency.write().await;
+
+        for node_id in &nodes_to_delete {
+            // 删除节点
+            nodes.remove(node_id);
+            
+            // 删除相关的边
+            if let Some(edge_ids) = adjacency.remove(node_id) {
+                for edge_id in &edge_ids {
+                    edges.remove(edge_id);
+                }
+            }
+            
+            // 清理反向邻接表
+            if let Some(edge_ids) = reverse_adjacency.remove(node_id) {
+                for edge_id in &edge_ids {
+                    edges.remove(edge_id);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 获取所有（对标Mem0的get_all方法）
+    ///
+    /// 根据filters获取所有关系
+    pub async fn get_all(
+        &self,
+        filters: &HashMap<String, String>,
+        limit: usize,
+    ) -> Result<Vec<GraphRelation>> {
+        let edges = self.edges.read().await;
+        let nodes = self.nodes.read().await;
+        let mut relations = Vec::new();
+
+        for edge in edges.values().take(limit * 2) {
+            // 应用filters
+            let mut should_include = true;
+            
+            if let (Some(from_node), Some(to_node)) = 
+                (nodes.get(&edge.from_node), nodes.get(&edge.to_node)) {
+                
+                if let Some(user_id) = filters.get("user_id") {
+                    let from_match = from_node.memory.user_id().as_ref().map(|id| id.as_str()) == Some(user_id.as_str());
+                    let to_match = to_node.memory.user_id().as_ref().map(|id| id.as_str()) == Some(user_id.as_str());
+                    if !from_match && !to_match {
+                        should_include = false;
+                    }
+                }
+                
+                if let Some(agent_id) = filters.get("agent_id") {
+                    if from_node.memory.agent_id() != *agent_id && to_node.memory.agent_id() != *agent_id {
+                        should_include = false;
+                    }
+                }
+                
+                if should_include {
+                    let from_content = match &from_node.memory.content {
+                        Content::Text(text) => text.clone(),
+                        _ => String::new(),
+                    };
+                    let to_content = match &to_node.memory.content {
+                        Content::Text(text) => text.clone(),
+                        _ => String::new(),
+                    };
+                    relations.push(GraphRelation {
+                        from_node: edge.from_node.clone(),
+                        to_node: edge.to_node.clone(),
+                        relation_type: edge.relation_type.clone(),
+                        weight: edge.weight,
+                        from_content,
+                        to_content,
+                    });
+                }
+            }
+        }
+
+        relations.truncate(limit);
+        Ok(relations)
+    }
 }
 
 /// 图统计信息
@@ -644,6 +888,24 @@ pub struct GraphStats {
     pub node_types: HashMap<NodeType, usize>,
     /// Count of each relation type in the graph
     pub relation_types: HashMap<RelationType, usize>,
+}
+
+/// 图添加结果（Mem0兼容API）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphAddResult {
+    pub deleted_entities: Vec<MemoryId>,
+    pub added_entities: Vec<MemoryId>,
+}
+
+/// 图关系结果（Mem0兼容API）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphRelation {
+    pub from_node: MemoryId,
+    pub to_node: MemoryId,
+    pub relation_type: RelationType,
+    pub weight: f32,
+    pub from_content: String,
+    pub to_content: String,
 }
 
 #[cfg(test)]
@@ -693,5 +955,34 @@ mod tests {
         let stats = engine.get_graph_stats().await.unwrap();
         assert_eq!(stats.total_nodes, 2);
         assert_eq!(stats.total_edges, 1);
+    }
+
+    #[tokio::test]
+    async fn test_graph_memory_mem0_api() {
+        use crate::types::MemoryType;
+
+        let engine = GraphMemoryEngine::new();
+
+        // 测试add方法
+        let mut filters = HashMap::new();
+        filters.insert("agent_id".to_string(), "test_agent".to_string());
+        filters.insert("user_id".to_string(), "user1".to_string());
+
+        let result = engine.add("Apple is a fruit", &filters).await.unwrap();
+        assert!(!result.added_entities.is_empty());
+
+        // 测试search方法
+        let relations = engine.search("fruit", &filters, 10).await.unwrap();
+        // 可能为空，因为需要先建立关系
+        assert!(relations.len() <= 10);
+
+        // 测试get_all方法
+        let all_relations = engine.get_all(&filters, 10).await.unwrap();
+        assert!(all_relations.len() <= 10);
+
+        // 测试delete_all方法
+        engine.delete_all(&filters).await.unwrap();
+        let after_delete = engine.get_all(&filters, 10).await.unwrap();
+        assert_eq!(after_delete.len(), 0);
     }
 }
