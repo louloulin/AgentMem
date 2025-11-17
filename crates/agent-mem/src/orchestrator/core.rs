@@ -111,7 +111,7 @@ pub struct MemoryOrchestrator {
     pub(crate) vector_search_engine: Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
     #[cfg(feature = "postgres")]
     pub(crate) fulltext_search_engine: Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
-    
+
     // ========== 重排序器 ==========
     pub(crate) reranker: Option<Arc<dyn agent_mem_core::search::Reranker>>,
 
