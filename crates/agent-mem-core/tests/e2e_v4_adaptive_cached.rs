@@ -3,12 +3,11 @@
 
 use agent_mem_core::config::AgentMemConfig;
 use agent_mem_core::performance::cache::QueryCacheConfig;
-use agent_mem_core::search::adaptive_router::AdaptiveRouter;
-use agent_mem_core::search::query_classifier::SearchStrategy;
-use agent_mem_core::search::adaptive_search_engine::SearchEngineBackend;
+use agent_mem_core::search::adaptive_router::{AdaptiveRouter, StrategyId};
+use agent_mem_core::search::adaptive_search_engine::{SearchBackendResult, SearchEngineBackend};
 use agent_mem_core::search::cached_adaptive_engine::{CachedAdaptiveEngine, ParallelSearchOptimizer};
 use agent_mem_core::search::{SearchQuery, SearchResult};
-use agent_mem_core::types::{Content, Memory, MemoryBuilder, AttributeKey, AttributeValue};
+use agent_mem_core::types::{AttributeKey, AttributeValue, Content, Memory, MemoryBuilder};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
@@ -53,7 +52,7 @@ impl SearchEngineBackend for MockSearchBackend {
         query: SearchQuery,
         _vector_weight: f32,
         _fulltext_weight: f32,
-    ) -> Result<super::agent_mem_core::search::adaptive_search_engine::SearchBackendResult> {
+    ) -> Result<SearchBackendResult> {
         // 模拟搜索延迟
         tokio::time::sleep(Duration::from_millis(50)).await;
         
@@ -80,7 +79,7 @@ impl SearchEngineBackend for MockSearchBackend {
             }
         }
         
-        Ok(super::agent_mem_core::search::adaptive_search_engine::SearchBackendResult {
+        Ok(SearchBackendResult {
             results,
         })
     }
@@ -103,6 +102,7 @@ async fn test_adaptive_router_strategy_selection() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     // 第一次决策（应该选择Balanced策略）
@@ -110,11 +110,11 @@ async fn test_adaptive_router_strategy_selection() {
     
     assert!(matches!(
         strategy,
-        SearchStrategy::VectorHeavy
-            | SearchStrategy::Balanced
-            | SearchStrategy::FulltextHeavy
-            | SearchStrategy::VectorOnly
-            | SearchStrategy::FulltextOnly
+        StrategyId::VectorHeavy
+            | StrategyId::Balanced
+            | StrategyId::FulltextHeavy
+            | StrategyId::VectorOnly
+            | StrategyId::FulltextOnly
     ));
     assert!((weights.vector_weight + weights.fulltext_weight - 1.0).abs() < 0.01);
 
@@ -136,6 +136,7 @@ async fn test_adaptive_learning_feedback() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     // 执行10次搜索+反馈循环
@@ -152,13 +153,14 @@ async fn test_adaptive_learning_feedback() {
             .unwrap();
     }
 
-    // 获取性能历史
-    let history = router.get_performance_history().await;
-    assert_eq!(history.len(), 10);
+    // 验证策略统计（总尝试次数应为10）
+    let stats = router.get_strategy_stats().await;
+    let total_tries: usize = stats.values().map(|arm| arm.total_tries).sum();
+    assert_eq!(total_tries, 10);
 
     println!("✅ Adaptive learning feedback loop completed");
     println!("   - Iterations: 10");
-    println!("   - History records: {}", history.len());
+    println!("   - Total strategy updates: {}", total_tries);
     println!("   - Accuracy range: 0.70 → 0.88");
 }
 
@@ -184,6 +186,7 @@ async fn test_cache_hit_and_miss() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     let query_vector = vec![0.1; 128];
@@ -242,6 +245,7 @@ async fn test_cache_statistics() {
             vector_weight: 0.0,
             fulltext_weight: 0.0,
             filters: None,
+            metadata_filters: None,
         };
 
         // 每个查询执行2次
@@ -286,6 +290,7 @@ async fn test_parallel_search_performance() {
                 vector_weight: 0.0,
                 fulltext_weight: 0.0,
                 filters: None,
+                metadata_filters: None,
             };
             (vec![0.1; 128], query)
         })
@@ -333,6 +338,7 @@ async fn test_cache_warmup() {
                 vector_weight: 0.0,
                 fulltext_weight: 0.0,
                 filters: None,
+                metadata_filters: None,
             };
             (vec![0.1; 128], query)
         })
@@ -371,6 +377,7 @@ async fn test_full_adaptive_search_flow() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     let query_vector = vec![0.1; 128];
@@ -415,6 +422,7 @@ async fn test_cache_clear() {
         vector_weight: 0.0,
         fulltext_weight: 0.0,
         filters: None,
+        metadata_filters: None,
     };
 
     // 执行搜索填充缓存

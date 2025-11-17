@@ -4,7 +4,7 @@
 
 #[cfg(feature = "libsql")]
 mod libsql_factory_tests {
-    use agent_mem_config::{DatabaseBackend, DatabaseConfig, PoolConfig};
+    use agent_mem_config::{database::PoolConfig, DatabaseBackend, DatabaseConfig};
     use agent_mem_core::storage::factory::RepositoryFactory;
     use agent_mem_core::storage::models::User;
     use tempfile::TempDir;
@@ -154,7 +154,7 @@ mod libsql_factory_tests {
 
 #[cfg(not(feature = "libsql"))]
 mod libsql_feature_disabled_tests {
-    use agent_mem_config::{DatabaseBackend, DatabaseConfig, PoolConfig};
+    use agent_mem_config::{database::PoolConfig, DatabaseBackend, DatabaseConfig};
     use agent_mem_core::storage::factory::RepositoryFactory;
 
     #[tokio::test]
@@ -177,7 +177,7 @@ mod libsql_feature_disabled_tests {
 
 #[cfg(not(feature = "postgres"))]
 mod postgres_feature_disabled_tests {
-    use agent_mem_config::{DatabaseBackend, DatabaseConfig, PoolConfig};
+    use agent_mem_config::{database::PoolConfig, DatabaseBackend, DatabaseConfig};
     use agent_mem_core::storage::factory::RepositoryFactory;
 
     #[tokio::test]

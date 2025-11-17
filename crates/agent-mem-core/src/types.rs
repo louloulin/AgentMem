@@ -1863,20 +1863,21 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
     ) -> anyhow::Result<O>
     where
         I: Clone,
-        O: Clone,
+        O: Clone + Into<I>,
     {
+        let mut current_input = input;
         let mut current_output: Option<O> = None;
         
         for stage in &self.stages {
             let stage_name = stage.name();
             
-            match stage.execute(input.clone(), context).await {
+            match stage.execute(current_input.clone(), context).await {
                 Ok(StageResult::Continue(output)) => {
-                    current_output = Some(output.clone());
-                    // If there's a next stage that expects the output as input,
-                    // we need type conversion here (simplified for now)
+                    current_input = output.clone().into();
+                    current_output = Some(output);
                 }
                 Ok(StageResult::Skip(output)) => {
+                    current_input = output.clone().into();
                     current_output = Some(output);
                     break;
                 }
@@ -1884,7 +1885,11 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
                     if let Some(ref handler) = self.error_handler {
                         handler(stage_name, &reason);
                     }
-                    return Err(anyhow::anyhow!("Pipeline aborted at stage '{}': {}", stage_name, reason));
+                    return Err(anyhow::anyhow!(
+                        "Pipeline aborted at stage '{}': {}",
+                        stage_name,
+                        reason
+                    ));
                 }
                 Err(e) => {
                     if stage.is_optional() {
@@ -1893,7 +1898,11 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
                         }
                         continue;
                     } else {
-                        return Err(anyhow::anyhow!("Pipeline failed at stage '{}': {}", stage_name, e));
+                        return Err(anyhow::anyhow!(
+                            "Pipeline failed at stage '{}': {}",
+                            stage_name,
+                            e
+                        ));
                     }
                 }
             }

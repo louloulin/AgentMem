@@ -26,9 +26,8 @@ impl PipelineStage for ContentPreprocessStage {
     ) -> Result<StageResult<Self::Output>> {
         // 简单的内容清洗
         let mut output = input;
-        if let Content::Text(ref text) = output.content {
-            let cleaned = text.trim().to_string();
-            output.content = Content::Text(cleaned);
+        if let Content::Text(text) = &mut output.content {
+            *text = text.trim().to_string();
         }
         Ok(StageResult::Continue(output))
     }
@@ -52,7 +51,7 @@ impl PipelineStage for DeduplicationStage {
         context: &mut PipelineContext,
     ) -> Result<StageResult<Self::Output>> {
         // 模拟去重逻辑
-        context.set("dedup_checked", true);
+        context.set("dedup_checked", true)?;
         Ok(StageResult::Continue(input))
     }
 }
@@ -86,7 +85,7 @@ impl PipelineStage for ImportanceStage {
             AttributeKey::system("importance"),
             AttributeValue::Number(importance),
         );
-        context.set("importance_calculated", importance);
+        context.set("importance_calculated", importance)?;
         Ok(StageResult::Continue(output))
     }
 }
@@ -272,7 +271,9 @@ async fn test_pipeline_stage_skip() {
         .add_stage(ImportanceStage);
 
     let mut context = PipelineContext::new();
-    context.set("should_skip", true);
+    context
+        .set("should_skip", true)
+        .expect("failed to set skip flag");
 
     let result = pipeline.execute(memory.clone(), &mut context).await;
     assert!(result.is_ok());
@@ -331,8 +332,13 @@ async fn test_dag_cycle_detection() {
 
     // 应该检测到环并返回错误
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("cycle") 
-            || result.as_ref().unwrap_err().to_string().contains("dependency"));
+    let err_msg = result.unwrap_err().to_string();
+    let err_msg_lower = err_msg.to_lowercase();
+    assert!(
+        err_msg_lower.contains("cycle") || err_msg_lower.contains("dependency"),
+        "Unexpected error message: {}",
+        err_msg
+    );
 
     println!("✅ DAG cycle detection test passed");
 }

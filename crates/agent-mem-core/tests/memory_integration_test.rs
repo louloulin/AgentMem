@@ -2,7 +2,7 @@
 
 use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_core::orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig};
-use agent_mem_core::Memory;
+use agent_mem_core::types::{AttributeKey, AttributeValue, Content, Memory, MemoryBuilder};
 use agent_mem_traits::{MemoryType, Message, MessageRole};
 use chrono::Utc;
 use std::sync::Arc;
@@ -11,9 +11,12 @@ use std::sync::Arc;
 fn test_memory_integrator_config_default() {
     let config = MemoryIntegratorConfig::default();
     assert_eq!(config.max_memories, 10);
-    assert_eq!(config.relevance_threshold, 0.5);
-    assert!(config.include_importance);
+    assert!((config.relevance_threshold - 0.1).abs() < f32::EPSILON);
     assert!(config.include_timestamp);
+    assert!(config.sort_by_importance);
+    assert!((config.episodic_weight - 1.2).abs() < f32::EPSILON);
+    assert!((config.working_weight - 1.0).abs() < f32::EPSILON);
+    assert!((config.semantic_weight - 0.9).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -21,13 +24,19 @@ fn test_memory_integrator_config_custom() {
     let config = MemoryIntegratorConfig {
         max_memories: 20,
         relevance_threshold: 0.7,
-        include_importance: false,
         include_timestamp: false,
+        sort_by_importance: false,
+        episodic_weight: 0.8,
+        working_weight: 1.1,
+        semantic_weight: 0.6,
     };
     assert_eq!(config.max_memories, 20);
     assert_eq!(config.relevance_threshold, 0.7);
-    assert!(!config.include_importance);
     assert!(!config.include_timestamp);
+    assert!(!config.sort_by_importance);
+    assert!((config.episodic_weight - 0.8).abs() < f32::EPSILON);
+    assert!((config.working_weight - 1.1).abs() < f32::EPSILON);
+    assert!((config.semantic_weight - 0.6).abs() < f32::EPSILON);
 }
 
 #[tokio::test]
@@ -37,7 +46,7 @@ async fn test_retrieve_memories_empty_query() {
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
     let result = integrator
-        .retrieve_memories("", "agent-1", "user-1", 10)
+        .retrieve_relevant_memories_with_session("", "agent-1", Some("user-1"), None, 10)
         .await;
 
     assert!(result.is_ok());
@@ -48,28 +57,7 @@ async fn test_retrieve_memories_empty_query() {
 
 #[test]
 fn test_format_memory_for_prompt() {
-    use agent_mem_traits::{Entity, Relation, Session};
-    let memory = Memory {
-        id: "mem-1".to_string(),
-        user_id: Some("user-1".to_string()),
-        agent_id: "agent-1".to_string(),
-        content: "User prefers Python".to_string(),
-        memory_type: MemoryType::Semantic,
-        importance: 0.8,
-        hash: Some("hash123".to_string()),
-        embedding: None,
-        metadata: std::collections::HashMap::new(),
-        created_at: Utc::now(),
-        updated_at: Some(Utc::now()),
-        last_accessed_at: Utc::now(),
-        session: Session::default(),
-        entities: Vec::<Entity>::new(),
-        relations: Vec::<Relation>::new(),
-        score: Some(0.9),
-        expires_at: None,
-        access_count: 5,
-        version: 1,
-    };
+    let memory = create_test_memory("mem-1", "User prefers Python", 0.8);
 
     let formatted = format_memory_for_test(&memory, true, true);
     assert!(formatted.contains("User prefers Python"));
@@ -83,14 +71,18 @@ fn format_memory_for_test(
     include_importance: bool,
     include_timestamp: bool,
 ) -> String {
-    let mut formatted = format!("[{:?}] {}", memory.memory_type, memory.content);
+    let content = match &memory.content {
+        Content::Text(text) => text.clone(),
+        other => format!("{:?}", other),
+    };
+    let mut formatted = format!("[{:?}] {}", memory.memory_type(), content);
 
     if include_importance {
-        formatted.push_str(&format!(" (importance: {:.1})", memory.importance));
+        formatted.push_str(&format!(" (importance: {:.1})", memory.importance()));
     }
 
     if include_timestamp {
-        formatted.push_str(&format!(" (created: {})", memory.created_at));
+        formatted.push_str(&format!(" (created: {})", memory.created_at()));
     }
 
     formatted
@@ -107,36 +99,42 @@ fn test_filter_by_relevance() {
     let threshold = 0.5;
     let filtered: Vec<_> = memories
         .into_iter()
-        .filter(|m| m.score.unwrap_or(0.0) >= threshold)
+        .filter(|m| m.score().unwrap_or(0.0) >= threshold as f64)
         .collect();
 
     assert_eq!(filtered.len(), 2);
 }
 
 // 辅助函数：创建测试记忆
-fn create_test_memory(id: &str, content: &str, score: f32) -> Memory {
-    use agent_mem_traits::{Entity, Relation, Session};
-    Memory {
-        id: id.to_string(),
-        user_id: Some("user-1".to_string()),
-        agent_id: "agent-1".to_string(),
-        content: content.to_string(),
-        memory_type: MemoryType::Semantic,
-        importance: score,
-        hash: Some(format!("hash-{}", id)),
-        embedding: None,
-        metadata: std::collections::HashMap::new(),
-        created_at: Utc::now(),
-        updated_at: Some(Utc::now()),
-        last_accessed_at: Utc::now(),
-        session: Session::default(),
-        entities: Vec::<Entity>::new(),
-        relations: Vec::<Relation>::new(),
-        score: Some(score),
-        expires_at: None,
-        access_count: 0,
-        version: 1,
-    }
+fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
+    MemoryBuilder::new()
+        .id(id.to_string())
+        .content(Content::Text(content.to_string()))
+        .attribute(
+            AttributeKey::system("agent_id"),
+            AttributeValue::String("agent-1".to_string()),
+        )
+        .attribute(
+            AttributeKey::system("user_id"),
+            AttributeValue::String("user-1".to_string()),
+        )
+        .attribute(
+            AttributeKey::system("memory_type"),
+            AttributeValue::String(MemoryType::Semantic.as_str().to_string()),
+        )
+        .attribute(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance as f64),
+        )
+        .attribute(
+            AttributeKey::system("score"),
+            AttributeValue::Number(importance as f64),
+        )
+        .attribute(
+            AttributeKey::system("version"),
+            AttributeValue::Number(1.0),
+        )
+        .build()
 }
 
 #[test]
@@ -148,8 +146,8 @@ fn test_sort_by_importance() {
     ];
 
     memories.sort_by(|a, b| {
-        b.importance
-            .partial_cmp(&a.importance)
+        b.importance()
+            .partial_cmp(&a.importance())
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -194,9 +192,16 @@ fn build_memory_context_for_test(memories: &[Memory]) -> String {
 
     let mut context = String::from("Relevant memories:\n\n");
     for (i, memory) in memories.iter().enumerate() {
-        context.push_str(&format!("{}. {}\n", i + 1, memory.content));
+        context.push_str(&format!("{}. {}\n", i + 1, memory_text(memory)));
     }
     context
+}
+
+fn memory_text(memory: &Memory) -> String {
+    match &memory.content {
+        Content::Text(text) => text.clone(),
+        other => format!("{:?}", other),
+    }
 }
 
 #[test]
@@ -242,18 +247,18 @@ fn test_max_memories_validation() {
 fn test_memory_metadata() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
 
-    assert!(memory.metadata.is_empty());
-    assert_eq!(memory.version, 1);
-    assert_eq!(memory.access_count, 0);
+    assert_eq!(memory.user_id().as_deref(), Some("user-1"));
+    assert_eq!(memory.version(), 1);
+    assert_eq!(memory.metadata.accessed_count, 0);
 }
 
 #[test]
 fn test_memory_timestamps() {
     let memory = create_test_memory("mem-1", "Test content", 0.8);
 
-    assert!(memory.created_at.timestamp() > 0);
-    assert!(memory.last_accessed_at.timestamp() > 0);
-    assert!(memory.expires_at.is_none());
+    assert!(memory.created_at() > 0);
+    assert!(memory.metadata.updated_at.timestamp() > 0);
+    assert!(memory.metadata.last_accessed.is_none());
 }
 
 #[test]
@@ -281,14 +286,26 @@ fn test_empty_memories_handling() {
 #[test]
 fn test_memory_importance_range() {
     let memory = create_test_memory("mem-1", "Test", 0.5);
-    assert!(memory.importance >= 0.0 && memory.importance <= 1.0);
+    let importance = memory.importance();
+    assert!(importance >= 0.0 && importance <= 1.0);
 }
 
 #[test]
 fn test_memory_score_optional() {
-    let mut memory = create_test_memory("mem-1", "Test", 0.5);
-    assert!(memory.score.is_some());
+    let memory_with_score = create_test_memory("mem-1", "Test", 0.5);
+    assert!(memory_with_score.score().is_some());
 
-    memory.score = None;
-    assert!(memory.score.is_none());
+    let memory_without_score = MemoryBuilder::new()
+        .id("mem-2".to_string())
+        .content(Content::Text("No score".to_string()))
+        .attribute(
+            AttributeKey::system("agent_id"),
+            AttributeValue::String("agent-1".to_string()),
+        )
+        .attribute(
+            AttributeKey::system("user_id"),
+            AttributeValue::String("user-1".to_string()),
+        )
+        .build();
+    assert!(memory_without_score.score().is_none());
 }

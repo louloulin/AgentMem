@@ -65,7 +65,7 @@ mod cache_tests {
 }
 
 // 基础功能测试（不需要feature flag）
-#[cfg(test)]
+#[cfg(all(feature = "redis-cache", test))]
 mod basic_tests {
     use agent_mem_core::search::CachedVectorSearchConfig;
 
