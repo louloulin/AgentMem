@@ -5,39 +5,42 @@
 use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
-    Memory, MemoryType,
+    types::{AttributeKey, AttributeValue, Content, Memory, MemoryBuilder, MemoryType},
 };
-use agent_mem_traits::Session;
-use chrono::Utc;
-use std::collections::HashMap;
 use std::sync::Arc;
-use uuid::Uuid;
 
 // 辅助函数：创建测试用的 Memory
 fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
     // importance 和 score 保持一致
     let importance = score.unwrap_or(0.5);
-    Memory {
-        id: Uuid::new_v4().to_string(),
-        content: content.to_string(),
-        hash: None,
-        metadata: HashMap::new(),
-        score,
-        created_at: Utc::now(),
-        updated_at: Some(Utc::now()),
-        session: Session::new(),
-        memory_type,
-        entities: vec![],
-        relations: vec![],
-        agent_id: "test-agent".to_string(),
-        user_id: Some("test-user".to_string()),
-        importance,
-        embedding: None,
-        last_accessed_at: Utc::now(),
-        access_count: 0,
-        expires_at: None,
-        version: 1,
+    let mut memory = MemoryBuilder::new()
+        .content(Content::Text(content.to_string()))
+        .attribute(
+            AttributeKey::system("agent_id"),
+            AttributeValue::String("test-agent".to_string()),
+        )
+        .attribute(
+            AttributeKey::system("user_id"),
+            AttributeValue::String("test-user".to_string()),
+        )
+        .attribute(
+            AttributeKey::system("memory_type"),
+            AttributeValue::String(memory_type.as_str().to_string()),
+        )
+        .attribute(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance as f64),
+        );
+    
+    // 如果有score，也设置score属性（用于检索时的相关性分数）
+    if let Some(score_val) = score {
+        memory = memory.attribute(
+            AttributeKey::system("score"),
+            AttributeValue::Number(score_val as f64),
+        );
     }
+    
+    memory.build()
 }
 
 #[tokio::test]
@@ -95,7 +98,7 @@ async fn test_memory_integrator_filter_by_relevance() {
         "Should keep 2 memories with score >= 0.7"
     );
     assert!(
-        filtered.iter().all(|m| m.score.unwrap_or(0.0) >= 0.7),
+        filtered.iter().all(|m| m.score().unwrap_or(0.0) >= 0.7),
         "All filtered memories should have score >= 0.7"
     );
 
@@ -121,18 +124,16 @@ async fn test_memory_integrator_sort_memories() {
 
     // 4. 验证排序结果（按分数降序）
     assert_eq!(sorted.len(), 3, "Should have 3 memories");
-    assert_eq!(
-        sorted[0].content, "High score",
-        "First should be highest score"
-    );
-    assert_eq!(
-        sorted[1].content, "Medium score",
-        "Second should be medium score"
-    );
-    assert_eq!(
-        sorted[2].content, "Low score",
-        "Third should be lowest score"
-    );
+    // 检查内容（需要从Content::Text中提取）
+    if let Content::Text(ref text) = sorted[0].content {
+        assert!(text.contains("High"), "First should be highest score");
+    }
+    if let Content::Text(ref text) = sorted[1].content {
+        assert!(text.contains("Medium"), "Second should be medium score");
+    }
+    if let Content::Text(ref text) = sorted[2].content {
+        assert!(text.contains("Low"), "Third should be lowest score");
+    }
 
     println!("✅ test_memory_integrator_sort_memories passed");
 }
@@ -243,7 +244,7 @@ async fn test_memory_types() {
             memory_type.clone(),
             Some(0.8),
         );
-        assert_eq!(memory.memory_type, memory_type);
+        assert_eq!(memory.memory_type(), memory_type);
     }
 
     println!("✅ test_memory_types passed");

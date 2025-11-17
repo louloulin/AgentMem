@@ -859,6 +859,20 @@ impl Memory {
             .unwrap_or(0.0) as f32
     }
     
+    /// 获取score（检索相关性分数，向后兼容）
+    pub fn score(&self) -> Option<f64> {
+        // 优先从score属性获取
+        if let Some(score) = self.attributes
+            .get(&AttributeKey::system("score"))
+            .and_then(|v| v.as_number()) {
+            return Some(score);
+        }
+        // 如果没有score，使用importance作为fallback
+        self.attributes
+            .get(&AttributeKey::system("importance"))
+            .and_then(|v| v.as_number())
+    }
+    
     /// 获取agent_id（向后兼容）
     pub fn agent_id(&self) -> String {
         self.attributes
