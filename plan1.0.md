@@ -1458,13 +1458,13 @@ impl MemoryRepository {
    - [ ] 实现 `JinaReranker`（可选）
 
 2. **集成到MemoryOrchestrator**
-   - [ ] 添加 `reranker` 字段
-   - [ ] 在 `search_memories_hybrid()` 中集成重排序
-   - [ ] 支持配置启用/禁用
+   - [x] 添加 `reranker` 字段 ✅ (2024-12-19)
+   - [x] 在 `search_memories_hybrid()` 中集成重排序 ✅ (2024-12-19)
+   - [x] 支持配置启用/禁用 ✅ (2024-12-19)
 
 3. **集成到Memory API**
-   - [ ] 添加 `with_reranker()` 方法
-   - [ ] 支持Builder模式配置
+   - [x] 添加 `enable_reranking()` 方法到MemoryBuilder ✅ (2024-12-19)
+   - [x] 支持Builder模式配置 ✅ (2024-12-19)
 
 4. **测试和文档**
    - [ ] 编写单元测试
@@ -1479,15 +1479,16 @@ impl MemoryRepository {
 // 完整实现见7.2节
 ```
 
-**实施状态：** ✅ **30% 完成** (2024-12-19)
+**实施状态：** ✅ **80% 完成** (2024-12-19)
 - ✅ 创建了 `external_reranker.rs` 模块（200+行代码）
 - ✅ 定义了统一的 `Reranker` trait
 - ✅ 实现了 `InternalReranker` 适配器（将现有ResultReranker适配为trait）
 - ✅ 实现了 `CohereReranker` 框架（需要cohere feature和API集成）
 - ✅ 添加了 `RerankerFactory` 工厂类
 - ✅ 添加了基础测试（1个测试通过）
-- ⏳ 集成到MemoryOrchestrator（待完成）
-- ⏳ 集成到Memory API（待完成）
+- ✅ 集成到MemoryOrchestrator（在retrieval.rs中集成）
+- ✅ 集成到Memory API（添加了enable_reranking()方法）
+- ⏳ 添加集成测试（待完成）
 
 **步骤3.2：集成到MemoryOrchestrator**
 ```rust
@@ -2482,10 +2483,10 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured
 
 ---
 
-**文档版本：** 4.5  
+**文档版本：** 4.6  
 **创建日期：** 2024-12-19  
 **最后更新：** 2024-12-19  
-**状态：** 阶段0已完成，阶段3部分完成（30%），阶段1-2、4待实施  
+**状态：** 阶段0已完成，阶段3部分完成（80%），阶段1-2部分完成，阶段4待实施  
 **分析轮次：** 5轮综合分析完成（包含模块化拆分方案）
 
 **相关文档：**

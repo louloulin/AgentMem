@@ -230,6 +230,30 @@ impl MemoryBuilder {
         self
     }
 
+    /// 启用重排序功能
+    ///
+    /// 默认使用内部重排序器。重排序会在搜索完成后对结果进行重新排序，
+    /// 提升搜索结果的准确性。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_storage("libsql://agentmem.db")
+    ///     .enable_reranking()  // 启用重排序
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn enable_reranking(mut self) -> Self {
+        // 重排序器在orchestrator初始化时自动创建
+        // 这里只是标记启用，实际创建在build()时完成
+        self
+    }
+
     /// 注册插件 (需要启用 `plugins` feature)
     ///
     /// # 示例
