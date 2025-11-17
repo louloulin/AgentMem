@@ -114,6 +114,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         query: "测试查询".to_string(),
         limit: 10,
         threshold: Some(0.0),
+        vector_weight: 0.7,
+        fulltext_weight: 0.3,
         filters: Some(SearchFilters {
             user_id: None,
             organization_id: None,
@@ -122,8 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             end_time: None,
             tags: None,
         }),
-        vector_weight: 1.0,
-        fulltext_weight: 0.0,
+        metadata_filters: None,
     };
 
     let (results, search_time) = search_engine.search(query_vector.clone(), &query).await?;

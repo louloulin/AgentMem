@@ -80,6 +80,7 @@ impl RetrievalModule {
             vector_weight: 0.7,
             fulltext_weight: 0.3,
             filters: Some(search_filters),
+            metadata_filters: None,
         };
 
         // Step 5: 执行搜索
