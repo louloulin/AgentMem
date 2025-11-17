@@ -56,7 +56,7 @@ impl PipelineStage for FullMemoryProcessingStage {
             }
         }
 
-        context.set("processed", true);
+        context.set("processed", true).unwrap();
         Ok(StageResult::Continue(output))
     }
 }

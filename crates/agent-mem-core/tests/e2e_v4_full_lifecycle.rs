@@ -191,7 +191,6 @@ async fn test_hierarchical_scope_access() {
 #[tokio::test]
 async fn test_advanced_query_features() {
     // 1. 聚合查询
-    use agent_mem_core::types::AggregationOp;
     let aggregation_query = QueryBuilder::new()
         .text("统计用户偏好")
         .build();
@@ -249,7 +248,11 @@ async fn test_relation_graph() {
         .relations
         .find_by_target(&memory1.id)
         .iter()
-        .any(|relation| relation.relation_type == RelationType::SimilarTo);
+        .any(|relation| {
+            let relation = *relation;
+            std::mem::discriminant(&relation.relation_type)
+                == std::mem::discriminant(&RelationType::SimilarTo)
+        });
     assert!(has_relation, "关系图应包含 SimilarTo 关系");
 
     println!("✅ Relation graph test passed");
