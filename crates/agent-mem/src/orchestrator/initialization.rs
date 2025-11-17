@@ -671,12 +671,44 @@ impl InitializationModule {
 
         // 创建 FullTextSearchEngine
         // 注意：FullTextSearchEngine需要PgPool，如果storage_url是PostgreSQL连接，可以创建
-        // 这里暂时返回None，因为需要PostgreSQL连接池，这需要额外的配置
-        let fulltext_search_engine = if let Some(_storage_url) = &config.storage_url {
-            // TODO: 如果storage_url是PostgreSQL连接，创建PgPool并初始化FullTextSearchEngine
-            // 需要检查storage_url是否是PostgreSQL格式，然后创建连接池
-            warn!("FullTextSearchEngine 需要PostgreSQL连接池，当前暂不支持自动创建");
-            None
+        let fulltext_search_engine = if let Some(storage_url) = &config.storage_url {
+            // 检查storage_url是否是PostgreSQL格式
+            if storage_url.starts_with("postgresql://") || storage_url.starts_with("postgres://") {
+                #[cfg(feature = "postgres")]
+                {
+                    use sqlx::{PgPool, PgPoolOptions};
+                    use std::time::Duration;
+                    
+                    match PgPoolOptions::new()
+                        .max_connections(10)
+                        .min_connections(2)
+                        .acquire_timeout(Duration::from_secs(30))
+                        .idle_timeout(Duration::from_secs(600))
+                        .max_lifetime(Duration::from_secs(1800))
+                        .connect(storage_url)
+                        .await
+                    {
+                        Ok(pool) => {
+                            let pool = Arc::new(pool);
+                            let engine = FullTextSearchEngine::new(pool);
+                            info!("✅ FullTextSearchEngine 创建成功（使用PostgreSQL连接池）");
+                            Some(Arc::new(engine))
+                        }
+                        Err(e) => {
+                            warn!("创建PostgreSQL连接池失败: {}，FullTextSearchEngine 将不可用", e);
+                            None
+                        }
+                    }
+                }
+                #[cfg(not(feature = "postgres"))]
+                {
+                    warn!("PostgreSQL feature 未启用，FullTextSearchEngine 将不可用");
+                    None
+                }
+            } else {
+                warn!("存储URL不是PostgreSQL格式，FullTextSearchEngine 将不可用");
+                None
+            }
         } else {
             warn!("存储URL未配置，FullTextSearchEngine 将不可用");
             None

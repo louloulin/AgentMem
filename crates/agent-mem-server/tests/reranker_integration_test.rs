@@ -131,6 +131,7 @@ async fn test_optimizer_components_exist() -> Result<(), Box<dyn std::error::Err
         vector_weight: 0.7,
         fulltext_weight: 0.3,
         filters: None,
+        metadata_filters: None,
     };
 
     let plan = optimizer.optimize_query(&query);
