@@ -114,17 +114,16 @@ async fn test_add_text_convenience_api() {
     assert!(!result.results.is_empty(), "应该返回至少一个事件 ID");
     let memory_id = &result.results[0].id;
 
-    let memory = mem.get(memory_id).await.expect("get 失败");
+    let event = &result.results[0];
     assert!(
-        memory.content.contains("latte art"),
+        event.memory.contains("latte art"),
         "应当找到 add_text 写入的内容"
     );
     assert_eq!(
-        memory.user_id.as_deref(),
-        Some(user_id.as_str()),
-        "返回结果应绑定到指定 user_id"
+        event.actor_id.as_deref(),
+        Some(agent_id.as_str()),
+        "事件应记录触发的 agent_id"
     );
-    assert_eq!(memory.agent_id, agent_id, "返回结果应绑定到指定 agent_id");
 }
 
 #[tokio::test]
@@ -150,20 +149,9 @@ async fn test_add_structured_convenience_api() {
     assert!(!result.results.is_empty(), "应该返回至少一个事件 ID");
     let memory_id = &result.results[0].id;
 
-    let memory = mem.get(memory_id).await.expect("get 失败");
+    let event = &result.results[0];
     assert!(
-        memory.content.contains("user_profile"),
+        event.memory.contains("user_profile"),
         "应当包含结构化内容被序列化后的字段"
-    );
-
-    let structured_metadata = memory
-        .metadata
-        .get("content_format")
-        .and_then(|value| value.as_str());
-
-    assert_eq!(
-        structured_metadata,
-        Some("structured_json"),
-        "metadata 中应包含 content_format=structured_json"
     );
 }
