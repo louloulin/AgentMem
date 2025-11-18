@@ -38,7 +38,8 @@ impl AgentMemBackend {
 #[async_trait]
 impl LumosMemory for AgentMemBackend {
     async fn store(&self, message: &LumosMessage) -> LumosResult<()> {
-        debug!("Storing message to AgentMem: {:?}", message.role);
+        info!("💾 Storing message to AgentMem: role={:?}, agent_id={}, user_id={}", 
+              message.role, self.agent_id, self.user_id);
         
         // 转换LumosMessage为AgentMem Memory
         let role_str = match message.role {
@@ -86,16 +87,21 @@ impl LumosMemory for AgentMemBackend {
         
         // 调用MemoryEngine存储
         let memory_id = self.engine.add_memory(memory).await
-            .map_err(|e| lumosai_core::Error::Other(format!("Failed to store memory: {}", e)))?;
+            .map_err(|e| {
+                let err_msg = format!("Failed to store memory: {}", e);
+                warn!("{}", err_msg);
+                lumosai_core::Error::Other(err_msg)
+            })?;
         
-        info!("✅ Stored memory to AgentMem: {}", memory_id);
+        info!("✅ Stored memory to AgentMem: id={}", memory_id);
         Ok(())
     }
     
     async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
-        let query = config.query.as_deref().unwrap_or("");
-        let limit = 10; // 默认限制
-        debug!("Retrieving memories from AgentMem: query='{}', limit={}", query, limit);
+        // 确定检索限制
+        let limit = config.last_messages.unwrap_or(10);
+        info!("🔍 Retrieving memories: agent_id={}, user_id={}, limit={}", 
+              self.agent_id, self.user_id, limit);
         
         // 构建搜索scope
         let scope = Some(MemoryScope::User {
@@ -103,12 +109,18 @@ impl LumosMemory for AgentMemBackend {
             user_id: self.user_id.clone(),
         });
         
-        // 调用MemoryEngine搜索
-        let memories = self.engine.search_memories(query, scope, Some(limit))
+        // ✅ 修复：使用空查询来获取最近的消息（按时间排序）
+        // search_memories会自动按created_at DESC排序
+        info!("Calling engine.search_memories with empty query");
+        let memories = self.engine.search_memories("", scope, Some(limit))
             .await
-            .map_err(|e| lumosai_core::Error::Other(format!("Failed to retrieve memories: {}", e)))?;
+            .map_err(|e| {
+                let err_msg = format!("Failed to retrieve memories: {}", e);
+                warn!("{}", err_msg);
+                lumosai_core::Error::Other(err_msg)
+            })?;
         
-        info!("Retrieved {} memories from AgentMem", memories.len());
+        info!("✅ Retrieved {} historical messages from AgentMem", memories.len());
         
         // 转换Memory为LumosMessage
         let messages = memories.into_iter()
