@@ -19,6 +19,7 @@ agent-mem-tools = { path = "../agent-mem-tools" }
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-observability = { path = "../agent-mem-observability" }
 agent-mem-storage = { path = "../agent-mem-storage", optional = true }
+agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成
 
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }

@@ -1,0 +1,38 @@
+[package]
+name = "agent-mem-lumosai"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# LumosAI 核心
+lumosai_core = { path = "../../lumosai/lumosai_core" }
+
+# AgentMem 核心
+agent-mem-core = { path = "../agent-mem-core" }
+agent-mem-traits = { path = "../agent-mem-traits" }
+
+# 异步运行时
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 日志
+tracing = "0.1"
+
+# 其他
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
