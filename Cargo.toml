@@ -9,6 +9,7 @@ exclude = [
     "crates/agent-mem-plugin-sdk/examples/hello_plugin",  # Plugin example - standalone
     "crates/agent-mem-plugin-sdk/examples/memory_processor",  # Plugin example - standalone
     "crates/agent-mem-plugin-sdk/examples/code_analyzer",  # Plugin example - standalone
+    "crates/agent-mem-lumosai",  # LumosAI集成 - 独立编译，避免workspace依赖冲突
 ]
 
 members = [

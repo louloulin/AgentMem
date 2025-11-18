@@ -19,7 +19,7 @@ agent-mem-tools = { path = "../agent-mem-tools" }
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-observability = { path = "../agent-mem-observability" }
 agent-mem-storage = { path = "../agent-mem-storage", optional = true }
-agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成
+# agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成 (暂时禁用)
 
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
@@ -97,7 +97,7 @@ plugins = ["agent-mem/plugins"]
 postgres = ["agent-mem-core/postgres"]
 libsql = ["agent-mem-core/libsql"]
 lancedb = ["agent-mem-storage/lancedb"]
-lumosai = ["agent-mem-lumosai"]  # LumosAI集成 (experimental)
+# lumosai = ["agent-mem-lumosai"]  # LumosAI集成 (暂时禁用 - workspace依赖冲突)
 
 [dev-dependencies]
 tokio-test = "0.4"
