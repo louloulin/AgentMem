@@ -265,6 +265,11 @@ impl AttributeKey {
         Self::new("user", name)
     }
     
+    /// 核心属性（core命名空间）- 用于agent_id, user_id等核心字段
+    pub fn core(name: impl Into<String>) -> Self {
+        Self::new("core", name)
+    }
+    
     /// 领域属性（domain命名空间）
     pub fn domain(name: impl Into<String>) -> Self {
         Self::new("domain", name)
@@ -826,20 +831,21 @@ impl Memory {
         let mut builder = MemoryBuilder::new()
             .content(Content::Text(content));
         
+        // 🔑 关键修复: 使用core属性以匹配memory_to_db的读取逻辑
         builder.attributes.set(
-            AttributeKey::system("agent_id"),
+            AttributeKey::core("agent_id"),
             AttributeValue::String(agent_id),
         );
         
         if let Some(uid) = user_id {
             builder.attributes.set(
-                AttributeKey::system("user_id"),
+                AttributeKey::core("user_id"),
                 AttributeValue::String(uid),
             );
         }
         
         builder.attributes.set(
-            AttributeKey::system("memory_type"),
+            AttributeKey::core("memory_type"),
             AttributeValue::String(memory_type.as_str().to_string()),
         );
         
