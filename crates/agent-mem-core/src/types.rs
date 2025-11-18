@@ -764,12 +764,12 @@ impl RelationGraph {
     }
 }
 
-/// 系统元信息
+/// 系统元信息 (保持与V4 Metadata兼容)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
-    pub accessed_count: u64,
+    pub access_count: u64,  // 统一使用access_count，与V4一致
     pub last_accessed: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -779,7 +779,7 @@ impl Default for Metadata {
         Self {
             created_at: now,
             updated_at: now,
-            accessed_count: 0,
+            access_count: 0,
             last_accessed: None,
         }
     }
@@ -794,7 +794,7 @@ impl Metadata {
         if let Some(last_accessed) = self.last_accessed {
             map.insert("last_accessed".to_string(), last_accessed.to_rfc3339());
         }
-        map.insert("accessed_count".to_string(), self.accessed_count.to_string());
+        map.insert("access_count".to_string(), self.access_count.to_string());
         map
     }
 }
@@ -1008,7 +1008,7 @@ impl Memory {
                     .unwrap_or_else(chrono::Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(old.last_accessed_at, 0)
                     .unwrap_or_else(chrono::Utc::now),
-                accessed_count: old.access_count as u64,
+                access_count: old.access_count as u64,
                 last_accessed: Some(
                     chrono::DateTime::from_timestamp(old.last_accessed_at, 0)
                         .unwrap_or_else(chrono::Utc::now),
@@ -1019,7 +1019,7 @@ impl Memory {
     
     /// 记录访问
     pub fn access(&mut self) {
-        self.metadata.accessed_count += 1;
+        self.metadata.access_count += 1;
         self.metadata.last_accessed = Some(chrono::Utc::now());
         self.metadata.updated_at = chrono::Utc::now();
     }
@@ -2093,7 +2093,7 @@ impl From<Memory> for MemoryItem {
             importance,
             embedding: None,
             last_accessed_at: memory.metadata.last_accessed.unwrap_or_else(Utc::now),
-            access_count: memory.metadata.accessed_count as u32,
+            access_count: memory.metadata.access_count as u32,
             expires_at: memory.attributes.get(&AttributeKey::system("expires_at"))
                 .and_then(|v| v.as_number())
                 .map(|ts| DateTime::from_timestamp(ts as i64, 0).unwrap_or_else(Utc::now)),
@@ -2205,7 +2205,7 @@ impl TryFrom<MemoryItem> for Memory {
             metadata: Metadata {
                 created_at: item.created_at,
                 updated_at: item.updated_at.unwrap_or(item.created_at),
-                accessed_count: item.access_count as u64,
+                access_count: item.access_count as u64,
                 last_accessed: Some(item.last_accessed_at),
             },
         })
@@ -2542,7 +2542,7 @@ mod tests {
         );
         
         // Verify metadata
-        assert_eq!(memory.metadata.accessed_count, 5);
+        assert_eq!(memory.metadata.access_count, 5);
     }
     
     #[test]
@@ -2551,10 +2551,10 @@ mod tests {
             .text("Test")
             .build();
         
-        let initial_count = memory.metadata.accessed_count;
+        let initial_count = memory.metadata.access_count;
         memory.access();
         
-        assert_eq!(memory.metadata.accessed_count, initial_count + 1);
+        assert_eq!(memory.metadata.access_count, initial_count + 1);
         assert!(memory.metadata.last_accessed.is_some());
     }
     

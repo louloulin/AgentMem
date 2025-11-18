@@ -962,3 +962,23 @@ pub struct PerformanceReport {
     pub p99_latency: Duration,
     pub throughput: f64,
 }
+
+// ============================================================================
+// Phase 1: MemoryV4 → MemoryItem 转换支持（向后兼容）
+// ============================================================================
+
+/// Convert MemoryV4 to legacy MemoryItem (for backward compatibility)
+#[allow(deprecated)]
+impl From<crate::abstractions::Memory> for MemoryItem {
+    fn from(memory: crate::abstractions::Memory) -> Self {
+        memory.to_legacy_item()
+    }
+}
+
+/// Convert reference to MemoryV4 to legacy MemoryItem
+#[allow(deprecated)]
+impl From<&crate::abstractions::Memory> for MemoryItem {
+    fn from(memory: &crate::abstractions::Memory) -> Self {
+        memory.to_legacy_item()
+    }
+}

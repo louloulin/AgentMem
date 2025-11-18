@@ -165,8 +165,16 @@ impl MemoryOrchestrator {
         info!("✅ CoreMemoryManager 创建成功");
         
         // 创建 MemoryManager 用于提供完整的CRUD功能
-        let memory_manager = Some(Arc::new(MemoryManager::new()));
-        info!("✅ MemoryManager 创建成功");
+        // Phase 0 修复: 使用 LibSQL 后端而不是 InMemoryOperations
+        let db_path = config.storage_url.as_ref()
+            .map(|u| u.as_str())
+            .unwrap_or("./data/agentmem.db");
+        info!("🔧 Phase 0: 使用 LibSQL 后端: {}", db_path);
+        let operations = super::initialization::InitializationModule::create_libsql_operations(db_path).await?;
+        let memory_manager = Some(Arc::new(
+            MemoryManager::with_operations(agent_mem_config::MemoryConfig::default(), operations)
+        ));
+        info!("✅ Phase 0: MemoryManager 创建成功 (持久化后端: {})", db_path);
 
         #[cfg(feature = "postgres")]
         let semantic_manager = None;

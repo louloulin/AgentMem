@@ -114,6 +114,25 @@ impl Content {
     }
 }
 
+/// Display implementation for Content
+impl std::fmt::Display for Content {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Content::Text(s) => write!(f, "{}", s),
+            Content::Structured(v) => {
+                let json_str = serde_json::to_string(v)
+                    .unwrap_or_else(|_| format!("{:?}", v));
+                write!(f, "{}", json_str)
+            }
+            Content::Vector(v) => write!(f, "[vector:{}dims]", v.len()),
+            Content::Multimodal(contents) => {
+                write!(f, "[multimodal:{}parts]", contents.len())
+            }
+            Content::Binary(b) => write!(f, "[binary:{}bytes]", b.len()),
+        }
+    }
+}
+
 /// Attribute set (completely open)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AttributeSet {
@@ -947,6 +966,77 @@ impl Memory {
             .get(&AttributeKey::system("last_updated_by_id"))
             .and_then(|v| v.as_string())
             .cloned()
+    }
+    
+    // ========== Phase 0 辅助方法：充分复用现有代码 ==========
+    
+    /// 记录访问（更新metadata）
+    pub fn access(&mut self) {
+        self.metadata.access_count += 1;
+        self.metadata.accessed_at = chrono::Utc::now();
+        self.metadata.updated_at = chrono::Utc::now();
+    }
+    
+    /// 获取version（用于向后兼容）
+    /// 注意：V4架构不使用version，返回access_count作为版本号
+    pub fn version(&self) -> u32 {
+        self.metadata.version
+    }
+    
+    /// 更新内容
+    pub fn update_content(&mut self, content: impl Into<String>) {
+        self.content = Content::Text(content.into());
+        self.metadata.updated_at = chrono::Utc::now();
+    }
+    
+    /// 添加metadata到attributes
+    pub fn add_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.attributes.insert(
+            AttributeKey::new("metadata", &key.into()),
+            AttributeValue::String(value.into())
+        );
+    }
+    
+    /// 便捷方法：创建新的Memory（向后兼容）
+    /// 与crate::types::Memory::new()保持一致的API
+    pub fn new(
+        agent_id: impl Into<String>,
+        user_id: Option<String>,
+        memory_type: impl Into<String>,
+        content: impl Into<String>,
+        importance: f32,
+    ) -> Self {
+        let mut attributes = AttributeSet::new();
+        
+        attributes.insert(
+            AttributeKey::core("agent_id"),
+            AttributeValue::String(agent_id.into()),
+        );
+        
+        if let Some(uid) = user_id {
+            attributes.insert(
+                AttributeKey::core("user_id"),
+                AttributeValue::String(uid),
+            );
+        }
+        
+        attributes.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String(memory_type.into()),
+        );
+        
+        attributes.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance as f64),
+        );
+        
+        Self {
+            id: MemoryId::new(),
+            content: Content::Text(content.into()),
+            attributes,
+            relations: RelationGraph::new(),
+            metadata: Metadata::default(),
+        }
     }
 }
 

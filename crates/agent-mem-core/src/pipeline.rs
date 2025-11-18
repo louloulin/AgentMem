@@ -679,7 +679,7 @@ impl PipelineStage for ImportanceReassessmentStage {
         
         // 1. Access frequency factor
         if self.enable_access_freq {
-            let access_count = input.metadata.accessed_count;
+            let access_count = input.metadata.access_count;
             // Logarithmic scale: frequent access = higher importance
             // log(1+x) to avoid log(0) and smooth scaling
             let freq_score = if access_count > 0 {
@@ -1375,7 +1375,7 @@ mod tests {
             .build();
         
         // Simulate some access history
-        memory.metadata.accessed_count = 10;
+        memory.metadata.access_count = 10;
         
         // Add some relations to boost importance
         memory.relations.add_relation(crate::types::Relation {

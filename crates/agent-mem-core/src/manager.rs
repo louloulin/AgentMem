@@ -5,13 +5,13 @@ use crate::{
     lifecycle::{LifecycleConfig, MemoryLifecycle},
     managers::deduplication::MemoryDeduplicator,
     operations::{InMemoryOperations, MemoryOperations},
-    types::{Memory, MemoryQuery, MemorySearchResult, MemoryStats, MemoryType},
+    types::{MemoryQuery, MemorySearchResult, MemoryStats, MemoryType},
 };
 use agent_mem_config::MemoryConfig;
 use agent_mem_llm::LLMProvider;
 use agent_mem_traits::{
     AgentMemError, DecisionEngine, ExtractedFact, FactExtractor, HistoryEntry, MemoryActionType,
-    MemoryEvent, MemoryItem, MemoryProvider, Message, Result, Session,
+    MemoryEvent, MemoryItem, MemoryProvider, MemoryV4 as Memory, Message, Result, Session,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -234,7 +234,7 @@ impl MemoryManager {
         let mut memory = Memory::new(
             agent_id,
             user_id,
-            memory_type.unwrap_or(MemoryType::Episodic),
+            memory_type.unwrap_or(MemoryType::Episodic).as_str().to_string(),
             content,
             importance.unwrap_or(0.5),
         );

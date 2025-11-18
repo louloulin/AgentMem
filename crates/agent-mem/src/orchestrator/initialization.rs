@@ -15,9 +15,11 @@ use agent_mem_intelligence::{
 };
 use agent_mem_intelligence::clustering::{dbscan::DBSCANClusterer, kmeans::KMeansClusterer};
 use agent_mem_intelligence::MemoryReasoner;
+use agent_mem_core::storage::libsql::{LibSqlConnectionManager, LibSqlMemoryRepository, LibSqlMemoryOperations};
+use agent_mem_core::operations::MemoryOperations;
 
 use super::core::OrchestratorConfig;
-use agent_mem_traits::Result;
+use agent_mem_traits::{AgentMemError, Result};
 
 /// Intelligence组件集合
 pub struct IntelligenceComponents {
@@ -764,6 +766,42 @@ impl InitializationModule {
                 Ok(None)
             }
         }
+    }
+    
+    /// 创建LibSQL Memory Operations
+    /// 
+    /// 用于替代InMemoryOperations，提供持久化存储
+    /// 
+    /// # Phase 0 Implementation (ag25.md)
+    /// 这是Phase 0: 紧急修复的核心函数，确保记忆数据持久化到SQLite
+    pub async fn create_libsql_operations(
+        db_path: &str,
+    ) -> Result<Box<dyn MemoryOperations + Send + Sync>> {
+        info!("🔧 Phase 0: 创建 LibSQL Memory Operations: {}", db_path);
+        
+        // Step 1: 创建连接管理器
+        let conn_mgr = LibSqlConnectionManager::new(db_path)
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection manager: {}", e)))?;
+        
+        info!("✅ LibSQL连接管理器创建成功");
+        
+        // Step 2: 获取连接
+        let conn = conn_mgr.get_connection()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e)))?;
+        
+        info!("✅ 获取LibSQL连接成功");
+        
+        // Step 3: 创建repository
+        let repo = LibSqlMemoryRepository::new(conn);
+        info!("✅ LibSqlMemoryRepository创建成功");
+        
+        // Step 4: 包装为operations（实现MemoryOperations trait）
+        let operations = LibSqlMemoryOperations::new(repo);
+        
+        info!("✅ Phase 0: LibSQL Memory Operations 创建成功 - 数据将持久化到 {}", db_path);
+        Ok(Box::new(operations))
     }
 }
 

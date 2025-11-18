@@ -11,6 +11,7 @@ pub mod learning_repository;
 pub mod memory_repository;
 pub mod message_repository;
 pub mod migrations;
+pub mod operations_adapter;
 pub mod organization_repository;
 pub mod tool_repository;
 pub mod user_repository;
@@ -25,6 +26,7 @@ pub use learning_repository::{LearningRepositoryTrait, LibSqlLearningRepository}
 pub use memory_repository::LibSqlMemoryRepository;
 pub use message_repository::LibSqlMessageRepository;
 pub use migrations::run_migrations;
+pub use operations_adapter::LibSqlMemoryOperations;
 pub use organization_repository::LibSqlOrganizationRepository;
 pub use tool_repository::LibSqlToolRepository;
 pub use user_repository::LibSqlUserRepository;
