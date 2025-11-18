@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_core::storage::models::Agent;
-use agent_mem_core::storage::factory::Repositories;
+use agent_mem::Memory as AgentMemApi;
 use lumosai_core::agent::Agent as LumosAgent;
 use lumosai_core::llm::{LlmProvider, providers};
 use crate::memory_adapter::AgentMemBackend;
@@ -12,12 +12,12 @@ use serde_json::Value;
 use tracing::{debug, info, warn};
 
 pub struct LumosAgentFactory {
-    repositories: Arc<Repositories>,
+    memory_api: Arc<AgentMemApi>,
 }
 
 impl LumosAgentFactory {
-    pub fn new(repositories: Arc<Repositories>) -> Self {
-        Self { repositories }
+    pub fn new(memory_api: Arc<AgentMemApi>) -> Self {
+        Self { memory_api }
     }
     
     /// 根据AgentMem Agent配置创建LumosAI Agent
@@ -129,9 +129,9 @@ impl LumosAgentFactory {
         agent: &Agent,
         user_id: &str,
     ) -> anyhow::Result<Arc<dyn lumosai_core::memory::Memory>> {
-        // ✅ 使用 Repositories（包含完整的 Memory API）
+        // ✅ 使用agent-mem的Memory API（完整的顶层接口）
         let backend = Arc::new(AgentMemBackend::new(
-            self.repositories.clone(),
+            self.memory_api.clone(),
             agent.id.clone(),
             user_id.to_string(),
         ));
