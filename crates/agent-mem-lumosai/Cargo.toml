@@ -19,7 +19,7 @@ agent-mem-core = { path = "../agent-mem-core" }
 agent-mem-traits = { path = "../agent-mem-traits" }
 
 # 异步运行时
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.40", features = [] }
 async-trait = "0.1"
 
 # 序列化
