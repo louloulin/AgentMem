@@ -1079,9 +1079,18 @@ pub async fn search_memories(
         sorted_results.extend(fuzzy_matches);
     }
 
-    // 转换为JSON格式，简化结构以匹配前端期望
+    // 🔧 修复: 过滤低相关度结果
+    let min_score_threshold = request.threshold.unwrap_or(0.7); // 默认最低阈值 0.7
+    info!("🎯 过滤阈值: {}", min_score_threshold);
+    
+    // 转换为JSON，同时应用阈值过滤
     let json_results: Vec<serde_json::Value> = sorted_results
         .into_iter()
+        .filter(|item| {
+            // 使用真实的 score，如果没有则使用 0.0
+            let score = item.score.unwrap_or(0.0);
+            score >= min_score_threshold
+        })
         .map(|item| {
             serde_json::json!({
                 "id": item.id,
@@ -1095,7 +1104,7 @@ pub async fn search_memories(
                 "access_count": item.access_count,
                 "metadata": item.metadata,
                 "hash": item.hash,
-                "score": 1.0,  // Memory API不返回score，默认为1.0
+                "score": item.score.unwrap_or(0.0),  // 🔧 修复: 使用真实的 score
             })
         })
         .collect();
