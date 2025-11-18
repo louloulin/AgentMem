@@ -736,18 +736,57 @@ pub async fn get_memory(
 )]
 pub async fn update_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Path(id): Path<String>,
     Json(request): Json<crate::models::UpdateMemoryRequest>,
 ) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
     info!("Updating memory with ID: {}", id);
 
-    memory_manager
-        .update_memory(&id, request.content, request.importance, None)
+    // 🔧 修复: 直接更新LibSQL Repository
+    // 先获取现有记忆
+    let existing = repositories
+        .memories
+        .find_by_id(&id)
         .await
         .map_err(|e| {
-            error!("Failed to update memory: {}", e);
+            error!("Failed to find memory for update: {}", e);
+            ServerError::MemoryError(format!("Memory not found: {}", e))
+        })?
+        .ok_or_else(|| ServerError::MemoryError("Memory not found".to_string()))?;
+
+    // 构建更新后的Memory，保留其他字段
+    let updated_content = if let Some(content) = request.content {
+        agent_mem_traits::Content::text(content)
+    } else {
+        existing.content.clone()
+    };
+
+    let updated_importance = request.importance.unwrap_or(
+        existing.importance().unwrap_or(0.5) as f32
+    );
+
+    // 使用builder模式构建更新后的Memory
+    let mut updated = existing.clone();
+    updated.content = updated_content;
+    
+    // 更新importance - 使用system命名空间（和importance()方法一致）
+    updated.attributes.set(
+        agent_mem_traits::AttributeKey::system("importance"),
+        agent_mem_traits::AttributeValue::Number(updated_importance as f64)
+    );
+    updated.metadata.updated_at = chrono::Utc::now();
+
+    // 执行更新
+    repositories
+        .memories
+        .update(&updated)
+        .await
+        .map_err(|e| {
+            error!("Failed to update memory in repository: {}", e);
             ServerError::MemoryError(e.to_string())
         })?;
+
+    info!("✅ Memory updated in LibSQL");
 
     let response = crate::models::MemoryResponse {
         id,
@@ -773,14 +812,28 @@ pub async fn update_memory(
 )]
 pub async fn delete_memory(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
     info!("Deleting memory with ID: {}", id);
 
-    memory_manager.delete_memory(&id).await.map_err(|e| {
-        error!("Failed to delete memory: {}", e);
-        ServerError::MemoryError(e.to_string())
-    })?;
+    // 🔧 修复: 同时删除双层存储
+    // Step 1: 删除LibSQL Repository (主要存储)
+    repositories
+        .memories
+        .delete(&id)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete memory from repository: {}", e);
+            ServerError::MemoryError(format!("Failed to delete memory: {}", e))
+        })?;
+
+    info!("✅ Memory deleted from LibSQL");
+
+    // Step 2: 尝试删除Memory API (向量存储) - 如果失败不影响主流程
+    if let Err(e) = memory_manager.delete_memory(&id).await {
+        warn!("Failed to delete memory from Memory API (non-critical): {}", e);
+    }
 
     let response = crate::models::MemoryResponse {
         id,
