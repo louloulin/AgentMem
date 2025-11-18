@@ -76,23 +76,24 @@ pub async fn send_chat_message_lumosai(
     
     info!("✅ Created LumosAI agent: {}", agent.name.as_ref().map(|s| s.as_str()).unwrap_or("unnamed"));
     
-    // 5. 构建消息
+    // 5. 构建消息并调用LumosAI Agent生成响应
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
+    use lumosai_core::agent::types::AgentGenerateOptions;
+    
     let messages = vec![
         LumosMessage {
             role: LumosRole::User,
             content: req.message.clone(),
-            metadata: req.metadata.clone(),
+            metadata: None,
             name: None,
         },
     ];
     
-    // 6. 调用LumosAI Agent生成响应
-    use lumosai_core::agent::AgentGenerateOptions;
     let response = lumos_agent.generate(
         &messages,
-        &AgentGenerateOptions::default(),
-    ).await
+        &AgentGenerateOptions::default()
+    )
+        .await
         .map_err(|e| {
             error!("Agent generation failed: {}", e);
             ServerError::internal_error(format!("Agent failed: {}", e))
@@ -104,7 +105,7 @@ pub async fn send_chat_message_lumosai(
     // 7. 返回响应
     Ok(Json(ApiResponse::success(ChatMessageResponse {
         message_id: Uuid::new_v4().to_string(),
-        content: response,
+        content: response.response,  // AgentGenerateResult的response字段
         memories_updated: true,
         memories_count: 1,
         processing_time_ms,
