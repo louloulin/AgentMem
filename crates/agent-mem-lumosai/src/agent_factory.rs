@@ -37,22 +37,20 @@ impl LumosAgentFactory {
         debug!("Created LLM provider: {}", llm_config.provider);
         
         // 3. 创建Memory Backend
-        let memory_backend = self.create_memory_backend(agent, user_id).await?;
+        let _memory_backend = self.create_memory_backend(agent, user_id).await?;
         debug!("Created AgentMem backend");
         
         // 4. 使用AgentBuilder构建LumosAI Agent
+        let agent_name = agent.name.as_ref().map(|s| s.as_str()).unwrap_or("assistant");
         let lumos_agent = AgentBuilder::new()
-            .name(&agent.name)
+            .name(agent_name)
             .instructions(&agent.system.clone().unwrap_or_else(|| 
-                "You are a helpful AI assistant.".to_string()
+                "You are a helpful AI assistant".to_string()
             ))
             .model(llm_provider)
-            .memory(memory_backend)
-            .temperature(0.7)
-            .max_tokens(2000)
             .build()?;
         
-        info!("✅ Successfully created LumosAI agent: {}", agent.name);
+        info!("✅ Successfully created LumosAI agent: {}", agent_name);
         Ok(Arc::new(lumos_agent))
     }
     
@@ -88,11 +86,11 @@ impl LumosAgentFactory {
             "anthropic" => Arc::new(providers::anthropic(api_key, Some(config.model.clone()))),
             "deepseek" => Arc::new(providers::deepseek(api_key, Some(config.model.clone()))),
             "qwen" => Arc::new(providers::qwen(api_key, Some(config.model.clone()))),
-            "gemini" => Arc::new(providers::gemini(api_key, Some(config.model.clone()))),
-            "cohere" => Arc::new(providers::cohere(api_key, Some(config.model.clone()))),
-            "mistral" => Arc::new(providers::mistral(api_key, Some(config.model.clone()))),
-            "perplexity" => Arc::new(providers::perplexity(api_key, Some(config.model.clone()))),
-            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}", config.provider)),
+            "gemini" => Arc::new(providers::gemini(api_key, config.model.clone())),
+            "cohere" => Arc::new(providers::cohere(api_key, config.model.clone())),
+            // "mistral" => Arc::new(providers::mistral(api_key, Some(config.model.clone()))),
+            // "perplexity" => Arc::new(providers::perplexity(api_key, Some(config.model.clone()))),
+            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}. Supported: zhipu, openai, anthropic, deepseek, qwen, gemini, cohere", config.provider)),
         };
         
         Ok(provider)

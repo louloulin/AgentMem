@@ -1,13 +1,14 @@
 //! Memory Adapter - 将AgentMem作为LumosAI的Memory Backend
 
 use async_trait::async_trait;
-use lumosai_core::memory::Memory as LumosMemory;
+use lumosai_core::memory::{Memory as LumosMemory, MemoryConfig};
 use lumosai_core::llm::Message as LumosMessage;
 use lumosai_core::llm::Role as LumosRole;
 use lumosai_core::Result as LumosResult;
 use agent_mem_core::engine::MemoryEngine;
 use agent_mem_core::hierarchy::MemoryScope;
-use agent_mem_traits::{Memory, Content, AttributeKey, AttributeValue, MemoryId};
+use agent_mem_traits::{Content, AttributeKey, AttributeValue, MemoryId};
+use agent_mem_traits::abstractions::Memory as AgentMemMemory;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -45,16 +46,21 @@ impl LumosMemory for AgentMemBackend {
             LumosRole::User => "user",
             LumosRole::Assistant => "assistant",
             LumosRole::Tool => "tool",
+            LumosRole::Function => "function",
+            LumosRole::Custom(ref custom) => custom.as_str(),
         };
         
         let content_text = format!("[{}]: {}", role_str, message.content);
-        let content = Content::text(content_text);
+        let content = Content::Text(content_text);
         
         // 创建Memory
-        let mut memory = Memory::new(
-            MemoryId::new(),
+        let mut memory = AgentMemMemory {
+            id: MemoryId::new(),
             content,
-        );
+            attributes: Default::default(),
+            relations: Default::default(),
+            metadata: Default::default(),
+        };
         
         // 设置属性
         memory.attributes.set(
@@ -71,10 +77,10 @@ impl LumosMemory for AgentMemBackend {
         );
         
         // 如果有metadata，也保存
-        if let Some(metadata) = &message.metadata {
+        if let Some(metadata) = message.metadata.as_ref() {
             memory.attributes.set(
                 AttributeKey::user("original_metadata"),
-                AttributeValue::String(metadata.to_string())
+                AttributeValue::String(serde_json::to_string(metadata).unwrap_or_default())
             );
         }
         
@@ -86,7 +92,9 @@ impl LumosMemory for AgentMemBackend {
         Ok(())
     }
     
-    async fn retrieve(&self, query: &str, limit: usize) -> LumosResult<Vec<LumosMessage>> {
+    async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
+        let query = config.query.as_deref().unwrap_or("");
+        let limit = 10; // 默认限制
         debug!("Retrieving memories from AgentMem: query='{}', limit={}", query, limit);
         
         // 构建搜索scope
@@ -109,7 +117,9 @@ impl LumosMemory for AgentMemBackend {
                 let content_text = match &mem.content {
                     Content::Text(t) => t.clone(),
                     Content::Structured(v) => v.to_string(),
-                    _ => String::new(),
+                    Content::Vector(_) => "[vector]".to_string(),
+                    Content::Multimodal(_) => "[multimodal]".to_string(),
+                    Content::Binary(_) => "[binary]".to_string(),
                 };
                 
                 // 解析role
@@ -142,7 +152,12 @@ impl LumosMemory for AgentMemBackend {
         Ok(messages)
     }
     
-    async fn clear(&self) -> LumosResult<()> {
+}
+
+// clear方法不在Memory trait中，作为独立实现
+impl AgentMemBackend {
+    #[allow(dead_code)]
+    async fn _clear(&self) -> LumosResult<()> {
         warn!("Memory clear requested but not implemented in AgentMem");
         // AgentMem没有直接的clear方法，保留为未来功能
         Ok(())
