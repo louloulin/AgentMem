@@ -15,6 +15,8 @@ use uuid::Uuid;
 
 #[cfg(feature = "lumosai")]
 use agent_mem_lumosai::agent_factory::LumosAgentFactory;
+#[cfg(feature = "lumosai")]
+use crate::routes::memory::MemoryManager;
 
 /// Chat message request
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +41,7 @@ pub struct ChatMessageResponse {
 #[cfg(feature = "lumosai")]
 pub async fn send_chat_message_lumosai(
     Extension(repositories): Extension<Arc<Repositories>>,
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Extension(auth_user): Extension<AuthUser>,
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
