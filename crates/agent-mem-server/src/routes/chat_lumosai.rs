@@ -53,7 +53,7 @@ pub async fn send_chat_message_lumosai(
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {}", e)))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
     
-    debug!("Found agent: {}", agent.name);
+    debug!("Found agent: {}", agent.name.as_ref().map(|s| s.as_str()).unwrap_or("unnamed"));
     
     // 2. 权限检查
     if agent.organization_id != auth_user.org_id {
@@ -74,7 +74,7 @@ pub async fn send_chat_message_lumosai(
             ServerError::internal_error(format!("Failed to create agent: {}", e))
         })?;
     
-    info!("✅ Created LumosAI agent: {}", agent.name);
+    info!("✅ Created LumosAI agent: {}", agent.name.as_ref().map(|s| s.as_str()).unwrap_or("unnamed"));
     
     // 5. 构建消息
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
