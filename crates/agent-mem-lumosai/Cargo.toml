@@ -15,8 +15,7 @@ categories.workspace = true
 lumosai_core = { path = "../../lumosai/lumosai_core" }
 
 # AgentMem 核心
-agent-mem-core = { path = "../agent-mem-core" }
-agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem = { path = "../agent-mem" }  # 顶层统一API
 
 # 异步运行时
 tokio = { version = "1.40", features = [] }

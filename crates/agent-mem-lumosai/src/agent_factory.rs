@@ -1,7 +1,6 @@
 //! Agent Factory - 从AgentMem Agent配置创建LumosAI Agent
 
 use anyhow::{Context, Result};
-use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_core::storage::models::Agent;
 use agent_mem::Memory as AgentMemApi;
 use lumosai_core::agent::Agent as LumosAgent;
