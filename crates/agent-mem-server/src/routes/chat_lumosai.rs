@@ -66,8 +66,8 @@ pub async fn send_chat_message_lumosai(
     debug!("Using user_id: {}", user_id);
     
     // 4. 创建LumosAI Agent (使用AgentMem作为记忆后端)
-    // ✅ 使用state中的memory API（统一接口）
-    let factory = LumosAgentFactory::new(state.memory.memory.clone());
+    // ✅ 使用memory_manager中的memory API（统一接口）
+    let factory = LumosAgentFactory::new(memory_manager.memory.clone());
     let lumos_agent = factory.create_chat_agent(&agent, user_id)
         .await
         .map_err(|e| {

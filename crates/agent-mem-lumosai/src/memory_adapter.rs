@@ -63,14 +63,14 @@ impl LumosMemory for AgentMemBackend {
         };
         
         // ✅ 调用agent-mem的add_with_options API
-        let result = self.memory_api.add_with_options(content, options).await
+        let _result = self.memory_api.add_with_options(content, options).await
             .map_err(|e| {
                 let err_msg = format!("Failed to store memory: {}", e);
                 warn!("{}", err_msg);
                 lumosai_core::Error::Other(err_msg)
             })?;
         
-        info!("✅ Stored memory to AgentMem: id={:?}", result.memory_id);
+        info!("✅ Stored memory to AgentMem");
         Ok(())
     }
     
@@ -99,10 +99,9 @@ impl LumosMemory for AgentMemBackend {
         // 转换MemoryItem为LumosMessage
         let messages = memories.into_iter()
             .filter_map(|mem| {
-                // 从metadata中提取role
+                // 从metadata中提取role（metadata是HashMap<String, Value>）
                 let role_str = mem.metadata
-                    .as_ref()
-                    .and_then(|m| m.get("role"))
+                    .get("role")
                     .and_then(|v| v.as_str())
                     .unwrap_or("user");
                 
