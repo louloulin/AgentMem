@@ -10,7 +10,7 @@ use axum::{extract::{Extension, Path}, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 #[cfg(feature = "lumosai")]
@@ -89,47 +89,12 @@ pub async fn send_chat_message_lumosai(
         name: None,
     };
     
-    // 6. 获取Memory Backend并手动调用retrieve
-    let mut context_messages = vec![];
+    // 6. LumosAI会自动处理memory，这里不需要手动操作
+    // generate()方法内部会自动调用memory.retrieve()和memory.store()
+    let context_messages = vec![];
+    let memories_count = 0;  // LumosAI自动管理，这里设为0
     
-    if let Some(memory) = lumos_agent.get_memory() {
-        debug!("🔍 Retrieving historical memories from AgentMem...");
-        
-        // 使用MemoryConfig检索历史消息
-        use lumosai_core::memory::MemoryConfig;
-        let memory_config = MemoryConfig {
-            store_id: None,
-            namespace: Some(format!("agent_{}", agent.id)),
-            enabled: true,
-            working_memory: None,
-            semantic_recall: None,
-            last_messages: Some(10),  // 检索最近10条消息
-            query: None,
-        };
-        
-        // 调用memory.retrieve()获取历史
-        match memory.retrieve(&memory_config).await {
-            Ok(historical_messages) => {
-                if !historical_messages.is_empty() {
-                    info!("📝 Retrieved {} historical messages from memory", historical_messages.len());
-                    context_messages = historical_messages;
-                } else {
-                    debug!("No historical messages found");
-                }
-            }
-            Err(e) => {
-                error!("Failed to retrieve memories: {}", e);
-            }
-        }
-    } else {
-        warn!("⚠️  Memory Backend not attached to Agent - get_memory() returned None!");
-        // 添加额外的调试信息
-        if lumos_agent.has_own_memory() {
-            error!("🔴 BUG: Agent.has_own_memory() is true but get_memory() returns None!");
-        }
-    }
-    
-    // 7. 构建完整消息列表（历史 + 当前）
+    // 7. 构建完整消息列表（只有当前消息，历史由LumosAI自动加载）
     let mut all_messages = context_messages;
     all_messages.push(user_message.clone());
     
@@ -146,31 +111,8 @@ pub async fn send_chat_message_lumosai(
             ServerError::internal_error(format!("Agent failed: {}", e))
         })?;
     
-    // 9. 保存用户消息和助手响应到Memory
-    if let Some(memory) = lumos_agent.get_memory() {
-        debug!("💾 Storing conversation to memory...");
-        
-        // 保存用户消息
-        if let Err(e) = memory.store(&user_message).await {
-            error!("Failed to store user message: {}", e);
-        } else {
-            debug!("✅ Stored user message");
-        }
-        
-        // 保存助手响应
-        let assistant_message = LumosMessage {
-            role: LumosRole::Assistant,
-            content: response.response.clone(),
-            metadata: None,
-            name: None,
-        };
-        
-        if let Err(e) = memory.store(&assistant_message).await {
-            error!("Failed to store assistant message: {}", e);
-        } else {
-            debug!("✅ Stored assistant response");
-        }
-    }
+    // 9. Memory存储由LumosAI的generate()方法自动完成
+    // 不需要手动调用store()
     
     let processing_time_ms = start_time.elapsed().as_millis() as u64;
     info!("✅ Chat response generated in {}ms", processing_time_ms);
@@ -180,7 +122,7 @@ pub async fn send_chat_message_lumosai(
         message_id: Uuid::new_v4().to_string(),
         content: response.response,
         memories_updated: true,  // 对话已保存到Memory
-        memories_count: context_messages.len(),  // 使用的历史记忆数量
+        memories_count,  // 使用的历史记忆数量
         processing_time_ms,
     })))
 }

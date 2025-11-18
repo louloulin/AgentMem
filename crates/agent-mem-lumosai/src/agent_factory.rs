@@ -1,15 +1,15 @@
 //! Agent Factory - 从AgentMem Agent配置创建LumosAI Agent
 
-use lumosai_core::agent::{AgentBuilder, Agent as LumosAgent};
-use lumosai_core::llm::providers;
-use lumosai_core::llm::LlmProvider;
+use anyhow::{Context, Result};
+use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_core::storage::models::Agent;
 use agent_mem_core::storage::factory::Repositories;
-use agent_mem_core::engine::{MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::LLMConfig;
+use lumosai_core::agent::Agent as LumosAgent;
+use lumosai_core::llm::{LlmProvider, providers};
 use crate::memory_adapter::AgentMemBackend;
 use std::sync::Arc;
-use tracing::{debug, info};
+use serde_json::Value;
+use tracing::{debug, info, warn};
 
 pub struct LumosAgentFactory {
     repositories: Arc<Repositories>,
@@ -30,11 +30,13 @@ impl LumosAgentFactory {
         
         // 1. 解析LLM配置
         let llm_config = self.parse_llm_config(agent)?;
-        debug!("Parsed LLM config: provider={}, model={}", llm_config.provider, llm_config.model);
+        debug!("Parsed LLM config: provider={}, model={}", 
+            llm_config.get("provider").and_then(|v| v.as_str()).unwrap_or("unknown"),
+            llm_config.get("model").and_then(|v| v.as_str()).unwrap_or("unknown"));
         
         // 2. 创建LLM Provider
         let llm_provider = self.create_llm_provider(&llm_config)?;
-        debug!("Created LLM provider: {}", llm_config.provider);
+        debug!("Created LLM provider: {}", llm_config.get("provider").and_then(|v| v.as_str()).unwrap_or("unknown"));
         
         // 3. 创建Memory Backend并配置
         let memory_backend = self.create_memory_backend(agent, user_id).await?;
@@ -78,43 +80,45 @@ impl LumosAgentFactory {
         Ok(Arc::new(lumos_agent))
     }
     
-    fn parse_llm_config(&self, agent: &Agent) -> anyhow::Result<LLMConfig> {
-        let llm_config_value = agent.llm_config.clone()
+    fn parse_llm_config(&self, agent: &Agent) -> anyhow::Result<Value> {
+        let mut llm_config_value = agent.llm_config.clone()
             .ok_or_else(|| anyhow::anyhow!("Agent LLM config not set"))?;
         
-        let mut llm_config: LLMConfig = 
-            serde_json::from_value(llm_config_value)?;
-        
-        // 从环境变量读取API key (如果配置中没有)
-        if llm_config.api_key.is_none() {
-            let env_var_name = format!("{}_API_KEY", llm_config.provider.to_uppercase());
-            if let Ok(api_key) = std::env::var(&env_var_name) {
-                debug!("Loaded API key from environment: {}", env_var_name);
-                llm_config.api_key = Some(api_key);
+        // 如果配置中没有api_key，从环境变量读取
+        if llm_config_value.get("api_key").map(|v| v.is_null()).unwrap_or(true) {
+            if let Some(provider) = llm_config_value.get("provider").and_then(|v| v.as_str()) {
+                let env_var_name = format!("{}_API_KEY", provider.to_uppercase());
+                if let Ok(api_key) = std::env::var(&env_var_name) {
+                    debug!("Loaded API key from environment: {}", env_var_name);
+                    if let Some(obj) = llm_config_value.as_object_mut() {
+                        obj.insert("api_key".to_string(), Value::String(api_key));
+                    }
+                }
             }
         }
         
-        Ok(llm_config)
+        Ok(llm_config_value)
     }
     
     fn create_llm_provider(
         &self,
-        config: &LLMConfig,
+        config: &Value,
     ) -> anyhow::Result<Arc<dyn LlmProvider>> {
-        let api_key = config.api_key.clone()
-            .ok_or_else(|| anyhow::anyhow!("API key not configured for provider: {}", config.provider))?;
+        let api_key = config["api_key"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("API key not configured for provider: {}", config["provider"]))?
+            .to_string();
+        let provider_name = config["provider"].as_str().unwrap();
+        let model = config["model"].as_str().unwrap().to_string();
         
-        let provider: Arc<dyn LlmProvider> = match config.provider.as_str() {
-            "zhipu" => Arc::new(providers::zhipu(api_key, Some(config.model.clone()))),
-            "openai" => Arc::new(providers::openai(api_key, Some(config.model.clone()))),
-            "anthropic" => Arc::new(providers::anthropic(api_key, Some(config.model.clone()))),
-            "deepseek" => Arc::new(providers::deepseek(api_key, Some(config.model.clone()))),
-            "qwen" => Arc::new(providers::qwen(api_key, Some(config.model.clone()))),
-            "gemini" => Arc::new(providers::gemini(api_key, config.model.clone())),
-            "cohere" => Arc::new(providers::cohere(api_key, config.model.clone())),
-            // "mistral" => Arc::new(providers::mistral(api_key, Some(config.model.clone()))),
-            // "perplexity" => Arc::new(providers::perplexity(api_key, Some(config.model.clone()))),
-            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}. Supported: zhipu, openai, anthropic, deepseek, qwen, gemini, cohere", config.provider)),
+        let provider: Arc<dyn LlmProvider> = match provider_name {
+            "zhipu" => Arc::new(providers::zhipu(api_key, Some(model))),
+            "openai" => Arc::new(providers::openai(api_key, Some(model))),
+            "anthropic" => Arc::new(providers::anthropic(api_key, Some(model))),
+            "deepseek" => Arc::new(providers::deepseek(api_key, Some(model))),
+            "qwen" => Arc::new(providers::qwen(api_key, Some(model))),
+            "gemini" => Arc::new(providers::gemini(api_key, model)),
+            "cohere" => Arc::new(providers::cohere(api_key, model)),
+            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}. Supported: zhipu, openai, anthropic, deepseek, qwen, gemini, cohere", provider_name)),
         };
         
         Ok(provider)

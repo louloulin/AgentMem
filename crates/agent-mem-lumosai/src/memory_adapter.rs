@@ -10,7 +10,7 @@ use agent_mem_core::hierarchy::MemoryScope;
 use agent_mem_traits::{Content, AttributeKey, AttributeValue, MemoryId};
 use agent_mem_traits::abstractions::Memory as AgentMemMemory;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// AgentMem Backend for LumosAI
 /// 
