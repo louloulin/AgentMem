@@ -53,7 +53,10 @@ impl MemoryManager {
         info!("  - 数据库类型: LibSQL (SQLite)");
         info!("  - 数据库路径: {}", db_path);
 
-        let mut builder = Memory::builder().with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
+        let mut builder = Memory::builder()
+            .with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
+            // ⚠️ 不设置 default_user_id 和 default_agent_id
+            // 强制每次调用时显式传入，避免被默认值覆盖
 
         // 🔑 关键修复 #2：配置Embedder（P0问题）
         info!("🔌 配置 Embedder (向量嵌入)");

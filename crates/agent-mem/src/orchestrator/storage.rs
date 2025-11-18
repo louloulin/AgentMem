@@ -82,20 +82,27 @@ impl StorageModule {
             }
         }
 
-        // Step 3: 并行写入 CoreMemoryManager、VectorStore 和 HistoryManager
+        // Step 3: 并行写入 CoreMemoryManager、VectorStore、HistoryManager 和 MemoryManager
         let core_manager = orchestrator.core_manager.clone();
         let vector_store = orchestrator.vector_store.clone();
         let history_manager = orchestrator.history_manager.clone();
+        let memory_manager = orchestrator.memory_manager.clone();
 
         // 为每个async块准备独立的clone
         let content_for_core = content.clone();
         let content_for_history = content.clone();
+        let content_for_db = content.clone();
         let memory_id_for_vector = memory_id.clone();
         let memory_id_for_history = memory_id.clone();
+        let memory_id_for_db = memory_id.clone();
+        let agent_id_for_db = agent_id.clone();
+        let user_id_for_db = actual_user_id.clone();
         let embedding_for_vector = embedding.clone();
         let full_metadata_for_vector = full_metadata.clone();
+        let full_metadata_for_db = full_metadata.clone();
+        let memory_type_for_db = memory_type.clone();
 
-        let (core_result, vector_result, history_result) = tokio::join!(
+        let (core_result, vector_result, history_result, db_result) = tokio::join!(
             // 并行任务 1: 存储到 CoreMemoryManager
             async move {
                 if let Some(manager) = core_manager {
@@ -143,6 +150,35 @@ impl StorageModule {
                 } else {
                     Ok::<(), String>(())
                 }
+            },
+            // 并行任务 4: 存储到 MemoryManager (关键修复！)
+            async move {
+                if let Some(manager) = memory_manager {
+                    use agent_mem_core::types::MemoryType;
+                    
+                    // 转换metadata为HashMap<String, String>
+                    let metadata_for_manager: Option<std::collections::HashMap<String, String>> =
+                        Some(full_metadata_for_db
+                            .iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect());
+                    
+                    // 写入数据库 - 使用MemoryManager的公开API
+                    manager.add_memory(
+                        agent_id_for_db.clone(),
+                        Some(user_id_for_db.clone()),
+                        content_for_db.clone(),
+                        Some(memory_type_for_db.unwrap_or(MemoryType::Episodic)),
+                        Some(1.0),  // importance
+                        metadata_for_manager,
+                    )
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("MemoryManager write failed: {}", e))
+                } else {
+                    // ⚠️ 关键：MemoryManager未初始化应该报错，不能静默失败
+                    Err("MemoryManager not initialized - critical error!".to_string())
+                }
             }
         );
 
@@ -168,7 +204,16 @@ impl StorageModule {
             warn!("历史记录失败，但记忆已成功添加: {}", e);
         }
 
-        info!("✅ 记忆添加完成（并行写入）: {}", memory_id);
+        // 🔑 关键：检查MemoryManager写入结果
+        if let Err(e) = db_result {
+            error!("❌ 存储到 MemoryManager 失败: {}", e);
+            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
+                "Failed to store to MemoryManager (memories table): {}",
+                e
+            )));
+        }
+
+        info!("✅ 记忆添加完成（4个存储全部成功）: {}", memory_id);
         Ok(memory_id)
     }
 
