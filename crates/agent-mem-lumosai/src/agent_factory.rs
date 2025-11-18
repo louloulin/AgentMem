@@ -129,15 +129,9 @@ impl LumosAgentFactory {
         agent: &Agent,
         user_id: &str,
     ) -> anyhow::Result<Arc<dyn lumosai_core::memory::Memory>> {
-        // 创建MemoryEngine with LibSQL Repository
-        let memory_engine = Arc::new(MemoryEngine::with_repository(
-            MemoryEngineConfig::default(),
-            self.repositories.memories.clone(),
-        ));
-        
-        // 包装为AgentMemBackend
+        // ✅ 使用 Repositories（包含完整的 Memory API）
         let backend = Arc::new(AgentMemBackend::new(
-            memory_engine,
+            self.repositories.clone(),
             agent.id.clone(),
             user_id.to_string(),
         ));
