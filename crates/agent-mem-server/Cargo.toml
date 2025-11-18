@@ -97,6 +97,7 @@ plugins = ["agent-mem/plugins"]
 postgres = ["agent-mem-core/postgres"]
 libsql = ["agent-mem-core/libsql"]
 lancedb = ["agent-mem-storage/lancedb"]
+lumosai = ["agent-mem-lumosai"]  # LumosAI集成 (experimental)
 
 [dev-dependencies]
 tokio-test = "0.4"
