@@ -101,7 +101,7 @@ export default function MemoriesPageEnhanced() {
   // Add Memory Dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newMemory, setNewMemory] = useState({
-    agent_id: '',
+    agent_id: '__none__',
     content: '',
     memory_type: 'Semantic',
     importance: 0.8,
@@ -201,15 +201,6 @@ export default function MemoriesPageEnhanced() {
   };
   
   const handleAddMemory = async () => {
-    if (!newMemory.agent_id) {
-      toast({
-        title: "Validation Error",
-        description: "Please select an agent",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (!newMemory.content.trim()) {
       toast({
         title: "Validation Error",
@@ -222,8 +213,11 @@ export default function MemoriesPageEnhanced() {
     try {
       setSubmitting(true);
       
+      // Convert '__none__' to empty string for global memory
+      const agentId = newMemory.agent_id === '__none__' ? '' : newMemory.agent_id;
+      
       await apiClient.createMemory({
-        agent_id: newMemory.agent_id,
+        agent_id: agentId,
         content: newMemory.content,
         memory_type: newMemory.memory_type,
         importance: newMemory.importance,
@@ -237,16 +231,14 @@ export default function MemoriesPageEnhanced() {
       // Close dialog and reset form
       setAddDialogOpen(false);
       setNewMemory({
-        agent_id: '',
+        agent_id: '__none__',
         content: '',
         memory_type: 'Semantic',
         importance: 0.8,
       });
       
-      // Reload memories if currently viewing the same agent
-      if (selectedAgentId === newMemory.agent_id) {
-        await handleAgentChange(newMemory.agent_id);
-      }
+      // Reload current view
+      await loadData();
     } catch (err) {
       toast({
         title: "Failed to add memory",
@@ -531,15 +523,16 @@ export default function MemoriesPageEnhanced() {
           <div className="grid gap-4 py-4">
             {/* Agent Selection */}
             <div className="grid gap-2">
-              <Label htmlFor="agent">Agent *</Label>
+              <Label htmlFor="agent">Agent (Optional)</Label>
               <Select
                 value={newMemory.agent_id}
                 onValueChange={(value) => setNewMemory({ ...newMemory, agent_id: value })}
               >
                 <SelectTrigger id="agent">
-                  <SelectValue placeholder="Select an agent" />
+                  <SelectValue placeholder="Select an agent or leave empty" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">No Agent (Global Memory)</SelectItem>
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name || `Agent ${agent.id.slice(0, 8)}`}
@@ -613,7 +606,7 @@ export default function MemoriesPageEnhanced() {
             <Button
               type="button"
               onClick={handleAddMemory}
-              disabled={submitting || !newMemory.agent_id || !newMemory.content.trim()}
+              disabled={submitting || !newMemory.content.trim()}
             >
               {submitting ? 'Adding...' : 'Add Memory'}
             </Button>
