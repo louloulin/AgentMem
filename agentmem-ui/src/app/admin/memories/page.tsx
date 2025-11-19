@@ -101,7 +101,7 @@ export default function MemoriesPageEnhanced() {
   // Add Memory Dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newMemory, setNewMemory] = useState({
-    agent_id: '__none__',
+    agent_id: '',
     content: '',
     memory_type: 'Semantic',
     importance: 0.8,

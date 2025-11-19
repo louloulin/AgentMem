@@ -21,7 +21,8 @@
       "mcp__serena__search_for_pattern",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "Bash(cargo test)"
+      "Bash(cargo test)",
+      "WebFetch(domain:developer.harmonyos.com)"
     ],
     "deny": [],
     "ask": []

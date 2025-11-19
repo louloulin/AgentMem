@@ -75,7 +75,8 @@ impl LumosMemory for AgentMemBackend {
     }
     
     async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
-        let limit = config.last_messages.unwrap_or(10);
+        // ⚡ 性能优化: 减少检索数量以降低prompt tokens和响应时间
+        let limit = config.last_messages.unwrap_or(3);  // 从10降到3
         info!("🔍 Retrieving memories: agent_id={}, user_id={}, limit={}", 
               self.agent_id, self.user_id, limit);
         
