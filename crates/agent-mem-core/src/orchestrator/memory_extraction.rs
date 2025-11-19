@@ -2,14 +2,13 @@
 //!
 //! 参考 MIRIX 的 absorb_content_into_memory 逻辑
 
-use crate::{engine::MemoryEngine, Memory};
+use crate::{engine::MemoryEngine, Memory, hierarchy::MemoryScope};
 use agent_mem_llm::LLMClient;
 use agent_mem_traits::{
-    MemoryType, Message, Result, Session, MemoryId, Content, 
+    MemoryType, Message, Result, MemoryId, Content,
     AttributeSet, RelationGraph, MetadataV4 as Metadata
 };
 use chrono::Utc;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -162,7 +161,7 @@ impl MemoryExtractor {
                 let mut memories = Vec::new();
                 for item in items {
                     if let Some(content) = item.get("content").and_then(|v| v.as_str()) {
-                        let memory_type = item
+                        let _memory_type = item
                             .get("type")
                             .and_then(|v| v.as_str())
                             .and_then(|s| self.parse_memory_type(s));
@@ -262,7 +261,12 @@ impl MemoryExtractor {
             .collect()
     }
 
-    /// 保存提取的记忆
+    /// 保存提取的记忆（带去重逻辑）
+    ///
+    /// 参考 mem0 的去重机制：
+    /// 1. 对每条新记忆，搜索现有相似记忆
+    /// 2. 如果相似度 > 0.85，跳过（认为是重复）
+    /// 3. 否则保存新记忆
     pub async fn save_memories(&self, memories: Vec<Memory>) -> Result<usize> {
         let count = memories.len();
 
@@ -271,13 +275,26 @@ impl MemoryExtractor {
             return Ok(0);
         }
 
-        info!("Saving {} extracted memories", count);
+        info!("Saving {} extracted memories (with deduplication)", count);
+
+        let mut saved_count = 0;
+        let mut skipped_count = 0;
 
         for memory in memories {
+            // 去重检查：搜索相似记忆
+            let is_duplicate = self.check_duplicate(&memory).await?;
+
+            if is_duplicate {
+                debug!("Skipping duplicate memory: {:?}", memory.content);
+                skipped_count += 1;
+                continue;
+            }
+
             // 使用 MemoryEngine 保存记忆
             match self.memory_engine.add_memory(memory.clone()).await {
                 Ok(_) => {
                     debug!("Successfully saved memory: {:?}", memory.content);
+                    saved_count += 1;
                 }
                 Err(e) => {
                     warn!("Failed to save memory '{:?}': {}", memory.content, e);
@@ -286,7 +303,66 @@ impl MemoryExtractor {
             }
         }
 
-        info!("Successfully saved {} memories", count);
-        Ok(count)
+        info!(
+            "Memory save complete: {} saved, {} skipped (duplicates)",
+            saved_count, skipped_count
+        );
+        Ok(saved_count)
+    }
+
+    /// 检查记忆是否重复
+    ///
+    /// 使用向量相似度检测重复记忆
+    /// 相似度阈值: 0.85 (参考 mem0)
+    async fn check_duplicate(&self, memory: &Memory) -> Result<bool> {
+        // 获取记忆的文本内容
+        let query = match &memory.content {
+            Content::Text(text) => text.clone(),
+            _ => {
+                // 非文本内容不做去重检查
+                return Ok(false);
+            }
+        };
+
+        // 获取 agent_id 和 user_id 用于构建 scope
+        let agent_id = memory.agent_id().map(|s| s.to_string());
+        let user_id = memory.user_id().map(|s| s.to_string());
+
+        // 构建 MemoryScope
+        let scope = match (agent_id, user_id) {
+            (Some(aid), Some(uid)) => Some(MemoryScope::User {
+                agent_id: aid,
+                user_id: uid,
+            }),
+            (Some(aid), None) => Some(MemoryScope::Agent(aid)),
+            (None, Some(uid)) => Some(MemoryScope::User {
+                agent_id: "default".to_string(),
+                user_id: uid,
+            }),
+            (None, None) => None,
+        };
+
+        // 搜索相似记忆（限制5条）
+        let similar_memories = self
+            .memory_engine
+            .search_memories(&query, scope, Some(5))
+            .await
+            .map_err(|e| agent_mem_traits::AgentMemError::storage_error(e.to_string()))?;
+
+        // 检查是否有高度相似的记忆
+        const SIMILARITY_THRESHOLD: f64 = 0.85;
+
+        for similar in similar_memories {
+            let score = similar.score().unwrap_or(0.0);
+            if score >= SIMILARITY_THRESHOLD {
+                debug!(
+                    "Found duplicate memory with similarity {:.2}: {:?}",
+                    score, similar.content
+                );
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }
