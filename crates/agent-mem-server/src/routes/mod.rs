@@ -170,6 +170,11 @@ pub async fn create_router(
             get(chat::get_chat_history),
         )
         // LumosAI集成路由 (experimental)
+        // 注意：更具体的路径必须在前面，避免被通用路径匹配
+        .route(
+            "/api/v1/agents/:agent_id/chat/lumosai/stream",
+            post(chat_lumosai::send_chat_message_lumosai_stream),
+        )
         .route(
             "/api/v1/agents/:agent_id/chat/lumosai",
             post(chat_lumosai::send_chat_message_lumosai),

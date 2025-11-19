@@ -39,6 +39,7 @@ function ChatPageInner() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true); // 是否启用流式响应
+  const [useLumosAI, setUseLumosAI] = useState(false); // 🚀 是否使用 LumosAI 模式
   const [showMemoryPanel, setShowMemoryPanel] = useState(true); // ✨ 记忆面板显示状态
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -150,8 +151,10 @@ function ChatPageInner() {
     setMessages((prev) => [...prev, agentMessage]);
 
     try {
-      const url = `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/stream`;
-      console.log('[Chat] Sending streaming request to:', url);
+      const url = useLumosAI 
+        ? `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/lumosai/stream`
+        : `${API_BASE_URL}/api/v1/agents/${selectedAgentId}/chat/stream`;
+      console.log('[Chat] Sending streaming request to:', url, useLumosAI ? '(LumosAI)' : '(Standard)');
       
       const response = await fetch(url, {
         method: 'POST',
@@ -315,7 +318,23 @@ function ChatPageInner() {
     }
 
     try {
-      if (useStreaming) {
+      if (useLumosAI) {
+        // 🚀 Use LumosAI API (no streaming support)
+        const response = await apiClient.sendLumosAIChatMessage(selectedAgentId, {
+          message: messageContent,
+          user_id: DEFAULT_USER_ID,
+          session_id: sessionId,
+        });
+
+        const agentMessage: Message = {
+          id: response.message_id,
+          role: 'agent',
+          content: response.content,
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, agentMessage]);
+      } else if (useStreaming) {
         // Use SSE streaming
         await handleStreamingMessage(messageContent);
       } else {
@@ -406,32 +425,59 @@ function ChatPageInner() {
             <span>{sseConnected ? 'SSE Connected' : 'SSE Disconnected'}</span>
           </Badge>
 
-          {/* Streaming Toggle */}
+          {/* LumosAI Mode Toggle */}
           <label className="flex items-center space-x-2 cursor-pointer group">
             <div className="relative">
               <input
                 type="checkbox"
-                checked={useStreaming}
-                onChange={(e) => setUseStreaming(e.target.checked)}
+                checked={useLumosAI}
+                onChange={(e) => setUseLumosAI(e.target.checked)}
                 className="sr-only"
               />
               <div className={`w-11 h-6 rounded-full transition-colors ${
-                useStreaming 
-                  ? 'bg-purple-600' 
+                useLumosAI 
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600' 
                   : 'bg-gray-300 dark:bg-gray-600'
               }`}></div>
               <div className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                useStreaming ? 'transform translate-x-5' : ''
+                useLumosAI ? 'transform translate-x-5' : ''
               }`}>
-                {useStreaming && (
-                  <Zap className="w-3 h-3 text-purple-600 absolute inset-0.5" />
+                {useLumosAI && (
+                  <span className="text-xs absolute inset-0 flex items-center justify-center">🚀</span>
                 )}
               </div>
             </div>
-            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-              {useStreaming ? '✨ 流式响应' : '💬 标准响应'}
+            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors font-medium">
+              {useLumosAI ? '🚀 LumosAI' : '⚙️ 标准'}
             </span>
           </label>
+
+          {/* Streaming Toggle */}
+          <label className="flex items-center space-x-2 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={useStreaming}
+                  onChange={(e) => setUseStreaming(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-11 h-6 rounded-full transition-colors ${
+                  useStreaming 
+                    ? 'bg-purple-600' 
+                    : 'bg-gray-300 dark:bg-gray-600'
+                }`}></div>
+                <div className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                  useStreaming ? 'transform translate-x-5' : ''
+                }`}>
+                  {useStreaming && (
+                    <Zap className="w-3 h-3 text-purple-600 absolute inset-0.5" />
+                  )}
+                </div>
+              </div>
+              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                {useStreaming ? '✨ 流式' : '💬 标准'}
+              </span>
+            </label>
 
           {/* Agent Selector */}
           <div className="w-64">
@@ -470,18 +516,28 @@ function ChatPageInner() {
             {/* Agent Info */}
             {selectedAgent && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <Bot className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                      <Bot className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {selectedAgent.name || 'Unnamed Agent'}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedAgent.state || 'idle'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {selectedAgent.name || 'Unnamed Agent'}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedAgent.state || 'idle'}
-                    </p>
-                  </div>
+                  {/* Mode Badge */}
+                  {useLumosAI && (
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0">
+                      <span className="mr-1">🚀</span>
+                      <span>LumosAI 高级模式</span>
+                      <span className="ml-2 text-xs opacity-80">智能记忆 · 自动关联</span>
+                    </Badge>
+                  )}
                 </div>
               </div>
             )}

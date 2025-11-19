@@ -87,7 +87,7 @@ export interface ChatMessageRequest {
   user_id?: string;
   session_id?: string;
   stream?: boolean;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, any>;
 }
 
 export interface ToolCallInfo {
@@ -102,6 +102,22 @@ export interface ChatMessageResponse {
   memories_updated: boolean;
   memories_count: number;
   tool_calls?: ToolCallInfo[];
+  processing_time_ms: number;
+}
+
+// LumosAI Chat Types
+export interface LumosAIChatRequest {
+  message: string;
+  user_id?: string;
+  session_id?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LumosAIChatResponse {
+  message_id: string;
+  content: string;
+  memories_updated: boolean;
+  memories_count: number;
   processing_time_ms: number;
 }
 
@@ -562,6 +578,23 @@ class ApiClient {
   async getChatHistory(agentId: string): Promise<ChatHistoryMessage[]> {
     const response = await this.request<ApiResponse<ChatHistoryMessage[]>>(
       `/api/v1/agents/${agentId}/chat/history`
+    );
+    return response.data;
+  }
+
+  /**
+   * Send chat message to agent using LumosAI
+   */
+  async sendLumosAIChatMessage(
+    agentId: string,
+    data: LumosAIChatRequest
+  ): Promise<LumosAIChatResponse> {
+    const response = await this.request<ApiResponse<LumosAIChatResponse>>(
+      `/api/v1/agents/${agentId}/chat/lumosai`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
     );
     return response.data;
   }
