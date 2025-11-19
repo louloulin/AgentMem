@@ -1,6 +1,6 @@
 //! Huawei MaaS (华为) LLM提供商实现
 
-use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result, llm::{FunctionCallResponse, FunctionDefinition, BoxStream}};
+use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result};
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use reqwest::Client;
@@ -148,10 +148,10 @@ impl LLMProvider for HuaweiMaasProvider {
             .ok_or_else(|| AgentMemError::LLMError("No response from Huawei MaaS".to_string()))
     }
 
-    async fn generate_stream(
+        async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         let api_key = self.config.api_key.as_ref().ok_or_else(|| {
             AgentMemError::ConfigError("Huawei MaaS API key not configured".to_string())
         })?;
@@ -235,7 +235,7 @@ impl LLMProvider for HuaweiMaasProvider {
         _messages: &[Message],
         _functions: &[agent_mem_traits::llm::FunctionDefinition],
     ) -> Result<agent_mem_traits::llm::FunctionCallResponse> {
-        Err(AgentMemError::UnsupportedFeature(
+        Err(AgentMemError::UnsupportedOperation(
             "Function calling is not yet implemented for HuaweiMaasProvider".to_string(),
         ))
     }

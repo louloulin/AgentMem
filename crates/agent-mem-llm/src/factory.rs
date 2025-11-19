@@ -14,6 +14,7 @@ use crate::providers::{ClaudeProvider, CohereProvider, MistralProvider, Perplexi
 
 use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo, Result};
 use async_trait::async_trait;
+use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -81,7 +82,7 @@ impl LLMProvider for LLMProviderEnum {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         match self {
             #[cfg(feature = "openai")]
             LLMProviderEnum::OpenAI(provider) => provider.generate_stream(messages).await,

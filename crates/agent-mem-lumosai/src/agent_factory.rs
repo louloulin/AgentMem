@@ -117,7 +117,8 @@ impl LumosAgentFactory {
             "qwen" => Arc::new(providers::qwen(api_key, Some(model))),
             "gemini" => Arc::new(providers::gemini(api_key, model)),
             "cohere" => Arc::new(providers::cohere(api_key, model)),
-            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}. Supported: zhipu, openai, anthropic, deepseek, qwen, gemini, cohere", provider_name)),
+            "maas" => Arc::new(providers::huawei_maas(api_key, Some(model))),
+            _ => return Err(anyhow::anyhow!("Unsupported LLM provider: {}. Supported: zhipu, openai, anthropic, deepseek, qwen, gemini, cohere, maas", provider_name)),
         };
         
         Ok(provider)
