@@ -427,8 +427,11 @@ pub async fn get_memory_growth(
         .connect()
         .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
 
-    // ✅ Query historical daily stats (last 30 days)
-    // Note: Using simple date comparison instead of date() function for LibSQL compatibility
+    let mut data_points: Vec<MemoryGrowthPoint> = Vec::new();
+    let mut total_memories = 0i64;
+
+    // ✅ Try to query historical daily stats (last 30 days)
+    // If table doesn't exist, fall back to current data
     let thirty_days_ago = (Utc::now() - Duration::days(30))
         .format("%Y-%m-%d")
         .to_string();
@@ -437,40 +440,36 @@ pub async fn get_memory_growth(
                  WHERE date >= ?
                  ORDER BY date ASC";
 
-    let mut stmt = conn
-        .prepare(query)
-        .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
-    let mut rows = stmt
-        .query(params![thirty_days_ago])
-        .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+    // Try to query, but don't fail if table doesn't exist
+    match conn.prepare(query).await {
+        Ok(mut stmt) => {
+            if let Ok(mut rows) = stmt.query(params![thirty_days_ago]).await {
 
-    let mut data_points: Vec<MemoryGrowthPoint> = Vec::new();
-    let mut total_memories = 0i64;
+                while let Ok(Some(row)) = rows.next().await {
+                    let date: String = row.get(0).unwrap_or_default();
+                    let total: i64 = row.get(1).unwrap_or(0);
+                    let new: i64 = row.get(2).unwrap_or(0);
+                    let by_type_json: Option<String> = row.get(3).ok();
 
-    while let Some(row) = rows
-        .next()
-        .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
-    {
-        let date: String = row.get(0).unwrap_or_default();
-        let total: i64 = row.get(1).unwrap_or(0);
-        let new: i64 = row.get(2).unwrap_or(0);
-        let by_type_json: Option<String> = row.get(3).ok();
+                    let by_type: HashMap<String, i64> = by_type_json
+                        .and_then(|json| serde_json::from_str(&json).ok())
+                        .unwrap_or_default();
 
-        let by_type: HashMap<String, i64> = by_type_json
-            .and_then(|json| serde_json::from_str(&json).ok())
-            .unwrap_or_default();
+                    data_points.push(MemoryGrowthPoint {
+                        date,
+                        total,
+                        new,
+                        by_type,
+                    });
 
-        data_points.push(MemoryGrowthPoint {
-            date,
-            total,
-            new,
-            by_type,
-        });
-
-        total_memories = total; // Update to latest
+                    total_memories = total; // Update to latest
+                }
+            }
+        }
+        Err(e) => {
+            // Table doesn't exist or query failed - log warning and continue with fallback
+            warn!("⚠️  memory_stats_daily table not available: {}", e);
+        }
     }
 
     // ✅ If no historical data exists, generate current data point
