@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use futures::stream::{self};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::time::Duration;
 use tracing::{debug, info};
 
@@ -214,7 +215,7 @@ impl LLMProvider for LocalTestProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // 简单实现：将完整响应分块流式返回
         let response = self.generate(messages).await?;
         let chunks: Vec<String> = response
@@ -225,7 +226,7 @@ impl LLMProvider for LocalTestProvider {
             .collect();
 
         let stream = stream::iter(chunks.into_iter().map(Ok));
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {

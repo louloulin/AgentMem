@@ -11,6 +11,7 @@ use futures::Stream;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Together 消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -279,7 +280,7 @@ impl LLMProvider for TogetherProvider {
     async fn generate_stream(
         &self,
         _messages: &[Message],
-    ) -> Result<Box<dyn Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
         // Together 流式生成需要额外的实现
         // 目前返回错误，表示不支持
         Err(AgentMemError::llm_error(

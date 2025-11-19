@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Ollama API请求结构
 #[derive(Debug, Serialize)]
@@ -186,7 +187,7 @@ impl LLMProvider for OllamaProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         use futures::stream::StreamExt;
 
         // 构建流式请求
@@ -285,7 +286,7 @@ impl LLMProvider for OllamaProvider {
                 })
             });
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {

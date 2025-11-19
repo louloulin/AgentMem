@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Gemini 请求消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,7 +226,7 @@ impl LLMProvider for GeminiProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         use futures::stream::StreamExt;
 
         // 转换消息格式
@@ -318,7 +319,7 @@ impl LLMProvider for GeminiProvider {
                 })
             });
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {

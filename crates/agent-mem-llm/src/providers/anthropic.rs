@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Anthropic API请求结构
 #[derive(Debug, Serialize)]
@@ -203,7 +204,7 @@ impl LLMProvider for AnthropicProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         use futures::stream::StreamExt;
 
         // 构建 Anthropic 消息格式
@@ -306,7 +307,7 @@ impl LLMProvider for AnthropicProvider {
                 })
             });
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {

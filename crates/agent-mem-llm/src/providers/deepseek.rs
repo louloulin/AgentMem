@@ -8,6 +8,7 @@ use futures::stream;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// DeepSeek API 配置
 #[derive(Debug, Clone)]
@@ -296,9 +297,9 @@ impl crate::LLMProvider for DeepSeekProvider {
     async fn generate_stream(
         &self,
         _messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // DeepSeek 流式响应暂未实现，返回空流
-        Ok(Box::new(stream::empty()))
+        Ok(Box::pin(stream::empty()))
     }
 
     fn get_model_info(&self) -> ModelInfo {

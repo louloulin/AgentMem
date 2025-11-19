@@ -5,6 +5,7 @@ use agent_mem_traits::{
     llm::{FunctionCallResponse, FunctionDefinition},
     LLMConfig, LLMProvider, Message, ModelInfo, Result,
 };
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -101,7 +102,7 @@ impl LLMClient {
     pub async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         self.provider.generate_stream(messages).await
     }
 

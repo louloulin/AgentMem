@@ -11,6 +11,7 @@ use futures::Stream;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Bedrock 请求消息
 #[derive(Debug, Clone, Serialize)]
@@ -349,7 +350,7 @@ impl LLMProvider for BedrockProvider {
     async fn generate_stream(
         &self,
         _messages: &[Message],
-    ) -> Result<Box<dyn Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
         // Bedrock 流式生成需要额外的实现
         // 目前返回错误，表示不支持
         Err(AgentMemError::llm_error(

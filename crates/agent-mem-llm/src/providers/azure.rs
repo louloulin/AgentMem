@@ -12,6 +12,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use std::time::Duration;
+use std::pin::Pin;
 
 /// Azure OpenAI 消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,7 +261,7 @@ impl LLMProvider for AzureProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
         use futures::stream::StreamExt;
 
         // 转换消息格式
@@ -349,7 +350,7 @@ impl LLMProvider for AzureProvider {
                 })
             });
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {

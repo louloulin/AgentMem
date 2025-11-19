@@ -6,6 +6,7 @@ use futures::{StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 // --- 数据结构定义 ---
 

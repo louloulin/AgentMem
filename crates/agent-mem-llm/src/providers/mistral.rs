@@ -8,6 +8,7 @@ use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 use tracing::{debug, error, info};
 
@@ -252,11 +253,11 @@ impl crate::LLMProvider for MistralProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // For now, fall back to non-streaming
         let response = self.generate(messages).await?;
         let stream = futures::stream::once(async move { Ok(response) });
-        Ok(Box::new(Box::pin(stream)))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> agent_mem_traits::ModelInfo {

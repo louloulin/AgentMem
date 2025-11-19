@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 use tracing::{debug, info, warn};
 
 /// Zhipu AI API请求结构
@@ -365,7 +366,7 @@ impl LLMProvider for ZhipuProvider {
     async fn generate_stream(
         &self,
         _messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         Err(AgentMemError::LLMError(
             "Streaming not yet implemented for Zhipu provider".to_string(),
         ))

@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use std::pin::Pin;
 
 /// OpenAI API请求结构
 #[derive(Debug, Serialize)]
@@ -225,7 +226,7 @@ impl LLMProvider for OpenAIProvider {
     async fn generate_stream(
         &self,
         messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         use futures::stream::StreamExt;
 
         // 创建流式请求
@@ -323,7 +324,7 @@ impl LLMProvider for OpenAIProvider {
                 })
             });
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 
     fn get_model_info(&self) -> ModelInfo {
