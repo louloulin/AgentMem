@@ -75,6 +75,12 @@ impl AutoConfig {
             return Some(("openai".to_string(), model));
         }
 
+        // 检测 Huawei MaaS
+        if env::var("HUAWEI_MAAS_API_KEY").is_ok() {
+            let model = env::var("HUAWEI_MAAS_MODEL").unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
+            return Some(("huawei_maas".to_string(), model));
+        }
+
         // 检测 DeepSeek
         if env::var("DEEPSEEK_API_KEY").is_ok() {
             let model = env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string());

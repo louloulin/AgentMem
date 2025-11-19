@@ -26,6 +26,7 @@ pub mod together;
 #[cfg(test)]
 mod together_test;
 pub mod zhipu;
+pub mod huawei_maas;
 
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureProvider;
@@ -35,6 +36,7 @@ pub use cohere::CohereProvider;
 pub use deepseek::DeepSeekProvider;
 pub use gemini::GeminiProvider;
 pub use groq::GroqProvider;
+pub use huawei_maas::HuaweiMaasProvider;
 pub use litellm::{LiteLLMProvider, SupportedModel};
 pub use local_test::LocalTestProvider;
 pub use mistral::MistralProvider;

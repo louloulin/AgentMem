@@ -163,12 +163,16 @@ impl InitializationModule {
                 "deepseek" => std::env::var("DEEPSEEK_API_KEY")
                     .or_else(|_| std::env::var("LLM_API_KEY"))
                     .ok(),
+                "huawei_maas" => std::env::var("HUAWEI_MAAS_API_KEY")
+                    .or_else(|_| std::env::var("LLM_API_KEY"))
+                    .ok(),
                 _ => {
                     // 对于未知的 provider，尝试所有常见的 API Key 环境变量
                     std::env::var("ZHIPU_API_KEY")
                         .or_else(|_| std::env::var("OPENAI_API_KEY"))
                         .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
                         .or_else(|_| std::env::var("DEEPSEEK_API_KEY"))
+                        .or_else(|_| std::env::var("HUAWEI_MAAS_API_KEY"))
                         .or_else(|_| std::env::var("LLM_API_KEY"))
                         .ok()
                 }
@@ -186,6 +190,13 @@ impl InitializationModule {
                     let zhipu_model = std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4.6".to_string());
                     info!("✅ 检测到 ZHIPU_API_KEY，自动切换到 zhipu provider");
                     return Self::create_llm_provider_with_config("zhipu", &zhipu_model, Some(zhipu_key)).await;
+                }
+
+                // 检测 Huawei MaaS
+                if let Ok(huawei_key) = std::env::var("HUAWEI_MAAS_API_KEY") {
+                    let huawei_model = std::env::var("HUAWEI_MAAS_MODEL").unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
+                    info!("✅ 检测到 HUAWEI_MAAS_API_KEY，自动切换到 huawei_maas provider");
+                    return Self::create_llm_provider_with_config("huawei_maas", &huawei_model, Some(huawei_key)).await;
                 }
 
                 // 检测 OpenAI

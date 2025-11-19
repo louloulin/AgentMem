@@ -8,6 +8,7 @@ use crate::providers::GeminiProvider;
 use crate::providers::LiteLLMProvider;
 use crate::providers::OllamaProvider; // 移除条件编译，确保总是可用
 use crate::providers::ZhipuProvider;
+use crate::providers::HuaweiMaasProvider;
 use crate::providers::{AnthropicProvider, OpenAIProvider};
 use crate::providers::{ClaudeProvider, CohereProvider, MistralProvider, PerplexityProvider};
 
@@ -35,6 +36,7 @@ pub enum LLMProviderEnum {
     Perplexity(PerplexityProvider),
     DeepSeek(DeepSeekProvider),
     Zhipu(ZhipuProvider),
+    HuaweiMaas(HuaweiMaasProvider),
 }
 
 #[async_trait]
@@ -72,6 +74,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Perplexity(provider) => provider.generate(messages).await,
             LLMProviderEnum::DeepSeek(provider) => provider.generate(messages).await,
             LLMProviderEnum::Zhipu(provider) => provider.generate(messages).await,
+            LLMProviderEnum::HuaweiMaas(provider) => provider.generate(messages).await,
         }
     }
 
@@ -102,6 +105,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Perplexity(provider) => provider.generate_stream(messages).await,
             LLMProviderEnum::DeepSeek(provider) => provider.generate_stream(messages).await,
             LLMProviderEnum::Zhipu(provider) => provider.generate_stream(messages).await,
+            LLMProviderEnum::HuaweiMaas(provider) => provider.generate_stream(messages).await,
         }
     }
 
@@ -130,6 +134,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Perplexity(provider) => provider.get_model_info(),
             LLMProviderEnum::DeepSeek(provider) => provider.get_model_info(),
             LLMProviderEnum::Zhipu(provider) => provider.get_model_info(),
+            LLMProviderEnum::HuaweiMaas(provider) => provider.get_model_info(),
         }
     }
 
@@ -155,6 +160,7 @@ impl LLMProvider for LLMProviderEnum {
             LLMProviderEnum::Perplexity(provider) => provider.validate_config(),
             LLMProviderEnum::DeepSeek(provider) => provider.validate_config(),
             LLMProviderEnum::Zhipu(provider) => provider.validate_config(),
+            LLMProviderEnum::HuaweiMaas(provider) => provider.validate_config(),
         }
     }
 }
@@ -267,6 +273,10 @@ impl LLMFactory {
                 let provider = ZhipuProvider::new(config.clone())?;
                 LLMProviderEnum::Zhipu(provider)
             }
+            "huawei_maas" => {
+                let provider = HuaweiMaasProvider::new(config.clone())?;
+                LLMProviderEnum::HuaweiMaas(provider)
+            }
             _ => return Err(AgentMemError::unsupported_provider(&config.provider)),
         };
 
@@ -300,6 +310,7 @@ impl LLMFactory {
         providers.push("perplexity");
         providers.push("deepseek");
         providers.push("zhipu");
+        providers.push("huawei_maas");
 
         providers
     }
@@ -493,6 +504,11 @@ impl RealLLMFactory {
             }
             "zhipu" => {
                 let provider = ZhipuProvider::new(config.clone())?;
+                Self::validate_provider(&provider).await?;
+                Ok(Arc::new(provider))
+            }
+            "huawei_maas" => {
+                let provider = HuaweiMaasProvider::new(config.clone())?;
                 Self::validate_provider(&provider).await?;
                 Ok(Arc::new(provider))
             }
