@@ -106,6 +106,13 @@ pub async fn run_migrations(conn: Arc<Mutex<Connection>>) -> Result<()> {
         add_session_id_to_memories(&conn_guard),
     )
     .await?;
+    run_migration(
+        &conn_guard,
+        14,
+        "create_memory_vectors",
+        create_memory_vectors_table(&conn_guard),
+    )
+    .await?;
 
     // Initialize default data (idempotent - safe to run multiple times)
     init_default_data(&conn_guard).await?;
@@ -631,6 +638,42 @@ async fn add_session_id_to_memories(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Create memory_vectors table for vector search
+async fn create_memory_vectors_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE memory_vectors (
+            id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            vector BLOB NOT NULL,
+            dimension INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE
+        )",
+        (),
+    )
+    .await
+    .map_err(|e| {
+        AgentMemError::StorageError(format!("Failed to create memory_vectors table: {e}"))
+    })?;
+
+    // Create indexes for performance
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memory_vectors_memory_id ON memory_vectors(memory_id)",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_memory_vectors_dimension ON memory_vectors(dimension)",
+        (),
+    )
+    .await
+    .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
+
+    Ok(())
+}
+
 /// Initialize default data (organizations, users)
 /// This is idempotent - safe to run multiple times
 async fn init_default_data(conn: &Connection) -> Result<()> {
@@ -693,7 +736,7 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 13); // 13 migrations (including learning_feedback and add_session_id_to_memories)
+        assert_eq!(count, 14); // 14 migrations (including memory_vectors)
     }
 
     #[tokio::test]
@@ -716,6 +759,6 @@ mod tests {
 
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
-        assert_eq!(count, 13); // 13 migrations (including session_id)
+        assert_eq!(count, 14); // 14 migrations (including memory_vectors)
     }
 }
