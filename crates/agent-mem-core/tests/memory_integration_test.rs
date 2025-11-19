@@ -249,7 +249,7 @@ fn test_memory_metadata() {
 
     assert_eq!(memory.user_id().as_deref(), Some("user-1"));
     assert_eq!(memory.version(), 1);
-    assert_eq!(memory.metadata.accessed_count, 0);
+    assert_eq!(memory.metadata.access_count, 0);
 }
 
 #[test]
