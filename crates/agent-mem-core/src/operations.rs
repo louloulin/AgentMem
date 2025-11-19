@@ -114,7 +114,7 @@ impl InMemoryOperations {
 
         for memory in memories {
             let content_text = match &memory.content {
-                crate::types::Content::Text(text) => text.clone(),
+                agent_mem_traits::Content::Text(text) => text.clone(),
                 _ => continue, // Skip non-text content
             };
             let content_lower = content_text.to_lowercase();
@@ -161,7 +161,7 @@ impl InMemoryOperations {
         }
 
         // Sort by similarity descending
-        results.sort_by(|a, b| {
+        results.sort_by(|a: &MemorySearchResult, b: &MemorySearchResult| {
             b.score
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -194,7 +194,7 @@ impl InMemoryOperations {
             .values()
             .filter(|memory| {
                 // Agent ID filter
-                if memory.agent_id() != query.agent_id {
+                if memory.agent_id().as_deref() != Some(&query.agent_id) {
                     return false;
                 }
 
@@ -207,28 +207,29 @@ impl InMemoryOperations {
 
                 // Memory type filter
                 if let Some(memory_type) = query.memory_type {
-                    if memory.memory_type() != memory_type {
+                    let type_str = memory_type.as_str();
+                    if memory.memory_type().as_deref() != Some(type_str) {
                         return false;
                     }
                 }
 
                 // Importance filter
                 if let Some(min_importance) = query.min_importance {
-                    if memory.importance() < min_importance {
+                    if memory.importance().unwrap_or(0.0) < min_importance as f64 {
                         return false;
                     }
                 }
 
                 // Age filter
                 if let Some(max_age) = query.max_age_seconds {
-                    let age = current_time - memory.created_at();
+                    let age = current_time - memory.created_at().timestamp();
                     if age > max_age {
                         return false;
                     }
                 }
 
                 // Skip expired memories (check if memory has expiry attribute)
-                if let Some(expiry_attr) = memory.attributes.get(&crate::types::AttributeKey::system("expires_at")) {
+                if let Some(expiry_attr) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("expires_at")) {
                     if let Some(expiry_ts) = expiry_attr.as_number() {
                         if current_time > expiry_ts as i64 {
                     return false;
@@ -305,7 +306,7 @@ impl MemoryOperations for InMemoryOperations {
                 .into_iter()
                 .map(|memory| MemorySearchResult {
                     memory: memory.clone(),
-                    score: memory.importance(),
+                    score: memory.importance().unwrap_or(0.5) as f32,
                     match_type: MatchType::Metadata,
                 })
                 .collect()
@@ -351,7 +352,7 @@ impl MemoryOperations for InMemoryOperations {
         let memories: Vec<Memory> = memory_ids
             .iter()
             .filter_map(|id| self.memories.get(id))
-            .filter(|memory| memory.agent_id() == agent_id)
+            .filter(|memory| memory.agent_id().as_deref() == Some(agent_id))
             .cloned()
             .collect();
 
@@ -359,10 +360,10 @@ impl MemoryOperations for InMemoryOperations {
     }
 
     async fn get_memory_stats(&self, agent_id: Option<&str>) -> Result<MemoryStats> {
-        let memories: Vec<&Memory> = if let Some(agent_id) = agent_id {
+        let memories: Vec<&agent_mem_traits::MemoryV4> = if let Some(agent_id) = agent_id {
             self.memories
                 .values()
-                .filter(|memory| memory.agent_id() == agent_id)
+                .filter(|memory| memory.agent_id().as_deref() == Some(agent_id))
                 .collect()
         } else {
             self.memories.values().collect()
@@ -384,7 +385,7 @@ impl MemoryOperations for InMemoryOperations {
 
         for memory in &memories {
             // Type distribution - from attributes
-            if let Some(memory_type_str) = memory.attributes.get(&crate::types::AttributeKey::system("memory_type"))
+            if let Some(memory_type_str) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("memory_type"))
                 .and_then(|v| v.as_string())
             {
                 if let Ok(memory_type) = memory_type_str.parse::<crate::types::MemoryType>() {
@@ -396,7 +397,7 @@ impl MemoryOperations for InMemoryOperations {
             }
 
             // Agent distribution - from attributes
-            if let Some(agent_id) = memory.attributes.get(&crate::types::AttributeKey::system("agent_id"))
+            if let Some(agent_id) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("agent_id"))
                 .and_then(|v| v.as_string())
             {
                 *stats
@@ -406,7 +407,7 @@ impl MemoryOperations for InMemoryOperations {
             }
 
             // Importance and access stats - from attributes
-            let importance = memory.attributes.get(&crate::types::AttributeKey::system("importance"))
+            let importance = memory.attributes.get(&agent_mem_traits::AttributeKey::system("importance"))
                 .and_then(|v| v.as_number())
                 .unwrap_or(0.0) as f32;
             total_importance += importance;
@@ -437,17 +438,17 @@ impl MemoryOperations for InMemoryOperations {
         let mut created_ids = Vec::new();
 
         for memory in memories {
-            let memory_id = memory.id.clone();
+            let memory_id_str = memory.id.0.clone();
 
-            if self.memories.contains_key(&memory_id) {
+            if self.memories.contains_key(&memory_id_str) {
                 return Err(AgentMemError::memory_error(format!(
-                    "Memory {memory_id} already exists"
+                    "Memory {} already exists", memory_id_str
                 )));
             }
 
             self.update_indices(&memory);
-            self.memories.insert(memory_id.clone(), memory);
-            created_ids.push(memory_id);
+            self.memories.insert(memory_id_str.clone(), memory);
+            created_ids.push(memory_id_str);
         }
 
         Ok(created_ids)

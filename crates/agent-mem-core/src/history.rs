@@ -1,7 +1,6 @@
 //! Memory history tracking and versioning
 
-use crate::types::Memory;
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::{AgentMemError, MemoryV4, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -101,14 +100,14 @@ impl MemoryHistory {
     }
 
     /// Record memory creation
-    pub fn record_creation(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_creation(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
-            timestamp: memory.created_at(),
+            timestamp: memory.created_at().timestamp(),
             change_type: ChangeType::Created,
             change_description: Some("Memory created".to_string()),
         };
@@ -120,15 +119,15 @@ impl MemoryHistory {
     /// Record memory content update
     pub fn record_content_update(
         &mut self,
-        memory: &Memory,
+        memory: &MemoryV4,
         old_content: &str,
         change_description: Option<String>,
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ContentUpdated,
@@ -146,18 +145,19 @@ impl MemoryHistory {
     }
 
     /// Record importance change
-    pub fn record_importance_change(&mut self, memory: &Memory, old_importance: f32) -> Result<()> {
+    pub fn record_importance_change(&mut self, memory: &MemoryV4, old_importance: f32) -> Result<()> {
+        let new_importance = memory.importance().unwrap_or(0.5) as f32;
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: new_importance,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ImportanceChanged,
             change_description: Some(format!(
                 "Importance changed from {:.2} to {:.2}",
-                old_importance, memory.importance()
+                old_importance, new_importance
             )),
         };
 
@@ -168,14 +168,14 @@ impl MemoryHistory {
     /// Record metadata update
     pub fn record_metadata_update(
         &mut self,
-        memory: &Memory,
+        memory: &MemoryV4,
         changed_keys: Vec<String>,
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::MetadataUpdated,
@@ -187,16 +187,16 @@ impl MemoryHistory {
     }
 
     /// Record memory access (if enabled)
-    pub fn record_access(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_access(&mut self, memory: &MemoryV4) -> Result<()> {
         if !self.config.track_access_events {
             return Ok(());
         }
 
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Accessed,
@@ -208,12 +208,12 @@ impl MemoryHistory {
     }
 
     /// Record memory archival
-    pub fn record_archival(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_archival(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Archived,
@@ -225,12 +225,12 @@ impl MemoryHistory {
     }
 
     /// Record memory restoration
-    pub fn record_restoration(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_restoration(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
+            memory_id: memory.id.0.clone(),
             version: memory.version(),
             content: memory.content.to_string(),
-            importance: memory.importance(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Restored,

@@ -321,6 +321,22 @@ impl Default for Metadata {
     }
 }
 
+impl Metadata {
+    /// Convert metadata to HashMap for backward compatibility
+    pub fn to_hashmap(&self) -> std::collections::HashMap<String, String> {
+        let mut map = std::collections::HashMap::new();
+        map.insert("created_at".to_string(), self.created_at.to_rfc3339());
+        map.insert("updated_at".to_string(), self.updated_at.to_rfc3339());
+        map.insert("accessed_at".to_string(), self.accessed_at.to_rfc3339());
+        map.insert("access_count".to_string(), self.access_count.to_string());
+        map.insert("version".to_string(), self.version.to_string());
+        if let Some(ref hash) = self.hash {
+            map.insert("hash".to_string(), hash.clone());
+        }
+        map
+    }
+}
+
 // ============================================================================
 // Query Abstraction
 // ============================================================================

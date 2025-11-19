@@ -40,7 +40,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
     async fn create_memory(&mut self, memory: Memory) -> Result<String> {
         let repo = self.repo.lock().await;
         repo.create(&memory).await?;
-        Ok(memory.id.clone())
+        Ok(memory.id.0.clone())
     }
 
     async fn get_memory(&self, memory_id: &str) -> Result<Option<Memory>> {
@@ -87,14 +87,15 @@ impl MemoryOperations for LibSqlMemoryOperations {
                 
                 // Memory type filter
                 if let Some(memory_type) = query.memory_type {
-                    if memory.memory_type() != memory_type {
+                    let type_str = memory_type.as_str();
+                    if memory.memory_type().as_deref() != Some(type_str) {
                         return false;
                     }
                 }
-                
+
                 // Importance filter
                 if let Some(min_importance) = query.min_importance {
-                    if memory.importance() < min_importance {
+                    if memory.importance().unwrap_or(0.0) < min_importance as f64 {
                         return false;
                     }
                 }
@@ -121,7 +122,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
                 .into_iter()
                 .map(|memory| MemorySearchResult {
                     memory: memory.clone(),
-                    score: memory.importance(),
+                    score: memory.importance().unwrap_or(0.5) as f32,
                     match_type: MatchType::Metadata,
                 })
                 .collect()
@@ -158,11 +159,12 @@ impl MemoryOperations for LibSqlMemoryOperations {
         let all_memories = repo.find_by_agent_id(agent_id, 1000).await?;
         
         // Filter by memory type
+        let type_str = memory_type.as_str();
         let filtered: Vec<Memory> = all_memories
             .into_iter()
-            .filter(|memory| memory.memory_type() == memory_type)
+            .filter(|memory| memory.memory_type().as_deref() == Some(type_str))
             .collect();
-        
+
         Ok(filtered)
     }
 
@@ -194,27 +196,33 @@ impl MemoryOperations for LibSqlMemoryOperations {
         
         for memory in &memories {
             // Type distribution
-            *stats
-                .memories_by_type
-                .entry(memory.memory_type())
-                .or_insert(0) += 1;
-            
+            if let Some(memory_type_str) = memory.memory_type() {
+                if let Ok(memory_type) = memory_type_str.parse::<crate::types::MemoryType>() {
+                    *stats
+                        .memories_by_type
+                        .entry(memory_type)
+                        .or_insert(0) += 1;
+                }
+            }
+
             // Agent distribution
-            *stats
-                .memories_by_agent
-                .entry(memory.agent_id())
-                .or_insert(0) += 1;
-            
+            if let Some(agent_id) = memory.agent_id() {
+                *stats
+                    .memories_by_agent
+                    .entry(agent_id)
+                    .or_insert(0) += 1;
+            }
+
             // Importance and access stats
-            let importance = memory.importance();
+            let importance = memory.importance().unwrap_or(0.0);
             total_importance += importance;
-            
-            let access_count = memory.metadata.access_count;
-            total_access_count += access_count as u64;
-            
+
+            let access_count = memory.metadata.access_count as u64;
+            total_access_count += access_count;
+
             if access_count > most_accessed_count {
                 most_accessed_count = access_count;
-                stats.most_accessed_memory_id = Some(memory.id.clone());
+                stats.most_accessed_memory_id = Some(memory.id.0.clone());
             }
             
             // Created timestamp
@@ -224,7 +232,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
             }
         }
         
-        stats.average_importance = total_importance / memories.len() as f32;
+        stats.average_importance = (total_importance / memories.len() as f64) as f32;
         stats.total_access_count = total_access_count;
         stats.oldest_memory_age_days = (current_time - oldest_timestamp) as f32 / (24.0 * 3600.0);
         
@@ -250,8 +258,8 @@ impl MemoryOperations for LibSqlMemoryOperations {
             if let Some(mut memory) = repo.find_by_id(&memory_id).await? {
                 // Soft delete by setting attribute flag (V4 compatible)
                 memory.attributes.insert(
-                    crate::types::AttributeKey::system("is_deleted"),
-                    crate::types::AttributeValue::Boolean(true)
+                    agent_mem_traits::AttributeKey::system("is_deleted"),
+                    agent_mem_traits::AttributeValue::Boolean(true)
                 );
                 repo.update(&memory).await?;
                 deleted_count += 1;
@@ -270,7 +278,7 @@ impl LibSqlMemoryOperations {
         
         for memory in memories {
             let content_text = match &memory.content {
-                crate::types::Content::Text(text) => text.clone(),
+                agent_mem_traits::Content::Text(text) => text.clone(),
                 _ => continue, // Skip non-text content
             };
             let content_lower = content_text.to_lowercase();

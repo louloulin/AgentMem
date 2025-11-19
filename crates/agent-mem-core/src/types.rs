@@ -2295,7 +2295,7 @@ impl MemoryQuery {
 #[derive(Debug, Clone)]
 pub struct MemorySearchResult {
     /// The matched memory
-    pub memory: Memory,
+    pub memory: agent_mem_traits::MemoryV4,
     /// Relevance score (0.0 to 1.0)
     pub score: f32,
     /// Type of match found

@@ -406,8 +406,8 @@ impl MemoryManager {
         if let Some(importance) = new_importance {
             let clamped = importance.clamp(0.0, 1.0);
             memory.attributes.set(
-                crate::types::AttributeKey::system("importance"),
-                crate::types::AttributeValue::Number(clamped as f64),
+                agent_mem_traits::AttributeKey::system("importance"),
+                agent_mem_traits::AttributeValue::Number(clamped as f64),
             );
         }
 
@@ -426,8 +426,8 @@ impl MemoryManager {
                 history.record_content_update(&memory, &old_content_str, None)?;
             }
 
-            if memory.importance() != old_importance {
-                history.record_importance_change(&memory, old_importance)?;
+            if memory.importance().unwrap_or(0.5) as f32 != old_importance.unwrap_or(0.5) as f32 {
+                history.record_importance_change(&memory, old_importance.unwrap_or(0.5) as f32)?;
             }
         }
 
@@ -740,17 +740,17 @@ impl MemoryManager {
                     .collect();
 
                 MemoryItem {
-                    id: memory.id.clone(),
+                    id: memory.id.0.clone(),
                     content: memory.content.to_string(),
                     hash: None,
                     metadata,
                     score: Some(result.score),
-                    created_at: chrono::DateTime::from_timestamp(memory.created_at(), 0).unwrap_or_else(chrono::Utc::now),
-                    updated_at: memory.metadata.last_accessed.or(Some(memory.metadata.updated_at)),
+                    created_at: memory.created_at(),
+                    updated_at: Some(memory.metadata.updated_at),
                     session: Session {
-                        id: memory.agent_id(),
+                        id: memory.agent_id().unwrap_or_default(),
                         user_id: memory.user_id(),
-                        agent_id: Some(memory.agent_id()),
+                        agent_id: memory.agent_id(),
                         run_id: None,
                         actor_id: None,
                         created_at: chrono::Utc::now(),
@@ -759,12 +759,11 @@ impl MemoryManager {
                     memory_type: agent_mem_traits::MemoryType::Episodic, // 默认类型
                     entities: vec![],
                     relations: vec![],
-                    agent_id: memory.agent_id(),
+                    agent_id: memory.agent_id().unwrap_or_default(),
                     user_id: memory.user_id(),
-                    importance: memory.importance(),
+                    importance: memory.importance().unwrap_or(0.5) as f32,
                     embedding: None,
-                    last_accessed_at: chrono::DateTime::from_timestamp(memory.last_accessed_at(), 0)
-                        .unwrap_or_else(chrono::Utc::now),
+                    last_accessed_at: memory.metadata.accessed_at,
                     access_count: 0,
                     expires_at: None,
                     version: 1,
