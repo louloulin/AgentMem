@@ -80,6 +80,7 @@ impl MemoryBuilder {
     /// - `anthropic` - Anthropic (Claude)
     /// - `deepseek` - DeepSeek
     /// - `ollama` - Ollama (本地模型)
+    /// - `huawei_maas` - 华为 MaaS (deepseek-v3.2-exp 等)
     ///
     /// # 示例
     ///

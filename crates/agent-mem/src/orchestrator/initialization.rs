@@ -233,7 +233,8 @@ impl InitializationModule {
                     "openai" => "OPENAI_API_KEY 或 LLM_API_KEY",
                     "anthropic" => "ANTHROPIC_API_KEY 或 LLM_API_KEY",
                     "deepseek" => "DEEPSEEK_API_KEY 或 LLM_API_KEY",
-                    _ => "ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY 或 LLM_API_KEY",
+                    "huawei_maas" => "HUAWEI_MAAS_API_KEY 或 LLM_API_KEY",
+                    _ => "ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, HUAWEI_MAAS_API_KEY 或 LLM_API_KEY",
                 };
                 warn!(
                     "未找到任何 LLM API Key 环境变量 (当前 provider: {}, 需要: {})",

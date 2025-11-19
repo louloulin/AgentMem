@@ -1,12 +1,11 @@
 //! Huawei MaaS (华为) LLM提供商实现
 
-use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result};
+use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result, llm::{FunctionCallResponse, FunctionDefinition, BoxStream}};
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{debug, info, warn};
 
 // --- 数据结构定义 ---
 
@@ -202,15 +201,17 @@ impl LLMProvider for HuaweiMaasProvider {
                     Ok(s) => {
                         let mut content_parts = Vec::new();
                         for line in s.lines() {
-                            if line.starts_with("data:") {
-                                let data = &line[5..].trim();
+                            if let Some(data) = line.strip_prefix("data: ") {
+                                let data = data.trim();
                                 if data == "[DONE]" {
                                     break;
                                 }
                                 if let Ok(stream_resp) = serde_json::from_str::<HuaweiMaasStreamResponse>(data) {
                                     if let Some(choice) = stream_resp.choices.first() {
                                         if let Some(content) = &choice.delta.content {
-                                            content_parts.push(content.clone());
+                                            if !content.is_empty() {
+                                                content_parts.push(content.clone());
+                                            }
                                         }
                                     }
                                 }
@@ -227,6 +228,16 @@ impl LLMProvider for HuaweiMaasProvider {
             });
 
         Ok(Box::pin(stream))
+    }
+
+    async fn generate_with_functions(
+        &self,
+        _messages: &[Message],
+        _functions: &[agent_mem_traits::llm::FunctionDefinition],
+    ) -> Result<agent_mem_traits::llm::FunctionCallResponse> {
+        Err(AgentMemError::UnsupportedFeature(
+            "Function calling is not yet implemented for HuaweiMaasProvider".to_string(),
+        ))
     }
 
     fn get_model_info(&self) -> ModelInfo {
