@@ -29,7 +29,7 @@ impl Default for MemoryExtractorConfig {
     fn default() -> Self {
         Self {
             auto_extract: true,
-            min_turns_for_extraction: 3,
+            min_turns_for_extraction: 1,  // ✅ 修改为1，允许首轮对话就提取记忆
             extraction_prompt: r#"Analyze the following conversation and extract important information that should be remembered for future interactions.
 
 Focus on:
