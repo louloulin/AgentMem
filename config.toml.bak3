@@ -1,0 +1,103 @@
+# AgentMem Server Configuration Example
+# Phase 10 MVP P0-1: 配置文件示例
+
+[server]
+# Server listening port
+port = 8080
+
+# Server listening host
+host = "0.0.0.0"
+
+# Enable CORS (Cross-Origin Resource Sharing)
+enable_cors = true
+
+# Enable authentication
+enable_auth = false
+
+# JWT secret key (MUST change in production!)
+jwt_secret = "your-super-secret-jwt-key-minimum-32-characters-long-please-change"
+
+# Enable metrics endpoint
+enable_metrics = true
+
+# Enable OpenAPI documentation
+enable_docs = true
+
+# Request timeout in seconds
+request_timeout = 30
+
+# Max request body size in bytes (1MB)
+max_body_size = 1048576
+
+# Enable request logging
+enable_logging = true
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+# Multi-tenant mode
+multi_tenant = false
+
+# Rate limiting (requests per minute per IP)
+rate_limit_requests_per_minute = 100
+
+# Database connection URL
+database_url = "postgresql://agentmem:password@localhost:5432/agentmem"
+
+[memory]
+# Default agent ID
+default_agent_id = "default"
+
+# Enable intelligent features
+enable_intelligent_features = true
+
+# LLM provider
+llm_provider = "openai"
+
+# LLM model
+llm_model = "gpt-4"
+
+# Embedder provider
+embedder_provider = "openai"
+
+# Embedder model
+embedder_model = "text-embedding-3-small"
+
+# Vector store URL (optional, defaults to in-memory)
+# vector_store_url = "lancedb://./data/vectors.lance"
+
+[openai]
+# OpenAI API Key (can also use OPENAI_API_KEY env var)
+# api_key = "sk-..."
+
+# OpenAI API Base URL (for custom endpoints)
+# api_base = "https://api.openai.com/v1"
+
+[monitoring]
+# Enable Prometheus metrics
+enable_prometheus = true
+
+# Prometheus metrics port
+prometheus_port = 9090
+
+# Enable structured logging (JSON)
+structured_logging = true
+
+# Log file path (optional, defaults to stdout)
+# log_file = "./logs/agentmem.log"
+
+[security]
+# CORS allowed origins (comma-separated)
+cors_allowed_origins = "*"
+
+# CORS allowed methods
+cors_allowed_methods = "GET,POST,PUT,DELETE,OPTIONS"
+
+# CORS allowed headers
+cors_allowed_headers = "Authorization,Content-Type"
+
+# Maximum concurrent connections
+max_connections = 1000
+
+# Connection timeout in seconds
+connection_timeout = 60

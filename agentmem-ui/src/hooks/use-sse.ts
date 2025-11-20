@@ -269,6 +269,12 @@ export function useSSE(
    * Connect to SSE
    */
   const connect = useCallback(() => {
+    // ✅ 修复SSR：只在浏览器环境中使用EventSource
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
+      log('Skipping SSE connection in SSR environment');
+      return;
+    }
+    
     // Clean up existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();

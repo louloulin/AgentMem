@@ -353,6 +353,7 @@ pub async fn send_chat_message_stream(
             // 从LLM流读取下一块
             match llm_stream.next().await {
                 Some(Ok(content_chunk)) => {
+                    info!("📤 Sending content chunk: {} chars", content_chunk.len());
                     // 发送内容块
                     let content_event_chunk = StreamChunk {
                         chunk_type: "content".to_string(),

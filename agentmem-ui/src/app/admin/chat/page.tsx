@@ -198,26 +198,35 @@ function ChatPageInner() {
       let accumulatedContent = '';
       let hasReceivedData = false;
       let streamError: Error | null = null;
+      let buffer = ''; // ✅ 缓冲不完整的SSE行
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            console.log('[Chat] Stream ended, received data:', hasReceivedData);
+            console.log('[Chat] 🏁 Stream ended, received data:', hasReceivedData);
             if (!hasReceivedData) {
               throw new Error('Stream ended without receiving any data');
             }
             break;
           }
 
+          // ✅ 解码chunk并追加到buffer
           const chunk = decoder.decode(value, { stream: true });
+          console.log('[Chat] 📦 Raw chunk received:', chunk.length, 'bytes');
+          
           if (chunk.trim()) {
             hasReceivedData = true;
           }
           
-          const lines = chunk.split('\n');
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          
+          // ✅ 保留最后一行（可能不完整）
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
+            console.log('[Chat] 🔍 Processing line:', line.substring(0, 80));
             if (line.startsWith('data: ')) {
               const data = line.slice(6).trim();
               if (!data || data === 'keep-alive') continue;
@@ -227,16 +236,19 @@ function ChatPageInner() {
                 console.log('[Chat] Received SSE chunk:', parsed.chunk_type);
                 
                 if (parsed.chunk_type === 'start') {
-                  console.log('[Chat] Stream started');
+                  console.log('[Chat] 🌊 Stream started - real-time SSE');
                   // Stream started successfully
                 } else if (parsed.chunk_type === 'content' && parsed.content) {
+                  // ✅ 真实流式：立即更新UI
                   accumulatedContent += parsed.content;
+                  console.log('[Chat] 💬 Content chunk:', JSON.stringify(parsed.content), 
+                             '| Total:', accumulatedContent.length, 'chars');
                   
-                  // Update message content
+                  // 立即更新UI显示每个chunk（强制重新渲染）
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === agentMessageId
-                        ? { ...msg, content: accumulatedContent }
+                        ? { ...msg, content: accumulatedContent, timestamp: new Date() }
                         : msg
                     )
                   );
