@@ -148,6 +148,7 @@ function ChatPageInner() {
       timestamp: new Date(),
       isStreaming: true,
     };
+    console.log('[Chat] 🎬 Creating streaming message:', { id: agentMessageId, isStreaming: true, content: '' });
     setMessages((prev) => [...prev, agentMessage]);
 
     try {
@@ -245,13 +246,19 @@ function ChatPageInner() {
                              '| Total:', accumulatedContent.length, 'chars');
                   
                   // 立即更新UI显示每个chunk（保持isStreaming状态）
-                  setMessages((prev) =>
-                    prev.map((msg) =>
+                  setMessages((prev) => {
+                    const updated = prev.map((msg) =>
                       msg.id === agentMessageId
                         ? { ...msg, content: accumulatedContent, isStreaming: true, timestamp: new Date() }
                         : msg
-                    )
-                  );
+                    );
+                    console.log('[Chat] 📝 Updated message:', { 
+                      id: agentMessageId, 
+                      contentLength: accumulatedContent.length,
+                      isStreaming: true 
+                    });
+                    return updated;
+                  });
                 } else if (parsed.chunk_type === 'done') {
                   console.log('[Chat] Stream completed, memories_count:', parsed.memories_count);
                   // Mark streaming as complete
@@ -652,12 +659,12 @@ function MessageBubble({ message }: MessageBubbleProps) {
             } ${message.isStreaming ? 'shadow-lg' : ''}`}
           >
             {!message.content && message.isStreaming ? (
-              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 animate-pulse">
+              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm font-medium">正在思考</span>
-                <span className="animate-bounce">●</span>
-                <span className="animate-bounce animation-delay-200">●</span>
-                <span className="animate-bounce animation-delay-400">●</span>
+                <span className="inline-block animate-bounce">●</span>
+                <span className="inline-block animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
+                <span className="inline-block animate-bounce" style={{ animationDelay: '0.4s' }}>●</span>
               </div>
             ) : message.content ? (
               <div className="text-sm whitespace-pre-wrap">
