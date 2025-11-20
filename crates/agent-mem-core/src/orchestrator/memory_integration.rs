@@ -5,7 +5,11 @@
 use crate::{engine::MemoryEngine, Memory};
 use agent_mem_traits::{MemoryType, Result};
 use regex::Regex;
-use std::sync::Arc;
+use std::num::NonZeroUsize;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, RwLock,
+};
 use tracing::{debug, info};
 
 /// 记忆集成器配置
@@ -19,7 +23,7 @@ pub struct MemoryIntegratorConfig {
     pub include_timestamp: bool,
     /// 是否按重要性排序
     pub sort_by_importance: bool,
-
+    
     // 🆕 Phase 1.5: 认知架构权重配置（基于Adaptive Memory Framework）
     /// Episodic Memory权重（Long-term Memory优先，理论依据: Atkinson-Shiffrin）
     pub episodic_weight: f32,
@@ -27,12 +31,80 @@ pub struct MemoryIntegratorConfig {
     pub working_weight: f32,
     /// Semantic Memory权重（备选，理论依据: HCAM分层检索）
     pub semantic_weight: f32,
-
+    
     // ⭐ Phase 5: 记忆压缩配置
     /// 启用记忆压缩
     pub enable_compression: bool,
     /// 压缩阈值（超过此数量启动压缩）
     pub compression_threshold: usize,
+}
+
+#[derive(Debug)]
+struct CacheMetrics {
+    hits: AtomicU64,
+    misses: AtomicU64,
+    evictions: AtomicU64,
+    size: AtomicU64,
+}
+
+impl CacheMetrics {
+    fn new() -> Self {
+        Self {
+            hits: AtomicU64::new(0),
+            misses: AtomicU64::new(0),
+            evictions: AtomicU64::new(0),
+            size: AtomicU64::new(0),
+        }
+    }
+
+    fn record_hit(&self) {
+        self.hits.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_miss(&self) {
+        self.misses.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_eviction(&self) {
+        self.evictions.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn set_size(&self, size: usize) {
+        self.size.store(size as u64, Ordering::Relaxed);
+    }
+
+    #[allow(dead_code)]
+    fn snapshot(&self) -> (u64, u64, u64, u64) {
+        (
+            self.hits.load(Ordering::Relaxed),
+            self.misses.load(Ordering::Relaxed),
+            self.evictions.load(Ordering::Relaxed),
+            self.size.load(Ordering::Relaxed),
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_cache_key() {
+        let engine = Arc::new(MemoryEngine::new(Default::default()));
+        let integrator = MemoryIntegrator::with_default_config(engine);
+
+        let key = integrator.normalize_cache_key(
+            "  Hello World ",
+            "agent-1",
+            Some("user-1"),
+            Some("session-1"),
+        );
+
+        assert_eq!(
+            key,
+            "agent-1::user-1::session-1::hello world".to_string()
+        );
+    }
 }
 
 impl Default for MemoryIntegratorConfig {
@@ -42,12 +114,12 @@ impl Default for MemoryIntegratorConfig {
             relevance_threshold: 0.1,
             include_timestamp: true,
             sort_by_importance: true,
-
+            
             // Phase 1.5: 认知架构权重
             episodic_weight: 1.2,
             working_weight: 1.0,
             semantic_weight: 0.9,
-
+            
             // Phase 5: 记忆压缩
             enable_compression: true,
             compression_threshold: 10, // 超过10条启动压缩
@@ -67,7 +139,8 @@ pub struct MemoryIntegrator {
     memory_engine: Arc<MemoryEngine>,
     config: MemoryIntegratorConfig,
     /// ⭐ 简单LRU缓存 (query -> memories)
-    cache: Arc<std::sync::RwLock<std::collections::HashMap<String, CacheEntry>>>,
+    cache: Arc<RwLock<lru::LruCache<String, CacheEntry>>>,
+    cache_metrics: CacheMetrics,
 }
 
 impl MemoryIntegrator {
@@ -76,7 +149,10 @@ impl MemoryIntegrator {
         Self {
             memory_engine,
             config,
-            cache: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            cache: Arc::new(RwLock::new(lru::LruCache::new(
+                NonZeroUsize::new(100).unwrap(),
+            ))),
+            cache_metrics: CacheMetrics::new(),
         }
     }
 
@@ -84,36 +160,80 @@ impl MemoryIntegrator {
     pub fn with_default_config(memory_engine: Arc<MemoryEngine>) -> Self {
         Self::new(memory_engine, MemoryIntegratorConfig::default())
     }
-
+    
     /// ⭐ 检查缓存
-    fn get_cached(&self, query: &str) -> Option<Vec<Memory>> {
-        if let Ok(cache) = self.cache.read() {
-            if let Some(entry) = cache.get(query) {
-                // 缓存有效期5分钟
+    fn get_cached(&self, key: &str) -> Option<Vec<Memory>> {
+        if let Ok(mut cache) = self.cache.write() {
+            if let Some(entry) = cache.get(key) {
                 if entry.timestamp.elapsed().as_secs() < 300 {
-                    debug!("🎯 Cache hit for query: {}", &query[..query.len().min(50)]);
+                    debug!("🎯 Cache hit for key: {}", &key[..key.len().min(50)]);
+                    self.cache_metrics.record_hit();
                     return Some(entry.memories.clone());
                 }
+
+                cache.pop(key);
             }
         }
+
+        self.cache_metrics.record_miss();
         None
     }
 
+    fn normalize_cache_key(
+        &self,
+        query: &str,
+        agent_id: &str,
+        user_id: Option<&str>,
+        session_id: Option<&str>,
+    ) -> String {
+        let normalized_query = query.trim().to_lowercase();
+        let user_part = user_id.unwrap_or("_global");
+        let session_part = session_id.unwrap_or("_session");
+        format!(
+            "{}::{}::{}::{}",
+            agent_id, user_part, session_part, normalized_query
+        )
+    }
+    
     /// ⭐ 更新缓存
-    fn update_cache(&self, query: String, memories: Vec<Memory>) {
+    fn update_cache(&self, key: String, memories: Vec<Memory>) {
         if let Ok(mut cache) = self.cache.write() {
-            // 限制缓存大小为100条
-            if cache.len() >= 100 {
-                // 简单策略：清空缓存
-                cache.clear();
-            }
-            cache.insert(
-                query,
+            let evicted = cache.put(
+                key,
                 CacheEntry {
-                    memories: memories.clone(),
-                    timestamp: std::time::Instant::now(),
+                memories: memories.clone(),
+                timestamp: std::time::Instant::now(),
                 },
             );
+
+            if evicted.is_some() {
+                self.cache_metrics.record_eviction();
+            }
+
+            self.cache_metrics.set_size(cache.len());
+        }
+    }
+
+    /// 失效指定Agent/User的缓存
+    pub fn invalidate_cache(&self, agent_id: &str, user_id: Option<&str>) {
+        if let Ok(mut cache) = self.cache.write() {
+            let prefix = match user_id {
+                Some(uid) => format!("{}::{}::", agent_id, uid),
+                None => format!("{}::", agent_id),
+            };
+
+            let keys: Vec<String> = cache
+                .iter()
+                .map(|(k, _)| k.clone())
+                .filter(|k| k.starts_with(&prefix))
+                .collect();
+
+            for key in keys {
+                cache.pop(&key);
+            }
+
+            self.cache_metrics.set_size(cache.len());
+            info!("🗑️  Invalidated cache entries with prefix {}", prefix);
         }
     }
 
@@ -213,12 +333,12 @@ impl MemoryIntegrator {
         max_count: usize,
     ) -> Result<Vec<Memory>> {
         // ⭐ 先检查缓存
-        let cache_key = format!("{}:{}:{:?}:{:?}", query, agent_id, user_id, session_id);
+        let cache_key = self.normalize_cache_key(query, agent_id, user_id, session_id);
         if let Some(cached) = self.get_cached(&cache_key) {
             info!("🎯 Cache hit, returning {} cached memories", cached.len());
             return Ok(cached.into_iter().take(max_count).collect());
         }
-
+        
         use crate::hierarchy::MemoryScope;
         use std::collections::HashSet;
         use tracing::warn;
@@ -234,13 +354,13 @@ impl MemoryIntegrator {
         // 🔧 修复: 改进商品ID检测 - 从查询中提取商品ID（即使包含其他文本）
         let product_id_pattern = Regex::new(r"P\d{6}").unwrap(); // 不要求完全匹配，允许包含其他文本
         let extracted_product_id = product_id_pattern.find(query).map(|m| m.as_str());
-
+        
         if let Some(product_id) = extracted_product_id {
             info!(
                 "🎯 检测到商品ID查询，提取ID: {} (from query: {})",
                 product_id, query
             );
-
+            
             // 使用提取的商品ID进行查询（而不是完整查询）
             let global_scope = MemoryScope::Global;
             match self
@@ -253,11 +373,11 @@ impl MemoryIntegrator {
                         "✅ Global Memory (商品ID查询) 找到 {} 条记忆",
                         memories.len()
                     );
-
+                    
                     // 🔧 修复: 优先返回精确匹配的商品记忆，过滤工作记忆
                     let mut exact_product_memories = Vec::new();
                     let mut other_memories = Vec::new();
-
+                    
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 检查是否是精确匹配的商品记忆
@@ -270,19 +390,19 @@ impl MemoryIntegrator {
                                 content_str.contains(&format!("商品ID: {}", product_id))
                                     || memory
                                         .attributes
-                                        .get(&agent_mem_traits::AttributeKey::core("product_id"))
-                                        .and_then(|attr_val| attr_val.as_string())
-                                        .map(|pid| pid == product_id)
-                                        .unwrap_or(false)
+                                    .get(&agent_mem_traits::AttributeKey::core("product_id"))
+                                    .and_then(|attr_val| attr_val.as_string())
+                                    .map(|pid| pid == product_id)
+                                    .unwrap_or(false)
                             };
-
+                            
                             // 排除工作记忆
                             let mem_type_opt = memory.memory_type();
                             let is_working_memory = mem_type_opt
                                 .as_ref()
                                 .map(|t| t.to_lowercase() == "working")
                                 .unwrap_or(false);
-
+                            
                             if is_exact_product && !is_working_memory {
                                 // 精确匹配的商品记忆，权重提升
                                 if let Some(score) = memory.score() {
@@ -291,24 +411,24 @@ impl MemoryIntegrator {
                                 exact_product_memories.push(memory);
                             } else if !is_working_memory {
                                 // 其他相关记忆
-                                if let Some(score) = memory.score() {
+                            if let Some(score) = memory.score() {
                                     memory.set_score(score * 1.2); // 适度提升权重
                                 }
                                 other_memories.push(memory);
                             }
                         }
                     }
-
+                    
                     // 合并：精确匹配在前
                     let exact_count = exact_product_memories.len();
                     all_memories.extend(exact_product_memories);
                     all_memories.extend(other_memories);
-
+                    
                     // 如果找到足够的结果，直接返回
                     if all_memories.len() >= max_count {
                         info!(
                             "✅ 商品ID查询完成，返回 {} 条结果 (精确匹配: {})",
-                            all_memories.len(),
+                            all_memories.len(), 
                             exact_count
                         );
                         all_memories.sort_by(|a, b| {
@@ -380,8 +500,8 @@ impl MemoryIntegrator {
                     query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            if let Some(score) = memory.score() {
-                                memory.set_score(score * self.config.episodic_weight as f64);
+                        if let Some(score) = memory.score() {
+                            memory.set_score(score * self.config.episodic_weight as f64);
                             }
                             all_memories.push(memory);
                         }
@@ -391,20 +511,20 @@ impl MemoryIntegrator {
                 Err(e) => {
                     warn!("⚠️  Episodic Memory query failed: {}", e);
                 }
-            }
+        }
 
             // 处理 Working 结果
             if let Some(Ok(memories)) = working_result {
-                let mut added = 0;
+                    let mut added = 0;
                 query_count += 1;
-                for memory in memories {
-                    if seen_ids.insert(memory.id.clone()) {
-                        all_memories.push(memory);
-                        added += 1;
+                    for memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            all_memories.push(memory);
+                            added += 1;
+                        }
                     }
-                }
                 info!("🔄 Working Memory added {} memories", added);
-            }
+                }
         }
 
         // ✅ 优化2: 早停检查1 - Episodic + Working已足够
@@ -570,15 +690,15 @@ impl MemoryIntegrator {
 
         // 返回 top N（基于HCAM的两阶段检索结果）
         let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
-
+        
         // ⭐ 更新缓存
         self.update_cache(cache_key, result.clone());
-
+        
         Ok(result)
     }
 
     /// ⭐ Phase 3: 极简记忆注入格式（token优化）
-    ///
+    /// 
     /// 优化：去除冗长说明，只保留核心信息
     pub fn inject_memories_to_prompt(&self, memories: &[Memory]) -> String {
         if memories.is_empty() {
@@ -600,7 +720,7 @@ impl MemoryIntegrator {
             };
             lines.push(format!("{}. {}", i + 1, truncated));
         }
-
+        
         lines.join("\n")
     }
 
@@ -620,12 +740,12 @@ impl MemoryIntegrator {
     }
 
     /// ⭐ Phase 2: 综合评分系统 (relevance + importance + recency)
-    ///
+    /// 
     /// 借鉴mem0的最佳实践：相关性(50%) + 重要性(30%) + 时效性(20%)
     pub fn calculate_comprehensive_score(&self, memory: &Memory) -> f64 {
         let relevance = memory.score().unwrap_or(0.5); // 相似度分数
         let importance = memory.importance().unwrap_or(0.5);
-
+        
         // 时效性衰减：使用指数衰减，半衰期为30天
         use chrono::Utc;
         let now = Utc::now();
@@ -636,11 +756,11 @@ impl MemoryIntegrator {
         } else {
             1.0 // 未来时间（时钟偏差），默认1.0
         };
-
+        
         // 综合评分：0.5 * relevance + 0.3 * importance + 0.2 * recency
         0.5 * relevance + 0.3 * importance + 0.2 * recency
     }
-
+    
     /// 按综合评分排序记忆（Phase 2优化）
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
@@ -680,15 +800,15 @@ impl MemoryIntegrator {
         info!("🔍 filter_by_relevance: output={} memories", filtered.len());
         filtered
     }
-
+    
     /// ⭐ Phase 5: 记忆去重
     /// 移除内容相似的重复记忆
     pub fn deduplicate_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
         use std::collections::HashSet;
-
+        
         let mut seen_content = HashSet::new();
         let mut dedup = Vec::new();
-
+        
         for memory in memories {
             let content_key = match &memory.content {
                 agent_mem_traits::Content::Text(t) => {
@@ -701,14 +821,14 @@ impl MemoryIntegrator {
                 }
                 _ => continue,
             };
-
+            
             if seen_content.insert(content_key.to_string()) {
                 dedup.push(memory);
             } else {
                 debug!("🔄 Deduplicate: skipping duplicate memory");
             }
         }
-
+        
         info!(
             "🔄 Deduplicate: {} → {} memories",
             seen_content.len() + (dedup.len() - seen_content.len()),
@@ -716,25 +836,25 @@ impl MemoryIntegrator {
         );
         dedup
     }
-
+    
     /// ⭐ Phase 5: 记忆压缩（简化版）
     /// 当记忆数量过多时，只保留最重要的
     pub fn compress_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
         if !self.config.enable_compression || memories.len() <= self.config.compression_threshold {
             return memories;
         }
-
+        
         info!(
             "📦 Compression: {} memories exceed threshold {}, keeping top {}",
             memories.len(),
             self.config.compression_threshold,
             self.config.compression_threshold / 2
         );
-
+        
         // 简单策略：只保留最重要的前N条
         let keep_count = self.config.compression_threshold / 2;
         let mut result: Vec<Memory> = memories.into_iter().take(keep_count).collect();
-
+        
         info!(
             "📦 Compressed: kept {} most important memories",
             result.len()

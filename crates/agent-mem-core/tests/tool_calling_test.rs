@@ -8,7 +8,7 @@ use agent_mem_traits::{
 };
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 use tokio;
 
 /// Mock LLM Provider for testing
@@ -26,8 +26,8 @@ impl LLMProvider for MockLLMProvider {
     async fn generate_stream(
         &self,
         _messages: &[Message],
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
-        unimplemented!("Streaming not needed for tests")
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
+        Err(agent_mem_traits::AgentMemError::unsupported_provider("mock_llm"))
     }
 
     fn get_model_info(&self) -> ModelInfo {

@@ -7,7 +7,6 @@ mod tests {
         orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     };
     use agent_mem_traits::abstractions::Memory;
-    use agent_mem_traits::{Content, MemoryId};
     use std::sync::Arc;
     use std::time::Instant;
 

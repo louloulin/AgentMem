@@ -10,13 +10,15 @@ use std::sync::Arc;
 #[test]
 fn test_memory_integrator_config_default() {
     let config = MemoryIntegratorConfig::default();
-    assert_eq!(config.max_memories, 10);
+    assert_eq!(config.max_memories, 3);
     assert!((config.relevance_threshold - 0.1).abs() < f32::EPSILON);
     assert!(config.include_timestamp);
     assert!(config.sort_by_importance);
     assert!((config.episodic_weight - 1.2).abs() < f32::EPSILON);
     assert!((config.working_weight - 1.0).abs() < f32::EPSILON);
     assert!((config.semantic_weight - 0.9).abs() < f32::EPSILON);
+    assert!(config.enable_compression);
+    assert_eq!(config.compression_threshold, 10);
 }
 
 #[test]
@@ -29,6 +31,8 @@ fn test_memory_integrator_config_custom() {
         episodic_weight: 0.8,
         working_weight: 1.1,
         semantic_weight: 0.6,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     assert_eq!(config.max_memories, 20);
     assert_eq!(config.relevance_threshold, 0.7);

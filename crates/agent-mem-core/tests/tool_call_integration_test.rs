@@ -3,7 +3,7 @@
 //! Tests the newly implemented tool calling functionality in the orchestrator
 
 use agent_mem_core::orchestrator::tool_integration::{ToolIntegrator, ToolIntegratorConfig};
-use agent_mem_tools::{builtin::CalculatorTool, ExecutionContext, Tool, ToolExecutor};
+use agent_mem_tools::{builtin::CalculatorTool, ExecutionContext, ToolExecutor};
 use agent_mem_traits::llm::FunctionCall;
 use std::sync::Arc;
 use std::time::Duration;

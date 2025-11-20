@@ -5,7 +5,9 @@ use agent_mem_core::operations::MemoryOperations;
 use agent_mem_core::storage::libsql::{
     LibSqlConnectionManager, LibSqlMemoryOperations, LibSqlMemoryRepository,
 };
-use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryV4 as Memory};
+use agent_mem_traits::{
+    AttributeKey, AttributeSet, AttributeValue, Content, MemoryV4 as Memory, MetadataV4,
+};
 
 #[tokio::test]
 async fn test_phase0_libsql_persistence() {
@@ -50,7 +52,7 @@ async fn test_phase0_libsql_persistence() {
         content: Content::text("Phase 0 测试记忆"),
         attributes,
         relations: agent_mem_traits::RelationGraph::new(),
-        metadata: agent_mem_traits::Metadata::default(),
+        metadata: MetadataV4::default(),
     };
 
     let memory_id = memory.id.0.clone();
@@ -116,7 +118,7 @@ async fn test_phase0_batch_persistence() {
             content: Content::text(format!("Batch memory {}", i)),
             attributes,
             relations: agent_mem_traits::RelationGraph::new(),
-            metadata: agent_mem_traits::Metadata::default(),
+            metadata: MetadataV4::default(),
         };
         memories.push(memory);
     }

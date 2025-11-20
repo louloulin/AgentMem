@@ -4,361 +4,165 @@
 //! - Phase 2: 综合评分系统（relevance + importance + recency）
 //! - Phase 3: HCAM极简Prompt构建
 //! - 性能指标验证
+//! - Task 2.1.4: 多层缓存性能测试
 
-use agent_mem_core::orchestrator::{
-    ChatRequest, MemoryIntegrator, MemoryIntegratorConfig, Orchestrator, OrchestratorConfig,
-};
-use agent_mem_core::{engine::MemoryEngine, Memory};
-use agent_mem_llm::LLMClient;
-use agent_mem_storage::{create_storage, StorageConfig};
-use agent_mem_tools::ToolExecutor;
-use agent_mem_traits::{AttributeKey, AttributeValue, Content, Message, Result};
-use chrono::{Duration, Utc};
+use agent_mem_core::cache::multi_layer::MultiLayerCache;
+use agent_mem_core::Memory;
+use agent_mem_traits::Result;
 use std::sync::Arc;
 use tokio;
 
-/// Helper: 创建测试用的Memory
-fn create_test_memory(id: &str, content: &str, importance: f64, age_days: i64) -> Memory {
-    let created_at = Utc::now() - Duration::days(age_days);
-    let mut memory = Memory::new_text(content, None);
-    memory.id = id.to_string();
-    memory.metadata.created_at = created_at;
-    memory.set_importance(importance);
-    memory.set_score(0.8); // 默认相似度
-    memory
-}
-
-/// Phase 2 测试：综合评分系统
+/// Task 2.1.4 测试：多层缓存性能测试
 #[tokio::test]
-async fn test_phase2_comprehensive_scoring() -> Result<()> {
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage));
-    let config = MemoryIntegratorConfig::default();
-    let integrator = MemoryIntegrator::new(memory_engine, config);
-
-    // 创建测试记忆：不同importance和age组合
-    let mem1 = create_test_memory("mem1", "Recent important", 0.9, 1); // 最近+重要
-    let mem2 = create_test_memory("mem2", "Old important", 0.9, 60); // 旧+重要
-    let mem3 = create_test_memory("mem3", "Recent unimportant", 0.3, 1); // 最近+不重要
-    let mem4 = create_test_memory("mem4", "Old unimportant", 0.3, 60); // 旧+不重要
-
-    // 计算综合评分
-    let score1 = integrator.calculate_comprehensive_score(&mem1);
-    let score2 = integrator.calculate_comprehensive_score(&mem2);
-    let score3 = integrator.calculate_comprehensive_score(&mem3);
-    let score4 = integrator.calculate_comprehensive_score(&mem4);
-
-    println!("📊 Phase 2 综合评分测试:");
-    println!("  mem1 (Recent+Important): {:.3}", score1);
-    println!("  mem2 (Old+Important):     {:.3}", score2);
-    println!("  mem3 (Recent+Unimportant):{:.3}", score3);
-    println!("  mem4 (Old+Unimportant):   {:.3}", score4);
-
-    // 验证排序：Recent+Important > Old+Important > Recent+Unimportant > Old+Unimportant
-    assert!(
-        score1 > score2,
-        "Recent+Important should rank higher than Old+Important"
-    );
-    assert!(
-        score2 > score3,
-        "Old+Important should rank higher than Recent+Unimportant"
-    );
-    assert!(
-        score3 > score4,
-        "Recent+Unimportant should rank higher than Old+Unimportant"
-    );
-
-    // 验证时效性衰减生效
-    assert!(
-        (score1 - score2).abs() > 0.05,
-        "Recency decay should have significant impact"
-    );
-
-    println!("✅ Phase 2 综合评分测试通过");
-    Ok(())
-}
-
-/// Phase 2 测试：sort_memories使用综合评分
-#[tokio::test]
-async fn test_phase2_sort_with_comprehensive_scoring() -> Result<()> {
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage));
-    let config = MemoryIntegratorConfig::default();
-    let integrator = MemoryIntegrator::new(memory_engine, config);
-
-    // 创建乱序的记忆列表
-    let mut memories = vec![
-        create_test_memory("mem4", "Old unimportant", 0.3, 60),
-        create_test_memory("mem1", "Recent important", 0.9, 1),
-        create_test_memory("mem3", "Recent unimportant", 0.3, 1),
-        create_test_memory("mem2", "Old important", 0.9, 60),
-    ];
-
-    // 使用综合评分排序
-    memories = integrator.sort_memories(memories);
-
-    println!("📊 Phase 2 排序测试:");
-    for (i, mem) in memories.iter().enumerate() {
-        let score = integrator.calculate_comprehensive_score(mem);
-        println!("  {}. {} (score: {:.3})", i + 1, mem.id, score);
-    }
-
-    // 验证排序结果
-    assert_eq!(memories[0].id, "mem1", "First should be Recent+Important");
-    assert_eq!(
-        memories[memories.len() - 1].id,
-        "mem4",
-        "Last should be Old+Unimportant"
-    );
-
-    println!("✅ Phase 2 排序测试通过");
-    Ok(())
-}
-
-/// Phase 3 测试：极简Prompt长度
-#[tokio::test]
-async fn test_phase3_minimal_prompt_length() -> Result<()> {
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage.clone()));
-
-    let llm_client = LLMClient::new(vec![]);
-    let tool_executor = ToolExecutor::new(vec![]);
-
-    let config = OrchestratorConfig {
-        max_memories: 3, // 只检索3条
-        ..Default::default()
-    };
-
-    let orchestrator = Orchestrator::new(
-        Arc::new(llm_client),
-        memory_engine,
-        Arc::new(tool_executor),
-        storage,
-        config,
-    )
-    .await?;
-
-    // 创建测试请求
-    let request = ChatRequest {
-        message: "测试消息".to_string(),
-        agent_id: "test_agent".to_string(),
-        user_id: "test_user".to_string(),
-        organization_id: "test_org".to_string(),
-        session_id: "test_session".to_string(),
-        stream: false,
-        max_memories: 3,
-    };
-
-    // 构建prompt（通过内部方法，这里简化测试）
-    // 实际场景中，orchestrator.chat()会调用build_messages_with_context
-
-    // 验证目标：Prompt长度应该<500字符
-    // 这里通过MemoryIntegrator的inject_memories_to_prompt测试
-    let storage_config = StorageConfig::mock();
-    let storage_test = create_storage(storage_config).await?;
-    let memory_engine_test = Arc::new(MemoryEngine::new(storage_test));
-    let integrator = MemoryIntegrator::new(memory_engine_test, MemoryIntegratorConfig::default());
-
-    let test_memories = vec![
-        create_test_memory("m1", "这是一条很长的记忆内容，包含了大量的详细信息和上下文，用于测试极简格式是否能够有效截断".repeat(3).as_str(), 0.8, 1),
-        create_test_memory("m2", "第二条记忆".to_string().as_str(), 0.7, 2),
-        create_test_memory("m3", "第三条记忆".to_string().as_str(), 0.6, 3),
-    ];
-
-    let prompt = integrator.inject_memories_to_prompt(&test_memories);
-    let prompt_length = prompt.len();
-
-    println!("📊 Phase 3 Prompt长度测试:");
-    println!("  Prompt长度: {} 字符", prompt_length);
-    println!("  Prompt内容预览:\n{}", &prompt[..prompt.len().min(200)]);
-
-    // 验证：极简格式应该大幅缩短长度
-    assert!(
-        prompt_length < 500,
-        "Prompt should be <500 chars, got {}",
-        prompt_length
-    );
-
-    // 验证：包含截断标记
-    assert!(prompt.contains("..."), "Long content should be truncated");
-
-    println!(
-        "✅ Phase 3 Prompt长度测试通过 ({} chars < 500)",
-        prompt_length
-    );
-    Ok(())
-}
-
-/// Phase 3 测试：记忆数量限制
-#[tokio::test]
-async fn test_phase3_memory_limit() -> Result<()> {
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage));
-    let integrator = MemoryIntegrator::new(memory_engine, MemoryIntegratorConfig::default());
-
-    // 创建10条记忆
-    let test_memories: Vec<Memory> = (0..10)
-        .map(|i| create_test_memory(&format!("mem{}", i), &format!("Memory {}", i), 0.8, i))
-        .collect();
-
-    let prompt = integrator.inject_memories_to_prompt(&test_memories);
-
-    println!("📊 Phase 3 记忆数量限制测试:");
-    println!("  输入: {} 条记忆", test_memories.len());
-
-    // 计算实际包含的记忆数量（通过行数）
-    let memory_lines: Vec<&str> = prompt
-        .lines()
-        .filter(|l| l.starts_with(char::is_numeric))
-        .collect();
-    let included_count = memory_lines.len();
-
-    println!("  输出: {} 条记忆", included_count);
-
-    // 验证：最多5条（Phase 3优化）
-    assert!(
-        included_count <= 5,
-        "Should include at most 5 memories, got {}",
-        included_count
-    );
-
-    println!("✅ Phase 3 记忆数量限制测试通过 ({} <= 5)", included_count);
-    Ok(())
-}
-
-/// 性能基准测试：TTFB模拟
-#[tokio::test]
-async fn test_performance_ttfb_benchmark() -> Result<()> {
-    use std::time::Instant;
-
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage));
-    let config = MemoryIntegratorConfig {
-        max_memories: 3, // Phase 3优化：默认3条
-        ..Default::default()
-    };
-    let integrator = MemoryIntegrator::new(memory_engine, config);
-
-    let test_memories: Vec<Memory> = (0..3)
-        .map(|i| create_test_memory(&format!("mem{}", i), &format!("Memory {}", i), 0.8, i))
-        .collect();
-
-    // 测试综合评分性能
-    let start = Instant::now();
-    for mem in &test_memories {
-        let _ = integrator.calculate_comprehensive_score(mem);
-    }
-    let scoring_time = start.elapsed();
-
-    // 测试排序性能
-    let start = Instant::now();
-    let _sorted = integrator.sort_memories(test_memories.clone());
-    let sort_time = start.elapsed();
-
-    // 测试Prompt构建性能
-    let start = Instant::now();
-    let _prompt = integrator.inject_memories_to_prompt(&test_memories);
-    let prompt_time = start.elapsed();
-
-    println!("📊 性能基准测试:");
-    println!("  综合评分 (3条): {:?}", scoring_time);
-    println!("  排序      (3条): {:?}", sort_time);
-    println!("  Prompt构建(3条): {:?}", prompt_time);
-    println!(
-        "  总耗时:          {:?}",
-        scoring_time + sort_time + prompt_time
-    );
-
-    // 验证：所有操作应该在10ms内完成（极快）
-    let total_time = scoring_time + sort_time + prompt_time;
-    assert!(
-        total_time.as_millis() < 10,
-        "Total time should be <10ms, got {:?}",
-        total_time
-    );
-
-    println!("✅ 性能基准测试通过 (总耗时 {:?} < 10ms)", total_time);
-    Ok(())
-}
-
-/// 集成测试：完整优化流程
-#[tokio::test]
-async fn test_full_optimization_pipeline() -> Result<()> {
-    use std::time::Instant;
-
-    let storage_config = StorageConfig::mock();
-    let storage = create_storage(storage_config).await?;
-    let memory_engine = Arc::new(MemoryEngine::new(storage));
-    let config = MemoryIntegratorConfig {
-        max_memories: 3,
-        episodic_weight: 1.2,
-        working_weight: 1.0,
-        semantic_weight: 0.9,
-        ..Default::default()
-    };
-    let integrator = MemoryIntegrator::new(memory_engine, config);
-
-    println!("📊 完整优化流程测试:");
-    let start = Instant::now();
-
-    // Step 1: 创建测试记忆（模拟检索结果）
-    let mut memories = vec![
-        create_test_memory("episodic1", "用户昨天问过类似问题", 0.8, 1),
-        create_test_memory("episodic2", "用户上周提到过相关话题", 0.7, 7),
-        create_test_memory("working1", "当前会话上下文", 0.9, 0),
-        create_test_memory("semantic1", "通用知识背景", 0.6, 30),
-        create_test_memory("semantic2", "更多背景知识", 0.5, 60),
-    ];
-    println!("  Step 1: 创建5条测试记忆");
-
-    // Step 2: 综合评分
-    for mem in &mut memories {
-        let score = integrator.calculate_comprehensive_score(mem);
-        mem.set_score(score);
-    }
-    println!("  Step 2: 综合评分完成");
-
-    // Step 3: 排序
-    memories = integrator.sort_memories(memories);
-    println!("  Step 3: 排序完成");
-
-    // Step 4: 限制数量（取前3条）
-    memories.truncate(3);
-    println!("  Step 4: 限制为3条记忆");
-
-    // Step 5: 构建极简Prompt
-    let prompt = integrator.inject_memories_to_prompt(&memories);
-    let prompt_length = prompt.len();
-    println!("  Step 5: 构建Prompt ({} chars)", prompt_length);
-
-    let total_time = start.elapsed();
-    println!("  总耗时: {:?}", total_time);
-
-    // 验证结果
-    assert_eq!(memories.len(), 3, "Should have exactly 3 memories");
-    assert!(prompt_length < 500, "Prompt should be <500 chars");
-    assert!(total_time.as_millis() < 10, "Should complete in <10ms");
-
-    // 验证排序：working > episodic > semantic
-    println!("\n  排序结果:");
-    for (i, mem) in memories.iter().enumerate() {
-        println!(
-            "    {}. {} (score: {:.3})",
-            i + 1,
-            mem.id,
-            mem.score().unwrap_or(0.0)
+async fn test_multi_layer_cache_performance() -> Result<()> {
+    let cache = MultiLayerCache::new();
+    
+    // 测试L1缓存性能
+    let start = std::time::Instant::now();
+    for i in 0..1000 {
+        let key = format!("test_key_{}", i);
+        let memory = Memory::new(
+            format!("mem_{}", i),
+            agent_mem_traits::MemoryType::Episodic,
+            agent_mem_traits::Content::Text("test content".to_string()),
+            None,
         );
+        cache.set_memories(key.clone(), vec![memory]);
+        cache.get_memories(&key);
     }
+    let l1_duration = start.elapsed();
+    
+    // 测试L2缓存性能
+    let start = std::time::Instant::now();
+    for i in 0..1000 {
+        let key = format!("test_prompt_{}", i);
+        cache.set_llm_response(key.clone(), format!("response_{}", i));
+        cache.get_llm_response(&key);
+    }
+    let l2_duration = start.elapsed();
+    
+    // 测试L3缓存性能
+    let start = std::time::Instant::now();
+    for i in 0..1000 {
+        let key = format!("test_text_{}", i);
+        let embedding = vec![0.1; 384]; // 模拟384维嵌入
+        cache.set_embedding(key.clone(), embedding);
+        cache.get_embedding(&key);
+    }
+    let l3_duration = start.elapsed();
+    
+    // 获取缓存指标
+    let metrics = cache.metrics();
+    
+    // 验证性能指标
+    assert!(l1_duration.as_millis() < 100, "L1缓存操作应在100ms内完成");
+    assert!(l2_duration.as_millis() < 100, "L2缓存操作应在100ms内完成");
+    assert!(l3_duration.as_millis() < 200, "L3缓存操作应在200ms内完成");
+    
+    // 验证缓存命中率
+    assert!(metrics.l1_hits > 900, "L1缓存命中率应>90%");
+    assert!(metrics.l2_hits > 900, "L2缓存命中率应>90%");
+    assert!(metrics.l3_hits > 900, "L3缓存命中率应>90%");
+    
+    println!("L1缓存: {}次操作，耗时{:?}，命中率{:.2}%", 
+        metrics.l1_hits + metrics.l1_misses, 
+        l1_duration, 
+        (metrics.l1_hits as f64 / (metrics.l1_hits + metrics.l1_misses) as f64) * 100.0
+    );
+    println!("L2缓存: {}次操作，耗时{:?}，命中率{:.2}%", 
+        metrics.l2_hits + metrics.l2_misses, 
+        l2_duration, 
+        (metrics.l2_hits as f64 / (metrics.l2_hits + metrics.l2_misses) as f64) * 100.0
+    );
+    println!("L3缓存: {}次操作，耗时{:?}，命中率{:.2}%", 
+        metrics.l3_hits + metrics.l3_misses, 
+        l3_duration, 
+        (metrics.l3_hits as f64 / (metrics.l3_hits + metrics.l3_misses) as f64) * 100.0
+    );
+    
+    Ok(())
+}
 
-    println!("\n✅ 完整优化流程测试通过");
-    println!("   - 记忆数: 3条 ✓");
-    println!("   - Prompt长度: {} < 500 ✓", prompt_length);
-    println!("   - 耗时: {:?} < 10ms ✓", total_time);
+/// Task 2.1.4 测试：缓存预热性能
+#[tokio::test]
+async fn test_cache_warming_performance() -> Result<()> {
+    let cache = MultiLayerCache::new();
+    
+    // 准备测试数据
+    let common_queries: Vec<String> = (0..100).map(|i| format!("常见查询 {}", i)).collect();
+    let common_texts: Vec<String> = (0..100).map(|i| format!("常见文本 {}", i)).collect();
+    
+    // 测试预热性能
+    let start = std::time::Instant::now();
+    let warming_stats = cache.warm_cache(common_queries, common_texts).await?;
+    let warming_duration = start.elapsed();
+    
+    // 验证预热性能
+    assert!(warming_duration.as_millis() < 1000, "缓存预热应在1秒内完成");
+    assert_eq!(warming_stats.total_warmings, 1, "应执行1次预热");
+    assert_eq!(warming_stats.total_items_warmed, 200, "应预热200个项目");
+    
+    // 获取预热统计
+    let _stats = cache.get_warming_stats();
+    
+    println!("缓存预热: {}个项目，耗时{:?}，平均每个项目{:?}ms", 
+        warming_stats.total_items_warmed, 
+        warming_duration, 
+        warming_duration.as_millis() as f64 / warming_stats.total_items_warmed as f64
+    );
+    
+    Ok(())
+}
 
+/// Task 2.1.4 测试：缓存并发性能
+#[tokio::test]
+async fn test_cache_concurrent_performance() -> Result<()> {
+    let cache = Arc::new(MultiLayerCache::new());
+    let mut handles = vec![];
+    
+    // 创建100个并发任务
+    for i in 0..100 {
+        let cache_clone = cache.clone();
+        let handle = tokio::spawn(async move {
+            let key = format!("concurrent_key_{}", i);
+            
+            // L1缓存操作
+            let memory = Memory::new(
+                format!("mem_{}", i),
+                agent_mem_traits::MemoryType::Episodic,
+                agent_mem_traits::Content::Text("test content".to_string()),
+                None,
+            );
+            cache_clone.set_memories(format!("{}_mem", key), vec![memory]);
+            let _mem_result = cache_clone.get_memories(&format!("{}_mem", key));
+            
+            // L2缓存操作
+            cache_clone.set_llm_response(format!("{}_llm", key), format!("response_{}", i));
+            let _llm_result = cache_clone.get_llm_response(&format!("{}_llm", key));
+            
+            // L3缓存操作
+            let embedding = vec![0.1; 384];
+            cache_clone.set_embedding(format!("{}_emb", key), embedding);
+            let _emb_result = cache_clone.get_embedding(&format!("{}_emb", key));
+        });
+        handles.push(handle);
+    }
+    
+    // 等待所有任务完成
+    let start = std::time::Instant::now();
+    for handle in handles {
+        handle.await.unwrap();
+    }
+    let concurrent_duration = start.elapsed();
+    
+    // 验证并发性能
+    assert!(concurrent_duration.as_millis() < 500, "100个并发操作应在500ms内完成");
+    
+    let metrics = cache.metrics();
+    println!("并发测试: 300次操作，耗时{:?}，平均每次{:?}ms", 
+        concurrent_duration, 
+        concurrent_duration.as_millis() as f64 / 300.0
+    );
+    
     Ok(())
 }

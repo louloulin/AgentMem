@@ -70,6 +70,8 @@ async fn test_memory_integrator_inject_memories() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -112,6 +114,8 @@ async fn test_memory_integrator_filter_by_relevance() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -155,6 +159,8 @@ async fn test_memory_integrator_sort_memories() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -204,6 +210,8 @@ async fn test_memory_integrator_empty_memories() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -234,6 +242,8 @@ async fn test_memory_integrator_no_score() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: true,
+        compression_threshold: 5,
     };
     let integrator = MemoryIntegrator::new(memory_engine, config);
 
@@ -290,6 +300,8 @@ async fn test_memory_integrator_config() {
         episodic_weight: 1.2,
         working_weight: 1.0,
         semantic_weight: 0.9,
+        enable_compression: false,
+        compression_threshold: 20,
     };
     assert_eq!(custom_config.relevance_threshold, 0.8);
     assert_eq!(custom_config.max_memories, 20);

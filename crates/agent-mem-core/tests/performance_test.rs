@@ -4,7 +4,6 @@ use agent_mem_core::performance::{
     BatchConfig, BatchProcessor, BenchmarkConfig, CacheKey, PerformanceBenchmark,
     PerformanceConfig, PerformanceManager, QueryCache, QueryCacheConfig,
 };
-use agent_mem_traits::Result;
 
 #[tokio::test]
 async fn test_query_cache_basic() {
