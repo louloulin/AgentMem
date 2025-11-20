@@ -249,8 +249,8 @@ pub async fn send_chat_message_lumosai_stream(
     
     // 5. ⭐ 转换为StreamingAgent以支持真实token-by-token streaming
     let streaming_config = StreamingConfig {
-        text_buffer_size: 10,  // 每10个字符发送一次
-        emit_metadata: true,
+        text_buffer_size: 1,  // 每1个字符发送一次，最快响应
+        emit_metadata: false,  // 禁用metadata减少开销
         emit_memory_updates: false,
         text_delta_delay_ms: None,  // 无延迟，实时发送
     };
