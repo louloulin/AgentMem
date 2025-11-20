@@ -132,11 +132,16 @@ impl LocalTestProvider {
         } else if content.contains("分析") || content.contains("analysis") {
             self.response_templates.get("analysis").unwrap().clone()
         } else {
-            // 生成基于内容的动态响应
+            // 生成基于内容的动态响应 (UTF-8安全截断)
+            let content_preview: String = if content.chars().count() > 50 {
+                content.chars().take(50).collect()
+            } else {
+                content.clone()
+            };
             format!(
                 "我理解您提到了：「{}」。这是一个很有趣的话题。基于我的理解，我可以提供以下见解：\n\n1. 您的输入包含了 {} 个字符\n2. 消息类型：{:?}\n3. 这是第 {} 条消息\n\n如果您需要更具体的帮助，请告诉我更多详细信息。",
-                if content.len() > 50 { &content[..50] } else { &content },
-                content.len(),
+                content_preview,
+                content.chars().count(),
                 last_message.role,
                 messages.len()
             )

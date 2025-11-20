@@ -187,15 +187,16 @@ impl LLMProvider for ZhipuProvider {
         info!("   URL: {}", url);
         info!("   消息数量: {}", messages.len());
         
-        // 🔍 详细记录每条消息的内容和长度
+        // 🔍 详细记录每条消息的内容和长度 (UTF-8安全截断)
         for (idx, msg) in messages.iter().enumerate() {
-            let content_preview = if msg.content.len() > 200 {
-                format!("{}... (总长度: {}字符)", &msg.content[..200], msg.content.len())
+            let content_preview = if msg.content.chars().count() > 200 {
+                let truncated: String = msg.content.chars().take(200).collect();
+                format!("{}... (总长度: {}字符)", truncated, msg.content.chars().count())
             } else {
                 msg.content.clone()
             };
             info!("   📝 消息[{}] role={:?}, 长度={}字符, 内容=\"{}\"", 
-                idx, msg.role, msg.content.len(), content_preview);
+                idx, msg.role, msg.content.chars().count(), content_preview);
         }
         
         debug!("   消息内容（完整）: {:?}", messages);
