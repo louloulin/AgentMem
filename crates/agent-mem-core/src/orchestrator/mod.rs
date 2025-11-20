@@ -721,7 +721,10 @@ impl AgentOrchestrator {
         Ok(memories)
     }
 
-    /// 构建包含会话上下文和记忆的消息列表（新版本，集成Working Memory）
+    /// ⭐ Phase 3: HCAM分层Prompt构建（极简风格）
+    /// 
+    /// 优化目标：从4606字符降至<500字符（-89%）
+    /// 理论依据：HCAM模型 - 简洁优先原则
     async fn build_messages_with_context(
         &self,
         request: &ChatRequest,
@@ -729,41 +732,38 @@ impl AgentOrchestrator {
         memories: &[Memory],
     ) -> Result<Vec<Message>> {
         let mut messages = Vec::new();
+        let mut system_parts = Vec::new();
 
-        // 构建系统消息，优先级：Working Context > 长期记忆
-        let mut system_message_parts = Vec::new();
-
-        // 1. 添加会话上下文（优先级最高）
+        // Level 2: Working Context (当前会话，最重要) - 极简格式
         if !working_context.is_empty() {
-            system_message_parts.push(format!(
-                "## ⚠️ CURRENT SESSION CONTEXT (HIGHEST PRIORITY)\n\n\
-                **IMPORTANT**: The following is the CURRENT conversation in THIS session. \
-                This information has the HIGHEST priority and should OVERRIDE any conflicting information from past memories.\n\n\
-                **Current Session History:**\n{}",
-                working_context
-            ));
+            system_parts.push(format!("## Current Session\n{}", working_context));
         }
 
-        // 2. 添加长期记忆（仅供参考）
+        // Level 3: Episodic Context (相关经验) - 极简格式
         if !memories.is_empty() {
-            let memory_context = self.memory_integrator.inject_memories_to_prompt(memories);
-            system_message_parts.push(format!(
-                "## 📚 PAST MEMORIES (For Reference Only)\n\n\
-                **Note**: The following are memories from PAST conversations. \
-                If there is any conflict between these past memories and the current session context above, \
-                ALWAYS prioritize the current session information.\n\n\
-                {}",
-                memory_context
-            ));
+            let mut memory_lines = Vec::new();
+            for (i, mem) in memories.iter().enumerate() {
+                let content = match &mem.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    _ => "[data]",
+                };
+                // 极简格式：序号 + 内容（最多100字符）
+                let truncated = if content.len() > 100 {
+                    format!("{}...", &content[..100])
+                } else {
+                    content.to_string()
+                };
+                memory_lines.push(format!("{}. {}", i + 1, truncated));
+            }
+            system_parts.push(format!("## Past Context\n{}", memory_lines.join("\n")));
         }
 
-        // 如果有任何上下文信息，添加系统消息
-        if !system_message_parts.is_empty() {
-            let system_content = system_message_parts.join("\n\n");
-            messages.push(Message::system(&system_content));
+        // 构建系统消息（如果有上下文）
+        if !system_parts.is_empty() {
+            messages.push(Message::system(&system_parts.join("\n\n")));
         }
 
-        // 添加用户消息
+        // Level 1: Current Message (当前输入)
         messages.push(Message::user(&request.message));
 
         Ok(messages)

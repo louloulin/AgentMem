@@ -206,7 +206,7 @@ impl MemoryIntegrator {
                                 content_str.contains(&format!("商品ID: {}", product_id)) ||
                                 memory.attributes
                                     .get(&agent_mem_traits::AttributeKey::core("product_id"))
-                                    .and_then(|v| v.as_string())
+                                    .and_then(|attr_val| attr_val.as_string())
                                     .map(|pid| pid == product_id)
                                     .unwrap_or(false)
                             };
@@ -441,62 +441,30 @@ impl MemoryIntegrator {
         Ok(all_memories.into_iter().take(max_count).collect())
     }
 
-    /// 将记忆注入到 prompt
-    ///
-    /// 参考 MIRIX 的记忆格式化方式
+    /// ⭐ Phase 3: 极简记忆注入格式（token优化）
+    /// 
+    /// 优化：去除冗长说明，只保留核心信息
     pub fn inject_memories_to_prompt(&self, memories: &[Memory]) -> String {
         if memories.is_empty() {
             return String::new();
         }
 
-        let mut prompt = String::from("## Relevant Memories\n\n");
-        prompt.push_str("The following memories may be relevant to the current conversation:\n\n");
-
-        for (i, memory) in memories.iter().enumerate() {
-            // 格式化记忆
-            prompt.push_str(&format!("{}. ", i + 1));
-
-            // 添加记忆类型标签
-            // Get memory type from attributes
-            let mem_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
-            let mem_type = match mem_type_str.to_lowercase().as_str() {
-                "episodic" => agent_mem_traits::MemoryType::Episodic,
-                "semantic" => agent_mem_traits::MemoryType::Semantic,
-                "procedural" => agent_mem_traits::MemoryType::Procedural,
-                "working" => agent_mem_traits::MemoryType::Working,
-                _ => agent_mem_traits::MemoryType::Episodic,
-            };
-            prompt.push_str(&format!(
-                "[{}] ",
-                self.format_memory_type(&mem_type)
-            ));
-
-            // 添加记忆内容
+        let mut lines = Vec::new();
+        for (i, memory) in memories.iter().enumerate().take(5) {  // 最多5条
             let content_str = match &memory.content {
                 agent_mem_traits::Content::Text(t) => t.as_str(),
-                agent_mem_traits::Content::Structured(_) => "[structured data]",
-                _ => "[unknown content]",
+                _ => "[data]",
             };
-            prompt.push_str(content_str);
-
-            // 添加时间戳（如果启用）
-            if self.config.include_timestamp {
-                let time_str = memory.metadata.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
-                prompt.push_str(&format!(" ({time_str})"));
-            }
-
-            // 添加重要性分数（如果有）
-            if memory.importance().unwrap_or(0.0) > 0.7 {
-                prompt.push_str(" [Important]");
-            }
-
-            prompt.push('\n');
+            // 极简格式：序号 + 内容（最多80字符）
+            let truncated = if content_str.len() > 80 {
+                format!("{}...", &content_str[..80])
+            } else {
+                content_str.to_string()
+            };
+            lines.push(format!("{}. {}", i + 1, truncated));
         }
-
-        prompt.push_str(
-            "\nPlease use these memories to provide more contextual and personalized responses.\n",
-        );
-        prompt
+        
+        lines.join("\n")
     }
 
     /// 格式化记忆类型
@@ -514,14 +482,33 @@ impl MemoryIntegrator {
         }
     }
 
-    /// 按重要性和相关性排序记忆
+    /// ⭐ Phase 2: 综合评分系统 (relevance + importance + recency)
+    /// 
+    /// 借鉴mem0的最佳实践：相关性(50%) + 重要性(30%) + 时效性(20%)
+    pub fn calculate_comprehensive_score(&self, memory: &Memory) -> f64 {
+        let relevance = memory.score().unwrap_or(0.5); // 相似度分数
+        let importance = memory.importance().unwrap_or(0.5);
+        
+        // 时效性衰减：使用指数衰减，半衰期为30天
+        let age_seconds = memory.metadata.created_at
+            .elapsed()
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let age_days = age_seconds as f64 / 86400.0;
+        let recency = (-age_days / 30.0).exp(); // 指数衰减，30天半衰期
+        
+        // 综合评分：0.5 * relevance + 0.3 * importance + 0.2 * recency
+        0.5 * relevance + 0.3 * importance + 0.2 * recency
+    }
+    
+    /// 按综合评分排序记忆（Phase 2优化）
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
+            // Phase 2: 使用综合评分代替单一importance
             memories.sort_by(|a, b| {
-                b.importance()
-                    .unwrap_or(0.0)
-                    .partial_cmp(&a.importance().unwrap_or(0.0))
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                let score_a = self.calculate_comprehensive_score(a);
+                let score_b = self.calculate_comprehensive_score(b);
+                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
             });
         }
         memories
