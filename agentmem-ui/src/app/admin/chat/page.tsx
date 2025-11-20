@@ -337,7 +337,13 @@ function ChatPageInner() {
     }
 
     try {
-      if (useLumosAI) {
+      // ✅ 优先检查是否流式（修复"思考中"不显示的BUG）
+      if (useStreaming) {
+        console.log('[Chat] 🚀 Using streaming mode, useLumosAI:', useLumosAI);
+        // handleStreamingMessage 内部会根据 useLumosAI 选择正确的endpoint
+        await handleStreamingMessage(messageContent);
+      } else if (useLumosAI) {
+        console.log('[Chat] 📞 Using LumosAI non-streaming mode');
         // 🚀 Use LumosAI API (no streaming support)
         const response = await apiClient.sendLumosAIChatMessage(selectedAgentId, {
           message: messageContent,
@@ -353,10 +359,8 @@ function ChatPageInner() {
         };
 
         setMessages((prev) => [...prev, agentMessage]);
-      } else if (useStreaming) {
-        // Use SSE streaming
-        await handleStreamingMessage(messageContent);
       } else {
+        console.log('[Chat] 📞 Using standard non-streaming mode');
         // Use regular API call
         const response = await apiClient.sendChatMessage(selectedAgentId, {
           message: messageContent,
