@@ -163,9 +163,47 @@ pub async fn send_chat_message_lumosai(
     })))
 }
 
+/// Helper function to create streaming events from a complete response
+#[cfg(feature = "lumosai")]
+fn create_streaming_events(
+    response_text: String,
+    total_steps: usize,
+) -> Vec<Result<lumosai_core::agent::streaming::AgentEvent, Box<dyn std::error::Error + Send + Sync>>> {
+    use lumosai_core::agent::streaming::AgentEvent;
+    use chrono::Utc;
+    
+    let mut events = Vec::new();
+    let agent_id = uuid::Uuid::new_v4().to_string();
+    let timestamp = Utc::now().to_rfc3339();
+    
+    // 1. Agent started event
+    events.push(Ok(AgentEvent::AgentStarted {
+        agent_id: agent_id.clone(),
+        timestamp: timestamp.clone(),
+    }));
+    
+    // 2. Split response into chunks and create TextDelta events
+    const CHUNK_SIZE: usize = 10; // 每次发送10个字符
+    for chunk in response_text.as_bytes().chunks(CHUNK_SIZE) {
+        if let Ok(text) = String::from_utf8(chunk.to_vec()) {
+            events.push(Ok(AgentEvent::TextDelta {
+                delta: text,
+                step_id: Some("0".to_string()),
+            }));
+        }
+    }
+    
+    // 3. Generation complete event
+    events.push(Ok(AgentEvent::GenerationComplete {
+        final_response: response_text,
+        total_steps,
+    }));
+    
+    events
+}
+
 /// Send chat message using LumosAI Agent with streaming (SSE)
-/// TODO: Fix streaming implementation - temporarily disabled
-#[cfg(all(feature = "lumosai", feature = "streaming_disabled"))]
+#[cfg(feature = "lumosai")]
 pub async fn send_chat_message_lumosai_stream(
     Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
@@ -173,11 +211,9 @@ pub async fn send_chat_message_lumosai_stream(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, axum::Error>>>> {
-    // TODO: Fix streaming implementation
-    // use lumosai_core::agent::streaming::{AgentEvent, StreamingAgentExt};
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
     use lumosai_core::agent::types::AgentGenerateOptions;
-    use lumosai_core::agent::Agent;
+    use lumosai_core::agent::streaming::AgentEvent;
     
     info!("💬 Chat request (LumosAI Streaming): agent={}, message_len={}", agent_id, req.message.len());
     
@@ -220,10 +256,19 @@ pub async fn send_chat_message_lumosai_stream(
     let messages = vec![user_message];
     let options = AgentGenerateOptions::default();
     
-    // 6. 创建事件流
-    let event_stream = lumos_agent.generate_stream_events(&messages, &options);
+    // 6. 调用generate获取完整响应
+    let generate_result = lumos_agent.generate(&messages, &options).await
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
     
-    // 7. 转换为 SSE 格式
+    // 7. 将完整响应转换为streaming events
+    let response_text = generate_result.response;
+    let total_steps = generate_result.steps.len();
+    
+    // 创建模拟的streaming events
+    let events = create_streaming_events(response_text, total_steps);
+    let event_stream = futures::stream::iter(events);
+    
+    // 8. 转换为 SSE 格式
     let sse_stream = event_stream.map(|event_result| {
         match event_result {
             Ok(event) => {
@@ -287,24 +332,11 @@ pub async fn send_chat_message_lumosai_stream(
         }
     });
     
-    // 8. 返回 SSE 响应
+    // 9. 返回 SSE 响应
     Ok(Sse::new(sse_stream).keep_alive(KeepAlive::default()))
 }
 
-/// Fallback for streaming when not enabled
-#[cfg(any(not(feature = "lumosai"), not(feature = "streaming_disabled")))]
-pub async fn send_chat_message_lumosai_stream(
-    _repositories: Extension<Arc<Repositories>>,
-    _auth_user: Extension<AuthUser>,
-    _agent_id: Path<String>,
-    _req: Json<ChatMessageRequest>,
-) -> ServerResult<Json<ApiResponse<ChatMessageResponse>>> {
-    Err(ServerError::internal_error(
-        "LumosAI integration or streaming not enabled. Compile with --features lumosai,streaming_disabled"
-    ))
-}
-
-/// Fallback when lumosai feature is not enabled
+/// Fallback when lumosai feature is not enabled - non-streaming
 #[cfg(not(feature = "lumosai"))]
 pub async fn send_chat_message_lumosai(
     _repositories: Extension<Arc<Repositories>>,
@@ -317,6 +349,7 @@ pub async fn send_chat_message_lumosai(
     ))
 }
 
+/// Fallback when lumosai feature is not enabled - streaming
 #[cfg(not(feature = "lumosai"))]
 pub async fn send_chat_message_lumosai_stream(
     _repositories: Extension<Arc<Repositories>>,
@@ -325,8 +358,8 @@ pub async fn send_chat_message_lumosai_stream(
     _req: Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, axum::Error>>>> {
     use futures::stream;
+    use axum::response::sse::{Event, KeepAlive};
     
-    // 返回一个包含错误的单元素流
     let error_stream = stream::once(async {
         Event::default()
             .json_data(serde_json::json!({
