@@ -67,13 +67,14 @@ impl BackgroundTaskManager {
         F: std::future::Future<Output = TaskResult> + Send + 'static,
     {
         let task_id = format!("{}-{}", task_type, Uuid::new_v4());
+        let task_id_for_future = task_id.clone();
         let manager = self.clone();
         let task_type_string = task_type.to_string();
         let started_at = Instant::now();
         tokio::spawn(async move {
             manager
                 .record_running(TaskStatus {
-                    id: task_id.clone(),
+                    id: task_id_for_future.clone(),
                     task_type: task_type_string.clone(),
                     started_at,
                     state: TaskState::Running,
@@ -87,11 +88,11 @@ impl BackgroundTaskManager {
                 TaskResult::Completed { detail } => {
                     info!(
                         "✅ Background task {} completed in {:?}: {}",
-                        task_id, duration, detail
+                        task_id_for_future, duration, detail
                     );
                     manager
                         .update_state(
-                            &task_id,
+                            &task_id_for_future,
                             TaskState::Completed {
                                 duration,
                                 detail,
@@ -102,11 +103,11 @@ impl BackgroundTaskManager {
                 TaskResult::Failed { error } => {
                     error!(
                         "❌ Background task {} failed after {:?}: {}",
-                        task_id, duration, error
+                        task_id_for_future, duration, error
                     );
                     manager
                         .update_state(
-                            &task_id,
+                            &task_id_for_future,
                             TaskState::Failed {
                                 duration,
                                 error,

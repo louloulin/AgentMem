@@ -489,14 +489,12 @@ impl AgentOrchestrator {
         .await?;
         debug!("Updated working memory for session {}", request.session_id);
 
-        // 7. 提取和更新记忆
-        let memories_extracted = if self.config.auto_extract_memories {
-            self.extract_and_update_memories(&request, &messages)
-                .await?
+        // 7. 提取和更新记忆（异步）
+        if self.config.auto_extract_memories {
+            self.schedule_memory_extraction(&request, &messages);
         } else {
-            0
-        };
-        info!("Extracted and updated {} new memories", memories_extracted);
+            debug!("Auto memory extraction disabled, skipping extraction");
+        }
 
         // ⭐ 8. 更新性能统计
         let ttfb_ms = start_time.elapsed().as_millis() as u64;
@@ -512,8 +510,8 @@ impl AgentOrchestrator {
         Ok(ChatResponse {
             message_id: assistant_message_id,
             content: final_response,
-            memories_updated: memories_extracted > 0,
-            memories_count: memories_retrieved_count, // ✅ 使用检索到的记忆数量
+            memories_updated: false,
+            memories_count: memories_retrieved_count, // ✅ 返回检索到的记忆数量（用于前端展示）
             tool_calls: if tool_calls_info.is_empty() {
                 None
             } else {
@@ -658,21 +656,17 @@ impl AgentOrchestrator {
             .await?;
         debug!("Created assistant message: {}", assistant_message_id);
 
-        // 7. 提取和更新记忆
-        let memories_count = if self.config.auto_extract_memories {
-            self.extract_and_update_memories(&request, &messages)
-                .await?
-        } else {
-            0
-        };
-        info!("Extracted and updated {} memories", memories_count);
+        // 7. 提取和更新记忆（异步）
+        if self.config.auto_extract_memories {
+            self.schedule_memory_extraction(&request, &messages);
+        }
 
         // 8. 返回响应
         Ok(ChatResponse {
             message_id: assistant_message_id,
             content: final_response,
-            memories_updated: memories_count > 0,
-            memories_count,
+            memories_updated: false,
+            memories_count: memories.len(),
             tool_calls: if tool_calls_info.is_empty() {
                 None
             } else {
@@ -1018,6 +1012,25 @@ impl AgentOrchestrator {
                 Vec::new()
             }
         }
+    }
+
+    /// 将记忆提取任务丢到后台执行
+    fn schedule_memory_extraction(&self, request: &ChatRequest, messages: &[Message]) {
+        let extractor = self.memory_extractor.clone();
+        let background = self.background_tasks.clone();
+        let request_clone = request.clone();
+        let messages_clone: Vec<Message> = messages.to_vec();
+
+        let task_id = background.spawn_memory_extraction(
+            extractor,
+            request_clone,
+            messages_clone,
+        );
+
+        info!(
+            "📤 Memory extraction scheduled as task {} for session {}",
+            task_id, request.session_id
+        );
     }
 
     /// 提取和更新记忆
