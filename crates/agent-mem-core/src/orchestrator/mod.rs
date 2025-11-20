@@ -221,6 +221,16 @@ impl Default for OrchestratorConfig {
     }
 }
 
+/// ⭐ 性能监控统计
+#[derive(Debug, Clone, Default)]
+pub struct PerformanceMetrics {
+    pub total_requests: u64,
+    pub avg_ttfb_ms: f64,
+    pub avg_prompt_chars: f64,
+    pub avg_memories: f64,
+    pub last_ttfb_ms: u64,
+}
+
 /// Agent 编排器 - 核心对话循环
 ///
 /// 参考 MIRIX 的 AgentWrapper.step() 实现
@@ -236,6 +246,8 @@ pub struct AgentOrchestrator {
     tool_integrator: ToolIntegrator,
     /// Working Memory Store - 用于会话级临时上下文（最小改动方案：直接使用Store而非Agent）
     working_store: Option<Arc<dyn agent_mem_traits::WorkingMemoryStore>>,
+    /// ⭐ 性能监控
+    metrics: Arc<std::sync::RwLock<PerformanceMetrics>>,
 }
 
 impl AgentOrchestrator {
@@ -273,6 +285,7 @@ impl AgentOrchestrator {
             memory_extractor,
             tool_integrator,
             working_store,
+            metrics: Arc::new(std::sync::RwLock::new(PerformanceMetrics::default())),
         }
     }
 
@@ -478,7 +491,17 @@ impl AgentOrchestrator {
         };
         info!("Extracted and updated {} new memories", memories_extracted);
 
-        // 8. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）
+        // ⭐ 8. 更新性能统计
+        let ttfb_ms = start_time.elapsed().as_millis() as u64;
+        let prompt_chars: usize = messages.iter()
+            .map(|m| m.content.len())
+            .sum();
+        self.update_metrics(ttfb_ms, prompt_chars, memories_retrieved_count);
+        
+        info!("📊 Performance: TTFB={}ms, Prompt={}chars, Memories={}", 
+            ttfb_ms, prompt_chars, memories_retrieved_count);
+
+        // 9. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）
         Ok(ChatResponse {
             message_id: assistant_message_id,
             content: final_response,
@@ -490,6 +513,27 @@ impl AgentOrchestrator {
                 Some(tool_calls_info)
             },
         })
+    }
+    
+    /// ⭐ 更新性能统计
+    fn update_metrics(&self, ttfb_ms: u64, prompt_chars: usize, memories: usize) {
+        if let Ok(mut metrics) = self.metrics.write() {
+            let n = metrics.total_requests as f64;
+            metrics.total_requests += 1;
+            metrics.last_ttfb_ms = ttfb_ms;
+            
+            // 移动平均
+            metrics.avg_ttfb_ms = (metrics.avg_ttfb_ms * n + ttfb_ms as f64) / (n + 1.0);
+            metrics.avg_prompt_chars = (metrics.avg_prompt_chars * n + prompt_chars as f64) / (n + 1.0);
+            metrics.avg_memories = (metrics.avg_memories * n + memories as f64) / (n + 1.0);
+        }
+    }
+    
+    /// ⭐ 获取性能统计
+    pub fn get_metrics(&self) -> PerformanceMetrics {
+        self.metrics.read()
+            .map(|m| m.clone())
+            .unwrap_or_default()
     }
 
     /// 执行带工具调用的对话循环

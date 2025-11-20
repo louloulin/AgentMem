@@ -55,10 +55,19 @@ impl Default for MemoryIntegratorConfig {
     }
 }
 
+/// ⭐ 简单缓存项
+#[derive(Clone)]
+struct CacheEntry {
+    memories: Vec<Memory>,
+    timestamp: std::time::Instant,
+}
+
 /// 记忆集成器
 pub struct MemoryIntegrator {
     memory_engine: Arc<MemoryEngine>,
     config: MemoryIntegratorConfig,
+    /// ⭐ 简单LRU缓存 (query -> memories)
+    cache: Arc<std::sync::RwLock<std::collections::HashMap<String, CacheEntry>>>,
 }
 
 impl MemoryIntegrator {
@@ -67,12 +76,42 @@ impl MemoryIntegrator {
         Self {
             memory_engine,
             config,
+            cache: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
         }
     }
 
     /// 使用默认配置创建
     pub fn with_default_config(memory_engine: Arc<MemoryEngine>) -> Self {
         Self::new(memory_engine, MemoryIntegratorConfig::default())
+    }
+    
+    /// ⭐ 检查缓存
+    fn get_cached(&self, query: &str) -> Option<Vec<Memory>> {
+        if let Ok(cache) = self.cache.read() {
+            if let Some(entry) = cache.get(query) {
+                // 缓存有效期5分钟
+                if entry.timestamp.elapsed().as_secs() < 300 {
+                    debug!("🎯 Cache hit for query: {}", &query[..query.len().min(50)]);
+                    return Some(entry.memories.clone());
+                }
+            }
+        }
+        None
+    }
+    
+    /// ⭐ 更新缓存
+    fn update_cache(&self, query: String, memories: Vec<Memory>) {
+        if let Ok(mut cache) = self.cache.write() {
+            // 限制缓存大小为100条
+            if cache.len() >= 100 {
+                // 简单策略：清空缓存
+                cache.clear();
+            }
+            cache.insert(query, CacheEntry {
+                memories: memories.clone(),
+                timestamp: std::time::Instant::now(),
+            });
+        }
     }
 
     /// 从对话中检索相关记忆（支持session隔离）
@@ -170,6 +209,13 @@ impl MemoryIntegrator {
         session_id: Option<&str>,
         max_count: usize,
     ) -> Result<Vec<Memory>> {
+        // ⭐ 先检查缓存
+        let cache_key = format!("{}:{}:{:?}:{:?}", query, agent_id, user_id, session_id);
+        if let Some(cached) = self.get_cached(&cache_key) {
+            info!("🎯 Cache hit, returning {} cached memories", cached.len());
+            return Ok(cached.into_iter().take(max_count).collect());
+        }
+        
         use crate::hierarchy::MemoryScope;
         use std::collections::HashSet;
         use tracing::warn;
@@ -448,7 +494,12 @@ impl MemoryIntegrator {
         });
 
         // 返回 top N（基于HCAM的两阶段检索结果）
-        Ok(all_memories.into_iter().take(max_count).collect())
+        let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
+        
+        // ⭐ 更新缓存
+        self.update_cache(cache_key, result.clone());
+        
+        Ok(result)
     }
 
     /// ⭐ Phase 3: 极简记忆注入格式（token优化）
