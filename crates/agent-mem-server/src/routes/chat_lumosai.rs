@@ -215,9 +215,9 @@ pub async fn send_chat_message_lumosai_stream(
     use lumosai_core::agent::types::AgentGenerateOptions;
     use lumosai_core::agent::streaming::{AgentEvent, StreamingAgent, StreamingConfig};
     use futures::StreamExt;
+    use tokio_stream::wrappers::ReceiverStream;
     
     let start_time = std::time::Instant::now();
-    let req_start = start_time.clone();
     info!("🚀 [REAL-STREAMING] Chat request: agent={}, message_len={}", agent_id, req.message.len());
     info!("⏱️  [+0ms] Request received");
     
@@ -278,13 +278,24 @@ pub async fn send_chat_message_lumosai_stream(
     let messages = vec![user_message];
     let options = AgentGenerateOptions::default();
     
-    // 7. ⭐ 使用真实streaming执行 - 直接从LLM获取token流
-    info!("⏱️  [+{}ms] Calling execute_streaming", start_time.elapsed().as_millis());
-    info!("📤 Calling StreamingAgent.execute_streaming() - REAL TOKEN STREAMING");
-    let event_stream = streaming_agent.execute_streaming(&messages, &options);
+    // 7. ⭐ 使用channel解决生命周期问题
+    info!("⏱️  [+{}ms] Creating streaming channel", start_time.elapsed().as_millis());
+    info!("📤 Setting up REAL TOKEN STREAMING with channel");
+    
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    
+    // 在独立任务中执行streaming，避免生命周期问题
+    tokio::spawn(async move {
+        let mut event_stream = streaming_agent.execute_streaming(&messages, &options);
+        while let Some(event_result) = event_stream.next().await {
+            if tx.send(event_result).await.is_err() {
+                break; // 接收端已关闭
+            }
+        }
+    });
     
     // 8. 转换为 SSE 格式
-    let sse_stream = event_stream.map(move |event_result| {
+    let sse_stream = ReceiverStream::new(rx).map(move |event_result| {
         match event_result {
             Ok(event) => {
                 let sse_data = match event {
