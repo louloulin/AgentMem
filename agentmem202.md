@@ -120,6 +120,20 @@ Prompt:     21KB →  3KB →  2KB →  1KB ✅ (21x减少)
   }
   ```
 
+#### 实施总结
+
+- ✅ `step` / `step_with_tools` 不再等待记忆提取，改为调用 `schedule_memory_extraction`，即时返回响应，TTFB 与用户感知延迟显著下降。
+- ✅ 新增 `BackgroundTaskManager`（`crates/agent-mem-core/src/orchestrator/background_tasks.rs`），统一跟踪任务状态、日志输出，并提供 `spawn_memory_extraction` 封装。
+- ✅ 后台任务内置 3 次指数退避重试，失败会记录 `TaskState::Failed`，成功会记录耗时与明细。
+- ✅ `ChatResponse` 字段保持兼容（`memories_count` 代表检索到的记忆数量），后台提取完成后自动写入长记忆。
+
+#### 测试验证
+
+```bash
+cargo test --package agent-mem-core --lib background_task -- --nocapture    # 后台任务管理器单测
+cargo test --package agent-mem-server --test route_compatibility_test -- --nocapture  # 回归验证
+```
+
 - [x] **1.1.2 修改Prompt构建逻辑** (1天) - ✅ 已集成
   ```rust
   // 文件位置: crates/agent-mem-core/src/orchestrator/mod.rs:826-900
@@ -569,135 +583,67 @@ test result: ok. 5 passed; 0 failed; 0 ignored
   })
   ```
 
-- [ ] **1.3.2 添加后台任务监控** (0.5天)
+- [x] **1.3.2 添加后台任务监控** (0.5天)
   ```rust
   // 文件位置: crates/agent-mem-core/src/orchestrator/background_tasks.rs (新建)
   
-  use tokio::sync::mpsc;
-  use std::collections::HashMap;
-  
-  /// 后台任务管理器
+  #[derive(Debug, Default)]
   pub struct BackgroundTaskManager {
       tasks: Arc<RwLock<HashMap<String, TaskStatus>>>,
-      metrics: Arc<BackgroundTaskMetrics>,
   }
-  
-  pub struct TaskStatus {
-      pub task_id: String,
-      pub started_at: Instant,
-      pub status: TaskState,
-  }
-  
-  pub enum TaskState {
-      Running,
-      Completed { duration: Duration },
-      Failed { error: String },
-  }
-  
-  pub struct BackgroundTaskMetrics {
-      pub tasks_started: IntCounter,
-      pub tasks_completed: IntCounter,
-      pub tasks_failed: IntCounter,
-      pub task_duration: Histogram,
-  }
-  
-  impl BackgroundTaskManager {
-      pub fn spawn_extraction_task(
-          &self,
-          task_id: String,
-          extractor: Arc<MemoryExtractor>,
-          request: ChatRequest,
-          messages: Vec<Message>,
-      ) {
-          let tasks = self.tasks.clone();
-          let metrics = self.metrics.clone();
-          
-          // 记录任务启动
-          tasks.write().unwrap().insert(task_id.clone(), TaskStatus {
-              task_id: task_id.clone(),
-              started_at: Instant::now(),
-              status: TaskState::Running,
-          });
-          
-          metrics.tasks_started.inc();
-          
-          tokio::spawn(async move {
-              let start = Instant::now();
-              
-              match extractor.extract_and_update_memories(&request, &messages).await {
-                  Ok(count) => {
-                      let duration = start.elapsed();
-                      
-                      // 更新状态
-                      if let Ok(mut tasks) = tasks.write() {
-                          tasks.insert(task_id.clone(), TaskStatus {
-                              task_id,
-                              started_at: start,
-                              status: TaskState::Completed { duration },
-                          });
-                      }
-                      
-                      metrics.tasks_completed.inc();
-                      metrics.task_duration.observe(duration.as_secs_f64());
-                      
-                      info!("✅ [ASYNC] Task completed: {} memories in {:?}", count, duration);
-                  },
-                  Err(e) => {
-                      // 更新状态为失败
-                      if let Ok(mut tasks) = tasks.write() {
-                          tasks.insert(task_id.clone(), TaskStatus {
-                              task_id,
-                              started_at: start,
-                              status: TaskState::Failed { error: e.to_string() },
-                          });
-                      }
-                      
-                      metrics.tasks_failed.inc();
-                      error!("❌ [ASYNC] Task failed: {}", e);
-                      
-                      // TODO: 实施重试机制
-                  }
-              }
-          });
-      }
-      
-      pub fn get_task_status(&self, task_id: &str) -> Option<TaskStatus> {
-          self.tasks.read().unwrap().get(task_id).cloned()
-      }
+
+  pub fn spawn_memory_extraction(
+      &self,
+      extractor: Arc<MemoryExtractor>,
+      request: ChatRequest,
+      messages: Vec<Message>,
+  ) -> String {
+      self.spawn_task("memory_extraction", async move {
+          match run_memory_extraction(extractor, request, messages).await {
+              Ok(count) => TaskResult::Completed {
+                  detail: format!("extracted {} memories", count),
+              },
+              Err(e) => TaskResult::Failed {
+                  error: e.to_string(),
+              },
+          }
+      })
   }
   ```
 
-- [ ] **1.3.3 实施重试机制** (0.5天)
+- [x] **1.3.3 实施重试机制** (0.5天)
   ```rust
-  // 添加指数退避重试
-  
-  async fn extract_with_retry(
+  // 文件位置: crates/agent-mem-core/src/orchestrator/background_tasks.rs:146-172
+  async fn run_memory_extraction(
       extractor: Arc<MemoryExtractor>,
-      request: &ChatRequest,
-      messages: &[Message],
-      max_retries: usize,
+      request: ChatRequest,
+      messages: Vec<Message>,
   ) -> Result<usize> {
       let mut retries = 0;
-      let mut delay = Duration::from_secs(1);
-      
+      let mut delay = TokioDuration::from_secs(1);
+      let max_retries = 3;
+
       loop {
-          match extractor.extract_and_update_memories(request, messages).await {
-              Ok(count) => {
-                  if retries > 0 {
-                      info!("✅ Retry succeeded after {} attempts", retries);
-                  }
+          match extractor
+              .extract_from_conversation(&messages, &agent_id, &user_id)
+              .await
+          {
+              Ok(extracted) => {
+                  let count = extractor.save_memories(extracted).await?;
                   return Ok(count);
-              },
+              }
               Err(e) => {
                   retries += 1;
                   if retries >= max_retries {
-                      error!("❌ All {} retries failed: {}", max_retries, e);
                       return Err(e);
                   }
-                  
-                  warn!("⚠️  Retry {}/{}: {}", retries, max_retries, e);
-                  tokio::time::sleep(delay).await;
-                  delay *= 2; // 指数退避
+
+                  warn!(
+                      "⚠️  Memory extraction failed (attempt {}): {}. Retrying...",
+                      retries, e
+                  );
+                  sleep(delay).await;
+                  delay *= 2;
               }
           }
       }
