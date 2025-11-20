@@ -9,7 +9,7 @@ use lumosai_core::llm::Role as LumosRole;
 use lumosai_core::memory::{Memory as LumosMemory, MemoryConfig};
 use lumosai_core::Result as LumosResult;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 /// AgentMem Backend for LumosAI
 ///
@@ -95,36 +95,86 @@ impl LumosMemory for AgentMemBackend {
 
     async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
         let retrieve_start = std::time::Instant::now();
-        // ⚡ 性能优化: 减少检索数量以降低prompt tokens和响应时间
-        let limit = config.last_messages.unwrap_or(1); // ⭐ 优化: 只检索1条历史
 
         info!("🔍 [MEMORY-RETRIEVE] Starting");
-        info!(
-            "   Agent: {}, User: {}, Limit: {}",
-            self.agent_id, self.user_id, limit
-        );
+        info!("   Agent: {}, User: {}", self.agent_id, self.user_id);
 
-        // ✅ 使用agent-mem的get_all API
-        let options = GetAllOptions {
-            agent_id: Some(self.agent_id.clone()),
-            user_id: Some(self.user_id.clone()),
-            limit: Some(limit),
-            ..Default::default()
+        // ⭐ 核心修复：支持语义搜索（参考SemanticMemory实现）
+        let memories = if let Some(query) = &config.query {
+            // ✅ 有query -> 使用语义搜索
+            let limit = config.last_messages.unwrap_or(5);
+            info!("   🔍 Semantic search mode");
+            info!("      Query: '{}'", query);
+            info!("      Limit: {}", limit);
+
+            let db_query_start = std::time::Instant::now();
+            
+            // ✅ 使用agent-mem的search API（带options）
+            use agent_mem::SearchOptions;
+            let search_options = SearchOptions {
+                agent_id: Some(self.agent_id.clone()),
+                user_id: Some(self.user_id.clone()),
+                limit: Some(limit),
+                ..Default::default()
+            };
+            
+            let results = self
+                .memory_api
+                .search_with_options(query, search_options)
+                .await
+                .map_err(|e| {
+                    let err_msg = format!("Semantic search failed: {}", e);
+                    warn!("   ❌ {}", err_msg);
+                    lumosai_core::Error::Other(err_msg)
+                })?;
+            let db_query_duration = db_query_start.elapsed();
+
+            info!(
+                "   ⏱️  Semantic search: {:?}, Found: {} memories",
+                db_query_duration,
+                results.len()
+            );
+
+            // 详细记录搜索结果
+            for (idx, mem) in results.iter().enumerate() {
+                info!(
+                    "      {}. [Score: {:.4}] {}",
+                    idx + 1,
+                    mem.score.unwrap_or(0.0),
+                    mem.content.chars().take(80).collect::<String>()
+                );
+            }
+
+            results
+        } else {
+            // ❌ 无query -> 使用时间顺序
+            let limit = config.last_messages.unwrap_or(1);
+            info!("   📜 History mode (no query)");
+            info!("      Limit: {}", limit);
+
+            let options = GetAllOptions {
+                agent_id: Some(self.agent_id.clone()),
+                user_id: Some(self.user_id.clone()),
+                limit: Some(limit),
+                ..Default::default()
+            };
+
+            let db_query_start = std::time::Instant::now();
+            let results = self.memory_api.get_all(options).await.map_err(|e| {
+                let err_msg = format!("Failed to retrieve memories: {}", e);
+                warn!("   ❌ {}", err_msg);
+                lumosai_core::Error::Other(err_msg)
+            })?;
+            let db_query_duration = db_query_start.elapsed();
+
+            info!(
+                "   ⏱️  Database query: {:?}, Found: {} memories",
+                db_query_duration,
+                results.len()
+            );
+
+            results
         };
-
-        let db_query_start = std::time::Instant::now();
-        let memories = self.memory_api.get_all(options).await.map_err(|e| {
-            let err_msg = format!("Failed to retrieve memories: {}", e);
-            warn!("   ❌ {}", err_msg);
-            lumosai_core::Error::Other(err_msg)
-        })?;
-        let db_query_duration = db_query_start.elapsed();
-
-        info!(
-            "   ⏱️  Database query: {:?}, Found: {} memories",
-            db_query_duration,
-            memories.len()
-        );
 
         // 转换MemoryItem为LumosMessage
         let messages: Vec<LumosMessage> = memories
