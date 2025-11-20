@@ -217,7 +217,9 @@ pub async fn send_chat_message_lumosai_stream(
     use futures::StreamExt;
     
     let start_time = std::time::Instant::now();
+    let req_start = start_time.clone();
     info!("🚀 [REAL-STREAMING] Chat request: agent={}, message_len={}", agent_id, req.message.len());
+    info!("⏱️  [+0ms] Request received");
     
     // 1. 验证Agent
     let agent = repositories.agents
@@ -226,17 +228,22 @@ pub async fn send_chat_message_lumosai_stream(
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {}", e)))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
     
+    info!("⏱️  [+{}ms] Agent verified", start_time.elapsed().as_millis());
+    
     // 2. 权限检查
     if agent.organization_id != auth_user.org_id {
         error!("Access denied: agent org {} != user org {}", agent.organization_id, auth_user.org_id);
         return Err(ServerError::forbidden("Access denied"));
     }
     
+    info!("⏱️  [+{}ms] Permission checked", start_time.elapsed().as_millis());
+    
     // 3. 获取user_id
     let user_id = req.user_id.as_ref().unwrap_or(&auth_user.user_id).clone();
     debug!("Using user_id: {}", user_id);
     
     // 4. 创建LumosAI Agent
+    info!("⏱️  [+{}ms] Starting Agent Factory", start_time.elapsed().as_millis());
     let factory = LumosAgentFactory::new(memory_manager.memory.clone());
     let lumos_agent = factory.create_chat_agent(&agent, &user_id)
         .await
@@ -245,6 +252,7 @@ pub async fn send_chat_message_lumosai_stream(
             ServerError::internal_error(format!("Failed to create agent: {}", e))
         })?;
     
+    info!("⏱️  [+{}ms] BasicAgent created", start_time.elapsed().as_millis());
     info!("✅ Created BasicAgent, converting to StreamingAgent...");
     
     // 5. ⭐ 转换为StreamingAgent以支持真实token-by-token streaming
@@ -256,6 +264,7 @@ pub async fn send_chat_message_lumosai_stream(
     };
     
     let streaming_agent = StreamingAgent::with_config(lumos_agent, streaming_config);
+    info!("⏱️  [+{}ms] StreamingAgent created", start_time.elapsed().as_millis());
     info!("✅ StreamingAgent created with real-time token streaming");
     
     // 6. 构建用户消息
@@ -270,6 +279,7 @@ pub async fn send_chat_message_lumosai_stream(
     let options = AgentGenerateOptions::default();
     
     // 7. ⭐ 使用真实streaming执行 - 直接从LLM获取token流
+    info!("⏱️  [+{}ms] Calling execute_streaming", start_time.elapsed().as_millis());
     info!("📤 Calling StreamingAgent.execute_streaming() - REAL TOKEN STREAMING");
     let event_stream = streaming_agent.execute_streaming(&messages, &options);
     
