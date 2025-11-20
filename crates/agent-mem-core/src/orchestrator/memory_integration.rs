@@ -27,20 +27,30 @@ pub struct MemoryIntegratorConfig {
     pub working_weight: f32,
     /// Semantic Memory权重（备选，理论依据: HCAM分层检索）
     pub semantic_weight: f32,
+    
+    // ⭐ Phase 5: 记忆压缩配置
+    /// 启用记忆压缩
+    pub enable_compression: bool,
+    /// 压缩阈值（超过此数量启动压缩）
+    pub compression_threshold: usize,
 }
 
 impl Default for MemoryIntegratorConfig {
     fn default() -> Self {
         Self {
-            max_memories: 10,
-            relevance_threshold: 0.1, // ✅ 降低阈值以支持更宽泛的匹配
+            max_memories: 3,  // Phase 2/3优化
+            relevance_threshold: 0.1,
             include_timestamp: true,
             sort_by_importance: true,
             
-            // 🆕 Phase 1.5: 基于Adaptive Memory Framework的权重配置
-            episodic_weight: 1.2,   // 提升Long-term Memory（主要来源）
-            working_weight: 1.0,    // 正常（新鲜且相关，补充上下文）
-            semantic_weight: 0.9,   // 降低（范围更广，备选）
+            // Phase 1.5: 认知架构权重
+            episodic_weight: 1.2,
+            working_weight: 1.0,
+            semantic_weight: 0.9,
+            
+            // Phase 5: 记忆压缩
+            enable_compression: true,
+            compression_threshold: 10,  // 超过10条启动压缩
         }
     }
 }
@@ -540,5 +550,55 @@ impl MemoryIntegrator {
 
         info!("🔍 filter_by_relevance: output={} memories", filtered.len());
         filtered
+    }
+    
+    /// ⭐ Phase 5: 记忆去重
+    /// 移除内容相似的重复记忆
+    pub fn deduplicate_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
+        use std::collections::HashSet;
+        
+        let mut seen_content = HashSet::new();
+        let mut dedup = Vec::new();
+        
+        for memory in memories {
+            let content_key = match &memory.content {
+                agent_mem_traits::Content::Text(t) => {
+                    // 使用前100字符作为去重key
+                    if t.len() > 100 {
+                        &t[..100]
+                    } else {
+                        t.as_str()
+                    }
+                }
+                _ => continue,
+            };
+            
+            if seen_content.insert(content_key.to_string()) {
+                dedup.push(memory);
+            } else {
+                debug!("🔄 Deduplicate: skipping duplicate memory");
+            }
+        }
+        
+        info!("🔄 Deduplicate: {} → {} memories", seen_content.len() + (dedup.len() - seen_content.len()), dedup.len());
+        dedup
+    }
+    
+    /// ⭐ Phase 5: 记忆压缩（简化版）
+    /// 当记忆数量过多时，只保留最重要的
+    pub fn compress_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
+        if !self.config.enable_compression || memories.len() <= self.config.compression_threshold {
+            return memories;
+        }
+        
+        info!("📦 Compression: {} memories exceed threshold {}, keeping top {}", 
+            memories.len(), self.config.compression_threshold, self.config.compression_threshold / 2);
+        
+        // 简单策略：只保留最重要的前N条
+        let keep_count = self.config.compression_threshold / 2;
+        let mut result: Vec<Memory> = memories.into_iter().take(keep_count).collect();
+        
+        info!("📦 Compressed: kept {} most important memories", result.len());
+        result
     }
 }

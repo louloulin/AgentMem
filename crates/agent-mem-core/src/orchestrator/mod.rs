@@ -764,9 +764,13 @@ impl AgentOrchestrator {
         // 🆕 认知架构验证: 日志已在 retrieve_episodic_first 中记录
         debug!("Memory sources: Episodic (主要) + Working (补充) + Semantic (备选)");
 
-        // 过滤和排序
+        // Phase 2/3: 过滤和排序
         let memories = self.memory_integrator.filter_by_relevance(memories);
         let memories = self.memory_integrator.sort_memories(memories);
+        
+        // Phase 5: 去重和压缩
+        let memories = self.memory_integrator.deduplicate_memories(memories);
+        let memories = self.memory_integrator.compress_memories(memories);
 
         Ok(memories)
     }
