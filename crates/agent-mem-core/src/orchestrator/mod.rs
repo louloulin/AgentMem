@@ -268,8 +268,10 @@ impl AgentOrchestrator {
         let memory_integrator = MemoryIntegrator::with_default_config(memory_engine.clone());
 
         // 创建记忆提取器
-        let memory_extractor =
-            MemoryExtractor::with_default_config(llm_client.clone(), memory_engine.clone());
+        let memory_extractor = Arc::new(MemoryExtractor::with_default_config(
+            llm_client.clone(),
+            memory_engine.clone(),
+        ));
 
         // 创建工具集成器
         let tool_config = ToolIntegratorConfig {
@@ -290,6 +292,7 @@ impl AgentOrchestrator {
             tool_integrator,
             working_store,
             metrics: Arc::new(std::sync::RwLock::new(PerformanceMetrics::default())),
+            background_tasks: Arc::new(BackgroundTaskManager::new()),
         }
     }
 
