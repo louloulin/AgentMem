@@ -490,12 +490,15 @@ impl MemoryIntegrator {
         let importance = memory.importance().unwrap_or(0.5);
         
         // 时效性衰减：使用指数衰减，半衰期为30天
-        let age_seconds = memory.metadata.created_at
-            .elapsed()
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        use chrono::Utc;
+        let now = Utc::now();
+        let age_seconds = (now - memory.metadata.created_at).num_seconds();
         let age_days = age_seconds as f64 / 86400.0;
-        let recency = (-age_days / 30.0).exp(); // 指数衰减，30天半衰期
+        let recency = if age_days >= 0.0 {
+            (-age_days / 30.0).exp() // 指数衰减，30天半衰期
+        } else {
+            1.0 // 未来时间（时钟偏差），默认1.0
+        };
         
         // 综合评分：0.5 * relevance + 0.3 * importance + 0.2 * recency
         0.5 * relevance + 0.3 * importance + 0.2 * recency
