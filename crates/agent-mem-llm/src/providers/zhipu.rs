@@ -186,11 +186,39 @@ impl LLMProvider for ZhipuProvider {
         info!("   模型: {}", self.config.model);
         info!("   URL: {}", url);
         info!("   消息数量: {}", messages.len());
-        debug!("   消息内容: {:?}", messages);
+        
+        // 🔍 详细记录每条消息的内容和长度
+        for (idx, msg) in messages.iter().enumerate() {
+            let content_preview = if msg.content.len() > 200 {
+                format!("{}... (总长度: {}字符)", &msg.content[..200], msg.content.len())
+            } else {
+                msg.content.clone()
+            };
+            info!("   📝 消息[{}] role={:?}, 长度={}字符, 内容=\"{}\"", 
+                idx, msg.role, msg.content.len(), content_preview);
+        }
+        
+        debug!("   消息内容（完整）: {:?}", messages);
+
+        let converted_messages = self.convert_messages(messages);
+        
+        // 🔍 打印完整的prompt内容（所有消息合并）
+        info!("📋 === 完整Prompt内容（所有消息） ===");
+        let total_chars: usize = converted_messages.iter()
+            .map(|m| m.content.len())
+            .sum();
+        info!("   总字符数: {}", total_chars);
+        
+        // 合并所有消息内容
+        let full_prompt: String = converted_messages.iter()
+            .map(|m| format!("[{}] {}\n", m.role, m.content))
+            .collect();
+        info!("{}", full_prompt);
+        info!("📋 === Prompt内容结束 ===");
 
         let request = ZhipuRequest {
             model: self.config.model.clone(),
-            messages: self.convert_messages(messages),
+            messages: converted_messages,
             temperature: self.config.temperature,
             max_tokens: self.config.max_tokens,
             top_p: self.config.top_p,
@@ -199,7 +227,7 @@ impl LLMProvider for ZhipuProvider {
             tool_choice: None,
         };
 
-        debug!("   请求体: {:?}", serde_json::to_string(&request).unwrap_or_default());
+        debug!("   请求体JSON: {}", serde_json::to_string_pretty(&request).unwrap_or_default());
 
         info!("🔵 发送 HTTP 请求...");
         let http_start = std::time::Instant::now();

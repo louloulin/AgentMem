@@ -154,6 +154,17 @@ impl LumosMemory for AgentMemBackend {
     info!("✅ [MEMORY-RETRIEVE] Completed in {:?}, Returned: {} messages", 
           total_duration, messages.len());
     
+    // 🔍 详细记录检索到的每条消息
+    for (idx, msg) in messages.iter().enumerate() {
+        let content_preview = if msg.content.len() > 100 {
+            format!("{}...", &msg.content[..100])
+        } else {
+            msg.content.clone()
+        };
+        info!("   📋 历史[{}] role={:?}, 长度={}字符, 内容=\"{}\"", 
+            idx, msg.role, msg.content.len(), content_preview);
+    }
+    
     if total_duration.as_millis() > 100 {
         warn!("   ⚠️  Retrieve took > 100ms, consider caching");
     }
