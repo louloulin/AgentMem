@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use tokio::time::{sleep, Duration as TokioDuration};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -155,12 +155,34 @@ async fn run_memory_extraction(
     let agent_id = request.agent_id.clone();
     let user_id = request.user_id.clone();
 
-    let extracted = extractor
-        .extract_from_conversation(&messages, &agent_id, &user_id)
-        .await?;
+    let mut retries = 0;
+    let mut delay = TokioDuration::from_secs(1);
+    let max_retries = 3;
 
-    let count = extractor.save_memories(extracted).await?;
-    Ok(count)
+    loop {
+        match extractor
+            .extract_from_conversation(&messages, &agent_id, &user_id)
+            .await
+        {
+            Ok(extracted) => {
+                let count = extractor.save_memories(extracted).await?;
+                return Ok(count);
+            }
+            Err(e) => {
+                retries += 1;
+                if retries >= max_retries {
+                    return Err(e);
+                }
+
+                warn!(
+                    "⚠️  Memory extraction failed (attempt {}): {}. Retrying...",
+                    retries, e
+                );
+                sleep(delay).await;
+                delay *= 2;
+            }
+        }
+    }
 }
 
 #[cfg(test)]

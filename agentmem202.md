@@ -542,7 +542,7 @@ test result: ok. 5 passed; 0 failed; 0 ignored
 
 ---
 
-### Task 1.3: 异步记忆提取 (2天) 🔴
+### Task 1.3: 异步记忆提取 (2天) ✅ **已完成**
 
 **问题**: 记忆提取阻塞响应28秒  
 **目标**: 异步执行，不阻塞用户  
@@ -550,72 +550,23 @@ test result: ok. 5 passed; 0 failed; 0 ignored
 
 #### 子任务清单
 
-- [ ] **1.3.1 修改orchestrator.step()** (1天)
+- [x] **1.3.1 修改orchestrator.step()** (1天)
   ```rust
-  // 文件位置: crates/agent-mem-core/src/orchestrator/mod.rs:409-502
-  
-  pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
-      let start_time = std::time::Instant::now();
-      request.validate()?;
-      
-      info!("Starting conversation step for agent={}", request.agent_id);
-      
-      // 1-6. 正常流程
-      let working_context = self.get_working_context(&request.session_id).await?;
-      let user_message_id = self.create_user_message(&request).await?;
-      let memories = self.retrieve_memories(&request).await?;
-      let messages = self.build_messages_with_context(&request, &working_context, &memories).await?;
-      let (final_response, tool_calls_info) = self.execute_with_tools(&messages, &request.user_id).await?;
-      let assistant_message_id = self.create_assistant_message(
-          &request.organization_id,
-          &request.agent_id,
-          &request.user_id,
-          &final_response,
-      ).await?;
-      
-      // 7. 更新Working Memory
-      self.update_working_memory(
-          &request.session_id,
-          &request.user_id,
-          &request.agent_id,
-          &request.message,
-          &final_response,
-      ).await?;
-      
-      // ✅ 8. 异步提取记忆（不阻塞响应）
-      if self.config.auto_extract_memories {
-          let extractor = self.memory_extractor.clone();
-          let request_clone = request.clone();
-          let messages_clone = messages.clone();
-          
-          tokio::spawn(async move {
-              info!("🔄 [ASYNC] Starting background memory extraction");
-              
-              match extractor.extract_and_update_memories(&request_clone, &messages_clone).await {
-                  Ok(count) => {
-                      info!("✅ [ASYNC] Extracted {} memories successfully", count);
-                  },
-                  Err(e) => {
-                      error!("❌ [ASYNC] Memory extraction failed: {}", e);
-                      // TODO: 添加重试机制
-                  }
-              }
-          });
-          
-          info!("📤 Memory extraction dispatched to background");
-      }
-      
-      // ✅ 9. 立即返回响应
-      let ttfb_ms = start_time.elapsed().as_millis() as u64;
-      self.update_metrics(ttfb_ms, messages.len(), memories.len());
-      
-      Ok(ChatResponse {
-          message_id: assistant_message_id,
-          content: final_response,
-          tool_calls: tool_calls_info,
-          memories_retrieved: memories.len(),
-      })
+  // 文件位置: crates/agent-mem-core/src/orchestrator/mod.rs:409-520
+
+  // 7. 提取和更新记忆（异步）
+  if self.config.auto_extract_memories {
+      self.schedule_memory_extraction(&request, &messages);
   }
+
+  // 9. 返回响应（memories_count 现在表示检索到的记忆数量，异步写入后台完成）
+  Ok(ChatResponse {
+      message_id: assistant_message_id,
+      content: final_response,
+      memories_updated: false,
+      memories_count: memories_retrieved_count,
+      tool_calls: if tool_calls_info.is_empty() { None } else { Some(tool_calls_info) },
+  })
   ```
 
 - [ ] **1.3.2 添加后台任务监控** (0.5天)
