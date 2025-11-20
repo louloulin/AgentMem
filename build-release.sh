@@ -264,7 +264,7 @@ build_server() {
     # 构建后端
     log_info "构建 Rust 服务器..."
     if [ "$BUILD_MODE" = "release" ]; then
-        cargo build --package agent-mem-server --release
+        cargo build --package agent-mem-server --release --features lumosai 
         BINARY_PATH="target/release/agent-mem-server"
     else
         cargo build --package agent-mem-server
