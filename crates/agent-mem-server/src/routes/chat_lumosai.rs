@@ -202,7 +202,7 @@ fn create_streaming_events(
     events
 }
 
-/// Send chat message using LumosAI Agent with streaming (SSE)
+/// Send chat message using LumosAI Agent with streaming (SSE) - REAL STREAMING
 #[cfg(feature = "lumosai")]
 pub async fn send_chat_message_lumosai_stream(
     Extension(repositories): Extension<Arc<Repositories>>,
@@ -213,9 +213,11 @@ pub async fn send_chat_message_lumosai_stream(
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, axum::Error>>>> {
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
     use lumosai_core::agent::types::AgentGenerateOptions;
-    use lumosai_core::agent::streaming::AgentEvent;
+    use lumosai_core::agent::streaming::{AgentEvent, StreamingAgent, StreamingConfig};
+    use futures::StreamExt;
     
-    info!("💬 Chat request (LumosAI Streaming): agent={}, message_len={}", agent_id, req.message.len());
+    let start_time = std::time::Instant::now();
+    info!("🚀 [REAL-STREAMING] Chat request: agent={}, message_len={}", agent_id, req.message.len());
     
     // 1. 验证Agent
     let agent = repositories.agents
@@ -243,9 +245,20 @@ pub async fn send_chat_message_lumosai_stream(
             ServerError::internal_error(format!("Failed to create agent: {}", e))
         })?;
     
-    info!("✅ Created LumosAI agent with streaming support");
+    info!("✅ Created BasicAgent, converting to StreamingAgent...");
     
-    // 5. 构建用户消息
+    // 5. ⭐ 转换为StreamingAgent以支持真实token-by-token streaming
+    let streaming_config = StreamingConfig {
+        text_buffer_size: 10,  // 每10个字符发送一次
+        emit_metadata: true,
+        emit_memory_updates: false,
+        text_delta_delay_ms: None,  // 无延迟，实时发送
+    };
+    
+    let streaming_agent = StreamingAgent::with_config(lumos_agent, streaming_config);
+    info!("✅ StreamingAgent created with real-time token streaming");
+    
+    // 6. 构建用户消息
     let user_message = LumosMessage {
         role: LumosRole::User,
         content: req.message.clone(),
@@ -256,61 +269,106 @@ pub async fn send_chat_message_lumosai_stream(
     let messages = vec![user_message];
     let options = AgentGenerateOptions::default();
     
-    // 6. 调用generate获取完整响应
-    let generate_result = lumos_agent.generate(&messages, &options).await
-        .map_err(|e| ServerError::internal_error(e.to_string()))?;
-    
-    // 7. 将完整响应转换为streaming events
-    let response_text = generate_result.response;
-    let total_steps = generate_result.steps.len();
-    
-    // 创建模拟的streaming events
-    let events = create_streaming_events(response_text, total_steps);
-    let event_stream = futures::stream::iter(events);
+    // 7. ⭐ 使用真实streaming执行 - 直接从LLM获取token流
+    info!("📤 Calling StreamingAgent.execute_streaming() - REAL TOKEN STREAMING");
+    let event_stream = streaming_agent.execute_streaming(&messages, &options);
     
     // 8. 转换为 SSE 格式
-    let sse_stream = event_stream.map(|event_result| {
+    let sse_stream = event_stream.map(move |event_result| {
         match event_result {
             Ok(event) => {
                 let sse_data = match event {
-                    AgentEvent::AgentStarted { .. } => {
+                    AgentEvent::AgentStarted { agent_id: aid, timestamp } => {
+                        info!("🎬 [SSE] Agent started: {}", aid);
                         serde_json::json!({
                             "chunk_type": "start",
-                            "message": "Agent started"
+                            "agent_id": aid,
+                            "timestamp": timestamp
                         })
                     },
-                    AgentEvent::TextDelta { delta, .. } => {
+                    AgentEvent::TextDelta { delta, step_id } => {
+                        // ⭐ 真实的token增量，实时发送
                         serde_json::json!({
                             "chunk_type": "content",
-                            "content": delta
+                            "content": delta,
+                            "step_id": step_id
+                        })
+                    },
+                    AgentEvent::ToolCallStart { tool_call, step_id } => {
+                        info!("🔧 [SSE] Tool call start: {}", tool_call.name);
+                        serde_json::json!({
+                            "chunk_type": "tool_call_start",
+                            "tool_name": tool_call.name,
+                            "step_id": step_id
+                        })
+                    },
+                    AgentEvent::ToolCallComplete { tool_result, step_id } => {
+                        info!("✅ [SSE] Tool call complete: {:?}", tool_result.status);
+                        serde_json::json!({
+                            "chunk_type": "tool_call_complete",
+                            "status": format!("{:?}", tool_result.status),
+                            "step_id": step_id
                         })
                     },
                     AgentEvent::GenerationComplete { final_response, total_steps } => {
+                        let elapsed = start_time.elapsed();
+                        info!("🏁 [SSE] Generation complete in {:?}, steps: {}", elapsed, total_steps);
                         serde_json::json!({
                             "chunk_type": "done",
-                            "final_response": final_response,
+                            "response": final_response,
                             "total_steps": total_steps,
-                            "memories_updated": true,
-                            "memories_count": 0
+                            "elapsed_ms": elapsed.as_millis() as u64
                         })
                     },
-                    AgentEvent::ToolCalled { tool_name, arguments, .. } => {
+                    AgentEvent::MessageSent { message, timestamp } => {
                         serde_json::json!({
-                            "chunk_type": "tool_call",
-                            "tool_name": tool_name,
-                            "arguments": arguments
+                            "chunk_type": "message",
+                            "message": message,
+                            "timestamp": timestamp
                         })
                     },
-                    AgentEvent::Error { error, .. } => {
+                    AgentEvent::AgentStopped { agent_id: aid, timestamp } => {
+                        info!("🛑 [SSE] Agent stopped: {}", aid);
+                        serde_json::json!({
+                            "chunk_type": "stop",
+                            "agent_id": aid,
+                            "timestamp": timestamp
+                        })
+                    },
+                    AgentEvent::MemoryUpdate { key, operation } => {
+                        serde_json::json!({
+                            "chunk_type": "memory_update",
+                            "key": key,
+                            "operation": format!("{:?}", operation)
+                        })
+                    },
+                    AgentEvent::Error { error, step_id } => {
+                        error!("❌ [SSE] Error: {}", error);
                         serde_json::json!({
                             "chunk_type": "error",
-                            "content": error
+                            "content": error,
+                            "step_id": step_id
+                        })
+                    },
+                    AgentEvent::Metadata { key, value } => {
+                        serde_json::json!({
+                            "chunk_type": "metadata",
+                            "key": key,
+                            "value": value
+                        })
+                    },
+                    AgentEvent::StepComplete { step, step_id } => {
+                        info!("✨ [SSE] Step complete: {}", step_id);
+                        serde_json::json!({
+                            "chunk_type": "step_complete",
+                            "step_type": format!("{:?}", step.step_type),
+                            "step_id": step_id
                         })
                     },
                     _ => {
                         serde_json::json!({
-                            "chunk_type": "metadata",
-                            "data": format!("{:?}", event)
+                            "chunk_type": "unknown",
+                            "data": "event"
                         })
                     }
                 };

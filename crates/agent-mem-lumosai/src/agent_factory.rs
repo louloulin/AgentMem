@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use agent_mem_core::storage::models::Agent;
 use agent_mem::Memory as AgentMemApi;
-use lumosai_core::agent::Agent as LumosAgent;
+use lumosai_core::agent::{Agent as LumosAgent, BasicAgent};
 use lumosai_core::llm::{LlmProvider, providers};
 use crate::memory_adapter::AgentMemBackend;
 use std::sync::Arc;
@@ -19,12 +19,12 @@ impl LumosAgentFactory {
         Self { memory_api }
     }
     
-    /// 根据AgentMem Agent配置创建LumosAI Agent
+    /// 根据AgentMem Agent配置创建LumosAI Agent (返回BasicAgent以支持streaming)
     pub async fn create_chat_agent(
         &self,
         agent: &Agent,
         user_id: &str,
-    ) -> anyhow::Result<Arc<dyn LumosAgent>> {
+    ) -> anyhow::Result<BasicAgent> {
         info!("Creating LumosAI agent for: {} (user: {})", agent.id, user_id);
         
         // 1. 解析LLM配置
@@ -76,7 +76,17 @@ impl LumosAgentFactory {
         
         info!("✅ Successfully created LumosAI agent with integrated memory: {}", agent_name);
         
-        Ok(Arc::new(lumos_agent))
+        Ok(lumos_agent)
+    }
+    
+    /// 创建chat agent并包装为trait object (向后兼容)
+    pub async fn create_chat_agent_arc(
+        &self,
+        agent: &Agent,
+        user_id: &str,
+    ) -> anyhow::Result<Arc<dyn LumosAgent>> {
+        let basic_agent = self.create_chat_agent(agent, user_id).await?;
+        Ok(Arc::new(basic_agent))
     }
     
     fn parse_llm_config(&self, agent: &Agent) -> anyhow::Result<Value> {
