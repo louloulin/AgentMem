@@ -6,21 +6,21 @@ mod tests {
         engine::{MemoryEngine, MemoryEngineConfig},
         orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     };
-    use agent_mem_traits::{Content, Memory, MemoryId};
+    use agent_mem_traits::{Content, MemoryId};
+    use agent_mem_traits::abstractions::Memory;
     use std::sync::Arc;
     use std::time::Instant;
 
     /// 创建测试用的Memory
     #[allow(dead_code)]
-    fn create_test_memory(id: &str, content: &str, agent_id: &str, user_id: &str) -> Memory {
-        Memory::builder()
-            .id(MemoryId::from_string(id.to_string()))
-            .content(Content::Text(content.to_string()))
-            .agent_id(agent_id)
-            .user_id(Some(user_id))
-            .importance(0.8)
-            .build()
-            .unwrap()
+    fn create_test_memory(_id: &str, content: &str, agent_id: &str, user_id: &str) -> Memory {
+        Memory::new(
+            agent_id,
+            Some(user_id.to_string()),
+            "episodic",
+            content,
+            0.8
+        )
     }
 
     /// 测试早停逻辑：当Episodic Memory返回足够记忆时
@@ -91,7 +91,7 @@ mod tests {
     #[tokio::test]
     async fn test_cache_hit() {
         let config = MemoryEngineConfig::default();
-        let engine = Arc::new(MemoryEngine::new(config).unwrap());
+        let engine = Arc::new(MemoryEngine::new(config));
         
         let integrator_config = MemoryIntegratorConfig::default();
         let integrator = MemoryIntegrator::new(engine.clone(), integrator_config);
@@ -143,7 +143,7 @@ mod tests {
     #[tokio::test]
     async fn test_deduplication_and_ranking() {
         let config = MemoryEngineConfig::default();
-        let engine = Arc::new(MemoryEngine::new(config).unwrap());
+        let engine = Arc::new(MemoryEngine::new(config));
         
         let integrator_config = MemoryIntegratorConfig::default();
         let integrator = MemoryIntegrator::new(engine.clone(), integrator_config);
