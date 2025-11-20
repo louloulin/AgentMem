@@ -223,8 +223,9 @@ impl LumosMemory for AgentMemBackend {
 
         // 🔍 详细记录检索到的每条消息
         for (idx, msg) in messages.iter().enumerate() {
-            let content_preview = if msg.content.len() > 100 {
-                format!("{}...", &msg.content[..100])
+            // ⭐ 安全截断：按字符数而非字节数，避免UTF-8边界错误
+            let content_preview = if msg.content.chars().count() > 100 {
+                format!("{}...", msg.content.chars().take(100).collect::<String>())
             } else {
                 msg.content.clone()
             };
@@ -232,7 +233,7 @@ impl LumosMemory for AgentMemBackend {
                 "   📋 历史[{}] role={:?}, 长度={}字符, 内容=\"{}\"",
                 idx,
                 msg.role,
-                msg.content.len(),
+                msg.content.chars().count(),  // 使用字符数而非字节数
                 content_preview
             );
         }
