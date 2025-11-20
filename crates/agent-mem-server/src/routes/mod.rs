@@ -156,7 +156,7 @@ pub async fn create_router(
             "/api/v1/agents/:id/messages",
             post(agents::send_message_to_agent),
         )
-        // Chat routes (new AgentOrchestrator-based API)
+        // ===== Chat routes (v1 - 推荐使用) =====
         .route(
             "/api/v1/agents/:agent_id/chat",
             post(chat::send_chat_message),
@@ -169,7 +169,20 @@ pub async fn create_router(
             "/api/v1/agents/:agent_id/chat/history",
             get(chat::get_chat_history),
         )
-        // LumosAI集成路由 (experimental)
+        // ===== ✅ Task 1.5: 兼容路由（向后兼容，解决404错误）=====
+        .route(
+            "/api/agents/:agent_id/chat",
+            post(chat::send_chat_message),
+        )
+        .route(
+            "/api/agents/:agent_id/chat/stream",
+            post(chat::send_chat_message_stream),
+        )
+        .route(
+            "/api/agents/:agent_id/chat/history",
+            get(chat::get_chat_history),
+        )
+        // ===== LumosAI集成路由 (experimental) =====
         // 注意：更具体的路径必须在前面，避免被通用路径匹配
         .route(
             "/api/v1/agents/:agent_id/chat/lumosai/stream",
@@ -177,6 +190,15 @@ pub async fn create_router(
         )
         .route(
             "/api/v1/agents/:agent_id/chat/lumosai",
+            post(chat_lumosai::send_chat_message_lumosai),
+        )
+        // ===== ✅ Task 1.5: LumosAI 兼容路由 =====
+        .route(
+            "/api/agents/:agent_id/chat/lumosai/stream",
+            post(chat_lumosai::send_chat_message_lumosai_stream),
+        )
+        .route(
+            "/api/agents/:agent_id/chat/lumosai",
             post(chat_lumosai::send_chat_message_lumosai),
         )
         // Agent state management routes
