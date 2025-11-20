@@ -829,41 +829,58 @@ impl AgentOrchestrator {
         working_context: &str,
         memories: &[Memory],
     ) -> Result<Vec<Message>> {
+        use crate::prompt::MemorySummarizer;
+        
         let mut messages = Vec::new();
-        let mut system_parts = Vec::new();
-
-        // Level 2: Working Context (当前会话，最重要) - 极简格式
-        if !working_context.is_empty() {
-            system_parts.push(format!("## Current Session\n{}", working_context));
+        
+        // ✅ Task 1.1: 使用智能摘要压缩记忆内容
+        // 创建摘要器：每条记忆最大200字符
+        let summarizer = MemorySummarizer::new(200);
+        
+        // ✅ 限制记忆数量为3条（减少90% Prompt大小）
+        let limited_memories = memories.iter().take(3);
+        
+        let mut memory_text = String::new();
+        for (i, mem) in limited_memories.enumerate() {
+            let content = match &mem.content {
+                agent_mem_traits::Content::Text(t) => t.as_str(),
+                _ => "[data]",
+            };
+            
+            // ✅ 智能摘要化每条记忆（保留头尾信息）
+            let summary = summarizer.summarize(content);
+            
+            // ✅ 极简格式：移除类型标签，节省空间
+            memory_text.push_str(&format!("{}. {}\n", i + 1, summary));
         }
-
-        // Level 3: Episodic Context (相关经验) - 极简格式
-        if !memories.is_empty() {
-            let mut memory_lines = Vec::new();
-            for (i, mem) in memories.iter().enumerate() {
-                let content = match &mem.content {
-                    agent_mem_traits::Content::Text(t) => t.as_str(),
-                    _ => "[data]",
-                };
-                // 极简格式：序号 + 内容（最多100字符）
-                let truncated = if content.len() > 100 {
-                    format!("{}...", &content[..100])
-                } else {
-                    content.to_string()
-                };
-                memory_lines.push(format!("{}. {}", i + 1, truncated));
-            }
-            system_parts.push(format!("## Past Context\n{}", memory_lines.join("\n")));
-        }
-
-        // 构建系统消息（如果有上下文）
-        if !system_parts.is_empty() {
-            messages.push(Message::system(&system_parts.join("\n\n")));
-        }
-
-        // Level 1: Current Message (当前输入)
+        
+        // ✅ 极简Prompt模板
+        let system_message = if memory_text.is_empty() {
+            // 无记忆时：仅30字符
+            "You are a helpful assistant.".to_string()
+        } else {
+            // 有记忆时：约600-800字符
+            format!(
+                "Context:\n{}\n\nUse context when relevant.",
+                memory_text
+            )
+        };
+        
+        // 构建消息列表
+        messages.push(Message::system(&system_message));
         messages.push(Message::user(&request.message));
-
+        
+        // 记录Prompt大小（用于监控）
+        let total_chars = system_message.len() + request.message.len();
+        debug!(
+            "📏 Prompt size: {} chars (system: {}, user: {}), memories: {}/{}",
+            total_chars,
+            system_message.len(),
+            request.message.len(),
+            memories.iter().take(3).count(),
+            memories.len()
+        );
+        
         Ok(messages)
     }
 
@@ -1129,6 +1146,9 @@ mod tests {
             auto_extract_memories: false,
             memory_extraction_threshold: 0.7,
             enable_tool_calling: true,
+            enable_adaptive: false,
+            token_budget: 8000,
+            ttfb_threshold_ms: 500,
         };
 
         assert_eq!(config.max_tool_rounds, 3);

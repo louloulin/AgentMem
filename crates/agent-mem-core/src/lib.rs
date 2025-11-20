@@ -56,6 +56,8 @@ pub mod operations;
 pub mod orchestrator;
 /// Pipeline framework for memory operations
 pub mod pipeline;
+/// Prompt processing and optimization
+pub mod prompt;
 /// Configuration loader (Week 3-4: eliminate hardcoding)
 pub mod config;
 /// Query abstraction (V4.0: replace String queries)
@@ -134,6 +136,9 @@ pub use integration::{
 pub use orchestrator::{
     AgentOrchestrator, ChatRequest, ChatResponse, OrchestratorConfig, ToolCallInfo,
 };
+
+// Re-export prompt modules
+pub use prompt::summarizer::{MemorySummarizer, SummarizationStrategy};
 
 // Re-export cache modules
 pub use cache::{
