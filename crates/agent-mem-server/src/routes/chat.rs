@@ -324,22 +324,7 @@ pub async fn send_chat_message_stream(
         Ok(stream) => stream,
         Err(e) => {
             error!("Failed to start streaming: {}", e);
-            // 返回错误流
-            let error_chunk = StreamChunk {
-                chunk_type: "error".to_string(),
-                content: Some(format!("Failed to start stream: {}", e)),
-                tool_call: None,
-                memories_count: None,
-            };
-            let error_json = serde_json::to_string(&error_chunk).unwrap_or_else(|_| {
-                "{\"chunk_type\":\"error\",\"content\":\"Stream initialization failed\"}".to_string()
-            });
-            let error_stream = stream::once(async move { Ok::<Event, Infallible>(Event::default().data(error_json)) });
-            return Ok(Sse::new(error_stream).keep_alive(
-                KeepAlive::new()
-                    .interval(Duration::from_secs(15))
-                    .text("keep-alive-text"),
-            ));
+            return Err(ServerError::internal_error(format!("Failed to start stream: {}", e)));
         }
     };
 
@@ -415,8 +400,8 @@ pub async fn send_chat_message_stream(
     );
 
     Ok(Sse::new(response_stream).keep_alive(
-        axum::response::sse::KeepAlive::new()
-            .interval(std::time::Duration::from_secs(15))
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
             .text("keep-alive"),
     ))
 }
