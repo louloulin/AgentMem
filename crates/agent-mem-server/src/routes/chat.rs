@@ -20,14 +20,15 @@ use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest as Orchestrato
 use agent_mem_core::storage::factory::Repositories;
 use axum::{
     extract::{Extension, Path},
-    response::sse::{Event, Sse},
+    response::sse::{Event, KeepAlive, Sse},
     Json,
 };
-use futures::stream::Stream;
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::convert::Infallible;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{debug, error, info};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -315,158 +316,103 @@ pub async fn send_chat_message_stream(
         max_memories: 10,
     };
 
-    // Clone for the stream
-    let orchestrator = Arc::new(orchestrator);
-    let orchestrator_clone = orchestrator.clone();
+    info!("🌊 启动真实SSE流式传输");
 
-    // ✅ Create real streaming response - 真正的流式响应
-    // 使用状态机模式：0=start, 1=streaming content, 2=done
-    enum StreamState {
-        Start(Arc<AgentOrchestrator>, OrchestratorChatRequest),
-        Streaming(String, usize, usize), // (content, memories_count, char_index)
-        Done,
-    }
+    // ✅ 使用Orchestrator的真实流式方法（需要Arc）
+    let orchestrator_arc = Arc::new(orchestrator);
+    let llm_stream = match orchestrator_arc.step_stream(orchestrator_request).await {
+        Ok(stream) => stream,
+        Err(e) => {
+            error!("Failed to start streaming: {}", e);
+            // 返回错误流
+            let error_chunk = StreamChunk {
+                chunk_type: "error".to_string(),
+                content: Some(format!("Failed to start stream: {}", e)),
+                tool_call: None,
+                memories_count: None,
+            };
+            let error_json = serde_json::to_string(&error_chunk).unwrap_or_else(|_| {
+                "{\"chunk_type\":\"error\",\"content\":\"Stream initialization failed\"}".to_string()
+            });
+            let error_stream = stream::once(async move { Ok::<Event, Infallible>(Event::default().data(error_json)) });
+            return Ok(Sse::new(error_stream).keep_alive(
+                KeepAlive::new()
+                    .interval(Duration::from_secs(15))
+                    .text("keep-alive-text"),
+            ));
+        }
+    };
 
-    let initial_state = StreamState::Start(orchestrator_clone, orchestrator_request);
+    // ✅ 转换LLM流为SSE Event流
+    let response_stream = stream::unfold(
+        (llm_stream, true, false),
+        |(mut llm_stream, is_first, mut is_done)| async move {
+            if is_done {
+                return None;
+            }
 
-    let response_stream = stream::unfold(initial_state, |state| async move {
-        match state {
-            StreamState::Start(orch, req) => {
-                // Send start chunk
+            // 发送start事件（仅第一次）
+            if is_first {
                 let start_chunk = StreamChunk {
                     chunk_type: "start".to_string(),
                     content: None,
                     tool_call: None,
                     memories_count: None,
                 };
-
-                let start_event = match serde_json::to_string(&start_chunk) {
-                    Ok(json) => Ok(Event::default().data(json)),
-                    Err(e) => {
-                        error!("Failed to serialize start chunk: {}", e);
-                        // Even if serialization fails, send a fallback error message
-                        let fallback_error = StreamChunk {
-                            chunk_type: "error".to_string(),
-                            content: Some("Failed to initialize stream".to_string()),
-                            tool_call: None,
-                            memories_count: None,
-                        };
-                        match serde_json::to_string(&fallback_error) {
-                            Ok(json) => Ok(Event::default().data(json)),
-                            Err(_) => {
-                                // Last resort: send plain text error
-                                Ok(Event::default().data("{\"chunk_type\":\"error\",\"content\":\"Stream initialization failed\"}"))
-                            }
-                        }
-                    }
-                };
-
-                // Execute orchestrator and get full response
-                match orch.step(req).await {
-                    Ok(response) => {
-                        let content = response.content;
-                        let memories_count = response.memories_count;
-
-                        info!(
-                            "Orchestrator step completed: content_len={}, memories_count={}",
-                            content.len(),
-                            memories_count
-                        );
-
-                        // Transition to streaming state
-                        Some((
-                            start_event,
-                            StreamState::Streaming(content, memories_count, 0),
-                        ))
-                    }
-                    Err(e) => {
-                        error!("Orchestrator step failed: {}", e);
-                        // Send error and end - ensure we always send something
-                        let error_chunk = StreamChunk {
-                            chunk_type: "error".to_string(),
-                            content: Some(format!("Orchestrator error: {}", e)),
-                            tool_call: None,
-                            memories_count: None,
-                        };
-
-                        let error_event = match serde_json::to_string(&error_chunk) {
-                            Ok(json) => Ok(Event::default().data(json)),
-                            Err(ser_err) => {
-                                error!("Failed to serialize error chunk: {}", ser_err);
-                                // Fallback: send plain text error
-                                Ok(Event::default().data(format!(
-                                    "{{\"chunk_type\":\"error\",\"content\":\"{}\"}}",
-                                    e.to_string().replace('"', "\\\"")
-                                )))
-                            }
-                        };
-                        Some((error_event, StreamState::Done))
-                    }
-                }
+                let start_json = serde_json::to_string(&start_chunk)
+                    .unwrap_or_else(|_| "{\"chunk_type\":\"start\"}".to_string());
+                let start_event = Ok::<Event, Infallible>(Event::default().data(start_json));
+                return Some((start_event, (llm_stream, false, is_done)));
             }
-            StreamState::Streaming(content, memories_count, char_index) => {
-                // Stream content in small chunks for typewriter effect
-                const CHUNK_SIZE: usize = 5; // Send 5 chars at a time
 
-                let char_count = content.chars().count();
-                if char_index >= char_count {
-                    // All content sent, send done chunk
+            // 从LLM流读取下一块
+            match llm_stream.next().await {
+                Some(Ok(content_chunk)) => {
+                    // 发送内容块
+                    let content_event_chunk = StreamChunk {
+                        chunk_type: "content".to_string(),
+                        content: Some(content_chunk),
+                        tool_call: None,
+                        memories_count: None,
+                    };
+                    let content_json = serde_json::to_string(&content_event_chunk)
+                        .unwrap_or_else(|_| "{\"chunk_type\":\"content\",\"content\":\"\"}".to_string());
+                    let event = Ok::<Event, Infallible>(Event::default().data(content_json));
+                    Some((event, (llm_stream, false, is_done)))
+                }
+                Some(Err(e)) => {
+                    // LLM流错误
+                    error!("LLM stream error: {}", e);
+                    let error_chunk = StreamChunk {
+                        chunk_type: "error".to_string(),
+                        content: Some(format!("LLM error: {}", e)),
+                        tool_call: None,
+                        memories_count: None,
+                    };
+                    let error_json = serde_json::to_string(&error_chunk)
+                        .unwrap_or_else(|_| "{\"chunk_type\":\"error\"}".to_string());
+                    is_done = true;
+                    let event = Ok::<Event, Infallible>(Event::default().data(error_json));
+                    Some((event, (llm_stream, false, is_done)))
+                }
+                None => {
+                    // 流结束
+                    info!("✅ LLM流式传输完成");
                     let done_chunk = StreamChunk {
                         chunk_type: "done".to_string(),
                         content: None,
                         tool_call: None,
-                        memories_count: Some(memories_count),
+                        memories_count: Some(0), // TODO: 从context传递memories_count
                     };
-
-                    let done_event = match serde_json::to_string(&done_chunk) {
-                        Ok(json) => Ok(Event::default().data(json)),
-                        Err(e) => {
-                            error!("Failed to serialize done chunk: {}", e);
-                            // Fallback: send plain text done message
-                            Ok(Event::default().data(format!(
-                                "{{\"chunk_type\":\"done\",\"memories_count\":{}}}",
-                                memories_count
-                            )))
-                        }
-                    };
-                    Some((done_event, StreamState::Done))
-                } else {
-                    // Send next chunk of content (using character-based indexing for UTF-8 safety)
-                    let chars: Vec<char> = content.chars().collect();
-                    let end_index = std::cmp::min(char_index + CHUNK_SIZE, chars.len());
-                    let chunk_content: String = chars[char_index..end_index].iter().collect();
-
-                    let content_chunk = StreamChunk {
-                        chunk_type: "content".to_string(),
-                        content: Some(chunk_content.clone()),
-                        tool_call: None,
-                        memories_count: None,
-                    };
-
-                    let content_event = match serde_json::to_string(&content_chunk) {
-                        Ok(json) => Ok(Event::default().data(json)),
-                        Err(e) => {
-                            error!("Failed to serialize content chunk: {}", e);
-                            // Fallback: send plain text content
-                            Ok(Event::default().data(format!(
-                                "{{\"chunk_type\":\"content\",\"content\":\"{}\"}}",
-                                chunk_content.replace('"', "\\\"").replace('\n', "\\n")
-                            )))
-                        }
-                    };
-
-                    // Add small delay for typewriter effect (optional, can be removed for faster streaming)
-                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-
-                    Some((
-                        content_event,
-                        StreamState::Streaming(content, memories_count, end_index),
-                    ))
+                    let done_json = serde_json::to_string(&done_chunk)
+                        .unwrap_or_else(|_| "{\"chunk_type\":\"done\"}".to_string());
+                    is_done = true;
+                    let event = Ok::<Event, Infallible>(Event::default().data(done_json));
+                    Some((event, (llm_stream, false, is_done)))
                 }
             }
-            StreamState::Done => None,
-        }
-    });
+        },
+    );
 
     Ok(Sse::new(response_stream).keep_alive(
         axum::response::sse::KeepAlive::new()
@@ -549,3 +495,4 @@ mod tests {
         assert_eq!(req.stream, false);
     }
 }
+

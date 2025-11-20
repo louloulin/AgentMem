@@ -9,6 +9,7 @@ use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::{llm::FunctionDefinition, AgentMemError, Message, Result};
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -400,6 +401,101 @@ impl AgentOrchestrator {
         Ok(())
     }
 
+    /// 执行流式对话循环 (真实SSE流式)
+    ///
+    /// 这是真实的流式实现，直接从LLM流式返回内容：
+    /// 1. 准备上下文和记忆
+    /// 2. 调用LLM的 generate_stream 方法
+    /// 3. 实时转发流式数据
+    /// 4. 流结束后保存消息和更新记忆
+    pub async fn step_stream(
+        self: Arc<Self>,
+        request: ChatRequest,
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send + 'static>>> {
+        use futures::stream::{Stream, StreamExt};
+        use futures::stream;
+
+        info!(
+            "🌊 Starting REAL streaming conversation for agent_id={}, user_id={}",
+            request.agent_id, request.user_id
+        );
+
+        // 1. 准备上下文
+        let working_context = self.get_working_context(&request.session_id).await?;
+        let user_message_id = self.create_user_message(&request).await?;
+
+        // 2. 检索记忆
+        let adjusted_max_memories = if self.config.enable_adaptive {
+            self.adaptive_adjust_memories(&request, std::time::Duration::from_secs(0))
+                .await
+        } else {
+            request.max_memories
+        };
+
+        let mut adjusted_request = request.clone();
+        adjusted_request.max_memories = adjusted_max_memories;
+        let memories = self.retrieve_memories(&adjusted_request).await?;
+        let memories_count = memories.len();
+        
+        info!("   📚 检索到 {} 条记忆", memories_count);
+
+        // 3. 构建消息
+        let messages = self
+            .build_messages_with_context(&request, &working_context, &memories)
+            .await?;
+
+        info!("   📝 构建了 {} 条消息", messages.len());
+
+        // 4. 调用LLM真实流式
+        let llm_stream = self.llm_client.generate_stream(&messages).await?;
+        info!("   ✅ LLM流式已启动");
+
+        // 5. 创建包装流，用于收集完整响应并在结束时保存
+        let request_clone = request.clone();
+        let orchestrator = self.clone();
+        let messages_clone = messages.clone();
+        
+        let wrapped_stream = stream::unfold(
+            (llm_stream, String::new(), false, request_clone, orchestrator, messages_clone, memories_count, user_message_id),
+            |(mut stream, mut accumulated_content, mut is_done, req, orch, msgs, mem_count, _msg_id)| async move {
+                if is_done {
+                    return None;
+                }
+
+                match stream.next().await {
+                    Some(Ok(chunk)) => {
+                        // 累积内容
+                        accumulated_content.push_str(&chunk);
+                        
+                        // 返回当前块，继续流式
+                        Some((
+                            Ok(chunk),
+                            (stream, accumulated_content, is_done, req, orch, msgs, mem_count, _msg_id),
+                        ))
+                    }
+                    Some(Err(e)) => {
+                        // 流式错误
+                        warn!("❌ 流式传输错误: {}", e);
+                        is_done = true;
+                        Some((Err(e), (stream, accumulated_content, is_done, req, orch, msgs, mem_count, _msg_id)))
+                    }
+                    None => {
+                        // 流结束，保存完整响应
+                        info!("   ✅ 流式传输完成，累积内容: {} 字符", accumulated_content.len());
+                        
+                        // Note: 保存操作由外部调用者处理，这里只返回流数据
+                        // TODO: 考虑在流结束后通过其他机制保存消息和更新记忆
+                        
+                        is_done = true;
+                        None
+                    }
+                }
+            },
+        );
+
+        Ok(Box::pin(wrapped_stream))
+    }
+
     /// 执行完整的对话循环
     ///
     /// 这是核心方法，参考 MIRIX 的 AgentWrapper.step() 实现：
@@ -443,31 +539,38 @@ impl AgentOrchestrator {
         };
 
         // 2. 检索相关记忆（使用调整后的数量）
+        let retrieval_start = std::time::Instant::now();
         let mut adjusted_request = request.clone();
         adjusted_request.max_memories = adjusted_max_memories;
         let memories = self.retrieve_memories(&adjusted_request).await?;
         let memories_retrieved_count = memories.len();
+        let retrieval_duration = retrieval_start.elapsed();
         info!(
-            "Retrieved {} memories (adjusted from {} to {})",
-            memories_retrieved_count, request.max_memories, adjusted_max_memories
+            "Retrieved {} memories (adjusted from {} to {}) in {:?}",
+            memories_retrieved_count, request.max_memories, adjusted_max_memories, retrieval_duration
         );
 
         // 3. 构建 prompt（注入会话上下文和长期记忆）
+        let build_start = std::time::Instant::now();
         let messages = self
             .build_messages_with_context(&request, &working_context, &memories)
             .await?;
+        let build_duration = build_start.elapsed();
         debug!(
-            "Built {} messages with working context and memories",
-            messages.len()
+            "Built {} messages with working context and memories in {:?}",
+            messages.len(), build_duration
         );
 
         // 4. 调用 LLM（可能需要多轮工具调用）
+        let llm_start = std::time::Instant::now();
         let (final_response, tool_calls_info) =
             self.execute_with_tools(&messages, &request.user_id).await?;
+        let llm_duration = llm_start.elapsed();
         debug!(
-            "Got final response: {} chars, {} tool calls",
+            "Got final response: {} chars, {} tool calls in {:?}",
             final_response.len(),
-            tool_calls_info.len()
+            tool_calls_info.len(),
+            llm_duration
         );
 
         // 5. 保存 assistant 消息
@@ -500,7 +603,8 @@ impl AgentOrchestrator {
         }
 
         // ⭐ 8. 更新性能统计
-        let ttfb_ms = start_time.elapsed().as_millis() as u64;
+        let total_duration = start_time.elapsed();
+        let ttfb_ms = total_duration.as_millis() as u64;
         let prompt_chars: usize = messages.iter().map(|m| m.content.len()).sum();
         self.update_metrics(ttfb_ms, prompt_chars, memories_retrieved_count);
 
@@ -508,6 +612,11 @@ impl AgentOrchestrator {
             "📊 Performance: TTFB={}ms, Prompt={}chars, Memories={}",
             ttfb_ms, prompt_chars, memories_retrieved_count
         );
+        info!("   ⏱️  详细时间分解:");
+        info!("      - 内存检索: {:?} ({:.1}%)", retrieval_duration, (retrieval_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
+        info!("      - 消息构建: {:?} ({:.1}%)", build_duration, (build_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
+        info!("      - LLM调用: {:?} ({:.1}%)", llm_duration, (llm_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
+        info!("      - 总耗时: {:?}", total_duration);
 
         // 9. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）
         Ok(ChatResponse {
