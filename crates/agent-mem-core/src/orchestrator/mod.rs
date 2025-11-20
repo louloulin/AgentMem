@@ -192,16 +192,31 @@ pub struct OrchestratorConfig {
 
     /// 是否启用工具调用
     pub enable_tool_calling: bool,
+    
+    /// ⭐ Phase 4: 自适应配置
+    /// 是否启用自适应调整
+    pub enable_adaptive: bool,
+    
+    /// TTFB阈值(ms) - 超过此值触发降级
+    pub ttfb_threshold_ms: u64,
+    
+    /// Token预算上限
+    pub token_budget: usize,
 }
 
 impl Default for OrchestratorConfig {
     fn default() -> Self {
         Self {
             max_tool_rounds: 5,
-            max_memories: 10,
+            max_memories: 3,  // Phase 2/3优化: 从10降到3
             auto_extract_memories: true,
             memory_extraction_threshold: 0.5,
-            enable_tool_calling: false, // 默认关闭，需要显式启用
+            enable_tool_calling: false,
+            
+            // Phase 4: 自适应配置默认值
+            enable_adaptive: true,
+            ttfb_threshold_ms: 5000,  // 5秒阈值
+            token_budget: 850,  // HCAM推荐值
         }
     }
 }
@@ -379,6 +394,8 @@ impl AgentOrchestrator {
     /// 8. 提取和更新记忆
     /// 9. 返回响应
     pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
+        let start_time = std::time::Instant::now();
+        
         // ✅ 验证请求参数
         request.validate()?;
 
@@ -397,10 +414,20 @@ impl AgentOrchestrator {
         let user_message_id = self.create_user_message(&request).await?;
         debug!("Created user message: {}", user_message_id);
 
-        // 2. 检索相关记忆
-        let memories = self.retrieve_memories(&request).await?;
+        // ⭐ Phase 4: 自适应调整 - 根据性能动态调整max_memories
+        let adjusted_max_memories = if self.config.enable_adaptive {
+            self.adaptive_adjust_memories(&request, start_time.elapsed()).await
+        } else {
+            request.max_memories
+        };
+
+        // 2. 检索相关记忆（使用调整后的数量）
+        let mut adjusted_request = request.clone();
+        adjusted_request.max_memories = adjusted_max_memories;
+        let memories = self.retrieve_memories(&adjusted_request).await?;
         let memories_retrieved_count = memories.len();
-        info!("Retrieved {} memories", memories_retrieved_count);
+        info!("Retrieved {} memories (adjusted from {} to {})", 
+            memories_retrieved_count, request.max_memories, adjusted_max_memories);
 
         // 3. 构建 prompt（注入会话上下文和长期记忆）
         let messages = self
@@ -684,10 +711,33 @@ impl AgentOrchestrator {
     }
 
     /// 检索相关记忆
+    /// ⭐ Phase 4: 自适应调整记忆数量
+    /// 根据历史性能动态调整
+    async fn adaptive_adjust_memories(&self, _request: &ChatRequest, elapsed: std::time::Duration) -> usize {
+        let base_max = self.config.max_memories;
+        let elapsed_ms = elapsed.as_millis() as u64;
+        
+        // 如果已经超过阈值，减少记忆数量
+        if elapsed_ms > self.config.ttfb_threshold_ms {
+            let reduced = base_max.saturating_sub(1).max(1);
+            warn!("⚠️  Adaptive: High latency {}ms > {}ms, reducing memories {} → {}", 
+                elapsed_ms, self.config.ttfb_threshold_ms, base_max, reduced);
+            reduced
+        } else if elapsed_ms < 1000 && base_max < 5 {
+            // 如果性能很好，适度增加
+            let increased = (base_max + 1).min(5);
+            info!("✅ Adaptive: Low latency {}ms, increasing memories {} → {}", 
+                elapsed_ms, base_max, increased);
+            increased
+        } else {
+            base_max
+        }
+    }
+    
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
         // 🆕 Phase 1: 使用 Episodic-first检索（基于认知理论）
         // 理论依据: Atkinson-Shiffrin模型 + HCAM分层检索
-        let max_count = self.config.max_memories;
+        let max_count = request.max_memories;
 
         // 使用新的 retrieve_episodic_first 方法
         // Priority 1: Episodic Memory (Agent/User) - 主要来源
