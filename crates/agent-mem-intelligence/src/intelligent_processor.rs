@@ -17,8 +17,10 @@ use crate::fact_extraction::{AdvancedFactExtractor, ExtractedFact, FactExtractor
 use crate::importance_evaluator::{
     ImportanceEvaluation, ImportanceEvaluator, ImportanceEvaluatorConfig,
 };
-use agent_mem_traits::{MemoryV4 as Memory, MetadataV4, LLMConfig, MemoryItem, MemoryType, Message, Result, Session};
 use agent_mem_llm::{factory::RealLLMFactory, LLMProvider};
+use agent_mem_traits::{
+    LLMConfig, MemoryItem, MemoryType, MemoryV4 as Memory, Message, MetadataV4, Result, Session,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -187,22 +189,24 @@ impl IntelligentMemoryProcessor {
         let new_memories: Vec<Memory> = extracted_facts
             .iter()
             .map(|fact| {
-                use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph};
+                use agent_mem_traits::{
+                    AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph,
+                };
 
                 let mut attributes = AttributeSet::new();
                 attributes.insert(
                     AttributeKey::core("agent_id"),
-                    AttributeValue::String("default".to_string())
+                    AttributeValue::String("default".to_string()),
                 );
                 attributes.insert(
                     AttributeKey::system("importance"),
-                    AttributeValue::Number(fact.confidence as f64)
+                    AttributeValue::Number(fact.confidence as f64),
                 );
 
                 for (k, v) in &fact.metadata {
                     attributes.insert(
                         AttributeKey::user(k.clone()),
-                        AttributeValue::String(v.to_string())
+                        AttributeValue::String(v.to_string()),
                     );
                 }
 
@@ -227,18 +231,20 @@ impl IntelligentMemoryProcessor {
         let existing_memory_v4: Vec<Memory> = existing_memories
             .iter()
             .map(|mem| {
-                use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph};
+                use agent_mem_traits::{
+                    AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, RelationGraph,
+                };
 
                 let mut attributes = AttributeSet::new();
                 attributes.insert(
                     AttributeKey::core("agent_id"),
-                    AttributeValue::String("default".to_string())
+                    AttributeValue::String("default".to_string()),
                 );
 
                 for (k, v) in &mem.metadata {
                     attributes.insert(
                         AttributeKey::user(k.clone()),
-                        AttributeValue::String(v.clone())
+                        AttributeValue::String(v.clone()),
                     );
                 }
 
@@ -251,7 +257,9 @@ impl IntelligentMemoryProcessor {
                         created_at: chrono::DateTime::parse_from_rfc3339(&mem.created_at)
                             .unwrap_or_else(|_| chrono::Utc::now().into())
                             .with_timezone(&chrono::Utc),
-                        updated_at: mem.updated_at.as_ref()
+                        updated_at: mem
+                            .updated_at
+                            .as_ref()
                             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                             .map(|dt| dt.with_timezone(&chrono::Utc))
                             .unwrap_or_else(chrono::Utc::now),
@@ -847,7 +855,7 @@ impl EnhancedIntelligentProcessor {
                 expires_at: None,
                 version: 1,
             };
-            
+
             let temp_memory = agent_mem_core::storage::conversion::legacy_to_v4(&temp_memory_item);
 
             let evaluation = self
@@ -911,7 +919,7 @@ impl EnhancedIntelligentProcessor {
                 version: 1,
             })
             .collect();
-        
+
         let temp_memories: Vec<Memory> = temp_memory_items
             .iter()
             .map(|item| agent_mem_core::storage::conversion::legacy_to_v4(item))

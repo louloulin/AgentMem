@@ -46,7 +46,8 @@ mod p1_optimizations_tests {
         async fn generate_stream(
             &self,
             _messages: &[Message],
-        ) -> TraitResult<Box<dyn futures::Stream<Item = TraitResult<String>> + Send + Unpin>> {
+        ) -> TraitResult<Box<dyn futures::Stream<Item = TraitResult<String>> + Send + Unpin>>
+        {
             use futures::stream;
             let items = vec![Ok("Mock stream response".to_string())];
             Ok(Box::new(stream::iter(items)))

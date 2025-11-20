@@ -145,7 +145,11 @@ impl MemoryHistory {
     }
 
     /// Record importance change
-    pub fn record_importance_change(&mut self, memory: &MemoryV4, old_importance: f32) -> Result<()> {
+    pub fn record_importance_change(
+        &mut self,
+        memory: &MemoryV4,
+        old_importance: f32,
+    ) -> Result<()> {
         let new_importance = memory.importance().unwrap_or(0.5) as f32;
         let entry = MemoryHistoryEntry {
             memory_id: memory.id.0.clone(),
@@ -200,7 +204,10 @@ impl MemoryHistory {
             metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Accessed,
-            change_description: Some(format!("Memory accessed (count: {})", memory.metadata.access_count)),
+            change_description: Some(format!(
+                "Memory accessed (count: {})",
+                memory.metadata.access_count
+            )),
         };
 
         self.add_history_entry(entry);

@@ -14,15 +14,11 @@ use std::sync::Arc;
 async fn check_backend_health(api_url: &str) -> Result<(), String> {
     let url = format!("{}/health", api_url);
     let timeout = std::time::Duration::from_secs(5);
-    
-    let result = tokio::task::spawn_blocking(move || {
-        ureq::get(&url)
-            .timeout(timeout)
-            .call()
-    })
-    .await
-    .map_err(|e| format!("Join error: {}", e))?;
-    
+
+    let result = tokio::task::spawn_blocking(move || ureq::get(&url).timeout(timeout).call())
+        .await
+        .map_err(|e| format!("Join error: {}", e))?;
+
     match result {
         Ok(resp) if resp.status() == 200 => Ok(()),
         Ok(resp) => Err(format!("Backend unhealthy: status {}", resp.status())),
@@ -98,7 +94,7 @@ impl Tool for AddMemoryTool {
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
         // 🆕 健康检查
         let api_url = get_api_url();
-        
+
         if let Err(e) = check_backend_health(&api_url).await {
             tracing::warn!("Backend health check failed: {}", e);
             return Ok(json!({
@@ -108,14 +104,14 @@ impl Tool for AddMemoryTool {
                 "details": e
             }));
         }
-        
-        let content = args["content"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("content is required".to_string()))?;
 
-        let user_id = args["user_id"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
+        let content = args["content"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("content is required".to_string())
+        })?;
+
+        let user_id = args["user_id"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("user_id is required".to_string())
+        })?;
 
         // 🆕 Phase 5: 提取scope相关参数
         let scope_type = args["scope_type"].as_str().unwrap_or("auto");
@@ -123,41 +119,41 @@ impl Tool for AddMemoryTool {
         let run_id = args["run_id"].as_str();
         let session_id = args["session_id"].as_str();
         let org_id = args["org_id"].as_str();
-        
+
         // 🆕 Phase 5: 构建metadata（包含scope信息）
         let mut metadata_map = std::collections::HashMap::new();
-        
+
         // 根据scope_type或自动推断
         let actual_scope_type = match scope_type {
             "user" => {
                 metadata_map.insert("scope_type".to_string(), "user".to_string());
                 "user"
-            },
+            }
             "agent" => {
                 metadata_map.insert("scope_type".to_string(), "agent".to_string());
                 "agent"
-            },
+            }
             "run" => {
                 metadata_map.insert("scope_type".to_string(), "run".to_string());
                 if let Some(rid) = run_id {
                     metadata_map.insert("run_id".to_string(), rid.to_string());
                 }
                 "run"
-            },
+            }
             "session" => {
                 metadata_map.insert("scope_type".to_string(), "session".to_string());
                 if let Some(sid) = session_id {
                     metadata_map.insert("session_id".to_string(), sid.to_string());
                 }
                 "session"
-            },
+            }
             "organization" => {
                 metadata_map.insert("scope_type".to_string(), "organization".to_string());
                 if let Some(oid) = org_id {
                     metadata_map.insert("org_id".to_string(), oid.to_string());
                 }
                 "organization"
-            },
+            }
             "auto" | _ => {
                 // 自动推断（当前逻辑）
                 if let Some(rid) = run_id {
@@ -180,24 +176,25 @@ impl Tool for AddMemoryTool {
 
         // 🆕 智能Agent ID处理：根据scope决定是否需要agent_id
         let agent_id = if actual_scope_type == "agent" || agent_id_arg.is_some() {
-            agent_id_arg.map(|s| s.to_string())
-                .unwrap_or_else(|| {
-                    std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
-                        .unwrap_or_else(|_| format!("agent-{}", user_id))
-                })
+            agent_id_arg.map(|s| s.to_string()).unwrap_or_else(|| {
+                std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
+                    .unwrap_or_else(|_| format!("agent-{}", user_id))
+            })
         } else {
             format!("default-agent-{}", user_id)
         };
-        
+
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
-        
+
         // 合并用户提供的metadata
         if let Some(user_metadata_str) = args["metadata"].as_str() {
-            if let Ok(user_metadata) = serde_json::from_str::<std::collections::HashMap<String, String>>(user_metadata_str) {
+            if let Ok(user_metadata) =
+                serde_json::from_str::<std::collections::HashMap<String, String>>(user_metadata_str)
+            {
                 metadata_map.extend(user_metadata);
             }
         }
-        
+
         // 🆕 确保Agent存在（自动创建）- 仅当需要agent时
         if actual_scope_type == "agent" || agent_id_arg.is_some() {
             ensure_agent_exists(&api_url, &agent_id, user_id).await?;
@@ -217,7 +214,10 @@ impl Tool for AddMemoryTool {
         });
 
         tracing::debug!("Calling API: POST {}", url);
-        tracing::debug!("Request body: {}", serde_json::to_string(&request_body).unwrap_or_default());
+        tracing::debug!(
+            "Request body: {}",
+            serde_json::to_string(&request_body).unwrap_or_default()
+        );
 
         // 使用 spawn_blocking 运行同步 HTTP 请求
         let api_response = tokio::task::spawn_blocking(move || {
@@ -226,15 +226,16 @@ impl Tool for AddMemoryTool {
                 .send_json(&request_body);
 
             match response {
-                Ok(resp) => {
-                    resp.into_json::<Value>()
-                        .map_err(|e| format!("Failed to parse response: {}", e))
-                }
+                Ok(resp) => resp
+                    .into_json::<Value>()
+                    .map_err(|e| format!("Failed to parse response: {}", e)),
                 Err(ureq::Error::Status(code, resp)) => {
-                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    let text = resp
+                        .into_string()
+                        .unwrap_or_else(|_| "Unknown error".to_string());
                     Err(format!("API returned error {}: {}", code, text))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e))
+                Err(e) => Err(format!("HTTP request failed: {}", e)),
             }
         })
         .await
@@ -277,16 +278,8 @@ impl Tool for SearchMemoriesTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(self.name(), self.description())
-            .add_parameter(
-                "query",
-                PropertySchema::string("搜索查询"),
-                true,
-            )
-            .add_parameter(
-                "user_id",
-                PropertySchema::string("用户 ID（可选）"),
-                false,
-            )
+            .add_parameter("query", PropertySchema::string("搜索查询"), true)
+            .add_parameter("user_id", PropertySchema::string("用户 ID（可选）"), false)
             .add_parameter(
                 "limit",
                 PropertySchema::number("返回结果数量限制（默认 10）"),
@@ -302,7 +295,7 @@ impl Tool for SearchMemoriesTool {
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
         // 🆕 健康检查
         let api_url = get_api_url();
-        
+
         if let Err(e) = check_backend_health(&api_url).await {
             tracing::warn!("Backend health check failed: {}", e);
             return Ok(json!({
@@ -312,19 +305,22 @@ impl Tool for SearchMemoriesTool {
                 "details": e
             }));
         }
-        
-        let query = args["query"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("query is required".to_string()))?;
+
+        let query = args["query"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("query is required".to_string())
+        })?;
 
         let limit = args["limit"].as_i64().unwrap_or(10) as usize;
-        
-        // 提取 user_id 参数（如果未提供，使用默认值"default"）
-        let user_id = args["user_id"]
-            .as_str()
-            .unwrap_or("default");
 
-        tracing::debug!("Searching memories: query='{}', user_id='{}', limit={}", query, user_id, limit);
+        // 提取 user_id 参数（如果未提供，使用默认值"default"）
+        let user_id = args["user_id"].as_str().unwrap_or("default");
+
+        tracing::debug!(
+            "Searching memories: query='{}', user_id='{}', limit={}",
+            query,
+            user_id,
+            limit
+        );
         let url = format!("{}/api/v1/memories/search", api_url);
 
         let request_body = json!({
@@ -342,15 +338,16 @@ impl Tool for SearchMemoriesTool {
                 .send_json(&request_body);
 
             match response {
-                Ok(resp) => {
-                    resp.into_json::<Value>()
-                        .map_err(|e| format!("Failed to parse response: {}", e))
-                }
+                Ok(resp) => resp
+                    .into_json::<Value>()
+                    .map_err(|e| format!("Failed to parse response: {}", e)),
                 Err(ureq::Error::Status(code, resp)) => {
-                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    let text = resp
+                        .into_string()
+                        .unwrap_or_else(|_| "Unknown error".to_string());
                     Err(format!("API returned error {}: {}", code, text))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e))
+                Err(e) => Err(format!("HTTP request failed: {}", e)),
             }
         })
         .await
@@ -359,20 +356,20 @@ impl Tool for SearchMemoriesTool {
 
         // 提取搜索结果
         // 注意：API返回的是 {"data": [...]}，不是 {"data": {"memories": [...]}}
-        let memories = api_response["data"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let memories = api_response["data"].as_array().cloned().unwrap_or_default();
 
-        let results: Vec<Value> = memories.iter().map(|mem| {
-            json!({
-                "memory_id": mem["id"].as_str().unwrap_or("unknown"),
-                "content": mem["content"].as_str().unwrap_or(""),
-                "relevance_score": mem["score"].as_f64().unwrap_or(0.0),
-                "memory_type": mem["memory_type"].as_str().unwrap_or("Episodic"),
-                "timestamp": mem["created_at"].as_str().unwrap_or("")
+        let results: Vec<Value> = memories
+            .iter()
+            .map(|mem| {
+                json!({
+                    "memory_id": mem["id"].as_str().unwrap_or("unknown"),
+                    "content": mem["content"].as_str().unwrap_or(""),
+                    "relevance_score": mem["score"].as_f64().unwrap_or(0.0),
+                    "memory_type": mem["memory_type"].as_str().unwrap_or("Episodic"),
+                    "timestamp": mem["created_at"].as_str().unwrap_or("")
+                })
             })
-        }).collect();
+            .collect();
 
         Ok(json!({
             "success": true,
@@ -399,16 +396,8 @@ impl Tool for ChatTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(self.name(), self.description())
-            .add_parameter(
-                "message",
-                PropertySchema::string("用户消息"),
-                true,
-            )
-            .add_parameter(
-                "user_id",
-                PropertySchema::string("用户 ID"),
-                true,
-            )
+            .add_parameter("message", PropertySchema::string("用户消息"), true)
+            .add_parameter("user_id", PropertySchema::string("用户 ID"), true)
             .add_parameter(
                 "agent_id",
                 PropertySchema::string("Agent ID（可选，默认使用环境变量配置）"),
@@ -429,7 +418,7 @@ impl Tool for ChatTool {
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
         // 🆕 健康检查
         let api_url = get_api_url();
-        
+
         if let Err(e) = check_backend_health(&api_url).await {
             tracing::warn!("Backend health check failed: {}", e);
             return Ok(json!({
@@ -439,14 +428,14 @@ impl Tool for ChatTool {
                 "details": e
             }));
         }
-        
-        let message = args["message"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("message is required".to_string()))?;
 
-        let user_id = args["user_id"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
+        let message = args["message"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("message is required".to_string())
+        })?;
+
+        let user_id = args["user_id"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("user_id is required".to_string())
+        })?;
 
         // 使用环境变量或默认 agent ID
         let default_agent = std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
@@ -472,15 +461,16 @@ impl Tool for ChatTool {
                 .send_json(&request_body);
 
             match response {
-                Ok(resp) => {
-                    resp.into_json::<Value>()
-                        .map_err(|e| format!("Failed to parse response: {}", e))
-                }
+                Ok(resp) => resp
+                    .into_json::<Value>()
+                    .map_err(|e| format!("Failed to parse response: {}", e)),
                 Err(ureq::Error::Status(code, resp)) => {
-                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    let text = resp
+                        .into_string()
+                        .unwrap_or_else(|_| "Unknown error".to_string());
                     Err(format!("API returned error {}: {}", code, text))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e))
+                Err(e) => Err(format!("HTTP request failed: {}", e)),
             }
         })
         .await
@@ -493,9 +483,7 @@ impl Tool for ChatTool {
             .unwrap_or("No response")
             .to_string();
 
-        let memories_count = api_response["data"]["memories_count"]
-            .as_u64()
-            .unwrap_or(0);
+        let memories_count = api_response["data"]["memories_count"].as_u64().unwrap_or(0);
 
         Ok(json!({
             "success": true,
@@ -523,11 +511,7 @@ impl Tool for GetSystemPromptTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(self.name(), self.description())
-            .add_parameter(
-                "user_id",
-                PropertySchema::string("用户 ID"),
-                true,
-            )
+            .add_parameter("user_id", PropertySchema::string("用户 ID"), true)
             .add_parameter(
                 "context",
                 PropertySchema::string("上下文描述（可选）"),
@@ -538,7 +522,7 @@ impl Tool for GetSystemPromptTool {
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
         // 🆕 健康检查
         let api_url = get_api_url();
-        
+
         if let Err(e) = check_backend_health(&api_url).await {
             tracing::warn!("Backend health check failed: {}", e);
             return Ok(json!({
@@ -548,10 +532,10 @@ impl Tool for GetSystemPromptTool {
                 "details": e
             }));
         }
-        
-        let user_id = args["user_id"]
-            .as_str()
-            .ok_or_else(|| crate::error::ToolError::InvalidArgument("user_id is required".to_string()))?;
+
+        let user_id = args["user_id"].as_str().ok_or_else(|| {
+            crate::error::ToolError::InvalidArgument("user_id is required".to_string())
+        })?;
 
         let context = args["context"].as_str().unwrap_or("");
         let url = format!("{}/api/v1/memories/search", api_url);
@@ -576,15 +560,16 @@ impl Tool for GetSystemPromptTool {
                 .send_json(&request_body);
 
             match response {
-                Ok(resp) => {
-                    resp.into_json::<Value>()
-                        .map_err(|e| format!("Failed to parse response: {}", e))
-                }
+                Ok(resp) => resp
+                    .into_json::<Value>()
+                    .map_err(|e| format!("Failed to parse response: {}", e)),
                 Err(ureq::Error::Status(code, resp)) => {
-                    let text = resp.into_string().unwrap_or_else(|_| "Unknown error".to_string());
+                    let text = resp
+                        .into_string()
+                        .unwrap_or_else(|_| "Unknown error".to_string());
                     Err(format!("API returned error {}: {}", code, text))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e))
+                Err(e) => Err(format!("HTTP request failed: {}", e)),
             }
         })
         .await
@@ -631,43 +616,45 @@ pub async fn register_agentmem_tools(executor: &crate::executor::ToolExecutor) -
     executor.register_tool(Arc::new(AddMemoryTool)).await?;
     executor.register_tool(Arc::new(SearchMemoriesTool)).await?;
     executor.register_tool(Arc::new(ChatTool)).await?;
-    executor.register_tool(Arc::new(GetSystemPromptTool)).await?;
-    
+    executor
+        .register_tool(Arc::new(GetSystemPromptTool))
+        .await?;
+
     // 🆕 注册Agent管理工具
-    executor.register_tool(Arc::new(crate::agent_tools::ListAgentsTool)).await?;
-    
+    executor
+        .register_tool(Arc::new(crate::agent_tools::ListAgentsTool))
+        .await?;
+
     Ok(())
 }
 
 /// 🆕 确保Agent存在，如果不存在则自动创建
 async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> ToolResult<()> {
     let check_url = format!("{}/api/v1/agents/{}", api_url, agent_id);
-    
+
     // 1. 检查Agent是否存在
     let exists = tokio::task::spawn_blocking({
         let check_url = check_url.clone();
-        move || {
-            match ureq::get(&check_url).call() {
-                Ok(_) => true,
-                Err(ureq::Error::Status(404, _)) => false,
-                Err(e) => {
-                    tracing::warn!("Failed to check agent existence: {}", e);
-                    false
-                }
+        move || match ureq::get(&check_url).call() {
+            Ok(_) => true,
+            Err(ureq::Error::Status(404, _)) => false,
+            Err(e) => {
+                tracing::warn!("Failed to check agent existence: {}", e);
+                false
             }
         }
     })
     .await
     .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-    
+
     if exists {
         tracing::debug!("Agent {} already exists", agent_id);
         return Ok(());
     }
-    
+
     // 2. Agent不存在，自动创建
     tracing::info!("🤖 Agent {} 不存在，自动创建", agent_id);
-    
+
     let create_url = format!("{}/api/v1/agents", api_url);
     let create_body = json!({
         "id": agent_id,
@@ -675,7 +662,7 @@ async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> To
         "description": "Automatically created agent for memory management via MCP",
         "user_id": user_id
     });
-    
+
     let result = tokio::task::spawn_blocking({
         let create_url = create_url.clone();
         let create_body = create_body.clone();
@@ -687,7 +674,7 @@ async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> To
     })
     .await
     .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-    
+
     match result {
         Ok(_) => {
             tracing::info!("✅ Agent {} 创建成功", agent_id);
@@ -702,4 +689,3 @@ async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> To
         }
     }
 }
-

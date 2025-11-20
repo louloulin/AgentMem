@@ -23,11 +23,7 @@ async fn test_add_batch_basic() {
     assert_eq!(results.len(), 3, "应该成功添加 3 条记忆");
 
     for (i, result) in results.iter().enumerate() {
-        assert!(
-            !result.results.is_empty(),
-            "结果 {} 应该包含事件",
-            i + 1
-        );
+        assert!(!result.results.is_empty(), "结果 {} 应该包含事件", i + 1);
     }
 
     println!("✅ 批量添加基本测试通过");
@@ -38,17 +34,17 @@ async fn test_add_batch_with_user_scope() {
     // 测试带用户作用域的批量添加
     let mem = Memory::new().await.expect("初始化失败");
 
-    let contents = vec![
-        "记忆1".to_string(),
-        "记忆2".to_string(),
-    ];
+    let contents = vec!["记忆1".to_string(), "记忆2".to_string()];
 
     let options = AddMemoryOptions {
         user_id: Some("alice".to_string()),
         ..Default::default()
     };
 
-    let results = mem.add_batch(contents, options).await.expect("批量添加失败");
+    let results = mem
+        .add_batch(contents, options)
+        .await
+        .expect("批量添加失败");
 
     assert_eq!(results.len(), 2);
     println!("✅ 带用户作用域的批量添加测试通过");
@@ -59,9 +55,7 @@ async fn test_add_batch_performance() {
     // 测试批量添加的性能
     let mem = Memory::new().await.expect("初始化失败");
 
-    let contents: Vec<String> = (0..10)
-        .map(|i| format!("测试记忆 {}", i))
-        .collect();
+    let contents: Vec<String> = (0..10).map(|i| format!("测试记忆 {}", i)).collect();
 
     let start = std::time::Instant::now();
     let results = mem
@@ -83,17 +77,17 @@ async fn test_add_batch_with_infer_false() {
     // 测试批量添加（禁用智能功能）
     let mem = Memory::new().await.expect("初始化失败");
 
-    let contents = vec![
-        "原始内容1".to_string(),
-        "原始内容2".to_string(),
-    ];
+    let contents = vec!["原始内容1".to_string(), "原始内容2".to_string()];
 
     let options = AddMemoryOptions {
         infer: false,
         ..Default::default()
     };
 
-    let results = mem.add_batch(contents, options).await.expect("批量添加失败");
+    let results = mem
+        .add_batch(contents, options)
+        .await
+        .expect("批量添加失败");
 
     assert_eq!(results.len(), 2);
     println!("✅ 批量添加（简单模式）测试通过");
@@ -114,4 +108,3 @@ async fn test_add_batch_empty() {
     assert_eq!(results.len(), 0, "空批量应该返回空结果");
     println!("✅ 空批量添加测试通过");
 }
-

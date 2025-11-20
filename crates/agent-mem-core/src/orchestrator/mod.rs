@@ -194,14 +194,14 @@ pub struct OrchestratorConfig {
 
     /// 是否启用工具调用
     pub enable_tool_calling: bool,
-    
+
     /// ⭐ Phase 4: 自适应配置
     /// 是否启用自适应调整
     pub enable_adaptive: bool,
-    
+
     /// TTFB阈值(ms) - 超过此值触发降级
     pub ttfb_threshold_ms: u64,
-    
+
     /// Token预算上限
     pub token_budget: usize,
 }
@@ -210,15 +210,15 @@ impl Default for OrchestratorConfig {
     fn default() -> Self {
         Self {
             max_tool_rounds: 5,
-            max_memories: 3,  // Phase 2/3优化: 从10降到3
+            max_memories: 3, // Phase 2/3优化: 从10降到3
             auto_extract_memories: true,
             memory_extraction_threshold: 0.5,
             enable_tool_calling: false,
-            
+
             // Phase 4: 自适应配置默认值
             enable_adaptive: true,
-            ttfb_threshold_ms: 5000,  // 5秒阈值
-            token_budget: 850,  // HCAM推荐值
+            ttfb_threshold_ms: 5000, // 5秒阈值
+            token_budget: 850,       // HCAM推荐值
         }
     }
 }
@@ -415,7 +415,7 @@ impl AgentOrchestrator {
     /// 9. 返回响应
     pub async fn step(&self, request: ChatRequest) -> Result<ChatResponse> {
         let start_time = std::time::Instant::now();
-        
+
         // ✅ 验证请求参数
         request.validate()?;
 
@@ -436,7 +436,8 @@ impl AgentOrchestrator {
 
         // ⭐ Phase 4: 自适应调整 - 根据性能动态调整max_memories
         let adjusted_max_memories = if self.config.enable_adaptive {
-            self.adaptive_adjust_memories(&request, start_time.elapsed()).await
+            self.adaptive_adjust_memories(&request, start_time.elapsed())
+                .await
         } else {
             request.max_memories
         };
@@ -446,8 +447,10 @@ impl AgentOrchestrator {
         adjusted_request.max_memories = adjusted_max_memories;
         let memories = self.retrieve_memories(&adjusted_request).await?;
         let memories_retrieved_count = memories.len();
-        info!("Retrieved {} memories (adjusted from {} to {})", 
-            memories_retrieved_count, request.max_memories, adjusted_max_memories);
+        info!(
+            "Retrieved {} memories (adjusted from {} to {})",
+            memories_retrieved_count, request.max_memories, adjusted_max_memories
+        );
 
         // 3. 构建 prompt（注入会话上下文和长期记忆）
         let messages = self
@@ -498,13 +501,13 @@ impl AgentOrchestrator {
 
         // ⭐ 8. 更新性能统计
         let ttfb_ms = start_time.elapsed().as_millis() as u64;
-        let prompt_chars: usize = messages.iter()
-            .map(|m| m.content.len())
-            .sum();
+        let prompt_chars: usize = messages.iter().map(|m| m.content.len()).sum();
         self.update_metrics(ttfb_ms, prompt_chars, memories_retrieved_count);
-        
-        info!("📊 Performance: TTFB={}ms, Prompt={}chars, Memories={}", 
-            ttfb_ms, prompt_chars, memories_retrieved_count);
+
+        info!(
+            "📊 Performance: TTFB={}ms, Prompt={}chars, Memories={}",
+            ttfb_ms, prompt_chars, memories_retrieved_count
+        );
 
         // 9. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）
         Ok(ChatResponse {
@@ -519,26 +522,25 @@ impl AgentOrchestrator {
             },
         })
     }
-    
+
     /// ⭐ 更新性能统计
     fn update_metrics(&self, ttfb_ms: u64, prompt_chars: usize, memories: usize) {
         if let Ok(mut metrics) = self.metrics.write() {
             let n = metrics.total_requests as f64;
             metrics.total_requests += 1;
             metrics.last_ttfb_ms = ttfb_ms;
-            
+
             // 移动平均
             metrics.avg_ttfb_ms = (metrics.avg_ttfb_ms * n + ttfb_ms as f64) / (n + 1.0);
-            metrics.avg_prompt_chars = (metrics.avg_prompt_chars * n + prompt_chars as f64) / (n + 1.0);
+            metrics.avg_prompt_chars =
+                (metrics.avg_prompt_chars * n + prompt_chars as f64) / (n + 1.0);
             metrics.avg_memories = (metrics.avg_memories * n + memories as f64) / (n + 1.0);
         }
     }
-    
+
     /// ⭐ 获取性能统计
     pub fn get_metrics(&self) -> PerformanceMetrics {
-        self.metrics.read()
-            .map(|m| m.clone())
-            .unwrap_or_default()
+        self.metrics.read().map(|m| m.clone()).unwrap_or_default()
     }
 
     /// 执行带工具调用的对话循环
@@ -758,27 +760,35 @@ impl AgentOrchestrator {
     /// 检索相关记忆
     /// ⭐ Phase 4: 自适应调整记忆数量
     /// 根据历史性能动态调整
-    async fn adaptive_adjust_memories(&self, _request: &ChatRequest, elapsed: std::time::Duration) -> usize {
+    async fn adaptive_adjust_memories(
+        &self,
+        _request: &ChatRequest,
+        elapsed: std::time::Duration,
+    ) -> usize {
         let base_max = self.config.max_memories;
         let elapsed_ms = elapsed.as_millis() as u64;
-        
+
         // 如果已经超过阈值，减少记忆数量
         if elapsed_ms > self.config.ttfb_threshold_ms {
             let reduced = base_max.saturating_sub(1).max(1);
-            warn!("⚠️  Adaptive: High latency {}ms > {}ms, reducing memories {} → {}", 
-                elapsed_ms, self.config.ttfb_threshold_ms, base_max, reduced);
+            warn!(
+                "⚠️  Adaptive: High latency {}ms > {}ms, reducing memories {} → {}",
+                elapsed_ms, self.config.ttfb_threshold_ms, base_max, reduced
+            );
             reduced
         } else if elapsed_ms < 1000 && base_max < 5 {
             // 如果性能很好，适度增加
             let increased = (base_max + 1).min(5);
-            info!("✅ Adaptive: Low latency {}ms, increasing memories {} → {}", 
-                elapsed_ms, base_max, increased);
+            info!(
+                "✅ Adaptive: Low latency {}ms, increasing memories {} → {}",
+                elapsed_ms, base_max, increased
+            );
             increased
         } else {
             base_max
         }
     }
-    
+
     async fn retrieve_memories(&self, request: &ChatRequest) -> Result<Vec<Memory>> {
         // 🆕 Phase 1: 使用 Episodic-first检索（基于认知理论）
         // 理论依据: Atkinson-Shiffrin模型 + HCAM分层检索
@@ -812,7 +822,7 @@ impl AgentOrchestrator {
         // Phase 2/3: 过滤和排序
         let memories = self.memory_integrator.filter_by_relevance(memories);
         let memories = self.memory_integrator.sort_memories(memories);
-        
+
         // Phase 5: 去重和压缩
         let memories = self.memory_integrator.deduplicate_memories(memories);
         let memories = self.memory_integrator.compress_memories(memories);
@@ -821,7 +831,7 @@ impl AgentOrchestrator {
     }
 
     /// ⭐ Phase 3: HCAM分层Prompt构建（极简风格）
-    /// 
+    ///
     /// 优化目标：从4606字符降至<500字符（-89%）
     /// 理论依据：HCAM模型 - 简洁优先原则
     async fn build_messages_with_context(
@@ -831,46 +841,43 @@ impl AgentOrchestrator {
         memories: &[Memory],
     ) -> Result<Vec<Message>> {
         use crate::prompt::MemorySummarizer;
-        
+
         let mut messages = Vec::new();
-        
+
         // ✅ Task 1.1: 使用智能摘要压缩记忆内容
         // 创建摘要器：每条记忆最大200字符
         let summarizer = MemorySummarizer::new(200);
 
         // ✅ 限制记忆数量为3条（减少90% Prompt大小）
         let limited_memories = memories.iter().take(3);
-        
+
         let mut memory_text = String::new();
         for (i, mem) in limited_memories.enumerate() {
-                let content = match &mem.content {
-                    agent_mem_traits::Content::Text(t) => t.as_str(),
-                    _ => "[data]",
-                };
-            
+            let content = match &mem.content {
+                agent_mem_traits::Content::Text(t) => t.as_str(),
+                _ => "[data]",
+            };
+
             // ✅ 智能摘要化每条记忆（保留头尾信息）
             let summary = summarizer.summarize(content);
-            
+
             // ✅ 极简格式：移除类型标签，节省空间
             memory_text.push_str(&format!("{}. {}\n", i + 1, summary));
-            }
-        
+        }
+
         // ✅ 极简Prompt模板
         let system_message = if memory_text.is_empty() {
             // 无记忆时：仅30字符
             "You are a helpful assistant.".to_string()
         } else {
             // 有记忆时：约600-800字符
-            format!(
-                "Context:\n{}\n\nUse context when relevant.",
-                memory_text
-            )
+            format!("Context:\n{}\n\nUse context when relevant.", memory_text)
         };
-        
+
         // 构建消息列表
         messages.push(Message::system(&system_message));
         messages.push(Message::user(&request.message));
-        
+
         // 记录Prompt大小（用于监控）
         let total_chars = system_message.len() + request.message.len();
         debug!(
@@ -1021,11 +1028,7 @@ impl AgentOrchestrator {
         let request_clone = request.clone();
         let messages_clone: Vec<Message> = messages.to_vec();
 
-        let task_id = background.spawn_memory_extraction(
-            extractor,
-            request_clone,
-            messages_clone,
-        );
+        let task_id = background.spawn_memory_extraction(extractor, request_clone, messages_clone);
 
         info!(
             "📤 Memory extraction scheduled as task {} for session {}",

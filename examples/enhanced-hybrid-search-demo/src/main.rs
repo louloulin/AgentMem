@@ -3,7 +3,7 @@
 //! 展示如何使用增强的混合检索系统
 
 use agent_mem_core::search::{
-    EnhancedHybridSearchEngineV2, EnhancedHybridConfig, QueryClassifier, SearchResult,
+    EnhancedHybridConfig, EnhancedHybridSearchEngineV2, QueryClassifier, SearchResult,
 };
 use agent_mem_storage::backends::{FTS5SearchResult, LibSQLFTS5Store};
 use agent_mem_traits::Result;
@@ -61,19 +61,22 @@ struct MockVectorSearcher;
 
 #[async_trait::async_trait]
 impl agent_mem_core::search::enhanced_hybrid_v2::VectorSearcher for MockVectorSearcher {
-    async fn search(&self, query: &str, limit: usize, _threshold: f32) -> Result<Vec<SearchResult>> {
+    async fn search(
+        &self,
+        query: &str,
+        limit: usize,
+        _threshold: f32,
+    ) -> Result<Vec<SearchResult>> {
         // 这里应该实际调用LanceDB
         // 现在返回模拟数据用于演示
-        Ok(vec![
-            SearchResult {
-                id: format!("vec_{}", uuid::Uuid::new_v4()),
-                content: format!("Vector search result for: {}", query),
-                score: 0.85,
-                vector_score: Some(0.85),
-                fulltext_score: None,
-                metadata: None,
-            },
-        ])
+        Ok(vec![SearchResult {
+            id: format!("vec_{}", uuid::Uuid::new_v4()),
+            content: format!("Vector search result for: {}", query),
+            score: 0.85,
+            vector_score: Some(0.85),
+            fulltext_score: None,
+            metadata: None,
+        }])
     }
 }
 
@@ -89,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
     // 1. 初始化LibSQL FTS5存储
     info!("📦 Initializing LibSQL FTS5 Store...");
     let store = Arc::new(LibSQLFTS5Store::new(":memory:").await?);
-    
+
     // 2. 插入测试数据
     info!("📝 Inserting test data...");
     insert_test_data(&store).await?;
@@ -147,7 +150,10 @@ async fn run_test_queries(engine: &EnhancedHybridSearchEngineV2) -> anyhow::Resu
         ("P000001", "Exact ID Query"),
         ("Apple", "Short Keyword Query"),
         ("推荐一款手机", "Natural Language Query (Chinese)"),
-        ("What is artificial intelligence?", "Semantic Query (English)"),
+        (
+            "What is artificial intelligence?",
+            "Semantic Query (English)",
+        ),
         ("iPhone 15 Pro Max", "Product Query"),
     ];
 
@@ -206,4 +212,3 @@ async fn run_test_queries(engine: &EnhancedHybridSearchEngineV2) -> anyhow::Resu
 
     Ok(())
 }
-

@@ -313,7 +313,10 @@ impl ConflictResolver for DefaultConflictResolver {
                         let mut best_importance = -1.0;
 
                         for memory_id in &conflict.memory_ids {
-                            if let Some(memory) = memories.iter().find(|m| m.id.as_str() == memory_id.as_str()) {
+                            if let Some(memory) = memories
+                                .iter()
+                                .find(|m| m.id.as_str() == memory_id.as_str())
+                            {
                                 let importance = memory.score().unwrap_or(0.0);
                                 if importance > best_importance {
                                     best_importance = importance;

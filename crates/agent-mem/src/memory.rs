@@ -3,9 +3,9 @@
 //! Memory 提供了简洁的 API 来管理所有类型的记忆，
 //! 内部自动路由到对应的专门 Agent 处理。
 
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde_json::Value;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
@@ -1187,9 +1187,9 @@ impl Memory {
     // ========== 🆕 Phase 3: 便捷API（Scope友好） ==========
 
     /// 🆕 添加用户级记忆（最简单）
-    /// 
+    ///
     /// 只需要user_id，适用于个人知识库场景
-    /// 
+    ///
     /// # 示例
     /// ```rust,no_run
     /// # use agent_mem::Memory;
@@ -1206,16 +1206,16 @@ impl Memory {
     ) -> Result<AddResult> {
         let options = AddMemoryOptions {
             user_id: Some(user_id.into()),
-            agent_id: None,  // 不指定agent
+            agent_id: None, // 不指定agent
             ..Default::default()
         };
         self.add_with_options(content, options).await
     }
-    
+
     /// 🆕 添加Agent级记忆
-    /// 
+    ///
     /// 需要user_id和agent_id，适用于多Agent系统
-    /// 
+    ///
     /// # 示例
     /// ```rust,no_run
     /// # use agent_mem::Memory;
@@ -1238,11 +1238,11 @@ impl Memory {
         };
         self.add_with_options(content, options).await
     }
-    
+
     /// 🆕 添加运行级记忆（临时会话）
-    /// 
+    ///
     /// 需要user_id和run_id，适用于临时对话场景
-    /// 
+    ///
     /// # 示例
     /// ```rust,no_run
     /// # use agent_mem::Memory;
@@ -1267,21 +1267,21 @@ impl Memory {
         };
         self.add_with_options(content, options).await
     }
-    
+
     /// 🆕 P1: 使用 MemoryScope 添加记忆（支持灵活的 Session 管理）
-    /// 
+    ///
     /// 支持多种记忆隔离模式：Global, Organization, User, Agent, Run, Session
-    /// 
+    ///
     /// # 示例
     /// ```rust,no_run
     /// # use agent_mem::{Memory, MemoryScope};
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let mem = Memory::new().await?;
-    /// 
+    ///
     /// // 组织级记忆（企业多租户）
     /// let scope = MemoryScope::Organization { org_id: "acme-corp".to_string() };
     /// mem.add_with_scope("Company policy", scope).await?;
-    /// 
+    ///
     /// // 会话级记忆（多窗口对话）
     /// let scope = MemoryScope::Session {
     ///     user_id: "alice".to_string(),

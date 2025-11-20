@@ -22,7 +22,10 @@ pub async fn run_test_real(
     concurrency: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("🚀 开始真实记忆检索压测: 数据集={}, 并发={}", dataset_size, concurrency);
+    info!(
+        "🚀 开始真实记忆检索压测: 数据集={}, 并发={}",
+        dataset_size, concurrency
+    );
     info!("📊 使用真实 AgentMem SDK + 向量搜索");
 
     // 准备测试数据集
@@ -40,16 +43,18 @@ pub async fn run_test_real(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     let semaphore = Arc::new(Semaphore::new(concurrency));
     let mut handles = Vec::new();
@@ -116,12 +121,16 @@ async fn prepare_dataset(env: &RealStressTestEnv, size: usize) -> Result<()> {
             contents.push(format!(
                 "Dataset item {} - Topic: {} - Content: Sample memory for retrieval testing",
                 i,
-                i % 10  // 10 个不同主题
+                i % 10 // 10 个不同主题
             ));
         }
 
         // 使用批量添加 API
-        if let Err(e) = env.memory.add_batch(contents, agent_mem::AddMemoryOptions::default()).await {
+        if let Err(e) = env
+            .memory
+            .add_batch(contents, agent_mem::AddMemoryOptions::default())
+            .await
+        {
             warn!("批量添加失败: {}", e);
         }
     }
@@ -163,8 +172,11 @@ pub async fn run_test(
     concurrency: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("🚀 开始 Mock 记忆检索压测: 数据集={}, 并发={}", dataset_size, concurrency);
-    
+    info!(
+        "🚀 开始 Mock 记忆检索压测: 数据集={}, 并发={}",
+        dataset_size, concurrency
+    );
+
     let total_queries = 1000;
     let pb = multi_progress.add(ProgressBar::new(total_queries as u64));
     pb.set_style(
@@ -219,4 +231,3 @@ async fn simulate_vector_search_mock(dataset_size: usize, query_index: usize) ->
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     query_index % 200 != 0
 }
-

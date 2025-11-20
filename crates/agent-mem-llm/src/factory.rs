@@ -5,10 +5,10 @@ use crate::providers::AzureProvider;
 use crate::providers::DeepSeekProvider;
 #[cfg(feature = "gemini")]
 use crate::providers::GeminiProvider;
+use crate::providers::HuaweiMaasProvider;
 use crate::providers::LiteLLMProvider;
 use crate::providers::OllamaProvider; // 移除条件编译，确保总是可用
 use crate::providers::ZhipuProvider;
-use crate::providers::HuaweiMaasProvider;
 use crate::providers::{AnthropicProvider, OpenAIProvider};
 use crate::providers::{ClaudeProvider, CohereProvider, MistralProvider, PerplexityProvider};
 

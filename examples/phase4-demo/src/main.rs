@@ -238,8 +238,14 @@ async fn demo_conflict_resolution() -> Result<()> {
     ];
 
     // 转换为 MemoryV4
-    let new_memories_v4: Vec<MemoryV4> = new_memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
-    let existing_memories_v4: Vec<MemoryV4> = existing_memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
+    let new_memories_v4: Vec<MemoryV4> = new_memories
+        .iter()
+        .map(|m| MemoryV4::from_legacy_item(m))
+        .collect();
+    let existing_memories_v4: Vec<MemoryV4> = existing_memories
+        .iter()
+        .map(|m| MemoryV4::from_legacy_item(m))
+        .collect();
 
     // 检测冲突
     let conflicts = conflict_resolver
@@ -338,7 +344,10 @@ async fn demo_integrated_processing() -> Result<()> {
         .iter()
         .map(|m| create_test_memory(&m.content, m.importance))
         .collect();
-    let memories_v4: Vec<MemoryV4> = memories.iter().map(|m| MemoryV4::from_legacy_item(m)).collect();
+    let memories_v4: Vec<MemoryV4> = memories
+        .iter()
+        .map(|m| MemoryV4::from_legacy_item(m))
+        .collect();
     let conflict_detections = conflict_resolver
         .detect_conflicts(&memories_v4, &memories_v4)
         .await?;

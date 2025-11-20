@@ -33,8 +33,6 @@ pub mod hybrid_manager;
 #[cfg(feature = "postgres")]
 pub mod memory_repository;
 #[cfg(feature = "postgres")]
-pub mod postgres_memory_repository;
-#[cfg(feature = "postgres")]
 pub mod memory_tables_migration;
 #[cfg(feature = "postgres")]
 pub mod message_repository;
@@ -48,6 +46,8 @@ pub mod migrations;
 pub mod pool_manager;
 #[cfg(feature = "postgres")]
 pub mod postgres;
+#[cfg(feature = "postgres")]
+pub mod postgres_memory_repository;
 #[cfg(feature = "postgres")]
 pub mod query_analyzer;
 #[cfg(feature = "redis-cache")]

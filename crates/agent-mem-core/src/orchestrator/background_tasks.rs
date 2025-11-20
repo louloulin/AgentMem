@@ -93,10 +93,7 @@ impl BackgroundTaskManager {
                     manager
                         .update_state(
                             &task_id_for_future,
-                            TaskState::Completed {
-                                duration,
-                                detail,
-                            },
+                            TaskState::Completed { duration, detail },
                         )
                         .await;
                 }
@@ -106,13 +103,7 @@ impl BackgroundTaskManager {
                         task_id_for_future, duration, error
                     );
                     manager
-                        .update_state(
-                            &task_id_for_future,
-                            TaskState::Failed {
-                                duration,
-                                error,
-                            },
-                        )
+                        .update_state(&task_id_for_future, TaskState::Failed { duration, error })
                         .await;
                 }
             }
@@ -216,4 +207,3 @@ mod tests {
         }
     }
 }
-

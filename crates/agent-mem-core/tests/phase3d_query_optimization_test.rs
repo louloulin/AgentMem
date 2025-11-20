@@ -1,8 +1,8 @@
 // Phase 3-D: 查询优化与智能重排序集成测试
 
-use agent_mem_core::search::{IndexStatistics, QueryOptimizer, SearchQuery, SearchResult};
 use agent_mem_core::search::query_optimizer::SearchStrategy;
-use agent_mem_core::search::reranker::{cosine_similarity_exact, ResultReranker, RerankConfig};
+use agent_mem_core::search::reranker::{cosine_similarity_exact, RerankConfig, ResultReranker};
+use agent_mem_core::search::{IndexStatistics, QueryOptimizer, SearchQuery, SearchResult};
 use std::sync::{Arc, RwLock};
 
 /// 测试查询优化器 - 小数据集

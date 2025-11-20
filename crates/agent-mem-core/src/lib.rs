@@ -20,6 +20,8 @@ pub mod cache;
 pub mod client;
 pub mod collaboration;
 pub mod compression;
+/// Configuration loader (Week 3-4: eliminate hardcoding)
+pub mod config;
 /// Environment-based configuration
 pub mod config_env;
 pub mod conflict;
@@ -36,9 +38,9 @@ pub mod extraction;
 pub mod graph_memory;
 /// Graph optimization with compression and query optimization
 pub mod graph_optimization;
-pub mod hierarchy;
 /// Hierarchical memory service with enhanced features
 pub mod hierarchical_service;
+pub mod hierarchy;
 /// Hierarchy manager for advanced memory structure management
 pub mod hierarchy_manager;
 pub mod history;
@@ -54,16 +56,14 @@ pub mod message_queue;
 pub mod operations;
 /// Agent orchestrator for conversation loop and memory integration
 pub mod orchestrator;
+/// Performance optimization system with caching, batching, and benchmarking
+pub mod performance;
 /// Pipeline framework for memory operations
 pub mod pipeline;
 /// Prompt processing and optimization
 pub mod prompt;
-/// Configuration loader (Week 3-4: eliminate hardcoding)
-pub mod config;
 /// Query abstraction (V4.0: replace String queries)
 pub mod query;
-/// Performance optimization system with caching, batching, and benchmarking
-pub mod performance;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
 pub mod search;
@@ -106,14 +106,14 @@ pub use agents::{
 };
 
 // Re-export Query abstraction
-pub use query::{
-    Query, QueryBuilder, QueryId, QueryIntent, QueryContext, QueryFeatures, QueryComplexity,
-    Constraint, Preference, AggregationOp,
-};
 pub use coordination::{
     AgentMessage, AgentStatus, CoordinationError, CoordinationResult, CoordinationStats,
     LoadBalancingStrategy, MessageType, MetaMemoryConfig, MetaMemoryManager, TaskRequest,
     TaskResponse,
+};
+pub use query::{
+    AggregationOp, Constraint, Preference, Query, QueryBuilder, QueryComplexity, QueryContext,
+    QueryFeatures, QueryId, QueryIntent,
 };
 
 // Re-export retrieval modules
@@ -151,11 +151,11 @@ pub use cache::{
 // Re-export from traits
 // V4 Architecture: Memory now points to the new V4 abstraction
 pub use agent_mem_traits::{
-    AgentMemError, 
-    MemoryV4 as Memory,  // V4: Primary Memory type
-    MemoryItem,           // Legacy: Kept for backward compatibility
-    MemoryType, 
-    Result as MemoryResult, 
+    AgentMemError,
+    MemoryItem, // Legacy: Kept for backward compatibility
+    MemoryType,
+    MemoryV4 as Memory, // V4: Primary Memory type
+    Result as MemoryResult,
     Session,
 };
 

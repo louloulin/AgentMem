@@ -4,10 +4,10 @@
 
 use agent_mem_server::{MemoryServer, ServerConfig};
 use clap::Parser;
+use once_cell::sync::Lazy;
 use std::process;
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use once_cell::sync::Lazy;
 
 #[derive(Parser)]
 #[command(name = "agent-mem-server")]
@@ -150,8 +150,9 @@ async fn main() {
 }
 
 // 全局 guard 保持文件日志 writer 存活
-static FILE_APPENDER_GUARD: Lazy<std::sync::Mutex<Option<tracing_appender::non_blocking::WorkerGuard>>> =
-    Lazy::new(|| std::sync::Mutex::new(None));
+static FILE_APPENDER_GUARD: Lazy<
+    std::sync::Mutex<Option<tracing_appender::non_blocking::WorkerGuard>>,
+> = Lazy::new(|| std::sync::Mutex::new(None));
 
 /// 创建必要的目录
 fn create_directories() -> std::io::Result<()> {
@@ -160,9 +161,9 @@ fn create_directories() -> std::io::Result<()> {
 
     // 需要创建的目录列表
     let directories = vec![
-        "data",           // 数据库文件目录
+        "data",               // 数据库文件目录
         "data/vectors.lance", // 向量存储目录（LanceDB 会自动创建，但我们先创建父目录）
-        "logs",           // 日志文件目录
+        "logs",               // 日志文件目录
     ];
 
     for dir in directories {
@@ -196,7 +197,11 @@ fn init_logging(log_level: &str) {
     let symlink_path = log_dir.join("agentmem-server.log");
 
     eprintln!("   日志文件: {}", dated_log_file);
-    eprintln!("   软链接: {} -> {}", symlink_path.display(), dated_log_file);
+    eprintln!(
+        "   软链接: {} -> {}",
+        symlink_path.display(),
+        dated_log_file
+    );
 
     // 文件日志层（每日轮转）
     let file_appender = tracing_appender::rolling::daily(log_dir, "agentmem-server.log");
@@ -216,8 +221,8 @@ fn init_logging(log_level: &str) {
         .with_line_number(false);
 
     // 环境过滤器
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     eprintln!("   配置日志层...");
 

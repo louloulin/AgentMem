@@ -329,7 +329,7 @@ impl Mem5Client {
                         expires_at: None,
                         version: 1,
                     };
-                    
+
                     let v4_memory = agent_mem_core::storage::conversion::legacy_to_v4(&memory_item);
 
                     engine.add_memory(v4_memory).await.map_err(|e| {
@@ -450,7 +450,7 @@ impl Mem5Client {
                         _ => String::new(),
                     };
                     let importance = memory.importance().unwrap_or(0.5);
-                    
+
                     MemorySearchResult {
                         id: memory.id.to_string(),
                         content: content_str,

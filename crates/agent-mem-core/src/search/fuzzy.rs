@@ -271,7 +271,7 @@ impl FuzzyMatchEngine {
 // SearchEngine Trait 实现 (V4)
 // ============================================================================
 
-use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use agent_mem_traits::{Query, QueryIntent, QueryIntentType, SearchEngine};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -283,7 +283,8 @@ impl SearchEngine for FuzzyMatchEngine {
             QueryIntent::NaturalLanguage { text, .. } => text.clone(),
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取自然语言意图
-                intents.iter()
+                intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::NaturalLanguage { text, .. } = intent {
                             Some(text.clone())
@@ -308,7 +309,8 @@ impl SearchEngine for FuzzyMatchEngine {
         let results = self.search(&search_query).await?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
-        let v4_results = results.into_iter()
+        let v4_results = results
+            .into_iter()
             .map(|r| agent_mem_traits::SearchResultV4 {
                 id: r.id,
                 content: r.content,
@@ -331,7 +333,7 @@ impl SearchEngine for FuzzyMatchEngine {
     fn supported_intents(&self) -> Vec<QueryIntentType> {
         vec![
             QueryIntentType::NaturalLanguage, // 主要支持自然语言查询
-            QueryIntentType::Hybrid, // 也支持混合查询（提取文本部分）
+            QueryIntentType::Hybrid,          // 也支持混合查询（提取文本部分）
         ]
     }
 }

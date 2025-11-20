@@ -2,8 +2,8 @@
 //! Week 9-10: Pipeline和DAG执行流程测试
 
 use agent_mem_core::types::{
-    Content, Memory, MemoryBuilder, Pipeline, PipelineContext, PipelineStage, StageResult,
-    DagPipeline, AttributeKey, AttributeValue,
+    AttributeKey, AttributeValue, Content, DagPipeline, Memory, MemoryBuilder, Pipeline,
+    PipelineContext, PipelineStage, StageResult,
 };
 use anyhow::Result;
 
@@ -80,7 +80,7 @@ impl PipelineStage for ImportanceStage {
         } else {
             0.5
         };
-        
+
         output.attributes.set(
             AttributeKey::system("importance"),
             AttributeValue::Number(importance),
@@ -167,16 +167,20 @@ async fn test_dag_pipeline_parallel_execution() {
 #[tokio::test]
 async fn test_dag_conditional_branching() {
     let memory = MemoryBuilder::new()
-        .content(Content::Text("长文本测试内容，用于触发条件分支逻辑".to_string()))
+        .content(Content::Text(
+            "长文本测试内容，用于触发条件分支逻辑".to_string(),
+        ))
         .build();
 
     let pipeline = DagPipeline::<Memory, Memory>::new("conditional_dag")
         .add_node("preprocess", ContentPreprocessStage, vec![])
-        .add_node("importance", ImportanceStage, vec!["preprocess".to_string()])
+        .add_node(
+            "importance",
+            ImportanceStage,
+            vec!["preprocess".to_string()],
+        )
         .add_condition("high_importance", |ctx| {
-            ctx.get::<f64>("importance_calculated")
-                .unwrap_or(0.0)
-                > 0.5
+            ctx.get::<f64>("importance_calculated").unwrap_or(0.0) > 0.5
         })
         .add_edge("importance", "dedup", Some("high_importance".to_string()));
 
@@ -184,7 +188,7 @@ async fn test_dag_conditional_branching() {
     let results = pipeline.execute(memory.clone(), &mut context).await;
 
     assert!(results.is_ok());
-    
+
     println!("✅ DAG conditional branching test passed");
     println!("   - Condition: high_importance");
     println!("   - Branch: importance → dedup (conditional)");
@@ -386,4 +390,3 @@ async fn test_complex_dag_topology() {
     println!("   - Edges: 5");
     println!("   - Max parallel: 2 (B, C can run in parallel)");
 }
-

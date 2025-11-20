@@ -78,8 +78,8 @@ async fn test_end_to_end_memory_pipeline_query() {
     println!("✅ Step 1: Memory created");
 
     // 2. Pipeline处理
-    let pipeline = Pipeline::<Memory, Memory>::new("full_pipeline")
-        .add_stage(FullMemoryProcessingStage);
+    let pipeline =
+        Pipeline::<Memory, Memory>::new("full_pipeline").add_stage(FullMemoryProcessingStage);
 
     let mut context = PipelineContext::new();
     let processed_memory = pipeline.execute(memory, &mut context).await.unwrap();
@@ -100,9 +100,7 @@ async fn test_end_to_end_memory_pipeline_query() {
     println!("✅ Step 2: Pipeline processed");
 
     // 3. 构建Query
-    let query = QueryBuilder::new()
-        .text("四川火锅")
-        .build();
+    let query = QueryBuilder::new().text("四川火锅").build();
 
     assert!(matches!(query.intent, QueryIntent::SemanticSearch { .. }));
 
@@ -310,14 +308,14 @@ async fn test_hierarchical_scope_access_control() {
     assert!(global_mem.attributes.can_access(&agent_mem.attributes));
     assert!(global_mem.attributes.can_access(&user_mem.attributes));
     assert!(global_mem.attributes.can_access(&session_mem.attributes));
-    
+
     // Agent (level 1) 可以访问 User 和 Session
     assert!(agent_mem.attributes.can_access(&user_mem.attributes));
     assert!(agent_mem.attributes.can_access(&session_mem.attributes));
-    
+
     // User (level 2) 可以访问 Session
     assert!(user_mem.attributes.can_access(&session_mem.attributes));
-    
+
     // 反向不可访问（低权限不能访问高权限）
     assert!(!session_mem.attributes.can_access(&global_mem.attributes));
 
@@ -353,8 +351,8 @@ async fn test_pipeline_query_attributeset_integration() {
         .build();
 
     // 2. Pipeline处理
-    let pipeline = Pipeline::<Memory, Memory>::new("product_pipeline")
-        .add_stage(FullMemoryProcessingStage);
+    let pipeline =
+        Pipeline::<Memory, Memory>::new("product_pipeline").add_stage(FullMemoryProcessingStage);
 
     let mut context = PipelineContext::new();
     let processed = pipeline.execute(memory, &mut context).await.unwrap();
@@ -363,20 +361,16 @@ async fn test_pipeline_query_attributeset_integration() {
     use agent_mem_core::types::{ComparisonOperator, Constraint};
 
     let mut query = QueryBuilder::new().text("iPhone").build();
-    query
-        .constraints
-        .push(Constraint::AttributeRange {
-            key: AttributeKey::domain("price"),
-            min: 5000.0,
-            max: 10000.0,
-        });
-    query
-        .constraints
-        .push(Constraint::AttributeMatch {
-            key: AttributeKey::domain("category"),
-            operator: ComparisonOperator::Equal,
-            value: AttributeValue::String("electronics".to_string()),
-        });
+    query.constraints.push(Constraint::AttributeRange {
+        key: AttributeKey::domain("price"),
+        min: 5000.0,
+        max: 10000.0,
+    });
+    query.constraints.push(Constraint::AttributeMatch {
+        key: AttributeKey::domain("category"),
+        operator: ComparisonOperator::Equal,
+        value: AttributeValue::String("electronics".to_string()),
+    });
 
     // 验证Query约束
     assert_eq!(query.constraints.len(), 2);
@@ -398,4 +392,3 @@ async fn test_pipeline_query_attributeset_integration() {
     println!("   - Pipeline: processed");
     println!("   - Query: 2 constraints");
 }
-

@@ -77,7 +77,8 @@ impl AutoConfig {
 
         // 检测 Huawei MaaS
         if env::var("HUAWEI_MAAS_API_KEY").is_ok() {
-            let model = env::var("HUAWEI_MAAS_MODEL").unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
+            let model =
+                env::var("HUAWEI_MAAS_MODEL").unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
             return Some(("huawei_maas".to_string(), model));
         }
 

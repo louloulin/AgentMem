@@ -3,11 +3,11 @@
 //! Provides zero-copy conversions between business model (Memory V4)
 //! and database model (DbMemory)
 
-use agent_mem_traits::{
-    AttributeKey, AttributeSet, AttributeValue, Content, MemoryV4 as Memory,
-    MetadataV4 as Metadata, MemoryId, RelationGraph, Result, AgentMemError,
-};
 use crate::storage::models::DbMemory;
+use agent_mem_traits::{
+    AgentMemError, AttributeKey, AttributeSet, AttributeValue, Content, MemoryId,
+    MemoryV4 as Memory, MetadataV4 as Metadata, RelationGraph, Result,
+};
 use chrono::Utc;
 use std::collections::HashMap;
 
@@ -131,7 +131,7 @@ pub fn db_to_memory(db: &DbMemory) -> Result<Memory> {
             AttributeValue::String(db.level.clone()),
         );
     }
-    
+
     // 填充系统属性
     if let Some(score) = db.score {
         attributes.insert(
@@ -173,7 +173,7 @@ pub fn db_to_memory(db: &DbMemory) -> Result<Memory> {
             hash: db.hash.clone(),
         }
     };
-    
+
     // 构造Memory
     Ok(Memory {
         id: MemoryId::from_string(db.id.clone()),
@@ -197,7 +197,7 @@ pub fn db_to_memories(db_memories: &[DbMemory]) -> Result<Vec<Memory>> {
 /// Helper: Convert MemoryItem (Legacy) to Memory (V4)
 pub fn legacy_to_v4(item: &agent_mem_traits::MemoryItem) -> Memory {
     let mut attributes = AttributeSet::new();
-    
+
     // Core attributes
     attributes.insert(
         AttributeKey::core("agent_id"),
@@ -209,13 +209,10 @@ pub fn legacy_to_v4(item: &agent_mem_traits::MemoryItem) -> Memory {
             AttributeValue::String(user_id.clone()),
         );
     }
-    
+
     // System attributes
     if let Some(hash) = item.hash.clone() {
-    attributes.insert(
-        AttributeKey::system("hash"),
-            AttributeValue::String(hash),
-    );
+        attributes.insert(AttributeKey::system("hash"), AttributeValue::String(hash));
     }
     if let Some(score) = item.score {
         attributes.insert(
@@ -223,11 +220,11 @@ pub fn legacy_to_v4(item: &agent_mem_traits::MemoryItem) -> Memory {
             AttributeValue::Number(score as f64),
         );
     }
-        attributes.insert(
-            AttributeKey::system("importance"),
+    attributes.insert(
+        AttributeKey::system("importance"),
         AttributeValue::Number(item.importance as f64),
-        );
-    
+    );
+
     // Metadata
     let metadata = Metadata {
         created_at: item.created_at,
@@ -237,7 +234,7 @@ pub fn legacy_to_v4(item: &agent_mem_traits::MemoryItem) -> Memory {
         version: 1,
         hash: item.hash.clone(),
     };
-    
+
     Memory {
         id: MemoryId::from_string(item.id.clone()),
         content: Content::Text(item.content.clone()),
@@ -250,40 +247,40 @@ pub fn legacy_to_v4(item: &agent_mem_traits::MemoryItem) -> Memory {
 /// Helper: Convert Memory (V4) to MemoryItem (Legacy)
 pub fn v4_to_legacy(memory: &Memory) -> agent_mem_traits::MemoryItem {
     use agent_mem_traits::{MemoryItem, MemoryType, Session};
-    
+
     let agent_id = memory
         .attributes
         .get(&AttributeKey::core("agent_id"))
         .and_then(|v| v.as_string())
         .unwrap_or(&"".to_string())
         .to_string();
-    
+
     let user_id = memory
         .attributes
         .get(&AttributeKey::core("user_id"))
         .and_then(|v| v.as_string())
         .cloned();
-    
+
     let hash = memory.metadata.hash.clone();
-    
+
     let score = memory
         .attributes
         .get(&AttributeKey::system("score"))
         .and_then(|v| v.as_number())
         .map(|n| n as f32);
-    
+
     let importance = memory
         .attributes
         .get(&AttributeKey::system("importance"))
         .and_then(|v| v.as_number())
         .unwrap_or(0.5) as f32;
-    
+
     let content = match &memory.content {
         Content::Text(t) => t.clone(),
         Content::Structured(v) => v.to_string(),
         _ => String::new(),
     };
-    
+
     MemoryItem {
         id: memory.id.as_str().to_string(),
         agent_id: agent_id.clone(),
@@ -318,7 +315,7 @@ pub fn v4_to_legacy(memory: &Memory) -> agent_mem_traits::MemoryItem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_roundtrip_conversion() {
         let mut memory = Memory {
@@ -335,7 +332,7 @@ mod tests {
                 hash: None,
             },
         };
-        
+
         memory.attributes.insert(
             AttributeKey::core("agent_id"),
             AttributeValue::String("agent_123".to_string()),
@@ -348,21 +345,21 @@ mod tests {
             AttributeKey::core("organization_id"),
             AttributeValue::String("org_789".to_string()),
         );
-        
+
         // Memory -> DbMemory -> Memory
         let db_memory = memory_to_db(&memory);
         let recovered = db_to_memory(&db_memory).unwrap();
-        
+
         assert_eq!(memory.id.as_str(), recovered.id.as_str());
         assert_eq!(memory.agent_id(), recovered.agent_id());
         assert_eq!(memory.user_id(), recovered.user_id());
     }
-    
+
     #[test]
     fn test_legacy_conversion() {
         use agent_mem_traits::{MemoryItem, MemoryType, Session};
         use chrono::Utc;
-        
+
         let legacy = MemoryItem {
             id: "mem_123".to_string(),
             agent_id: "agent_456".to_string(),
@@ -392,16 +389,16 @@ mod tests {
             expires_at: None,
             version: 1,
         };
-        
+
         // Legacy -> V4 -> Legacy
         let v4 = legacy_to_v4(&legacy);
         let recovered = v4_to_legacy(&v4);
-        
+
         assert_eq!(legacy.id, recovered.id);
         assert_eq!(legacy.agent_id, recovered.agent_id);
         assert_eq!(legacy.content, recovered.content);
     }
-    
+
     #[test]
     fn test_conversion_with_all_fields() {
         let mut memory = Memory {
@@ -418,24 +415,42 @@ mod tests {
                 hash: Some("hash_comprehensive".to_string()),
             },
         };
-        
+
         // Set all possible attributes
-        memory.attributes.insert(AttributeKey::core("organization_id"), AttributeValue::String("org_comprehensive".to_string()));
+        memory.attributes.insert(
+            AttributeKey::core("organization_id"),
+            AttributeValue::String("org_comprehensive".to_string()),
+        );
         memory.set_user_id("user_comprehensive");
         memory.set_agent_id("agent_comprehensive");
         memory.set_memory_type("semantic");
-        memory.attributes.insert(AttributeKey::core("scope"), AttributeValue::String("global".to_string()));
-        memory.attributes.insert(AttributeKey::core("level"), AttributeValue::String("strategic".to_string()));
+        memory.attributes.insert(
+            AttributeKey::core("scope"),
+            AttributeValue::String("global".to_string()),
+        );
+        memory.attributes.insert(
+            AttributeKey::core("level"),
+            AttributeValue::String("strategic".to_string()),
+        );
         memory.set_importance(0.88);
         memory.set_score(0.92);
-        memory.attributes.insert(AttributeKey::system("is_deleted"), AttributeValue::Boolean(false));
-        memory.attributes.insert(AttributeKey::system("created_by_id"), AttributeValue::String("creator_1".to_string()));
-        memory.attributes.insert(AttributeKey::system("last_updated_by_id"), AttributeValue::String("updater_1".to_string()));
-        
+        memory.attributes.insert(
+            AttributeKey::system("is_deleted"),
+            AttributeValue::Boolean(false),
+        );
+        memory.attributes.insert(
+            AttributeKey::system("created_by_id"),
+            AttributeValue::String("creator_1".to_string()),
+        );
+        memory.attributes.insert(
+            AttributeKey::system("last_updated_by_id"),
+            AttributeValue::String("updater_1".to_string()),
+        );
+
         // Convert to DbMemory and back
         let db_memory = memory_to_db(&memory);
         let recovered = db_to_memory(&db_memory).unwrap();
-        
+
         // Verify all fields
         assert_eq!(memory.id.as_str(), recovered.id.as_str());
         assert_eq!(memory.organization_id(), recovered.organization_id());
@@ -444,16 +459,19 @@ mod tests {
         assert_eq!(memory.memory_type(), recovered.memory_type());
         assert_eq!(memory.scope(), recovered.scope());
         assert_eq!(memory.level(), recovered.level());
-        
+
         // Verify numeric fields with tolerance
         assert!((memory.importance().unwrap() - recovered.importance().unwrap()).abs() < 0.001);
         assert!((memory.score().unwrap() - recovered.score().unwrap()).abs() < 0.001);
-        
+
         // Verify metadata
-        assert_eq!(memory.metadata.access_count, recovered.metadata.access_count);
+        assert_eq!(
+            memory.metadata.access_count,
+            recovered.metadata.access_count
+        );
         assert_eq!(memory.metadata.version, recovered.metadata.version);
     }
-    
+
     #[test]
     fn test_conversion_with_missing_optional_fields() {
         // Create Memory with minimal fields
@@ -471,17 +489,17 @@ mod tests {
                 hash: None,
             },
         };
-        
+
         // Convert and verify it doesn't crash
         let db_memory = memory_to_db(&memory);
         let recovered = db_to_memory(&db_memory).unwrap();
-        
+
         assert_eq!(memory.id.as_str(), recovered.id.as_str());
         assert!(recovered.organization_id().is_none());
         assert!(recovered.user_id().is_none());
         assert!(recovered.agent_id().is_none());
     }
-    
+
     #[test]
     fn test_batch_conversion() {
         let memories: Vec<Memory> = (0..5)
@@ -505,22 +523,22 @@ mod tests {
                 mem
             })
             .collect();
-        
+
         // Batch convert to DB and back
         let db_memories = memories_to_db(&memories);
         let recovered = db_to_memories(&db_memories).unwrap();
-        
+
         assert_eq!(memories.len(), recovered.len());
         for (original, recovered) in memories.iter().zip(recovered.iter()) {
             assert_eq!(original.id.as_str(), recovered.id.as_str());
             assert_eq!(original.agent_id(), recovered.agent_id());
         }
     }
-    
+
     #[test]
     fn test_structured_content_conversion() {
         use serde_json::json;
-        
+
         let mut memory = Memory {
             id: MemoryId::new(),
             content: Content::Structured(json!({
@@ -541,14 +559,14 @@ mod tests {
                 hash: None,
             },
         };
-        
+
         memory.set_agent_id("agent_structured");
-        
+
         // Convert and verify structured content is serialized
         let db_memory = memory_to_db(&memory);
         assert!(db_memory.content.contains("structured_data"));
         assert!(db_memory.content.contains("nested"));
-        
+
         let recovered = db_to_memory(&db_memory).unwrap();
         // Content should be recovered as text (serialized JSON)
         match recovered.content {
@@ -559,13 +577,3 @@ mod tests {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-

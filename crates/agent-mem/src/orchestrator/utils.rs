@@ -2,12 +2,12 @@
 //!
 //! 提供各种辅助方法，包括查询预处理、阈值计算、类型转换等
 
-use std::collections::HashMap;
-use agent_mem_traits::{MemoryItem, Result};
-use agent_mem_intelligence::{ExistingMemory, StructuredFact};
+use agent_mem_core::search::SearchResult;
 use agent_mem_core::types::Memory as CoreMemory;
 use agent_mem_core::types::MemoryType;
-use agent_mem_core::search::SearchResult;
+use agent_mem_intelligence::{ExistingMemory, StructuredFact};
+use agent_mem_traits::{MemoryItem, Result};
+use std::collections::HashMap;
 use tracing::{debug, error};
 
 /// 工具函数模块
@@ -24,9 +24,8 @@ impl UtilsModule {
         let word_count = query.split_whitespace().count();
 
         // 检测精确查询模式（商品ID、SKU等）
-        let is_exact_query = query.chars().all(|c| c.is_alphanumeric())
-            && query_len < 20
-            && word_count <= 1;
+        let is_exact_query =
+            query.chars().all(|c| c.is_alphanumeric()) && query_len < 20 && word_count <= 1;
 
         // 规则1: 精确查询（如P000001）大幅降低阈值
         let len_adjustment = if is_exact_query {
@@ -41,7 +40,7 @@ impl UtilsModule {
 
         // 规则2: 单词数少降低阈值
         let word_adjustment = if is_exact_query {
-            0.0  // 精确查询已经在规则1处理
+            0.0 // 精确查询已经在规则1处理
         } else if word_count == 1 {
             -0.1 // 单词查询降低阈值
         } else if word_count > 10 {
@@ -51,9 +50,10 @@ impl UtilsModule {
         };
 
         // 规则3: 精确查询不需要特殊字符检查
-        let has_special = !is_exact_query && query
-            .chars()
-            .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
+        let has_special = !is_exact_query
+            && query
+                .chars()
+                .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
         let special_adjustment = if has_special { 0.05 } else { 0.0 };
 
         // 计算最终阈值
@@ -148,9 +148,7 @@ impl UtilsModule {
     ///
     /// 将 SearchResult 转换为 MemoryItem 格式
     #[cfg(feature = "postgres")]
-    pub fn convert_search_results_to_memory_items(
-        results: Vec<SearchResult>,
-    ) -> Vec<MemoryItem> {
+    pub fn convert_search_results_to_memory_items(results: Vec<SearchResult>) -> Vec<MemoryItem> {
         if results.is_empty() {
             return Vec::new();
         }
@@ -494,11 +492,7 @@ impl UtilsModule {
     }
 
     /// 构建重排序提示词
-    pub fn build_rerank_prompt(
-        query: &str,
-        memory_items: &[MemoryItem],
-        user_id: &str,
-    ) -> String {
+    pub fn build_rerank_prompt(query: &str, memory_items: &[MemoryItem], user_id: &str) -> String {
         let mut prompt = format!(
             "用户查询: {}\n用户ID: {}\n\n请根据查询意图和相关性对以下记忆进行重新排序。\n\n记忆列表:\n",
             query, user_id
@@ -552,4 +546,3 @@ impl UtilsModule {
         }
     }
 }
-

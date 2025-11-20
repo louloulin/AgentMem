@@ -35,8 +35,8 @@ pub struct MemoryRetrievalConfig {
 pub struct ConcurrentOpsConfig {
     pub concurrent_users: usize,
     pub duration_seconds: u64,
-    pub read_ratio: f32,  // 0.0 - 1.0
-    pub write_ratio: f32, // 0.0 - 1.0
+    pub read_ratio: f32,   // 0.0 - 1.0
+    pub write_ratio: f32,  // 0.0 - 1.0
     pub update_ratio: f32, // 0.0 - 1.0
 }
 
@@ -85,7 +85,11 @@ impl Default for StressTestConfig {
             memory_retrieval: MemoryRetrievalConfig {
                 dataset_size: 100000,
                 concurrency: 100,
-                query_types: vec!["vector".to_string(), "fulltext".to_string(), "hybrid".to_string()],
+                query_types: vec![
+                    "vector".to_string(),
+                    "fulltext".to_string(),
+                    "hybrid".to_string(),
+                ],
                 top_k: 10,
             },
             concurrent_ops: ConcurrentOpsConfig {
@@ -144,4 +148,3 @@ impl StressTestConfig {
         Ok(())
     }
 }
-

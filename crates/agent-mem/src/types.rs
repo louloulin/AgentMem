@@ -96,7 +96,7 @@ impl Default for AddMemoryOptions {
             agent_id: None,
             run_id: None,
             metadata: HashMap::new(),
-            infer: true,  // ✅ 修改为 true，对标 Mem0，默认启用智能功能
+            infer: true, // ✅ 修改为 true，对标 Mem0，默认启用智能功能
             memory_type: None,
             prompt: None,
         }
@@ -128,7 +128,7 @@ impl MemoryScope {
         // 检查 metadata 中的 org_id 和 session_id
         let org_id = options.metadata.get("org_id").cloned();
         let session_id = options.metadata.get("session_id").cloned();
-        
+
         // 优先级: Session > Run > Agent > Organization > User > Global
         if let (Some(user_id), Some(session_id)) = (options.user_id.as_ref(), session_id.as_ref()) {
             return MemoryScope::Session {
@@ -136,39 +136,41 @@ impl MemoryScope {
                 session_id: session_id.clone(),
             };
         }
-        
+
         if let (Some(user_id), Some(run_id)) = (options.user_id.as_ref(), options.run_id.as_ref()) {
             return MemoryScope::Run {
                 user_id: user_id.clone(),
                 run_id: run_id.clone(),
             };
         }
-        
-        if let (Some(user_id), Some(agent_id)) = (options.user_id.as_ref(), options.agent_id.as_ref()) {
+
+        if let (Some(user_id), Some(agent_id)) =
+            (options.user_id.as_ref(), options.agent_id.as_ref())
+        {
             return MemoryScope::Agent {
                 user_id: user_id.clone(),
                 agent_id: agent_id.clone(),
             };
         }
-        
+
         if let Some(org_id) = org_id {
             return MemoryScope::Organization { org_id };
         }
-        
+
         if let Some(user_id) = options.user_id.as_ref() {
             return MemoryScope::User {
                 user_id: user_id.clone(),
             };
         }
-        
+
         MemoryScope::Global
     }
-    
+
     /// 转换为 AddMemoryOptions
     pub fn to_options(&self) -> AddMemoryOptions {
         let mut options = AddMemoryOptions::default();
         let mut metadata = HashMap::new();
-        
+
         match self {
             MemoryScope::Global => {
                 // 不需要设置任何字段
@@ -187,12 +189,15 @@ impl MemoryScope {
                 options.user_id = Some(user_id.clone());
                 options.run_id = Some(run_id.clone());
             }
-            MemoryScope::Session { user_id, session_id } => {
+            MemoryScope::Session {
+                user_id,
+                session_id,
+            } => {
                 options.user_id = Some(user_id.clone());
                 metadata.insert("session_id".to_string(), session_id.clone());
             }
         }
-        
+
         options.metadata = metadata;
         options
     }
@@ -200,7 +205,7 @@ impl MemoryScope {
 
 impl AddMemoryOptions {
     /// 🆕 Phase 1: 从options推断scope类型（不修改结构）
-    /// 
+    ///
     /// 根据提供的user_id, agent_id, run_id自动判断记忆作用域
     pub fn infer_scope_type(&self) -> String {
         // 优先级: Run > Agent > User > Global
@@ -215,21 +220,21 @@ impl AddMemoryOptions {
         }
         "global".to_string()
     }
-    
+
     /// 🆕 P1: 获取 MemoryScope（支持 org_id 和 session_id）
     pub fn to_scope(&self) -> MemoryScope {
         MemoryScope::from_options(self)
     }
-    
+
     /// 🆕 Phase 1: 构建带scope的metadata（复用现有逻辑）
-    /// 
+    ///
     /// 将options中的信息转换为metadata，包含scope_type
     pub fn build_full_metadata(&self) -> HashMap<String, String> {
         let mut full_metadata = self.metadata.clone();
-        
+
         // 自动添加scope信息到metadata
         full_metadata.insert("scope_type".to_string(), self.infer_scope_type());
-        
+
         if let Some(ref user_id) = self.user_id {
             full_metadata.insert("user_id".to_string(), user_id.clone());
         }
@@ -239,7 +244,7 @@ impl AddMemoryOptions {
         if let Some(ref run_id) = self.run_id {
             full_metadata.insert("run_id".to_string(), run_id.clone());
         }
-        
+
         full_metadata
     }
 }

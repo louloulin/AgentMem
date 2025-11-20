@@ -3,9 +3,9 @@
 //! 提供统一的Reranker trait，支持内部和外部重排序实现
 //! 包括Cohere、Jina等外部API集成
 
-use async_trait::async_trait;
-use agent_mem_traits::Result;
 use crate::search::{SearchQuery, SearchResult};
+use agent_mem_traits::Result;
+use async_trait::async_trait;
 
 /// 重排序器trait
 ///
@@ -192,4 +192,3 @@ mod tests {
         assert!(!reranked.is_empty());
     }
 }
-

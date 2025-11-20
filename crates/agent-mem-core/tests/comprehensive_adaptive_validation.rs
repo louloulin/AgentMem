@@ -2,12 +2,12 @@
 //!
 //! 包含更多真实场景和边界情况的验证
 
-use std::sync::Arc;
 use agent_mem_config::agentmem_config::AgentMemConfig;
 use agent_mem_core::search::{
     AdaptiveSearchOptimizer, QueryFeatures, SearchQuery, SearchReranker, SearchResult,
     SearchWeights, WeightPredictor,
 };
+use std::sync::Arc;
 
 /// 测试多语言查询支持
 #[test]

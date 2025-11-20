@@ -4,8 +4,8 @@
 
 #[path = "shared/simple_memory_adapter.rs"]
 mod simple_memory_adapter;
-use simple_memory_adapter::SimpleMemory;
 use agent_mem_traits::Result;
+use simple_memory_adapter::SimpleMemory;
 use std::collections::HashMap;
 
 #[tokio::main]

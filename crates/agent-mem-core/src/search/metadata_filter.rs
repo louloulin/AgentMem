@@ -98,7 +98,15 @@ impl MetadataFilterSystem {
                 for op_key in obj.keys() {
                     if matches!(
                         op_key.as_str(),
-                        "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "nin" | "contains" | "icontains"
+                        "eq" | "ne"
+                            | "gt"
+                            | "gte"
+                            | "lt"
+                            | "lte"
+                            | "in"
+                            | "nin"
+                            | "contains"
+                            | "icontains"
                     ) {
                         return true;
                     }
@@ -164,9 +172,10 @@ impl MetadataFilterSystem {
             if obj.len() == 1 {
                 let (field, filter_obj) = obj.iter().next().unwrap();
                 if let Some(filter_map) = filter_obj.as_object() {
-                    return Self::parse_field_filter(field, &serde_json::Value::Object(
-                        filter_map.clone()
-                    ));
+                    return Self::parse_field_filter(
+                        field,
+                        &serde_json::Value::Object(filter_map.clone()),
+                    );
                 }
             }
         }
@@ -266,53 +275,44 @@ impl MetadataFilterSystem {
 
         match &filter.operator {
             FilterOperator::Eq => {
-                Self::compare_values(field_value, &filter.value, |a, b| {
-                    match (a, b) {
-                        (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
-                        (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
-                        (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
-                        (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
-                        (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
-                        (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
-                        _ => false,
-                    }
+                Self::compare_values(field_value, &filter.value, |a, b| match (a, b) {
+                    (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                    (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                    (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                    (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                    (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                    (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                    _ => false,
                 })
             }
             FilterOperator::Ne => {
-                !Self::compare_values(field_value, &filter.value, |a, b| {
-                    match (a, b) {
-                        (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
-                        (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
-                        (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
-                        (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
-                        (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
-                        (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
-                        _ => false,
-                    }
+                !Self::compare_values(field_value, &filter.value, |a, b| match (a, b) {
+                    (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                    (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                    (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                    (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                    (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                    (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                    _ => false,
                 })
             }
-            FilterOperator::Gt => {
-                Self::compare_numeric(field_value, &filter.value, |a, b| a > b)
-            }
-            FilterOperator::Gte => {
-                Self::compare_numeric(field_value, &filter.value, |a, b| a >= b)
-            }
-            FilterOperator::Lt => {
-                Self::compare_numeric(field_value, &filter.value, |a, b| a < b)
-            }
-            FilterOperator::Lte => {
-                Self::compare_numeric(field_value, &filter.value, |a, b| a <= b)
-            }
+            FilterOperator::Gt => Self::compare_numeric(field_value, &filter.value, |a, b| a > b),
+            FilterOperator::Gte => Self::compare_numeric(field_value, &filter.value, |a, b| a >= b),
+            FilterOperator::Lt => Self::compare_numeric(field_value, &filter.value, |a, b| a < b),
+            FilterOperator::Lte => Self::compare_numeric(field_value, &filter.value, |a, b| a <= b),
             FilterOperator::In => {
                 if let FilterValue::List(list) = &filter.value {
-                    list.iter().any(|v| Self::compare_values(field_value, v, |a, b| a == b))
+                    list.iter()
+                        .any(|v| Self::compare_values(field_value, v, |a, b| a == b))
                 } else {
                     false
                 }
             }
             FilterOperator::Nin => {
                 if let FilterValue::List(list) = &filter.value {
-                    !list.iter().any(|v| Self::compare_values(field_value, v, |a, b| a == b))
+                    !list
+                        .iter()
+                        .any(|v| Self::compare_values(field_value, v, |a, b| a == b))
                 } else {
                     true
                 }
@@ -329,7 +329,11 @@ impl MetadataFilterSystem {
     }
 
     /// 比较值
-    fn compare_values<F>(field_value: Option<&serde_json::Value>, filter_value: &FilterValue, cmp: F) -> bool
+    fn compare_values<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
     where
         F: Fn(&FilterValue, &FilterValue) -> bool,
     {
@@ -369,7 +373,11 @@ impl MetadataFilterSystem {
     }
 
     /// 比较数值
-    fn compare_numeric<F>(field_value: Option<&serde_json::Value>, filter_value: &FilterValue, cmp: F) -> bool
+    fn compare_numeric<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
     where
         F: Fn(f64, f64) -> bool,
     {
@@ -388,7 +396,11 @@ impl MetadataFilterSystem {
     }
 
     /// 比较字符串
-    fn compare_string<F>(field_value: Option<&serde_json::Value>, filter_value: &FilterValue, cmp: F) -> bool
+    fn compare_string<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
     where
         F: Fn(&str, &str) -> bool,
     {
@@ -458,7 +470,8 @@ impl MetadataFilterSystem {
                 Ok(format!("({})", clauses?.join(" OR ")))
             }
             LogicalOperator::Not(condition) => {
-                let clause = Self::build_condition_clause(condition, params, param_offset + params.len())?;
+                let clause =
+                    Self::build_condition_clause(condition, params, param_offset + params.len())?;
                 Ok(format!("NOT ({})", clause))
             }
             LogicalOperator::Single(condition) => {
@@ -491,20 +504,23 @@ impl MetadataFilterSystem {
 
         let value = match &filter.value {
             FilterValue::String(s) => serde_json::Value::String(s.clone()),
-            FilterValue::Number(n) => serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?),
+            FilterValue::Number(n) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?)
+            }
             FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
             FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
             FilterValue::List(list) => {
                 // 对于IN/NIN操作符，需要特殊处理
-                let values: Vec<String> = list.iter().map(|v| {
-                    match v {
+                let values: Vec<String> = list
+                    .iter()
+                    .map(|v| match v {
                         FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
                         FilterValue::Number(n) => n.to_string(),
                         FilterValue::Integer(i) => i.to_string(),
                         FilterValue::Boolean(b) => b.to_string().to_uppercase(),
                         _ => "NULL".to_string(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
             }
             FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
@@ -517,9 +533,7 @@ impl MetadataFilterSystem {
                 // 对于LIKE/ILIKE，需要添加通配符
                 Ok(format!("{} {} {}", field_path, sql_op, param_placeholder))
             }
-            _ => {
-                Ok(format!("{} {} {}", field_path, sql_op, param_placeholder))
-            }
+            _ => Ok(format!("{} {} {}", field_path, sql_op, param_placeholder)),
         }
     }
 
@@ -595,20 +609,23 @@ impl MetadataFilterSystem {
                     _ => serde_json::Value::String(s.clone()),
                 }
             }
-            FilterValue::Number(n) => serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?),
+            FilterValue::Number(n) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?)
+            }
             FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
             FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
             FilterValue::List(list) => {
                 // 对于IN/NIN操作符
-                let values: Vec<String> = list.iter().map(|v| {
-                    match v {
+                let values: Vec<String> = list
+                    .iter()
+                    .map(|v| match v {
                         FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
                         FilterValue::Number(n) => n.to_string(),
                         FilterValue::Integer(i) => i.to_string(),
                         FilterValue::Boolean(b) => b.to_string().to_uppercase(),
                         _ => "NULL".to_string(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
             }
             FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
@@ -641,7 +658,7 @@ mod tests {
     fn test_process_metadata_filters() {
         let mut filters = HashMap::new();
         filters.insert("category".to_string(), serde_json::json!("food"));
-        
+
         let result = MetadataFilterSystem::process_metadata_filters(&filters);
         assert!(result.is_ok());
     }
@@ -662,4 +679,3 @@ mod tests {
         assert!(MetadataFilterSystem::matches(&logical, &metadata));
     }
 }
-

@@ -106,7 +106,11 @@ impl StorageModule {
             // 并行任务 1: 存储到 CoreMemoryManager
             async move {
                 if let Some(manager) = core_manager {
-                    manager.create_persona_block(content_for_core, None).await.map(|_| ()).map_err(|e| e.to_string())
+                    manager
+                        .create_persona_block(content_for_core, None)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
                     Ok::<(), String>(())
                 }
@@ -125,7 +129,11 @@ impl StorageModule {
                         metadata: string_metadata,
                     };
 
-                    store.add_vectors(vec![vector_data]).await.map(|_| ()).map_err(|e| e.to_string())
+                    store
+                        .add_vectors(vec![vector_data])
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
                     Ok::<(), String>(())
                 }
@@ -146,7 +154,11 @@ impl StorageModule {
                         role: Some("user".to_string()),
                     };
 
-                    history.add_history(entry).await.map(|_| ()).map_err(|e| e.to_string())
+                    history
+                        .add_history(entry)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
                 } else {
                     Ok::<(), String>(())
                 }
@@ -155,23 +167,26 @@ impl StorageModule {
             async move {
                 if let Some(manager) = memory_manager {
                     use agent_mem_core::types::MemoryType;
-                    
+
                     // 转换metadata为HashMap<String, String>
                     let metadata_for_manager: Option<std::collections::HashMap<String, String>> =
-                        Some(full_metadata_for_db
-                            .iter()
-                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                            .collect());
-                    
+                        Some(
+                            full_metadata_for_db
+                                .iter()
+                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                                .collect(),
+                        );
+
                     // 写入数据库 - 使用MemoryManager的公开API
-                    manager.add_memory(
-                        agent_id_for_db.clone(),
-                        Some(user_id_for_db.clone()),
-                        content_for_db.clone(),
-                        Some(memory_type_for_db.unwrap_or(MemoryType::Episodic)),
-                        Some(1.0),  // importance
-                        metadata_for_manager,
-                    )
+                    manager
+                        .add_memory(
+                            agent_id_for_db.clone(),
+                            Some(user_id_for_db.clone()),
+                            content_for_db.clone(),
+                            Some(memory_type_for_db.unwrap_or(MemoryType::Episodic)),
+                            Some(1.0), // importance
+                            metadata_for_manager,
+                        )
                         .await
                         .map(|_| ())
                         .map_err(|e| format!("MemoryManager write failed: {}", e))
@@ -249,12 +264,14 @@ impl StorageModule {
         info!("更新记忆: {}", memory_id);
 
         // 从 data 中提取更新字段
-        let new_content = data.get("content").and_then(|v| v.as_str().map(|s| s.to_string()));
-        let new_importance = data.get("importance").and_then(|v| v.as_f64().map(|f| f as f32));
-        let new_metadata: Option<HashMap<String, String>> = data
-            .get("metadata")
-            .and_then(|v| v.as_object())
-            .map(|obj| {
+        let new_content = data
+            .get("content")
+            .and_then(|v| v.as_str().map(|s| s.to_string()));
+        let new_importance = data
+            .get("importance")
+            .and_then(|v| v.as_f64().map(|f| f as f32));
+        let new_metadata: Option<HashMap<String, String>> =
+            data.get("metadata").and_then(|v| v.as_object()).map(|obj| {
                 obj.iter()
                     .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                     .collect()
@@ -263,7 +280,12 @@ impl StorageModule {
         // 1. 使用 MemoryManager 更新记忆
         if let Some(manager) = &orchestrator.memory_manager {
             manager
-                .update_memory(memory_id, new_content.clone(), new_importance, new_metadata.clone())
+                .update_memory(
+                    memory_id,
+                    new_content.clone(),
+                    new_importance,
+                    new_metadata.clone(),
+                )
                 .await
                 .map_err(|e| {
                     agent_mem_traits::AgentMemError::storage_error(&format!(
@@ -334,10 +356,7 @@ impl StorageModule {
     }
 
     /// 删除记忆
-    pub async fn delete_memory(
-        orchestrator: &MemoryOrchestrator,
-        memory_id: &str,
-    ) -> Result<()> {
+    pub async fn delete_memory(orchestrator: &MemoryOrchestrator, memory_id: &str) -> Result<()> {
         info!("删除记忆: {}", memory_id);
 
         // 1. 先获取记忆内容用于历史记录
@@ -345,15 +364,12 @@ impl StorageModule {
 
         // 2. 使用 MemoryManager 删除记忆
         if let Some(manager) = &orchestrator.memory_manager {
-            manager
-                .delete_memory(memory_id)
-                .await
-                .map_err(|e| {
-                    agent_mem_traits::AgentMemError::storage_error(&format!(
-                        "Failed to delete memory from MemoryManager: {}",
-                        e
-                    ))
-                })?;
+            manager.delete_memory(memory_id).await.map_err(|e| {
+                agent_mem_traits::AgentMemError::storage_error(&format!(
+                    "Failed to delete memory from MemoryManager: {}",
+                    e
+                ))
+            })?;
         }
 
         // 3. 从向量存储删除
@@ -456,14 +472,7 @@ impl StorageModule {
         if infer {
             // infer=true: 使用智能推理模式
             info!("使用智能推理模式 (infer=true)");
-            Self::add_memory_intelligent(
-                orchestrator,
-                content,
-                agent_id,
-                user_id,
-                metadata,
-            )
-            .await
+            Self::add_memory_intelligent(orchestrator, content, agent_id, user_id, metadata).await
         } else {
             // infer=false: 使用快速模式
             info!("使用快速模式 (infer=false)");
@@ -516,8 +525,8 @@ impl StorageModule {
         user_id: Option<String>,
         metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AddResult> {
-        use crate::types::MemoryEvent;
         use super::intelligence::IntelligenceModule;
+        use crate::types::MemoryEvent;
 
         info!(
             "智能添加记忆: content={}, agent_id={}, user_id={:?}",
@@ -559,4 +568,3 @@ impl StorageModule {
         .await
     }
 }
-

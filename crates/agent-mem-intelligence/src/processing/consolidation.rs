@@ -3,7 +3,7 @@
 //! Implements intelligent memory consolidation to reduce redundancy
 //! and improve memory organization.
 
-use agent_mem_traits::{MemoryV4 as Memory, Result, AttributeKey, AttributeValue};
+use agent_mem_traits::{AttributeKey, AttributeValue, MemoryV4 as Memory, Result};
 use agent_mem_utils::text::jaccard_similarity;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -180,11 +180,7 @@ impl MemoryConsolidator {
         // Consider memory type similarity
         let type1 = memory1.memory_type().unwrap_or("episodic".to_string());
         let type2 = memory2.memory_type().unwrap_or("episodic".to_string());
-        let type_similarity = if type1 == type2 {
-            1.0
-        } else {
-            0.5
-        };
+        let type_similarity = if type1 == type2 { 1.0 } else { 0.5 };
 
         // Consider temporal proximity (memories created close in time are more likely to be related)
         let time_diff = (memory1.metadata.created_at - memory2.metadata.created_at)
@@ -267,7 +263,8 @@ impl MemoryConsolidator {
         // Mark other memories for removal (set empty content as marker)
         for &idx in group {
             if idx != base_idx {
-                memories[idx].content = agent_mem_traits::Content::Text(String::new()); // Mark for removal
+                memories[idx].content = agent_mem_traits::Content::Text(String::new());
+                // Mark for removal
             }
         }
 
@@ -366,11 +363,9 @@ impl MemoryConsolidator {
 
     /// Clean up memories marked for removal
     pub fn cleanup_removed_memories(&self, memories: &mut Vec<Memory>) {
-        memories.retain(|memory| {
-            match &memory.content {
-                agent_mem_traits::Content::Text(t) => !t.is_empty(),
-                _ => true,
-            }
+        memories.retain(|memory| match &memory.content {
+            agent_mem_traits::Content::Text(t) => !t.is_empty(),
+            _ => true,
         });
     }
 }
@@ -378,7 +373,10 @@ impl MemoryConsolidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{MemoryId, Content, AttributeSet, AttributeKey, AttributeValue, RelationGraph, MetadataV4 as Metadata};
+    use agent_mem_traits::{
+        AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4 as Metadata,
+        RelationGraph,
+    };
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
         let now = chrono::Utc::now();
@@ -393,7 +391,7 @@ mod tests {
                 accessed_at: now,
                 access_count: 0,
                 version: 1,
-            hash: Some("test_hash".to_string()),
+                hash: Some("test_hash".to_string()),
             },
         };
         memory.set_agent_id("test_agent");

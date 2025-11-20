@@ -13,7 +13,7 @@ use agent_mem_core::{
     hierarchy::MemoryScope,
 };
 use agent_mem_performance::telemetry::{ProductionTelemetryConfig, ProductionTelemetrySystem};
-use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session, Content};
+use agent_mem_traits::{Content, MemoryItem, MemoryType, MemoryV4, Session};
 
 use anyhow::Result;
 use std::collections::HashMap;

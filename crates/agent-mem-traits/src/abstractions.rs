@@ -20,16 +20,16 @@ use std::collections::HashMap;
 pub struct Memory {
     /// Unique identifier
     pub id: MemoryId,
-    
+
     /// Core content (multi-modal)
     pub content: Content,
-    
+
     /// Open attribute set (completely extensible)
     pub attributes: AttributeSet,
-    
+
     /// Relations with other memories/entities
     pub relations: RelationGraph,
-    
+
     /// System metadata (maintained by the system)
     pub metadata: Metadata,
 }
@@ -42,11 +42,11 @@ impl MemoryId {
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
-    
+
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
-    
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -69,16 +69,16 @@ impl std::fmt::Display for MemoryId {
 pub enum Content {
     /// Text content
     Text(String),
-    
+
     /// Structured data
     Structured(serde_json::Value),
-    
+
     /// Vector embedding
     Vector(Vec<f32>),
-    
+
     /// Multi-modal combination
     Multimodal(Vec<Content>),
-    
+
     /// Binary data
     Binary(Vec<u8>),
 }
@@ -87,15 +87,15 @@ impl Content {
     pub fn text(s: impl Into<String>) -> Self {
         Content::Text(s.into())
     }
-    
+
     pub fn structured(v: serde_json::Value) -> Self {
         Content::Structured(v)
     }
-    
+
     pub fn vector(v: Vec<f32>) -> Self {
         Content::Vector(v)
     }
-    
+
     /// Check if content contains a substring (for text content)
     pub fn contains(&self, pattern: &str) -> bool {
         match self {
@@ -104,7 +104,7 @@ impl Content {
             _ => false,
         }
     }
-    
+
     /// Get text representation
     pub fn as_text(&self) -> Option<&str> {
         match self {
@@ -120,8 +120,7 @@ impl std::fmt::Display for Content {
         match self {
             Content::Text(s) => write!(f, "{}", s),
             Content::Structured(v) => {
-                let json_str = serde_json::to_string(v)
-                    .unwrap_or_else(|_| format!("{:?}", v));
+                let json_str = serde_json::to_string(v).unwrap_or_else(|_| format!("{:?}", v));
                 write!(f, "{}", json_str)
             }
             Content::Vector(v) => write!(f, "[vector:{}dims]", v.len()),
@@ -138,7 +137,7 @@ impl std::fmt::Display for Content {
 pub struct AttributeSet {
     /// Attributes dictionary (type-safe)
     pub attributes: HashMap<AttributeKey, AttributeValue>,
-    
+
     /// Optional schema for validation
     pub schema: Option<AttributeSchema>,
 }
@@ -147,25 +146,25 @@ impl AttributeSet {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn with_attribute(mut self, key: AttributeKey, value: AttributeValue) -> Self {
         self.attributes.insert(key, value);
         self
     }
-    
+
     pub fn get(&self, key: &AttributeKey) -> Option<&AttributeValue> {
         self.attributes.get(key)
     }
-    
+
     pub fn set(&mut self, key: AttributeKey, value: AttributeValue) {
         self.attributes.insert(key, value);
     }
-    
+
     /// Alias for set() for backward compatibility
     pub fn insert(&mut self, key: AttributeKey, value: AttributeValue) {
         self.set(key, value);
     }
-    
+
     pub fn remove(&mut self, key: &AttributeKey) -> Option<AttributeValue> {
         self.attributes.remove(key)
     }
@@ -176,7 +175,7 @@ impl AttributeSet {
 pub struct AttributeKey {
     /// Namespace (to avoid conflicts)
     pub namespace: String,
-    
+
     /// Key name
     pub name: String,
 }
@@ -188,27 +187,27 @@ impl AttributeKey {
             name: name.into(),
         }
     }
-    
+
     /// Create a core attribute (system namespace)
     pub fn core(name: impl Into<String>) -> Self {
         Self::new("core", name)
     }
-    
+
     /// Create a system attribute (for system-managed metadata)
     pub fn system(name: impl Into<String>) -> Self {
         Self::new("system", name)
     }
-    
+
     /// Create a user attribute
     pub fn user(name: impl Into<String>) -> Self {
         Self::new("user", name)
     }
-    
+
     /// Create an agent attribute
     pub fn agent(name: impl Into<String>) -> Self {
         Self::new("agent", name)
     }
-    
+
     pub fn full_name(&self) -> String {
         format!("{}::{}", self.namespace, self.name)
     }
@@ -234,7 +233,7 @@ impl AttributeValue {
             _ => None,
         }
     }
-    
+
     pub fn as_number(&self) -> Option<f64> {
         match self {
             AttributeValue::Number(n) => Some(*n),
@@ -242,7 +241,7 @@ impl AttributeValue {
             _ => None,
         }
     }
-    
+
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             AttributeValue::Boolean(b) => Some(*b),
@@ -274,7 +273,7 @@ pub enum AttributeType {
 pub struct RelationGraph {
     /// Outgoing edges (this memory points to others)
     pub outgoing: Vec<RelationV4>,
-    
+
     /// Incoming edges (others point to this)
     pub incoming: Vec<RelationV4>,
 }
@@ -283,11 +282,11 @@ impl RelationGraph {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn add_outgoing(&mut self, relation: RelationV4) {
         self.outgoing.push(relation);
     }
-    
+
     pub fn add_incoming(&mut self, relation: RelationV4) {
         self.incoming.push(relation);
     }
@@ -346,13 +345,13 @@ impl Metadata {
 pub struct Query {
     /// Core: query intent (multiple expressions)
     pub intent: QueryIntent,
-    
+
     /// Core: constraints (must satisfy)
     pub constraints: Vec<Constraint>,
-    
+
     /// Core: preferences (soft requirements)
     pub preferences: Vec<Preference>,
-    
+
     /// Context (affects understanding and retrieval)
     pub context: QueryContext,
 }
@@ -366,17 +365,17 @@ impl Query {
             context: QueryContext::default(),
         }
     }
-    
+
     pub fn with_constraint(mut self, constraint: Constraint) -> Self {
         self.constraints.push(constraint);
         self
     }
-    
+
     pub fn with_preference(mut self, preference: Preference) -> Self {
         self.preferences.push(preference);
         self
     }
-    
+
     pub fn with_context(mut self, context: QueryContext) -> Self {
         self.context = context;
         self
@@ -391,17 +390,13 @@ pub enum QueryIntent {
         text: String,
         language: Option<String>,
     },
-    
+
     /// Structured query
-    Structured {
-        predicates: Vec<Predicate>,
-    },
-    
+    Structured { predicates: Vec<Predicate> },
+
     /// Vector similarity
-    Vector {
-        embedding: Vec<f32>,
-    },
-    
+    Vector { embedding: Vec<f32> },
+
     /// Hybrid (combine multiple)
     Hybrid {
         intents: Vec<QueryIntent>,
@@ -416,11 +411,11 @@ impl QueryIntent {
             language: None,
         }
     }
-    
+
     pub fn structured(predicates: Vec<Predicate>) -> Self {
         QueryIntent::Structured { predicates }
     }
-    
+
     pub fn vector(embedding: Vec<f32>) -> Self {
         QueryIntent::Vector { embedding }
     }
@@ -453,10 +448,10 @@ pub enum ComparisonOperator {
 pub enum FusionStrategy {
     /// Weighted average
     Weighted(Vec<f32>),
-    
+
     /// Reciprocal rank fusion
     ReciprocalRank,
-    
+
     /// Custom fusion
     Custom(String),
 }
@@ -470,23 +465,19 @@ pub enum Constraint {
         operator: ComparisonOperator,
         value: AttributeValue,
     },
-    
+
     /// Relation constraint
     Relation {
         relation_type: String,
         target: String,
     },
-    
+
     /// Temporal constraint
-    Temporal {
-        time_range: TimeRange,
-    },
-    
+    Temporal { time_range: TimeRange },
+
     /// Spatial constraint (Scope)
-    Spatial {
-        scope: ScopeConstraint,
-    },
-    
+    Spatial { scope: ScopeConstraint },
+
     /// Logical combination
     Logical {
         operator: LogicalOperator,
@@ -515,13 +506,13 @@ pub enum ScopeConstraint {
         key: AttributeKey,
         value: AttributeValue,
     },
-    
+
     /// Relation match
     RelationMatch {
         relation_type: String,
         target: String,
     },
-    
+
     /// Any (no constraint)
     Any,
 }
@@ -531,7 +522,7 @@ pub enum ScopeConstraint {
 pub struct Preference {
     /// Preference type
     pub preference_type: PreferenceType,
-    
+
     /// Weight (adjustable)
     pub weight: f32,
 }
@@ -540,10 +531,10 @@ pub struct Preference {
 pub enum PreferenceType {
     /// Temporal preference (freshness)
     Temporal(TemporalPreference),
-    
+
     /// Relevance preference
     Relevance(RelevancePreference),
-    
+
     /// Diversity preference
     Diversity(DiversityPreference),
 }
@@ -620,11 +611,7 @@ pub trait SearchEngine: Send + Sync {
 #[async_trait]
 pub trait RetrievalEngine: Send + Sync {
     /// Retrieve memories
-    async fn retrieve(
-        &self,
-        query: &Query,
-        context: &RetrievalContext,
-    ) -> Result<RetrievalResult>;
+    async fn retrieve(&self, query: &Query, context: &RetrievalContext) -> Result<RetrievalResult>;
 
     /// Engine name
     fn name(&self) -> &str;
@@ -654,10 +641,10 @@ pub struct RetrievalContext {
 pub struct RetrievalResult {
     /// Memories list
     pub memories: Vec<ScoredMemory>,
-    
+
     /// Explanation (optional, for debugging)
     pub explanation: Option<RetrievalExplanation>,
-    
+
     /// Performance metrics
     pub metrics: RetrievalMetrics,
 }
@@ -667,10 +654,10 @@ pub struct RetrievalResult {
 pub struct ScoredMemory {
     /// Memory
     pub memory: Memory,
-    
+
     /// Total score
     pub score: f32,
-    
+
     /// Score breakdown (explainability)
     pub score_breakdown: HashMap<String, f32>,
 }
@@ -680,10 +667,10 @@ pub struct ScoredMemory {
 pub struct RetrievalExplanation {
     /// Why these memories were selected
     pub reasoning: Vec<ReasoningStep>,
-    
+
     /// Engines used
     pub engines_used: Vec<String>,
-    
+
     /// Fusion strategy
     pub fusion_strategy: String,
 }
@@ -710,25 +697,26 @@ impl Memory {
     /// Create memory from old MemoryItem format
     pub fn from_legacy_item(item: &crate::types::MemoryItem) -> Self {
         let mut attributes = AttributeSet::new();
-        
+
         // Map legacy fields to attributes
         attributes.set(
             AttributeKey::core("user_id"),
-            item.user_id.as_ref()
+            item.user_id
+                .as_ref()
                 .map(|s| AttributeValue::String(s.clone()))
                 .unwrap_or(AttributeValue::Null),
         );
-        
+
         attributes.set(
             AttributeKey::core("agent_id"),
             AttributeValue::String(item.agent_id.clone()),
         );
-        
+
         attributes.set(
             AttributeKey::core("memory_type"),
             AttributeValue::String(item.memory_type.as_str().to_string()),
         );
-        
+
         attributes.set(
             AttributeKey::core("importance"),
             AttributeValue::Number(item.importance as f64),
@@ -749,7 +737,7 @@ impl Memory {
                 AttributeValue::String(v.to_string()),
             );
         }
-        
+
         Self {
             id: MemoryId::from_string(item.id.clone()),
             content: Content::text(item.content.clone()),
@@ -765,38 +753,45 @@ impl Memory {
             },
         }
     }
-    
+
     /// Convert to legacy MemoryItem format
     pub fn to_legacy_item(&self) -> crate::types::MemoryItem {
         use crate::types::MemoryType;
-        
-        let user_id = self.attributes.get(&AttributeKey::core("user_id"))
+
+        let user_id = self
+            .attributes
+            .get(&AttributeKey::core("user_id"))
             .and_then(|v| v.as_string())
             .cloned();
-        
-        let agent_id = self.attributes.get(&AttributeKey::core("agent_id"))
+
+        let agent_id = self
+            .attributes
+            .get(&AttributeKey::core("agent_id"))
             .and_then(|v| v.as_string())
             .cloned()
             .unwrap_or_else(|| "default".to_string());
-        
-        let importance = self.attributes.get(&AttributeKey::core("importance"))
+
+        let importance = self
+            .attributes
+            .get(&AttributeKey::core("importance"))
             .and_then(|v| v.as_number())
             .unwrap_or(0.5) as f32;
-        
-        let memory_type_str = self.attributes.get(&AttributeKey::core("memory_type"))
+
+        let memory_type_str = self
+            .attributes
+            .get(&AttributeKey::core("memory_type"))
             .and_then(|v| v.as_string())
             .map(|s| s.as_str())
             .unwrap_or("episodic");
-        
-        let memory_type = MemoryType::parse_type(memory_type_str)
-            .unwrap_or(MemoryType::Episodic);
-        
+
+        let memory_type = MemoryType::parse_type(memory_type_str).unwrap_or(MemoryType::Episodic);
+
         let content = match &self.content {
             Content::Text(s) => s.clone(),
             Content::Structured(v) => v.to_string(),
             _ => "".to_string(),
         };
-        
+
         crate::types::MemoryItem {
             id: self.id.0.clone(),
             content,
@@ -837,7 +832,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get user_id from attributes
     pub fn user_id(&self) -> Option<String> {
         self.attributes
@@ -845,7 +840,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get memory_type from attributes
     pub fn memory_type(&self) -> Option<String> {
         self.attributes
@@ -853,21 +848,21 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get importance from attributes
     pub fn importance(&self) -> Option<f64> {
         self.attributes
             .get(&AttributeKey::system("importance"))
             .and_then(|v| v.as_number())
     }
-    
+
     /// Get score from attributes
     pub fn score(&self) -> Option<f64> {
         self.attributes
             .get(&AttributeKey::system("score"))
             .and_then(|v| v.as_number())
     }
-    
+
     /// Get hash from attributes
     pub fn hash(&self) -> Option<String> {
         self.attributes
@@ -875,67 +870,65 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get access_count from metadata
     pub fn access_count(&self) -> u32 {
         self.metadata.access_count
     }
-    
+
     /// Get created_at from metadata
     pub fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.metadata.created_at
     }
-    
+
     /// Get updated_at from metadata
     pub fn updated_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.metadata.updated_at
     }
-    
+
     /// Get last_accessed from metadata
     pub fn last_accessed(&self) -> chrono::DateTime<chrono::Utc> {
         self.metadata.accessed_at
     }
-    
+
     /// Set agent_id attribute
     pub fn set_agent_id(&mut self, agent_id: impl Into<String>) {
         self.attributes.insert(
             AttributeKey::core("agent_id"),
-            AttributeValue::String(agent_id.into())
+            AttributeValue::String(agent_id.into()),
         );
     }
-    
+
     /// Set user_id attribute
     pub fn set_user_id(&mut self, user_id: impl Into<String>) {
         self.attributes.insert(
             AttributeKey::core("user_id"),
-            AttributeValue::String(user_id.into())
+            AttributeValue::String(user_id.into()),
         );
     }
-    
+
     /// Set memory_type attribute
     pub fn set_memory_type(&mut self, memory_type: impl Into<String>) {
         self.attributes.insert(
             AttributeKey::core("memory_type"),
-            AttributeValue::String(memory_type.into())
+            AttributeValue::String(memory_type.into()),
         );
     }
-    
+
     /// Set importance attribute
     pub fn set_importance(&mut self, importance: f64) {
         self.attributes.insert(
             AttributeKey::system("importance"),
-            AttributeValue::Number(importance)
+            AttributeValue::Number(importance),
         );
     }
-    
+
     /// Set score attribute
     pub fn set_score(&mut self, score: f64) {
-        self.attributes.insert(
-            AttributeKey::system("score"),
-            AttributeValue::Number(score)
-        );
+        self.attributes
+            .insert(AttributeKey::system("score"), AttributeValue::Number(score));
     }
-    
+
     /// Get organization_id from attributes
     pub fn organization_id(&self) -> Option<String> {
         self.attributes
@@ -943,7 +936,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get scope from attributes
     pub fn scope(&self) -> Option<String> {
         self.attributes
@@ -951,7 +944,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get level from attributes
     pub fn level(&self) -> Option<String> {
         self.attributes
@@ -959,7 +952,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get is_deleted from attributes
     pub fn is_deleted(&self) -> bool {
         self.attributes
@@ -967,7 +960,7 @@ impl Memory {
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
     }
-    
+
     /// Get created_by_id from attributes
     pub fn created_by_id(&self) -> Option<String> {
         self.attributes
@@ -975,7 +968,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     /// Get last_updated_by_id from attributes
     pub fn last_updated_by_id(&self) -> Option<String> {
         self.attributes
@@ -983,36 +976,36 @@ impl Memory {
             .and_then(|v| v.as_string())
             .cloned()
     }
-    
+
     // ========== Phase 0 辅助方法：充分复用现有代码 ==========
-    
+
     /// 记录访问（更新metadata）
     pub fn access(&mut self) {
         self.metadata.access_count += 1;
         self.metadata.accessed_at = chrono::Utc::now();
         self.metadata.updated_at = chrono::Utc::now();
     }
-    
+
     /// 获取version（用于向后兼容）
     /// 注意：V4架构不使用version，返回access_count作为版本号
     pub fn version(&self) -> u32 {
         self.metadata.version
     }
-    
+
     /// 更新内容
     pub fn update_content(&mut self, content: impl Into<String>) {
         self.content = Content::Text(content.into());
         self.metadata.updated_at = chrono::Utc::now();
     }
-    
+
     /// 添加metadata到attributes
     pub fn add_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.attributes.insert(
             AttributeKey::new("metadata", &key.into()),
-            AttributeValue::String(value.into())
+            AttributeValue::String(value.into()),
         );
     }
-    
+
     /// 便捷方法：创建新的Memory（向后兼容）
     /// 与crate::types::Memory::new()保持一致的API
     pub fn new(
@@ -1023,29 +1016,26 @@ impl Memory {
         importance: f32,
     ) -> Self {
         let mut attributes = AttributeSet::new();
-        
+
         attributes.insert(
             AttributeKey::core("agent_id"),
             AttributeValue::String(agent_id.into()),
         );
-        
+
         if let Some(uid) = user_id {
-            attributes.insert(
-                AttributeKey::core("user_id"),
-                AttributeValue::String(uid),
-            );
+            attributes.insert(AttributeKey::core("user_id"), AttributeValue::String(uid));
         }
-        
+
         attributes.insert(
             AttributeKey::core("memory_type"),
             AttributeValue::String(memory_type.into()),
         );
-        
+
         attributes.insert(
             AttributeKey::system("importance"),
             AttributeValue::Number(importance as f64),
         );
-        
+
         Self {
             id: MemoryId::new(),
             content: Content::Text(content.into()),
@@ -1055,4 +1045,3 @@ impl Memory {
         }
     }
 }
-

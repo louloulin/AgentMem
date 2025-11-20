@@ -35,16 +35,18 @@ pub async fn run_test_real(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     for i in 0..total_batches {
         let op_start = Instant::now();
@@ -74,7 +76,7 @@ pub async fn run_test(
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
     info!("🚀 开始 Mock 批量操作压测: 批量大小={}", batch_size);
-    
+
     let total_batches = 100;
     let pb = multi_progress.add(ProgressBar::new(total_batches as u64));
     pb.set_style(

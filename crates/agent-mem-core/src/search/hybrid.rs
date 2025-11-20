@@ -3,8 +3,8 @@
 //! 整合向量搜索和全文搜索，使用 RRF 算法融合结果
 
 use super::{
-    FullTextSearchEngine, RRFRanker, SearchQuery, SearchResult, SearchResultRanker, SearchStats,
-    VectorSearchEngine, MetadataFilterSystem, LogicalOperator,
+    FullTextSearchEngine, LogicalOperator, MetadataFilterSystem, RRFRanker, SearchQuery,
+    SearchResult, SearchResultRanker, SearchStats, VectorSearchEngine,
 };
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
@@ -169,7 +169,8 @@ impl HybridSearchEngine {
 
         // 融合搜索结果
         let fusion_start = Instant::now();
-        let mut fused_results = self.fuse_results(vector_results.clone(), fulltext_results.clone())?;
+        let mut fused_results =
+            self.fuse_results(vector_results.clone(), fulltext_results.clone())?;
         let fusion_time = fusion_start.elapsed().as_millis() as u64;
 
         // 应用元数据过滤（阶段2：高级过滤）
@@ -292,7 +293,7 @@ impl HybridSearchEngine {
 // SearchEngine Trait 实现 (V4)
 // ============================================================================
 
-use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use agent_mem_traits::{Query, QueryIntent, QueryIntentType, SearchEngine};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -303,16 +304,16 @@ impl SearchEngine for HybridSearchEngine {
         let (query_vector, query_text) = match &query.intent {
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取向量和文本
-                let vector = intents.iter()
-                    .find_map(|intent| {
-                        if let QueryIntent::Vector { embedding } = intent {
-                            Some(embedding.clone())
-                        } else {
-                            None
-                        }
-                    });
+                let vector = intents.iter().find_map(|intent| {
+                    if let QueryIntent::Vector { embedding } = intent {
+                        Some(embedding.clone())
+                    } else {
+                        None
+                    }
+                });
 
-                let text = intents.iter()
+                let text = intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::NaturalLanguage { text, .. } = intent {
                             Some(text.clone())
@@ -322,9 +323,11 @@ impl SearchEngine for HybridSearchEngine {
                     })
                     .unwrap_or_default();
 
-                let vector = vector.ok_or_else(|| AgentMemError::validation_error(
-                    "Hybrid query must contain at least one Vector intent"
-                ))?;
+                let vector = vector.ok_or_else(|| {
+                    AgentMemError::validation_error(
+                        "Hybrid query must contain at least one Vector intent",
+                    )
+                })?;
 
                 (vector, text)
             }
@@ -339,9 +342,10 @@ impl SearchEngine for HybridSearchEngine {
                 ));
             }
             _ => {
-                return Err(AgentMemError::validation_error(
-                    format!("Unsupported query intent for HybridSearchEngine: {:?}", query.intent)
-                ));
+                return Err(AgentMemError::validation_error(format!(
+                    "Unsupported query intent for HybridSearchEngine: {:?}",
+                    query.intent
+                )));
             }
         };
 
@@ -356,7 +360,9 @@ impl SearchEngine for HybridSearchEngine {
         let hybrid_result = self.search(query_vector, &search_query).await?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
-        let v4_results = hybrid_result.results.into_iter()
+        let v4_results = hybrid_result
+            .results
+            .into_iter()
             .map(|r| agent_mem_traits::SearchResultV4 {
                 id: r.id,
                 content: r.content,
@@ -394,11 +400,10 @@ impl SearchEngine for HybridSearchEngine {
 
         for result in results {
             // 将result的metadata转换为HashMap
-            let metadata: HashMap<String, serde_json::Value> = if let Some(meta) = &result.metadata {
+            let metadata: HashMap<String, serde_json::Value> = if let Some(meta) = &result.metadata
+            {
                 if let Some(obj) = meta.as_object() {
-                    obj.iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect()
+                    obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
                 } else {
                     HashMap::new()
                 }

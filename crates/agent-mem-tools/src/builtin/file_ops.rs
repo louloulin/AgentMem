@@ -94,10 +94,7 @@ impl Tool for FileReadTool {
             .ok_or_else(|| ToolError::InvalidArgument("line_start is required".to_string()))?
             as usize;
 
-        let num_lines = args
-            .get("num_lines")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(1) as usize;
+        let num_lines = args.get("num_lines").and_then(|v| v.as_i64()).unwrap_or(1) as usize;
 
         if line_start < 1 || num_lines < 1 {
             return Err(ToolError::InvalidArgument(
@@ -134,18 +131,20 @@ impl FileReadTool {
             )));
         }
 
-        let file = fs::File::open(&path).await.map_err(|e| {
-            ToolError::ExecutionFailed(format!("Failed to open file: {e}"))
-        })?;
+        let file = fs::File::open(&path)
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to open file: {e}")))?;
 
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
         let mut result_lines = Vec::new();
         let mut current_line = 1;
 
-        while let Some(line) = lines.next_line().await.map_err(|e| {
-            ToolError::ExecutionFailed(format!("Failed to read line: {e}"))
-        })? {
+        while let Some(line) = lines
+            .next_line()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to read line: {e}")))?
+        {
             if current_line >= line_start && current_line < line_start + num_lines {
                 result_lines.push(line);
             }
@@ -276,9 +275,9 @@ impl FileWriteTool {
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write to file: {e}")))?;
 
         if append {
-            file.write_all(b"\n").await.map_err(|e| {
-                ToolError::ExecutionFailed(format!("Failed to write newline: {e}"))
-            })?;
+            file.write_all(b"\n")
+                .await
+                .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write newline: {e}")))?;
         }
 
         Ok(())
@@ -301,4 +300,3 @@ pub struct FileWriteResult {
     pub bytes_written: usize,
     pub append: bool,
 }
-

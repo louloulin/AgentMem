@@ -226,12 +226,18 @@ impl AuthContext {
             Permission::CallTool(_) => {
                 // 检查是否有调用工具的通用权限或特定工具权限
                 self.permissions.contains(permission)
-                    || self.permissions.iter().any(|p| matches!(p, Permission::CallTool(_)))
+                    || self
+                        .permissions
+                        .iter()
+                        .any(|p| matches!(p, Permission::CallTool(_)))
             }
             Permission::ReadResource(_) => {
                 // 检查是否有读取资源的通用权限或特定资源权限
                 self.permissions.contains(permission)
-                    || self.permissions.iter().any(|p| matches!(p, Permission::ReadResource(_)))
+                    || self
+                        .permissions
+                        .iter()
+                        .any(|p| matches!(p, Permission::ReadResource(_)))
             }
             Permission::SubscribeResource(_) => {
                 // 检查是否有订阅资源的通用权限或特定资源权限
@@ -244,7 +250,10 @@ impl AuthContext {
             Permission::GetPrompt(_) => {
                 // 检查是否有获取提示词的通用权限或特定提示词权限
                 self.permissions.contains(permission)
-                    || self.permissions.iter().any(|p| matches!(p, Permission::GetPrompt(_)))
+                    || self
+                        .permissions
+                        .iter()
+                        .any(|p| matches!(p, Permission::GetPrompt(_)))
             }
             _ => self.permissions.contains(permission),
         }
@@ -394,7 +403,10 @@ impl AuthManager {
             drop(contexts);
             // 创建新的上下文
             let context = AuthContext::new(user_id.clone(), Role::Developer);
-            self.contexts.write().await.insert(user_id.clone(), context.clone());
+            self.contexts
+                .write()
+                .await
+                .insert(user_id.clone(), context.clone());
             Ok(context)
         }
     }
@@ -415,11 +427,10 @@ impl AuthManager {
 
         // ✅ 2. 解码和验证 JWT
         let decoding_key = DecodingKey::from_secret(self.jwt_config.secret.as_bytes());
-        let token_data = decode::<JwtClaims>(token, &decoding_key, &validation)
-            .map_err(|e| {
-                warn!("JWT verification failed: {}", e);
-                McpError::AuthenticationFailed(format!("Invalid JWT: {e}"))
-            })?;
+        let token_data = decode::<JwtClaims>(token, &decoding_key, &validation).map_err(|e| {
+            warn!("JWT verification failed: {}", e);
+            McpError::AuthenticationFailed(format!("Invalid JWT: {e}"))
+        })?;
 
         let claims = token_data.claims;
 
@@ -470,7 +481,10 @@ impl AuthManager {
                 }
             }
 
-            self.contexts.write().await.insert(user_id.clone(), context.clone());
+            self.contexts
+                .write()
+                .await
+                .insert(user_id.clone(), context.clone());
 
             info!("Created new auth context for user: {}", user_id);
             Ok(context)
@@ -520,7 +534,10 @@ impl AuthManager {
 
         let response = client
             .post(&introspection_url)
-            .basic_auth(&self.oauth2_config.client_id, Some(&self.oauth2_config.client_secret))
+            .basic_auth(
+                &self.oauth2_config.client_id,
+                Some(&self.oauth2_config.client_secret),
+            )
             .form(&[("token", access_token)])
             .send()
             .await
@@ -540,13 +557,10 @@ impl AuthManager {
             extra: HashMap<String, serde_json::Value>,
         }
 
-        let introspection: IntrospectionResponse = response
-            .json()
-            .await
-            .map_err(|e| {
-                warn!("Failed to parse OAuth2 introspection response: {}", e);
-                McpError::AuthenticationFailed("Invalid OAuth2 response".to_string())
-            })?;
+        let introspection: IntrospectionResponse = response.json().await.map_err(|e| {
+            warn!("Failed to parse OAuth2 introspection response: {}", e);
+            McpError::AuthenticationFailed("Invalid OAuth2 response".to_string())
+        })?;
 
         // ✅ 3. 验证令牌有效性
         if !introspection.active {
@@ -556,8 +570,9 @@ impl AuthManager {
         }
 
         // ✅ 4. 提取用户信息
-        let user_id = introspection.sub
-            .ok_or_else(|| McpError::AuthenticationFailed("OAuth2 token missing subject".to_string()))?;
+        let user_id = introspection.sub.ok_or_else(|| {
+            McpError::AuthenticationFailed("OAuth2 token missing subject".to_string())
+        })?;
 
         // ✅ 5. 检查过期时间
         if let Some(exp) = introspection.exp {
@@ -603,7 +618,10 @@ impl AuthManager {
                 }
             }
 
-            self.contexts.write().await.insert(user_id.clone(), context.clone());
+            self.contexts
+                .write()
+                .await
+                .insert(user_id.clone(), context.clone());
 
             info!("Created new OAuth2 auth context for user: {}", user_id);
             Ok(context)
@@ -682,7 +700,10 @@ impl AuthManager {
 
     /// 撤销权限
     pub async fn revoke_permission(&self, user_id: &str, permission: &Permission) -> McpResult<()> {
-        info!("Revoking permission {:?} from user: {}", permission, user_id);
+        info!(
+            "Revoking permission {:?} from user: {}",
+            permission, user_id
+        );
         let mut contexts = self.contexts.write().await;
         let context = contexts
             .get_mut(user_id)
@@ -770,12 +791,7 @@ pub struct AuditEvent {
 
 impl AuditEvent {
     /// 创建新的审计事件
-    pub fn new(
-        event_type: AuditEventType,
-        user_id: String,
-        action: String,
-        success: bool,
-    ) -> Self {
+    pub fn new(event_type: AuditEventType, user_id: String, action: String, success: bool) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             event_type,
@@ -1029,7 +1045,12 @@ mod tests {
 
         // 查询认证事件
         let auth_events = logger
-            .query(None, Some(&AuditEventType::AuthenticationSuccess), None, None)
+            .query(
+                None,
+                Some(&AuditEventType::AuthenticationSuccess),
+                None,
+                None,
+            )
             .await;
         assert_eq!(auth_events.len(), 2);
     }
@@ -1043,4 +1064,3 @@ mod tests {
         assert!(context.is_expired());
     }
 }
-

@@ -4,8 +4,8 @@
 
 use super::SearchQuery;
 use super::SearchResult;
-use agent_mem_traits::Result;
 use agent_mem_config::agentmem_config::{AgentMemConfig, SearchConfig};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -170,7 +170,8 @@ impl WeightPredictor {
 
         // 规则5: 包含实体 → 平衡权重
         if features.entity_count > 0 {
-            let entity_boost = (features.entity_count as f32 * 0.05).min(self.config.exact_match_boost);
+            let entity_boost =
+                (features.entity_count as f32 * 0.05).min(self.config.exact_match_boost);
             fulltext_weight += entity_boost;
         }
 
@@ -212,7 +213,7 @@ pub struct AdaptiveSearchOptimizer {
 
     /// 是否启用学习（从配置读取）
     enable_learning: bool,
-    
+
     /// 配置
     config: Arc<SearchConfig>,
 }
@@ -227,7 +228,7 @@ impl AdaptiveSearchOptimizer {
             config,
         }
     }
-    
+
     /// 创建新的自适应搜索优化器（向后兼容）
     pub fn new_with_learning(enable_learning: bool) -> Self {
         let config = Arc::new(AgentMemConfig::default().search);
@@ -276,7 +277,11 @@ impl SearchReranker {
     }
 
     /// 重排序搜索结果（基于多因素）
-    pub fn rerank(&self, mut results: Vec<SearchResult>, _query: &SearchQuery) -> Vec<SearchResult> {
+    pub fn rerank(
+        &self,
+        mut results: Vec<SearchResult>,
+        _query: &SearchQuery,
+    ) -> Vec<SearchResult> {
         // 为每个结果计算综合得分
         for result in &mut results {
             let mut final_score = result.score;

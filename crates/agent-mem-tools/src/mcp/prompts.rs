@@ -20,26 +20,26 @@ use tracing::{debug, info};
 pub struct McpPrompt {
     /// 提示词名称
     pub name: String,
-    
+
     /// 提示词描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// 提示词参数
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub arguments: Vec<PromptArgument>,
-    
+
     /// 提示词内容
     pub content: Vec<PromptContent>,
-    
+
     /// 提示词版本
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    
+
     /// 提示词标签
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<String>,
-    
+
     /// 元数据
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -58,25 +58,25 @@ impl McpPrompt {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// 设置描述
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
-    
+
     /// 添加参数
     pub fn with_argument(mut self, argument: PromptArgument) -> Self {
         self.arguments.push(argument);
         self
     }
-    
+
     /// 设置版本
     pub fn with_version(mut self, version: impl Into<String>) -> Self {
         self.version = Some(version.into());
         self
     }
-    
+
     /// 添加标签
     pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
@@ -89,19 +89,19 @@ impl McpPrompt {
 pub struct PromptArgument {
     /// 参数名称
     pub name: String,
-    
+
     /// 参数描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// 是否必需
     #[serde(default)]
     pub required: bool,
-    
+
     /// 参数类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arg_type: Option<String>,
-    
+
     /// 默认值
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<serde_json::Value>,
@@ -118,19 +118,19 @@ impl PromptArgument {
             default: None,
         }
     }
-    
+
     /// 设置为必需
     pub fn required(mut self) -> Self {
         self.required = true;
         self
     }
-    
+
     /// 设置描述
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
-    
+
     /// 设置类型
     pub fn with_type(mut self, arg_type: impl Into<String>) -> Self {
         self.arg_type = Some(arg_type.into());
@@ -148,24 +148,24 @@ pub enum PromptContent {
         /// 文本内容
         text: String,
     },
-    
+
     /// 图片内容
     #[serde(rename = "image")]
     Image {
         /// 图片 URL 或 base64 数据
         data: String,
-        
+
         /// MIME 类型
         #[serde(skip_serializing_if = "Option::is_none")]
         mime_type: Option<String>,
     },
-    
+
     /// 资源引用
     #[serde(rename = "resource")]
     Resource {
         /// 资源 URI
         uri: String,
-        
+
         /// MIME 类型
         #[serde(skip_serializing_if = "Option::is_none")]
         mime_type: Option<String>,
@@ -184,7 +184,7 @@ pub struct McpListPromptsResponse {
 pub struct McpGetPromptRequest {
     /// 提示词名称
     pub name: String,
-    
+
     /// 提示词参数
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub arguments: HashMap<String, serde_json::Value>,
@@ -195,7 +195,7 @@ pub struct McpGetPromptRequest {
 pub struct McpGetPromptResponse {
     /// 提示词内容
     pub content: Vec<PromptContent>,
-    
+
     /// 提示词描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -205,7 +205,7 @@ pub struct McpGetPromptResponse {
 pub struct PromptManager {
     /// 提示词存储
     prompts: Arc<RwLock<HashMap<String, McpPrompt>>>,
-    
+
     /// 模板引擎（使用 Handlebars）
     template_engine: Arc<RwLock<handlebars::Handlebars<'static>>>,
 }
@@ -215,18 +215,18 @@ impl PromptManager {
     pub fn new() -> Self {
         let mut hb = handlebars::Handlebars::new();
         hb.set_strict_mode(false);
-        
+
         Self {
             prompts: Arc::new(RwLock::new(HashMap::new())),
             template_engine: Arc::new(RwLock::new(hb)),
         }
     }
-    
+
     /// 注册提示词
     pub async fn register_prompt(&self, prompt: McpPrompt) -> McpResult<()> {
         let name = prompt.name.clone();
         info!("Registering prompt: {}", name);
-        
+
         // 注册模板
         let mut engine = self.template_engine.write().await;
         for (idx, content) in prompt.content.iter().enumerate() {
@@ -238,15 +238,15 @@ impl PromptManager {
             }
         }
         drop(engine);
-        
+
         // 存储提示词
         let mut prompts = self.prompts.write().await;
         prompts.insert(name.clone(), prompt);
-        
+
         debug!("Prompt registered: {}", name);
         Ok(())
     }
-    
+
     /// 列出所有提示词
     pub async fn list_prompts(&self) -> McpResult<Vec<McpPrompt>> {
         info!("Listing all prompts");
@@ -255,7 +255,7 @@ impl PromptManager {
         debug!("Found {} prompts", result.len());
         Ok(result)
     }
-    
+
     /// 获取提示词
     pub async fn get_prompt(
         &self,
@@ -263,7 +263,7 @@ impl PromptManager {
         arguments: HashMap<String, serde_json::Value>,
     ) -> McpResult<McpGetPromptResponse> {
         info!("Getting prompt: {}", name);
-        
+
         // 查找提示词
         let prompts = self.prompts.read().await;
         let prompt = prompts
@@ -271,7 +271,7 @@ impl PromptManager {
             .ok_or_else(|| McpError::Internal(format!("Prompt not found: {name}")))?
             .clone();
         drop(prompts);
-        
+
         // 验证必需参数
         for arg in &prompt.arguments {
             if arg.required && !arguments.contains_key(&arg.name) {
@@ -281,19 +281,19 @@ impl PromptManager {
                 )));
             }
         }
-        
+
         // 渲染模板
         let engine = self.template_engine.read().await;
         let mut rendered_content = Vec::new();
-        
+
         for (idx, content) in prompt.content.iter().enumerate() {
             match content {
                 PromptContent::Text { .. } => {
                     let template_name = format!("{name}_{idx}");
-                    let rendered = engine
-                        .render(&template_name, &arguments)
-                        .map_err(|e| McpError::Internal(format!("Failed to render template: {e}")))?;
-                    
+                    let rendered = engine.render(&template_name, &arguments).map_err(|e| {
+                        McpError::Internal(format!("Failed to render template: {e}"))
+                    })?;
+
                     rendered_content.push(PromptContent::Text { text: rendered });
                 }
                 other => {
@@ -301,7 +301,7 @@ impl PromptManager {
                 }
             }
         }
-        
+
         Ok(McpGetPromptResponse {
             content: rendered_content,
             description: prompt.description,
@@ -492,4 +492,3 @@ mod tests {
         assert_eq!(prompt.arguments.len(), 1);
     }
 }
-

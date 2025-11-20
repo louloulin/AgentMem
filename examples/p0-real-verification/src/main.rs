@@ -30,7 +30,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "-".repeat(60));
 
     let default_options = AddMemoryOptions::default();
-    println!("✅ AddMemoryOptions::default().infer = {}", default_options.infer);
+    println!(
+        "✅ AddMemoryOptions::default().infer = {}",
+        default_options.infer
+    );
 
     if default_options.infer {
         println!("✅ 通过：默认值为 true（符合 P0 优化目标）");
@@ -121,4 +124,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

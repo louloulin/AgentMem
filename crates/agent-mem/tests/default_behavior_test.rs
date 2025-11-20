@@ -12,10 +12,7 @@ use agent_mem::{AddMemoryOptions, Memory};
 fn test_default_infer_is_true() {
     // 验证默认值是 true（P0 优化的核心改动）
     let options = AddMemoryOptions::default();
-    assert_eq!(
-        options.infer, true,
-        "默认应该启用智能功能（对标 Mem0）"
-    );
+    assert_eq!(options.infer, true, "默认应该启用智能功能（对标 Mem0）");
 }
 
 #[test]
@@ -28,10 +25,7 @@ fn test_default_options_fields() {
     assert_eq!(options.run_id, None, "默认 run_id 应该为 None");
     assert!(options.metadata.is_empty(), "默认 metadata 应该为空");
     assert_eq!(options.infer, true, "默认 infer 应该为 true");
-    assert_eq!(
-        options.memory_type, None,
-        "默认 memory_type 应该为 None"
-    );
+    assert_eq!(options.memory_type, None, "默认 memory_type 应该为 None");
     assert_eq!(options.prompt, None, "默认 prompt 应该为 None");
 }
 
@@ -61,7 +55,9 @@ async fn test_explicit_infer_false_still_works() {
         ..Default::default()
     };
 
-    let result = mem.add_with_options("Raw content".to_string(), options).await;
+    let result = mem
+        .add_with_options("Raw content".to_string(), options)
+        .await;
     assert!(result.is_ok(), "简单模式应该成功");
 
     if let Ok(add_result) = result {
@@ -79,7 +75,9 @@ async fn test_backward_compatibility_with_explicit_infer_true() {
         ..Default::default()
     };
 
-    let result = mem.add_with_options("I love pizza".to_string(), options).await;
+    let result = mem
+        .add_with_options("I love pizza".to_string(), options)
+        .await;
     assert!(result.is_ok(), "显式启用智能功能应该成功");
 
     if let Ok(add_result) = result {
@@ -213,4 +211,3 @@ fn test_options_debug() {
     assert!(debug_str.contains("infer"));
     assert!(debug_str.contains("true"));
 }
-

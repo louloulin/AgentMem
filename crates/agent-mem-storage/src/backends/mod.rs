@@ -22,9 +22,9 @@ pub mod postgres_working;
 // 嵌入式存储
 #[cfg(feature = "lancedb")]
 pub mod lancedb_store;
-pub mod libsql_store;
 #[cfg(feature = "libsql")]
 pub mod libsql_fts5;
+pub mod libsql_store;
 
 pub mod azure_ai_search;
 #[cfg(test)]
@@ -72,9 +72,9 @@ pub use postgres_working::PostgresWorkingStore;
 // 嵌入式存储导出
 #[cfg(feature = "lancedb")]
 pub use lancedb_store::LanceDBStore as LanceDBVectorStore;
-pub use libsql_store::{LibSQLStore, MemoryRecord};
 #[cfg(feature = "libsql")]
-pub use libsql_fts5::{LibSQLFTS5Store, FTS5SearchResult, BM25Params, FTS5Stats};
+pub use libsql_fts5::{BM25Params, FTS5SearchResult, FTS5Stats, LibSQLFTS5Store};
+pub use libsql_store::{LibSQLStore, MemoryRecord};
 
 pub use azure_ai_search::AzureAISearchStore;
 pub use chroma::ChromaStore;

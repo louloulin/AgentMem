@@ -40,14 +40,18 @@ impl RetrievalModule {
         threshold: Option<f32>,
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
-        info!("混合搜索记忆: query={}, user_id={}, limit={}", query, user_id, limit);
+        info!(
+            "混合搜索记忆: query={}, user_id={}, limit={}",
+            query, user_id, limit
+        );
 
         // Step 1: 查询预处理
         let processed_query = UtilsModule::preprocess_query(&query).await?;
         debug!("查询预处理完成: '{}' -> '{}'", query, processed_query);
 
         // Step 2: 动态阈值调整
-        let dynamic_threshold = UtilsModule::calculate_dynamic_threshold(&processed_query, threshold);
+        let dynamic_threshold =
+            UtilsModule::calculate_dynamic_threshold(&processed_query, threshold);
         debug!("动态阈值: {:?} -> {}", threshold, dynamic_threshold);
 
         // Step 3: 生成查询向量
@@ -55,17 +59,18 @@ impl RetrievalModule {
             UtilsModule::generate_query_embedding(&processed_query, embedder.as_ref()).await?
         } else {
             return Err(agent_mem_traits::AgentMemError::ConfigError(
-                "Embedder not configured. Cannot perform vector search without embedder.".to_string(),
+                "Embedder not configured. Cannot perform vector search without embedder."
+                    .to_string(),
             ));
         };
 
         // Step 4: 构建SearchQuery
-        use agent_mem_core::search::{SearchQuery, SearchFilters};
+        use agent_mem_core::search::{SearchFilters, SearchQuery};
         let mut search_filters = SearchFilters::default();
-        
+
         // 添加用户ID过滤
         search_filters.user_id = Some(user_id.clone());
-        
+
         // 添加自定义过滤条件
         if let Some(filters) = filters {
             for (k, v) in filters {
@@ -91,41 +96,42 @@ impl RetrievalModule {
                 .search(&search_query)
                 .await
                 .map_err(|e| {
-                    agent_mem_traits::AgentMemError::storage_error(&format!(
-                        "Search failed: {}",
-                        e
-                    ))
+                    agent_mem_traits::AgentMemError::storage_error(&format!("Search failed: {}", e))
                 })?;
 
             // Step 6: 转换结果
-            let mut memory_items = UtilsModule::convert_search_results_to_memory_items(search_results);
+            let mut memory_items =
+                UtilsModule::convert_search_results_to_memory_items(search_results);
             info!("✅ 混合搜索完成: {} 个结果", memory_items.len());
-            
+
             // Step 7: 应用重排序（如果启用）
             if let Some(reranker) = &orchestrator.reranker {
                 info!("应用重排序...");
-                let search_results_for_rerank: Vec<agent_mem_core::search::SearchResult> = memory_items
-                    .iter()
-                    .map(|item| agent_mem_core::search::SearchResult {
-                        id: item.id.clone(),
-                        content: item.content.clone(),
-                        score: item.score.unwrap_or(0.0),
-                        vector_score: item.score,
-                        fulltext_score: None,
-                        metadata: item.metadata.clone().map(|m| {
-                            serde_json::json!(m)
-                        }),
-                    })
-                    .collect();
-                
-                match reranker.rerank(
-                    &processed_query,
-                    Some(&query_vector),
-                    search_results_for_rerank,
-                    &search_query,
-                ).await {
+                let search_results_for_rerank: Vec<agent_mem_core::search::SearchResult> =
+                    memory_items
+                        .iter()
+                        .map(|item| agent_mem_core::search::SearchResult {
+                            id: item.id.clone(),
+                            content: item.content.clone(),
+                            score: item.score.unwrap_or(0.0),
+                            vector_score: item.score,
+                            fulltext_score: None,
+                            metadata: item.metadata.clone().map(|m| serde_json::json!(m)),
+                        })
+                        .collect();
+
+                match reranker
+                    .rerank(
+                        &processed_query,
+                        Some(&query_vector),
+                        search_results_for_rerank,
+                        &search_query,
+                    )
+                    .await
+                {
                     Ok(reranked_results) => {
-                        memory_items = UtilsModule::convert_search_results_to_memory_items(reranked_results);
+                        memory_items =
+                            UtilsModule::convert_search_results_to_memory_items(reranked_results);
                         info!("✅ 重排序完成: {} 个结果", memory_items.len());
                     }
                     Err(e) => {
@@ -133,7 +139,7 @@ impl RetrievalModule {
                     }
                 }
             }
-            
+
             Ok(memory_items)
         } else {
             // 降级：仅使用向量搜索
@@ -141,7 +147,7 @@ impl RetrievalModule {
             if let Some(vector_store) = &orchestrator.vector_store {
                 let mut filter_map: HashMap<String, serde_json::Value> = HashMap::new();
                 filter_map.insert("user_id".to_string(), serde_json::json!(user_id));
-                
+
                 if let Some(filters) = filters {
                     for (k, v) in filters {
                         filter_map.insert(k, serde_json::json!(v));
@@ -165,7 +171,7 @@ impl RetrievalModule {
                         })
                         .collect(),
                 );
-                
+
                 Ok(memory_items)
             } else {
                 Err(agent_mem_traits::AgentMemError::ConfigError(
@@ -185,8 +191,8 @@ impl RetrievalModule {
         threshold: Option<f32>,
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
-        use chrono::Utc;
         use agent_mem_traits::{Entity, Relation, Session};
+        use chrono::Utc;
 
         info!(
             "向量搜索（嵌入式模式）: query={}, user_id={}, limit={}",
@@ -208,7 +214,10 @@ impl RetrievalModule {
         // 2. 向量搜索
         if let Some(vector_store) = &orchestrator.vector_store {
             let mut filter_map = HashMap::new();
-            filter_map.insert("_query_hint".to_string(), serde_json::json!(query.to_lowercase()));
+            filter_map.insert(
+                "_query_hint".to_string(),
+                serde_json::json!(query.to_lowercase()),
+            );
 
             if let Some(filters) = filters {
                 for (k, v) in filters {
@@ -279,17 +288,18 @@ impl RetrievalModule {
             .into_iter()
             .map(|mem| {
                 let mut score = mem.importance;
-                
+
                 // 1. 重要性权重 (40%)
                 let importance_score = mem.importance * 0.4;
-                
+
                 // 2. 相关性权重 (30%) - 基于内容匹配
-                let relevance_score = if mem.content.to_lowercase().contains(&query.to_lowercase()) {
+                let relevance_score = if mem.content.to_lowercase().contains(&query.to_lowercase())
+                {
                     0.3
                 } else {
                     0.1
                 };
-                
+
                 // 3. 时间衰减权重 (20%) - 最近访问的记忆得分更高
                 let time_score = if let Some(updated_at) = mem.updated_at {
                     let age_days = (chrono::Utc::now() - updated_at).num_days();
@@ -298,32 +308,29 @@ impl RetrievalModule {
                 } else {
                     0.1
                 };
-                
+
                 // 4. 访问频率权重 (10%) - 访问次数多的记忆得分更高
                 let access_score = {
                     let access_factor = (mem.access_count as f32 / 100.0).min(1.0);
                     access_factor * 0.1
                 };
-                
+
                 // 5. 用户相关性权重 - 如果记忆属于当前用户，得分更高
                 let user_score = if mem.user_id.as_ref().map(|s| s.as_str()) == Some(user_id) {
                     0.1
                 } else {
                     0.0
                 };
-                
+
                 score = importance_score + relevance_score + time_score + access_score + user_score;
                 (mem, score)
             })
             .collect();
-        
+
         // 按综合得分排序
-        scored_memories.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
-        
+        scored_memories.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
         // 返回排序后的记忆（去掉得分）
         Ok(scored_memories.into_iter().map(|(mem, _)| mem).collect())
     }
 }
-

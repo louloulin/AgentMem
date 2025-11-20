@@ -36,7 +36,7 @@ impl ConflictDetector {
     /// Detect conflicts between memories
     pub fn detect_conflicts(&self, memories: &[Memory]) -> Vec<ConflictPair> {
         let mut conflicts = Vec::new();
-        
+
         for i in 0..memories.len() {
             for j in (i + 1)..memories.len() {
                 if let Some(conflict_type) = self.check_conflict(&memories[i], &memories[j]) {
@@ -49,7 +49,7 @@ impl ConflictDetector {
                 }
             }
         }
-        
+
         conflicts
     }
 
@@ -63,23 +63,24 @@ impl ConflictDetector {
 
         // Calculate content similarity
         let similarity = self.calculate_similarity(m1, m2);
-        
+
         if similarity >= self.similarity_threshold {
             // Check version conflict (by comparing updated_at timestamps)
-            if m1.metadata.updated_at != m1.metadata.created_at 
-                || m2.metadata.updated_at != m2.metadata.created_at {
+            if m1.metadata.updated_at != m1.metadata.created_at
+                || m2.metadata.updated_at != m2.metadata.created_at
+            {
                 return Some(ConflictType::VersionConflict);
             }
-            
+
             // Check content conflict (similar but not identical)
             if m1.content.to_string() != m2.content.to_string() {
                 return Some(ConflictType::ContentConflict);
             }
-            
+
             // Exact duplicate
             return Some(ConflictType::Duplicate);
         }
-        
+
         None
     }
 
@@ -87,30 +88,33 @@ impl ConflictDetector {
     fn calculate_similarity(&self, m1: &Memory, m2: &Memory) -> f32 {
         let content1 = m1.content.to_string();
         let content2 = m2.content.to_string();
-        
+
         // Simple Jaccard similarity based on words
-        let words1: HashMap<&str, usize> = content1
-            .split_whitespace()
-            .fold(HashMap::new(), |mut map, word| {
-                *map.entry(word).or_insert(0) += 1;
-                map
-            });
-        
-        let words2: HashMap<&str, usize> = content2
-            .split_whitespace()
-            .fold(HashMap::new(), |mut map, word| {
-                *map.entry(word).or_insert(0) += 1;
-                map
-            });
-        
+        let words1: HashMap<&str, usize> =
+            content1
+                .split_whitespace()
+                .fold(HashMap::new(), |mut map, word| {
+                    *map.entry(word).or_insert(0) += 1;
+                    map
+                });
+
+        let words2: HashMap<&str, usize> =
+            content2
+                .split_whitespace()
+                .fold(HashMap::new(), |mut map, word| {
+                    *map.entry(word).or_insert(0) += 1;
+                    map
+                });
+
         let intersection: usize = words1
             .keys()
             .filter(|k| words2.contains_key(*k))
             .map(|k| words1[k].min(*words2.get(k).unwrap_or(&0)))
             .sum();
-        
-        let union: usize = words1.values().sum::<usize>() + words2.values().sum::<usize>() - intersection;
-        
+
+        let union: usize =
+            words1.values().sum::<usize>() + words2.values().sum::<usize>() - intersection;
+
         if union == 0 {
             0.0
         } else {

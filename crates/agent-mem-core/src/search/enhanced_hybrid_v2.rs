@@ -8,8 +8,8 @@
 //! - RRF Fusion: 结果融合
 //! - Performance Monitoring: 性能监控
 
-use super::query_classifier::{QueryClassifier, QueryType, SearchStrategy};
 use super::adaptive_threshold::AdaptiveThresholdCalculator;
+use super::query_classifier::{QueryClassifier, QueryType, SearchStrategy};
 use super::{SearchResult, SearchStats};
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
@@ -24,33 +24,37 @@ use tracing::{debug, info, warn};
 pub struct EnhancedHybridConfig {
     /// 是否启用查询分类
     pub enable_query_classification: bool,
-    
+
     /// 是否启用自适应阈值
     pub enable_adaptive_threshold: bool,
-    
+
     /// 是否启用并行搜索
     pub enable_parallel: bool,
-    
+
     /// 是否启用性能监控
     pub enable_metrics: bool,
-    
+
     /// 是否启用缓存
     pub enable_cache: bool,
-    
+
     /// RRF常数k
     pub rrf_k: f32,
-    
+
     /// 向量搜索权重 (0.0 - 1.0) - 向后兼容
     #[serde(default = "default_vector_weight")]
     pub vector_weight: f32,
-    
+
     /// 全文搜索权重 (0.0 - 1.0) - 向后兼容
     #[serde(default = "default_fulltext_weight")]
     pub fulltext_weight: f32,
 }
 
-fn default_vector_weight() -> f32 { 0.7 }
-fn default_fulltext_weight() -> f32 { 0.3 }
+fn default_vector_weight() -> f32 {
+    0.7
+}
+fn default_fulltext_weight() -> f32 {
+    0.3
+}
 
 impl Default for EnhancedHybridConfig {
     fn default() -> Self {
@@ -72,16 +76,16 @@ impl Default for EnhancedHybridConfig {
 pub struct EnhancedSearchResult {
     /// 结果列表
     pub results: Vec<SearchResult>,
-    
+
     /// 查询类型
     pub query_type: QueryType,
-    
+
     /// 使用的策略
     pub strategy: SearchStrategy,
-    
+
     /// 搜索统计
     pub stats: EnhancedSearchStats,
-    
+
     /// 调试信息（可选）
     pub debug_info: Option<DebugInfo>,
 }
@@ -91,34 +95,34 @@ pub struct EnhancedSearchResult {
 pub struct EnhancedSearchStats {
     /// 总时间（毫秒）
     pub total_time_ms: u64,
-    
+
     /// 查询分类时间（毫秒）
     pub classification_time_ms: u64,
-    
+
     /// 向量搜索时间（毫秒）
     pub vector_search_time_ms: u64,
-    
+
     /// BM25搜索时间（毫秒）
     pub bm25_search_time_ms: u64,
-    
+
     /// 精确匹配时间（毫秒）
     pub exact_match_time_ms: u64,
-    
+
     /// 融合时间（毫秒）
     pub fusion_time_ms: u64,
-    
+
     /// 向量搜索结果数
     pub vector_results_count: usize,
-    
+
     /// BM25搜索结果数
     pub bm25_results_count: usize,
-    
+
     /// 精确匹配结果数
     pub exact_match_results_count: usize,
-    
+
     /// 最终结果数
     pub final_results_count: usize,
-    
+
     /// 使用的阈值
     pub threshold_used: f32,
 }
@@ -136,37 +140,34 @@ pub struct DebugInfo {
 /// 向量搜索trait（抽象）
 #[async_trait::async_trait]
 pub trait VectorSearcher: Send + Sync {
-    async fn search(&self, query: &str, limit: usize, threshold: f32) 
-        -> Result<Vec<SearchResult>>;
+    async fn search(&self, query: &str, limit: usize, threshold: f32) -> Result<Vec<SearchResult>>;
 }
 
 /// BM25搜索trait（抽象）
 #[async_trait::async_trait]
 pub trait BM25Searcher: Send + Sync {
-    async fn search(&self, query: &str, limit: usize) 
-        -> Result<Vec<SearchResult>>;
+    async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>>;
 }
 
 /// 精确匹配trait（抽象）
 #[async_trait::async_trait]
 pub trait ExactMatcher: Send + Sync {
-    async fn match_exact(&self, query: &str, limit: usize) 
-        -> Result<Vec<SearchResult>>;
+    async fn match_exact(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>>;
 }
 
 /// 增强的混合搜索引擎
 pub struct EnhancedHybridSearchEngine {
     config: EnhancedHybridConfig,
-    
+
     // 核心组件
     query_classifier: Arc<QueryClassifier>,
     threshold_calculator: Arc<AdaptiveThresholdCalculator>,
-    
+
     // 搜索器（使用trait对象实现解耦）
     vector_searcher: Option<Arc<dyn VectorSearcher>>,
     bm25_searcher: Option<Arc<dyn BM25Searcher>>,
     exact_matcher: Option<Arc<dyn ExactMatcher>>,
-    
+
     // 性能监控
     metrics: Arc<RwLock<SearchMetrics>>,
 }
@@ -176,16 +177,16 @@ pub struct EnhancedHybridSearchEngine {
 pub struct SearchMetrics {
     /// 总查询数
     pub total_queries: usize,
-    
+
     /// 各类型查询数
     pub queries_by_type: HashMap<QueryType, usize>,
-    
+
     /// 平均延迟（毫秒）
     pub avg_latency_ms: f64,
-    
+
     /// P99延迟（毫秒）
     pub p99_latency_ms: u64,
-    
+
     /// 缓存命中率
     pub cache_hit_rate: f64,
 }
@@ -195,7 +196,7 @@ impl EnhancedHybridSearchEngine {
     pub fn new(config: EnhancedHybridConfig) -> Self {
         let query_classifier = Arc::new(QueryClassifier::with_default_config());
         let threshold_calculator = Arc::new(AdaptiveThresholdCalculator::with_default_config());
-        
+
         Self {
             config,
             query_classifier,
@@ -206,33 +207,29 @@ impl EnhancedHybridSearchEngine {
             metrics: Arc::new(RwLock::new(SearchMetrics::default())),
         }
     }
-    
+
     /// 设置向量搜索器
     pub fn with_vector_searcher(mut self, searcher: Arc<dyn VectorSearcher>) -> Self {
         self.vector_searcher = Some(searcher);
         self
     }
-    
+
     /// 设置BM25搜索器
     pub fn with_bm25_searcher(mut self, searcher: Arc<dyn BM25Searcher>) -> Self {
         self.bm25_searcher = Some(searcher);
         self
     }
-    
+
     /// 设置精确匹配器
     pub fn with_exact_matcher(mut self, matcher: Arc<dyn ExactMatcher>) -> Self {
         self.exact_matcher = Some(matcher);
         self
     }
-    
+
     /// 执行搜索
-    pub async fn search(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<EnhancedSearchResult> {
+    pub async fn search(&self, query: &str, limit: usize) -> Result<EnhancedSearchResult> {
         let start = Instant::now();
-        
+
         // 1. 查询分类
         let classification_start = Instant::now();
         let (query_type, mut strategy) = if self.config.enable_query_classification {
@@ -241,42 +238,43 @@ impl EnhancedHybridSearchEngine {
             (QueryType::NaturalLanguage, SearchStrategy::default())
         };
         let classification_time_ms = classification_start.elapsed().as_millis() as u64;
-        
-        debug!("Query classified as: {:?}, strategy: {:?}", query_type, strategy);
-        
+
+        debug!(
+            "Query classified as: {:?}, strategy: {:?}",
+            query_type, strategy
+        );
+
         // 2. 自适应阈值计算
         if self.config.enable_adaptive_threshold {
             let features = self.query_classifier.extract_features(query);
-            strategy.threshold = self.threshold_calculator
+            strategy.threshold = self
+                .threshold_calculator
                 .calculate(query, &query_type, &features)
                 .await;
         }
-        
+
         debug!("Using threshold: {}", strategy.threshold);
-        
+
         // 3. 执行搜索
-        let (results, stats) = self.execute_search(
-            query,
-            limit,
-            &query_type,
-            &strategy,
-        ).await?;
-        
+        let (results, stats) = self
+            .execute_search(query, limit, &query_type, &strategy)
+            .await?;
+
         let total_time_ms = start.elapsed().as_millis() as u64;
-        
+
         // 4. 更新指标
         if self.config.enable_metrics {
             self.update_metrics(query_type, total_time_ms).await;
         }
-        
+
         // 5. 记录反馈（用于自适应调整）
         if !results.is_empty() {
-            let avg_score = results.iter()
-                .map(|r| r.score)
-                .sum::<f32>() / results.len() as f32;
-            self.threshold_calculator.record_feedback(query_type, avg_score).await;
+            let avg_score = results.iter().map(|r| r.score).sum::<f32>() / results.len() as f32;
+            self.threshold_calculator
+                .record_feedback(query_type, avg_score)
+                .await;
         }
-        
+
         Ok(EnhancedSearchResult {
             results,
             query_type,
@@ -289,7 +287,7 @@ impl EnhancedHybridSearchEngine {
             debug_info: None, // 可以在调试模式下填充
         })
     }
-    
+
     /// 执行实际搜索
     async fn execute_search(
         &self,
@@ -311,7 +309,7 @@ impl EnhancedHybridSearchEngine {
             final_results_count: 0,
             threshold_used: strategy.threshold,
         };
-        
+
         // 策略1: 精确匹配优先
         if strategy.use_exact_match {
             if let Some(matcher) = &self.exact_matcher {
@@ -319,42 +317,45 @@ impl EnhancedHybridSearchEngine {
                 let results = matcher.match_exact(query, limit).await?;
                 stats.exact_match_time_ms = start.elapsed().as_millis() as u64;
                 stats.exact_match_results_count = results.len();
-                
+
                 if !results.is_empty() {
                     stats.final_results_count = results.len();
                     return Ok((results, stats));
                 }
             }
         }
-        
+
         // 策略2: 并行执行向量搜索和BM25搜索
         let (vector_results, bm25_results) = if self.config.enable_parallel {
-            self.parallel_search(query, limit * 2, strategy, &mut stats).await?
+            self.parallel_search(query, limit * 2, strategy, &mut stats)
+                .await?
         } else {
-            self.sequential_search(query, limit * 2, strategy, &mut stats).await?
+            self.sequential_search(query, limit * 2, strategy, &mut stats)
+                .await?
         };
-        
+
         // 策略3: 融合结果
         let fusion_start = Instant::now();
         let fused = self.fuse_results(
-            vector_results, 
-            bm25_results, 
+            vector_results,
+            bm25_results,
             strategy.vector_weight,
-            strategy.bm25_weight
+            strategy.bm25_weight,
         );
         stats.fusion_time_ms = fusion_start.elapsed().as_millis() as u64;
-        
+
         // 策略4: 过滤和截断
-        let filtered: Vec<_> = fused.into_iter()
+        let filtered: Vec<_> = fused
+            .into_iter()
             .filter(|r| r.score >= strategy.threshold)
             .take(limit)
             .collect();
-        
+
         stats.final_results_count = filtered.len();
-        
+
         Ok((filtered, stats))
     }
-    
+
     /// 并行搜索
     async fn parallel_search(
         &self,
@@ -367,13 +368,16 @@ impl EnhancedHybridSearchEngine {
         let bm25_searcher = self.bm25_searcher.clone();
         let query = query.to_string();
         let threshold = strategy.threshold;
-        
-        let (vector_result, bm25_result): (Result<(Vec<SearchResult>, u64)>, Result<(Vec<SearchResult>, u64)>) = tokio::join!(
+
+        let (vector_result, bm25_result): (
+            Result<(Vec<SearchResult>, u64)>,
+            Result<(Vec<SearchResult>, u64)>,
+        ) = tokio::join!(
             async {
                 if !strategy.use_vector {
                     return Ok::<(Vec<SearchResult>, u64), AgentMemError>((Vec::new(), 0u64));
                 }
-                
+
                 if let Some(searcher) = vector_searcher {
                     let start = Instant::now();
                     let results = searcher.search(&query, limit, threshold).await?;
@@ -387,7 +391,7 @@ impl EnhancedHybridSearchEngine {
                 if !strategy.use_bm25 {
                     return Ok::<(Vec<SearchResult>, u64), AgentMemError>((Vec::new(), 0u64));
                 }
-                
+
                 if let Some(searcher) = bm25_searcher {
                     let start = Instant::now();
                     let results = searcher.search(&query, limit).await?;
@@ -398,18 +402,18 @@ impl EnhancedHybridSearchEngine {
                 }
             }
         );
-        
+
         let (vector_results, vector_time) = vector_result?;
         let (bm25_results, bm25_time) = bm25_result?;
-        
+
         stats.vector_search_time_ms = vector_time;
         stats.bm25_search_time_ms = bm25_time;
         stats.vector_results_count = vector_results.len();
         stats.bm25_results_count = bm25_results.len();
-        
+
         Ok((vector_results, bm25_results))
     }
-    
+
     /// 顺序搜索
     async fn sequential_search(
         &self,
@@ -420,7 +424,7 @@ impl EnhancedHybridSearchEngine {
     ) -> Result<(Vec<SearchResult>, Vec<SearchResult>)> {
         let mut vector_results = Vec::new();
         let mut bm25_results = Vec::new();
-        
+
         if strategy.use_vector {
             if let Some(searcher) = &self.vector_searcher {
                 let start = Instant::now();
@@ -429,7 +433,7 @@ impl EnhancedHybridSearchEngine {
                 stats.vector_results_count = vector_results.len();
             }
         }
-        
+
         if strategy.use_bm25 {
             if let Some(searcher) = &self.bm25_searcher {
                 let start = Instant::now();
@@ -438,10 +442,10 @@ impl EnhancedHybridSearchEngine {
                 stats.bm25_results_count = bm25_results.len();
             }
         }
-        
+
         Ok((vector_results, bm25_results))
     }
-    
+
     /// RRF融合
     fn fuse_results(
         &self,
@@ -452,19 +456,20 @@ impl EnhancedHybridSearchEngine {
     ) -> Vec<SearchResult> {
         let mut score_map: HashMap<String, (SearchResult, f32)> = HashMap::new();
         let k = self.config.rrf_k;
-        
+
         // 向量搜索结果
         for (rank, mut result) in vector_results.into_iter().enumerate() {
             let rrf_score = vector_weight / (k + (rank + 1) as f32);
             result.vector_score = Some(result.score);
             score_map.insert(result.id.clone(), (result, rrf_score));
         }
-        
+
         // BM25搜索结果
         for (rank, result) in bm25_results.into_iter().enumerate() {
             let rrf_score = bm25_weight / (k + (rank + 1) as f32);
-            
-            score_map.entry(result.id.clone())
+
+            score_map
+                .entry(result.id.clone())
                 .and_modify(|(r, score)| {
                     r.fulltext_score = Some(result.score);
                     *score += rrf_score;
@@ -475,43 +480,45 @@ impl EnhancedHybridSearchEngine {
                     (r, rrf_score)
                 });
         }
-        
+
         // 排序
-        let mut results: Vec<_> = score_map.into_iter()
+        let mut results: Vec<_> = score_map
+            .into_iter()
             .map(|(_, (mut r, score))| {
                 r.score = score;
                 r
             })
             .collect();
-        
+
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-        
+
         results
     }
-    
+
     /// 更新指标
     async fn update_metrics(&self, query_type: QueryType, latency_ms: u64) {
         if let Ok(mut metrics) = self.metrics.try_write() {
             metrics.total_queries += 1;
-            
+
             *metrics.queries_by_type.entry(query_type).or_insert(0) += 1;
-            
+
             // 更新平均延迟（简单移动平均）
-            metrics.avg_latency_ms = (metrics.avg_latency_ms * (metrics.total_queries - 1) as f64 
-                + latency_ms as f64) / metrics.total_queries as f64;
-            
+            metrics.avg_latency_ms = (metrics.avg_latency_ms * (metrics.total_queries - 1) as f64
+                + latency_ms as f64)
+                / metrics.total_queries as f64;
+
             // 更新P99延迟（简化版本）
             if latency_ms > metrics.p99_latency_ms {
                 metrics.p99_latency_ms = latency_ms;
             }
         }
     }
-    
+
     /// 获取指标
     pub async fn get_metrics(&self) -> SearchMetrics {
         self.metrics.read().await.clone()
     }
-    
+
     /// 重置指标
     pub async fn reset_metrics(&self) {
         *self.metrics.write().await = SearchMetrics::default();
@@ -522,7 +529,7 @@ impl EnhancedHybridSearchEngine {
 // SearchEngine Trait 实现 (V4)
 // ============================================================================
 
-use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use agent_mem_traits::{Query, QueryIntent, QueryIntentType, SearchEngine};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -534,7 +541,8 @@ impl SearchEngine for EnhancedHybridSearchEngine {
             QueryIntent::NaturalLanguage { text, .. } => text.clone(),
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取自然语言意图
-                intents.iter()
+                intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::NaturalLanguage { text, .. } = intent {
                             Some(text.clone())
@@ -551,9 +559,10 @@ impl SearchEngine for EnhancedHybridSearchEngine {
                 ));
             }
             _ => {
-                return Err(AgentMemError::validation_error(
-                    format!("Unsupported query intent for EnhancedHybridSearchEngineV2: {:?}", query.intent)
-                ));
+                return Err(AgentMemError::validation_error(format!(
+                    "Unsupported query intent for EnhancedHybridSearchEngineV2: {:?}",
+                    query.intent
+                )));
             }
         };
 
@@ -564,7 +573,9 @@ impl SearchEngine for EnhancedHybridSearchEngine {
         let enhanced_result = self.search(&query_text, limit).await?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
-        let v4_results = enhanced_result.results.into_iter()
+        let v4_results = enhanced_result
+            .results
+            .into_iter()
             .map(|r| agent_mem_traits::SearchResultV4 {
                 id: r.id,
                 content: r.content,
@@ -587,7 +598,7 @@ impl SearchEngine for EnhancedHybridSearchEngine {
     fn supported_intents(&self) -> Vec<QueryIntentType> {
         vec![
             QueryIntentType::NaturalLanguage, // 主要支持自然语言查询
-            QueryIntentType::Hybrid, // 也支持混合查询（提取文本部分）
+            QueryIntentType::Hybrid,          // 也支持混合查询（提取文本部分）
         ]
     }
 }
@@ -595,7 +606,7 @@ impl SearchEngine for EnhancedHybridSearchEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_enhanced_hybrid_config() {
         let config = EnhancedHybridConfig::default();
@@ -603,7 +614,7 @@ mod tests {
         assert!(config.enable_adaptive_threshold);
         assert_eq!(config.rrf_k, 60.0);
     }
-    
+
     #[test]
     fn test_search_metrics() {
         let metrics = SearchMetrics::default();
@@ -611,4 +622,3 @@ mod tests {
         assert_eq!(metrics.avg_latency_ms, 0.0);
     }
 }
-

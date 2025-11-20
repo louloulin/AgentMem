@@ -41,10 +41,7 @@ pub struct BM25Params {
 
 impl Default for BM25Params {
     fn default() -> Self {
-        Self {
-            k1: 1.2,
-            b: 0.75,
-        }
+        Self { k1: 1.2, b: 0.75 }
     }
 }
 
@@ -62,11 +59,11 @@ impl LibSQLFTS5Store {
     pub async fn new(path: &str) -> Result<Self> {
         Self::new_with_params(path, BM25Params::default()).await
     }
-    
+
     /// 使用自定义BM25参数创建
     pub async fn new_with_params(path: &str, bm25_params: BM25Params) -> Result<Self> {
         info!("Initializing LibSQL FTS5 store at: {}", path);
-        
+
         // 展开路径
         let expanded_path = if path.starts_with("~/") {
             let home = std::env::var("HOME").map_err(|e| {
@@ -76,7 +73,7 @@ impl LibSQLFTS5Store {
         } else {
             path.to_string()
         };
-        
+
         // 创建父目录
         if expanded_path != ":memory:" {
             if let Some(parent) = Path::new(&expanded_path).parent() {
@@ -85,34 +82,34 @@ impl LibSQLFTS5Store {
                 })?;
             }
         }
-        
+
         // 打开数据库
         let db = Builder::new_local(&expanded_path)
             .build()
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to open database: {e}")))?;
-        
+
         let conn = db.connect().map_err(|e| {
             AgentMemError::StorageError(format!("Failed to connect to database: {e}"))
         })?;
-        
+
         let mut store = Self {
             db,
             conn,
             bm25_params,
         };
-        
+
         // 初始化schema
         store.init_schema().await?;
-        
+
         info!("LibSQL FTS5 store initialized successfully");
         Ok(store)
     }
-    
+
     /// 初始化数据库schema
     async fn init_schema(&mut self) -> Result<()> {
         debug!("Initializing FTS5 database schema");
-        
+
         // 1. 创建主表
         self.conn
             .execute(
@@ -134,7 +131,7 @@ impl LibSQLFTS5Store {
             .map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to create memories table: {e}"))
             })?;
-        
+
         // 2. 创建FTS5虚拟表
         self.conn
             .execute(
@@ -149,7 +146,7 @@ impl LibSQLFTS5Store {
             .map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to create FTS5 table: {e}"))
             })?;
-        
+
         // 3. 创建触发器 - 插入时同步
         self.conn
             .execute(
@@ -162,8 +159,10 @@ impl LibSQLFTS5Store {
                 (),
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create insert trigger: {e}")))?;
-        
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create insert trigger: {e}"))
+            })?;
+
         // 4. 创建触发器 - 更新时同步
         self.conn
             .execute(
@@ -177,8 +176,10 @@ impl LibSQLFTS5Store {
                 (),
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create update trigger: {e}")))?;
-        
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create update trigger: {e}"))
+            })?;
+
         // 5. 创建触发器 - 删除时同步
         self.conn
             .execute(
@@ -190,8 +191,10 @@ impl LibSQLFTS5Store {
                 (),
             )
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create delete trigger: {e}")))?;
-        
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create delete trigger: {e}"))
+            })?;
+
         // 6. 创建索引
         self.conn
             .execute(
@@ -200,7 +203,7 @@ impl LibSQLFTS5Store {
             )
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-        
+
         self.conn
             .execute(
                 "CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id)",
@@ -208,7 +211,7 @@ impl LibSQLFTS5Store {
             )
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-        
+
         self.conn
             .execute(
                 "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC)",
@@ -216,11 +219,11 @@ impl LibSQLFTS5Store {
             )
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to create index: {e}")))?;
-        
+
         debug!("FTS5 database schema initialized");
         Ok(())
     }
-    
+
     /// BM25全文搜索
     ///
     /// 使用FTS5的内置BM25函数进行搜索
@@ -231,7 +234,7 @@ impl LibSQLFTS5Store {
         filters: Option<&HashMap<String, String>>,
     ) -> Result<Vec<FTS5SearchResult>> {
         debug!("FTS5 BM25 search: query='{}', limit={}", query, limit);
-        
+
         // 构建SQL查询
         let mut sql = String::from(
             "SELECT 
@@ -244,9 +247,9 @@ impl LibSQLFTS5Store {
                 m.metadata
             FROM memories_fts
             JOIN memories m ON memories_fts.rowid = m.rowid
-            WHERE memories_fts MATCH ?"
+            WHERE memories_fts MATCH ?",
         );
-        
+
         // 添加过滤条件
         if let Some(filters) = filters {
             if let Some(agent_id) = filters.get("agent_id") {
@@ -256,57 +259,60 @@ impl LibSQLFTS5Store {
                 sql.push_str(&format!(" AND m.user_id = '{}'", user_id));
             }
         }
-        
+
         sql.push_str(" AND m.is_deleted = 0");
         sql.push_str(" ORDER BY score");
         sql.push_str(&format!(" LIMIT {}", limit));
-        
+
         debug!("SQL: {}", sql);
-        
+
         // 执行查询
-        let mut rows = self.conn
+        let mut rows = self
+            .conn
             .query(&sql, libsql::params![query])
             .await
             .map_err(|e| AgentMemError::StorageError(format!("FTS5 search failed: {e}")))?;
-        
+
         let mut results = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
-        })? {
-            let id: String = row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get id: {e}"))
-            })?;
-            
-            let content: String = row.get(1).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get content: {e}"))
-            })?;
-            
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
+        {
+            let id: String = row
+                .get(0)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?;
+
+            let content: String = row
+                .get(1)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?;
+
             // Get as f64 first, then convert to f32
-            let score_f64: f64 = row.get(2).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get score: {e}"))
-            })?;
+            let score_f64: f64 = row
+                .get(2)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get score: {e}")))?;
             let score = score_f64 as f32;
-            
-            let agent_id: String = row.get(3).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
-            })?;
-            
+
+            let agent_id: String = row
+                .get(3)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?;
+
             let user_id: Option<String> = row.get(4).ok();
-            
+
             let created_at_ts: i64 = row.get(5).map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
             })?;
-            
-            let created_at = DateTime::from_timestamp(created_at_ts, 0)
-                .unwrap_or_else(|| Utc::now());
-            
-            let metadata_json: String = row.get(6).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get metadata: {e}"))
-            })?;
-            
-            let metadata: HashMap<String, String> = serde_json::from_str(&metadata_json)
-                .unwrap_or_default();
-            
+
+            let created_at =
+                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(|| Utc::now());
+
+            let metadata_json: String = row
+                .get(6)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
+
+            let metadata: HashMap<String, String> =
+                serde_json::from_str(&metadata_json).unwrap_or_default();
+
             results.push(FTS5SearchResult {
                 id,
                 content,
@@ -317,11 +323,11 @@ impl LibSQLFTS5Store {
                 metadata,
             });
         }
-        
+
         debug!("FTS5 search returned {} results", results.len());
         Ok(results)
     }
-    
+
     /// 精确匹配搜索（用于ID等）
     pub async fn exact_match(
         &self,
@@ -330,15 +336,15 @@ impl LibSQLFTS5Store {
         filters: Option<&HashMap<String, String>>,
     ) -> Result<Vec<FTS5SearchResult>> {
         debug!("Exact match search: query='{}', limit={}", query, limit);
-        
+
         let mut sql = String::from(
             "SELECT 
                 id, content, 1.0 as score, agent_id, user_id, created_at, metadata
             FROM memories
             WHERE (id = ? OR content LIKE ?)
-            AND is_deleted = 0"
+            AND is_deleted = 0",
         );
-        
+
         // 添加过滤条件
         if let Some(filters) = filters {
             if let Some(agent_id) = filters.get("agent_id") {
@@ -348,45 +354,48 @@ impl LibSQLFTS5Store {
                 sql.push_str(&format!(" AND user_id = '{}'", user_id));
             }
         }
-        
+
         sql.push_str(&format!(" LIMIT {}", limit));
-        
+
         let like_pattern = format!("%{}%", query);
-        let mut rows = self.conn
+        let mut rows = self
+            .conn
             .query(&sql, libsql::params![query, like_pattern])
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Exact match failed: {e}")))?;
-        
+
         let mut results = Vec::new();
-        while let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to fetch row: {e}"))
-        })? {
-            let id: String = row.get(0).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get id: {e}"))
-            })?;
-            let content: String = row.get(1).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get content: {e}"))
-            })?;
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
+        {
+            let id: String = row
+                .get(0)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?;
+            let content: String = row
+                .get(1)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get content: {e}")))?;
             // Get as f64 first, then convert to f32
-            let score_f64: f64 = row.get(2).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get score: {e}"))
-            })?;
+            let score_f64: f64 = row
+                .get(2)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get score: {e}")))?;
             let score = score_f64 as f32;
-            let agent_id: String = row.get(3).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get agent_id: {e}"))
-            })?;
+            let agent_id: String = row
+                .get(3)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get agent_id: {e}")))?;
             let user_id: Option<String> = row.get(4).ok();
             let created_at_ts: i64 = row.get(5).map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
             })?;
-            let created_at = DateTime::from_timestamp(created_at_ts, 0)
-                .unwrap_or_else(|| Utc::now());
-            let metadata_json: String = row.get(6).map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get metadata: {e}"))
-            })?;
-            let metadata: HashMap<String, String> = serde_json::from_str(&metadata_json)
-                .unwrap_or_default();
-            
+            let created_at =
+                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(|| Utc::now());
+            let metadata_json: String = row
+                .get(6)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
+            let metadata: HashMap<String, String> =
+                serde_json::from_str(&metadata_json).unwrap_or_default();
+
             results.push(FTS5SearchResult {
                 id,
                 content,
@@ -397,11 +406,11 @@ impl LibSQLFTS5Store {
                 metadata,
             });
         }
-        
+
         debug!("Exact match returned {} results", results.len());
         Ok(results)
     }
-    
+
     /// 混合搜索（结合FTS5和精确匹配）
     pub async fn hybrid_search(
         &self,
@@ -414,66 +423,76 @@ impl LibSQLFTS5Store {
         if !exact_results.is_empty() {
             return Ok(exact_results);
         }
-        
+
         // 如果没有精确匹配，使用FTS5搜索
         self.search_bm25(query, limit, filters).await
     }
-    
+
     /// 获取统计信息
     pub async fn get_stats(&self) -> Result<FTS5Stats> {
-        let mut rows = self.conn
+        let mut rows = self
+            .conn
             .query("SELECT COUNT(*) FROM memories WHERE is_deleted = 0", ())
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to get stats: {e}")))?;
-        
-        let total_memories = if let Some(row) = rows.next().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get stats row: {e}"))
-        })? {
+
+        let total_memories = if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get stats row: {e}")))?
+        {
             row.get::<i64>(0).unwrap_or(0) as usize
         } else {
             0
         };
-        
-        let mut rows = self.conn
+
+        let mut rows = self
+            .conn
             .query("SELECT COUNT(*) FROM memories_fts", ())
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to get FTS stats: {e}")))?;
-        
+
         let indexed_memories = if let Some(row) = rows.next().await.map_err(convert_libsql_error)? {
             row.get::<i64>(0).unwrap_or(0) as usize
         } else {
             0
         };
-        
+
         Ok(FTS5Stats {
             total_memories,
             indexed_memories,
             bm25_params: self.bm25_params.clone(),
         })
     }
-    
+
     /// 重建FTS5索引
     pub async fn rebuild_index(&self) -> Result<()> {
         info!("Rebuilding FTS5 index...");
-        
+
         self.conn
-            .execute("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", ())
+            .execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                (),
+            )
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to rebuild index: {e}")))?;
-        
+
         info!("FTS5 index rebuilt successfully");
         Ok(())
     }
-    
+
     /// 优化FTS5索引
     pub async fn optimize_index(&self) -> Result<()> {
         info!("Optimizing FTS5 index...");
-        
+
         self.conn
-            .execute("INSERT INTO memories_fts(memories_fts) VALUES('optimize')", ())
+            .execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('optimize')",
+                (),
+            )
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to optimize index: {e}")))?;
-        
+
         info!("FTS5 index optimized successfully");
         Ok(())
     }
@@ -490,27 +509,27 @@ pub struct FTS5Stats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_fts5_store_creation() {
         let store = LibSQLFTS5Store::new(":memory:").await;
         assert!(store.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_bm25_params() {
         let params = BM25Params::default();
         assert_eq!(params.k1, 1.2);
         assert_eq!(params.b, 0.75);
     }
-    
+
     #[tokio::test]
     async fn test_fts5_search_empty() {
         let store = LibSQLFTS5Store::new(":memory:").await.unwrap();
         let results = store.search_bm25("test", 10, None).await.unwrap();
         assert_eq!(results.len(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_exact_match_empty() {
         let store = LibSQLFTS5Store::new(":memory:").await.unwrap();
@@ -518,4 +537,3 @@ mod tests {
         assert_eq!(results.len(), 0);
     }
 }
-

@@ -19,9 +19,8 @@ mod tests {
     #[tokio::test]
     async fn test_v1_chat_route() {
         use axum::routing::post;
-        
-        let app = Router::new()
-            .route("/api/v1/agents/:agent_id/chat", post(mock_chat_handler));
+
+        let app = Router::new().route("/api/v1/agents/:agent_id/chat", post(mock_chat_handler));
 
         let request = Request::builder()
             .method("POST")
@@ -30,7 +29,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -38,7 +37,7 @@ mod tests {
     #[tokio::test]
     async fn test_legacy_chat_route() {
         use axum::routing::post;
-        
+
         let app = Router::new()
             // 注册两个路由：v1和legacy
             .route("/api/v1/agents/:agent_id/chat", post(mock_chat_handler))
@@ -51,7 +50,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         // 验证：旧路由应该返回200而不是404
         assert_eq!(
             response.status(),
@@ -64,9 +63,12 @@ mod tests {
     #[tokio::test]
     async fn test_legacy_stream_route() {
         use axum::routing::post;
-        
+
         let app = Router::new()
-            .route("/api/v1/agents/:agent_id/chat/stream", post(mock_chat_handler))
+            .route(
+                "/api/v1/agents/:agent_id/chat/stream",
+                post(mock_chat_handler),
+            )
             .route("/api/agents/:agent_id/chat/stream", post(mock_chat_handler));
 
         let request = Request::builder()
@@ -76,7 +78,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(
             response.status(),
             StatusCode::OK,
@@ -88,14 +90,20 @@ mod tests {
     #[tokio::test]
     async fn test_legacy_history_route() {
         use axum::routing::get;
-        
+
         async fn mock_history_handler() -> &'static str {
             "history"
         }
-        
+
         let app = Router::new()
-            .route("/api/v1/agents/:agent_id/chat/history", get(mock_history_handler))
-            .route("/api/agents/:agent_id/chat/history", get(mock_history_handler));
+            .route(
+                "/api/v1/agents/:agent_id/chat/history",
+                get(mock_history_handler),
+            )
+            .route(
+                "/api/agents/:agent_id/chat/history",
+                get(mock_history_handler),
+            );
 
         let request = Request::builder()
             .method("GET")
@@ -104,7 +112,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(
             response.status(),
             StatusCode::OK,
@@ -116,10 +124,16 @@ mod tests {
     #[tokio::test]
     async fn test_legacy_lumosai_route() {
         use axum::routing::post;
-        
+
         let app = Router::new()
-            .route("/api/v1/agents/:agent_id/chat/lumosai", post(mock_chat_handler))
-            .route("/api/agents/:agent_id/chat/lumosai", post(mock_chat_handler));
+            .route(
+                "/api/v1/agents/:agent_id/chat/lumosai",
+                post(mock_chat_handler),
+            )
+            .route(
+                "/api/agents/:agent_id/chat/lumosai",
+                post(mock_chat_handler),
+            );
 
         let request = Request::builder()
             .method("POST")
@@ -128,7 +142,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(
             response.status(),
             StatusCode::OK,
@@ -140,10 +154,16 @@ mod tests {
     #[tokio::test]
     async fn test_legacy_lumosai_stream_route() {
         use axum::routing::post;
-        
+
         let app = Router::new()
-            .route("/api/v1/agents/:agent_id/chat/lumosai/stream", post(mock_chat_handler))
-            .route("/api/agents/:agent_id/chat/lumosai/stream", post(mock_chat_handler));
+            .route(
+                "/api/v1/agents/:agent_id/chat/lumosai/stream",
+                post(mock_chat_handler),
+            )
+            .route(
+                "/api/agents/:agent_id/chat/lumosai/stream",
+                post(mock_chat_handler),
+            );
 
         let request = Request::builder()
             .method("POST")
@@ -152,7 +172,7 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(
             response.status(),
             StatusCode::OK,
@@ -164,13 +184,12 @@ mod tests {
     #[tokio::test]
     async fn test_agent_id_extraction() {
         use axum::{extract::Path, routing::post};
-        
+
         async fn handler_with_param(Path(agent_id): Path<String>) -> String {
             format!("agent_id: {}", agent_id)
         }
-        
-        let app = Router::new()
-            .route("/api/agents/:agent_id/chat", post(handler_with_param));
+
+        let app = Router::new().route("/api/agents/:agent_id/chat", post(handler_with_param));
 
         let request = Request::builder()
             .method("POST")
@@ -179,15 +198,14 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-        
+
         assert_eq!(response.status(), StatusCode::OK);
-        
+
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
         let body_str = String::from_utf8(body.to_vec()).unwrap();
-        
+
         assert_eq!(body_str, "agent_id: my-test-agent-123");
     }
 }
-

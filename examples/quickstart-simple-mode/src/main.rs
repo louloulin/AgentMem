@@ -52,7 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("添加记忆 1: 'Raw content without processing'");
     let result1 = mem
-        .add_with_options("Raw content without processing".to_string(), simple_options.clone())
+        .add_with_options(
+            "Raw content without processing".to_string(),
+            simple_options.clone(),
+        )
         .await?;
     println!("✅ 添加成功: {:?}\n", result1);
 
@@ -93,7 +96,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 搜索成功，找到 {} 条记忆:\n", results.len());
 
     for (i, result) in results.iter().enumerate() {
-        let score_str = result.score.map(|s| format!("{:.2}", s)).unwrap_or_else(|| "N/A".to_string());
+        let score_str = result
+            .score
+            .map(|s| format!("{:.2}", s))
+            .unwrap_or_else(|| "N/A".to_string());
         println!("  {}. {} (相关性: {})", i + 1, result.content, score_str);
     }
 
@@ -134,4 +140,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

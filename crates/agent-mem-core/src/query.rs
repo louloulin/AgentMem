@@ -16,7 +16,7 @@ impl QueryId {
     pub fn new() -> Self {
         Self(Uuid::new_v4().to_string())
     }
-    
+
     pub fn from_string(s: impl Into<String>) -> Self {
         Self(s.into())
     }
@@ -44,15 +44,12 @@ pub enum QueryIntent {
     /// ID精确查找
     Lookup { entity_id: String },
     /// 语义搜索
-    SemanticSearch { 
+    SemanticSearch {
         text: String,
         semantic_vector: Option<Vec<f32>>,
     },
     /// 关系查询
-    RelationQuery { 
-        source: String, 
-        relation: String 
-    },
+    RelationQuery { source: String, relation: String },
     /// 聚合查询
     Aggregation { op: AggregationOp },
     /// 全文搜索
@@ -63,7 +60,7 @@ pub enum QueryIntent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AggregationOp {
     Count,
-    Sum(String),  // field name
+    Sum(String), // field name
     Avg(String),
     Max(String),
     Min(String),
@@ -73,20 +70,20 @@ pub enum AggregationOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Constraint {
     /// 属性精确匹配
-    AttributeMatch { 
-        key: AttributeKey, 
-        value: AttributeValue 
+    AttributeMatch {
+        key: AttributeKey,
+        value: AttributeValue,
     },
     /// 属性范围查询
-    AttributeRange { 
-        key: AttributeKey, 
-        min: f64, 
-        max: f64 
+    AttributeRange {
+        key: AttributeKey,
+        min: f64,
+        max: f64,
     },
     /// 时间范围
-    TimeRange { 
-        start: DateTime<Utc>, 
-        end: DateTime<Utc> 
+    TimeRange {
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
     },
     /// 结果数量限制
     Limit(usize),
@@ -141,9 +138,9 @@ pub struct QueryFeatures {
 /// 查询复杂度
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryComplexity {
-    Simple,    // 单个关键词
-    Medium,    // 多个关键词或简单条件
-    Complex,   // 复杂逻辑或多约束
+    Simple,  // 单个关键词
+    Medium,  // 多个关键词或简单条件
+    Complex, // 复杂逻辑或多约束
 }
 
 impl Query {
@@ -151,11 +148,11 @@ impl Query {
     pub fn builder() -> QueryBuilder {
         QueryBuilder::new()
     }
-    
+
     /// 从字符串自动构建Query
     pub fn from_string(s: &str) -> Self {
         let features = Self::extract_features(s);
-        
+
         Query {
             id: QueryId::new(),
             intent: Self::infer_intent(s, &features),
@@ -164,22 +161,22 @@ impl Query {
             context: QueryContext::default(),
         }
     }
-    
+
     /// 提取查询特征
     fn extract_features(s: &str) -> QueryFeatures {
         // ID模式检测 (如: U123456, M789012)
-        let has_id_pattern = s.contains(char::is_uppercase) && 
-                            s.chars().filter(|c| c.is_numeric()).count() >= 6;
-        
+        let has_id_pattern =
+            s.contains(char::is_uppercase) && s.chars().filter(|c| c.is_numeric()).count() >= 6;
+
         // 属性过滤检测 (如: user::name=john)
         let has_attribute_filter = s.contains("::") || s.contains('=');
-        
+
         // 关系查询检测 (如: memory1->related_to->memory2)
         let has_relation_query = s.contains("->") || s.contains("related");
-        
+
         // 关键词检测
         let has_keywords = s.split_whitespace().count() > 1;
-        
+
         // 复杂度估算
         let complexity = if s.len() < 10 && s.split_whitespace().count() == 1 {
             QueryComplexity::Simple
@@ -188,7 +185,7 @@ impl Query {
         } else {
             QueryComplexity::Medium
         };
-        
+
         QueryFeatures {
             has_id_pattern,
             has_attribute_filter,
@@ -198,12 +195,13 @@ impl Query {
             language: None, // 可扩展语言检测
         }
     }
-    
+
     /// 推断查询意图
     fn infer_intent(s: &str, features: &QueryFeatures) -> QueryIntent {
         if features.has_id_pattern {
             // ID查找
-            let entity_id = s.split_whitespace()
+            let entity_id = s
+                .split_whitespace()
                 .find(|w| w.len() > 6 && w.chars().any(|c| c.is_uppercase()))
                 .unwrap_or(s)
                 .to_string();
@@ -217,7 +215,9 @@ impl Query {
             }
         } else if s.starts_with("count") || s.starts_with("sum") {
             // 聚合查询
-            QueryIntent::Aggregation { op: AggregationOp::Count }
+            QueryIntent::Aggregation {
+                op: AggregationOp::Count,
+            }
         } else {
             // 默认语义搜索
             QueryIntent::SemanticSearch {
@@ -226,11 +226,11 @@ impl Query {
             }
         }
     }
-    
+
     /// 提取约束条件
     fn extract_constraints(s: &str, features: &QueryFeatures) -> Vec<Constraint> {
         let mut constraints = vec![];
-        
+
         // 提取属性匹配
         if features.has_attribute_filter {
             // 简单解析 key::value 或 key=value
@@ -254,27 +254,30 @@ impl Query {
                 }
             }
         }
-        
+
         // 默认限制100条结果
-        if !constraints.iter().any(|c| matches!(c, Constraint::Limit(_))) {
+        if !constraints
+            .iter()
+            .any(|c| matches!(c, Constraint::Limit(_)))
+        {
             constraints.push(Constraint::Limit(100));
         }
-        
+
         constraints
     }
-    
+
     /// 添加约束
     pub fn with_constraint(mut self, constraint: Constraint) -> Self {
         self.constraints.push(constraint);
         self
     }
-    
+
     /// 添加偏好
     pub fn with_preference(mut self, preference: Preference) -> Self {
         self.preferences.push(preference);
         self
     }
-    
+
     /// 设置上下文
     pub fn with_context(mut self, context: QueryContext) -> Self {
         self.context = context;
@@ -299,37 +302,37 @@ impl QueryBuilder {
             context: QueryContext::default(),
         }
     }
-    
+
     pub fn intent(mut self, intent: QueryIntent) -> Self {
         self.intent = Some(intent);
         self
     }
-    
+
     pub fn constraint(mut self, constraint: Constraint) -> Self {
         self.constraints.push(constraint);
         self
     }
-    
+
     pub fn preference(mut self, preference: Preference) -> Self {
         self.preferences.push(preference);
         self
     }
-    
+
     pub fn context(mut self, context: QueryContext) -> Self {
         self.context = context;
         self
     }
-    
+
     pub fn user_id(mut self, user_id: impl Into<String>) -> Self {
         self.context.user_id = Some(user_id.into());
         self
     }
-    
+
     pub fn agent_id(mut self, agent_id: impl Into<String>) -> Self {
         self.context.agent_id = Some(agent_id.into());
         self
     }
-    
+
     pub fn build(self) -> Query {
         Query {
             id: QueryId::new(),
@@ -376,7 +379,7 @@ mod tests {
             .constraint(Constraint::Limit(10))
             .user_id("user1")
             .build();
-        
+
         assert_eq!(query.constraints.len(), 1);
         assert_eq!(query.context.user_id, Some("user1".to_string()));
     }
@@ -387,4 +390,3 @@ mod tests {
         assert!(!query.constraints.is_empty());
     }
 }
-

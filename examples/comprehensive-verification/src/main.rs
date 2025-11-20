@@ -25,7 +25,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╚════════════════════════════════════════════════════════════════╝\n");
 
     // 设置环境变量
-    env::set_var("ZHIPU_API_KEY", "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k");
+    env::set_var(
+        "ZHIPU_API_KEY",
+        "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k",
+    );
     env::set_var("LLM_PROVIDER", "zhipu");
     env::set_var("LLM_MODEL", "glm-4.6");
     env::set_var("EMBEDDER_PROVIDER", "fastembed");
@@ -76,7 +79,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scope = MemoryScope::Organization {
         org_id: "acme-corp".to_string(),
     };
-    let result = mem.add_with_scope("公司政策：每周五远程办公", scope).await?;
+    let result = mem
+        .add_with_scope("公司政策：每周五远程办公", scope)
+        .await?;
     println!("✅ 组织级记忆添加成功: {} 个事件\n", result.results.len());
 
     // 2.3 会话级记忆
@@ -101,11 +106,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "我的爱好是徒步".to_string(),
         "我住在中国".to_string(),
     ];
-    
+
     let start = std::time::Instant::now();
     let results = mem.add_batch(contents, AddMemoryOptions::default()).await?;
     let duration = start.elapsed();
-    
+
     println!("✅ 批量添加完成:");
     println!("   - 成功: {} 个", results.len());
     println!("   - 耗时: {:?}", duration);
@@ -121,14 +126,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = std::time::Instant::now();
     let results = mem.search("我喜欢什么？").await?;
     let duration = start.elapsed();
-    
+
     println!("✅ 搜索完成:");
     println!("   - 找到: {} 条记忆", results.len());
     println!("   - 耗时: {:?}", duration);
-    
+
     for (i, result) in results.iter().take(5).enumerate() {
-        println!("   结果 {}: {} (相似度: {:.2})", 
-                 i + 1, result.content, result.importance);
+        println!(
+            "   结果 {}: {} (相似度: {:.2})",
+            i + 1,
+            result.content,
+            result.importance
+        );
     }
     println!();
 
@@ -151,7 +160,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         infer: false,
         ..Default::default()
     };
-    let result = mem.add_with_options("原始内容，不使用智能功能".to_string(), options).await?;
+    let result = mem
+        .add_with_options("原始内容，不使用智能功能".to_string(), options)
+        .await?;
     println!("✅ 简单模式正常工作: {} 个事件\n", result.results.len());
 
     // ==================== 总结 ====================
@@ -178,4 +189,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

@@ -20,8 +20,8 @@
 //! cargo run --package simple-memory-demo
 //! ```
 
-use agent_mem::Memory;
 use agent_mem::AddMemoryOptions;
+use agent_mem::Memory;
 use anyhow::Result;
 use std::collections::HashMap;
 use tracing::{info, Level};
@@ -53,15 +53,27 @@ async fn main() -> Result<()> {
     info!("---------------------------");
 
     let result1 = mem.add("I love pizza").await?;
-    let id1 = result1.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let id1 = result1
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory 1: {}", id1);
 
     let result2 = mem.add("My favorite color is blue").await?;
-    let id2 = result2.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let id2 = result2
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory 2: {}", id2);
 
     let result3 = mem.add("I work as a software engineer").await?;
-    let id3 = result3.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let id3 = result3
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory 3: {}\n", id3);
 
     // Test 3: Add memory with metadata
@@ -76,8 +88,14 @@ async fn main() -> Result<()> {
         metadata,
         ..Default::default()
     };
-    let result4 = mem.add_with_options("I'm allergic to peanuts", options).await?;
-    let id4 = result4.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let result4 = mem
+        .add_with_options("I'm allergic to peanuts", options)
+        .await?;
+    let id4 = result4
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory with metadata: {}\n", id4);
 
     // Test 4: Search memories
@@ -123,7 +141,10 @@ async fn main() -> Result<()> {
     info!("-------------------------");
 
     let mut update_data = HashMap::new();
-    update_data.insert("content".to_string(), serde_json::Value::String("I love pizza and pasta".to_string()));
+    update_data.insert(
+        "content".to_string(),
+        serde_json::Value::String("I love pizza and pasta".to_string()),
+    );
     mem.update(&id1, update_data).await?;
     info!("✅ Updated memory: {}\n", id1);
 
@@ -145,16 +166,26 @@ async fn main() -> Result<()> {
     let mut alice_mem = Memory::new().await?;
     alice_mem.set_default_user("alice");
     let alice_result = alice_mem.add("Alice loves Rust programming").await?;
-    let alice_id = alice_result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let alice_id = alice_result
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory for Alice: {}", alice_id);
 
     let mut bob_mem = Memory::new().await?;
     bob_mem.set_default_user("bob");
     let bob_result = bob_mem.add("Bob prefers Python").await?;
-    let bob_id = bob_result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+    let bob_id = bob_result
+        .results
+        .first()
+        .map(|r| r.id.clone())
+        .unwrap_or_default();
     info!("✅ Added memory for Bob: {}", bob_id);
 
-    let alice_memories = alice_mem.get_all(agent_mem::GetAllOptions::default()).await?;
+    let alice_memories = alice_mem
+        .get_all(agent_mem::GetAllOptions::default())
+        .await?;
     let bob_memories = bob_mem.get_all(agent_mem::GetAllOptions::default()).await?;
 
     info!("✅ Alice has {} memories", alice_memories.len());
@@ -174,10 +205,15 @@ async fn main() -> Result<()> {
     info!("📝 Test 11: Search with Limit");
     info!("------------------------------");
 
-    let limited_results = mem.search_with_options("What do you know?", agent_mem::SearchOptions {
-        limit: Some(2),
-        ..Default::default()
-    }).await?;
+    let limited_results = mem
+        .search_with_options(
+            "What do you know?",
+            agent_mem::SearchOptions {
+                limit: Some(2),
+                ..Default::default()
+            },
+        )
+        .await?;
     info!(
         "✅ Found {} memories (limited to 2):",
         limited_results.len()

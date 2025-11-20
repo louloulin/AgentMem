@@ -372,7 +372,8 @@ impl GraphMemoryManager {
 
         if !relations.is_empty() {
             summary.push_str(&format!("发现 {} 个关系: ", relations.len()));
-            let relation_types: Vec<&str> = relations.iter().map(|r| r.relation_type.as_str()).collect();
+            let relation_types: Vec<&str> =
+                relations.iter().map(|r| r.relation_type.as_str()).collect();
             summary.push_str(&relation_types.join(", "));
             summary.push('.');
         }

@@ -7,8 +7,8 @@ use agent_mem_core::{
     orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
     Memory, MemoryType,
 };
-use agent_mem_traits::{AttributeKey, AttributeValue, Content, MemoryId};
 use agent_mem_traits::abstractions::Metadata;
+use agent_mem_traits::{AttributeKey, AttributeValue, Content, MemoryId};
 use chrono::Utc;
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ use std::sync::Arc;
 fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>) -> Memory {
     let mut attributes = agent_mem_traits::AttributeSet::new();
     let importance = score.unwrap_or(0.5) as f64;
-    
+
     // 设置属性
     attributes.set(
         AttributeKey::core("agent_id"),
@@ -34,14 +34,14 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
         AttributeKey::system("importance"),
         AttributeValue::Number(importance),
     );
-    
+
     if let Some(score_val) = score {
         attributes.set(
             AttributeKey::system("score"),
             AttributeValue::Number(score_val as f64),
         );
     }
-    
+
     Memory {
         id: MemoryId::new(),
         content: Content::text(content.to_string()),
@@ -83,12 +83,18 @@ async fn test_memory_integrator_inject_memories() {
     let formatted = integrator.inject_memories_to_prompt(&memories);
 
     // 4. 验证格式化结果
-    assert!(formatted.contains("Semantic") || formatted.contains("semantic"), "Should contain memory type");
+    assert!(
+        formatted.contains("Semantic") || formatted.contains("semantic"),
+        "Should contain memory type"
+    );
     assert!(
         formatted.contains("coffee"),
         "Should contain memory content"
     );
-    assert!(formatted.contains("Episodic") || formatted.contains("episodic"), "Should contain memory type");
+    assert!(
+        formatted.contains("Episodic") || formatted.contains("episodic"),
+        "Should contain memory type"
+    );
     assert!(formatted.contains("John"), "Should contain memory content");
 
     println!("✅ test_memory_integrator_inject_memories passed");
@@ -173,11 +179,13 @@ async fn test_memory_integrator_sort_memories() {
         "Should be sorted by importance descending"
     );
     assert_eq!(
-        sorted[0].content.as_text().unwrap_or(""), "High score",
+        sorted[0].content.as_text().unwrap_or(""),
+        "High score",
         "Highest importance should be first"
     );
     assert_eq!(
-        sorted[2].content.as_text().unwrap_or(""), "Low score",
+        sorted[2].content.as_text().unwrap_or(""),
+        "Low score",
         "Lowest importance should be last"
     );
 
@@ -308,7 +316,11 @@ async fn test_memory_types() {
     for memory_type in memory_types {
         let memory = create_test_memory("Test content", memory_type.clone(), Some(0.8));
         let mem_type_str = memory.memory_type().unwrap_or_default();
-        assert_eq!(mem_type_str, memory_type.as_str(), "Memory type should match");
+        assert_eq!(
+            mem_type_str,
+            memory_type.as_str(),
+            "Memory type should match"
+        );
     }
 
     println!("✅ test_memory_types passed");

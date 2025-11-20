@@ -21,33 +21,29 @@ pub async fn api_version_compatibility_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let path = req.uri().path().to_string(); // ✅ 复制字符串避免借用问题
-    
+
     // 检查是否使用旧版本路由
-    let is_legacy_route = path.starts_with("/api/agents") 
-        && !path.starts_with("/api/v1/");
-    
+    let is_legacy_route = path.starts_with("/api/agents") && !path.starts_with("/api/v1/");
+
     if is_legacy_route {
         warn!(
             "⚠️  Client using deprecated API path: {} (recommended: /api/v1/...)",
             path
         );
     }
-    
+
     let mut response = next.run(req).await;
-    
+
     // ✅ Task 1.5: 在响应头中添加弃用提示（可选，Phase 2启用）
     if is_legacy_route {
         let headers = response.headers_mut();
-        headers.insert(
-            "X-API-Deprecated",
-            "true".parse().unwrap(),
-        );
+        headers.insert("X-API-Deprecated", "true".parse().unwrap());
         headers.insert(
             "X-API-Recommended",
             format!("/api/v1{}", &path[4..]).parse().unwrap(),
         );
     }
-    
+
     Ok(response)
 }
 
@@ -82,12 +78,9 @@ mod tests {
 
         // 验证响应成功
         assert_eq!(response.status(), StatusCode::OK);
-        
+
         // 验证弃用提示头存在
-        assert_eq!(
-            response.headers().get("X-API-Deprecated").unwrap(),
-            "true"
-        );
+        assert_eq!(response.headers().get("X-API-Deprecated").unwrap(), "true");
     }
 
     #[tokio::test]
@@ -105,9 +98,8 @@ mod tests {
 
         // 验证响应成功
         assert_eq!(response.status(), StatusCode::OK);
-        
+
         // 验证没有弃用提示头
         assert!(response.headers().get("X-API-Deprecated").is_none());
     }
 }
-

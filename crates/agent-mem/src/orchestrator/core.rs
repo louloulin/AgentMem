@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use agent_mem_core::managers::CoreMemoryManager;
 use agent_mem_core::manager::MemoryManager;
+use agent_mem_core::managers::CoreMemoryManager;
 use agent_mem_traits::{MemoryItem, Result};
 
 use super::initialization::IntelligenceComponents;
@@ -93,15 +93,20 @@ pub struct MemoryOrchestrator {
     pub(crate) fact_extractor: Option<Arc<agent_mem_intelligence::FactExtractor>>,
     pub(crate) advanced_fact_extractor: Option<Arc<agent_mem_intelligence::AdvancedFactExtractor>>,
     pub(crate) batch_entity_extractor: Option<Arc<agent_mem_intelligence::BatchEntityExtractor>>,
-    pub(crate) batch_importance_evaluator: Option<Arc<agent_mem_intelligence::BatchImportanceEvaluator>>,
+    pub(crate) batch_importance_evaluator:
+        Option<Arc<agent_mem_intelligence::BatchImportanceEvaluator>>,
     pub(crate) decision_engine: Option<Arc<agent_mem_intelligence::MemoryDecisionEngine>>,
-    pub(crate) enhanced_decision_engine: Option<Arc<agent_mem_intelligence::EnhancedDecisionEngine>>,
-    pub(crate) importance_evaluator: Option<Arc<agent_mem_intelligence::EnhancedImportanceEvaluator>>,
+    pub(crate) enhanced_decision_engine:
+        Option<Arc<agent_mem_intelligence::EnhancedDecisionEngine>>,
+    pub(crate) importance_evaluator:
+        Option<Arc<agent_mem_intelligence::EnhancedImportanceEvaluator>>,
     pub(crate) conflict_resolver: Option<Arc<agent_mem_intelligence::ConflictResolver>>,
 
     // ========== 聚类和推理组件 ==========
-    pub(crate) dbscan_clusterer: Option<Arc<agent_mem_intelligence::clustering::dbscan::DBSCANClusterer>>,
-    pub(crate) kmeans_clusterer: Option<Arc<agent_mem_intelligence::clustering::kmeans::KMeansClusterer>>,
+    pub(crate) dbscan_clusterer:
+        Option<Arc<agent_mem_intelligence::clustering::dbscan::DBSCANClusterer>>,
+    pub(crate) kmeans_clusterer:
+        Option<Arc<agent_mem_intelligence::clustering::kmeans::KMeansClusterer>>,
     pub(crate) memory_reasoner: Option<Arc<agent_mem_intelligence::MemoryReasoner>>,
 
     // ========== Search 组件 ==========
@@ -116,10 +121,14 @@ pub struct MemoryOrchestrator {
     pub(crate) reranker: Option<Arc<dyn agent_mem_core::search::Reranker>>,
 
     // ========== 多模态处理组件 ==========
-    pub(crate) image_processor: Option<Arc<agent_mem_intelligence::multimodal::image::ImageProcessor>>,
-    pub(crate) audio_processor: Option<Arc<agent_mem_intelligence::multimodal::audio::AudioProcessor>>,
-    pub(crate) video_processor: Option<Arc<agent_mem_intelligence::multimodal::video::VideoProcessor>>,
-    pub(crate) multimodal_manager: Option<Arc<agent_mem_intelligence::multimodal::MultimodalProcessorManager>>,
+    pub(crate) image_processor:
+        Option<Arc<agent_mem_intelligence::multimodal::image::ImageProcessor>>,
+    pub(crate) audio_processor:
+        Option<Arc<agent_mem_intelligence::multimodal::audio::AudioProcessor>>,
+    pub(crate) video_processor:
+        Option<Arc<agent_mem_intelligence::multimodal::video::VideoProcessor>>,
+    pub(crate) multimodal_manager:
+        Option<Arc<agent_mem_intelligence::multimodal::MultimodalProcessorManager>>,
 
     #[cfg(feature = "multimodal")]
     pub(crate) openai_vision: Option<Arc<agent_mem_intelligence::multimodal::OpenAIVisionClient>>,
@@ -131,9 +140,12 @@ pub struct MemoryOrchestrator {
     pub(crate) embedder: Option<Arc<dyn agent_mem_traits::Embedder + Send + Sync>>,
 
     // ========== LLM 缓存 ==========
-    pub(crate) facts_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::ExtractedFact>>>>,
-    pub(crate) structured_facts_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::StructuredFact>>>>,
-    pub(crate) importance_cache: Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::ImportanceEvaluation>>>>,
+    pub(crate) facts_cache:
+        Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::ExtractedFact>>>>,
+    pub(crate) structured_facts_cache:
+        Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::StructuredFact>>>>,
+    pub(crate) importance_cache:
+        Option<Arc<agent_mem_llm::LLMCache<Vec<agent_mem_intelligence::ImportanceEvaluation>>>>,
 
     // ========== 核心功能 ==========
     pub(crate) vector_store: Option<Arc<dyn agent_mem_traits::VectorStore + Send + Sync>>,
@@ -163,18 +175,25 @@ impl MemoryOrchestrator {
         info!("创建 Managers...");
         let core_manager = Some(Arc::new(CoreMemoryManager::new()));
         info!("✅ CoreMemoryManager 创建成功");
-        
+
         // 创建 MemoryManager 用于提供完整的CRUD功能
         // Phase 0 修复: 使用 LibSQL 后端而不是 InMemoryOperations
-        let db_path = config.storage_url.as_ref()
+        let db_path = config
+            .storage_url
+            .as_ref()
             .map(|u| u.as_str())
             .unwrap_or("./data/agentmem.db");
         info!("🔧 Phase 0: 使用 LibSQL 后端: {}", db_path);
-        let operations = super::initialization::InitializationModule::create_libsql_operations(db_path).await?;
-        let memory_manager = Some(Arc::new(
-            MemoryManager::with_operations(agent_mem_config::MemoryConfig::default(), operations)
-        ));
-        info!("✅ Phase 0: MemoryManager 创建成功 (持久化后端: {})", db_path);
+        let operations =
+            super::initialization::InitializationModule::create_libsql_operations(db_path).await?;
+        let memory_manager = Some(Arc::new(MemoryManager::with_operations(
+            agent_mem_config::MemoryConfig::default(),
+            operations,
+        )));
+        info!(
+            "✅ Phase 0: MemoryManager 创建成功 (持久化后端: {})",
+            db_path
+        );
 
         #[cfg(feature = "postgres")]
         let semantic_manager = None;
@@ -186,7 +205,8 @@ impl MemoryOrchestrator {
         // ========== Step 2: 创建 Intelligence 组件 ==========
         let intelligence_components = if config.enable_intelligent_features {
             info!("创建 Intelligence 组件...");
-            super::initialization::InitializationModule::create_intelligence_components(&config).await?
+            super::initialization::InitializationModule::create_intelligence_components(&config)
+                .await?
         } else {
             info!("智能功能已禁用，将使用基础模式");
             IntelligenceComponents {
@@ -221,26 +241,35 @@ impl MemoryOrchestrator {
         // ========== Step 5: 创建多模态处理组件 ==========
         let (image_processor, audio_processor, video_processor, multimodal_manager) = {
             info!("创建多模态处理组件...");
-            super::initialization::InitializationModule::create_multimodal_components(&config).await?
+            super::initialization::InitializationModule::create_multimodal_components(&config)
+                .await?
         };
 
         // ========== Step 6: 创建 OpenAI 多模态 API ==========
         #[cfg(feature = "multimodal")]
         let (openai_vision, openai_whisper) = {
             info!("创建 OpenAI 多模态 API 客户端...");
-            super::initialization::InitializationModule::create_openai_multimodal_clients(&config).await?
+            super::initialization::InitializationModule::create_openai_multimodal_clients(&config)
+                .await?
         };
 
         // ========== Step 7: 创建聚类和推理组件 ==========
         let (dbscan_clusterer, kmeans_clusterer, memory_reasoner) = {
             info!("创建聚类和推理组件...");
-            super::initialization::InitializationModule::create_clustering_reasoning_components(&config).await?
+            super::initialization::InitializationModule::create_clustering_reasoning_components(
+                &config,
+            )
+            .await?
         };
 
         // ========== Step 8: 创建向量存储 ==========
         let vector_store = {
             info!("Phase 6: 创建向量存储...");
-            super::initialization::InitializationModule::create_vector_store(&config, embedder.as_ref()).await?
+            super::initialization::InitializationModule::create_vector_store(
+                &config,
+                embedder.as_ref(),
+            )
+            .await?
         };
 
         // ========== Step 8.5: 创建 Search 组件（需要在vector_store创建之后）==========
@@ -250,7 +279,9 @@ impl MemoryOrchestrator {
                 &config,
                 vector_store.clone(),
                 embedder.clone(),
-            ).await.unwrap_or_else(|e| {
+            )
+            .await
+            .unwrap_or_else(|e| {
                 warn!("创建 Search 组件失败: {}, Search 功能将不可用", e);
                 (
                     None::<Arc<agent_mem_core::search::HybridSearchEngine>>,
@@ -260,11 +291,8 @@ impl MemoryOrchestrator {
             })
         };
         #[cfg(not(feature = "postgres"))]
-        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) = (
-            None::<Arc<()>>,
-            None::<Arc<()>>,
-            None::<Arc<()>>,
-        );
+        let (hybrid_search_engine, vector_search_engine, fulltext_search_engine) =
+            (None::<Arc<()>>, None::<Arc<()>>, None::<Arc<()>>);
 
         // ========== Step 8.5: 创建重排序器 ==========
         let reranker = {
@@ -279,29 +307,30 @@ impl MemoryOrchestrator {
         };
 
         // ========== Step 10: 创建 LLM 缓存 ==========
-        let (facts_cache, structured_facts_cache, importance_cache) = if config.enable_intelligent_features {
-            info!("Phase 2: 创建 LLM 缓存...");
-            use std::time::Duration;
+        let (facts_cache, structured_facts_cache, importance_cache) =
+            if config.enable_intelligent_features {
+                info!("Phase 2: 创建 LLM 缓存...");
+                use std::time::Duration;
 
-            let facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
-                Duration::from_secs(3600),
-                1000,
-            )));
-            let structured_facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
-                Duration::from_secs(3600),
-                1000,
-            )));
-            let importance_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
-                Duration::from_secs(3600),
-                1000,
-            )));
+                let facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                    Duration::from_secs(3600),
+                    1000,
+                )));
+                let structured_facts_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                    Duration::from_secs(3600),
+                    1000,
+                )));
+                let importance_cache = Some(Arc::new(agent_mem_llm::LLMCache::new(
+                    Duration::from_secs(3600),
+                    1000,
+                )));
 
-            info!("✅ LLM 缓存创建成功（TTL: 1小时，最大条目: 1000）");
-            (facts_cache, structured_facts_cache, importance_cache)
-        } else {
-            info!("智能功能已禁用，跳过 LLM 缓存创建");
-            (None, None, None)
-        };
+                info!("✅ LLM 缓存创建成功（TTL: 1小时，最大条目: 1000）");
+                (facts_cache, structured_facts_cache, importance_cache)
+            } else {
+                info!("智能功能已禁用，跳过 LLM 缓存创建");
+                (None, None, None)
+            };
 
         Ok(Self {
             // Managers
@@ -337,7 +366,7 @@ impl MemoryOrchestrator {
             vector_search_engine,
             #[cfg(feature = "postgres")]
             fulltext_search_engine,
-            
+
             // 重排序器
             reranker,
 
@@ -371,7 +400,7 @@ impl MemoryOrchestrator {
     }
 
     // ========== 存储方法委托 ==========
-    
+
     /// 添加记忆（快速模式）
     pub async fn add_memory_fast(
         &self,
@@ -490,12 +519,7 @@ impl MemoryOrchestrator {
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
         super::retrieval::RetrievalModule::search_memories_hybrid(
-            self,
-            query,
-            user_id,
-            limit,
-            threshold,
-            filters,
+            self, query, user_id, limit, threshold, filters,
         )
         .await
     }
@@ -511,12 +535,7 @@ impl MemoryOrchestrator {
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
         super::retrieval::RetrievalModule::search_memories_hybrid(
-            self,
-            query,
-            user_id,
-            limit,
-            threshold,
-            filters,
+            self, query, user_id, limit, threshold, filters,
         )
         .await
     }
@@ -557,11 +576,7 @@ impl MemoryOrchestrator {
         metadata: HashMap<String, String>,
     ) -> Result<Vec<String>> {
         super::batch::BatchModule::add_memory_batch_optimized(
-            self,
-            contents,
-            agent_id,
-            user_id,
-            metadata,
+            self, contents, agent_id, user_id, metadata,
         )
         .await
     }
@@ -577,11 +592,7 @@ impl MemoryOrchestrator {
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
         super::multimodal::MultimodalModule::add_image_memory(
-            self,
-            image_data,
-            user_id,
-            agent_id,
-            metadata,
+            self, image_data, user_id, agent_id, metadata,
         )
         .await
     }
@@ -595,11 +606,7 @@ impl MemoryOrchestrator {
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
         super::multimodal::MultimodalModule::add_audio_memory(
-            self,
-            audio_data,
-            user_id,
-            agent_id,
-            metadata,
+            self, audio_data, user_id, agent_id, metadata,
         )
         .await
     }
@@ -613,11 +620,7 @@ impl MemoryOrchestrator {
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
         super::multimodal::MultimodalModule::add_video_memory(
-            self,
-            video_data,
-            user_id,
-            agent_id,
-            metadata,
+            self, video_data, user_id, agent_id, metadata,
         )
         .await
     }
@@ -679,17 +682,19 @@ impl MemoryOrchestrator {
 
         // 使用 MemoryManager 获取所有记忆
         if let Some(manager) = &self.memory_manager {
-            let memories = manager.get_agent_memories(&agent_id, None).await
+            let memories = manager
+                .get_agent_memories(&agent_id, None)
+                .await
                 .map_err(|e| {
                     agent_mem_traits::AgentMemError::storage_error(&format!(
                         "Failed to get memories from MemoryManager: {}",
                         e
                     ))
                 })?;
-            
+
             // 转换为 MemoryItem
             // MemoryManager返回的是agent_mem_core::types::Memory，可以直接转换为MemoryItem
-                for memory in memories {
+            for memory in memories {
                 all_memories.push(MemoryItem::from(memory));
             }
         }
@@ -723,8 +728,10 @@ impl MemoryOrchestrator {
         let mut deleted_count = 0;
 
         // 先获取所有记忆
-        let memories = self.get_all_memories(agent_id.clone(), user_id.clone()).await?;
-        
+        let memories = self
+            .get_all_memories(agent_id.clone(), user_id.clone())
+            .await?;
+
         // 逐个删除
         for memory in memories {
             if let Ok(_) = StorageModule::delete_memory(self, &memory.id).await {
@@ -786,7 +793,9 @@ impl MemoryOrchestrator {
 
         // 从 MemoryManager 获取统计
         total_memories = if let Some(manager) = &self.memory_manager {
-            manager.get_memory_stats(None).await
+            manager
+                .get_memory_stats(None)
+                .await
                 .map(|stats| stats.total_memories)
                 .unwrap_or(0)
         } else {
@@ -816,4 +825,3 @@ impl MemoryOrchestrator {
         }
     }
 }
-

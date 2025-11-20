@@ -10,26 +10,23 @@ pub type McpResult<T> = Result<T, McpError>;
 pub enum McpError {
     /// 连接错误
     ConnectionError(String),
-    
+
     /// 超时错误
     TimeoutError {
         operation: String,
         server_name: String,
         timeout_seconds: u64,
     },
-    
+
     /// 未初始化错误
     NotInitializedError(String),
-    
+
     /// 工具执行错误
-    ToolExecutionError {
-        tool_name: String,
-        message: String,
-    },
-    
+    ToolExecutionError { tool_name: String, message: String },
+
     /// 配置错误
     ConfigError(String),
-    
+
     /// 序列化错误
     SerializationError(String),
 
@@ -44,7 +41,7 @@ pub enum McpError {
 
     /// 不支持的服务器类型
     UnsupportedServerType(String),
-    
+
     /// 资源未找到
     ResourceNotFound(String),
 
@@ -80,7 +77,11 @@ impl fmt::Display for McpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             McpError::ConnectionError(msg) => write!(f, "MCP connection error: {msg}"),
-            McpError::TimeoutError { operation, server_name, timeout_seconds } => {
+            McpError::TimeoutError {
+                operation,
+                server_name,
+                timeout_seconds,
+            } => {
                 write!(
                     f,
                     "MCP timeout error: {operation} for server '{server_name}' after {timeout_seconds} seconds"
@@ -145,4 +146,3 @@ impl From<std::io::Error> for McpError {
         McpError::ConnectionError(err.to_string())
     }
 }
-

@@ -172,8 +172,7 @@ impl ImportanceScorer {
         };
 
         // Apply decay based on time since last access
-        let time_since_access =
-            current_time - memory.metadata.accessed_at.timestamp();
+        let time_since_access = current_time - memory.metadata.accessed_at.timestamp();
         let decay_factor = self
             .decay_rate
             .powf(time_since_access as f32 / (24.0 * 60.0 * 60.0)); // Daily decay
@@ -208,7 +207,7 @@ impl ImportanceScorer {
             agent_mem_traits::Content::Structured(v) => &v.to_string(),
             _ => "",
         };
-        
+
         let content_length = content_str.len() as f32;
         let word_count = content_str.split_whitespace().count() as f32;
 
@@ -279,7 +278,6 @@ impl ImportanceScorer {
         emotional: f32,
         context: f32,
     ) -> f32 {
-
         let memory_type_str = memory.memory_type().unwrap_or("episodic".to_string());
         match memory_type_str.as_str() {
             "episodic" => {
@@ -368,7 +366,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn create_test_memory(id: &str, content: &str, access_count: u32) -> Memory {
-        use agent_mem_traits::{AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4, RelationGraph};
+        use agent_mem_traits::{
+            AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4,
+            RelationGraph,
+        };
         let now = Utc::now();
 
         let mut attributes = AttributeSet::new();

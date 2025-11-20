@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         embedder_provider: Some("fastembed".to_string()),
         embedder_model: Some("all-MiniLM-L6-v2".to_string()),
         vector_store_url: Some("memory".to_string()), // 使用内存向量存储
-        enable_intelligent_features: false, // 禁用智能功能以提高性能
+        enable_intelligent_features: false,           // 禁用智能功能以提高性能
     };
 
     info!("初始化 MemoryOrchestrator...");
@@ -68,7 +68,10 @@ async fn test_batch_performance(
     let items: Vec<_> = (0..batch_size)
         .map(|i| {
             (
-                format!("批量测试记忆 #{} - 这是一条测试数据，用于验证批量添加性能", i),
+                format!(
+                    "批量测试记忆 #{} - 这是一条测试数据，用于验证批量添加性能",
+                    i
+                ),
                 "test-agent".to_string(),
                 Some("test-user".to_string()),
                 Some(MemoryType::Episodic),
@@ -112,7 +115,9 @@ async fn test_batch_performance(
 }
 
 /// 对比测试：单个添加 vs 批量添加
-async fn comparison_test(orchestrator: &MemoryOrchestrator) -> Result<(), Box<dyn std::error::Error>> {
+async fn comparison_test(
+    orchestrator: &MemoryOrchestrator,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("========================================");
     info!("对比测试: 单个 vs 批量");
     info!("========================================\n");
@@ -136,7 +141,10 @@ async fn comparison_test(orchestrator: &MemoryOrchestrator) -> Result<(), Box<dy
     let single_duration = start.elapsed();
     let single_throughput = test_count as f64 / single_duration.as_secs_f64();
 
-    info!("  - 总时间: {:.2}ms", single_duration.as_secs_f64() * 1000.0);
+    info!(
+        "  - 总时间: {:.2}ms",
+        single_duration.as_secs_f64() * 1000.0
+    );
     info!("  - 吞吐量: {:.2} ops/s", single_throughput);
 
     // 测试 2: 批量添加
@@ -182,4 +190,3 @@ async fn comparison_test(orchestrator: &MemoryOrchestrator) -> Result<(), Box<dy
 
     Ok(())
 }
-

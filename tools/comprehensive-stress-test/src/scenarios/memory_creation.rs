@@ -23,7 +23,10 @@ pub async fn run_test_real(
     total_memories: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("🚀 开始真实记忆构建压测: 并发={}, 总数={}", concurrency, total_memories);
+    info!(
+        "🚀 开始真实记忆构建压测: 并发={}, 总数={}",
+        concurrency, total_memories
+    );
     info!("📊 使用真实 AgentMem SDK + PostgreSQL");
 
     // 创建进度条
@@ -41,14 +44,16 @@ pub async fn run_test_real(
     // 创建系统监控器
     let monitor = Arc::new(SystemMonitor::new());
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     // 并发控制
     let semaphore = Arc::new(Semaphore::new(concurrency));
@@ -138,8 +143,11 @@ pub async fn run_test(
     total_memories: usize,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("🚀 开始 Mock 记忆构建压测: 并发={}, 总数={}", concurrency, total_memories);
-    
+    info!(
+        "🚀 开始 Mock 记忆构建压测: 并发={}, 总数={}",
+        concurrency, total_memories
+    );
+
     let pb = multi_progress.add(ProgressBar::new(total_memories as u64));
     pb.set_style(
         ProgressStyle::default_bar()
@@ -204,16 +212,15 @@ mod tests {
         let config = RealStressTestConfig::default();
         let env = RealStressTestEnv::new(config).await.unwrap();
         let multi_progress = MultiProgress::new();
-        
+
         // 运行真实测试
         let stats = run_test_real(&env, 10, 100, &multi_progress).await.unwrap();
 
         assert!(stats.total_operations == 100);
         assert!(stats.successful_operations >= 95); // 至少 95% 成功
         assert!(stats.throughput > 0.0);
-        
+
         // 清理
         env.cleanup().await.unwrap();
     }
 }
-

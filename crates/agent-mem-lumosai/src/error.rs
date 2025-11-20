@@ -4,10 +4,10 @@ use thiserror::Error;
 pub enum LumosIntegrationError {
     #[error("Memory error: {0}")]
     Memory(String),
-    
+
     #[error("Agent error: {0}")]
     Agent(String),
-    
+
     #[error("LLM error: {0}")]
     Llm(String),
 }

@@ -236,7 +236,10 @@ impl FactExtractor {
         debug!("   Prompt 内容: {}", prompt);
 
         // P0 优化 #2: 添加超时控制
-        info!("🔵 调用 LLM 提取事实（超时: {}秒）...", self.timeout_config.fact_extraction_timeout_secs);
+        info!(
+            "🔵 调用 LLM 提取事实（超时: {}秒）...",
+            self.timeout_config.fact_extraction_timeout_secs
+        );
         let llm_start = std::time::Instant::now();
 
         let llm = self.llm.clone();
@@ -268,7 +271,10 @@ impl FactExtractor {
         info!("🔵 解析事实...");
         let mut facts = match serde_json::from_str::<FactExtractionResponse>(&json_text) {
             Ok(response) => {
-                info!("✅ LLM 事实提取成功，提取到 {} 个事实", response.facts.len());
+                info!(
+                    "✅ LLM 事实提取成功，提取到 {} 个事实",
+                    response.facts.len()
+                );
                 response.facts
             }
             Err(e) => {

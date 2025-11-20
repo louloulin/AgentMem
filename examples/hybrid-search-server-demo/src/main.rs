@@ -1,14 +1,13 @@
 //! 混合检索Server演示 - REST API + MCP工具
-//! 
+//!
 //! 这个演示展示了如何通过HTTP REST API和MCP协议暴露混合检索功能
 
 use agent_mem_core::search::{
-    QueryClassifier, AdaptiveThresholdCalculator,
-    EnhancedHybridSearchEngineV2, EnhancedHybridConfig,
-    QueryType, EnhancedSearchResult,
+    AdaptiveThresholdCalculator, EnhancedHybridConfig, EnhancedHybridSearchEngineV2,
+    EnhancedSearchResult, QueryClassifier, QueryType,
 };
-use agent_mem_tools::mcp::server::{McpServer, McpServerConfig};
 use agent_mem_tools::executor::ToolExecutor;
+use agent_mem_tools::mcp::server::{McpServer, McpServerConfig};
 use axum::{
     extract::{Extension, Query, State},
     http::StatusCode,
@@ -98,21 +97,24 @@ async fn search(
     Json(req): Json<SearchRequest>,
 ) -> impl IntoResponse {
     info!("搜索请求: query='{}', limit={}", req.query, req.limit);
-    
+
     // 1. 分类查询
     let query_type = state.classifier.classify(&req.query);
     info!("查询类型: {:?}", query_type);
-    
+
     // 2. 提取特征（用于阈值计算）
     let features = state.classifier.extract_features(&req.query);
-    
+
     // 3. 计算阈值
-    let threshold = state.threshold_calc.calculate(&req.query, &query_type, &features).await;
+    let threshold = state
+        .threshold_calc
+        .calculate(&req.query, &query_type, &features)
+        .await;
     info!("自适应阈值: {}", threshold);
-    
+
     // 4. 获取搜索策略
     let strategy = state.classifier.get_strategy(&query_type);
-    
+
     // 5. 模拟搜索（在实际应用中会调用真实的搜索引擎）
     let results = vec![
         ResultItem {
@@ -126,7 +128,7 @@ async fn search(
             score: 0.87,
         },
     ];
-    
+
     let response = SearchResponse {
         success: true,
         query: req.query.clone(),
@@ -139,7 +141,7 @@ async fn search(
             results_count: 2,
         },
     };
-    
+
     (StatusCode::OK, Json(response))
 }
 
@@ -150,7 +152,7 @@ async fn classify_query(
 ) -> impl IntoResponse {
     let query_type = state.classifier.classify(&params.query);
     let strategy = state.classifier.get_strategy(&query_type);
-    
+
     Json(serde_json::json!({
         "query": params.query,
         "query_type": format!("{:?}", query_type),
@@ -172,11 +174,9 @@ async fn mcp_tool_search(
     let query = arguments["query"]
         .as_str()
         .ok_or("Missing 'query' parameter")?;
-    
-    let _limit = arguments["limit"]
-        .as_u64()
-        .unwrap_or(10) as usize;
-    
+
+    let _limit = arguments["limit"].as_u64().unwrap_or(10) as usize;
+
     // 执行搜索（这里简化处理）
     Ok(serde_json::json!({
         "results": [
@@ -193,22 +193,20 @@ async fn mcp_tool_search(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
-    
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+
     info!("🚀 启动混合检索Server演示");
-    
+
     // 创建组件
     let classifier = Arc::new(QueryClassifier::with_default_config());
     let threshold_calc = Arc::new(AdaptiveThresholdCalculator::with_default_config());
-    
+
     // 创建应用状态
     let state = Arc::new(AppState {
         classifier: classifier.clone(),
         threshold_calc: threshold_calc.clone(),
     });
-    
+
     // 创建路由
     let app = Router::new()
         .route("/health", get(health_check))
@@ -216,7 +214,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/classify", get(classify_query))
         .layer(CorsLayer::permissive())
         .with_state(state);
-    
+
     // 启动服务器
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     info!("🌐 Server启动在 http://{}", addr);
@@ -229,28 +227,28 @@ async fn main() -> anyhow::Result<()> {
     info!("  curl http://localhost:3000/health");
     info!("  curl -X POST http://localhost:3000/api/search -H 'Content-Type: application/json' -d '{{\"query\":\"Apple 手机\"}}'");
     info!("  curl 'http://localhost:3000/api/classify?query=iPhone'");
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_search_request() {
         let req = SearchRequest {
             query: "test query".to_string(),
             limit: 10,
         };
-        
+
         assert_eq!(req.query, "test query");
         assert_eq!(req.limit, 10);
     }
-    
+
     #[test]
     fn test_health_response() {
         let response = HealthResponse {
@@ -258,9 +256,8 @@ mod tests {
             version: "0.1.0".to_string(),
             features: vec!["search".to_string()],
         };
-        
+
         assert_eq!(response.status, "healthy");
         assert_eq!(response.features.len(), 1);
     }
 }
-

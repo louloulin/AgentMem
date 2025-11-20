@@ -106,9 +106,7 @@ async fn test_query_construction_performance() {
     let start = Instant::now();
 
     for i in 0..iterations {
-        let _ = QueryBuilder::new()
-            .text(&format!("Query {}", i))
-            .build();
+        let _ = QueryBuilder::new().text(&format!("Query {}", i)).build();
     }
 
     let elapsed = start.elapsed();
@@ -191,7 +189,10 @@ async fn test_large_scale_memory_creation() {
     println!("   - Scale: {} memories", scale);
     println!("   - Elapsed: {:?}", elapsed);
     println!("   - Throughput: {:.0} memories/sec", throughput);
-    println!("   - Avg latency: {:.2}µs/memory", elapsed.as_micros() as f64 / scale as f64);
+    println!(
+        "   - Avg latency: {:.2}µs/memory",
+        elapsed.as_micros() as f64 / scale as f64
+    );
 
     assert_eq!(memories.len(), scale);
     assert!(elapsed.as_secs() < 10, "Too slow for large scale creation");
@@ -388,15 +389,12 @@ async fn test_full_lifecycle_latency_benchmark() {
             .build();
 
         // 模拟更新
-        memory.attributes.set(
-            AttributeKey::user("updated"),
-            AttributeValue::Boolean(true),
-        );
+        memory
+            .attributes
+            .set(AttributeKey::user("updated"), AttributeValue::Boolean(true));
 
         // 模拟Query
-        let _ = QueryBuilder::new()
-            .text(&format!("test {}", i))
-            .build();
+        let _ = QueryBuilder::new().text(&format!("test {}", i)).build();
 
         let latency = start.elapsed();
         latencies.push(latency.as_micros() as f64);
@@ -435,17 +433,21 @@ async fn test_comprehensive_performance_report() {
             .build();
     }
     let mem_throughput = 10_000.0 / mem_start.elapsed().as_secs_f64();
-    println!("║ Memory Creation: {:.0} ops/sec                    ║", mem_throughput);
+    println!(
+        "║ Memory Creation: {:.0} ops/sec                    ║",
+        mem_throughput
+    );
 
     // 2. Query构建
     let query_start = Instant::now();
     for i in 0..10_000 {
-        let _ = QueryBuilder::new()
-            .text(&format!("Query {}", i))
-            .build();
+        let _ = QueryBuilder::new().text(&format!("Query {}", i)).build();
     }
     let query_throughput = 10_000.0 / query_start.elapsed().as_secs_f64();
-    println!("║ Query Construction: {:.0} ops/sec                ║", query_throughput);
+    println!(
+        "║ Query Construction: {:.0} ops/sec                ║",
+        query_throughput
+    );
 
     // 3. AttributeSet操作
     let attr_start = Instant::now();
@@ -454,10 +456,12 @@ async fn test_comprehensive_performance_report() {
         let _ = AttributeValue::Number(i as f64);
     }
     let attr_throughput = 10_000.0 / attr_start.elapsed().as_secs_f64();
-    println!("║ AttributeSet Ops: {:.0} ops/sec                  ║", attr_throughput);
+    println!(
+        "║ AttributeSet Ops: {:.0} ops/sec                  ║",
+        attr_throughput
+    );
 
     println!("╠══════════════════════════════════════════════════════════╣");
     println!("║ ✅ All performance targets met                           ║");
     println!("╚══════════════════════════════════════════════════════════╝\n");
 }
-

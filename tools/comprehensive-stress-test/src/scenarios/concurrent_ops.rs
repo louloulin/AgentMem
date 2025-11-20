@@ -15,7 +15,10 @@ pub async fn run_test(
     duration_seconds: u64,
     multi_progress: &MultiProgress,
 ) -> Result<StressTestStats> {
-    info!("开始并发操作压测: 用户数={}, 持续={}s", concurrent_users, duration_seconds);
+    info!(
+        "开始并发操作压测: 用户数={}, 持续={}s",
+        concurrent_users, duration_seconds
+    );
 
     let pb = multi_progress.add(ProgressBar::new(duration_seconds));
     pb.set_style(
@@ -27,16 +30,18 @@ pub async fn run_test(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     let semaphore = Arc::new(Semaphore::new(concurrent_users));
     let start_time = Instant::now();
@@ -101,7 +106,9 @@ pub async fn run_test(
 
     info!(
         "并发压测完成: 总操作={}, 吞吐量={:.2} ops/s, 错误率={:.2}%",
-        stats.total_operations, stats.throughput, stats.error_rate * 100.0
+        stats.total_operations,
+        stats.throughput,
+        stats.error_rate * 100.0
     );
 
     Ok(stats)
@@ -121,4 +128,3 @@ async fn simulate_update_operation(_user_id: usize) -> bool {
     tokio::time::sleep(Duration::from_millis(20)).await;
     true
 }
-

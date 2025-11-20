@@ -5,13 +5,14 @@ use agent_mem_core::search::metadata_filter::{
 };
 use std::collections::HashMap;
 
-
 #[test]
 fn test_has_advanced_operators() {
     // 测试简单过滤（无高级操作符）
     let mut simple_filters = HashMap::new();
     simple_filters.insert("category".to_string(), serde_json::json!("food"));
-    assert!(!MetadataFilterSystem::has_advanced_operators(&simple_filters));
+    assert!(!MetadataFilterSystem::has_advanced_operators(
+        &simple_filters
+    ));
 
     // 测试AND操作符
     let mut and_filters = HashMap::new();
@@ -73,7 +74,6 @@ fn test_process_metadata_filters() {
 
 #[test]
 fn test_matches_filter() {
-
     // 测试等于操作符
     let filter = MetadataFilter {
         field: "category".to_string(),
@@ -167,4 +167,3 @@ fn test_logical_operators() {
     metadata.insert("category".to_string(), serde_json::json!("food"));
     assert!(MetadataFilterSystem::matches(&not_filter, &metadata));
 }
-

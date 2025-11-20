@@ -455,13 +455,13 @@ pub async fn send_chat_message_stream(
                         }
                     };
 
-                        // Add small delay for typewriter effect (optional, can be removed for faster streaming)
-                        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    // Add small delay for typewriter effect (optional, can be removed for faster streaming)
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
-                        Some((
+                    Some((
                         content_event,
-                            StreamState::Streaming(content, memories_count, end_index),
-                        ))
+                        StreamState::Streaming(content, memories_count, end_index),
+                    ))
                 }
             }
             StreamState::Done => None,

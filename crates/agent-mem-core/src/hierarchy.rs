@@ -358,10 +358,7 @@ impl HierarchicalMemoryManager {
                         let current_score = inherited_memory.memory.score().unwrap_or(0.5);
                         inherited_memory.memory.set_score(
                             current_score
-                                * (memory
-                                    .hierarchy_metadata
-                                    .inheritance
-                                    .decay_factor as f64)
+                                * (memory.hierarchy_metadata.inheritance.decay_factor as f64)
                                     .powi(level),
                         );
 
@@ -428,7 +425,10 @@ impl HierarchicalMemoryManager {
     /// Delete memory from scope
     pub fn delete_memory(&mut self, memory_id: &str, scope: &MemoryScope) -> Result<()> {
         if let Some(memories) = self.memories.get_mut(scope) {
-            if let Some(pos) = memories.iter().position(|m| m.memory.id.as_str() == memory_id) {
+            if let Some(pos) = memories
+                .iter()
+                .position(|m| m.memory.id.as_str() == memory_id)
+            {
                 let memory = &memories[pos];
                 if memory.hierarchy_metadata.permissions.deletable {
                     memories.remove(pos);
@@ -454,7 +454,10 @@ impl HierarchicalMemoryManager {
             for memory in memories {
                 scope_stats.total_memories += 1;
 
-                let mem_type_str = memory.memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+                let mem_type_str = memory
+                    .memory
+                    .memory_type()
+                    .unwrap_or_else(|| "episodic".to_string());
                 match mem_type_str.to_lowercase().as_str() {
                     // Legacy type
                     "factual" => scope_stats.semantic_memories += 1,

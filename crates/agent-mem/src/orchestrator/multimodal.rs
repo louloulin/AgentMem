@@ -102,14 +102,14 @@ impl MultimodalModule {
         // 降级：如果没有 ImageProcessor，使用简单模式
         warn!("ImageProcessor 未初始化，使用简单模式");
         let simple_description = format!("图像内容, 大小: {} KB", image_data.len() / 1024);
-        
+
         // 通过 storage 模块添加
         use super::storage::StorageModule;
         let mut add_metadata = metadata.unwrap_or_default();
         add_metadata.insert("content_type".to_string(), "image".to_string());
         add_metadata.insert("image_id".to_string(), image_id.clone());
         add_metadata.insert("image_size".to_string(), image_data.len().to_string());
-        
+
         let metadata_json: HashMap<String, serde_json::Value> = add_metadata
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -117,7 +117,7 @@ impl MultimodalModule {
 
         let simple_description_clone = simple_description.clone();
         let user_id_clone = user_id.clone();
-        
+
         let memory_id = StorageModule::add_memory_fast(
             orchestrator,
             simple_description,
@@ -205,7 +205,7 @@ impl MultimodalModule {
             add_metadata.insert("content_type".to_string(), "audio".to_string());
             add_metadata.insert("audio_id".to_string(), audio_id.clone());
             add_metadata.insert("audio_size".to_string(), audio_data.len().to_string());
-            
+
             let metadata_json: HashMap<String, serde_json::Value> = add_metadata
                 .into_iter()
                 .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -224,14 +224,14 @@ impl MultimodalModule {
         // 降级：如果没有 AudioProcessor，使用简单模式
         warn!("AudioProcessor 未初始化，使用简单模式");
         let simple_description = format!("音频内容, 大小: {} KB", audio_data.len() / 1024);
-        
+
         // 通过 storage 模块添加
         use super::storage::StorageModule;
         let mut add_metadata = metadata.unwrap_or_default();
         add_metadata.insert("content_type".to_string(), "audio".to_string());
         add_metadata.insert("audio_id".to_string(), audio_id.clone());
         add_metadata.insert("audio_size".to_string(), audio_data.len().to_string());
-        
+
         let metadata_json: HashMap<String, serde_json::Value> = add_metadata
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -327,7 +327,7 @@ impl MultimodalModule {
             add_metadata.insert("content_type".to_string(), "video".to_string());
             add_metadata.insert("video_id".to_string(), video_id.clone());
             add_metadata.insert("video_size".to_string(), video_data.len().to_string());
-            
+
             let metadata_json: HashMap<String, serde_json::Value> = add_metadata
                 .into_iter()
                 .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -346,14 +346,14 @@ impl MultimodalModule {
         // 降级：如果没有 VideoProcessor，使用简单模式
         warn!("VideoProcessor 未初始化，使用简单模式");
         let simple_description = format!("视频内容, 大小: {} KB", video_data.len() / 1024);
-        
+
         // 通过 storage 模块添加
         use super::storage::StorageModule;
         let mut add_metadata = metadata.unwrap_or_default();
         add_metadata.insert("content_type".to_string(), "video".to_string());
         add_metadata.insert("video_id".to_string(), video_id.clone());
         add_metadata.insert("video_size".to_string(), video_data.len().to_string());
-        
+
         let metadata_json: HashMap<String, serde_json::Value> = add_metadata
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
@@ -404,12 +404,3 @@ impl MultimodalModule {
         }
     }
 }
-
-
-
-
-
-
-
-
-

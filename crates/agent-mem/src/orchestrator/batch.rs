@@ -48,7 +48,9 @@ impl BatchModule {
         let mut memory_ids = Vec::new();
         let mut tasks = Vec::new();
 
-        for (i, (content, agent_id, user_id, memory_type, metadata)) in items.into_iter().enumerate() {
+        for (i, (content, agent_id, user_id, memory_type, metadata)) in
+            items.into_iter().enumerate()
+        {
             let memory_id = uuid::Uuid::new_v4().to_string();
             memory_ids.push(memory_id.clone());
 
@@ -61,7 +63,10 @@ impl BatchModule {
                 full_metadata.insert("user_id".to_string(), serde_json::json!(uid));
             }
             if let Some(mt) = &memory_type {
-                full_metadata.insert("memory_type".to_string(), serde_json::json!(format!("{:?}", mt)));
+                full_metadata.insert(
+                    "memory_type".to_string(),
+                    serde_json::json!(format!("{:?}", mt)),
+                );
             }
             if let Some(meta) = metadata {
                 full_metadata.extend(meta);
@@ -84,7 +89,8 @@ impl BatchModule {
                 let (core_result, vector_result, history_result) = tokio::join!(
                     async move {
                         if let Some(manager) = core_manager {
-                            manager.create_persona_block(content_for_core, None)
+                            manager
+                                .create_persona_block(content_for_core, None)
                                 .await
                                 .map(|_| ())
                                 .map_err(|e| e.to_string())
@@ -103,7 +109,8 @@ impl BatchModule {
                                 vector: embedding_for_vector,
                                 metadata: string_metadata,
                             };
-                            store.add_vectors(vec![vector_data])
+                            store
+                                .add_vectors(vec![vector_data])
                                 .await
                                 .map(|_| ())
                                 .map_err(|e| e.to_string())
@@ -125,7 +132,8 @@ impl BatchModule {
                                 actor_id: None,
                                 role: Some("user".to_string()),
                             };
-                            history.add_history(entry)
+                            history
+                                .add_history(entry)
                                 .await
                                 .map(|_| ())
                                 .map_err(|e| e.to_string())
@@ -191,7 +199,13 @@ impl BatchModule {
             .collect();
 
         // 构建批量添加项
-        let items: Vec<(String, String, Option<String>, Option<MemoryType>, Option<HashMap<String, serde_json::Value>>)> = contents
+        let items: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<MemoryType>,
+            Option<HashMap<String, serde_json::Value>>,
+        )> = contents
             .into_iter()
             .map(|content| {
                 (
@@ -208,8 +222,3 @@ impl BatchModule {
         Self::add_memories_batch(orchestrator, items).await
     }
 }
-
-
-
-
-

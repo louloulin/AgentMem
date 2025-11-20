@@ -11,8 +11,8 @@ use futures::Stream;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use std::time::Duration;
 use std::pin::Pin;
+use std::time::Duration;
 
 /// Azure OpenAI 消息
 #[derive(Debug, Clone, Serialize, Deserialize)]

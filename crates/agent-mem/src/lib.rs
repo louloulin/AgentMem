@@ -115,8 +115,8 @@ pub use agent_mem_traits::{AgentMemError, Result};
 
 // 重新导出 Memory V4 类型（推荐使用）
 pub use agent_mem_traits::abstractions::{
-    AttributeKey, AttributeSet, AttributeValue, Content, Memory as MemoryV4, Metadata,
-    Query, QueryIntent, RelationGraph,
+    AttributeKey, AttributeSet, AttributeValue, Content, Memory as MemoryV4, Metadata, Query,
+    QueryIntent, RelationGraph,
 };
 
 // Legacy 类型（已废弃，仅用于向后兼容）

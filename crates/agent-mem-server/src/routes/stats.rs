@@ -269,9 +269,7 @@ pub async fn get_dashboard_stats(
                 for memory in agent_memories {
                     let memory_item = memory.to_legacy_item();
                     let memory_type_str = format!("{:?}", memory_item.memory_type);
-                    *memories_by_type_map
-                        .entry(memory_type_str)
-                        .or_insert(0) += 1;
+                    *memories_by_type_map.entry(memory_type_str).or_insert(0) += 1;
                 }
             }
             Err(e) => {
@@ -444,7 +442,6 @@ pub async fn get_memory_growth(
     match conn.prepare(query).await {
         Ok(mut stmt) => {
             if let Ok(mut rows) = stmt.query(params![thirty_days_ago]).await {
-
                 while let Ok(Some(row)) = rows.next().await {
                     let date: String = row.get(0).unwrap_or_default();
                     let total: i64 = row.get(1).unwrap_or(0);

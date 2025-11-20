@@ -234,7 +234,10 @@ impl MemoryManager {
         let mut memory = Memory::new(
             agent_id,
             user_id,
-            memory_type.unwrap_or(MemoryType::Episodic).as_str().to_string(),
+            memory_type
+                .unwrap_or(MemoryType::Episodic)
+                .as_str()
+                .to_string(),
             content,
             importance.unwrap_or(0.5),
         );

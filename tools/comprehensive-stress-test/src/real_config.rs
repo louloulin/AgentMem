@@ -82,14 +82,12 @@ impl RealStressTestEnv {
 
         // 3. 初始化 AgentMem SDK (使用 LibSQL)
         info!("🎯 初始化 AgentMem SDK (LibSQL)...");
-        let memory = Memory::new()
-            .await
-            .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "Failed to initialize AgentMem: {}",
-                    e
-                ))
-            })?;
+        let memory = Memory::new().await.map_err(|e| {
+            agent_mem_traits::AgentMemError::storage_error(&format!(
+                "Failed to initialize AgentMem: {}",
+                e
+            ))
+        })?;
 
         info!("✅ AgentMem SDK 初始化成功");
 
@@ -148,4 +146,3 @@ mod tests {
         assert_eq!(config.lancedb_path, "./data/stress-test-vectors.lance");
     }
 }
-

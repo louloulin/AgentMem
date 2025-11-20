@@ -382,13 +382,13 @@ pub struct Entity {
 pub struct Relation {
     /// Relation type (user-defined)
     pub relation_type: String,
-    
+
     /// Source entity ID (for backward compatibility)
     pub source: String,
-    
+
     /// Target entity ID
     pub target: String,
-    
+
     /// Strength/confidence (0.0-1.0)
     pub confidence: f32,
 }

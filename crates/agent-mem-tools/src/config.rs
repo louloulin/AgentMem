@@ -1,5 +1,5 @@
 //! AgentMem Tools配置管理
-//! 
+//!
 //! 支持环境变量配置，避免硬编码
 
 use std::sync::OnceLock;
@@ -11,13 +11,13 @@ static GLOBAL_CONFIG: OnceLock<ToolsConfig> = OnceLock::new();
 pub struct ToolsConfig {
     /// AgentMem后端API URL
     pub api_url: String,
-    
+
     /// API超时时间（秒）
     pub timeout: u64,
-    
+
     /// 重试次数
     pub max_retries: u32,
-    
+
     /// 默认Agent ID
     pub default_agent_id: String,
 }
@@ -61,14 +61,14 @@ pub fn get_api_url() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_config() {
         let config = ToolsConfig::default();
         assert!(!config.api_url.is_empty());
         assert!(config.timeout > 0);
     }
-    
+
     #[test]
     fn test_global_config() {
         let config1 = ToolsConfig::global();
@@ -76,4 +76,3 @@ mod tests {
         assert_eq!(config1.api_url, config2.api_url);
     }
 }
-

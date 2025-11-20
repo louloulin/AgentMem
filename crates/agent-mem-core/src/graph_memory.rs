@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::types::{Memory, Content};
+use crate::types::{Content, Memory};
 
 // 类型别名
 /// 内存节点ID类型
@@ -650,7 +650,10 @@ impl GraphMemoryEngine {
 
         // 1. 创建Memory对象（复用现有类型）
         let memory = Memory::new(
-            filters.get("agent_id").cloned().unwrap_or_else(|| "default".to_string()),
+            filters
+                .get("agent_id")
+                .cloned()
+                .unwrap_or_else(|| "default".to_string()),
             filters.get("user_id").cloned(),
             MemoryType::Semantic,
             data.to_string(),
@@ -667,12 +670,15 @@ impl GraphMemoryEngine {
         let mut added_entities = vec![node_id.clone()];
         for related in related_nodes.iter().take(5) {
             // 建立RelatedTo关系
-            if let Ok(_) = self.add_edge(
-                node_id.clone(),
-                related.id.clone(),
-                RelationType::RelatedTo,
-                0.5,
-            ).await {
+            if let Ok(_) = self
+                .add_edge(
+                    node_id.clone(),
+                    related.id.clone(),
+                    RelationType::RelatedTo,
+                    0.5,
+                )
+                .await
+            {
                 added_entities.push(related.id.clone());
             }
         }
@@ -733,8 +739,9 @@ impl GraphMemoryEngine {
             if let Some(edge_ids) = adjacency.get(node_id) {
                 for edge_id in edge_ids.iter().take(5) {
                     if let Some(edge) = edges.get(edge_id) {
-                        if let (Some(from_node), Some(to_node)) = 
-                            (nodes.get(&edge.from_node), nodes.get(&edge.to_node)) {
+                        if let (Some(from_node), Some(to_node)) =
+                            (nodes.get(&edge.from_node), nodes.get(&edge.to_node))
+                        {
                             let from_content = match &from_node.memory.content {
                                 Content::Text(text) => text.clone(),
                                 _ => String::new(),
@@ -767,13 +774,13 @@ impl GraphMemoryEngine {
     /// 根据filters删除匹配的节点和边
     pub async fn delete_all(&self, filters: &HashMap<String, String>) -> Result<()> {
         let mut nodes_to_delete = Vec::new();
-        
+
         // 1. 查找要删除的节点
         {
             let nodes = self.nodes.read().await;
             for (node_id, node) in nodes.iter() {
                 let mut should_delete = true;
-                
+
                 // 应用filters
                 if let Some(user_id) = filters.get("user_id") {
                     let node_user_id = node.memory.user_id();
@@ -786,7 +793,7 @@ impl GraphMemoryEngine {
                         should_delete = false;
                     }
                 }
-                
+
                 if should_delete {
                     nodes_to_delete.push(node_id.clone());
                 }
@@ -802,14 +809,14 @@ impl GraphMemoryEngine {
         for node_id in &nodes_to_delete {
             // 删除节点
             nodes.remove(node_id);
-            
+
             // 删除相关的边
             if let Some(edge_ids) = adjacency.remove(node_id) {
                 for edge_id in &edge_ids {
                     edges.remove(edge_id);
                 }
             }
-            
+
             // 清理反向邻接表
             if let Some(edge_ids) = reverse_adjacency.remove(node_id) {
                 for edge_id in &edge_ids {
@@ -836,24 +843,28 @@ impl GraphMemoryEngine {
         for edge in edges.values().take(limit * 2) {
             // 应用filters
             let mut should_include = true;
-            
-            if let (Some(from_node), Some(to_node)) = 
-                (nodes.get(&edge.from_node), nodes.get(&edge.to_node)) {
-                
+
+            if let (Some(from_node), Some(to_node)) =
+                (nodes.get(&edge.from_node), nodes.get(&edge.to_node))
+            {
                 if let Some(user_id) = filters.get("user_id") {
-                    let from_match = from_node.memory.user_id().as_ref().map(|id| id.as_str()) == Some(user_id.as_str());
-                    let to_match = to_node.memory.user_id().as_ref().map(|id| id.as_str()) == Some(user_id.as_str());
+                    let from_match = from_node.memory.user_id().as_ref().map(|id| id.as_str())
+                        == Some(user_id.as_str());
+                    let to_match = to_node.memory.user_id().as_ref().map(|id| id.as_str())
+                        == Some(user_id.as_str());
                     if !from_match && !to_match {
                         should_include = false;
                     }
                 }
-                
+
                 if let Some(agent_id) = filters.get("agent_id") {
-                    if from_node.memory.agent_id() != *agent_id && to_node.memory.agent_id() != *agent_id {
+                    if from_node.memory.agent_id() != *agent_id
+                        && to_node.memory.agent_id() != *agent_id
+                    {
                         should_include = false;
                     }
                 }
-                
+
                 if should_include {
                     let from_content = match &from_node.memory.content {
                         Content::Text(text) => text.clone(),

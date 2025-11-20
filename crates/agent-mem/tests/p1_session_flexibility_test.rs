@@ -75,7 +75,10 @@ fn test_memory_scope_from_options() {
     };
     let scope = MemoryScope::from_options(&options);
     match scope {
-        MemoryScope::Session { user_id, session_id } => {
+        MemoryScope::Session {
+            user_id,
+            session_id,
+        } => {
             assert_eq!(user_id, "alice");
             assert_eq!(session_id, "window-1");
         }
@@ -115,7 +118,10 @@ fn test_memory_scope_to_options() {
         org_id: "acme-corp".to_string(),
     };
     let options = scope.to_options();
-    assert_eq!(options.metadata.get("org_id"), Some(&"acme-corp".to_string()));
+    assert_eq!(
+        options.metadata.get("org_id"),
+        Some(&"acme-corp".to_string())
+    );
 
     // 测试 Session -> Options
     let scope = MemoryScope::Session {
@@ -124,7 +130,10 @@ fn test_memory_scope_to_options() {
     };
     let options = scope.to_options();
     assert_eq!(options.user_id, Some("alice".to_string()));
-    assert_eq!(options.metadata.get("session_id"), Some(&"window-1".to_string()));
+    assert_eq!(
+        options.metadata.get("session_id"),
+        Some(&"window-1".to_string())
+    );
 }
 
 #[test]
@@ -170,4 +179,3 @@ async fn test_add_with_scope() {
     let result = mem.add_with_scope("Current conversation", scope).await;
     assert!(result.is_ok(), "Session scope 添加应该成功");
 }
-

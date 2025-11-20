@@ -16,6 +16,7 @@ mod gemini_test;
 pub mod groq;
 #[cfg(test)]
 mod groq_test;
+pub mod huawei_maas;
 pub mod litellm;
 pub mod local_test;
 pub mod mistral;
@@ -26,7 +27,6 @@ pub mod together;
 #[cfg(test)]
 mod together_test;
 pub mod zhipu;
-pub mod huawei_maas;
 
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureProvider;

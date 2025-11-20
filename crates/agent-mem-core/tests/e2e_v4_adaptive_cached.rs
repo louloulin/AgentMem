@@ -5,7 +5,9 @@ use agent_mem_core::config::AgentMemConfig;
 use agent_mem_core::performance::cache::QueryCacheConfig;
 use agent_mem_core::search::adaptive_router::{AdaptiveRouter, StrategyId};
 use agent_mem_core::search::adaptive_search_engine::{SearchBackendResult, SearchEngineBackend};
-use agent_mem_core::search::cached_adaptive_engine::{CachedAdaptiveEngine, ParallelSearchOptimizer};
+use agent_mem_core::search::cached_adaptive_engine::{
+    CachedAdaptiveEngine, ParallelSearchOptimizer,
+};
 use agent_mem_core::search::{SearchQuery, SearchResult};
 use agent_mem_core::types::{AttributeKey, AttributeValue, Content, Memory, MemoryBuilder};
 use anyhow::Result;
@@ -25,7 +27,7 @@ struct MockSearchBackend {
 impl MockSearchBackend {
     fn new() -> Self {
         let mut memories = Vec::new();
-        
+
         // 初始化测试数据
         for i in 0..50 {
             let memory = MemoryBuilder::new()
@@ -37,7 +39,7 @@ impl MockSearchBackend {
                 .build();
             memories.push(memory);
         }
-        
+
         Self {
             memories: Arc::new(Mutex::new(memories)),
         }
@@ -55,10 +57,10 @@ impl SearchEngineBackend for MockSearchBackend {
     ) -> Result<SearchBackendResult> {
         // 模拟搜索延迟
         tokio::time::sleep(Duration::from_millis(50)).await;
-        
+
         let memories = self.memories.lock().unwrap();
         let mut results = Vec::new();
-        
+
         // 简单的文本匹配
         for memory in memories.iter() {
             if let Content::Text(text) = &memory.content {
@@ -73,15 +75,13 @@ impl SearchEngineBackend for MockSearchBackend {
                     });
                 }
             }
-            
+
             if results.len() >= query.limit {
                 break;
             }
         }
-        
-        Ok(SearchBackendResult {
-            results,
-        })
+
+        Ok(SearchBackendResult { results })
     }
 }
 
@@ -107,7 +107,7 @@ async fn test_adaptive_router_strategy_selection() {
 
     // 第一次决策（应该选择Balanced策略）
     let (strategy, weights) = router.decide_strategy(&query).await.unwrap();
-    
+
     assert!(matches!(
         strategy,
         StrategyId::VectorHeavy
@@ -142,11 +142,11 @@ async fn test_adaptive_learning_feedback() {
     // 执行10次搜索+反馈循环
     for i in 0..10 {
         let (strategy, _) = router.decide_strategy(&query).await.unwrap();
-        
+
         // 模拟搜索结果反馈
         let accuracy = 0.7 + (i as f32 * 0.02); // 递增准确率
         let latency_ms = 100 + (i * 5); // 递增延迟
-        
+
         router
             .record_performance(&query, strategy, accuracy, latency_ms as u64)
             .await
@@ -170,7 +170,7 @@ async fn test_cache_hit_and_miss() {
     let config = AgentMemConfig::default();
     let cache_config = QueryCacheConfig::default();
     let backend = Arc::new(MockSearchBackend::new());
-    
+
     let engine = CachedAdaptiveEngine::new(
         backend,
         config,
@@ -193,7 +193,10 @@ async fn test_cache_hit_and_miss() {
 
     // 第一次搜索（缓存未命中）
     let start1 = std::time::Instant::now();
-    let results1 = engine.search(query_vector.clone(), query.clone()).await.unwrap();
+    let results1 = engine
+        .search(query_vector.clone(), query.clone())
+        .await
+        .unwrap();
     let latency1 = start1.elapsed();
 
     assert!(!results1.is_empty());
@@ -201,7 +204,10 @@ async fn test_cache_hit_and_miss() {
 
     // 第二次搜索（缓存命中）
     let start2 = std::time::Instant::now();
-    let results2 = engine.search(query_vector.clone(), query.clone()).await.unwrap();
+    let results2 = engine
+        .search(query_vector.clone(), query.clone())
+        .await
+        .unwrap();
     let latency2 = start2.elapsed();
 
     assert_eq!(results1.len(), results2.len());
@@ -210,7 +216,10 @@ async fn test_cache_hit_and_miss() {
     println!("✅ Cache hit/miss test passed");
     println!("   - 1st search (miss): {:?}", latency1);
     println!("   - 2nd search (hit): {:?}", latency2);
-    println!("   - Speedup: {:.1}x", latency1.as_millis() as f64 / latency2.as_millis() as f64);
+    println!(
+        "   - Speedup: {:.1}x",
+        latency1.as_millis() as f64 / latency2.as_millis() as f64
+    );
 }
 
 /// E2E测试：缓存统计
@@ -225,7 +234,7 @@ async fn test_cache_statistics() {
         warmup_batch_size: 0,
     };
     let backend = Arc::new(MockSearchBackend::new());
-    
+
     let engine = Arc::new(CachedAdaptiveEngine::new(
         backend,
         config,
@@ -249,7 +258,10 @@ async fn test_cache_statistics() {
         };
 
         // 每个查询执行2次
-        engine.search(query_vector.clone(), query.clone()).await.unwrap();
+        engine
+            .search(query_vector.clone(), query.clone())
+            .await
+            .unwrap();
         engine.search(query_vector.clone(), query).await.unwrap();
     }
 
@@ -257,7 +269,7 @@ async fn test_cache_statistics() {
     let stats = engine.get_cache_stats().await.unwrap();
     println!("✅ Cache statistics:");
     println!("{}", stats);
-    
+
     // 验证：20次请求，10次未命中，10次命中，命中率50%
     assert!(stats.contains("Total Requests: 20"));
     assert!(stats.contains("Cache Hits: 10"));
@@ -269,7 +281,7 @@ async fn test_parallel_search_performance() {
     let config = AgentMemConfig::default();
     let cache_config = QueryCacheConfig::default();
     let backend = Arc::new(MockSearchBackend::new());
-    
+
     let engine = Arc::new(CachedAdaptiveEngine::new(
         backend,
         config,
@@ -298,11 +310,14 @@ async fn test_parallel_search_performance() {
 
     // 执行并发搜索
     let start = std::time::Instant::now();
-    let results = optimizer.batch_search(engine.clone(), queries).await.unwrap();
+    let results = optimizer
+        .batch_search(engine.clone(), queries)
+        .await
+        .unwrap();
     let elapsed = start.elapsed();
 
     assert_eq!(results.len(), 50);
-    
+
     let qps = 50.0 / elapsed.as_secs_f64();
     println!("✅ Parallel search completed");
     println!("   - Queries: 50");
@@ -319,14 +334,8 @@ async fn test_cache_warmup() {
     let config = AgentMemConfig::default();
     let cache_config = QueryCacheConfig::default();
     let backend = Arc::new(MockSearchBackend::new());
-    
-    let engine = CachedAdaptiveEngine::new(
-        backend,
-        config,
-        cache_config,
-        true,
-        false,
-    );
+
+    let engine = CachedAdaptiveEngine::new(backend, config, cache_config, true, false);
 
     // 准备热点查询
     let hot_queries: Vec<(Vec<f32>, SearchQuery)> = (0..10)
@@ -346,7 +355,7 @@ async fn test_cache_warmup() {
 
     // 预热缓存
     let warmed = engine.warmup_cache(hot_queries).await.unwrap();
-    
+
     assert_eq!(warmed, 10);
     println!("✅ Cache warmup completed: {} queries", warmed);
 
@@ -361,7 +370,7 @@ async fn test_full_adaptive_search_flow() {
     let config = AgentMemConfig::default();
     let cache_config = QueryCacheConfig::default();
     let backend = Arc::new(MockSearchBackend::new());
-    
+
     let engine = CachedAdaptiveEngine::new(
         backend,
         config,
@@ -386,7 +395,7 @@ async fn test_full_adaptive_search_flow() {
     let results = engine.search(query_vector, query).await.unwrap();
 
     assert!(!results.is_empty());
-    
+
     for (idx, result) in results.iter().enumerate() {
         println!(
             "   Result {}: score={:.2}, content={}",
@@ -406,14 +415,8 @@ async fn test_cache_clear() {
     let config = AgentMemConfig::default();
     let cache_config = QueryCacheConfig::default();
     let backend = Arc::new(MockSearchBackend::new());
-    
-    let engine = CachedAdaptiveEngine::new(
-        backend,
-        config,
-        cache_config,
-        true,
-        false,
-    );
+
+    let engine = CachedAdaptiveEngine::new(backend, config, cache_config, true, false);
 
     let query = SearchQuery {
         query: "测试记忆内容 20".to_string(),
@@ -441,4 +444,3 @@ async fn test_cache_clear() {
 
     println!("✅ Cache clear test passed");
 }
-

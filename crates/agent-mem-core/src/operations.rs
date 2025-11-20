@@ -229,10 +229,13 @@ impl InMemoryOperations {
                 }
 
                 // Skip expired memories (check if memory has expiry attribute)
-                if let Some(expiry_attr) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("expires_at")) {
+                if let Some(expiry_attr) = memory
+                    .attributes
+                    .get(&agent_mem_traits::AttributeKey::system("expires_at"))
+                {
                     if let Some(expiry_ts) = expiry_attr.as_number() {
                         if current_time > expiry_ts as i64 {
-                    return false;
+                            return false;
                         }
                     }
                 }
@@ -267,8 +270,8 @@ impl MemoryOperations for InMemoryOperations {
 
         if let Some(existing) = self.memories.get(&memory_id_str) {
             // Check if indices need updating
-            let needs_reindex =
-                existing.agent_id() != memory.agent_id() || existing.memory_type() != memory.memory_type();
+            let needs_reindex = existing.agent_id() != memory.agent_id()
+                || existing.memory_type() != memory.memory_type();
 
             if needs_reindex {
                 // Clone the existing memory to avoid borrow issues
@@ -385,19 +388,20 @@ impl MemoryOperations for InMemoryOperations {
 
         for memory in &memories {
             // Type distribution - from attributes
-            if let Some(memory_type_str) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("memory_type"))
+            if let Some(memory_type_str) = memory
+                .attributes
+                .get(&agent_mem_traits::AttributeKey::system("memory_type"))
                 .and_then(|v| v.as_string())
             {
                 if let Ok(memory_type) = memory_type_str.parse::<crate::types::MemoryType>() {
-                    *stats
-                        .memories_by_type
-                        .entry(memory_type)
-                        .or_insert(0) += 1;
+                    *stats.memories_by_type.entry(memory_type).or_insert(0) += 1;
                 }
             }
 
             // Agent distribution - from attributes
-            if let Some(agent_id) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("agent_id"))
+            if let Some(agent_id) = memory
+                .attributes
+                .get(&agent_mem_traits::AttributeKey::system("agent_id"))
                 .and_then(|v| v.as_string())
             {
                 *stats
@@ -407,11 +411,13 @@ impl MemoryOperations for InMemoryOperations {
             }
 
             // Importance and access stats - from attributes
-            let importance = memory.attributes.get(&agent_mem_traits::AttributeKey::system("importance"))
+            let importance = memory
+                .attributes
+                .get(&agent_mem_traits::AttributeKey::system("importance"))
                 .and_then(|v| v.as_number())
                 .unwrap_or(0.0) as f32;
             total_importance += importance;
-            
+
             let access_count = memory.metadata.access_count as u64;
             total_access_count += access_count as u64;
 
@@ -442,7 +448,8 @@ impl MemoryOperations for InMemoryOperations {
 
             if self.memories.contains_key(&memory_id_str) {
                 return Err(AgentMemError::memory_error(format!(
-                    "Memory {} already exists", memory_id_str
+                    "Memory {} already exists",
+                    memory_id_str
                 )));
             }
 

@@ -5,7 +5,7 @@
 //! - expires_at: 过期时间（用于工作记忆）
 //! - version: 版本号（用于乐观锁定）
 
-use agent_mem_core::types::{Memory, MemoryType, AttributeKey, AttributeValue};
+use agent_mem_core::types::{AttributeKey, AttributeValue, Memory, MemoryType};
 use agent_mem_traits::Vector;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -44,7 +44,11 @@ async fn main() -> anyhow::Result<()> {
     memory_with_embedding.attributes.set(
         agent_mem_core::types::AttributeKey::system("embedding"),
         agent_mem_core::types::AttributeValue::Array(
-            embedding_vector.values.iter().map(|&v| agent_mem_core::types::AttributeValue::Number(v as f64)).collect()
+            embedding_vector
+                .values
+                .iter()
+                .map(|&v| agent_mem_core::types::AttributeValue::Number(v as f64))
+                .collect(),
         ),
     );
 
@@ -83,15 +87,13 @@ async fn main() -> anyhow::Result<()> {
     println!("✅ 创建带有 expires_at 的工作记忆:");
     println!("   - ID: {}", working_memory.id);
     println!("   - 内容: {}", working_memory.content.to_string());
-    println!(
-        "   - 创建时间: {}",
-        working_memory.created_at()
-    );
+    println!("   - 创建时间: {}", working_memory.created_at());
     println!(
         "   - 过期时间: {}",
         chrono::DateTime::from_timestamp(expires_at, 0).unwrap()
     );
-    let is_expired = working_memory.attributes
+    let is_expired = working_memory
+        .attributes
         .get(&AttributeKey::system("expires_at"))
         .and_then(|v| v.as_number())
         .map(|ts| chrono::Utc::now().timestamp() > ts as i64)
@@ -115,14 +117,16 @@ async fn main() -> anyhow::Result<()> {
 
     println!("✅ 测试已过期的记忆:");
     println!("   - ID: {}", expired_memory.id);
-    let expired_at = expired_memory.attributes
+    let expired_at = expired_memory
+        .attributes
         .get(&AttributeKey::system("expires_at"))
         .and_then(|v| v.as_number())
         .map(|ts| chrono::DateTime::from_timestamp(ts as i64, 0).unwrap());
     if let Some(expired_at) = expired_at {
         println!("   - 过期时间: {}", expired_at);
     }
-    let is_expired = expired_memory.attributes
+    let is_expired = expired_memory
+        .attributes
         .get(&AttributeKey::system("expires_at"))
         .and_then(|v| v.as_number())
         .map(|ts| chrono::Utc::now().timestamp() > ts as i64)
@@ -184,7 +188,10 @@ async fn main() -> anyhow::Result<()> {
     comprehensive_memory.attributes.set(
         AttributeKey::system("embedding"),
         AttributeValue::Array(
-            embedding_values.iter().map(|&v| AttributeValue::Number(v as f64)).collect()
+            embedding_values
+                .iter()
+                .map(|&v| AttributeValue::Number(v as f64))
+                .collect(),
         ),
     );
 
@@ -206,14 +213,25 @@ async fn main() -> anyhow::Result<()> {
     println!("   - 类型: {:?}", comprehensive_memory.memory_type());
     println!("   - 内容: {}", comprehensive_memory.content.to_string());
     println!("   - 重要性: {}", comprehensive_memory.importance());
-    let embedding_info = comprehensive_memory.attributes
+    let embedding_info = comprehensive_memory
+        .attributes
         .get(&AttributeKey::system("embedding"))
         .and_then(|v| v.as_array())
-        .map(|arr| (arr.len(), arr.iter().take(3).map(|x| format!("{:.2}", x)).collect::<Vec<_>>().join(", ")));
+        .map(|arr| {
+            (
+                arr.len(),
+                arr.iter()
+                    .take(3)
+                    .map(|x| format!("{:.2}", x))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )
+        });
     if let Some((len, preview)) = embedding_info {
         println!("   - Embedding: [{}...] ({}维)", preview, len);
     }
-    let expires_at = comprehensive_memory.attributes
+    let expires_at = comprehensive_memory
+        .attributes
         .get(&AttributeKey::system("expires_at"))
         .and_then(|v| v.as_number())
         .map(|ts| chrono::DateTime::from_timestamp(ts as i64, 0).unwrap());
@@ -221,8 +239,14 @@ async fn main() -> anyhow::Result<()> {
         println!("   - 过期时间: {}", expires_at);
     }
     println!("   - 版本: {}", comprehensive_memory.version());
-    println!("   - 访问次数: {}", comprehensive_memory.metadata.accessed_count);
-    println!("   - Metadata: {:?}", comprehensive_memory.metadata.to_hashmap());
+    println!(
+        "   - 访问次数: {}",
+        comprehensive_memory.metadata.accessed_count
+    );
+    println!(
+        "   - Metadata: {:?}",
+        comprehensive_memory.metadata.to_hashmap()
+    );
     println!();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

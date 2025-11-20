@@ -520,10 +520,7 @@ impl VectorStore for PostgresVectorStore {
 
     async fn health_check(&self) -> Result<HealthStatus> {
         // 检查数据库连接
-        match sqlx::query("SELECT 1")
-            .fetch_one(self.pool.as_ref())
-            .await
-        {
+        match sqlx::query("SELECT 1").fetch_one(self.pool.as_ref()).await {
             Ok(_) => Ok(HealthStatus {
                 status: "healthy".to_string(),
                 message: "PostgreSQL vector store is operational".to_string(),

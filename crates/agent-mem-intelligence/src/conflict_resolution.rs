@@ -7,8 +7,8 @@
 //! - 置信度评估
 
 use crate::similarity::SemanticSimilarity;
-use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use agent_mem_llm::LLMProvider;
+use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -271,7 +271,7 @@ impl ConflictResolver {
                     agent_mem_traits::Content::Structured(v) => &v.to_string(),
                     _ => "",
                 };
-                
+
                 let similarity = self
                     .similarity
                     .calculate_similarity(new_content_str, existing_content_str)
@@ -287,7 +287,10 @@ impl ConflictResolver {
                         let conflict = ConflictDetection {
                             id: format!("semantic_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Semantic,
-                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
+                            memory_ids: vec![
+                                new_memory.id.as_str().to_string(),
+                                existing_memory.id.as_str().to_string(),
+                            ],
                             description: format!(
                                 "语义冲突：新记忆 '{}' 与现有记忆 '{}' 存在矛盾",
                                 new_content_str.chars().take(50).collect::<String>(),
@@ -323,7 +326,8 @@ impl ConflictResolver {
         // 简化的时间冲突检测逻辑
         for new_memory in new_memories {
             for existing_memory in existing_memories {
-                let time_diff = (new_memory.metadata.created_at - existing_memory.metadata.created_at)
+                let time_diff = (new_memory.metadata.created_at
+                    - existing_memory.metadata.created_at)
                     .num_hours()
                     .abs();
 
@@ -338,13 +342,16 @@ impl ConflictResolver {
                         agent_mem_traits::Content::Structured(v) => &v.to_string(),
                         _ => "",
                     };
-                    
+
                     // 检查是否存在时间相关的冲突
                     if self.has_temporal_conflict(new_content_str, existing_content_str) {
                         let conflict = ConflictDetection {
                             id: format!("temporal_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Temporal,
-                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
+                            memory_ids: vec![
+                                new_memory.id.as_str().to_string(),
+                                existing_memory.id.as_str().to_string(),
+                            ],
                             description: "时间冲突：记忆中的时间信息不一致".to_string(),
                             severity: 0.7,
                             confidence: 0.8,
@@ -402,7 +409,10 @@ impl ConflictResolver {
                         let conflict = ConflictDetection {
                             id: format!("duplicate_conflict_{}", conflicts.len()),
                             conflict_type: ConflictType::Duplicate,
-                            memory_ids: vec![new_memory.id.as_str().to_string(), existing_memory.id.as_str().to_string()],
+                            memory_ids: vec![
+                                new_memory.id.as_str().to_string(),
+                                existing_memory.id.as_str().to_string(),
+                            ],
                             description: "重复内容：发现相似的记忆内容".to_string(),
                             severity: 0.6,
                             confidence: similarity,
@@ -559,7 +569,10 @@ impl ConflictResolver {
                     })
                     .collect();
 
-                if let Some(latest) = conflict_memories.iter().max_by_key(|m| m.metadata.created_at) {
+                if let Some(latest) = conflict_memories
+                    .iter()
+                    .max_by_key(|m| m.metadata.created_at)
+                {
                     let to_delete: Vec<String> = conflict_memories
                         .iter()
                         .filter(|m| m.id.as_str() != latest.id.as_str())

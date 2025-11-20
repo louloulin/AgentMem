@@ -53,10 +53,9 @@ impl MemoryManager {
         info!("  - 数据库类型: LibSQL (SQLite)");
         info!("  - 数据库路径: {}", db_path);
 
-        let mut builder = Memory::builder()
-            .with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
-            // ⚠️ 不设置 default_user_id 和 default_agent_id
-            // 强制每次调用时显式传入，避免被默认值覆盖
+        let mut builder = Memory::builder().with_storage(&db_path); // 🔑 关键修复：显式指定使用LibSQL
+                                                                    // ⚠️ 不设置 default_user_id 和 default_agent_id
+                                                                    // 强制每次调用时显式传入，避免被默认值覆盖
 
         // 🔑 关键修复 #2：配置Embedder（P0问题）
         info!("🔌 配置 Embedder (向量嵌入)");
@@ -199,36 +198,36 @@ impl MemoryManager {
 
         // 🆕 Phase 2 Server: 提取scope_type（如果没有则自动推断）
         // ✅ 修复优先级：user_id优先于session_id（符合agentmem61.md设计）
-        let scope_type = full_metadata
-            .get("scope_type")
-            .cloned()
-            .unwrap_or_else(|| {
-                // 自动推断scope类型 - 正确的优先级
-                // 1. 如果有user_id和agent_id（非默认），这是长期记忆（Agent scope）
-                if user_id_val != "default" && effective_agent_id.starts_with("agent-") && effective_agent_id != "default-agent" {
-                    "agent".to_string()
-                } 
-                // 2. 如果只有user_id（非默认），这是用户记忆（User scope）
-                else if user_id_val != "default" {
-                    "user".to_string()
-                }
-                // 3. 如果有session_id，这是工作记忆（Session scope）
-                else if full_metadata.contains_key("session_id") {
-                    "session".to_string()
-                }
-                // 4. 如果有run_id
-                else if full_metadata.contains_key("run_id") {
-                    "run".to_string()
-                }
-                // 5. 如果有org_id
-                else if full_metadata.contains_key("org_id") {
-                    "organization".to_string()
-                }
-                // 6. 默认为全局
-                else {
-                    "global".to_string()
-                }
-            });
+        let scope_type = full_metadata.get("scope_type").cloned().unwrap_or_else(|| {
+            // 自动推断scope类型 - 正确的优先级
+            // 1. 如果有user_id和agent_id（非默认），这是长期记忆（Agent scope）
+            if user_id_val != "default"
+                && effective_agent_id.starts_with("agent-")
+                && effective_agent_id != "default-agent"
+            {
+                "agent".to_string()
+            }
+            // 2. 如果只有user_id（非默认），这是用户记忆（User scope）
+            else if user_id_val != "default" {
+                "user".to_string()
+            }
+            // 3. 如果有session_id，这是工作记忆（Session scope）
+            else if full_metadata.contains_key("session_id") {
+                "session".to_string()
+            }
+            // 4. 如果有run_id
+            else if full_metadata.contains_key("run_id") {
+                "run".to_string()
+            }
+            // 5. 如果有org_id
+            else if full_metadata.contains_key("org_id") {
+                "organization".to_string()
+            }
+            // 6. 默认为全局
+            else {
+                "global".to_string()
+            }
+        });
 
         let metadata_json: serde_json::Value = full_metadata
             .into_iter()
@@ -242,7 +241,7 @@ impl MemoryManager {
             .find_by_id(&effective_agent_id)
             .await
             .map_err(|e| format!("Failed to query agent: {}", e))?;
-        
+
         let organization_id = agent_opt
             .as_ref()
             .map(|a| a.organization_id.clone())
@@ -250,7 +249,7 @@ impl MemoryManager {
 
         let db_memory = agent_mem_core::storage::models::DbMemory {
             id: memory_id.clone(),
-            organization_id, // 使用Agent的organization_id或默认值
+            organization_id,                // 使用Agent的organization_id或默认值
             user_id: "default".to_string(), // 使用默认user (TODO: 应该从auth获取实际user)
             agent_id: effective_agent_id.clone(),
             content,
@@ -261,7 +260,7 @@ impl MemoryManager {
                 "{:?}",
                 memory_type.unwrap_or(agent_mem_traits::MemoryType::Semantic)
             ),
-            scope: scope_type,  // 🆕 Phase 2 Server: 使用推断或提取的scope_type
+            scope: scope_type, // 🆕 Phase 2 Server: 使用推断或提取的scope_type
             level: "normal".to_string(),
             importance: importance.unwrap_or(0.5),
             access_count: 0,
@@ -437,8 +436,11 @@ impl MemoryManager {
 
         // 🔧 智能阈值调整：根据查询类型动态设置
         let dynamic_threshold = get_adaptive_threshold(&query);
-        info!("📊 自适应阈值: query='{}', threshold={}", query, dynamic_threshold);
-        
+        info!(
+            "📊 自适应阈值: query='{}', threshold={}",
+            query, dynamic_threshold
+        );
+
         let options = SearchOptions {
             user_id: user_id.clone(),
             limit: Some(fetch_limit),
@@ -480,7 +482,7 @@ impl MemoryManager {
                     let fallback_options = SearchOptions {
                         user_id,
                         limit: Some(base_limit),
-                        threshold: Some(dynamic_threshold),  // 使用动态阈值
+                        threshold: Some(dynamic_threshold), // 使用动态阈值
                         ..Default::default()
                     };
                     return self
@@ -618,9 +620,9 @@ impl MemoryManager {
 // ==================== 辅助函数 ====================
 
 /// 安全地截取字符串到指定字符数（使用字符边界，避免UTF-8 panic）
-/// 
+///
 /// 这个函数确保在字符边界处截取，而不是字节边界，避免在多字节UTF-8字符中间切片
-/// 
+///
 /// # 性能说明
 /// 使用 `chars().take()` 直接截取，只遍历需要的字符，对长字符串高效
 fn truncate_string_at_char_boundary(s: &str, max_chars: usize) -> String {
@@ -764,30 +766,26 @@ pub async fn update_memory(
         existing.content.clone()
     };
 
-    let updated_importance = request.importance.unwrap_or(
-        existing.importance().unwrap_or(0.5) as f32
-    );
+    let updated_importance = request
+        .importance
+        .unwrap_or(existing.importance().unwrap_or(0.5) as f32);
 
     // 使用builder模式构建更新后的Memory
     let mut updated = existing.clone();
     updated.content = updated_content;
-    
+
     // 更新importance - 使用system命名空间（和importance()方法一致）
     updated.attributes.set(
         agent_mem_traits::AttributeKey::system("importance"),
-        agent_mem_traits::AttributeValue::Number(updated_importance as f64)
+        agent_mem_traits::AttributeValue::Number(updated_importance as f64),
     );
     updated.metadata.updated_at = chrono::Utc::now();
 
     // 执行更新
-    repositories
-        .memories
-        .update(&updated)
-        .await
-        .map_err(|e| {
-            error!("Failed to update memory in repository: {}", e);
-            ServerError::MemoryError(e.to_string())
-        })?;
+    repositories.memories.update(&updated).await.map_err(|e| {
+        error!("Failed to update memory in repository: {}", e);
+        ServerError::MemoryError(e.to_string())
+    })?;
 
     info!("✅ Memory updated in LibSQL");
 
@@ -822,20 +820,19 @@ pub async fn delete_memory(
 
     // 🔧 修复: 同时删除双层存储
     // Step 1: 删除LibSQL Repository (主要存储)
-    repositories
-        .memories
-        .delete(&id)
-        .await
-        .map_err(|e| {
-            error!("Failed to delete memory from repository: {}", e);
-            ServerError::MemoryError(format!("Failed to delete memory: {}", e))
-        })?;
+    repositories.memories.delete(&id).await.map_err(|e| {
+        error!("Failed to delete memory from repository: {}", e);
+        ServerError::MemoryError(format!("Failed to delete memory: {}", e))
+    })?;
 
     info!("✅ Memory deleted from LibSQL");
 
     // Step 2: 尝试删除Memory API (向量存储) - 如果失败不影响主流程
     if let Err(e) = memory_manager.delete_memory(&id).await {
-        warn!("Failed to delete memory from Memory API (non-critical): {}", e);
+        warn!(
+            "Failed to delete memory from Memory API (non-critical): {}",
+            e
+        );
     }
 
     let response = crate::models::MemoryResponse {
@@ -852,48 +849,52 @@ pub async fn delete_memory(
 /// 智能阈值计算：根据查询类型动态调整阈值
 fn get_adaptive_threshold(query: &str) -> f32 {
     use regex::Regex;
-    
+
     // 检测商品ID格式: P + 6位数字
     if let Ok(pattern) = Regex::new(r"^P\d{6}$") {
         if pattern.is_match(query) {
-            return 0.1;  // 商品ID: 极低阈值，几乎只要匹配就返回
+            return 0.1; // 商品ID: 极低阈值，几乎只要匹配就返回
         }
     }
-    
+
     // 检测UUID格式
     if query.len() == 36 && query.matches('-').count() == 4 {
-        return 0.1;  // UUID: 极低阈值
+        return 0.1; // UUID: 极低阈值
     }
-    
+
     // 检测其他精确ID格式（全字母数字，无空格，长度< 20）
-    if query.len() < 20 
-        && !query.contains(' ') 
-        && query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-        return 0.2;  // 精确ID: 低阈值
+    if query.len() < 20
+        && !query.contains(' ')
+        && query
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return 0.2; // 精确ID: 低阈值
     }
-    
+
     // 短查询（< 5字符）
     if query.len() < 5 {
-        return 0.3;  // 短查询: 低阈值
+        return 0.3; // 短查询: 低阈值
     }
-    
+
     // 包含商品相关关键词
     let lower_query = query.to_lowercase();
-    if lower_query.contains("商品") 
-        || lower_query.contains("订单") 
-        || lower_query.contains("id") 
-        || lower_query.contains("product") {
-        return 0.4;  // 商品相关: 中低阈值
+    if lower_query.contains("商品")
+        || lower_query.contains("订单")
+        || lower_query.contains("id")
+        || lower_query.contains("product")
+    {
+        return 0.4; // 商品相关: 中低阈值
     }
-    
+
     // 根据长度调整
     let query_len = query.len();
     if query_len < 20 {
-        0.3  // 短查询
+        0.3 // 短查询
     } else if query_len < 50 {
-        0.5  // 中等长度查询
+        0.5 // 中等长度查询
     } else {
-        0.7  // 长查询用高阈值
+        0.7 // 长查询用高阈值
     }
 }
 
@@ -905,11 +906,13 @@ fn detect_exact_query(query: &str) -> bool {
             return true;
         }
     }
-    
+
     // 其他精确ID格式（全字母数字，无空格，长度< 20）
-    query.len() < 20 
-        && !query.contains(' ') 
-        && query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    query.len() < 20
+        && !query.contains(' ')
+        && query
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
 /// 通过LibSQL精确查询（商品ID等）- 使用search方法，直接返回JSON
@@ -918,13 +921,14 @@ async fn search_by_libsql_exact(
     query: &str,
     limit: usize,
 ) -> Result<Vec<serde_json::Value>, String> {
-    use tracing::{error, info, debug};
-    
+    use tracing::{debug, error, info};
+
     info!("🔍 LibSQL精确查询: query='{}', limit={}", query, limit);
-    
+
     // 使用repositories.memories.search方法（支持content LIKE查询）
-    match repositories.memories
-        .search(query, (limit * 2) as i64)  // 多取一些，用于排序过滤
+    match repositories
+        .memories
+        .search(query, (limit * 2) as i64) // 多取一些，用于排序过滤
         .await
     {
         Ok(memories) if !memories.is_empty() => {
@@ -932,10 +936,7 @@ async fn search_by_libsql_exact(
 
             // 🔧 修复: 将 MemoryV4 转换为 MemoryItem 以便访问字段
             use agent_mem_traits::MemoryV4;
-            let memory_items: Vec<_> = memories
-                .into_iter()
-                .map(|m| m.to_legacy_item())
-                .collect();
+            let memory_items: Vec<_> = memories.into_iter().map(|m| m.to_legacy_item()).collect();
 
             // 🔧 修复: 优先返回精确匹配的商品记忆
             // 1. 分离精确匹配和模糊匹配
@@ -965,7 +966,11 @@ async fn search_by_libsql_exact(
                 }
             }
 
-            info!("📊 精确匹配: {} 条, 模糊匹配: {} 条", exact_matches.len(), fuzzy_matches.len());
+            info!(
+                "📊 精确匹配: {} 条, 模糊匹配: {} 条",
+                exact_matches.len(),
+                fuzzy_matches.len()
+            );
 
             // 2. 合并结果：精确匹配在前，模糊匹配在后
             let mut sorted_memories = exact_matches;
@@ -977,8 +982,10 @@ async fn search_by_libsql_exact(
             for mem in &sorted_memories {
                 // 🔧 修复: 使用字符边界而不是字节边界，避免UTF-8字符中间切片导致panic
                 let content_preview = truncate_string_at_char_boundary(&mem.content, 50);
-                debug!("  - ID: {}, Type: {:?}, Content: {}...",
-                    mem.id, mem.memory_type, content_preview);
+                debug!(
+                    "  - ID: {}, Type: {:?}, Content: {}...",
+                    mem.id, mem.memory_type, content_preview
+                );
             }
 
             // 直接转换为JSON
@@ -1001,12 +1008,12 @@ async fn search_by_libsql_exact(
                     })
                 })
                 .collect();
-            
+
             if json_results.is_empty() {
                 info!("⚠️  过滤后没有有效结果: query='{}'", query);
                 Err(format!("未找到匹配的记忆: {}", query))
             } else {
-            Ok(json_results)
+                Ok(json_results)
             }
         }
         Ok(_) => {
@@ -1055,13 +1062,13 @@ pub async fn search_memories(
     Json(request): Json<crate::models::SearchRequest>,
 ) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
     info!("🔍 搜索记忆: query={}", request.query);
-    
+
     // 🎯 Phase 1: LibSQL精确查询（商品ID等）
     let is_exact_query = detect_exact_query(&request.query);
-    
+
     if is_exact_query {
         info!("🎯 检测到精确查询，使用LibSQL: {}", request.query);
-        
+
         // 尝试LibSQL精确匹配
         let limit = request.limit.unwrap_or(10);
         match search_by_libsql_exact(&repositories, &request.query, limit).await {
@@ -1077,10 +1084,10 @@ pub async fn search_memories(
             }
         }
     }
-    
+
     // 🔍 Phase 2: 向量语义搜索（降级或默认）
     info!("🔍 使用向量语义搜索: {}", request.query);
-    let query_clone = request.query.clone();  // Clone for later use
+    let query_clone = request.query.clone(); // Clone for later use
     let results = memory_manager
         .search_memories(
             request.query,
@@ -1101,7 +1108,7 @@ pub async fn search_memories(
         // 分离精确匹配和模糊匹配
         let mut exact_matches = Vec::new();
         let mut fuzzy_matches = Vec::new();
-        
+
         for item in sorted_results {
             let is_exact = {
                 // 检查 content 是否包含 "商品ID: {query}"
@@ -1113,23 +1120,24 @@ pub async fn search_memories(
                     .map(|pid| pid == query_clone)
                     .unwrap_or(false)
             };
-            
+
             // 排除工作记忆（working memory）
-            let is_working_memory = matches!(
-                item.memory_type.to_string().as_str(),
-                "working" | "Working"
-            );
-            
+            let is_working_memory =
+                matches!(item.memory_type.to_string().as_str(), "working" | "Working");
+
             if is_exact && !is_working_memory {
                 exact_matches.push(item);
             } else if !is_working_memory {
                 fuzzy_matches.push(item);
             }
         }
-        
-        info!("📊 向量搜索排序: 精确匹配 {} 条, 模糊匹配 {} 条", 
-            exact_matches.len(), fuzzy_matches.len());
-        
+
+        info!(
+            "📊 向量搜索排序: 精确匹配 {} 条, 模糊匹配 {} 条",
+            exact_matches.len(),
+            fuzzy_matches.len()
+        );
+
         // 合并：精确匹配在前，模糊匹配在后
         sorted_results = exact_matches;
         sorted_results.extend(fuzzy_matches);
@@ -1138,7 +1146,7 @@ pub async fn search_memories(
     // 🔧 修复: 过滤低相关度结果
     let min_score_threshold = request.threshold.unwrap_or(0.7); // 默认最低阈值 0.7
     info!("🎯 过滤阈值: {}", min_score_threshold);
-    
+
     // 转换为JSON，同时应用阈值过滤
     let json_results: Vec<serde_json::Value> = sorted_results
         .into_iter()

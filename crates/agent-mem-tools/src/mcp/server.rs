@@ -3,14 +3,15 @@
 //! 将 AgentMem 工具暴露为 MCP 服务，允许其他 MCP 客户端调用
 
 use super::error::{McpError, McpResult};
-use super::types::{McpContent, McpListToolsResponse, McpTool, McpToolCallRequest, McpToolCallResponse};
-use super::resources::{
-    ResourceManager, McpListResourcesResponse,
-    McpReadResourceRequest, McpReadResourceResponse, McpSubscribeResourceRequest,
-    McpSubscribeResourceResponse, ResourceChangeType,
-};
 use super::prompts::{
-    PromptManager, McpListPromptsResponse, McpGetPromptRequest, McpGetPromptResponse,
+    McpGetPromptRequest, McpGetPromptResponse, McpListPromptsResponse, PromptManager,
+};
+use super::resources::{
+    McpListResourcesResponse, McpReadResourceRequest, McpReadResourceResponse,
+    McpSubscribeResourceRequest, McpSubscribeResourceResponse, ResourceChangeType, ResourceManager,
+};
+use super::types::{
+    McpContent, McpListToolsResponse, McpTool, McpToolCallRequest, McpToolCallResponse,
 };
 use crate::executor::{Tool, ToolExecutor};
 use serde::{Deserialize, Serialize};
@@ -24,16 +25,16 @@ use tracing::{debug, info};
 pub struct McpServerConfig {
     /// 服务器名称
     pub name: String,
-    
+
     /// 服务器版本
     pub version: String,
-    
+
     /// 服务器描述
     pub description: String,
-    
+
     /// 是否需要认证
     pub require_auth: bool,
-    
+
     /// API 密钥（如果需要认证）
     pub api_keys: Vec<String>,
 }
@@ -120,7 +121,7 @@ impl McpServer {
             initialized: Arc::new(RwLock::new(false)),
         }
     }
-    
+
     /// 初始化服务器
     pub async fn initialize(&self) -> McpResult<()> {
         let mut initialized = self.initialized.write().await;
@@ -146,16 +147,16 @@ impl McpServer {
 
         Ok(())
     }
-    
+
     /// 注册工具
     pub async fn register_tool(&self, tool: Arc<dyn Tool>) -> McpResult<()> {
         let tool_name = tool.name().to_string();
         let mut tools = self.tools.write().await;
 
         if tools.contains_key(&tool_name) {
-            return Err(McpError::ConfigError(
-                format!("Tool '{tool_name}' already registered")
-            ));
+            return Err(McpError::ConfigError(format!(
+                "Tool '{tool_name}' already registered"
+            )));
         }
 
         tools.insert(tool_name.clone(), tool);
@@ -169,15 +170,15 @@ impl McpServer {
         let mut tools = self.tools.write().await;
 
         if tools.remove(tool_name).is_none() {
-            return Err(McpError::ConfigError(
-                format!("Tool '{tool_name}' not found")
-            ));
+            return Err(McpError::ConfigError(format!(
+                "Tool '{tool_name}' not found"
+            )));
         }
 
         info!("Unregistered tool: {}", tool_name);
         Ok(())
     }
-    
+
     /// 列出所有工具
     pub async fn list_tools(&self) -> McpResult<McpListToolsResponse> {
         self.check_initialized().await?;
@@ -201,12 +202,15 @@ impl McpServer {
 
         Ok(McpListToolsResponse { tools: mcp_tools })
     }
-    
+
     /// 调用工具
     pub async fn call_tool(&self, request: McpToolCallRequest) -> McpResult<McpToolCallResponse> {
         self.check_initialized().await?;
 
-        info!("Calling tool: {} with args: {:?}", request.name, request.arguments);
+        info!(
+            "Calling tool: {} with args: {:?}",
+            request.name, request.arguments
+        );
 
         // 创建执行上下文
         use crate::executor::ExecutionContext;
@@ -218,7 +222,8 @@ impl McpServer {
         };
 
         // 执行工具
-        let result = self.tool_executor
+        let result = self
+            .tool_executor
             .execute_tool(&request.name, request.arguments, &context)
             .await
             .map_err(|e| McpError::ToolExecutionError {
@@ -228,8 +233,7 @@ impl McpServer {
 
         // 转换结果为 MCP 格式
         let content = vec![McpContent::Text {
-            text: serde_json::to_string_pretty(&result)
-                .unwrap_or_else(|_| format!("{result:?}")),
+            text: serde_json::to_string_pretty(&result).unwrap_or_else(|_| format!("{result:?}")),
         }];
 
         Ok(McpToolCallResponse {
@@ -237,16 +241,16 @@ impl McpServer {
             is_error: false,
         })
     }
-    
+
     /// 验证 API 密钥
     pub fn verify_api_key(&self, api_key: &str) -> bool {
         if !self.config.require_auth {
             return true;
         }
-        
+
         self.config.api_keys.contains(&api_key.to_string())
     }
-    
+
     /// 获取服务器信息
     pub fn get_server_info(&self) -> ServerInfo {
         ServerInfo {
@@ -256,8 +260,8 @@ impl McpServer {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ServerCapabilities {
                 tools: true,
-                resources: true,  // 支持 Resources
-                prompts: true,    // 支持 Prompts
+                resources: true, // 支持 Resources
+                prompts: true,   // 支持 Prompts
             },
         }
     }
@@ -273,7 +277,10 @@ impl McpServer {
     }
 
     /// 读取资源内容
-    pub async fn read_resource(&self, request: McpReadResourceRequest) -> McpResult<McpReadResourceResponse> {
+    pub async fn read_resource(
+        &self,
+        request: McpReadResourceRequest,
+    ) -> McpResult<McpReadResourceResponse> {
         self.check_initialized().await?;
 
         info!("Reading MCP resource: {}", request.uri);
@@ -285,11 +292,17 @@ impl McpServer {
     }
 
     /// 订阅资源变更
-    pub async fn subscribe_resource(&self, request: McpSubscribeResourceRequest) -> McpResult<McpSubscribeResourceResponse> {
+    pub async fn subscribe_resource(
+        &self,
+        request: McpSubscribeResourceRequest,
+    ) -> McpResult<McpSubscribeResourceResponse> {
         self.check_initialized().await?;
 
         info!("Subscribing to MCP resource: {}", request.uri);
-        let subscription = self.resource_manager.subscribe_resource(&request.uri).await?;
+        let subscription = self
+            .resource_manager
+            .subscribe_resource(&request.uri)
+            .await?;
 
         Ok(McpSubscribeResourceResponse {
             subscription_id: subscription.id,
@@ -301,15 +314,23 @@ impl McpServer {
         self.check_initialized().await?;
 
         info!("Unsubscribing from MCP resource: {}", subscription_id);
-        self.resource_manager.unsubscribe_resource(subscription_id).await
+        self.resource_manager
+            .unsubscribe_resource(subscription_id)
+            .await
     }
 
     /// 通知资源变更
-    pub async fn notify_resource_change(&self, uri: &str, change_type: ResourceChangeType) -> McpResult<()> {
+    pub async fn notify_resource_change(
+        &self,
+        uri: &str,
+        change_type: ResourceChangeType,
+    ) -> McpResult<()> {
         self.check_initialized().await?;
 
         info!("Notifying resource change: {} ({:?})", uri, change_type);
-        self.resource_manager.notify_resource_change(uri, change_type).await
+        self.resource_manager
+            .notify_resource_change(uri, change_type)
+            .await
     }
 
     /// 获取资源管理器
@@ -328,11 +349,17 @@ impl McpServer {
     }
 
     /// 获取提示词
-    pub async fn get_prompt(&self, request: McpGetPromptRequest) -> McpResult<McpGetPromptResponse> {
+    pub async fn get_prompt(
+        &self,
+        request: McpGetPromptRequest,
+    ) -> McpResult<McpGetPromptResponse> {
         self.check_initialized().await?;
 
         info!("Getting MCP prompt: {}", request.name);
-        let response = self.prompt_manager.get_prompt(&request.name, request.arguments).await?;
+        let response = self
+            .prompt_manager
+            .get_prompt(&request.name, request.arguments)
+            .await?;
 
         Ok(response)
     }
@@ -373,6 +400,6 @@ pub struct ServerCapabilities {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     // Mock测试已删除，请查看 server_tests.rs 中的真实测试
 }

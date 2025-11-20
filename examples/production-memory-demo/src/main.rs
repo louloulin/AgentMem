@@ -8,8 +8,8 @@
 //! 3. 数据在重启后仍然存在
 //! 4. 对比 SimpleMemory（内存存储）和 Agent（持久化存储）
 
-use agent_mem_core::agents::{CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
 use agent_mem::Memory;
+use agent_mem_core::agents::{CoreAgent, EpisodicAgent, MemoryAgent, SemanticAgent};
 use tracing::{error, info};
 
 #[tokio::main]
@@ -55,7 +55,11 @@ async fn demo_memory() {
             // 添加一些测试数据
             match mem.add("我喜欢吃披萨").await {
                 Ok(result) => {
-                    let id = result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+                    let id = result
+                        .results
+                        .first()
+                        .map(|r| r.id.clone())
+                        .unwrap_or_default();
                     info!("✅ 添加记忆成功: {}", id);
                 }
                 Err(e) => error!("❌ 添加记忆失败: {}", e),
@@ -63,7 +67,11 @@ async fn demo_memory() {
 
             match mem.add("我的生日是 1990-01-01").await {
                 Ok(result) => {
-                    let id = result.results.first().map(|r| r.id.clone()).unwrap_or_default();
+                    let id = result
+                        .results
+                        .first()
+                        .map(|r| r.id.clone())
+                        .unwrap_or_default();
                     info!("✅ 添加记忆成功: {}", id);
                 }
                 Err(e) => error!("❌ 添加记忆失败: {}", e),

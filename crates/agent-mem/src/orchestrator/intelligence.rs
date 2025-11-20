@@ -29,7 +29,8 @@ impl IntelligenceModule {
         if let Some(fact_extractor) = &orchestrator.fact_extractor {
             // 使用缓存
             if let Some(cache) = &orchestrator.facts_cache {
-                let cache_key = agent_mem_llm::LLMCache::<Vec<ExtractedFact>>::generate_key(content);
+                let cache_key =
+                    agent_mem_llm::LLMCache::<Vec<ExtractedFact>>::generate_key(content);
 
                 // 尝试从缓存获取
                 if let Some(cached_facts) = cache.get(&cache_key).await {
@@ -121,8 +122,9 @@ impl IntelligenceModule {
                     .map(|f| format!("{}:{}", f.description, f.fact_type))
                     .collect::<Vec<_>>()
                     .join("|");
-                let cache_key =
-                    agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(&cache_content);
+                let cache_key = agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(
+                    &cache_content,
+                );
 
                 // 尝试从缓存获取
                 if let Some(cached_evaluations) = cache.get(&cache_key).await {
@@ -164,8 +166,9 @@ impl IntelligenceModule {
                     .map(|f| format!("{}:{}", f.description, f.fact_type))
                     .collect::<Vec<_>>()
                     .join("|");
-                let cache_key =
-                    agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(&cache_content);
+                let cache_key = agent_mem_llm::LLMCache::<Vec<ImportanceEvaluation>>::generate_key(
+                    &cache_content,
+                );
                 cache.set(cache_key, evaluations.clone()).await;
                 debug!("✅ 重要性评估结果已缓存");
             }
@@ -235,7 +238,8 @@ impl IntelligenceModule {
                 let hybrid_result = hybrid_engine.search(query_vector, &search_query).await?;
 
                 // 转换为 MemoryItem
-                let memory_items = UtilsModule::convert_search_results_to_memory_items(hybrid_result.results);
+                let memory_items =
+                    UtilsModule::convert_search_results_to_memory_items(hybrid_result.results);
 
                 // 去重（基于ID）
                 let dedup_items = UtilsModule::deduplicate_memory_items(memory_items);
@@ -486,8 +490,8 @@ impl IntelligenceModule {
         user_id: Option<String>,
         metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AddResult> {
-        use crate::types::MemoryEvent;
         use super::storage::StorageModule;
+        use crate::types::MemoryEvent;
 
         info!("执行 {} 个决策", decisions.len());
 
@@ -496,7 +500,11 @@ impl IntelligenceModule {
 
         for decision in decisions {
             match &decision.action {
-                MemoryAction::Add { content, importance: _, metadata: action_metadata } => {
+                MemoryAction::Add {
+                    content,
+                    importance: _,
+                    metadata: action_metadata,
+                } => {
                     info!(
                         "执行 ADD 决策: content={}, confidence={:.2}",
                         content, decision.confidence
@@ -527,17 +535,26 @@ impl IntelligenceModule {
                         role: None,
                     });
                 }
-                MemoryAction::Update { memory_id, new_content, merge_strategy: _, change_reason: _ } => {
+                MemoryAction::Update {
+                    memory_id,
+                    new_content,
+                    merge_strategy: _,
+                    change_reason: _,
+                } => {
                     info!(
                         "执行 UPDATE 决策: memory_id={}, confidence={:.2}",
                         memory_id, decision.confidence
                     );
 
                     let mut update_data = HashMap::new();
-                    update_data.insert("content".to_string(), serde_json::Value::String(new_content.clone()));
+                    update_data.insert(
+                        "content".to_string(),
+                        serde_json::Value::String(new_content.clone()),
+                    );
 
                     // 调用存储模块更新记忆
-                    let _updated = StorageModule::update_memory(orchestrator, memory_id, update_data).await?;
+                    let _updated =
+                        StorageModule::update_memory(orchestrator, memory_id, update_data).await?;
 
                     results.push(MemoryEvent {
                         id: memory_id.clone(),
@@ -547,7 +564,10 @@ impl IntelligenceModule {
                         role: None,
                     });
                 }
-                MemoryAction::Delete { memory_id, deletion_reason: _ } => {
+                MemoryAction::Delete {
+                    memory_id,
+                    deletion_reason: _,
+                } => {
                     info!(
                         "执行 DELETE 决策: memory_id={}, confidence={:.2}",
                         memory_id, decision.confidence
@@ -564,7 +584,11 @@ impl IntelligenceModule {
                         role: None,
                     });
                 }
-                MemoryAction::Merge { primary_memory_id, secondary_memory_ids, merged_content } => {
+                MemoryAction::Merge {
+                    primary_memory_id,
+                    secondary_memory_ids,
+                    merged_content,
+                } => {
                     info!(
                         "执行 MERGE 决策: primary={}, secondaries={:?}, confidence={:.2}",
                         primary_memory_id, secondary_memory_ids, decision.confidence
@@ -572,8 +596,13 @@ impl IntelligenceModule {
 
                     // 更新主记忆内容
                     let mut update_data = HashMap::new();
-                    update_data.insert("content".to_string(), serde_json::Value::String(merged_content.clone()));
-                    let _updated = StorageModule::update_memory(orchestrator, primary_memory_id, update_data).await?;
+                    update_data.insert(
+                        "content".to_string(),
+                        serde_json::Value::String(merged_content.clone()),
+                    );
+                    let _updated =
+                        StorageModule::update_memory(orchestrator, primary_memory_id, update_data)
+                            .await?;
 
                     // 删除次要记忆
                     for secondary_id in secondary_memory_ids {
@@ -600,10 +629,7 @@ impl IntelligenceModule {
 
         info!("决策执行完成，共处理 {} 个操作", results.len());
 
-        Ok(AddResult {
-            results,
-            relations,
-        })
+        Ok(AddResult { results, relations })
     }
 
     /// 智能添加记忆（完整的10步流水线）
@@ -614,8 +640,8 @@ impl IntelligenceModule {
         user_id: Option<String>,
         metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AddResult> {
-        use crate::types::MemoryEvent;
         use super::storage::StorageModule;
+        use crate::types::MemoryEvent;
         use tracing::{debug, info, warn};
 
         info!(
@@ -668,7 +694,11 @@ impl IntelligenceModule {
         let facts = facts_result?;
         let structured_facts = structured_facts_result?;
 
-        info!("提取到 {} 个事实，{} 个结构化事实", facts.len(), structured_facts.len());
+        info!(
+            "提取到 {} 个事实，{} 个结构化事实",
+            facts.len(),
+            structured_facts.len()
+        );
 
         if facts.is_empty() {
             warn!("未提取到任何事实，直接添加原始内容");
@@ -706,8 +736,8 @@ impl IntelligenceModule {
 
         // Step 5: 搜索相似记忆
         info!("Step 5: 搜索相似记忆");
-        let existing_memories = Self::search_similar_memories_internal(orchestrator, &content, &agent_id, 10)
-            .await?;
+        let existing_memories =
+            Self::search_similar_memories_internal(orchestrator, &content, &agent_id, 10).await?;
         info!("找到 {} 个相似记忆", existing_memories.len());
 
         // Step 6: 冲突检测
@@ -748,7 +778,10 @@ impl IntelligenceModule {
         .await?;
 
         // Step 9-10: 异步聚类和推理（已在execute_decisions中处理）
-        info!("✅ 智能添加流水线完成，共处理 {} 个决策", results.results.len());
+        info!(
+            "✅ 智能添加流水线完成，共处理 {} 个决策",
+            results.results.len()
+        );
         Ok(results)
     }
 
@@ -792,6 +825,3 @@ impl IntelligenceModule {
         Ok(existing)
     }
 }
-
-
-

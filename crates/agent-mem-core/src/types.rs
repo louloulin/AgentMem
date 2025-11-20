@@ -1,11 +1,11 @@
 //! Core memory types and data structures
 
 use agent_mem_traits::{AgentMemError, MemoryItem, Result, Vector};
+use chrono::{DateTime, Utc};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use regex::Regex;
 
 /// Cognitive memory type classification (8 types for AgentMem 7.0)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -124,7 +124,7 @@ impl std::fmt::Display for MemoryType {
 
 impl std::str::FromStr for MemoryType {
     type Err = AgentMemError;
-    
+
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "episodic" => Ok(MemoryType::Episodic),
@@ -135,7 +135,10 @@ impl std::str::FromStr for MemoryType {
             "resource" => Ok(MemoryType::Resource),
             "knowledge" => Ok(MemoryType::Knowledge),
             "contextual" => Ok(MemoryType::Contextual),
-            _ => Err(AgentMemError::validation_error(&format!("Unknown memory type: {}", s))),
+            _ => Err(AgentMemError::validation_error(&format!(
+                "Unknown memory type: {}",
+                s
+            ))),
         }
     }
 }
@@ -186,11 +189,20 @@ pub enum Content {
     /// 文本内容
     Text(String),
     /// 图像内容（URL + 可选描述）
-    Image { url: String, caption: Option<String> },
+    Image {
+        url: String,
+        caption: Option<String>,
+    },
     /// 音频内容（URL + 可选转录文本）
-    Audio { url: String, transcript: Option<String> },
+    Audio {
+        url: String,
+        transcript: Option<String>,
+    },
     /// 视频内容（URL + 可选摘要）
-    Video { url: String, summary: Option<String> },
+    Video {
+        url: String,
+        summary: Option<String>,
+    },
     /// 结构化数据（JSON）
     Structured(serde_json::Value),
     /// 混合内容（多种类型组合）
@@ -207,9 +219,36 @@ impl PartialEq for Content {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Content::Text(a), Content::Text(b)) => a == b,
-            (Content::Image { url: u1, caption: c1 }, Content::Image { url: u2, caption: c2 }) => u1 == u2 && c1 == c2,
-            (Content::Audio { url: u1, transcript: t1 }, Content::Audio { url: u2, transcript: t2 }) => u1 == u2 && t1 == t2,
-            (Content::Video { url: u1, summary: s1 }, Content::Video { url: u2, summary: s2 }) => u1 == u2 && s1 == s2,
+            (
+                Content::Image {
+                    url: u1,
+                    caption: c1,
+                },
+                Content::Image {
+                    url: u2,
+                    caption: c2,
+                },
+            ) => u1 == u2 && c1 == c2,
+            (
+                Content::Audio {
+                    url: u1,
+                    transcript: t1,
+                },
+                Content::Audio {
+                    url: u2,
+                    transcript: t2,
+                },
+            ) => u1 == u2 && t1 == t2,
+            (
+                Content::Video {
+                    url: u1,
+                    summary: s1,
+                },
+                Content::Video {
+                    url: u2,
+                    summary: s2,
+                },
+            ) => u1 == u2 && s1 == s2,
             (Content::Structured(v1), Content::Structured(v2)) => v1 == v2,
             (Content::Mixed(m1), Content::Mixed(m2)) => m1 == m2,
             _ => false,
@@ -223,16 +262,43 @@ impl Content {
         match self {
             Content::Text(s) => s.clone(),
             Content::Image { url, caption } => {
-                format!("[Image: {}{}]", url, caption.as_ref().map(|c| format!(" - {}", c)).unwrap_or_default())
+                format!(
+                    "[Image: {}{}]",
+                    url,
+                    caption
+                        .as_ref()
+                        .map(|c| format!(" - {}", c))
+                        .unwrap_or_default()
+                )
             }
             Content::Audio { url, transcript } => {
-                format!("[Audio: {}{}]", url, transcript.as_ref().map(|t| format!(" - {}", t)).unwrap_or_default())
+                format!(
+                    "[Audio: {}{}]",
+                    url,
+                    transcript
+                        .as_ref()
+                        .map(|t| format!(" - {}", t))
+                        .unwrap_or_default()
+                )
             }
             Content::Video { url, summary } => {
-                format!("[Video: {}{}]", url, summary.as_ref().map(|s| format!(" - {}", s)).unwrap_or_default())
+                format!(
+                    "[Video: {}{}]",
+                    url,
+                    summary
+                        .as_ref()
+                        .map(|s| format!(" - {}", s))
+                        .unwrap_or_default()
+                )
             }
-            Content::Structured(v) => serde_json::to_string(v).unwrap_or_else(|_| "[Structured Data]".to_string()),
-            Content::Mixed(contents) => contents.iter().map(|c| c.as_text()).collect::<Vec<_>>().join("\n"),
+            Content::Structured(v) => {
+                serde_json::to_string(v).unwrap_or_else(|_| "[Structured Data]".to_string())
+            }
+            Content::Mixed(contents) => contents
+                .iter()
+                .map(|c| c.as_text())
+                .collect::<Vec<_>>()
+                .join("\n"),
         }
     }
 }
@@ -254,49 +320,49 @@ impl AttributeKey {
             name: name.into(),
         }
     }
-    
+
     /// 系统属性（system命名空间）
     pub fn system(name: impl Into<String>) -> Self {
         Self::new("system", name)
     }
-    
+
     /// 用户属性（user命名空间）
     pub fn user(name: impl Into<String>) -> Self {
         Self::new("user", name)
     }
-    
+
     /// 核心属性（core命名空间）- 用于agent_id, user_id等核心字段
     pub fn core(name: impl Into<String>) -> Self {
         Self::new("core", name)
     }
-    
+
     /// 领域属性（domain命名空间）
     pub fn domain(name: impl Into<String>) -> Self {
         Self::new("domain", name)
     }
-    
+
     /// 旧版属性（legacy命名空间，用于迁移）
     pub fn legacy(name: impl Into<String>) -> Self {
         Self::new("legacy", name)
     }
-    
+
     // ========== 🆕 标准Scope属性键（替代MemoryScope enum） ==========
-    
+
     /// 是否为全局scope (system::scope_global = true)
     pub fn scope_global() -> Self {
         Self::system("scope_global")
     }
-    
+
     /// Agent ID (system::agent_id)
     pub fn agent_id() -> Self {
         Self::system("agent_id")
     }
-    
+
     /// User ID (system::user_id)
     pub fn user_id() -> Self {
         Self::system("user_id")
     }
-    
+
     /// Session ID (system::session_id)
     pub fn session_id() -> Self {
         Self::system("session_id")
@@ -324,11 +390,11 @@ impl std::fmt::Display for AttributeValue {
             AttributeValue::Array(arr) => {
                 let items: Vec<String> = arr.iter().map(|v| v.to_string()).collect();
                 write!(f, "[{}]", items.join(", "))
-            },
+            }
             AttributeValue::Object(obj) => {
                 let items: Vec<String> = obj.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
                 write!(f, "{{{}}}", items.join(", "))
-            },
+            }
         }
     }
 }
@@ -343,17 +409,15 @@ impl AttributeValue {
             serde_json::Value::Array(arr) => {
                 AttributeValue::Array(arr.into_iter().map(Self::from_json).collect())
             }
-            serde_json::Value::Object(obj) => {
-                AttributeValue::Object(
-                    obj.into_iter()
-                        .map(|(k, v)| (k, Self::from_json(v)))
-                        .collect(),
-                )
-            }
+            serde_json::Value::Object(obj) => AttributeValue::Object(
+                obj.into_iter()
+                    .map(|(k, v)| (k, Self::from_json(v)))
+                    .collect(),
+            ),
             serde_json::Value::Null => AttributeValue::String("null".to_string()),
         }
     }
-    
+
     /// 转换为JSON
     pub fn to_json(&self) -> serde_json::Value {
         match self {
@@ -364,16 +428,12 @@ impl AttributeValue {
             AttributeValue::Array(arr) => {
                 serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
             }
-            AttributeValue::Object(obj) => {
-                serde_json::Value::Object(
-                    obj.iter()
-                        .map(|(k, v)| (k.clone(), v.to_json()))
-                        .collect(),
-                )
-            }
+            AttributeValue::Object(obj) => serde_json::Value::Object(
+                obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect(),
+            ),
         }
     }
-    
+
     /// 获取字符串值
     pub fn as_string(&self) -> Option<&str> {
         match self {
@@ -381,7 +441,7 @@ impl AttributeValue {
             _ => None,
         }
     }
-    
+
     /// 获取数字值
     pub fn as_number(&self) -> Option<f64> {
         match self {
@@ -389,7 +449,7 @@ impl AttributeValue {
             _ => None,
         }
     }
-    
+
     /// 获取数组
     pub fn as_array(&self) -> Option<&Vec<AttributeValue>> {
         match self {
@@ -397,7 +457,7 @@ impl AttributeValue {
             _ => None,
         }
     }
-    
+
     /// 获取布尔值
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
@@ -441,7 +501,11 @@ pub enum AttributePattern {
     /// 正则匹配
     Regex { namespace: String, pattern: String },
     /// 范围匹配（数值）
-    Range { key: AttributeKey, min: f64, max: f64 },
+    Range {
+        key: AttributeKey,
+        min: f64,
+        max: f64,
+    },
 }
 
 /// 属性集（完全开放的属性系统）
@@ -457,34 +521,37 @@ impl AttributeSet {
             attributes: HashMap::new(),
         }
     }
-    
+
     /// 设置属性
     pub fn set(&mut self, key: AttributeKey, value: AttributeValue) -> Option<AttributeValue> {
         self.attributes.insert(key, value)
     }
-    
+
     /// 获取属性
     pub fn get(&self, key: &AttributeKey) -> Option<&AttributeValue> {
         self.attributes.get(key)
     }
-    
+
     /// 删除属性
     pub fn remove(&mut self, key: &AttributeKey) -> Option<AttributeValue> {
         self.attributes.remove(key)
     }
-    
+
     /// 检查是否包含属性
     pub fn contains(&self, key: &AttributeKey) -> bool {
         self.attributes.contains_key(key)
     }
-    
+
     /// 获取所有属性
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, AttributeKey, AttributeValue> {
         self.attributes.iter()
     }
-    
+
     /// 模式查询（支持通配符、正则、范围）
-    pub fn query<'a>(&'a self, pattern: &'a AttributePattern) -> Vec<(&'a AttributeKey, &'a AttributeValue)> {
+    pub fn query<'a>(
+        &'a self,
+        pattern: &'a AttributePattern,
+    ) -> Vec<(&'a AttributeKey, &'a AttributeValue)> {
         match pattern {
             AttributePattern::Exact { key } => {
                 if let Some(value) = self.get(key) {
@@ -493,14 +560,15 @@ impl AttributeSet {
                     vec![]
                 }
             }
-            AttributePattern::Prefix { namespace, prefix } => {
-                self.attributes.iter()
-                    .filter(|(k, _)| k.namespace == *namespace && k.name.starts_with(prefix))
-                    .collect()
-            }
+            AttributePattern::Prefix { namespace, prefix } => self
+                .attributes
+                .iter()
+                .filter(|(k, _)| k.namespace == *namespace && k.name.starts_with(prefix))
+                .collect(),
             AttributePattern::Regex { namespace, pattern } => {
                 if let Ok(re) = Regex::new(pattern) {
-                    self.attributes.iter()
+                    self.attributes
+                        .iter()
                         .filter(|(k, _)| k.namespace == *namespace && re.is_match(&k.name))
                         .collect()
                 } else {
@@ -519,32 +587,42 @@ impl AttributeSet {
             }
         }
     }
-    
+
     /// 按命名空间查询
     pub fn query_by_namespace(&self, namespace: &str) -> Vec<(&AttributeKey, &AttributeValue)> {
-        self.attributes.iter()
+        self.attributes
+            .iter()
             .filter(|(k, _)| k.namespace == namespace)
             .collect()
     }
-    
+
     // ========== 🆕 Scope辅助方法（替代MemoryScope） ==========
-    
+
     /// 设置为全局scope
     pub fn set_global_scope(&mut self) {
         self.set(AttributeKey::scope_global(), AttributeValue::Boolean(true));
     }
-    
+
     /// 设置Agent scope
     pub fn set_agent_scope(&mut self, agent_id: impl Into<String>) {
-        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
+        self.set(
+            AttributeKey::agent_id(),
+            AttributeValue::String(agent_id.into()),
+        );
     }
-    
+
     /// 设置User scope
     pub fn set_user_scope(&mut self, agent_id: impl Into<String>, user_id: impl Into<String>) {
-        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
-        self.set(AttributeKey::user_id(), AttributeValue::String(user_id.into()));
+        self.set(
+            AttributeKey::agent_id(),
+            AttributeValue::String(agent_id.into()),
+        );
+        self.set(
+            AttributeKey::user_id(),
+            AttributeValue::String(user_id.into()),
+        );
     }
-    
+
     /// 设置Session scope
     pub fn set_session_scope(
         &mut self,
@@ -552,49 +630,58 @@ impl AttributeSet {
         user_id: impl Into<String>,
         session_id: impl Into<String>,
     ) {
-        self.set(AttributeKey::agent_id(), AttributeValue::String(agent_id.into()));
-        self.set(AttributeKey::user_id(), AttributeValue::String(user_id.into()));
-        self.set(AttributeKey::session_id(), AttributeValue::String(session_id.into()));
+        self.set(
+            AttributeKey::agent_id(),
+            AttributeValue::String(agent_id.into()),
+        );
+        self.set(
+            AttributeKey::user_id(),
+            AttributeValue::String(user_id.into()),
+        );
+        self.set(
+            AttributeKey::session_id(),
+            AttributeValue::String(session_id.into()),
+        );
     }
-    
+
     /// 判断是否为全局scope
     pub fn is_global_scope(&self) -> bool {
         self.get(&AttributeKey::scope_global())
             .and_then(|v| v.as_boolean())
             .unwrap_or(false)
     }
-    
+
     /// 获取Agent ID
     pub fn get_agent_id(&self) -> Option<String> {
         self.get(&AttributeKey::agent_id())
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
     }
-    
+
     /// 获取User ID
     pub fn get_user_id(&self) -> Option<String> {
         self.get(&AttributeKey::user_id())
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
     }
-    
+
     /// 获取Session ID
     pub fn get_session_id(&self) -> Option<String> {
         self.get(&AttributeKey::session_id())
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
     }
-    
+
     /// 推断scope层级（0=Global, 1=Agent, 2=User, 3=Session）
     pub fn infer_scope_level(&self) -> u8 {
         if self.is_global_scope() {
             return 0;
         }
-        
+
         let has_agent = self.get_agent_id().is_some();
         let has_user = self.get_user_id().is_some();
         let has_session = self.get_session_id().is_some();
-        
+
         match (has_agent, has_user, has_session) {
             (false, false, false) => 0, // 默认Global
             (true, false, false) => 1,  // Agent
@@ -603,17 +690,17 @@ impl AttributeSet {
             _ => 0,                     // 其他情况默认Global
         }
     }
-    
+
     /// 检查是否可以访问另一个AttributeSet的scope
     pub fn can_access(&self, other: &AttributeSet) -> bool {
         let self_level = self.infer_scope_level();
         let other_level = other.infer_scope_level();
-        
+
         // 更高权限可以访问更低权限
         if self_level < other_level {
             return true;
         }
-        
+
         // 同级别需要匹配ID
         if self_level == other_level {
             match self_level {
@@ -649,7 +736,7 @@ use crate::hierarchy::MemoryScope;
 impl From<MemoryScope> for AttributeSet {
     fn from(scope: MemoryScope) -> Self {
         let mut attrs = AttributeSet::new();
-        
+
         match scope {
             MemoryScope::Global => {
                 attrs.set_global_scope();
@@ -668,7 +755,7 @@ impl From<MemoryScope> for AttributeSet {
                 attrs.set_session_scope(agent_id, user_id, session_id);
             }
         }
-        
+
         attrs
     }
 }
@@ -678,11 +765,11 @@ impl From<&AttributeSet> for MemoryScope {
         if attrs.is_global_scope() {
             return MemoryScope::Global;
         }
-        
+
         let agent_id = attrs.get_agent_id();
         let user_id = attrs.get_user_id();
         let session_id = attrs.get_session_id();
-        
+
         match (agent_id, user_id, session_id) {
             (Some(aid), Some(uid), Some(sid)) => MemoryScope::Session {
                 agent_id: aid,
@@ -738,27 +825,31 @@ impl RelationGraph {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// 添加关系
     pub fn add_relation(&mut self, relation: Relation) {
         self.relations.push(relation);
     }
-    
+
     /// 获取所有关系
     pub fn relations(&self) -> &[Relation] {
         &self.relations
     }
-    
+
     /// 根据类型查找关系
     pub fn find_by_type(&self, relation_type: &RelationType) -> Vec<&Relation> {
-        self.relations.iter()
-            .filter(|r| std::mem::discriminant(&r.relation_type) == std::mem::discriminant(relation_type))
+        self.relations
+            .iter()
+            .filter(|r| {
+                std::mem::discriminant(&r.relation_type) == std::mem::discriminant(relation_type)
+            })
             .collect()
     }
-    
+
     /// 查找目标记忆的所有关系
     pub fn find_by_target(&self, target_id: &str) -> Vec<&Relation> {
-        self.relations.iter()
+        self.relations
+            .iter()
             .filter(|r| r.target_id == target_id)
             .collect()
     }
@@ -769,7 +860,7 @@ impl RelationGraph {
 pub struct Metadata {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
-    pub access_count: u64,  // 统一使用access_count，与V4一致
+    pub access_count: u64, // 统一使用access_count，与V4一致
     pub last_accessed: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -819,7 +910,7 @@ impl Memory {
     pub fn builder() -> MemoryBuilder {
         MemoryBuilder::new()
     }
-    
+
     /// 便捷方法：创建新的Memory（向后兼容）
     pub fn new(
         agent_id: String,
@@ -828,35 +919,33 @@ impl Memory {
         content: String,
         importance: f32,
     ) -> Self {
-        let mut builder = MemoryBuilder::new()
-            .content(Content::Text(content));
-        
+        let mut builder = MemoryBuilder::new().content(Content::Text(content));
+
         // 🔑 关键修复: 使用core属性以匹配memory_to_db的读取逻辑
         builder.attributes.set(
             AttributeKey::core("agent_id"),
             AttributeValue::String(agent_id),
         );
-        
+
         if let Some(uid) = user_id {
-            builder.attributes.set(
-                AttributeKey::core("user_id"),
-                AttributeValue::String(uid),
-            );
+            builder
+                .attributes
+                .set(AttributeKey::core("user_id"), AttributeValue::String(uid));
         }
-        
+
         builder.attributes.set(
             AttributeKey::core("memory_type"),
             AttributeValue::String(memory_type.as_str().to_string()),
         );
-        
+
         builder.attributes.set(
             AttributeKey::system("importance"),
             AttributeValue::Number(importance as f64),
         );
-        
+
         builder.build()
     }
-    
+
     /// 获取importance（向后兼容）
     pub fn importance(&self) -> f32 {
         self.attributes
@@ -864,13 +953,15 @@ impl Memory {
             .and_then(|v| v.as_number())
             .unwrap_or(0.0) as f32
     }
-    
+
     /// 获取score（检索相关性分数，向后兼容）
     pub fn score(&self) -> Option<f64> {
         // 优先从score属性获取
-        if let Some(score) = self.attributes
+        if let Some(score) = self
+            .attributes
             .get(&AttributeKey::system("score"))
-            .and_then(|v| v.as_number()) {
+            .and_then(|v| v.as_number())
+        {
             return Some(score);
         }
         // 如果没有score，使用importance作为fallback
@@ -878,7 +969,7 @@ impl Memory {
             .get(&AttributeKey::system("importance"))
             .and_then(|v| v.as_number())
     }
-    
+
     /// 获取agent_id（向后兼容）
     pub fn agent_id(&self) -> String {
         self.attributes
@@ -887,7 +978,7 @@ impl Memory {
             .map(|s| s.to_string())
             .unwrap_or_default()
     }
-    
+
     /// 获取user_id（向后兼容）
     pub fn user_id(&self) -> Option<String> {
         self.attributes
@@ -895,7 +986,7 @@ impl Memory {
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
     }
-    
+
     /// 获取version（向后兼容）
     pub fn version(&self) -> u32 {
         self.attributes
@@ -903,7 +994,7 @@ impl Memory {
             .and_then(|v| v.as_number())
             .unwrap_or(1.0) as u32
     }
-    
+
     /// 获取memory_type（向后兼容）
     pub fn memory_type(&self) -> MemoryType {
         self.attributes
@@ -912,58 +1003,59 @@ impl Memory {
             .and_then(|s| s.parse::<MemoryType>().ok())
             .unwrap_or(MemoryType::Semantic)
     }
-    
+
     /// 获取created_at（向后兼容）
     pub fn created_at(&self) -> i64 {
         self.metadata.created_at.timestamp()
     }
-    
+
     /// 获取last_accessed_at（向后兼容）
     pub fn last_accessed_at(&self) -> i64 {
-        self.metadata.last_accessed.unwrap_or(self.metadata.updated_at).timestamp()
+        self.metadata
+            .last_accessed
+            .unwrap_or(self.metadata.updated_at)
+            .timestamp()
     }
-    
+
     /// 更新内容（向后兼容）
     pub fn update_content(&mut self, new_content: String) {
         self.content = Content::Text(new_content);
         self.metadata.updated_at = chrono::Utc::now();
     }
-    
+
     /// 添加元数据（向后兼容）
     pub fn add_metadata(&mut self, key: String, value: String) {
-        self.attributes.set(
-            AttributeKey::user(key),
-            AttributeValue::String(value),
-        );
+        self.attributes
+            .set(AttributeKey::user(key), AttributeValue::String(value));
     }
-    
+
     /// 从旧格式迁移（用于数据迁移）
     pub fn from_legacy(old: LegacyMemory) -> Self {
         let mut attributes = AttributeSet::new();
-        
+
         // 迁移固定字段到属性
         attributes.set(
             AttributeKey::system("agent_id"),
             AttributeValue::String(old.agent_id),
         );
-        
+
         if let Some(user_id) = old.user_id {
             attributes.set(
                 AttributeKey::system("user_id"),
                 AttributeValue::String(user_id),
             );
         }
-        
+
         attributes.set(
             AttributeKey::system("memory_type"),
             AttributeValue::String(old.memory_type.as_str().to_string()),
         );
-        
+
         attributes.set(
             AttributeKey::system("importance"),
             AttributeValue::Number(old.importance as f64),
         );
-        
+
         // 迁移嵌入向量
         if let Some(embedding) = old.embedding {
             attributes.set(
@@ -971,33 +1063,30 @@ impl Memory {
                 AttributeValue::Number(embedding.values.len() as f64),
             );
         }
-        
+
         // 迁移metadata到legacy命名空间
         for (key, value) in old.metadata {
-            attributes.set(
-                AttributeKey::legacy(key),
-                AttributeValue::String(value),
-            );
+            attributes.set(AttributeKey::legacy(key), AttributeValue::String(value));
         }
-        
+
         // 迁移访问信息
         attributes.set(
             AttributeKey::system("access_count"),
             AttributeValue::Number(old.access_count as f64),
         );
-        
+
         if let Some(expires_at) = old.expires_at {
             attributes.set(
                 AttributeKey::system("expires_at"),
                 AttributeValue::Number(expires_at as f64),
             );
         }
-        
+
         attributes.set(
             AttributeKey::system("version"),
             AttributeValue::Number(old.version as f64),
         );
-        
+
         Self {
             id: old.id,
             content: Content::Text(old.content),
@@ -1016,7 +1105,7 @@ impl Memory {
             },
         }
     }
-    
+
     /// 记录访问
     pub fn access(&mut self) {
         self.metadata.access_count += 1;
@@ -1042,32 +1131,45 @@ impl MemoryBuilder {
             relations: RelationGraph::new(),
         }
     }
-    
+
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
-    
+
     pub fn content(mut self, content: impl Into<Content>) -> Self {
         self.content = Some(content.into());
         self
     }
-    
+
     pub fn text(mut self, text: impl Into<String>) -> Self {
         self.content = Some(Content::Text(text.into()));
         self
     }
-    
-    pub fn attribute(mut self, key: impl Into<AttributeKey>, value: impl Into<AttributeValue>) -> Self {
+
+    pub fn attribute(
+        mut self,
+        key: impl Into<AttributeKey>,
+        value: impl Into<AttributeValue>,
+    ) -> Self {
         self.attributes.set(key.into(), value.into());
         self
     }
-    
-    pub fn relation(mut self, target_id: String, relation_type: RelationType, strength: f32) -> Self {
-        self.relations.add_relation(Relation { target_id, relation_type, strength });
+
+    pub fn relation(
+        mut self,
+        target_id: String,
+        relation_type: RelationType,
+        strength: f32,
+    ) -> Self {
+        self.relations.add_relation(Relation {
+            target_id,
+            relation_type,
+            strength,
+        });
         self
     }
-    
+
     pub fn build(self) -> Memory {
         Memory {
             id: self.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
@@ -1116,14 +1218,9 @@ pub enum QueryIntent {
         semantic_vector: Option<Vec<f32>>,
     },
     /// 关系查询
-    RelationQuery {
-        source: String,
-        relation: String,
-    },
+    RelationQuery { source: String, relation: String },
     /// 聚合查询
-    Aggregation {
-        operation: AggregationOp,
-    },
+    Aggregation { operation: AggregationOp },
 }
 
 /// 聚合操作
@@ -1212,7 +1309,10 @@ pub enum TemporalPreference {
     /// 偏好最近的记忆
     Recent { within_days: u32 },
     /// 偏好特定时间段
-    TimeWindow { start: DateTime<Utc>, end: DateTime<Utc> },
+    TimeWindow {
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    },
     /// 偏好访问频繁的
     FrequentlyAccessed,
 }
@@ -1270,11 +1370,11 @@ impl Query {
     pub fn builder() -> QueryBuilder {
         QueryBuilder::new()
     }
-    
+
     /// 从字符串自动构建Query（智能推断）
     pub fn from_string(s: &str) -> Self {
         let features = QueryFeatures::extract(s);
-        
+
         Query {
             id: Uuid::new_v4().to_string(),
             intent: features.infer_intent(s),
@@ -1295,9 +1395,9 @@ struct QueryFeatures {
 
 #[derive(Debug, Clone)]
 enum QueryComplexity {
-    Simple,   // 单一条件
-    Medium,   // 2-3个条件
-    Complex,  // 4+个条件
+    Simple,  // 单一条件
+    Medium,  // 2-3个条件
+    Complex, // 4+个条件
 }
 
 impl QueryFeatures {
@@ -1305,7 +1405,7 @@ impl QueryFeatures {
         let has_id_pattern = Regex::new(r"[A-Z]\d{6}").unwrap().is_match(s);
         let has_attribute_filter = s.contains("::");
         let has_relation_query = s.contains("->");
-        
+
         let word_count = s.split_whitespace().count();
         let complexity = if word_count <= 3 {
             QueryComplexity::Simple
@@ -1314,7 +1414,7 @@ impl QueryFeatures {
         } else {
             QueryComplexity::Complex
         };
-        
+
         Self {
             has_id_pattern,
             has_attribute_filter,
@@ -1322,7 +1422,7 @@ impl QueryFeatures {
             complexity,
         }
     }
-    
+
     fn infer_intent(&self, s: &str) -> QueryIntent {
         if self.has_id_pattern {
             // Extract ID pattern
@@ -1332,7 +1432,7 @@ impl QueryFeatures {
                 };
             }
         }
-        
+
         if self.has_relation_query {
             let parts: Vec<&str> = s.split("->").collect();
             if parts.len() == 2 {
@@ -1342,20 +1442,20 @@ impl QueryFeatures {
                 };
             }
         }
-        
+
         // Default: Semantic search
         QueryIntent::SemanticSearch {
             text: s.to_string(),
             semantic_vector: None,
         }
     }
-    
+
     fn extract_constraints(&self) -> Vec<Constraint> {
         let mut constraints = vec![];
-        
+
         // Default limit
         constraints.push(Constraint::Limit(100));
-        
+
         constraints
     }
 }
@@ -1377,7 +1477,7 @@ impl QueryBuilder {
             context: QueryContext::default(),
         }
     }
-    
+
     /// 设置文本查询
     pub fn text(mut self, text: impl Into<String>) -> Self {
         self.intent = Some(QueryIntent::SemanticSearch {
@@ -1386,7 +1486,7 @@ impl QueryBuilder {
         });
         self
     }
-    
+
     /// 设置ID查询
     pub fn lookup(mut self, entity_id: impl Into<String>) -> Self {
         self.intent = Some(QueryIntent::Lookup {
@@ -1394,7 +1494,7 @@ impl QueryBuilder {
         });
         self
     }
-    
+
     /// 添加属性约束
     pub fn with_attribute(
         mut self,
@@ -1409,19 +1509,19 @@ impl QueryBuilder {
         });
         self
     }
-    
+
     /// 添加时间范围约束
     pub fn with_time_range(mut self, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
         self.constraints.push(Constraint::TimeRange { start, end });
         self
     }
-    
+
     /// 设置结果限制
     pub fn limit(mut self, limit: usize) -> Self {
         self.constraints.push(Constraint::Limit(limit));
         self
     }
-    
+
     /// 添加偏好
     pub fn prefer(mut self, preference_type: PreferenceType, weight: f32) -> Self {
         self.preferences.push(Preference {
@@ -1430,7 +1530,7 @@ impl QueryBuilder {
         });
         self
     }
-    
+
     /// 构建Query
     pub fn build(self) -> Query {
         Query {
@@ -1464,22 +1564,27 @@ impl PipelineContext {
             data: HashMap::new(),
         }
     }
-    
-    pub fn set(&mut self, key: impl Into<String>, value: impl Serialize) -> std::result::Result<(), serde_json::Error> {
+
+    pub fn set(
+        &mut self,
+        key: impl Into<String>,
+        value: impl Serialize,
+    ) -> std::result::Result<(), serde_json::Error> {
         let json_value = serde_json::to_value(value)?;
         self.data.insert(key.into(), json_value);
         Ok(())
     }
-    
+
     pub fn get<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
-        self.data.get(key)
+        self.data
+            .get(key)
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
-    
+
     pub fn contains(&self, key: &str) -> bool {
         self.data.contains_key(key)
     }
-    
+
     pub fn remove(&mut self, key: &str) -> Option<serde_json::Value> {
         self.data.remove(key)
     }
@@ -1501,17 +1606,17 @@ pub enum StageResult<T> {
 pub trait PipelineStage: Send + Sync {
     type Input: Send;
     type Output: Send;
-    
+
     /// Stage名称
     fn name(&self) -> &str;
-    
+
     /// 执行stage
     async fn execute(
         &self,
         input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>>;
-    
+
     /// 是否可选（可选stage失败不会中止pipeline）
     fn is_optional(&self) -> bool {
         false
@@ -1568,7 +1673,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
             error_handler: None,
         }
     }
-    
+
     /// 添加节点
     pub fn add_node<S>(mut self, id: impl Into<String>, stage: S, dependencies: Vec<String>) -> Self
     where
@@ -1580,19 +1685,24 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
             stage: std::sync::Arc::new(stage),
             dependencies: dependencies.clone(),
         };
-        
+
         self.nodes.insert(id.clone(), node);
-        
+
         // 如果没有依赖，是入口节点
         if dependencies.is_empty() {
             self.entry_nodes.push(id);
         }
-        
+
         self
     }
-    
+
     /// 添加边（带条件）
-    pub fn add_edge(mut self, from: impl Into<String>, to: impl Into<String>, condition: Option<String>) -> Self {
+    pub fn add_edge(
+        mut self,
+        from: impl Into<String>,
+        to: impl Into<String>,
+        condition: Option<String>,
+    ) -> Self {
         self.edges.push(DagEdge {
             from: from.into(),
             to: to.into(),
@@ -1600,7 +1710,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         });
         self
     }
-    
+
     /// 添加条件函数
     pub fn add_condition<F>(mut self, name: impl Into<String>, condition: F) -> Self
     where
@@ -1609,13 +1719,13 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         self.conditions.insert(name.into(), Box::new(condition));
         self
     }
-    
+
     /// 设置最大并行度
     pub fn with_max_parallelism(mut self, max: usize) -> Self {
         self.max_parallelism = max;
         self
     }
-    
+
     pub fn with_error_handler<F>(mut self, handler: F) -> Self
     where
         F: Fn(&str, &str) + Send + Sync + 'static,
@@ -1623,7 +1733,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         self.error_handler = Some(std::sync::Arc::new(handler));
         self
     }
-    
+
     /// 执行DAG Pipeline
     pub async fn execute(
         &self,
@@ -1632,29 +1742,32 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
     ) -> anyhow::Result<HashMap<String, O>> {
         use std::sync::Arc;
         use tokio::sync::Mutex;
-        
+
         // 拓扑排序，检测循环依赖
         let execution_order = self.topological_sort()?;
-        
+
         // 存储每个节点的执行结果
         let results: Arc<Mutex<HashMap<String, O>>> = Arc::new(Mutex::new(HashMap::new()));
         let context_shared = Arc::new(Mutex::new(context.clone()));
-        
+
         // 按层级执行（同层级可以并行）
         for level in execution_order {
             let mut handles = vec![];
-            
+
             for node_id in level {
-                let node = self.nodes.get(&node_id).ok_or_else(|| {
-                    anyhow::anyhow!("Node '{}' not found", node_id)
-                })?;
-                
+                let node = self
+                    .nodes
+                    .get(&node_id)
+                    .ok_or_else(|| anyhow::anyhow!("Node '{}' not found", node_id))?;
+
                 // 检查边条件
-                let should_execute = self.check_edge_conditions(&node_id, &context_shared).await?;
+                let should_execute = self
+                    .check_edge_conditions(&node_id, &context_shared)
+                    .await?;
                 if !should_execute {
                     continue;
                 }
-                
+
                 let input_clone = input.clone();
                 let results_clone = results.clone();
                 let context_clone = context_shared.clone();
@@ -1662,11 +1775,11 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 let error_handler = self.error_handler.clone();
                 let stage_clone = node.stage.clone();
                 let is_optional = node.stage.is_optional();
-                
+
                 // 执行节点（并行）
                 let handle = tokio::spawn(async move {
                     let mut ctx = context_clone.lock().await;
-                    
+
                     match stage_clone.execute(input_clone, &mut *ctx).await {
                         Ok(StageResult::Continue(output)) => {
                             results_clone.lock().await.insert(node_id.clone(), output);
@@ -1694,9 +1807,9 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                         }
                     }
                 });
-                
+
                 handles.push(handle);
-                
+
                 // 控制并行度
                 if handles.len() >= self.max_parallelism {
                     for handle in handles.drain(..) {
@@ -1704,77 +1817,80 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                     }
                 }
             }
-            
+
             // 等待当前层级所有任务完成
             for handle in handles {
                 handle.await??;
             }
         }
-        
+
         // 更新context
         *context = context_shared.lock().await.clone();
-        
+
         let final_results = results.lock().await.clone();
         Ok(final_results)
     }
-    
+
     /// 拓扑排序（Kahn算法）
     fn topological_sort(&self) -> anyhow::Result<Vec<Vec<String>>> {
         use std::collections::{HashMap, HashSet, VecDeque};
-        
+
         // 计算每个节点的入度
         let mut in_degree: HashMap<String, usize> = HashMap::new();
         let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
-        
+
         for node_id in self.nodes.keys() {
             in_degree.insert(node_id.clone(), 0);
             adjacency.insert(node_id.clone(), vec![]);
         }
-        
+
         // 构建邻接表和入度
         for edge in &self.edges {
             if let Some(degree) = in_degree.get_mut(&edge.to) {
                 *degree += 1;
             }
-            adjacency.entry(edge.from.clone())
+            adjacency
+                .entry(edge.from.clone())
                 .or_insert_with(Vec::new)
                 .push(edge.to.clone());
         }
-        
+
         // 也从节点的dependencies构建
         for (node_id, node) in &self.nodes {
             for dep in &node.dependencies {
                 if let Some(degree) = in_degree.get_mut(node_id) {
                     *degree += 1;
                 }
-                adjacency.entry(dep.clone())
+                adjacency
+                    .entry(dep.clone())
                     .or_insert_with(Vec::new)
                     .push(node_id.clone());
             }
         }
-        
+
         // Kahn算法
-        let mut queue: VecDeque<String> = in_degree.iter()
+        let mut queue: VecDeque<String> = in_degree
+            .iter()
             .filter(|(_, &degree)| degree == 0)
             .map(|(id, _)| id.clone())
             .collect();
-        
+
         let mut result: Vec<Vec<String>> = vec![];
         let mut visited = HashSet::new();
-        
+
         while !queue.is_empty() {
             let level_size = queue.len();
             let mut current_level = vec![];
-            
+
             for _ in 0..level_size {
                 if let Some(node_id) = queue.pop_front() {
                     if visited.contains(&node_id) {
                         continue;
                     }
-                    
+
                     visited.insert(node_id.clone());
                     current_level.push(node_id.clone());
-                    
+
                     // 减少后继节点的入度
                     if let Some(neighbors) = adjacency.get(&node_id) {
                         for neighbor in neighbors {
@@ -1788,12 +1904,12 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                     }
                 }
             }
-            
+
             if !current_level.is_empty() {
                 result.push(current_level);
             }
         }
-        
+
         // 检测循环依赖
         if visited.len() != self.nodes.len() {
             return Err(anyhow::anyhow!(
@@ -1802,10 +1918,10 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 self.nodes.len()
             ));
         }
-        
+
         Ok(result)
     }
-    
+
     /// 检查边条件
     async fn check_edge_conditions(
         &self,
@@ -1813,14 +1929,12 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         context: &std::sync::Arc<tokio::sync::Mutex<PipelineContext>>,
     ) -> anyhow::Result<bool> {
         // 找到所有指向该节点的边
-        let incoming_edges: Vec<&DagEdge> = self.edges.iter()
-            .filter(|e| e.to == node_id)
-            .collect();
-        
+        let incoming_edges: Vec<&DagEdge> = self.edges.iter().filter(|e| e.to == node_id).collect();
+
         if incoming_edges.is_empty() {
             return Ok(true); // 无入边，直接执行
         }
-        
+
         // 检查所有入边的条件
         let ctx = context.lock().await;
         for edge in incoming_edges {
@@ -1832,7 +1946,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 }
             }
         }
-        
+
         Ok(true)
     }
 }
@@ -1845,7 +1959,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
             error_handler: None,
         }
     }
-    
+
     pub fn add_stage<S>(mut self, stage: S) -> Self
     where
         S: PipelineStage<Input = I, Output = O> + 'static,
@@ -1853,7 +1967,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
         self.stages.push(Box::new(stage));
         self
     }
-    
+
     pub fn with_error_handler<F>(mut self, handler: F) -> Self
     where
         F: Fn(&str, &str) + Send + Sync + 'static,
@@ -1861,22 +1975,18 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
         self.error_handler = Some(Box::new(handler));
         self
     }
-    
-    pub async fn execute(
-        &self,
-        input: I,
-        context: &mut PipelineContext,
-    ) -> anyhow::Result<O>
+
+    pub async fn execute(&self, input: I, context: &mut PipelineContext) -> anyhow::Result<O>
     where
         I: Clone,
         O: Clone + Into<I>,
     {
         let mut current_input = input;
         let mut current_output: Option<O> = None;
-        
+
         for stage in &self.stages {
             let stage_name = stage.name();
-            
+
             match stage.execute(current_input.clone(), context).await {
                 Ok(StageResult::Continue(output)) => {
                     current_input = output.clone().into();
@@ -1913,7 +2023,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
                 }
             }
         }
-        
+
         current_output
             .ok_or_else(|| anyhow::anyhow!("Pipeline completed but no output was produced"))
     }
@@ -2035,25 +2145,34 @@ impl From<Memory> for MemoryItem {
         use agent_mem_traits::{MemoryType as TraitMemoryType, Session};
 
         // Extract system attributes
-        let agent_id = memory.attributes.get(&AttributeKey::system("agent_id"))
+        let agent_id = memory
+            .attributes
+            .get(&AttributeKey::system("agent_id"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string())
             .unwrap_or_else(|| "default".to_string());
-        
-        let user_id = memory.attributes.get(&AttributeKey::system("user_id"))
+
+        let user_id = memory
+            .attributes
+            .get(&AttributeKey::system("user_id"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
-        
-        let memory_type_str = memory.attributes.get(&AttributeKey::system("memory_type"))
+
+        let memory_type_str = memory
+            .attributes
+            .get(&AttributeKey::system("memory_type"))
             .and_then(|v| v.as_string())
             .unwrap_or("semantic");
-        
-        let importance = memory.attributes.get(&AttributeKey::system("importance"))
+
+        let importance = memory
+            .attributes
+            .get(&AttributeKey::system("importance"))
             .and_then(|v| v.as_number())
             .unwrap_or(0.5) as f32;
 
         // Convert all attributes to metadata
-        let metadata: HashMap<String, serde_json::Value> = memory.attributes
+        let metadata: HashMap<String, serde_json::Value> = memory
+            .attributes
             .iter()
             .map(|(k, v)| (format!("{}::{}", k.namespace, k.name), v.to_json()))
             .collect();
@@ -2094,10 +2213,14 @@ impl From<Memory> for MemoryItem {
             embedding: None,
             last_accessed_at: memory.metadata.last_accessed.unwrap_or_else(Utc::now),
             access_count: memory.metadata.access_count as u32,
-            expires_at: memory.attributes.get(&AttributeKey::system("expires_at"))
+            expires_at: memory
+                .attributes
+                .get(&AttributeKey::system("expires_at"))
                 .and_then(|v| v.as_number())
                 .map(|ts| DateTime::from_timestamp(ts as i64, 0).unwrap_or_else(Utc::now)),
-            version: memory.attributes.get(&AttributeKey::system("version"))
+            version: memory
+                .attributes
+                .get(&AttributeKey::system("version"))
                 .and_then(|v| v.as_number())
                 .unwrap_or(1.0) as u32,
         }
@@ -2165,36 +2288,33 @@ impl TryFrom<MemoryItem> for Memory {
 
     fn try_from(item: MemoryItem) -> Result<Self> {
         let mut attributes = AttributeSet::new();
-        
+
         // Extract system attributes
         attributes.set(
             AttributeKey::system("agent_id"),
             AttributeValue::String(item.agent_id.clone()),
         );
-        
+
         if let Some(user_id) = item.user_id.clone() {
             attributes.set(
                 AttributeKey::system("user_id"),
                 AttributeValue::String(user_id),
             );
         }
-        
+
         attributes.set(
             AttributeKey::system("memory_type"),
             AttributeValue::String(item.memory_type.as_str().to_string()),
         );
-        
+
         attributes.set(
             AttributeKey::system("importance"),
             AttributeValue::Number(item.importance as f64),
         );
-        
+
         // Convert metadata to attributes
         for (k, v) in item.metadata {
-            attributes.set(
-                AttributeKey::user(k),
-                AttributeValue::from_json(v),
-            );
+            attributes.set(AttributeKey::user(k), AttributeValue::from_json(v));
         }
 
         Ok(Memory {
@@ -2351,144 +2471,172 @@ impl Default for MemoryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     // ========== V4.0 新架构测试 ==========
-    
+
     #[test]
     fn test_content_text() {
         let content = Content::Text("Hello World".to_string());
         assert_eq!(content.as_text(), "Hello World");
     }
-    
+
     #[test]
     fn test_content_mixed() {
         let content = Content::Mixed(vec![
             Content::Text("Part 1".to_string()),
-            Content::Image { url: "http://example.com/img.jpg".to_string(), caption: Some("Image".to_string()) },
+            Content::Image {
+                url: "http://example.com/img.jpg".to_string(),
+                caption: Some("Image".to_string()),
+            },
         ]);
         let text = content.as_text();
         assert!(text.contains("Part 1"));
         assert!(text.contains("[Image:"));
     }
-    
+
     #[test]
     fn test_attribute_set_basic() {
         let mut attrs = AttributeSet::new();
-        
+
         // Set attribute
         attrs.set(
             AttributeKey::system("user_id"),
             AttributeValue::String("user123".to_string()),
         );
-        
+
         // Get attribute
         let value = attrs.get(&AttributeKey::system("user_id"));
         assert!(value.is_some());
         assert_eq!(value.unwrap().as_string(), Some("user123"));
-        
+
         // Contains check
         assert!(attrs.contains(&AttributeKey::system("user_id")));
         assert!(!attrs.contains(&AttributeKey::system("nonexistent")));
     }
-    
+
     #[test]
     fn test_attribute_set_query_by_namespace() {
         let mut attrs = AttributeSet::new();
-        attrs.set(AttributeKey::system("key1"), AttributeValue::String("val1".to_string()));
+        attrs.set(
+            AttributeKey::system("key1"),
+            AttributeValue::String("val1".to_string()),
+        );
         attrs.set(AttributeKey::system("key2"), AttributeValue::Number(42.0));
         attrs.set(AttributeKey::user("key3"), AttributeValue::Boolean(true));
-        
+
         let system_attrs = attrs.query_by_namespace("system");
         assert_eq!(system_attrs.len(), 2);
-        
+
         let user_attrs = attrs.query_by_namespace("user");
         assert_eq!(user_attrs.len(), 1);
     }
-    
+
     #[test]
     fn test_attribute_set_query_prefix() {
         let mut attrs = AttributeSet::new();
-        attrs.set(AttributeKey::domain("product_id"), AttributeValue::String("P000257".to_string()));
-        attrs.set(AttributeKey::domain("product_name"), AttributeValue::String("Widget".to_string()));
-        attrs.set(AttributeKey::domain("category"), AttributeValue::String("Electronics".to_string()));
-        
+        attrs.set(
+            AttributeKey::domain("product_id"),
+            AttributeValue::String("P000257".to_string()),
+        );
+        attrs.set(
+            AttributeKey::domain("product_name"),
+            AttributeValue::String("Widget".to_string()),
+        );
+        attrs.set(
+            AttributeKey::domain("category"),
+            AttributeValue::String("Electronics".to_string()),
+        );
+
         let pattern = AttributePattern::Prefix {
             namespace: "domain".to_string(),
             prefix: "product".to_string(),
         };
-        
+
         let results = attrs.query(&pattern);
         assert_eq!(results.len(), 2);
     }
-    
+
     #[test]
     fn test_attribute_set_query_range() {
         let mut attrs = AttributeSet::new();
-        attrs.set(AttributeKey::system("importance"), AttributeValue::Number(0.75));
-        
+        attrs.set(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(0.75),
+        );
+
         let pattern = AttributePattern::Range {
             key: AttributeKey::system("importance"),
             min: 0.5,
             max: 1.0,
         };
-        
+
         let results = attrs.query(&pattern);
         assert_eq!(results.len(), 1);
-        
+
         let pattern_out_of_range = AttributePattern::Range {
             key: AttributeKey::system("importance"),
             min: 0.0,
             max: 0.5,
         };
-        
+
         let results_empty = attrs.query(&pattern_out_of_range);
         assert_eq!(results_empty.len(), 0);
     }
-    
+
     #[test]
     fn test_relation_graph() {
         let mut graph = RelationGraph::new();
-        
+
         graph.add_relation(Relation {
             target_id: "mem-123".to_string(),
             relation_type: RelationType::References,
             strength: 0.9,
         });
-        
+
         graph.add_relation(Relation {
             target_id: "mem-456".to_string(),
             relation_type: RelationType::SimilarTo,
             strength: 0.7,
         });
-        
+
         assert_eq!(graph.relations().len(), 2);
-        
+
         let references = graph.find_by_type(&RelationType::References);
         assert_eq!(references.len(), 1);
         assert_eq!(references[0].target_id, "mem-123");
-        
+
         let target_relations = graph.find_by_target("mem-456");
         assert_eq!(target_relations.len(), 1);
     }
-    
+
     #[test]
     fn test_memory_builder() {
         let memory = Memory::builder()
             .text("Test content")
-            .attribute(AttributeKey::system("user_id"), AttributeValue::String("user123".to_string()))
-            .attribute(AttributeKey::system("importance"), AttributeValue::Number(0.8))
+            .attribute(
+                AttributeKey::system("user_id"),
+                AttributeValue::String("user123".to_string()),
+            )
+            .attribute(
+                AttributeKey::system("importance"),
+                AttributeValue::Number(0.8),
+            )
             .relation("mem-999".to_string(), RelationType::References, 0.95)
             .build();
-        
+
         assert!(memory.id.len() > 0);
         assert_eq!(memory.content.as_text(), "Test content");
         assert_eq!(
-            memory.attributes.get(&AttributeKey::system("user_id")).unwrap().as_string(),
+            memory
+                .attributes
+                .get(&AttributeKey::system("user_id"))
+                .unwrap()
+                .as_string(),
             Some("user123")
         );
         assert_eq!(memory.relations.relations().len(), 1);
     }
-    
+
     #[test]
     fn test_memory_from_legacy() {
         let legacy = LegacyMemory {
@@ -2510,54 +2658,72 @@ mod tests {
             },
             version: 1,
         };
-        
+
         let memory = Memory::from_legacy(legacy.clone());
-        
+
         // Verify ID and content
         assert_eq!(memory.id, "mem-001");
         assert_eq!(memory.content.as_text(), "Legacy content");
-        
+
         // Verify system attributes
         assert_eq!(
-            memory.attributes.get(&AttributeKey::system("agent_id")).unwrap().as_string(),
+            memory
+                .attributes
+                .get(&AttributeKey::system("agent_id"))
+                .unwrap()
+                .as_string(),
             Some("agent-1")
         );
         assert_eq!(
-            memory.attributes.get(&AttributeKey::system("user_id")).unwrap().as_string(),
+            memory
+                .attributes
+                .get(&AttributeKey::system("user_id"))
+                .unwrap()
+                .as_string(),
             Some("user-1")
         );
         assert_eq!(
-            memory.attributes.get(&AttributeKey::system("memory_type")).unwrap().as_string(),
+            memory
+                .attributes
+                .get(&AttributeKey::system("memory_type"))
+                .unwrap()
+                .as_string(),
             Some("semantic")
         );
         assert_eq!(
-            memory.attributes.get(&AttributeKey::system("importance")).unwrap().as_number(),
+            memory
+                .attributes
+                .get(&AttributeKey::system("importance"))
+                .unwrap()
+                .as_number(),
             Some(0.75)
         );
-        
+
         // Verify legacy metadata migration
         assert_eq!(
-            memory.attributes.get(&AttributeKey::legacy("key1")).unwrap().as_string(),
+            memory
+                .attributes
+                .get(&AttributeKey::legacy("key1"))
+                .unwrap()
+                .as_string(),
             Some("value1")
         );
-        
+
         // Verify metadata
         assert_eq!(memory.metadata.access_count, 5);
     }
-    
+
     #[test]
     fn test_memory_access() {
-        let mut memory = Memory::builder()
-            .text("Test")
-            .build();
-        
+        let mut memory = Memory::builder().text("Test").build();
+
         let initial_count = memory.metadata.access_count;
         memory.access();
-        
+
         assert_eq!(memory.metadata.access_count, initial_count + 1);
         assert!(memory.metadata.last_accessed.is_some());
     }
-    
+
     // ========== 原有测试（保持向后兼容） ==========
 
     #[test]
@@ -2695,43 +2861,40 @@ mod tests {
         );
         assert_eq!(contextual_memory.memory_type, MemoryType::Contextual);
     }
-    
+
     // ========== Query抽象测试 ==========
-    
+
     #[test]
     fn test_query_builder_basic() {
-        let query = Query::builder()
-            .text("测试查询")
-            .limit(10)
-            .build();
-        
+        let query = Query::builder().text("测试查询").limit(10).build();
+
         assert!(!query.id.is_empty());
         assert!(matches!(query.intent, QueryIntent::SemanticSearch { .. }));
         assert_eq!(query.constraints.len(), 1);
     }
-    
+
     #[test]
     fn test_query_from_string_id_pattern() {
         let query = Query::from_string("P000257商品详情");
-        
+
         if let QueryIntent::Lookup { entity_id } = query.intent {
             assert_eq!(entity_id, "P000257");
         } else {
             panic!("Expected Lookup intent");
         }
     }
-    
+
     #[test]
     fn test_query_from_string_semantic() {
         let query = Query::from_string("查询所有电子产品");
-        
+
         if let QueryIntent::SemanticSearch { text, .. } = query.intent {
             assert_eq!(text, "查询所有电子产品");
         } else {
             panic!("Expected SemanticSearch intent");
         }
     }
-    
+
     #[test]
     fn test_query_builder_with_constraints() {
         let query = Query::builder()
@@ -2743,10 +2906,10 @@ mod tests {
             )
             .limit(5)
             .build();
-        
+
         assert_eq!(query.constraints.len(), 2); // attribute + limit
     }
-    
+
     #[test]
     fn test_query_builder_with_preferences() {
         let query = Query::builder()
@@ -2756,16 +2919,18 @@ mod tests {
                 0.8,
             )
             .prefer(
-                PreferenceType::Importance { min_importance: 0.5 },
+                PreferenceType::Importance {
+                    min_importance: 0.5,
+                },
                 0.6,
             )
             .build();
-        
+
         assert_eq!(query.preferences.len(), 2);
         assert_eq!(query.preferences[0].weight, 0.8);
         assert_eq!(query.preferences[1].weight, 0.6);
     }
-    
+
     #[test]
     fn test_constraint_logic() {
         let constraint = Constraint::And(vec![
@@ -2776,101 +2941,101 @@ mod tests {
             },
             Constraint::MinScore(0.7),
         ]);
-        
+
         match constraint {
             Constraint::And(inner) => assert_eq!(inner.len(), 2),
             _ => panic!("Expected And constraint"),
         }
     }
-    
+
     // ========== Scope消除测试（AttributeSet替代MemoryScope） ==========
-    
+
     #[test]
     fn test_attributeset_global_scope() {
         let mut attrs = AttributeSet::new();
         attrs.set_global_scope();
-        
+
         assert!(attrs.is_global_scope());
         assert_eq!(attrs.infer_scope_level(), 0);
     }
-    
+
     #[test]
     fn test_attributeset_agent_scope() {
         let mut attrs = AttributeSet::new();
         attrs.set_agent_scope("agent-123");
-        
+
         assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
         assert_eq!(attrs.infer_scope_level(), 1);
     }
-    
+
     #[test]
     fn test_attributeset_user_scope() {
         let mut attrs = AttributeSet::new();
         attrs.set_user_scope("agent-123", "user-456");
-        
+
         assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
         assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
         assert_eq!(attrs.infer_scope_level(), 2);
     }
-    
+
     #[test]
     fn test_attributeset_session_scope() {
         let mut attrs = AttributeSet::new();
         attrs.set_session_scope("agent-123", "user-456", "session-789");
-        
+
         assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
         assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
         assert_eq!(attrs.get_session_id(), Some("session-789".to_string()));
         assert_eq!(attrs.infer_scope_level(), 3);
     }
-    
+
     #[test]
     fn test_attributeset_can_access() {
         let mut global = AttributeSet::new();
         global.set_global_scope();
-        
+
         let mut agent = AttributeSet::new();
         agent.set_agent_scope("agent-123");
-        
+
         let mut user = AttributeSet::new();
         user.set_user_scope("agent-123", "user-456");
-        
+
         // Global可以访问所有
         assert!(global.can_access(&agent));
         assert!(global.can_access(&user));
-        
+
         // Agent可以访问相同agent的user
         assert!(agent.can_access(&user));
-        
+
         // User不能访问Agent
         assert!(!user.can_access(&agent));
     }
-    
+
     #[test]
     fn test_memoryscope_to_attributeset() {
         use crate::hierarchy::MemoryScope;
-        
+
         let scope = MemoryScope::User {
             agent_id: "agent-123".to_string(),
             user_id: "user-456".to_string(),
         };
-        
+
         let attrs: AttributeSet = scope.into();
-        
+
         assert_eq!(attrs.get_agent_id(), Some("agent-123".to_string()));
         assert_eq!(attrs.get_user_id(), Some("user-456".to_string()));
         assert_eq!(attrs.infer_scope_level(), 2);
     }
-    
+
     #[test]
     fn test_attributeset_to_memoryscope() {
         use crate::hierarchy::MemoryScope;
-        
+
         let mut attrs = AttributeSet::new();
         attrs.set_session_scope("agent-123", "user-456", "session-789");
-        
+
         let scope: MemoryScope = (&attrs).into();
-        
+
         match scope {
             MemoryScope::Session {
                 agent_id,
@@ -2884,15 +3049,15 @@ mod tests {
             _ => panic!("Expected Session scope"),
         }
     }
-    
+
     // ========== DAG Pipeline测试 ==========
-    
+
     // 简单的测试Stage
     struct TestStage {
         name: String,
         delay_ms: u64,
     }
-    
+
     impl TestStage {
         fn new(name: impl Into<String>, delay_ms: u64) -> Self {
             Self {
@@ -2901,16 +3066,16 @@ mod tests {
             }
         }
     }
-    
+
     #[async_trait::async_trait]
     impl PipelineStage for TestStage {
         type Input = i32;
         type Output = i32;
-        
+
         fn name(&self) -> &str {
             &self.name
         }
-        
+
         async fn execute(
             &self,
             input: Self::Input,
@@ -2921,7 +3086,7 @@ mod tests {
             Ok(StageResult::Continue(input + 1))
         }
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_linear() {
         // 线性DAG: A -> B -> C
@@ -2929,16 +3094,16 @@ mod tests {
             .add_node("A", TestStage::new("A", 10), vec![])
             .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
             .add_node("C", TestStage::new("C", 10), vec!["B".to_string()]);
-        
+
         let mut ctx = PipelineContext::new();
         let results = dag.execute(0, &mut ctx).await.unwrap();
-        
+
         assert_eq!(results.len(), 3);
         assert_eq!(results.get("A"), Some(&1));
         assert_eq!(results.get("B"), Some(&1));
         assert_eq!(results.get("C"), Some(&1));
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_parallel() {
         // 并行DAG: A, B, C (无依赖)
@@ -2946,17 +3111,21 @@ mod tests {
             .add_node("A", TestStage::new("A", 50), vec![])
             .add_node("B", TestStage::new("B", 50), vec![])
             .add_node("C", TestStage::new("C", 50), vec![]);
-        
+
         let start = std::time::Instant::now();
         let mut ctx = PipelineContext::new();
         let results = dag.execute(0, &mut ctx).await.unwrap();
         let elapsed = start.elapsed().as_millis();
-        
+
         assert_eq!(results.len(), 3);
         // 并行执行应该快于串行（3个50ms任务串行需要150ms，并行应该在100ms内，留50%余量）
-        assert!(elapsed < 200, "Parallel execution took {}ms, expected < 200ms", elapsed);
+        assert!(
+            elapsed < 200,
+            "Parallel execution took {}ms, expected < 200ms",
+            elapsed
+        );
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_diamond() {
         // 菱形DAG: A -> B,C -> D
@@ -2964,32 +3133,36 @@ mod tests {
             .add_node("A", TestStage::new("A", 10), vec![])
             .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
             .add_node("C", TestStage::new("C", 10), vec!["A".to_string()])
-            .add_node("D", TestStage::new("D", 10), vec!["B".to_string(), "C".to_string()]);
-        
+            .add_node(
+                "D",
+                TestStage::new("D", 10),
+                vec!["B".to_string(), "C".to_string()],
+            );
+
         let mut ctx = PipelineContext::new();
         let results = dag.execute(0, &mut ctx).await.unwrap();
-        
+
         assert_eq!(results.len(), 4);
         assert!(ctx.get::<bool>("A_executed").unwrap_or(false));
         assert!(ctx.get::<bool>("B_executed").unwrap_or(false));
         assert!(ctx.get::<bool>("C_executed").unwrap_or(false));
         assert!(ctx.get::<bool>("D_executed").unwrap_or(false));
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_conditional() {
         // 条件分支: A -> B (if true) or C (if false)
         struct ConditionalStage;
-        
+
         #[async_trait::async_trait]
         impl PipelineStage for ConditionalStage {
             type Input = i32;
             type Output = i32;
-            
+
             fn name(&self) -> &str {
                 "Conditional"
             }
-            
+
             async fn execute(
                 &self,
                 input: Self::Input,
@@ -2999,7 +3172,7 @@ mod tests {
                 Ok(StageResult::Continue(input))
             }
         }
-        
+
         let dag = DagPipeline::new("test_conditional")
             .add_node("A", ConditionalStage, vec![])
             .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
@@ -3012,20 +3185,20 @@ mod tests {
             })
             .add_edge("A", "B", Some("is_high".to_string()))
             .add_edge("A", "C", Some("is_low".to_string()));
-        
+
         // Test with high value (should execute B)
         let mut ctx1 = PipelineContext::new();
         let results1 = dag.execute(10, &mut ctx1).await.unwrap();
         assert!(results1.contains_key("B"));
         assert!(!results1.contains_key("C"));
-        
+
         // Test with low value (should execute C)
         let mut ctx2 = PipelineContext::new();
         let results2 = dag.execute(3, &mut ctx2).await.unwrap();
         assert!(!results2.contains_key("B"));
         assert!(results2.contains_key("C"));
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_cycle_detection() {
         // 创建循环依赖: A -> B -> C -> A
@@ -3033,14 +3206,14 @@ mod tests {
             .add_node("A", TestStage::new("A", 10), vec!["C".to_string()])
             .add_node("B", TestStage::new("B", 10), vec!["A".to_string()])
             .add_node("C", TestStage::new("C", 10), vec!["B".to_string()]);
-        
+
         let mut ctx = PipelineContext::new();
         let result = dag.execute(0, &mut ctx).await;
-        
+
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Cycle detected"));
     }
-    
+
     #[tokio::test]
     async fn test_dag_pipeline_max_parallelism() {
         // 测试并行度控制
@@ -3050,14 +3223,18 @@ mod tests {
             .add_node("C", TestStage::new("C", 100), vec![])
             .add_node("D", TestStage::new("D", 100), vec![])
             .with_max_parallelism(2); // 最多同时执行2个
-        
+
         let start = std::time::Instant::now();
         let mut ctx = PipelineContext::new();
         let results = dag.execute(0, &mut ctx).await.unwrap();
         let elapsed = start.elapsed().as_millis();
-        
+
         assert_eq!(results.len(), 4);
         // 4个任务，并行度2，每批100ms，应该 >= 200ms
-        assert!(elapsed >= 180, "Execution took {}ms, expected >= 180ms", elapsed);
+        assert!(
+            elapsed >= 180,
+            "Execution took {}ms, expected >= 180ms",
+            elapsed
+        );
     }
 }

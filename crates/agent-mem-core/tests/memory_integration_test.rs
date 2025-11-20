@@ -130,10 +130,7 @@ fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
             AttributeKey::system("score"),
             AttributeValue::Number(importance as f64),
         )
-        .attribute(
-            AttributeKey::system("version"),
-            AttributeValue::Number(1.0),
-        )
+        .attribute(AttributeKey::system("version"), AttributeValue::Number(1.0))
         .build()
 }
 

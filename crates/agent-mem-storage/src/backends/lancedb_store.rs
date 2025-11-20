@@ -463,22 +463,29 @@ impl VectorStore for LanceDBStore {
         let table = self.get_or_create_table().await?;
 
         // 🔧 提取查询文本提示（用于文本匹配）
-        let query_hint = filters.get("_query_hint")
+        let query_hint = filters
+            .get("_query_hint")
             .and_then(|v| v.as_str())
             .map(|s| s.to_lowercase());
-        
-        debug!("🔍 查询提示: {:?}, 过滤器: {:?}", query_hint, filters.keys().collect::<Vec<_>>());
-        
+
+        debug!(
+            "🔍 查询提示: {:?}, 过滤器: {:?}",
+            query_hint,
+            filters.keys().collect::<Vec<_>>()
+        );
+
         // 🔧 动态调整检索数量：商品ID查询需要大量候选
-        let is_product_query = query_hint.as_ref().map_or(false, |h| h.starts_with("p") && h.len() < 10);
+        let is_product_query = query_hint
+            .as_ref()
+            .map_or(false, |h| h.starts_with("p") && h.len() < 10);
         let fetch_multiplier = if is_product_query {
-            200  // 商品ID查询：取大量候选，因为向量相似度不可靠
+            200 // 商品ID查询：取大量候选，因为向量相似度不可靠
         } else if filters.is_empty() {
             50
         } else {
             10
         };
-        
+
         // 2. 执行向量搜索（LanceDB会自动使用索引）
         let batches = table
             .query()
@@ -570,16 +577,22 @@ impl VectorStore for LanceDBStore {
                     if filter_key.starts_with('_') {
                         continue;
                     }
-                    
+
                     if let Some(metadata_value) = metadata.get(filter_key) {
                         // 比较值（支持字符串比较）
                         let filter_str = match filter_value {
                             serde_json::Value::String(s) => s.as_str(),
                             serde_json::Value::Number(n) => &n.to_string(),
-                            serde_json::Value::Bool(b) => if *b { "true" } else { "false" },
+                            serde_json::Value::Bool(b) => {
+                                if *b {
+                                    "true"
+                                } else {
+                                    "false"
+                                }
+                            }
                             _ => continue,
                         };
-                        
+
                         if metadata_value != filter_str {
                             passes_filter = false;
                             break;
@@ -612,18 +625,22 @@ impl VectorStore for LanceDBStore {
                 // 🎯 混合检索策略：文本匹配boost
                 // 检查metadata中是否包含查询关键词（用于商品ID等精确查询）
                 let has_text_match = if let Some(ref hint) = query_hint {
-                    let matches: Vec<_> = metadata.iter()
+                    let matches: Vec<_> = metadata
+                        .iter()
                         .filter(|(k, v)| v.to_lowercase().contains(hint))
                         .map(|(k, v)| (k.as_str(), v.as_str()))
                         .collect();
-                    
+
                     if !matches.is_empty() {
-                        debug!("🔍 Text match for id={}: hint='{}', matches={:?}", 
-                            id, hint, matches);
+                        debug!(
+                            "🔍 Text match for id={}: hint='{}', matches={:?}",
+                            id, hint, matches
+                        );
                         true
                     } else {
                         // 临时：打印所有metadata看为什么没匹配
-                        if results.len() < 5 {  // 只打印前5个
+                        if results.len() < 5 {
+                            // 只打印前5个
                             debug!("❌ No match for id={}: hint='{}', metadata_keys={:?}, first_value={:?}", 
                                 id, hint, metadata.keys().collect::<Vec<_>>(), 
                                 metadata.values().next());
@@ -633,30 +650,36 @@ impl VectorStore for LanceDBStore {
                 } else {
                     false
                 };
-                
+
                 if has_text_match {
                     // 文本匹配：大幅提升相似度
                     let old_sim = similarity;
-                    similarity = (similarity * 3.0).min(1.0);  // 3倍boost
-                    debug!("✅ Text match boost: id={}, old_sim={:.4}, new_sim={:.4}", 
-                        id, old_sim, similarity);
+                    similarity = (similarity * 3.0).min(1.0); // 3倍boost
+                    debug!(
+                        "✅ Text match boost: id={}, old_sim={:.4}, new_sim={:.4}",
+                        id, old_sim, similarity
+                    );
                 }
 
                 // 🔧 智能阈值：文本匹配的结果使用更低阈值
                 if let Some(threshold) = threshold {
                     let effective_threshold = if has_text_match {
-                        0.01  // 文本匹配：极低阈值，几乎不过滤
+                        0.01 // 文本匹配：极低阈值，几乎不过滤
                     } else {
                         threshold
                     };
-                    
+
                     if similarity < effective_threshold {
-                        debug!("❌ Filtered by threshold: id={}, sim={:.4} < {:.4}", 
-                            id, similarity, effective_threshold);
+                        debug!(
+                            "❌ Filtered by threshold: id={}, sim={:.4} < {:.4}",
+                            id, similarity, effective_threshold
+                        );
                         continue;
                     } else {
-                        debug!("✅ Passed threshold: id={}, sim={:.4} >= {:.4}, has_match={}", 
-                            id, similarity, effective_threshold, has_text_match);
+                        debug!(
+                            "✅ Passed threshold: id={}, sim={:.4} >= {:.4}, has_match={}",
+                            id, similarity, effective_threshold, has_text_match
+                        );
                     }
                 }
 

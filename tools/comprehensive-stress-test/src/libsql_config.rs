@@ -12,10 +12,10 @@ use tracing::info;
 pub struct LibSQLStressTestConfig {
     /// LibSQL 数据库文件路径
     pub db_path: String,
-    
+
     /// 是否启用嵌入生成
     pub enable_embeddings: bool,
-    
+
     /// 嵌入模型名称
     pub embedding_model: String,
 }
@@ -34,7 +34,7 @@ impl Default for LibSQLStressTestConfig {
 pub struct LibSQLStressTestEnv {
     /// AgentMem SDK 实例
     pub memory: Memory,
-    
+
     /// 配置
     pub config: LibSQLStressTestConfig,
 }
@@ -44,7 +44,14 @@ impl LibSQLStressTestEnv {
     pub async fn new(config: LibSQLStressTestConfig) -> Result<Self> {
         info!("🚀 初始化 LibSQL 压测环境...");
         info!("   数据库路径: {}", config.db_path);
-        info!("   嵌入生成: {}", if config.enable_embeddings { "启用" } else { "禁用" });
+        info!(
+            "   嵌入生成: {}",
+            if config.enable_embeddings {
+                "启用"
+            } else {
+                "禁用"
+            }
+        );
 
         // 确保数据目录存在
         if let Some(parent) = PathBuf::from(&config.db_path).parent() {
@@ -55,8 +62,7 @@ impl LibSQLStressTestEnv {
         // 格式: libsql://path/to/db
         let storage_url = format!("libsql://{}", config.db_path);
 
-        let mut builder = Memory::builder()
-            .with_storage(&storage_url);
+        let mut builder = Memory::builder().with_storage(&storage_url);
 
         // 如果启用嵌入，配置嵌入模型
         if config.enable_embeddings {
@@ -69,29 +75,29 @@ impl LibSQLStressTestEnv {
 
         Ok(Self { memory, config })
     }
-    
+
     /// 清理测试数据
     pub async fn cleanup(&self) -> Result<()> {
         info!("🧹 清理 LibSQL 测试数据...");
-        
+
         // 删除所有测试记忆
         // TODO: 实现批量删除 API
-        
+
         info!("✅ 清理完成");
         Ok(())
     }
-    
+
     /// 获取数据库统计信息
     pub async fn get_stats(&self) -> Result<DbStats> {
         info!("📊 获取数据库统计信息...");
-        
+
         // TODO: 实现统计 API
         let stats = DbStats {
             total_memories: 0,
             total_vectors: 0,
             db_size_bytes: 0,
         };
-        
+
         Ok(stats)
     }
 }
@@ -103,4 +109,3 @@ pub struct DbStats {
     pub total_vectors: usize,
     pub db_size_bytes: u64,
 }
-

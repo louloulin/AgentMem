@@ -1,12 +1,14 @@
 //! Huawei MaaS (华为) LLM提供商实现
 
-use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result};
+use agent_mem_traits::{
+    AgentMemError, LLMConfig, LLMProvider, Message, MessageRole, ModelInfo, Result,
+};
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::pin::Pin;
+use std::time::Duration;
 
 // --- 数据结构定义 ---
 
@@ -134,8 +136,14 @@ impl LLMProvider for HuaweiMaasProvider {
             .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {e}")))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AgentMemError::LLMError(format!("Huawei MaaS API error: {}", error_text)));
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AgentMemError::LLMError(format!(
+                "Huawei MaaS API error: {}",
+                error_text
+            )));
         }
 
         let maas_response: HuaweiMaasResponse = response.json().await.map_err(|e| {
@@ -149,7 +157,7 @@ impl LLMProvider for HuaweiMaasProvider {
             .ok_or_else(|| AgentMemError::LLMError("No response from Huawei MaaS".to_string()))
     }
 
-        async fn generate_stream(
+    async fn generate_stream(
         &self,
         messages: &[Message],
     ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
@@ -184,17 +192,22 @@ impl LLMProvider for HuaweiMaasProvider {
             .map_err(|e| AgentMemError::LLMError(format!("Failed to send request: {e}")))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AgentMemError::LLMError(format!("Huawei MaaS API error: {}", error_text)));
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AgentMemError::LLMError(format!(
+                "Huawei MaaS API error: {}",
+                error_text
+            )));
         }
 
         let stream = response
             .bytes_stream()
             .map_err(|e| AgentMemError::LLMError(format!("Stream error: {e}")))
             .and_then(|chunk| async move {
-                let s = String::from_utf8(chunk.to_vec()).map_err(|e| {
-                    AgentMemError::LLMError(format!("Stream UTF-8 error: {e}"))
-                })?;
+                let s = String::from_utf8(chunk.to_vec())
+                    .map_err(|e| AgentMemError::LLMError(format!("Stream UTF-8 error: {e}")))?;
                 Ok(s)
             })
             .filter_map(|res| async move {
@@ -207,7 +220,9 @@ impl LLMProvider for HuaweiMaasProvider {
                                 if data == "[DONE]" {
                                     break;
                                 }
-                                if let Ok(stream_resp) = serde_json::from_str::<HuaweiMaasStreamResponse>(data) {
+                                if let Ok(stream_resp) =
+                                    serde_json::from_str::<HuaweiMaasStreamResponse>(data)
+                                {
                                     if let Some(choice) = stream_resp.choices.first() {
                                         if let Some(content) = &choice.delta.content {
                                             if !content.is_empty() {
@@ -253,9 +268,10 @@ impl LLMProvider for HuaweiMaasProvider {
 
     fn validate_config(&self) -> Result<()> {
         if self.config.api_key.is_none() {
-            return Err(AgentMemError::ConfigError("Huawei MaaS API key is required".to_string()));
+            return Err(AgentMemError::ConfigError(
+                "Huawei MaaS API key is required".to_string(),
+            ));
         }
         Ok(())
     }
 }
-

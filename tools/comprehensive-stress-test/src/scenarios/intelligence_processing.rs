@@ -27,16 +27,18 @@ pub async fn run_test(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     let semaphore = Arc::new(Semaphore::new(concurrency));
     let mut handles = Vec::new();
@@ -80,4 +82,3 @@ async fn simulate_llm_call(_index: usize) -> bool {
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     true
 }
-

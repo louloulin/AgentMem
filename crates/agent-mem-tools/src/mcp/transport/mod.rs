@@ -22,14 +22,13 @@ use serde_json::Value;
 pub trait Transport: Send + Sync {
     /// 连接到服务器
     async fn connect(&mut self) -> McpResult<()>;
-    
+
     /// 发送请求
     async fn send_request(&self, method: &str, params: Value) -> McpResult<Value>;
-    
+
     /// 断开连接
     async fn disconnect(&mut self) -> McpResult<()>;
-    
+
     /// 检查是否已连接
     fn is_connected(&self) -> bool;
 }
-

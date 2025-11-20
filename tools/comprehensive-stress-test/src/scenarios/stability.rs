@@ -9,10 +9,7 @@ use tracing::{info, warn};
 use crate::monitor::SystemMonitor;
 use crate::stats::{StatsCollector, StressTestStats};
 
-pub async fn run_test(
-    hours: u64,
-    multi_progress: &MultiProgress,
-) -> Result<StressTestStats> {
+pub async fn run_test(hours: u64, multi_progress: &MultiProgress) -> Result<StressTestStats> {
     info!("开始长时间稳定性测试: {}小时", hours);
     warn!("此测试将运行 {} 小时，请确保系统资源充足", hours);
 
@@ -27,16 +24,18 @@ pub async fn run_test(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     let start_time = Instant::now();
     let test_duration = Duration::from_secs(duration_seconds);
@@ -56,7 +55,7 @@ pub async fn run_test(
         let op_start = Instant::now();
         let success = simulate_mixed_operation().await;
         let duration = op_start.elapsed();
-        
+
         stats_collector.record_operation(duration, success).await;
 
         // 模拟负载变化
@@ -74,8 +73,11 @@ pub async fn run_test(
     monitor.stop_monitoring().await;
 
     let stats = stats_collector.get_stats().await;
-    info!("稳定性测试完成: 总操作={}, 错误率={:.4}%", 
-        stats.total_operations, stats.error_rate * 100.0);
+    info!(
+        "稳定性测试完成: 总操作={}, 错误率={:.4}%",
+        stats.total_operations,
+        stats.error_rate * 100.0
+    );
 
     Ok(stats)
 }
@@ -86,4 +88,3 @@ async fn simulate_mixed_operation() -> bool {
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     true
 }
-

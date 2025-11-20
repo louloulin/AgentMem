@@ -13,10 +13,10 @@ pub struct StressTestStats {
     pub successful_operations: u64,
     pub failed_operations: u64,
     pub duration_seconds: f64,
-    
+
     // 吞吐量
     pub throughput: f64, // ops/sec
-    
+
     // 延迟统计 (毫秒)
     pub latency_min: f64,
     pub latency_max: f64,
@@ -26,17 +26,17 @@ pub struct StressTestStats {
     pub latency_p95: f64,
     pub latency_p99: f64,
     pub latency_p999: f64,
-    
+
     // 资源使用
     pub avg_cpu_usage: f64,
     pub peak_cpu_usage: f64,
     pub avg_memory_mb: f64,
     pub peak_memory_mb: f64,
-    
+
     // 错误统计
     pub error_rate: f64,
     pub errors_by_type: Vec<(String, u64)>,
-    
+
     // 时间戳
     pub start_time: String,
     pub end_time: String,
@@ -85,7 +85,7 @@ impl StatsCollector {
         Self {
             start_time: Instant::now(),
             histogram: Arc::new(RwLock::new(
-                Histogram::<u64>::new_with_bounds(1, 60_000, 3).unwrap()
+                Histogram::<u64>::new_with_bounds(1, 60_000, 3).unwrap(),
             )),
             total_ops: Arc::new(RwLock::new(0)),
             successful_ops: Arc::new(RwLock::new(0)),
@@ -197,4 +197,3 @@ impl Default for StatsCollector {
         Self::new()
     }
 }
-

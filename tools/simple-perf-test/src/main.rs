@@ -35,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 测试 1: 单个添加性能（Task 1.1 验证）
     println!("📊 测试 1: 单个添加性能（Task 1.1 验证）");
     println!("─────────────────────────────────────");
-    
+
     let mut durations = Vec::new();
     let test_count = 10;
-    
+
     for i in 0..test_count {
         let start = Instant::now();
         orchestrator
@@ -53,23 +53,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let duration = start.elapsed();
         durations.push(duration);
     }
-    
+
     let total_time: Duration = durations.iter().sum();
     let avg_time = total_time / test_count as u32;
     let throughput = 1000.0 / avg_time.as_millis() as f64;
-    
+
     println!("✅ 测试完成");
     println!("   记忆数量: {}", test_count);
     println!("   总时间: {:?}", total_time);
     println!("   平均延迟: {:?}", avg_time);
     println!("   吞吐量: {:.2} ops/s (单线程)", throughput);
-    println!("   预期多线程吞吐量: {:.2} ops/s (假设10并发)", throughput * 10.0);
+    println!(
+        "   预期多线程吞吐量: {:.2} ops/s (假设10并发)",
+        throughput * 10.0
+    );
     println!();
 
     // 测试 2: 批量添加性能（Task 1.2 验证 - 10个）
     println!("📊 测试 2: 批量添加 10 个记忆（Task 1.2 验证）");
     println!("─────────────────────────────────────");
-    
+
     let items: Vec<_> = (0..10)
         .map(|i| {
             (
@@ -81,13 +84,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })
         .collect();
-    
+
     let start = Instant::now();
     let memory_ids = orchestrator.add_memories_batch(items).await?;
     let duration = start.elapsed();
-    
+
     let throughput = 10000.0 / duration.as_millis() as f64;
-    
+
     println!("✅ 测试完成");
     println!("   记忆数量: {}", memory_ids.len());
     println!("   总时间: {:?}", duration);
@@ -98,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 测试 3: 批量添加性能（Task 1.2 验证 - 100个）
     println!("📊 测试 3: 批量添加 100 个记忆（Task 1.2 验证）");
     println!("─────────────────────────────────────");
-    
+
     let items: Vec<_> = (0..100)
         .map(|i| {
             (
@@ -110,13 +113,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })
         .collect();
-    
+
     let start = Instant::now();
     let memory_ids = orchestrator.add_memories_batch(items).await?;
     let duration = start.elapsed();
-    
+
     let throughput = 100000.0 / duration.as_millis() as f64;
-    
+
     println!("✅ 测试完成");
     println!("   记忆数量: {}", memory_ids.len());
     println!("   总时间: {:?}", duration);
@@ -157,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 测试 5: 性能对比（单个 vs 批量）
     println!("📊 测试 5: 性能对比（单个 vs 批量）");
     println!("─────────────────────────────────────");
-    
+
     // 单个添加 10 次
     let start = Instant::now();
     for i in 0..10 {
@@ -173,7 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let sequential_duration = start.elapsed();
     let sequential_throughput = 10000.0 / sequential_duration.as_millis() as f64;
-    
+
     // 批量添加 10 个
     let items: Vec<_> = (0..10)
         .map(|i| {
@@ -186,12 +189,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         })
         .collect();
-    
+
     let start = Instant::now();
     orchestrator.add_memories_batch(items).await?;
     let batch_duration = start.elapsed();
     let batch_throughput = 10000.0 / batch_duration.as_millis() as f64;
-    
+
     println!("✅ 对比完成");
     println!("   单个添加 10 次:");
     println!("     - 总时间: {:?}", sequential_duration);
@@ -199,7 +202,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   批量添加 10 个:");
     println!("     - 总时间: {:?}", batch_duration);
     println!("     - 吞吐量: {:.2} ops/s", batch_throughput);
-    println!("   性能提升: {:.2}x", batch_throughput / sequential_throughput);
+    println!(
+        "   性能提升: {:.2}x",
+        batch_throughput / sequential_throughput
+    );
     println!();
 
     // 总结
@@ -229,4 +235,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

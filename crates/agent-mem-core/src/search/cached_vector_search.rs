@@ -165,7 +165,7 @@ impl CachedVectorSearchEngine {
 // SearchEngine Trait 实现 (V4)
 // ============================================================================
 
-use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use agent_mem_traits::{Query, QueryIntent, QueryIntentType, SearchEngine};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -177,7 +177,8 @@ impl SearchEngine for CachedVectorSearchEngine {
             QueryIntent::Vector { embedding } => embedding.clone(),
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取向量意图
-                intents.iter()
+                intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::Vector { embedding } = intent {
                             Some(embedding.clone())
@@ -185,9 +186,11 @@ impl SearchEngine for CachedVectorSearchEngine {
                             None
                         }
                     })
-                    .ok_or_else(|| agent_mem_traits::AgentMemError::validation_error(
-                        "Hybrid query must contain at least one Vector intent"
-                    ))?
+                    .ok_or_else(|| {
+                        agent_mem_traits::AgentMemError::validation_error(
+                            "Hybrid query must contain at least one Vector intent",
+                        )
+                    })?
             }
             _ => {
                 return Err(agent_mem_traits::AgentMemError::validation_error(
@@ -203,7 +206,8 @@ impl SearchEngine for CachedVectorSearchEngine {
         let (results, _elapsed) = self.search(query_vector, &search_query).await?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
-        let v4_results = results.into_iter()
+        let v4_results = results
+            .into_iter()
             .map(|r| agent_mem_traits::SearchResultV4 {
                 id: r.id,
                 content: r.content,

@@ -45,7 +45,10 @@ async fn test_memory_operations_flow() {
     let repositories = match RepositoryFactory::create_repositories(&db_config).await {
         Ok(repos) => Arc::new(repos),
         Err(e) => {
-            println!("⚠️  Skipping flow test - failed to create repositories: {}", e);
+            println!(
+                "⚠️  Skipping flow test - failed to create repositories: {}",
+                e
+            );
             return;
         }
     };

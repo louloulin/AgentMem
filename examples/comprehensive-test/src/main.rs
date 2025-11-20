@@ -1,5 +1,5 @@
 use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
-use agent_mem_traits::{MemoryItem, MemoryType, MemoryV4, Session, Content};
+use agent_mem_traits::{Content, MemoryItem, MemoryType, MemoryV4, Session};
 use chrono::Utc;
 use std::collections::HashMap;
 use tracing::{error, info};

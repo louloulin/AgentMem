@@ -7,7 +7,7 @@
 //! cargo run --release -p libsql-stress-test
 //! ```
 
-use agent_mem::{Memory, AddMemoryOptions};
+use agent_mem::{AddMemoryOptions, Memory};
 use std::time::Instant;
 use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -27,12 +27,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("\n📦 初始化 AgentMem SDK...");
     let db_path = "./data/stress-test.db";
     std::fs::create_dir_all("./data")?;
-    
+
     let memory = Memory::builder()
         .with_storage(&format!("libsql://{}", db_path))
         .build()
         .await?;
-    
+
     info!("✅ SDK 初始化完成");
 
     // 2. 记忆创建压测（单条）
@@ -46,7 +46,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..create_count {
         let content = format!("Test memory {} - Created at {}", i, chrono::Utc::now());
 
-        match memory.add_with_options(content, AddMemoryOptions::default()).await {
+        match memory
+            .add_with_options(content, AddMemoryOptions::default())
+            .await
+        {
             Ok(result) => {
                 if !result.results.is_empty() {
                     success += 1;
@@ -74,18 +77,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("   失败: {}", failed);
     info!("   耗时: {:.2}s", duration_secs);
     info!("   吞吐量: {:.2} ops/s", throughput);
-    info!("   平均延迟: {:.2}ms", duration_secs * 1000.0 / create_count as f64);
+    info!(
+        "   平均延迟: {:.2}ms",
+        duration_secs * 1000.0 / create_count as f64
+    );
 
     // 2.5. 记忆创建压测（批量优化版）
     info!("\n📝 测试 1.5: 记忆创建性能（批量优化版）");
     info!("{}", "-".repeat(60));
     let batch_count = 100;
     let contents: Vec<String> = (0..batch_count)
-        .map(|i| format!("Batch test memory {} - Created at {}", i, chrono::Utc::now()))
+        .map(|i| {
+            format!(
+                "Batch test memory {} - Created at {}",
+                i,
+                chrono::Utc::now()
+            )
+        })
         .collect();
 
     let start = Instant::now();
-    match memory.add_batch_optimized(contents, AddMemoryOptions::default()).await {
+    match memory
+        .add_batch_optimized(contents, AddMemoryOptions::default())
+        .await
+    {
         Ok(results) => {
             let duration = start.elapsed();
             let duration_secs = duration.as_secs_f64();
@@ -97,8 +112,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("   失败: {}", batch_count - results.len());
             info!("   耗时: {:.2}s", duration_secs);
             info!("   吞吐量: {:.2} ops/s", throughput);
-            info!("   平均延迟: {:.2}ms", duration_secs * 1000.0 / batch_count as f64);
-            info!("   🚀 性能提升: {:.2}x", throughput / (create_count as f64 / duration_secs));
+            info!(
+                "   平均延迟: {:.2}ms",
+                duration_secs * 1000.0 / batch_count as f64
+            );
+            info!(
+                "   🚀 性能提升: {:.2}x",
+                throughput / (create_count as f64 / duration_secs)
+            );
         }
         Err(e) => {
             warn!("批量记忆创建失败: {}", e);
@@ -116,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for i in 0..search_count {
         let query = format!("Test memory {}", i % 10);
-        
+
         match memory.search(&query).await {
             Ok(results) => {
                 total_results += results.len();
@@ -143,7 +164,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("   检索到记忆数: {}", total_results);
     info!("   耗时: {:.2}s", duration_secs);
     info!("   吞吐量: {:.2} qps", throughput);
-    info!("   平均延迟: {:.2}ms", duration_secs * 1000.0 / search_count as f64);
+    info!(
+        "   平均延迟: {:.2}ms",
+        duration_secs * 1000.0 / search_count as f64
+    );
 
     // 4. 批量操作压测
     info!("\n📦 测试 3: 批量操作性能");
@@ -165,7 +189,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ));
         }
 
-        match memory.add_batch(contents, AddMemoryOptions::default()).await {
+        match memory
+            .add_batch(contents, AddMemoryOptions::default())
+            .await
+        {
             Ok(results) => {
                 if results.len() == batch_size {
                     success += 1;
@@ -202,7 +229,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("✅ 所有测试完成！");
     info!("   数据库: LibSQL ({})", db_path);
     info!("   总记忆数: ~{}", create_count + total_items);
-    
+
     // 6. 与 Mem0 对比
     info!("\n📈 与 Mem0 性能对比:");
     info!("{}", "-".repeat(60));
@@ -220,4 +247,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

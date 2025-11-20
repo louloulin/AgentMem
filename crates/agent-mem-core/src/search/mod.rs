@@ -10,29 +10,29 @@
 //! - 搜索性能优化
 
 pub mod adaptive;
-pub mod adaptive_threshold;
 /// Week 5-6: Adaptive router with Thompson Sampling
 pub mod adaptive_router;
 /// Week 5-6: Adaptive search engine (complete integration)
 pub mod adaptive_search_engine;
+pub mod adaptive_threshold;
+pub mod bm25;
 /// Week 7-8: Cached adaptive engine with parallel search
 pub mod cached_adaptive_engine;
-pub mod bm25;
-/// 元数据过滤系统（阶段2实现）
-pub mod metadata_filter;
 #[cfg(feature = "redis-cache")]
 pub mod cached_vector_search;
 #[cfg(feature = "postgres")]
 pub mod enhanced_hybrid;
 pub mod enhanced_hybrid_v2;
-#[cfg(feature = "postgres")]
-pub mod fulltext_search;
-pub mod fuzzy;
 /// 外部重排序器（Cohere等）
 pub mod external_reranker;
 #[cfg(feature = "postgres")]
+pub mod fulltext_search;
+pub mod fuzzy;
+#[cfg(feature = "postgres")]
 pub mod hybrid;
 pub mod learning;
+/// 元数据过滤系统（阶段2实现）
+pub mod metadata_filter;
 pub mod query_classifier;
 pub mod query_optimizer;
 pub mod ranker;
@@ -42,24 +42,19 @@ pub mod vector_search;
 pub use adaptive::{
     AdaptiveSearchOptimizer, QueryFeatures, SearchReranker, SearchWeights, WeightPredictor,
 };
-pub use adaptive_threshold::{AdaptiveThresholdCalculator, AdaptiveThresholdConfig, ThresholdCalculation};
+pub use adaptive_threshold::{
+    AdaptiveThresholdCalculator, AdaptiveThresholdConfig, ThresholdCalculation,
+};
 pub use bm25::{BM25Params, BM25SearchEngine};
-pub use enhanced_hybrid_v2::{
-    EnhancedHybridSearchEngine as EnhancedHybridSearchEngineV2,
-    EnhancedHybridConfig,
-    EnhancedSearchResult,
-    EnhancedSearchStats,
-};
-pub use query_classifier::{
-    QueryClassifier,
-    QueryType,
-    SearchStrategy as QuerySearchStrategy,
-    QueryFeatures as QueryClassifierFeatures,
-};
 #[cfg(feature = "redis-cache")]
 pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
 #[cfg(feature = "postgres")]
 pub use enhanced_hybrid::EnhancedHybridSearchEngine;
+pub use enhanced_hybrid_v2::{
+    EnhancedHybridConfig, EnhancedHybridSearchEngine as EnhancedHybridSearchEngineV2,
+    EnhancedSearchResult, EnhancedSearchStats,
+};
+pub use external_reranker::{InternalReranker, Reranker, RerankerFactory};
 #[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;
 pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
@@ -69,17 +64,24 @@ pub use learning::{
     FeedbackRecord, LearningConfig, LearningEngine, OptimizationReport, PatternImprovement,
     QueryPattern,
 };
+pub use query_classifier::{
+    QueryClassifier, QueryFeatures as QueryClassifierFeatures, QueryType,
+    SearchStrategy as QuerySearchStrategy,
+};
 pub use query_optimizer::{IndexStatistics, QueryOptimizer, ResultReranker};
-pub use external_reranker::{Reranker, InternalReranker, RerankerFactory};
 pub use ranker::{RRFRanker, SearchResultRanker};
 pub use vector_search::{
     build_hybrid_vector_search_sql, build_vector_search_sql, VectorDistanceOperator,
     VectorSearchEngine,
 };
 
+use agent_mem_traits::{
+    AttributeKey, AttributeValue, ComparisonOperator, Constraint, Query, QueryIntent,
+};
+pub use metadata_filter::{
+    FilterOperator, FilterValue, LogicalOperator, MetadataFilter, MetadataFilterSystem,
+};
 use serde::{Deserialize, Serialize};
-use agent_mem_traits::{Query, QueryIntent, Constraint, ComparisonOperator, AttributeKey, AttributeValue};
-pub use metadata_filter::{FilterOperator, FilterValue, LogicalOperator, MetadataFilter, MetadataFilterSystem};
 
 /// 搜索查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,7 +107,7 @@ impl Default for SearchQuery {
         Self {
             query: String::new(),
             limit: 10,
-            threshold: Some(0.3),  // 🔧 降低阈值以支持商品ID等精确查询
+            threshold: Some(0.3), // 🔧 降低阈值以支持商品ID等精确查询
             vector_weight: 0.7,
             fulltext_weight: 0.3,
             filters: None,
@@ -124,7 +126,8 @@ impl SearchQuery {
             QueryIntent::Structured { .. } => String::new(), // 结构化查询需要特殊处理
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取第一个自然语言查询
-                intents.iter()
+                intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::NaturalLanguage { text, .. } = intent {
                             Some(text.clone())
@@ -137,9 +140,16 @@ impl SearchQuery {
         };
 
         // 提取限制
-        let limit = query.constraints.iter()
+        let limit = query
+            .constraints
+            .iter()
             .find_map(|c| {
-                if let Constraint::Attribute { key, operator, value } = c {
+                if let Constraint::Attribute {
+                    key,
+                    operator,
+                    value,
+                } = c
+                {
                     if key.name == "limit" && matches!(operator, ComparisonOperator::Equals) {
                         if let AttributeValue::Number(n) = value {
                             return Some(*n as usize);
@@ -151,17 +161,22 @@ impl SearchQuery {
             .unwrap_or(10);
 
         // 提取阈值
-        let threshold = query.constraints.iter()
-            .find_map(|c| {
-                if let Constraint::Attribute { key, operator, value } = c {
-                    if key.name == "threshold" && matches!(operator, ComparisonOperator::GreaterOrEqual) {
-                        if let AttributeValue::Number(n) = value {
-                            return Some(*n as f32);
-                        }
+        let threshold = query.constraints.iter().find_map(|c| {
+            if let Constraint::Attribute {
+                key,
+                operator,
+                value,
+            } = c
+            {
+                if key.name == "threshold" && matches!(operator, ComparisonOperator::GreaterOrEqual)
+                {
+                    if let AttributeValue::Number(n) = value {
+                        return Some(*n as f32);
                     }
                 }
-                None
-            });
+            }
+            None
+        });
 
         // 提取过滤条件
         let filters = Self::extract_filters(query);
@@ -188,7 +203,11 @@ impl SearchQuery {
 
         for constraint in &query.constraints {
             match constraint {
-                Constraint::Attribute { key, operator, value } => {
+                Constraint::Attribute {
+                    key,
+                    operator,
+                    value,
+                } => {
                     if matches!(operator, ComparisonOperator::Equals) {
                         match key.name.as_str() {
                             "user_id" => {
@@ -208,15 +227,17 @@ impl SearchQuery {
                             }
                             "tags" => {
                                 if let AttributeValue::List(arr) = value {
-                                    tags = Some(arr.iter()
-                                        .filter_map(|v| {
-                                            if let AttributeValue::String(s) = v {
-                                                Some(s.clone())
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .collect());
+                                    tags = Some(
+                                        arr.iter()
+                                            .filter_map(|v| {
+                                                if let AttributeValue::String(s) = v {
+                                                    Some(s.clone())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .collect(),
+                                    );
                                 }
                             }
                             _ => {}
@@ -231,8 +252,13 @@ impl SearchQuery {
             }
         }
 
-        if user_id.is_some() || agent_id.is_some() || organization_id.is_some()
-            || start_time.is_some() || end_time.is_some() || tags.is_some() {
+        if user_id.is_some()
+            || agent_id.is_some()
+            || organization_id.is_some()
+            || start_time.is_some()
+            || end_time.is_some()
+            || tags.is_some()
+        {
             Some(SearchFilters {
                 user_id,
                 organization_id,
@@ -308,7 +334,7 @@ mod tests {
     fn test_search_query_default() {
         let query = SearchQuery::default();
         assert_eq!(query.limit, 10);
-        assert_eq!(query.threshold, Some(0.3));  // 🔧 更新测试以匹配新的默认阈值
+        assert_eq!(query.threshold, Some(0.3)); // 🔧 更新测试以匹配新的默认阈值
         assert_eq!(query.vector_weight, 0.7);
         assert_eq!(query.fulltext_weight, 0.3);
     }

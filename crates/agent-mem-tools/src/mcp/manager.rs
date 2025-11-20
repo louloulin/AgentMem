@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 pub struct McpClientManager {
     /// 客户端映射 (server_name -> client)
     clients: Arc<RwLock<HashMap<String, Arc<McpClient>>>>,
-    
+
     /// 服务器配置映射
     configs: Arc<RwLock<HashMap<String, McpServerConfig>>>,
 }
@@ -27,67 +27,73 @@ impl McpClientManager {
             configs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// 添加服务器
     pub async fn add_server(&self, config: McpServerConfig) -> McpResult<()> {
         let server_name = config.server_name.clone();
-        
+
         // 检查是否已存在
         if self.clients.read().await.contains_key(&server_name) {
-            return Err(McpError::ConfigError(
-                format!("Server '{server_name}' already exists")
-            ));
+            return Err(McpError::ConfigError(format!(
+                "Server '{server_name}' already exists"
+            )));
         }
-        
+
         // 创建客户端
         let client = Arc::new(McpClient::new(config.clone()));
-        
+
         // 连接到服务器
         client.connect().await?;
-        
+
         // 存储客户端和配置
-        self.clients.write().await.insert(server_name.clone(), client);
-        self.configs.write().await.insert(server_name.clone(), config);
-        
+        self.clients
+            .write()
+            .await
+            .insert(server_name.clone(), client);
+        self.configs
+            .write()
+            .await
+            .insert(server_name.clone(), config);
+
         Ok(())
     }
-    
+
     /// 移除服务器
     pub async fn remove_server(&self, server_name: &str) -> McpResult<()> {
-        let client = self.clients.write().await.remove(server_name)
-            .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{server_name}' not found")
-            ))?;
-        
+        let client = self
+            .clients
+            .write()
+            .await
+            .remove(server_name)
+            .ok_or_else(|| McpError::ConfigError(format!("Server '{server_name}' not found")))?;
+
         // 断开连接
         client.disconnect().await?;
-        
+
         // 移除配置
         self.configs.write().await.remove(server_name);
-        
+
         Ok(())
     }
-    
+
     /// 列出所有服务器
     pub async fn list_servers(&self) -> Vec<String> {
         self.clients.read().await.keys().cloned().collect()
     }
-    
+
     /// 获取服务器信息
     pub async fn get_server_info(&self, server_name: &str) -> McpResult<McpServerInfo> {
         let clients = self.clients.read().await;
         let configs = self.configs.read().await;
-        
-        let client = clients.get(server_name)
-            .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{server_name}' not found")
-            ))?;
-        
-        let config = configs.get(server_name)
-            .ok_or_else(|| McpError::ConfigError(
-                format!("Config for server '{server_name}' not found")
-            ))?;
-        
+
+        let client = clients
+            .get(server_name)
+            .ok_or_else(|| McpError::ConfigError(format!("Server '{server_name}' not found")))?;
+
+        let config = configs.get(server_name).ok_or_else(|| {
+            McpError::ConfigError(format!("Config for server '{server_name}' not found"))
+        })?;
+
         Ok(McpServerInfo {
             name: server_name.to_string(),
             server_type: format!("{:?}", config.server_type),
@@ -96,12 +102,12 @@ impl McpClientManager {
             config: serde_json::to_value(config)?,
         })
     }
-    
+
     /// 列出所有工具
     pub async fn list_all_tools(&self) -> McpResult<HashMap<String, Vec<McpTool>>> {
         let clients = self.clients.read().await;
         let mut all_tools = HashMap::new();
-        
+
         for (server_name, client) in clients.iter() {
             match client.list_tools().await {
                 Ok(tools) => {
@@ -113,21 +119,20 @@ impl McpClientManager {
                 }
             }
         }
-        
+
         Ok(all_tools)
     }
-    
+
     /// 列出指定服务器的工具
     pub async fn list_tools(&self, server_name: &str) -> McpResult<Vec<McpTool>> {
         let clients = self.clients.read().await;
-        let client = clients.get(server_name)
-            .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{server_name}' not found")
-            ))?;
-        
+        let client = clients
+            .get(server_name)
+            .ok_or_else(|| McpError::ConfigError(format!("Server '{server_name}' not found")))?;
+
         client.list_tools().await
     }
-    
+
     /// 执行工具
     pub async fn execute_tool(
         &self,
@@ -136,18 +141,17 @@ impl McpClientManager {
         arguments: Value,
     ) -> McpResult<McpToolCallResponse> {
         let clients = self.clients.read().await;
-        let client = clients.get(server_name)
-            .ok_or_else(|| McpError::ConfigError(
-                format!("Server '{server_name}' not found")
-            ))?;
-        
+        let client = clients
+            .get(server_name)
+            .ok_or_else(|| McpError::ConfigError(format!("Server '{server_name}' not found")))?;
+
         client.execute_tool(tool_name, arguments).await
     }
-    
+
     /// 查找工具（在所有服务器中搜索）
     pub async fn find_tool(&self, tool_name: &str) -> McpResult<Option<(String, McpTool)>> {
         let all_tools = self.list_all_tools().await?;
-        
+
         for (server_name, tools) in all_tools {
             for tool in tools {
                 if tool.name == tool_name {
@@ -155,23 +159,23 @@ impl McpClientManager {
                 }
             }
         }
-        
+
         Ok(None)
     }
-    
+
     /// 断开所有连接
     pub async fn disconnect_all(&self) -> McpResult<()> {
         let clients = self.clients.write().await;
-        
+
         for (server_name, client) in clients.iter() {
             if let Err(e) = client.disconnect().await {
                 eprintln!("Failed to disconnect server '{server_name}': {e}");
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// 获取客户端数量
     pub async fn client_count(&self) -> usize {
         self.clients.read().await.len()
@@ -199,7 +203,6 @@ impl Drop for McpClientManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[tokio::test]
     async fn test_create_manager() {
@@ -219,19 +222,11 @@ mod tests {
     async fn test_add_duplicate_server() {
         let manager = McpClientManager::new();
 
-        let config1 = McpServerConfig::stdio(
-            "test-server".to_string(),
-            "echo".to_string(),
-            vec![],
-            None,
-        );
+        let config1 =
+            McpServerConfig::stdio("test-server".to_string(), "echo".to_string(), vec![], None);
 
-        let config2 = McpServerConfig::stdio(
-            "test-server".to_string(),
-            "echo".to_string(),
-            vec![],
-            None,
-        );
+        let config2 =
+            McpServerConfig::stdio("test-server".to_string(), "echo".to_string(), vec![], None);
 
         // 第一次添加应该成功（如果 echo 命令可用）
         let _ = manager.add_server(config1).await;
@@ -265,11 +260,9 @@ mod tests {
     #[tokio::test]
     async fn test_execute_tool_not_found() {
         let manager = McpClientManager::new();
-        let result = manager.execute_tool(
-            "nonexistent",
-            "tool",
-            serde_json::json!({}),
-        ).await;
+        let result = manager
+            .execute_tool("nonexistent", "tool", serde_json::json!({}))
+            .await;
         assert!(result.is_err());
     }
 
@@ -281,4 +274,3 @@ mod tests {
         assert!(result.unwrap().is_none());
     }
 }
-

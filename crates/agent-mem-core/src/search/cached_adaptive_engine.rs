@@ -39,7 +39,7 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
     ) -> Self {
         let router = Arc::new(AdaptiveRouter::new(config));
         let cache = Arc::new(QueryCache::new(cache_config));
-        
+
         Self {
             backend,
             router,
@@ -48,7 +48,7 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
             enable_learning,
         }
     }
-    
+
     /// 执行缓存+自适应搜索
     pub async fn search(
         &self,
@@ -56,10 +56,10 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
         query: SearchQuery,
     ) -> Result<Vec<SearchResult>> {
         let start = Instant::now();
-        
+
         // 步骤1: 构建缓存键
         let cache_key = self.build_cache_key(&query);
-        
+
         // 步骤2: 尝试从缓存获取
         if self.enable_cache {
             if let Some(cached_results) = self.cache.get::<Vec<SearchResult>>(&cache_key).await {
@@ -71,21 +71,22 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
                 return Ok(cached_results);
             }
         }
-        
+
         // 步骤3: 缓存未命中，路由器决策策略
         let (strategy_id, weights) = self.router.decide_strategy(&query).await?;
-        
+
         debug!(
             "CachedAdaptive selected strategy: {:?}, weights: v={}, f={}",
             strategy_id, weights.vector_weight, weights.fulltext_weight
         );
-        
+
         // 步骤4: 执行搜索
         let mut query_clone = query.clone();
         query_clone.vector_weight = weights.vector_weight;
         query_clone.fulltext_weight = weights.fulltext_weight;
-        
-        let results = self.backend
+
+        let results = self
+            .backend
             .search_with_weights(
                 query_vector,
                 query_clone.clone(),
@@ -93,19 +94,19 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
                 weights.fulltext_weight,
             )
             .await?;
-        
+
         let latency_ms = start.elapsed().as_millis() as u64;
-        
+
         // 步骤5: 计算准确率
         let accuracy = self.calculate_accuracy(&results.results);
-        
+
         // 步骤6: 写入缓存
         if self.enable_cache && !results.results.is_empty() {
             if let Err(e) = self.cache.put(cache_key, results.results.clone()).await {
                 tracing::warn!("Failed to cache results: {}", e);
             }
         }
-        
+
         // 步骤7: 异步反馈学习
         if self.enable_learning {
             let router = Arc::clone(&self.router);
@@ -119,51 +120,50 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
                 }
             });
         }
-        
+
         info!(
             "Search completed: strategy={:?}, accuracy={:.2}, latency={}ms",
             strategy_id, accuracy, latency_ms
         );
-        
+
         Ok(results.results)
     }
-    
+
     /// 构建缓存键
     fn build_cache_key(&self, query: &SearchQuery) -> CacheKey {
         // 构建参数结构用于哈希（排除f32和DateTime等不可hash的类型）
-        let filter_str = query.filters.as_ref().map(|f| {
-            format!("{:?}_{:?}_{:?}", f.user_id, f.organization_id, f.agent_id)
-        });
-        
+        let filter_str = query
+            .filters
+            .as_ref()
+            .map(|f| format!("{:?}_{:?}_{:?}", f.user_id, f.organization_id, f.agent_id));
+
         let params = (
             &query.query,
             query.limit,
             query.threshold.map(|t| (t * 1000.0) as i32), // Convert f32 to i32
             filter_str,
         );
-        
+
         CacheKey::new("adaptive_search", &params)
     }
-    
+
     /// 计算准确率
     fn calculate_accuracy(&self, results: &[SearchResult]) -> f32 {
         if results.is_empty() {
             return 0.0;
         }
-        
+
         let top_k = results.len().min(5);
-        let avg_score: f32 = results.iter()
-            .take(top_k)
-            .map(|r| r.score)
-            .sum::<f32>() / top_k as f32;
-        
+        let avg_score: f32 =
+            results.iter().take(top_k).map(|r| r.score).sum::<f32>() / top_k as f32;
+
         avg_score.clamp(0.0, 1.0)
     }
-    
+
     /// 获取缓存统计
     pub async fn get_cache_stats(&self) -> Result<String> {
         let stats = self.cache.get_stats().await;
-        
+
         let output = format!(
             "=== Cache Stats ===\n\
              Total Requests: {}\n\
@@ -181,19 +181,22 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
             stats.expired_entries,
             stats.hit_rate() * 100.0
         );
-        
+
         Ok(output)
     }
-    
+
     /// 清空缓存
     pub async fn clear_cache(&self) -> Result<()> {
-        self.cache.clear().await.map_err(|e| anyhow::anyhow!("Cache clear error: {}", e))
+        self.cache
+            .clear()
+            .await
+            .map_err(|e| anyhow::anyhow!("Cache clear error: {}", e))
     }
-    
+
     /// 预热缓存（批量加载热点查询）
     pub async fn warmup_cache(&self, hot_queries: Vec<(Vec<f32>, SearchQuery)>) -> Result<usize> {
         let mut warmed = 0;
-        
+
         for (vector, query) in hot_queries {
             if let Ok(results) = self.search(vector, query).await {
                 if !results.is_empty() {
@@ -201,7 +204,7 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
                 }
             }
         }
-        
+
         info!("Cache warmed up with {} queries", warmed);
         Ok(warmed)
     }
@@ -217,7 +220,7 @@ impl ParallelSearchOptimizer {
     pub fn new(max_concurrency: usize) -> Self {
         Self { max_concurrency }
     }
-    
+
     /// 批量并发搜索
     pub async fn batch_search<S>(
         &self,
@@ -229,23 +232,23 @@ impl ParallelSearchOptimizer {
     {
         let start = Instant::now();
         let total_queries = queries.len();
-        
+
         // 使用tokio::spawn并发执行
         let mut tasks = Vec::new();
         let semaphore = Arc::new(tokio::sync::Semaphore::new(self.max_concurrency));
-        
+
         for (vector, query) in queries {
             let engine = Arc::clone(&engine);
             let permit = Arc::clone(&semaphore);
-            
+
             let task = tokio::spawn(async move {
                 let _permit = permit.acquire().await.unwrap();
                 engine.search(vector, query).await
             });
-            
+
             tasks.push(task);
         }
-        
+
         // 等待所有任务完成
         let mut results = Vec::new();
         for task in tasks {
@@ -261,7 +264,7 @@ impl ParallelSearchOptimizer {
                 }
             }
         }
-        
+
         let elapsed = start.elapsed();
         info!(
             "Batch search completed: {} queries in {:?} ({:.2} QPS)",
@@ -269,7 +272,7 @@ impl ParallelSearchOptimizer {
             elapsed,
             total_queries as f64 / elapsed.as_secs_f64()
         );
-        
+
         Ok(results)
     }
 }
@@ -277,7 +280,7 @@ impl ParallelSearchOptimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_cache_key_generation() {
         let query = SearchQuery {
@@ -289,11 +292,11 @@ mod tests {
             filters: None,
             metadata_filters: None,
         };
-        
+
         // Mock实现
         // 实际测试需要完整的Backend实现
     }
-    
+
     #[test]
     fn test_parallel_optimizer() {
         let optimizer = ParallelSearchOptimizer::new(10);
@@ -305,7 +308,7 @@ mod tests {
 // SearchEngine Trait 实现 (V4)
 // ============================================================================
 
-use agent_mem_traits::{SearchEngine, Query, QueryIntent, QueryIntentType};
+use agent_mem_traits::{Query, QueryIntent, QueryIntentType, SearchEngine};
 
 #[async_trait::async_trait]
 impl<S> SearchEngine for CachedAdaptiveEngine<S>
@@ -313,21 +316,24 @@ where
     S: SearchEngineBackend,
 {
     /// 执行搜索查询（V4 Query 接口）
-    async fn search(&self, query: &Query) -> agent_mem_traits::Result<Vec<agent_mem_traits::SearchResultV4>> {
+    async fn search(
+        &self,
+        query: &Query,
+    ) -> agent_mem_traits::Result<Vec<agent_mem_traits::SearchResultV4>> {
         // 1. 提取查询向量和文本
         let (query_vector, query_text) = match &query.intent {
             QueryIntent::Hybrid { intents, .. } => {
                 // 从混合查询中提取向量和文本
-                let vector = intents.iter()
-                    .find_map(|intent| {
-                        if let QueryIntent::Vector { embedding } = intent {
-                            Some(embedding.clone())
-                        } else {
-                            None
-                        }
-                    });
+                let vector = intents.iter().find_map(|intent| {
+                    if let QueryIntent::Vector { embedding } = intent {
+                        Some(embedding.clone())
+                    } else {
+                        None
+                    }
+                });
 
-                let text = intents.iter()
+                let text = intents
+                    .iter()
                     .find_map(|intent| {
                         if let QueryIntent::NaturalLanguage { text, .. } = intent {
                             Some(text.clone())
@@ -337,9 +343,11 @@ where
                     })
                     .unwrap_or_default();
 
-                let vector = vector.ok_or_else(|| agent_mem_traits::AgentMemError::validation_error(
-                    "Hybrid query must contain at least one Vector intent"
-                ))?;
+                let vector = vector.ok_or_else(|| {
+                    agent_mem_traits::AgentMemError::validation_error(
+                        "Hybrid query must contain at least one Vector intent",
+                    )
+                })?;
 
                 (vector, text)
             }
@@ -361,11 +369,14 @@ where
         }
 
         // 3. 执行缓存自适应搜索（使用现有的 search 方法）
-        let results = self.search(query_vector, search_query).await
+        let results = self
+            .search(query_vector, search_query)
+            .await
             .map_err(|e| agent_mem_traits::AgentMemError::Other(e))?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
-        let v4_results = results.into_iter()
+        let v4_results = results
+            .into_iter()
             .map(|r| agent_mem_traits::SearchResultV4 {
                 id: r.id,
                 content: r.content,
@@ -392,4 +403,3 @@ where
         ]
     }
 }
-

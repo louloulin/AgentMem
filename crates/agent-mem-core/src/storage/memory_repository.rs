@@ -6,8 +6,8 @@ use sqlx::{PgPool, Row};
 
 use super::models::DbMemory;
 use super::repository::Repository;
-use crate::{CoreError, CoreResult};
 use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
+use crate::{CoreError, CoreResult};
 
 /// Memory repository with enhanced multi-tenant support
 pub struct MemoryRepository {
@@ -186,7 +186,11 @@ impl MemoryRepository {
     }
 
     /// Get most important memories
-    pub async fn get_most_important(&self, agent_id: &str, limit: i64) -> CoreResult<Vec<DbMemory>> {
+    pub async fn get_most_important(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> CoreResult<Vec<DbMemory>> {
         let results = sqlx::query_as::<_, DbMemory>(
             r#"
             SELECT * FROM memories

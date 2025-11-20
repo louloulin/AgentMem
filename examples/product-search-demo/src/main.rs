@@ -1,10 +1,9 @@
 //! 商品搜索演示 - 基于混合检索系统（简化版）
-//! 
+//!
 //! 这个演示展示了如何使用混合检索系统进行商品搜索
 
 use agent_mem_core::search::{
-    QueryClassifier, AdaptiveThresholdCalculator,
-    QueryType, QuerySearchStrategy,
+    AdaptiveThresholdCalculator, QueryClassifier, QuerySearchStrategy, QueryType,
 };
 use anyhow::Result;
 use colored::Colorize;
@@ -53,7 +52,11 @@ fn create_sample_products() -> Vec<Product> {
             brand: "Huawei".to_string(),
             description: "麒麟9000S芯片，卫星通信，超光变摄像头".to_string(),
             price: 6999.0,
-            tags: vec!["卫星通信".to_string(), "国产".to_string(), "高端".to_string()],
+            tags: vec![
+                "卫星通信".to_string(),
+                "国产".to_string(),
+                "高端".to_string(),
+            ],
         },
         Product {
             id: "P004".to_string(),
@@ -80,10 +83,10 @@ fn create_sample_products() -> Vec<Product> {
 fn simple_search(products: &[Product], query: &str, query_type: QueryType) -> Vec<(Product, f32)> {
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
-    
+
     for product in products {
         let mut score = 0.0f32;
-        
+
         // 根据查询类型调整匹配策略
         match query_type {
             QueryType::ExactId => {
@@ -128,12 +131,12 @@ fn simple_search(products: &[Product], query: &str, query_type: QueryType) -> Ve
                 score = 0.0;
             }
         }
-        
+
         if score > 0.0 {
             results.push((product.clone(), score));
         }
     }
-    
+
     // 按分数排序
     results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
     results
@@ -142,21 +145,19 @@ fn simple_search(products: &[Product], query: &str, query_type: QueryType) -> Ve
 /// 测试场景
 async fn run_search_scenarios() -> Result<()> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
-    
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+
     println!("\n{}", "=".repeat(80));
     println!("{}", "🔍 商品搜索演示 - 混合检索系统".to_string().bold());
     println!("{}", "=".repeat(80));
-    
+
     // 创建组件
     let classifier = QueryClassifier::with_default_config();
     let _threshold_calc = AdaptiveThresholdCalculator::with_default_config();
     let products = create_sample_products();
-    
+
     println!("\n📦 商品数据库已加载: {} 个商品\n", products.len());
-    
+
     // 测试场景
     let test_queries = vec![
         ("P001", "精确ID查询"),
@@ -166,44 +167,51 @@ async fn run_search_scenarios() -> Result<()> {
         ("商务笔记本", "场景查询"),
         ("高端", "标签查询"),
     ];
-    
+
     for (query, description) in test_queries {
         println!("{}", "-".repeat(80));
         println!("📝 测试: {}", description.bold());
         println!("🔎 查询: {}", query.cyan());
-        
+
         // 查询分类
         let query_type = classifier.classify(query);
         let strategy = classifier.get_strategy(&query_type);
-        
+
         println!("🎯 查询类型: {:?}", query_type);
         println!("📊 搜索策略:");
-        println!("   • 向量搜索: {}, 权重: {:.2}", 
-            if strategy.use_vector { "✓" } else { "✗" }, 
+        println!(
+            "   • 向量搜索: {}, 权重: {:.2}",
+            if strategy.use_vector { "✓" } else { "✗" },
             strategy.vector_weight
         );
-        println!("   • BM25搜索: {}, 权重: {:.2}", 
-            if strategy.use_bm25 { "✓" } else { "✗" }, 
+        println!(
+            "   • BM25搜索: {}, 权重: {:.2}",
+            if strategy.use_bm25 { "✓" } else { "✗" },
             strategy.bm25_weight
         );
         println!("   • 相似度阈值: {:.2}", strategy.threshold);
-        
+
         // 执行搜索
         let results = simple_search(&products, query, query_type);
-        
+
         println!("\n✨ 搜索结果: ({} 个)", results.len());
         for (i, (product, score)) in results.iter().take(3).enumerate() {
-            println!("   {}. {} - {} (分数: {:.2})", 
+            println!(
+                "   {}. {} - {} (分数: {:.2})",
                 i + 1,
-                product.name.green(), 
+                product.name.green(),
                 product.brand.yellow(),
                 score
             );
-            println!("      💰 ¥{:.2} | 🏷️  {}", product.price, product.tags.join(", "));
+            println!(
+                "      💰 ¥{:.2} | 🏷️  {}",
+                product.price,
+                product.tags.join(", ")
+            );
         }
         println!();
     }
-    
+
     println!("{}", "=".repeat(80));
     println!("{}", "✅ 演示完成！".green().bold());
     println!("{}", "=".repeat(80));
@@ -213,7 +221,7 @@ async fn run_search_scenarios() -> Result<()> {
     println!("   • 混合搜索结合了向量搜索和BM25");
     println!("   • 性能提升: 检索精度 +53%, 召回率 +47%");
     println!("\n📚 更多信息: 查看 README.md\n");
-    
+
     Ok(())
 }
 
@@ -225,33 +233,33 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_search_scenarios() {
         let result = run_search_scenarios().await;
         assert!(result.is_ok());
     }
-    
+
     #[test]
     fn test_product_creation() {
         let products = create_sample_products();
         assert_eq!(products.len(), 5);
         assert_eq!(products[0].id, "P001");
     }
-    
+
     #[test]
     fn test_simple_search() {
         let products = create_sample_products();
-        
+
         // 测试精确ID
         let results = simple_search(&products, "P001", QueryType::ExactId);
         assert!(results.len() > 0);
         assert_eq!(results[0].0.id, "P001");
-        
+
         // 测试品牌搜索
         let results = simple_search(&products, "Apple", QueryType::ShortKeyword);
         assert!(results.len() >= 2); // iPhone + MacBook
-        
+
         // 测试分类搜索
         let results = simple_search(&products, "手机", QueryType::ShortKeyword);
         assert!(results.len() >= 3);

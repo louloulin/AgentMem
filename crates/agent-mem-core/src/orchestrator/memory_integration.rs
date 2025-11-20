@@ -19,7 +19,7 @@ pub struct MemoryIntegratorConfig {
     pub include_timestamp: bool,
     /// 是否按重要性排序
     pub sort_by_importance: bool,
-    
+
     // 🆕 Phase 1.5: 认知架构权重配置（基于Adaptive Memory Framework）
     /// Episodic Memory权重（Long-term Memory优先，理论依据: Atkinson-Shiffrin）
     pub episodic_weight: f32,
@@ -27,7 +27,7 @@ pub struct MemoryIntegratorConfig {
     pub working_weight: f32,
     /// Semantic Memory权重（备选，理论依据: HCAM分层检索）
     pub semantic_weight: f32,
-    
+
     // ⭐ Phase 5: 记忆压缩配置
     /// 启用记忆压缩
     pub enable_compression: bool,
@@ -38,19 +38,19 @@ pub struct MemoryIntegratorConfig {
 impl Default for MemoryIntegratorConfig {
     fn default() -> Self {
         Self {
-            max_memories: 3,  // Phase 2/3优化
+            max_memories: 3, // Phase 2/3优化
             relevance_threshold: 0.1,
             include_timestamp: true,
             sort_by_importance: true,
-            
+
             // Phase 1.5: 认知架构权重
             episodic_weight: 1.2,
             working_weight: 1.0,
             semantic_weight: 0.9,
-            
+
             // Phase 5: 记忆压缩
             enable_compression: true,
-            compression_threshold: 10,  // 超过10条启动压缩
+            compression_threshold: 10, // 超过10条启动压缩
         }
     }
 }
@@ -84,7 +84,7 @@ impl MemoryIntegrator {
     pub fn with_default_config(memory_engine: Arc<MemoryEngine>) -> Self {
         Self::new(memory_engine, MemoryIntegratorConfig::default())
     }
-    
+
     /// ⭐ 检查缓存
     fn get_cached(&self, query: &str) -> Option<Vec<Memory>> {
         if let Ok(cache) = self.cache.read() {
@@ -98,7 +98,7 @@ impl MemoryIntegrator {
         }
         None
     }
-    
+
     /// ⭐ 更新缓存
     fn update_cache(&self, query: String, memories: Vec<Memory>) {
         if let Ok(mut cache) = self.cache.write() {
@@ -107,10 +107,13 @@ impl MemoryIntegrator {
                 // 简单策略：清空缓存
                 cache.clear();
             }
-            cache.insert(query, CacheEntry {
-                memories: memories.clone(),
-                timestamp: std::time::Instant::now(),
-            });
+            cache.insert(
+                query,
+                CacheEntry {
+                    memories: memories.clone(),
+                    timestamp: std::time::Instant::now(),
+                },
+            );
         }
     }
 
@@ -215,7 +218,7 @@ impl MemoryIntegrator {
             info!("🎯 Cache hit, returning {} cached memories", cached.len());
             return Ok(cached.into_iter().take(max_count).collect());
         }
-        
+
         use crate::hierarchy::MemoryScope;
         use std::collections::HashSet;
         use tracing::warn;
@@ -229,13 +232,15 @@ impl MemoryIntegrator {
         );
 
         // 🔧 修复: 改进商品ID检测 - 从查询中提取商品ID（即使包含其他文本）
-        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();  // 不要求完全匹配，允许包含其他文本
-        let extracted_product_id = product_id_pattern.find(query)
-            .map(|m| m.as_str());
-        
+        let product_id_pattern = Regex::new(r"P\d{6}").unwrap(); // 不要求完全匹配，允许包含其他文本
+        let extracted_product_id = product_id_pattern.find(query).map(|m| m.as_str());
+
         if let Some(product_id) = extracted_product_id {
-            info!("🎯 检测到商品ID查询，提取ID: {} (from query: {})", product_id, query);
-            
+            info!(
+                "🎯 检测到商品ID查询，提取ID: {} (from query: {})",
+                product_id, query
+            );
+
             // 使用提取的商品ID进行查询（而不是完整查询）
             let global_scope = MemoryScope::Global;
             match self
@@ -244,12 +249,15 @@ impl MemoryIntegrator {
                 .await
             {
                 Ok(memories) if !memories.is_empty() => {
-                    info!("✅ Global Memory (商品ID查询) 找到 {} 条记忆", memories.len());
-                    
+                    info!(
+                        "✅ Global Memory (商品ID查询) 找到 {} 条记忆",
+                        memories.len()
+                    );
+
                     // 🔧 修复: 优先返回精确匹配的商品记忆，过滤工作记忆
                     let mut exact_product_memories = Vec::new();
                     let mut other_memories = Vec::new();
-                    
+
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 检查是否是精确匹配的商品记忆
@@ -259,46 +267,50 @@ impl MemoryIntegrator {
                                 _ => "",
                             };
                             let is_exact_product = {
-                                content_str.contains(&format!("商品ID: {}", product_id)) ||
-                                memory.attributes
-                                    .get(&agent_mem_traits::AttributeKey::core("product_id"))
-                                    .and_then(|attr_val| attr_val.as_string())
-                                    .map(|pid| pid == product_id)
-                                    .unwrap_or(false)
+                                content_str.contains(&format!("商品ID: {}", product_id))
+                                    || memory
+                                        .attributes
+                                        .get(&agent_mem_traits::AttributeKey::core("product_id"))
+                                        .and_then(|attr_val| attr_val.as_string())
+                                        .map(|pid| pid == product_id)
+                                        .unwrap_or(false)
                             };
-                            
+
                             // 排除工作记忆
                             let mem_type_opt = memory.memory_type();
-                            let is_working_memory = mem_type_opt.as_ref()
+                            let is_working_memory = mem_type_opt
+                                .as_ref()
                                 .map(|t| t.to_lowercase() == "working")
                                 .unwrap_or(false);
-                            
+
                             if is_exact_product && !is_working_memory {
                                 // 精确匹配的商品记忆，权重提升
                                 if let Some(score) = memory.score() {
-                                    memory.set_score(score * 2.0);  // 大幅提升权重
+                                    memory.set_score(score * 2.0); // 大幅提升权重
                                 }
                                 exact_product_memories.push(memory);
                             } else if !is_working_memory {
                                 // 其他相关记忆
-                            if let Some(score) = memory.score() {
-                                    memory.set_score(score * 1.2);  // 适度提升权重
+                                if let Some(score) = memory.score() {
+                                    memory.set_score(score * 1.2); // 适度提升权重
                                 }
                                 other_memories.push(memory);
                             }
                         }
                     }
-                    
+
                     // 合并：精确匹配在前
                     let exact_count = exact_product_memories.len();
                     all_memories.extend(exact_product_memories);
                     all_memories.extend(other_memories);
-                    
+
                     // 如果找到足够的结果，直接返回
                     if all_memories.len() >= max_count {
-                        info!("✅ 商品ID查询完成，返回 {} 条结果 (精确匹配: {})", 
-                            all_memories.len(), 
-                            exact_count);
+                        info!(
+                            "✅ 商品ID查询完成，返回 {} 条结果 (精确匹配: {})",
+                            all_memories.len(),
+                            exact_count
+                        );
                         all_memories.sort_by(|a, b| {
                             b.score()
                                 .unwrap_or(0.0)
@@ -309,7 +321,10 @@ impl MemoryIntegrator {
                     }
                 }
                 Ok(_) => {
-                    warn!("⚠️  Global Memory查询返回0结果: product_id='{}'", product_id);
+                    warn!(
+                        "⚠️  Global Memory查询返回0结果: product_id='{}'",
+                        product_id
+                    );
                 }
                 Err(e) => {
                     warn!("⚠️  Global Memory查询失败: {}, 继续其他scope查询", e);
@@ -319,7 +334,7 @@ impl MemoryIntegrator {
 
         // ========== ✅ Task 1.2: 并行查询 Priority 1 & 2 (优化) ==========
         let mut query_count = 0;
-        
+
         // ✅ 优化1: 并行查询最重要的两层（Episodic + Working）
         if let Some(uid) = user_id {
             let episodic_scope = MemoryScope::User {
@@ -332,25 +347,24 @@ impl MemoryIntegrator {
                 user_id: uid.to_string(),
                 session_id: sid.to_string(),
             });
-            
+
             info!("📚🔄 [1-2/4] Parallel querying Episodic + Working Memory");
-            
+
             let episodic_query = self.memory_engine.search_memories(
-                query, 
-                Some(episodic_scope), 
-                Some(max_count * 2)
+                query,
+                Some(episodic_scope),
+                Some(max_count * 2),
             );
-            
+
             let working_query = if let Some(ws) = working_scope {
-                Some(self.memory_engine.search_memories(
-                    query,
-                    Some(ws),
-                    Some(max_count / 2)
-                ))
+                Some(
+                    self.memory_engine
+                        .search_memories(query, Some(ws), Some(max_count / 2)),
+                )
             } else {
                 None
             };
-            
+
             // ✅ 并行执行
             let (episodic_result, working_result) = if let Some(wq) = working_query {
                 let (e, w) = tokio::join!(episodic_query, wq);
@@ -358,7 +372,7 @@ impl MemoryIntegrator {
             } else {
                 (episodic_query.await, None)
             };
-            
+
             // 处理 Episodic 结果
             match episodic_result {
                 Ok(memories) => {
@@ -366,8 +380,8 @@ impl MemoryIntegrator {
                     query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                        if let Some(score) = memory.score() {
-                            memory.set_score(score * self.config.episodic_weight as f64);
+                            if let Some(score) = memory.score() {
+                                memory.set_score(score * self.config.episodic_weight as f64);
                             }
                             all_memories.push(memory);
                         }
@@ -377,45 +391,48 @@ impl MemoryIntegrator {
                 Err(e) => {
                     warn!("⚠️  Episodic Memory query failed: {}", e);
                 }
-        }
+            }
 
             // 处理 Working 结果
             if let Some(Ok(memories)) = working_result {
-                    let mut added = 0;
+                let mut added = 0;
                 query_count += 1;
-                    for memory in memories {
-                        if seen_ids.insert(memory.id.clone()) {
-                            all_memories.push(memory);
-                            added += 1;
-                        }
+                for memory in memories {
+                    if seen_ids.insert(memory.id.clone()) {
+                        all_memories.push(memory);
+                        added += 1;
                     }
-                info!("🔄 Working Memory added {} memories", added);
                 }
+                info!("🔄 Working Memory added {} memories", added);
+            }
         }
-        
+
         // ✅ 优化2: 早停检查1 - Episodic + Working已足够
         if all_memories.len() >= max_count {
             let saved_queries = 2; // 节省了Semantic和Global查询
             info!(
                 "✅ Early stop after Priority 1-2: {} >= target {}, saved {} queries",
-                all_memories.len(), max_count, saved_queries
+                all_memories.len(),
+                max_count,
+                saved_queries
             );
-            
+
             // 记录统计
             self.record_query_stats(query_count, saved_queries);
-            
+
             // 排序、去重、限制数量
             all_memories.sort_by(|a, b| {
-                b.score().unwrap_or(0.0)
+                b.score()
+                    .unwrap_or(0.0)
                     .partial_cmp(&a.score().unwrap_or(0.0))
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
-            
+
             let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
-            
+
             // 更新缓存
             self.update_cache(cache_key.clone(), result.clone());
-            
+
             return Ok(result);
         }
 
@@ -456,26 +473,29 @@ impl MemoryIntegrator {
                     warn!("⚠️  Semantic Memory query failed: {}", e);
                 }
             }
-            
+
             // ✅ 优化4: 早停检查2 - 加上Semantic已足够
             if all_memories.len() >= max_count {
                 let saved_queries = 1; // 节省了Global查询
                 info!(
                     "✅ Early stop after Priority 3: {} >= target {}, saved {} queries",
-                    all_memories.len(), max_count, saved_queries
+                    all_memories.len(),
+                    max_count,
+                    saved_queries
                 );
-                
+
                 self.record_query_stats(query_count, saved_queries);
-                
+
                 all_memories.sort_by(|a, b| {
-                    b.score().unwrap_or(0.0)
+                    b.score()
+                        .unwrap_or(0.0)
                         .partial_cmp(&a.score().unwrap_or(0.0))
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
-                
+
                 let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
                 self.update_cache(cache_key.clone(), result.clone());
-                
+
                 return Ok(result);
             }
         }
@@ -550,15 +570,15 @@ impl MemoryIntegrator {
 
         // 返回 top N（基于HCAM的两阶段检索结果）
         let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
-        
+
         // ⭐ 更新缓存
         self.update_cache(cache_key, result.clone());
-        
+
         Ok(result)
     }
 
     /// ⭐ Phase 3: 极简记忆注入格式（token优化）
-    /// 
+    ///
     /// 优化：去除冗长说明，只保留核心信息
     pub fn inject_memories_to_prompt(&self, memories: &[Memory]) -> String {
         if memories.is_empty() {
@@ -566,7 +586,8 @@ impl MemoryIntegrator {
         }
 
         let mut lines = Vec::new();
-        for (i, memory) in memories.iter().enumerate().take(5) {  // 最多5条
+        for (i, memory) in memories.iter().enumerate().take(5) {
+            // 最多5条
             let content_str = match &memory.content {
                 agent_mem_traits::Content::Text(t) => t.as_str(),
                 _ => "[data]",
@@ -579,7 +600,7 @@ impl MemoryIntegrator {
             };
             lines.push(format!("{}. {}", i + 1, truncated));
         }
-        
+
         lines.join("\n")
     }
 
@@ -599,12 +620,12 @@ impl MemoryIntegrator {
     }
 
     /// ⭐ Phase 2: 综合评分系统 (relevance + importance + recency)
-    /// 
+    ///
     /// 借鉴mem0的最佳实践：相关性(50%) + 重要性(30%) + 时效性(20%)
     pub fn calculate_comprehensive_score(&self, memory: &Memory) -> f64 {
         let relevance = memory.score().unwrap_or(0.5); // 相似度分数
         let importance = memory.importance().unwrap_or(0.5);
-        
+
         // 时效性衰减：使用指数衰减，半衰期为30天
         use chrono::Utc;
         let now = Utc::now();
@@ -615,11 +636,11 @@ impl MemoryIntegrator {
         } else {
             1.0 // 未来时间（时钟偏差），默认1.0
         };
-        
+
         // 综合评分：0.5 * relevance + 0.3 * importance + 0.2 * recency
         0.5 * relevance + 0.3 * importance + 0.2 * recency
     }
-    
+
     /// 按综合评分排序记忆（Phase 2优化）
     pub fn sort_memories(&self, mut memories: Vec<Memory>) -> Vec<Memory> {
         if self.config.sort_by_importance {
@@ -627,7 +648,9 @@ impl MemoryIntegrator {
             memories.sort_by(|a, b| {
                 let score_a = self.calculate_comprehensive_score(a);
                 let score_b = self.calculate_comprehensive_score(b);
-                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                score_b
+                    .partial_cmp(&score_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
         memories
@@ -657,15 +680,15 @@ impl MemoryIntegrator {
         info!("🔍 filter_by_relevance: output={} memories", filtered.len());
         filtered
     }
-    
+
     /// ⭐ Phase 5: 记忆去重
     /// 移除内容相似的重复记忆
     pub fn deduplicate_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
         use std::collections::HashSet;
-        
+
         let mut seen_content = HashSet::new();
         let mut dedup = Vec::new();
-        
+
         for memory in memories {
             let content_key = match &memory.content {
                 agent_mem_traits::Content::Text(t) => {
@@ -678,36 +701,47 @@ impl MemoryIntegrator {
                 }
                 _ => continue,
             };
-            
+
             if seen_content.insert(content_key.to_string()) {
                 dedup.push(memory);
             } else {
                 debug!("🔄 Deduplicate: skipping duplicate memory");
             }
         }
-        
-        info!("🔄 Deduplicate: {} → {} memories", seen_content.len() + (dedup.len() - seen_content.len()), dedup.len());
+
+        info!(
+            "🔄 Deduplicate: {} → {} memories",
+            seen_content.len() + (dedup.len() - seen_content.len()),
+            dedup.len()
+        );
         dedup
     }
-    
+
     /// ⭐ Phase 5: 记忆压缩（简化版）
     /// 当记忆数量过多时，只保留最重要的
     pub fn compress_memories(&self, memories: Vec<Memory>) -> Vec<Memory> {
         if !self.config.enable_compression || memories.len() <= self.config.compression_threshold {
             return memories;
         }
-        
-        info!("📦 Compression: {} memories exceed threshold {}, keeping top {}", 
-            memories.len(), self.config.compression_threshold, self.config.compression_threshold / 2);
-        
+
+        info!(
+            "📦 Compression: {} memories exceed threshold {}, keeping top {}",
+            memories.len(),
+            self.config.compression_threshold,
+            self.config.compression_threshold / 2
+        );
+
         // 简单策略：只保留最重要的前N条
         let keep_count = self.config.compression_threshold / 2;
         let mut result: Vec<Memory> = memories.into_iter().take(keep_count).collect();
-        
-        info!("📦 Compressed: kept {} most important memories", result.len());
+
+        info!(
+            "📦 Compressed: kept {} most important memories",
+            result.len()
+        );
         result
     }
-    
+
     /// ✅ Task 1.2: 记录查询统计信息
     /// 用于监控早停优化效果
     fn record_query_stats(&self, actual_queries: usize, saved_queries: usize) {

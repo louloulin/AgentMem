@@ -10,8 +10,8 @@
 
 use crate::fact_extraction::{ExtractedFact, StructuredFact};
 use crate::importance_evaluator::ImportanceEvaluation;
-use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use agent_mem_llm::LLMProvider;
+use agent_mem_traits::{MemoryV4 as Memory, Message, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -330,8 +330,10 @@ impl MemoryDecisionEngine {
             if similar_memories.len() > 1 {
                 let merged_content = self.generate_merged_content(&similar_memories).await?;
                 let primary_memory = &similar_memories[0];
-                let secondary_ids: Vec<String> =
-                    similar_memories[1..].iter().map(|m| m.id.as_str().to_string()).collect();
+                let secondary_ids: Vec<String> = similar_memories[1..]
+                    .iter()
+                    .map(|m| m.id.as_str().to_string())
+                    .collect();
 
                 decisions.push(MemoryDecision {
                     action: MemoryAction::Merge {
@@ -344,7 +346,10 @@ impl MemoryDecisionEngine {
                         "Found {} similar memories that can be merged",
                         similar_memories.len()
                     ),
-                    affected_memories: similar_memories.iter().map(|m| m.id.as_str().to_string()).collect(),
+                    affected_memories: similar_memories
+                        .iter()
+                        .map(|m| m.id.as_str().to_string())
+                        .collect(),
                     estimated_impact: 0.7,
                 });
 
@@ -511,9 +516,7 @@ Resolution strategies:
 
     /// 生成合并后的内容
     async fn generate_merged_content(&self, memories: &[ExistingMemory]) -> Result<String> {
-        let contents: Vec<String> = memories.iter()
-            .map(|m| m.content.clone())
-            .collect();
+        let contents: Vec<String> = memories.iter().map(|m| m.content.clone()).collect();
 
         let _prompt = format!(
             r#"Merge these similar memory contents into one coherent text. Return only the merged content.

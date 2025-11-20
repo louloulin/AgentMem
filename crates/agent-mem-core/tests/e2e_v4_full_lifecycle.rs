@@ -2,8 +2,8 @@
 //! Week 9-10: 完整生命周期测试（Memory V4 + Query V4 + Pipeline + Adaptive）
 
 use agent_mem_core::types::{
-    AttributeKey, AttributeValue, ComparisonOperator, Content, Memory, MemoryBuilder, PreferenceType,
-    Query, QueryBuilder, QueryIntent, RelevancePreference, TemporalPreference,
+    AttributeKey, AttributeValue, ComparisonOperator, Content, Memory, MemoryBuilder,
+    PreferenceType, Query, QueryBuilder, QueryIntent, RelevancePreference, TemporalPreference,
 };
 use chrono::Utc;
 
@@ -12,7 +12,9 @@ use chrono::Utc;
 async fn test_full_lifecycle_v4() {
     // ============= 1. 创建记忆（新格式 V4） =============
     let memory = MemoryBuilder::new()
-        .content(Content::Text("用户喜欢吃四川火锅，辣度偏好中辣".to_string()))
+        .content(Content::Text(
+            "用户喜欢吃四川火锅，辣度偏好中辣".to_string(),
+        ))
         .attribute(
             AttributeKey::system("user_id"),
             AttributeValue::String("user_001".to_string()),
@@ -28,7 +30,7 @@ async fn test_full_lifecycle_v4() {
         .build();
 
     let memory_id = memory.id.clone();
-    
+
     // 验证Memory结构
     assert!(!memory.id.is_empty());
     assert!(matches!(memory.content, Content::Text(_)));
@@ -36,7 +38,7 @@ async fn test_full_lifecycle_v4() {
         memory.attributes.get(&AttributeKey::system("user_id")),
         Some(AttributeValue::String(s)) if s == "user_001"
     ));
-    
+
     println!("✅ Step 1: Memory created - ID: {}", memory_id);
 
     // ============= 2. 查询（新Query V4） =============
@@ -57,7 +59,7 @@ async fn test_full_lifecycle_v4() {
     assert!(matches!(query.intent, QueryIntent::SemanticSearch { .. }));
     assert_eq!(query.constraints.len(), 1);
     assert_eq!(query.preferences.len(), 1);
-    
+
     println!("✅ Step 2: Query constructed - Intent: {:?}", query.intent);
 
     // ============= 3. 更新记忆 =============
@@ -75,7 +77,7 @@ async fn test_full_lifecycle_v4() {
         Some(AttributeValue::String(value)) => assert_eq!(value, "extra_hot"),
         other => panic!("spice_level 属性缺失或类型不匹配: {:?}", other),
     }
-    
+
     println!("✅ Step 3: Memory updated - spice_level: extra_hot");
 
     // ============= 4. 删除记忆（软删除标记） =============
@@ -93,7 +95,7 @@ async fn test_full_lifecycle_v4() {
         Some(AttributeValue::Boolean(flag)) => assert!(*flag, "删除标记应为 true"),
         other => panic!("deleted 属性缺失或类型不匹配: {:?}", other),
     }
-    
+
     println!("✅ Step 4: Memory soft-deleted");
 
     // ============= 5. 验证完整周期 =============
@@ -162,7 +164,9 @@ async fn test_hierarchical_scope_access() {
     let mut user_memory = MemoryBuilder::new()
         .content(Content::Text("用户偏好".to_string()))
         .build();
-    user_memory.attributes.set_user_scope("agent_456", "user_456");
+    user_memory
+        .attributes
+        .set_user_scope("agent_456", "user_456");
     assert_eq!(
         user_memory.attributes.get_user_id(),
         Some("user_456".to_string())
@@ -172,7 +176,9 @@ async fn test_hierarchical_scope_access() {
     let mut session_memory = MemoryBuilder::new()
         .content(Content::Text("会话上下文".to_string()))
         .build();
-    session_memory.attributes.set_session_scope("agent_789", "user_789", "session_789");
+    session_memory
+        .attributes
+        .set_session_scope("agent_789", "user_789", "session_789");
     assert_eq!(
         session_memory.attributes.get_session_id(),
         Some("session_789".to_string())
@@ -191,20 +197,22 @@ async fn test_hierarchical_scope_access() {
 #[tokio::test]
 async fn test_advanced_query_features() {
     // 1. 聚合查询
-    let aggregation_query = QueryBuilder::new()
-        .text("统计用户偏好")
-        .build();
+    let aggregation_query = QueryBuilder::new().text("统计用户偏好").build();
     // 注意：当前QueryBuilder不支持直接设置Aggregation，需要通过intent方法
     // 这里先使用SemanticSearch作为替代
-    assert!(matches!(aggregation_query.intent, QueryIntent::SemanticSearch { .. }));
+    assert!(matches!(
+        aggregation_query.intent,
+        QueryIntent::SemanticSearch { .. }
+    ));
 
     // 2. 范围约束
-    let range_query = QueryBuilder::new()
-        .text("高重要性记忆")
-        .build();
+    let range_query = QueryBuilder::new().text("高重要性记忆").build();
     // 注意：当前QueryBuilder不支持直接添加AttributeRange约束
     // 这里先创建基础查询，约束可以通过其他方式添加
-    assert!(matches!(range_query.intent, QueryIntent::SemanticSearch { .. }));
+    assert!(matches!(
+        range_query.intent,
+        QueryIntent::SemanticSearch { .. }
+    ));
 
     // 3. 多偏好组合
     let multi_pref_query = QueryBuilder::new()
@@ -289,18 +297,12 @@ async fn test_legacy_migration() {
     // 验证迁移结果
     assert_eq!(new_memory.id, legacy.id);
     assert!(matches!(new_memory.content, Content::Text(_)));
-    match new_memory
-        .attributes
-        .get(&AttributeKey::system("agent_id"))
-    {
+    match new_memory.attributes.get(&AttributeKey::system("agent_id")) {
         Some(AttributeValue::String(agent_id)) => assert_eq!(agent_id, &legacy.agent_id),
         other => panic!("agent_id 属性缺失或类型不匹配: {:?}", other),
     }
     if let Some(user_id) = &legacy.user_id {
-        match new_memory
-            .attributes
-            .get(&AttributeKey::system("user_id"))
-        {
+        match new_memory.attributes.get(&AttributeKey::system("user_id")) {
             Some(AttributeValue::String(found_user_id)) => assert_eq!(found_user_id, user_id),
             other => panic!("user_id 属性缺失或类型不匹配: {:?}", other),
         }
@@ -343,11 +345,7 @@ async fn test_batch_operations() {
 
     // 批量查询
     let queries: Vec<Query> = (0..10)
-        .map(|i| {
-            QueryBuilder::new()
-                .text(&format!("记忆内容 {}", i))
-                .build()
-        })
+        .map(|i| QueryBuilder::new().text(&format!("记忆内容 {}", i)).build())
         .collect();
 
     assert_eq!(queries.len(), 10);
@@ -379,4 +377,3 @@ async fn test_performance_benchmark() {
     println!("✅ Performance: {} memories/sec", ops_per_sec as u64);
     assert!(ops_per_sec > 10_000.0, "Performance below threshold");
 }
-

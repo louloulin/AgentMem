@@ -10,10 +10,10 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
+use crate::storage::conversion::{db_to_memory, memory_to_db};
 use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
-use crate::storage::conversion::{memory_to_db, db_to_memory};
-use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
 
 /// LibSQL implementation of Memory repository
 pub struct LibSqlMemoryRepository {
@@ -40,7 +40,9 @@ impl LibSqlMemoryRepository {
         // Start transaction
         conn.execute("BEGIN TRANSACTION", libsql::params![])
             .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to begin transaction: {e}")))?;
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to begin transaction: {e}"))
+            })?;
 
         let mut created_memories = Vec::new();
 
@@ -51,35 +53,36 @@ impl LibSqlMemoryRepository {
                 AgentMemError::StorageError(format!("Failed to serialize metadata: {e}"))
             })?;
 
-            match conn.execute(
-                "INSERT INTO memories (
+            match conn
+                .execute(
+                    "INSERT INTO memories (
                     id, organization_id, user_id, agent_id, content, hash, metadata,
                     score, memory_type, scope, level, importance, access_count, last_accessed,
                     created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                libsql::params![
-                    db_memory.id,
-                    db_memory.organization_id,
-                    db_memory.user_id,
-                    db_memory.agent_id,
-                    db_memory.content,
-                    db_memory.hash,
-                    metadata_json,
-                    db_memory.score,
-                    db_memory.memory_type,
-                    db_memory.scope,
-                    db_memory.level,
-                    db_memory.importance,
-                    db_memory.access_count,
-                    db_memory.last_accessed.map(|dt| dt.timestamp()),
-                    db_memory.created_at.timestamp(),
-                    db_memory.updated_at.timestamp(),
-                    if db_memory.is_deleted { 1 } else { 0 },
-                    db_memory.created_by_id,
-                    db_memory.last_updated_by_id,
-                ],
-            )
-            .await
+                    libsql::params![
+                        db_memory.id,
+                        db_memory.organization_id,
+                        db_memory.user_id,
+                        db_memory.agent_id,
+                        db_memory.content,
+                        db_memory.hash,
+                        metadata_json,
+                        db_memory.score,
+                        db_memory.memory_type,
+                        db_memory.scope,
+                        db_memory.level,
+                        db_memory.importance,
+                        db_memory.access_count,
+                        db_memory.last_accessed.map(|dt| dt.timestamp()),
+                        db_memory.created_at.timestamp(),
+                        db_memory.updated_at.timestamp(),
+                        if db_memory.is_deleted { 1 } else { 0 },
+                        db_memory.created_by_id,
+                        db_memory.last_updated_by_id,
+                    ],
+                )
+                .await
             {
                 Ok(_) => created_memories.push((*memory).clone()),
                 Err(e) => {
@@ -505,14 +508,12 @@ impl LibSqlMemoryRepository {
 
         sql.push_str(" ORDER BY importance DESC, created_at DESC LIMIT ?");
 
-        let mut stmt = conn
-            .prepare(&sql)
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to prepare statement: {e}")))?;
+        let mut stmt = conn.prepare(&sql).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to prepare statement: {e}"))
+        })?;
 
         let mut rows = if query.is_empty() {
-            stmt.query(libsql::params![agent_id, limit])
-                .await
+            stmt.query(libsql::params![agent_id, limit]).await
         } else {
             stmt.query(libsql::params![agent_id, search_pattern, limit])
                 .await
@@ -593,30 +594,57 @@ mod tests {
 
     fn create_test_memory(id: &str) -> Memory {
         use agent_mem_traits::{
-            MemoryId, Content, AttributeKey, AttributeValue, AttributeSet, 
-            MetadataV4, RelationGraph
+            AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4,
+            RelationGraph,
         };
-        
+
         let mut attributes = AttributeSet::new();
-        attributes.insert(AttributeKey::core("organization_id"), AttributeValue::String("org1".to_string()));
-        attributes.insert(AttributeKey::core("user_id"), AttributeValue::String("user1".to_string()));
-        attributes.insert(AttributeKey::core("agent_id"), AttributeValue::String("agent1".to_string()));
-        attributes.insert(AttributeKey::core("memory_type"), AttributeValue::String("episodic".to_string()));
-        attributes.insert(AttributeKey::core("scope"), AttributeValue::String("session".to_string()));
-        attributes.insert(AttributeKey::core("level"), AttributeValue::String("high".to_string()));
-        attributes.insert(AttributeKey::system("hash"), AttributeValue::String("hash123".to_string()));
+        attributes.insert(
+            AttributeKey::core("organization_id"),
+            AttributeValue::String("org1".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("user_id"),
+            AttributeValue::String("user1".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("agent_id"),
+            AttributeValue::String("agent1".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String("episodic".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("scope"),
+            AttributeValue::String("session".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::core("level"),
+            AttributeValue::String("high".to_string()),
+        );
+        attributes.insert(
+            AttributeKey::system("hash"),
+            AttributeValue::String("hash123".to_string()),
+        );
         attributes.insert(AttributeKey::system("score"), AttributeValue::Number(0.95));
-        attributes.insert(AttributeKey::system("importance"), AttributeValue::Number(0.8));
-        attributes.insert(AttributeKey::system("created_by_id"), AttributeValue::String("user1".to_string()));
-        
+        attributes.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(0.8),
+        );
+        attributes.insert(
+            AttributeKey::system("created_by_id"),
+            AttributeValue::String("user1".to_string()),
+        );
+
         Memory {
             id: MemoryId::from_string(id.to_string()),
             content: Content::Text(format!("Test memory content {id}")),
             attributes,
             relations: RelationGraph::new(),
             metadata: MetadataV4 {
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
                 accessed_at: Utc::now(),
                 access_count: 0,
                 version: 1,

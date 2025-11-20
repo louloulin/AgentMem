@@ -2,8 +2,8 @@
 //! 消除所有硬编码常量
 
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// AgentMem完整配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,17 +158,17 @@ impl AgentMemConfig {
             "../config/agentmem.toml",
             "../../config/agentmem.toml",
         ];
-        
+
         for path in paths {
             if Path::new(path).exists() {
                 return Self::from_file(path);
             }
         }
-        
+
         // 如果都找不到，使用默认配置
         Ok(Self::default())
     }
-    
+
     /// 获取默认配置
     pub fn default() -> Self {
         Self {
@@ -272,14 +272,14 @@ impl AgentMemConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_config() {
         let config = AgentMemConfig::default();
         assert_eq!(config.system.version, "4.0.0");
         assert_eq!(config.search.vector_weight, 0.5);
     }
-    
+
     #[test]
     fn test_load_config() {
         // Test will pass if config file exists
@@ -288,4 +288,3 @@ mod tests {
         }
     }
 }
-

@@ -46,7 +46,8 @@ impl Tool for SearchTool {
             "num_results".to_string(),
             PropertySchema {
                 prop_type: "integer".to_string(),
-                description: "Maximum number of results to return (defaults to 5, max 10)".to_string(),
+                description: "Maximum number of results to return (defaults to 5, max 10)"
+                    .to_string(),
                 enum_values: None,
                 default: Some(serde_json::json!(5)),
                 minimum: Some(1.0),
@@ -139,6 +140,3 @@ pub struct SearchResult {
     /// 描述
     pub description: String,
 }
-
-
-

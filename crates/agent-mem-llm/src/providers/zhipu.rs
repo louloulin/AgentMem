@@ -8,8 +8,8 @@ use agent_mem_traits::{
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::pin::Pin;
+use std::time::Duration;
 use tracing::{debug, info, warn};
 
 /// Zhipu AI API请求结构
@@ -186,32 +186,40 @@ impl LLMProvider for ZhipuProvider {
         info!("   模型: {}", self.config.model);
         info!("   URL: {}", url);
         info!("   消息数量: {}", messages.len());
-        
+
         // 🔍 详细记录每条消息的内容和长度 (UTF-8安全截断)
         for (idx, msg) in messages.iter().enumerate() {
             let content_preview = if msg.content.chars().count() > 200 {
                 let truncated: String = msg.content.chars().take(200).collect();
-                format!("{}... (总长度: {}字符)", truncated, msg.content.chars().count())
+                format!(
+                    "{}... (总长度: {}字符)",
+                    truncated,
+                    msg.content.chars().count()
+                )
             } else {
                 msg.content.clone()
             };
-            info!("   📝 消息[{}] role={:?}, 长度={}字符, 内容=\"{}\"", 
-                idx, msg.role, msg.content.chars().count(), content_preview);
+            info!(
+                "   📝 消息[{}] role={:?}, 长度={}字符, 内容=\"{}\"",
+                idx,
+                msg.role,
+                msg.content.chars().count(),
+                content_preview
+            );
         }
-        
+
         debug!("   消息内容（完整）: {:?}", messages);
 
         let converted_messages = self.convert_messages(messages);
-        
+
         // 🔍 打印完整的prompt内容（所有消息合并）
         info!("📋 === 完整Prompt内容（所有消息） ===");
-        let total_chars: usize = converted_messages.iter()
-            .map(|m| m.content.len())
-            .sum();
+        let total_chars: usize = converted_messages.iter().map(|m| m.content.len()).sum();
         info!("   总字符数: {}", total_chars);
-        
+
         // 合并所有消息内容
-        let full_prompt: String = converted_messages.iter()
+        let full_prompt: String = converted_messages
+            .iter()
             .map(|m| format!("[{}] {}\n", m.role, m.content))
             .collect();
         info!("{}", full_prompt);
@@ -228,7 +236,10 @@ impl LLMProvider for ZhipuProvider {
             tool_choice: None,
         };
 
-        debug!("   请求体JSON: {}", serde_json::to_string_pretty(&request).unwrap_or_default());
+        debug!(
+            "   请求体JSON: {}",
+            serde_json::to_string_pretty(&request).unwrap_or_default()
+        );
 
         info!("🔵 发送 HTTP 请求...");
         let http_start = std::time::Instant::now();
@@ -276,23 +287,22 @@ impl LLMProvider for ZhipuProvider {
         info!("🔵 解析 JSON 响应...");
         let parse_start = std::time::Instant::now();
 
-        let zhipu_response: ZhipuResponse = response
-            .json()
-            .await
-            .map_err(|e| {
-                warn!("❌ JSON 解析失败: {}", e);
-                AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
-            })?;
+        let zhipu_response: ZhipuResponse = response.json().await.map_err(|e| {
+            warn!("❌ JSON 解析失败: {}", e);
+            AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
+        })?;
 
         let parse_duration = parse_start.elapsed();
         info!("✅ JSON 解析完成，耗时: {:?}", parse_duration);
 
         let total_duration = start_time.elapsed();
         info!("✅ Zhipu API 调用完成，总耗时: {:?}", total_duration);
-        info!("   Token 使用: prompt={}, completion={}, total={}",
+        info!(
+            "   Token 使用: prompt={}, completion={}, total={}",
             zhipu_response.usage.prompt_tokens,
             zhipu_response.usage.completion_tokens,
-            zhipu_response.usage.total_tokens);
+            zhipu_response.usage.total_tokens
+        );
 
         let result = zhipu_response
             .choices

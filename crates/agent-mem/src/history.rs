@@ -5,8 +5,8 @@
 use agent_mem_traits::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::{Row, SqlitePool};
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -73,7 +73,10 @@ impl HistoryManager {
         // 这样 SQLx 会自动创建数据库文件（如果不存在）
         let options = SqliteConnectOptions::from_str(db_path)
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!("解析数据库路径失败: {}", e))
+                agent_mem_traits::AgentMemError::storage_error(&format!(
+                    "解析数据库路径失败: {}",
+                    e
+                ))
             })?
             .create_if_missing(true);
 

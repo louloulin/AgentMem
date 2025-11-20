@@ -272,10 +272,9 @@ impl SamplingManager {
     /// 创建新的 Sampling 管理器
     pub fn new(llm_config: Option<&LLMConfig>) -> McpResult<Self> {
         let llm_client = if let Some(config) = llm_config {
-            Some(Arc::new(
-                LLMClient::new(config)
-                    .map_err(|e| McpError::Internal(format!("Failed to create LLM client: {e}")))?,
-            ))
+            Some(Arc::new(LLMClient::new(config).map_err(|e| {
+                McpError::Internal(format!("Failed to create LLM client: {e}"))
+            })?))
         } else {
             None
         };
@@ -317,17 +316,10 @@ impl SamplingManager {
             .as_ref()
             .ok_or_else(|| McpError::Internal("LLM client not initialized".to_string()))?;
 
-        info!(
-            "Creating message with {} messages",
-            request.messages.len()
-        );
+        info!("Creating message with {} messages", request.messages.len());
 
         // 转换消息格式
-        let mut messages: Vec<Message> = request
-            .messages
-            .into_iter()
-            .map(|m| m.into())
-            .collect();
+        let mut messages: Vec<Message> = request.messages.into_iter().map(|m| m.into()).collect();
 
         // 如果有系统提示词，添加到消息列表开头
         if let Some(system_prompt) = request.system_prompt {
@@ -360,9 +352,7 @@ impl SamplingManager {
             stop_reason: StopReason::EndTurn,
             usage: TokenUsage::new(input_tokens, output_tokens),
             created_at: Utc::now(),
-            model: request
-                .model
-                .unwrap_or_else(|| "default".to_string()),
+            model: request.model.unwrap_or_else(|| "default".to_string()),
         })
     }
 
@@ -488,4 +478,3 @@ mod tests {
         assert_eq!(json, "\"end_turn\"");
     }
 }
-

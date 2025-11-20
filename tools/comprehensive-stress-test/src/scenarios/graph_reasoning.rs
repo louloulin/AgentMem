@@ -27,23 +27,25 @@ pub async fn run_test(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     // 模拟图查询
     for i in 0..total_queries {
         let op_start = Instant::now();
         let success = simulate_graph_query(nodes, edges, i).await;
         let duration = op_start.elapsed();
-        
+
         stats_collector.record_operation(duration, success).await;
         pb.inc(1);
     }
@@ -64,4 +66,3 @@ async fn simulate_graph_query(nodes: usize, edges: usize, _query_index: usize) -
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     true
 }
-

@@ -169,11 +169,13 @@ impl MemoryProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use agent_mem_traits::MemoryType;
+    use chrono::Utc;
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
-        use agent_mem_traits::{MemoryId, Content, AttributeSet, RelationGraph, MetadataV4 as Metadata};
+        use agent_mem_traits::{
+            AttributeSet, Content, MemoryId, MetadataV4 as Metadata, RelationGraph,
+        };
         let now = Utc::now();
         let mut memory = Memory {
             id: MemoryId::from_string(id.to_string()),
@@ -181,11 +183,11 @@ mod tests {
             attributes: AttributeSet::new(),
             relations: RelationGraph::new(),
             metadata: Metadata {
-            created_at: now,
+                created_at: now,
                 updated_at: now,
                 accessed_at: now,
-            access_count: 0,
-            version: 1,
+                access_count: 0,
+                version: 1,
                 hash: None,
             },
         };

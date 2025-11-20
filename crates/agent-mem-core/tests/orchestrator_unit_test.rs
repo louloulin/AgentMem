@@ -5,11 +5,8 @@
 use agent_mem_core::{
     engine::{MemoryEngine, MemoryEngineConfig},
     orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig},
-    types::{
-        AttributeKey, AttributeValue, Content as LegacyContent, MemoryBuilder, MemoryType,
-    },
-    Memory as V4Memory,
-    MemoryItem,
+    types::{AttributeKey, AttributeValue, Content as LegacyContent, MemoryBuilder, MemoryType},
+    Memory as V4Memory, MemoryItem,
 };
 use agent_mem_traits::Content as V4Content;
 use std::sync::Arc;
@@ -37,7 +34,7 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
             AttributeKey::system("importance"),
             AttributeValue::Number(importance as f64),
         );
-    
+
     // 如果有score，也设置score属性（用于检索时的相关性分数）
     if let Some(score_val) = score {
         memory = memory.attribute(
@@ -45,7 +42,7 @@ fn create_test_memory(content: &str, memory_type: MemoryType, score: Option<f32>
             AttributeValue::Number(score_val as f64),
         );
     }
-    
+
     let legacy_memory = memory.build();
     let legacy_item: MemoryItem = legacy_memory.into();
     V4Memory::from_legacy_item(&legacy_item)
@@ -255,10 +252,7 @@ async fn test_memory_types() {
             memory_type.clone(),
             Some(0.8),
         );
-        assert_eq!(
-            memory.memory_type(),
-            Some(memory_type.as_str().to_string())
-        );
+        assert_eq!(memory.memory_type(), Some(memory_type.as_str().to_string()));
     }
 
     println!("✅ test_memory_types passed");

@@ -647,7 +647,9 @@ impl AgentMemClient {
                     agent_mem_traits::Content::Structured(v) => v.to_string(),
                     _ => String::new(),
                 };
-                let mem_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+                let mem_type_str = memory
+                    .memory_type()
+                    .unwrap_or_else(|| "episodic".to_string());
                 let mem_type = match mem_type_str.as_str() {
                     "semantic" => MemoryType::Semantic,
                     "procedural" => MemoryType::Procedural,
@@ -655,7 +657,7 @@ impl AgentMemClient {
                     "core" => MemoryType::Core,
                     _ => MemoryType::Episodic,
                 };
-                
+
                 MemorySearchResult {
                     id: memory.id.as_str().to_string(),
                     content,
@@ -702,7 +704,9 @@ impl AgentMemClient {
                 agent_mem_traits::Content::Structured(v) => v.to_string(),
                 _ => String::new(),
             };
-            let mem_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+            let mem_type_str = memory
+                .memory_type()
+                .unwrap_or_else(|| "episodic".to_string());
             let mem_type = match mem_type_str.as_str() {
                 "semantic" => MemoryType::Semantic,
                 "procedural" => MemoryType::Procedural,
@@ -710,7 +714,7 @@ impl AgentMemClient {
                 "core" => MemoryType::Core,
                 _ => MemoryType::Episodic,
             };
-            
+
             MemorySearchResult {
                 id: memory.id.as_str().to_string(),
                 content,
@@ -845,7 +849,9 @@ impl AgentMemClient {
                     agent_mem_traits::Content::Structured(v) => v.to_string(),
                     _ => String::new(),
                 };
-                let mem_type_str = memory.memory_type().unwrap_or_else(|| "episodic".to_string());
+                let mem_type_str = memory
+                    .memory_type()
+                    .unwrap_or_else(|| "episodic".to_string());
                 let mem_type = match mem_type_str.as_str() {
                     "semantic" => MemoryType::Semantic,
                     "procedural" => MemoryType::Procedural,
@@ -853,7 +859,7 @@ impl AgentMemClient {
                     "core" => MemoryType::Core,
                     _ => MemoryType::Episodic,
                 };
-                
+
                 MemorySearchResult {
                     id: memory.id.as_str().to_string(),
                     content,
@@ -1068,7 +1074,7 @@ impl AgentMemClient {
         // Convert MemoryItem to V4 Memory
         use crate::storage::conversion::legacy_to_v4;
         let v4_memory = legacy_to_v4(&memory_item);
-        
+
         let id = self
             .engine
             .add_memory(v4_memory)

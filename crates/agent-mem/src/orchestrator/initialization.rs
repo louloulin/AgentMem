@@ -5,18 +5,20 @@
 use std::sync::Arc;
 use tracing::{info, warn};
 
+use agent_mem_core::operations::MemoryOperations;
+use agent_mem_core::storage::libsql::{
+    LibSqlConnectionManager, LibSqlMemoryOperations, LibSqlMemoryRepository,
+};
 use agent_mem_embeddings::EmbeddingFactory;
-use agent_mem_llm::LLMFactory;
-use agent_mem_traits::{Embedder, LLMConfig, LLMProvider};
+use agent_mem_intelligence::clustering::{dbscan::DBSCANClusterer, kmeans::KMeansClusterer};
+use agent_mem_intelligence::MemoryReasoner;
 use agent_mem_intelligence::{
     AdvancedFactExtractor, BatchConfig, BatchEntityExtractor, BatchImportanceEvaluator,
     ConflictResolver, EnhancedDecisionEngine, EnhancedImportanceEvaluator, FactExtractor,
     MemoryDecisionEngine, TimeoutConfig,
 };
-use agent_mem_intelligence::clustering::{dbscan::DBSCANClusterer, kmeans::KMeansClusterer};
-use agent_mem_intelligence::MemoryReasoner;
-use agent_mem_core::storage::libsql::{LibSqlConnectionManager, LibSqlMemoryRepository, LibSqlMemoryOperations};
-use agent_mem_core::operations::MemoryOperations;
+use agent_mem_llm::LLMFactory;
+use agent_mem_traits::{Embedder, LLMConfig, LLMProvider};
 
 use super::core::OrchestratorConfig;
 use agent_mem_traits::{AgentMemError, Result};
@@ -183,27 +185,48 @@ impl InitializationModule {
                 (provider.clone(), model.clone(), Some(key))
             } else {
                 // 自动检测其他可用的 provider（按优先级）
-                info!("当前 provider ({}) 的 API Key 未找到，尝试自动检测其他可用的 provider", provider);
+                info!(
+                    "当前 provider ({}) 的 API Key 未找到，尝试自动检测其他可用的 provider",
+                    provider
+                );
 
                 // 检测 Zhipu
                 if let Ok(zhipu_key) = std::env::var("ZHIPU_API_KEY") {
-                    let zhipu_model = std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4.6".to_string());
+                    let zhipu_model =
+                        std::env::var("ZHIPU_MODEL").unwrap_or_else(|_| "glm-4.6".to_string());
                     info!("✅ 检测到 ZHIPU_API_KEY，自动切换到 zhipu provider");
-                    return Self::create_llm_provider_with_config("zhipu", &zhipu_model, Some(zhipu_key)).await;
+                    return Self::create_llm_provider_with_config(
+                        "zhipu",
+                        &zhipu_model,
+                        Some(zhipu_key),
+                    )
+                    .await;
                 }
 
                 // 检测 Huawei MaaS
                 if let Ok(huawei_key) = std::env::var("HUAWEI_MAAS_API_KEY") {
-                    let huawei_model = std::env::var("HUAWEI_MAAS_MODEL").unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
+                    let huawei_model = std::env::var("HUAWEI_MAAS_MODEL")
+                        .unwrap_or_else(|_| "deepseek-v3.2-exp".to_string());
                     info!("✅ 检测到 HUAWEI_MAAS_API_KEY，自动切换到 huawei_maas provider");
-                    return Self::create_llm_provider_with_config("huawei_maas", &huawei_model, Some(huawei_key)).await;
+                    return Self::create_llm_provider_with_config(
+                        "huawei_maas",
+                        &huawei_model,
+                        Some(huawei_key),
+                    )
+                    .await;
                 }
 
                 // 检测 OpenAI
                 if let Ok(openai_key) = std::env::var("OPENAI_API_KEY") {
-                    let openai_model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
+                    let openai_model =
+                        std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
                     info!("✅ 检测到 OPENAI_API_KEY，自动切换到 openai provider");
-                    return Self::create_llm_provider_with_config("openai", &openai_model, Some(openai_key)).await;
+                    return Self::create_llm_provider_with_config(
+                        "openai",
+                        &openai_model,
+                        Some(openai_key),
+                    )
+                    .await;
                 }
 
                 // 检测 Anthropic
@@ -211,20 +234,32 @@ impl InitializationModule {
                     let anthropic_model = std::env::var("ANTHROPIC_MODEL")
                         .unwrap_or_else(|_| "claude-3-5-sonnet-20241022".to_string());
                     info!("✅ 检测到 ANTHROPIC_API_KEY，自动切换到 anthropic provider");
-                    return Self::create_llm_provider_with_config("anthropic", &anthropic_model, Some(anthropic_key)).await;
+                    return Self::create_llm_provider_with_config(
+                        "anthropic",
+                        &anthropic_model,
+                        Some(anthropic_key),
+                    )
+                    .await;
                 }
 
                 // 检测 DeepSeek
                 if let Ok(deepseek_key) = std::env::var("DEEPSEEK_API_KEY") {
-                    let deepseek_model = std::env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string());
+                    let deepseek_model = std::env::var("DEEPSEEK_MODEL")
+                        .unwrap_or_else(|_| "deepseek-chat".to_string());
                     info!("✅ 检测到 DEEPSEEK_API_KEY，自动切换到 deepseek provider");
-                    return Self::create_llm_provider_with_config("deepseek", &deepseek_model, Some(deepseek_key)).await;
+                    return Self::create_llm_provider_with_config(
+                        "deepseek",
+                        &deepseek_model,
+                        Some(deepseek_key),
+                    )
+                    .await;
                 }
 
                 // 检测通用 LLM_API_KEY
                 if let Ok(llm_key) = std::env::var("LLM_API_KEY") {
                     info!("✅ 检测到 LLM_API_KEY，使用当前 provider ({})", provider);
-                    return Self::create_llm_provider_with_config(&provider, &model, Some(llm_key)).await;
+                    return Self::create_llm_provider_with_config(&provider, &model, Some(llm_key))
+                        .await;
                 }
 
                 // 所有检测都失败
@@ -262,7 +297,10 @@ impl InitializationModule {
         // 使用 LLMFactory 创建 Provider
         match LLMFactory::create_provider(&llm_config) {
             Ok(llm_provider) => {
-                info!("成功创建 LLM Provider: {} ({})", final_provider, final_model);
+                info!(
+                    "成功创建 LLM Provider: {} ({})",
+                    final_provider, final_model
+                );
                 Ok(Some(llm_provider))
             }
             Err(e) => {
@@ -335,7 +373,9 @@ impl InitializationModule {
                             match std::env::var("FASTEMBED_MODEL") {
                                 Ok(m) => m,
                                 Err(_) => {
-                                    info!("未配置 Embedder Model，使用默认值: multilingual-e5-small");
+                                    info!(
+                                        "未配置 Embedder Model，使用默认值: multilingual-e5-small"
+                                    );
                                     "multilingual-e5-small".to_string()
                                 }
                             }
@@ -590,7 +630,10 @@ impl InitializationModule {
                 "lancedb" => {
                     store_config.path = path.to_string();
                     store_config.table_name = "memory_vectors".to_string();
-                    info!("配置LanceDB: path={}, table={}", path, store_config.table_name);
+                    info!(
+                        "配置LanceDB: path={}, table={}",
+                        path, store_config.table_name
+                    );
                 }
                 "memory" => {
                     info!("使用内存向量存储");
@@ -610,7 +653,10 @@ impl InitializationModule {
             use agent_mem_storage::VectorStoreFactory;
             match VectorStoreFactory::create_vector_store(&store_config).await {
                 Ok(store) => {
-                    info!("✅ 向量存储创建成功（{} 模式，维度: {}）", provider, vector_dimension);
+                    info!(
+                        "✅ 向量存储创建成功（{} 模式，维度: {}）",
+                        provider, vector_dimension
+                    );
                     Ok(Some(store))
                 }
                 Err(e) => {
@@ -623,7 +669,8 @@ impl InitializationModule {
                     match MemoryVectorStore::new(fallback_config).await {
                         Ok(fallback_store) => {
                             info!("✅ 降级到内存向量存储成功（维度: {}）", vector_dimension);
-                            Ok(Some(Arc::new(fallback_store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>))
+                            Ok(Some(Arc::new(fallback_store)
+                                as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>))
                         }
                         Err(e2) => {
                             warn!("创建内存向量存储也失败: {}, 向量存储功能将不可用", e2);
@@ -642,8 +689,13 @@ impl InitializationModule {
 
             match MemoryVectorStore::new(store_config).await {
                 Ok(store) => {
-                    info!("✅ 向量存储创建成功（Memory 模式，维度: {}）", vector_dimension);
-                    Ok(Some(Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>))
+                    info!(
+                        "✅ 向量存储创建成功（Memory 模式，维度: {}）",
+                        vector_dimension
+                    );
+                    Ok(Some(
+                        Arc::new(store) as Arc<dyn agent_mem_traits::VectorStore + Send + Sync>
+                    ))
                 }
                 Err(e) => {
                     warn!("创建向量存储失败: {}, 向量存储功能将不可用", e);
@@ -664,7 +716,9 @@ impl InitializationModule {
         Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
         Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
     )> {
-        use agent_mem_core::search::{HybridSearchEngine, VectorSearchEngine, FullTextSearchEngine};
+        use agent_mem_core::search::{
+            FullTextSearchEngine, HybridSearchEngine, VectorSearchEngine,
+        };
         use std::sync::Arc;
 
         info!("创建 Search 组件...");
@@ -692,7 +746,7 @@ impl InitializationModule {
                 {
                     use sqlx::{PgPool, PgPoolOptions};
                     use std::time::Duration;
-                    
+
                     match PgPoolOptions::new()
                         .max_connections(10)
                         .min_connections(2)
@@ -709,7 +763,10 @@ impl InitializationModule {
                             Some(Arc::new(engine))
                         }
                         Err(e) => {
-                            warn!("创建PostgreSQL连接池失败: {}，FullTextSearchEngine 将不可用", e);
+                            warn!(
+                                "创建PostgreSQL连接池失败: {}，FullTextSearchEngine 将不可用",
+                                e
+                            );
                             None
                         }
                     }
@@ -729,12 +786,11 @@ impl InitializationModule {
         };
 
         // 创建 HybridSearchEngine
-        let hybrid_search_engine = if let (Some(vector_engine), Some(fulltext_engine)) = 
-            (vector_search_engine.clone(), fulltext_search_engine.clone()) {
-            let hybrid_engine = HybridSearchEngine::with_default_config(
-                vector_engine,
-                fulltext_engine,
-            );
+        let hybrid_search_engine = if let (Some(vector_engine), Some(fulltext_engine)) =
+            (vector_search_engine.clone(), fulltext_search_engine.clone())
+        {
+            let hybrid_engine =
+                HybridSearchEngine::with_default_config(vector_engine, fulltext_engine);
             info!("✅ HybridSearchEngine 创建成功");
             Some(Arc::new(hybrid_engine))
         } else {
@@ -742,20 +798,24 @@ impl InitializationModule {
             None
         };
 
-        Ok((hybrid_search_engine, vector_search_engine, fulltext_search_engine))
+        Ok((
+            hybrid_search_engine,
+            vector_search_engine,
+            fulltext_search_engine,
+        ))
     }
 
     /// 创建重排序器
     pub fn create_reranker() -> Option<Arc<dyn agent_mem_core::search::Reranker>> {
-        use agent_mem_core::search::{RerankerFactory, InternalReranker};
+        use agent_mem_core::search::{InternalReranker, RerankerFactory};
         use std::sync::Arc;
-        
+
         info!("创建重排序器...");
-        
+
         // 默认使用内部重排序器
         let reranker = InternalReranker::new();
         info!("✅ 重排序器创建成功（内部实现）");
-        
+
         Some(Arc::new(reranker))
     }
 
@@ -779,41 +839,46 @@ impl InitializationModule {
             }
         }
     }
-    
+
     /// 创建LibSQL Memory Operations
-    /// 
+    ///
     /// 用于替代InMemoryOperations，提供持久化存储
-    /// 
+    ///
     /// # Phase 0 Implementation (ag25.md)
     /// 这是Phase 0: 紧急修复的核心函数，确保记忆数据持久化到SQLite
     pub async fn create_libsql_operations(
         db_path: &str,
     ) -> Result<Box<dyn MemoryOperations + Send + Sync>> {
         info!("🔧 Phase 0: 创建 LibSQL Memory Operations: {}", db_path);
-        
+
         // Step 1: 创建连接管理器
-        let conn_mgr = LibSqlConnectionManager::new(db_path)
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to create LibSQL connection manager: {}", e)))?;
-        
+        let conn_mgr = LibSqlConnectionManager::new(db_path).await.map_err(|e| {
+            AgentMemError::StorageError(format!(
+                "Failed to create LibSQL connection manager: {}",
+                e
+            ))
+        })?;
+
         info!("✅ LibSQL连接管理器创建成功");
-        
+
         // Step 2: 获取连接
-        let conn = conn_mgr.get_connection()
-            .await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e)))?;
-        
+        let conn = conn_mgr.get_connection().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e))
+        })?;
+
         info!("✅ 获取LibSQL连接成功");
-        
+
         // Step 3: 创建repository
         let repo = LibSqlMemoryRepository::new(conn);
         info!("✅ LibSqlMemoryRepository创建成功");
-        
+
         // Step 4: 包装为operations（实现MemoryOperations trait）
         let operations = LibSqlMemoryOperations::new(repo);
-        
-        info!("✅ Phase 0: LibSQL Memory Operations 创建成功 - 数据将持久化到 {}", db_path);
+
+        info!(
+            "✅ Phase 0: LibSQL Memory Operations 创建成功 - 数据将持久化到 {}",
+            db_path
+        );
         Ok(Box::new(operations))
     }
 }
-

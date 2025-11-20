@@ -82,11 +82,11 @@ impl<T: Clone> LLMCache<T> {
     /// 设置缓存值（自定义 TTL）
     pub async fn set_with_ttl(&self, key: String, value: T, ttl: Duration) {
         let mut cache = self.cache.write().await;
-        
+
         // 如果缓存已满，清理过期条目
         if cache.len() >= self.max_entries {
             self.cleanup_expired(&mut cache);
-            
+
             // 如果清理后仍然满，删除最旧的条目
             if cache.len() >= self.max_entries {
                 if let Some(oldest_key) = cache
@@ -98,7 +98,7 @@ impl<T: Clone> LLMCache<T> {
                 }
             }
         }
-        
+
         cache.insert(key, CachedResult::new(value, ttl));
     }
 
@@ -135,7 +135,7 @@ impl<T: Clone> LLMCache<T> {
         let cache = self.cache.read().await;
         let total = cache.len();
         let expired = cache.values().filter(|v| v.is_expired()).count();
-        
+
         CacheStats {
             total_entries: total,
             expired_entries: expired,
@@ -163,14 +163,14 @@ mod tests {
     #[tokio::test]
     async fn test_cache_basic() {
         let cache = LLMCache::<String>::new(Duration::from_secs(60), 100);
-        
+
         // 设置值
         cache.set("key1".to_string(), "value1".to_string()).await;
-        
+
         // 获取值
         let value = cache.get("key1").await;
         assert_eq!(value, Some("value1".to_string()));
-        
+
         // 获取不存在的值
         let value = cache.get("key2").await;
         assert_eq!(value, None);
@@ -179,17 +179,17 @@ mod tests {
     #[tokio::test]
     async fn test_cache_expiration() {
         let cache = LLMCache::<String>::new(Duration::from_millis(100), 100);
-        
+
         // 设置值
         cache.set("key1".to_string(), "value1".to_string()).await;
-        
+
         // 立即获取，应该存在
         let value = cache.get("key1").await;
         assert_eq!(value, Some("value1".to_string()));
-        
+
         // 等待过期
         sleep(Duration::from_millis(150)).await;
-        
+
         // 再次获取，应该已过期
         let value = cache.get("key1").await;
         assert_eq!(value, None);
@@ -198,13 +198,13 @@ mod tests {
     #[tokio::test]
     async fn test_cache_max_entries() {
         let cache = LLMCache::<String>::new(Duration::from_secs(60), 3);
-        
+
         // 添加 4 个条目
         cache.set("key1".to_string(), "value1".to_string()).await;
         cache.set("key2".to_string(), "value2".to_string()).await;
         cache.set("key3".to_string(), "value3".to_string()).await;
         cache.set("key4".to_string(), "value4".to_string()).await;
-        
+
         // 检查统计信息
         let stats = cache.stats().await;
         assert_eq!(stats.total_entries, 3); // 最多 3 个条目
@@ -213,9 +213,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_or_compute() {
         let cache = LLMCache::<String>::new(Duration::from_secs(60), 100);
-        
+
         let mut call_count = 0;
-        
+
         // 第一次调用，应该计算
         let value = cache
             .get_or_compute("key1", || async {
@@ -226,7 +226,7 @@ mod tests {
             .unwrap();
         assert_eq!(value, "computed_value");
         assert_eq!(call_count, 1);
-        
+
         // 第二次调用，应该从缓存获取
         let value = cache
             .get_or_compute("key1", || async {
@@ -244,12 +244,11 @@ mod tests {
         let key1 = LLMCache::<String>::generate_key("test content");
         let key2 = LLMCache::<String>::generate_key("test content");
         let key3 = LLMCache::<String>::generate_key("different content");
-        
+
         // 相同内容应该生成相同的键
         assert_eq!(key1, key2);
-        
+
         // 不同内容应该生成不同的键
         assert_ne!(key1, key3);
     }
 }
-

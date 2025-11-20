@@ -2,11 +2,11 @@
 //!
 //! 参考 MIRIX 的 absorb_content_into_memory 逻辑
 
-use crate::{engine::MemoryEngine, Memory, hierarchy::MemoryScope};
+use crate::{engine::MemoryEngine, hierarchy::MemoryScope, Memory};
 use agent_mem_llm::LLMClient;
 use agent_mem_traits::{
-    MemoryType, Message, Result, MemoryId, Content,
-    AttributeSet, RelationGraph, MetadataV4 as Metadata
+    AttributeSet, Content, MemoryId, MemoryType, Message, MetadataV4 as Metadata, RelationGraph,
+    Result,
 };
 use chrono::Utc;
 use std::sync::Arc;
@@ -178,11 +178,11 @@ impl MemoryExtractor {
                             attributes: AttributeSet::new(),
                             relations: RelationGraph::new(),
                             metadata: Metadata {
-                            created_at: now,
+                                created_at: now,
                                 updated_at: now,
                                 accessed_at: now,
-                            access_count: 0,
-                            version: 1,
+                                access_count: 0,
+                                version: 1,
                                 hash: None,
                             },
                         };
@@ -244,11 +244,11 @@ impl MemoryExtractor {
                     attributes: AttributeSet::new(),
                     relations: RelationGraph::new(),
                     metadata: Metadata {
-                created_at: now,
+                        created_at: now,
                         updated_at: now,
                         accessed_at: now,
-                access_count: 0,
-                version: 1,
+                        access_count: 0,
+                        version: 1,
                         hash: None,
                     },
                 };

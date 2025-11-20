@@ -59,7 +59,6 @@ impl LogLevel {
     }
 }
 
-
 /// 日志条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -377,21 +376,12 @@ impl LoggingManager {
     }
 
     /// 获取日志
-    pub async fn get_logs(
-        &self,
-        limit: Option<usize>,
-        offset: Option<usize>,
-    ) -> Vec<LogEntry> {
+    pub async fn get_logs(&self, limit: Option<usize>, offset: Option<usize>) -> Vec<LogEntry> {
         let buffer = self.buffer.read().await;
         let offset = offset.unwrap_or(0);
         let limit = limit.unwrap_or(buffer.len());
 
-        buffer
-            .iter()
-            .skip(offset)
-            .take(limit)
-            .cloned()
-            .collect()
+        buffer.iter().skip(offset).take(limit).cloned().collect()
     }
 
     /// 查询日志
@@ -725,4 +715,3 @@ mod tests {
         assert_eq!(manager.get_logs(None, None).await.len(), 0);
     }
 }
-

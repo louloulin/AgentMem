@@ -37,7 +37,7 @@ impl StrategyId {
             Self::FulltextOnly,
         ]
     }
-    
+
     pub fn to_weights(&self) -> SearchWeights {
         match self {
             Self::VectorHeavy => SearchWeights {
@@ -48,7 +48,7 @@ impl StrategyId {
             Self::Balanced => SearchWeights {
                 vector_weight: 0.7,
                 fulltext_weight: 0.3,
-                confidence: 0.9,  // 最平衡，置信度高
+                confidence: 0.9, // 最平衡，置信度高
             },
             Self::FulltextHeavy => SearchWeights {
                 vector_weight: 0.3,
@@ -58,7 +58,7 @@ impl StrategyId {
             Self::VectorOnly => SearchWeights {
                 vector_weight: 1.0,
                 fulltext_weight: 0.0,
-                confidence: 0.7,  // 极端策略，置信度稍低
+                confidence: 0.7, // 极端策略，置信度稍低
             },
             Self::FulltextOnly => SearchWeights {
                 vector_weight: 0.0,
@@ -85,7 +85,7 @@ pub struct ThompsonSamplingArm {
 impl Default for ThompsonSamplingArm {
     fn default() -> Self {
         Self {
-            alpha: 1.0,  // 先验：均匀分布
+            alpha: 1.0, // 先验：均匀分布
             beta: 1.0,
             total_tries: 0,
             last_updated: Utc::now(),
@@ -100,7 +100,7 @@ impl ThompsonSamplingArm {
         let mut rng = rand::thread_rng();
         beta_dist.sample(&mut rng)
     }
-    
+
     /// 更新臂的参数（基于观察到的reward）
     pub fn update(&mut self, reward: f64) {
         // reward ∈ [0, 1]，1表示完全成功，0表示完全失败
@@ -109,7 +109,7 @@ impl ThompsonSamplingArm {
         self.total_tries += 1;
         self.last_updated = Utc::now();
     }
-    
+
     /// 获取期望成功率 (alpha / (alpha + beta))
     pub fn expected_rate(&self) -> f64 {
         self.alpha / (self.alpha + self.beta)
@@ -121,9 +121,9 @@ impl ThompsonSamplingArm {
 pub struct PerformanceRecord {
     pub strategy_id: StrategyId,
     pub query_pattern: String,
-    pub accuracy: f32,      // 准确率 [0, 1]
-    pub latency_ms: u64,    // 延迟（毫秒）
-    pub reward: f64,        // 综合奖励 [0, 1]
+    pub accuracy: f32,   // 准确率 [0, 1]
+    pub latency_ms: u64, // 延迟（毫秒）
+    pub reward: f64,     // 综合奖励 [0, 1]
     pub timestamp: DateTime<Utc>,
 }
 
@@ -140,28 +140,29 @@ impl PerformanceHistory {
             max_size,
         }
     }
-    
+
     pub fn record(&mut self, record: PerformanceRecord) {
         self.records.push(record);
         if self.records.len() > self.max_size {
             self.records.remove(0);
         }
     }
-    
+
     pub fn get_pattern_stats(&self, pattern: &str) -> Option<PatternStats> {
-        let pattern_records: Vec<_> = self.records
+        let pattern_records: Vec<_> = self
+            .records
             .iter()
             .filter(|r| r.query_pattern == pattern)
             .collect();
-        
+
         if pattern_records.is_empty() {
             return None;
         }
-        
+
         let total = pattern_records.len();
         let avg_accuracy = pattern_records.iter().map(|r| r.accuracy).sum::<f32>() / total as f32;
         let avg_latency = pattern_records.iter().map(|r| r.latency_ms).sum::<u64>() / total as u64;
-        
+
         Some(PatternStats {
             total_queries: total,
             avg_accuracy,
@@ -195,22 +196,25 @@ impl AdaptiveRouter {
         for strategy_id in StrategyId::all() {
             bandit.insert(strategy_id, ThompsonSamplingArm::default());
         }
-        
+
         Self {
             config,
             bandit: Arc::new(RwLock::new(bandit)),
             performance_history: Arc::new(RwLock::new(PerformanceHistory::new(10000))),
-            exploration_rate: 0.1,  // 10%探索，90%利用
+            exploration_rate: 0.1, // 10%探索，90%利用
         }
     }
-    
+
     /// 决策：选择最优策略（Thompson Sampling）
-    pub async fn decide_strategy(&self, query: &SearchQuery) -> Result<(StrategyId, SearchWeights)> {
+    pub async fn decide_strategy(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<(StrategyId, SearchWeights)> {
         let features = QueryFeatures::extract_from_query(&query.query);
-        
+
         // 探索 vs 利用
         let should_explore = rand::random::<f64>() < self.exploration_rate;
-        
+
         let strategy_id = if should_explore {
             // 探索：随机选择
             let all_strategies = StrategyId::all();
@@ -220,27 +224,27 @@ impl AdaptiveRouter {
             // 利用：Thompson Sampling选择
             self.thompson_sampling_select().await?
         };
-        
+
         let weights = strategy_id.to_weights();
         Ok((strategy_id, weights))
     }
-    
+
     /// Thompson Sampling 选择臂
     async fn thompson_sampling_select(&self) -> Result<StrategyId> {
         let bandit = self.bandit.read().await;
-        
+
         // 采样所有臂
         let mut samples: Vec<(StrategyId, f64)> = Vec::new();
         for (strategy_id, arm) in bandit.iter() {
             let sample = arm.sample();
             samples.push((*strategy_id, sample));
         }
-        
+
         // 选择采样值最大的臂
         samples.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         Ok(samples[0].0)
     }
-    
+
     /// 记录性能反馈并更新Bandit
     pub async fn record_performance(
         &self,
@@ -251,17 +255,17 @@ impl AdaptiveRouter {
     ) -> Result<()> {
         // 计算综合奖励
         let reward = self.calculate_reward(accuracy, latency_ms);
-        
+
         // 更新 Thompson Sampling
         let mut bandit = self.bandit.write().await;
         if let Some(arm) = bandit.get_mut(&strategy_id) {
             arm.update(reward);
         }
-        
+
         // 记录历史
         let features = QueryFeatures::extract_from_query(&query.query);
         let pattern = self.classify_query_pattern(&features);
-        
+
         let mut history = self.performance_history.write().await;
         history.record(PerformanceRecord {
             strategy_id,
@@ -271,15 +275,15 @@ impl AdaptiveRouter {
             reward,
             timestamp: Utc::now(),
         });
-        
+
         Ok(())
     }
-    
+
     /// 计算奖励（综合准确率和延迟）
     fn calculate_reward(&self, accuracy: f32, latency_ms: u64) -> f64 {
         // 准确率权重 0.7，延迟权重 0.3
         let accuracy_score = accuracy as f64;
-        
+
         // 延迟归一化：假设100ms为优秀，500ms为可接受
         let latency_score = if latency_ms < 100 {
             1.0
@@ -288,10 +292,10 @@ impl AdaptiveRouter {
         } else {
             0.0
         };
-        
+
         0.7 * accuracy_score + 0.3 * latency_score
     }
-    
+
     /// 分类查询模式
     fn classify_query_pattern(&self, features: &QueryFeatures) -> String {
         if features.has_exact_terms {
@@ -306,76 +310,79 @@ impl AdaptiveRouter {
             "complex_semantic".to_string()
         }
     }
-    
+
     /// 获取策略统计信息
     pub async fn get_strategy_stats(&self) -> HashMap<StrategyId, ThompsonSamplingArm> {
         self.bandit.read().await.clone()
     }
-    
+
     /// 获取模式统计信息
     pub async fn get_pattern_stats(&self, pattern: &str) -> Option<PatternStats> {
-        self.performance_history.read().await.get_pattern_stats(pattern)
+        self.performance_history
+            .read()
+            .await
+            .get_pattern_stats(pattern)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_thompson_sampling_arm() {
         let mut arm = ThompsonSamplingArm::default();
-        
+
         // 初始期望成功率应该是 0.5 (1/(1+1))
         assert!((arm.expected_rate() - 0.5).abs() < 0.01);
-        
+
         // 更新成功
         arm.update(1.0);
         // 期望成功率应该增加: 2/(2+1) = 0.666...
         assert!(arm.expected_rate() > 0.6);
-        
+
         // 更新失败
         arm.update(0.0);
         // 期望成功率应该下降: 2/(2+2) = 0.5
         assert!((arm.expected_rate() - 0.5).abs() < 0.01);
     }
-    
+
     #[test]
     fn test_strategy_weights() {
         let balanced = StrategyId::Balanced;
         let weights = balanced.to_weights();
         assert_eq!(weights.vector_weight, 0.7);
         assert_eq!(weights.fulltext_weight, 0.3);
-        
+
         let vector_heavy = StrategyId::VectorHeavy;
         let weights = vector_heavy.to_weights();
         assert_eq!(weights.vector_weight, 0.9);
         assert_eq!(weights.fulltext_weight, 0.1);
     }
-    
+
     #[test]
     fn test_reward_calculation() {
         let config = AgentMemConfig::default();
         let router = AdaptiveRouter::new(config);
-        
+
         // 高准确率，低延迟
         let reward1 = router.calculate_reward(0.9, 50);
-        assert!(reward1 > 0.8);  // 应该很高
-        
+        assert!(reward1 > 0.8); // 应该很高
+
         // 低准确率，高延迟
         let reward2 = router.calculate_reward(0.3, 600);
-        assert!(reward2 < 0.3);  // 应该很低
-        
+        assert!(reward2 < 0.3); // 应该很低
+
         // 高准确率，高延迟
         let reward3 = router.calculate_reward(0.9, 600);
-        assert!(reward3 > 0.6 && reward3 < 0.7);  // 中等偏高
+        assert!(reward3 > 0.6 && reward3 < 0.7); // 中等偏高
     }
-    
+
     #[tokio::test]
     async fn test_adaptive_router() {
         let config = AgentMemConfig::default();
         let router = AdaptiveRouter::new(config);
-        
+
         let query = SearchQuery {
             query: "test query".to_string(),
             limit: 10,
@@ -385,18 +392,20 @@ mod tests {
             filters: None,
             metadata_filters: None,
         };
-        
+
         // 决策
         let (strategy_id, weights) = router.decide_strategy(&query).await.unwrap();
         assert!(weights.vector_weight + weights.fulltext_weight > 0.0);
-        
+
         // 记录反馈
-        router.record_performance(&query, strategy_id, 0.85, 120).await.unwrap();
-        
+        router
+            .record_performance(&query, strategy_id, 0.85, 120)
+            .await
+            .unwrap();
+
         // 检查统计
         let stats = router.get_strategy_stats().await;
         assert!(stats.contains_key(&strategy_id));
         assert_eq!(stats[&strategy_id].total_tries, 1);
     }
 }
-

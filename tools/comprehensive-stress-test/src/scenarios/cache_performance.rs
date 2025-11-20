@@ -26,22 +26,24 @@ pub async fn run_test(
 
     let stats_collector = Arc::new(StatsCollector::new());
     let monitor = Arc::new(SystemMonitor::new());
-    
+
     let stats_clone = stats_collector.clone();
-    monitor.start_monitoring(1000, move |sys_stats| {
-        let stats_clone = stats_clone.clone();
-        tokio::spawn(async move {
-            stats_clone
-                .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
-                .await;
-        });
-    }).await;
+    monitor
+        .start_monitoring(1000, move |sys_stats| {
+            let stats_clone = stats_clone.clone();
+            tokio::spawn(async move {
+                stats_clone
+                    .record_system_stats(sys_stats.cpu_usage, sys_stats.process_memory_mb)
+                    .await;
+            });
+        })
+        .await;
 
     for i in 0..total_accesses {
         let op_start = Instant::now();
         let success = simulate_cache_access(i).await;
         let duration = op_start.elapsed();
-        
+
         stats_collector.record_operation(duration, success).await;
         pb.inc(1);
     }
@@ -61,4 +63,3 @@ async fn simulate_cache_access(index: usize) -> bool {
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
     true
 }
-

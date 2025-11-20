@@ -47,13 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("─────────────────────────────────────");
     println!("⚠️  注意: 此测试需要配置有效的 OpenAI API Key");
     println!("⚠️  如果未配置，将自动降级到快速模式\n");
-    
+
     let test_count = 5; // 减少测试次数，因为LLM调用较慢
     let mut durations = Vec::new();
-    
+
     for i in 0..test_count {
         let start = Instant::now();
-        
+
         let result = orchestrator
             .add_memory_v2(
                 format!("The user likes programming in Rust. Test {}", i),
@@ -66,36 +66,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None, // prompt
             )
             .await;
-        
+
         let duration = start.elapsed();
         durations.push(duration);
-        
+
         match result {
             Ok(add_result) => {
-                println!("  ✅ 记忆 {} 添加成功: {} 个事件, 耗时: {:?}", 
-                    i, add_result.results.len(), duration);
+                println!(
+                    "  ✅ 记忆 {} 添加成功: {} 个事件, 耗时: {:?}",
+                    i,
+                    add_result.results.len(),
+                    duration
+                );
             }
             Err(e) => {
                 println!("  ❌ 记忆 {} 添加失败: {}, 耗时: {:?}", i, e, duration);
             }
         }
     }
-    
+
     let total_time: std::time::Duration = durations.iter().sum();
     let avg_time = total_time / test_count as u32;
     let throughput = 1000.0 / avg_time.as_millis() as f64;
-    
+
     println!("\n✅ 测试完成");
     println!("   记忆数量: {}", test_count);
     println!("   总时间: {:?}", total_time);
     println!("   平均延迟: {:?}", avg_time);
     println!("   吞吐量: {:.2} ops/s", throughput);
     println!("   目标: 1,000 ops/s (需要并行LLM调用优化)");
-    
+
     // 测试 2: 对比快速模式和智能模式
     println!("\n📊 测试 2: 快速模式 vs 智能模式对比");
     println!("─────────────────────────────────────");
-    
+
     // 快速模式
     println!("\n🔹 快速模式 (infer=false):");
     let start = Instant::now();
@@ -105,20 +109,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format!("Fast mode test {}", i),
                 "test_agent".to_string(),
                 Some("test_user".to_string()),
-                None, // run_id
-                None, // metadata
+                None,  // run_id
+                None,  // metadata
                 false, // infer=false
-                None, // memory_type
-                None, // prompt
+                None,  // memory_type
+                None,  // prompt
             )
             .await?;
     }
     let fast_time = start.elapsed();
     let fast_throughput = 5000.0 / fast_time.as_millis() as f64;
-    
+
     println!("   总时间: {:?}", fast_time);
     println!("   吞吐量: {:.2} ops/s", fast_throughput);
-    
+
     // 智能模式
     println!("\n🔹 智能模式 (infer=true):");
     let start = Instant::now();
@@ -138,10 +142,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let intelligent_time = start.elapsed();
     let intelligent_throughput = 5000.0 / intelligent_time.as_millis() as f64;
-    
+
     println!("   总时间: {:?}", intelligent_time);
     println!("   吞吐量: {:.2} ops/s", intelligent_throughput);
-    
+
     // 对比
     println!("\n📈 性能对比:");
     println!("   快速模式: {:.2} ops/s", fast_throughput);
@@ -153,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let slowdown = intelligent_time.as_millis() as f64 / fast_time.as_millis() as f64;
         println!("   快速模式更快: {:.2}x", slowdown);
     }
-    
+
     println!("\n================================");
     println!("✅ 所有测试完成！");
     println!("\n📈 Phase 2 优化总结:");
@@ -164,7 +168,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   - 实现 LLM 结果缓存（Task 2.2）");
     println!("   - 进一步优化决策执行（Task 2.3）");
     println!("   - 运行真实压测验证（Task 2.4）");
-    
+
     Ok(())
 }
-

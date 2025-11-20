@@ -2,13 +2,13 @@
 //!
 //! 提供基于 SSE 的 MCP 流式传输
 
-use super::{Transport, McpError, McpResult};
+use super::{McpError, McpResult, Transport};
 use async_trait::async_trait;
 use eventsource_client::{self as es, Client as _};
 use futures::StreamExt;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use tracing::{info, warn};
 
 /// SSE 传输
@@ -83,17 +83,17 @@ impl Transport for SseTransport {
 
         Ok(())
     }
-    
+
     async fn send_request(&self, method: &str, params: Value) -> McpResult<Value> {
         if !self.is_connected() {
             return Err(McpError::NotConnected);
         }
-        
+
         // SSE 是单向通信（服务器到客户端）
         // 如果需要发送请求，需要使用额外的 HTTP 端点
         warn!("SSE transport does not support sending requests directly");
         warn!("Method: {}, Params: {}", method, params);
-        
+
         // 返回一个模拟响应
         Ok(serde_json::json!({
             "jsonrpc": "2.0",
@@ -103,7 +103,7 @@ impl Transport for SseTransport {
             }
         }))
     }
-    
+
     async fn disconnect(&mut self) -> McpResult<()> {
         info!("Disconnecting from SSE server");
 
@@ -111,9 +111,10 @@ impl Transport for SseTransport {
 
         Ok(())
     }
-    
+
     fn is_connected(&self) -> bool {
-        self.connected.try_read()
+        self.connected
+            .try_read()
             .map(|guard| *guard)
             .unwrap_or(false)
     }
@@ -165,11 +166,11 @@ mod tests {
     #[tokio::test]
     async fn test_sse_transport_disconnect() {
         let mut transport = SseTransport::new("http://localhost:8080/events".to_string());
-        
+
         // 模拟连接状态
         *transport.connected.write().await = true;
         assert!(transport.is_connected());
-        
+
         transport.disconnect().await.unwrap();
         assert!(!transport.is_connected());
     }
@@ -177,10 +178,10 @@ mod tests {
     #[tokio::test]
     async fn test_send_request_not_connected() {
         let transport = SseTransport::new("http://localhost:8080/events".to_string());
-        
+
         let result = transport.send_request("test_method", json!({})).await;
         assert!(result.is_err());
-        
+
         if let Err(McpError::NotConnected) = result {
             // Expected error
         } else {
@@ -222,4 +223,3 @@ mod tests {
         assert_eq!(event.unwrap(), json!({"test": "data"}));
     }
 }
-

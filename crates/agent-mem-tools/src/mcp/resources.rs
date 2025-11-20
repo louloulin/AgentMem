@@ -16,19 +16,19 @@ use tracing::{debug, info};
 pub struct McpResource {
     /// 资源 URI
     pub uri: String,
-    
+
     /// 资源名称
     pub name: String,
-    
+
     /// 资源描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// MIME 类型
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "mimeType")]
     pub mime_type: Option<String>,
-    
+
     /// 资源元数据
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, serde_json::Value>,
@@ -45,19 +45,19 @@ impl McpResource {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// 设置描述
     pub fn with_description(mut self, description: String) -> Self {
         self.description = Some(description);
         self
     }
-    
+
     /// 设置 MIME 类型
     pub fn with_mime_type(mut self, mime_type: String) -> Self {
         self.mime_type = Some(mime_type);
         self
     }
-    
+
     /// 添加元数据
     pub fn with_metadata(mut self, key: String, value: serde_json::Value) -> Self {
         self.metadata.insert(key, value);
@@ -70,10 +70,10 @@ impl McpResource {
 pub struct ResourceContent {
     /// 资源 URI
     pub uri: String,
-    
+
     /// 内容
     pub content: McpContent,
-    
+
     /// 最后修改时间
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "lastModified")]
@@ -85,11 +85,11 @@ pub struct ResourceContent {
 pub struct TemplateParameter {
     /// 参数名称
     pub name: String,
-    
+
     /// 参数描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// 是否必需
     pub required: bool,
 }
@@ -100,14 +100,14 @@ pub struct ResourceTemplate {
     /// 模板 URI 模式
     #[serde(rename = "uriTemplate")]
     pub uri_template: String,
-    
+
     /// 模板名称
     pub name: String,
-    
+
     /// 模板描述
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    
+
     /// 模板参数
     pub parameters: Vec<TemplateParameter>,
 }
@@ -152,10 +152,10 @@ pub struct McpSubscribeResourceResponse {
 pub struct ResourceChangeEvent {
     /// 资源 URI
     pub uri: String,
-    
+
     /// 变更类型
     pub change_type: ResourceChangeType,
-    
+
     /// 变更时间
     pub timestamp: DateTime<Utc>,
 }
@@ -177,10 +177,10 @@ pub enum ResourceChangeType {
 struct CachedResource {
     /// 资源内容
     content: ResourceContent,
-    
+
     /// 缓存时间
     cached_at: DateTime<Utc>,
-    
+
     /// TTL（秒）
     ttl: u64,
 }
@@ -194,7 +194,7 @@ impl CachedResource {
             ttl,
         }
     }
-    
+
     /// 检查是否过期
     fn is_expired(&self) -> bool {
         let elapsed = Utc::now()
@@ -209,10 +209,10 @@ impl CachedResource {
 pub struct ResourceSubscription {
     /// 订阅 ID
     pub id: String,
-    
+
     /// 资源 URI
     pub uri: String,
-    
+
     /// 创建时间
     pub created_at: DateTime<Utc>,
 }
@@ -221,10 +221,10 @@ pub struct ResourceSubscription {
 pub struct ResourceManager {
     /// 资源缓存
     cache: Arc<RwLock<HashMap<String, CachedResource>>>,
-    
+
     /// 资源订阅
     subscriptions: Arc<RwLock<HashMap<String, ResourceSubscription>>>,
-    
+
     /// 缓存 TTL（秒）
     cache_ttl: u64,
 }
@@ -238,11 +238,11 @@ impl ResourceManager {
             cache_ttl,
         }
     }
-    
+
     /// 列出所有资源
     pub async fn list_resources(&self) -> McpResult<Vec<McpResource>> {
         info!("Listing all resources");
-        
+
         // 这里返回预定义的资源列表
         // 在实际应用中，应该从 ResourceAgent 或数据库获取
         let resources = vec![
@@ -252,14 +252,12 @@ impl ResourceManager {
             )
             .with_description("Core memory blocks and templates".to_string())
             .with_mime_type("application/json".to_string()),
-            
             McpResource::new(
                 "agentmem://memory/episodic".to_string(),
                 "Episodic Memory".to_string(),
             )
             .with_description("Time-based episodic memories".to_string())
             .with_mime_type("application/json".to_string()),
-            
             McpResource::new(
                 "agentmem://memory/semantic".to_string(),
                 "Semantic Memory".to_string(),
@@ -267,15 +265,15 @@ impl ResourceManager {
             .with_description("Semantic knowledge and facts".to_string())
             .with_mime_type("application/json".to_string()),
         ];
-        
+
         debug!("Found {} resources", resources.len());
         Ok(resources)
     }
-    
+
     /// 读取资源内容
     pub async fn read_resource(&self, uri: &str) -> McpResult<ResourceContent> {
         info!("Reading resource: {}", uri);
-        
+
         // 先检查缓存
         {
             let cache = self.cache.read().await;
@@ -288,10 +286,10 @@ impl ResourceManager {
                 }
             }
         }
-        
+
         // 从存储获取资源
         let content = self.fetch_resource_content(uri).await?;
-        
+
         // 更新缓存
         {
             let mut cache = self.cache.write().await;
@@ -300,46 +298,43 @@ impl ResourceManager {
                 CachedResource::new(content.clone(), self.cache_ttl),
             );
         }
-        
+
         Ok(content)
     }
-    
+
     /// 从存储获取资源内容
     async fn fetch_resource_content(&self, uri: &str) -> McpResult<ResourceContent> {
         // 解析 URI 并获取资源
         // 这里提供模拟实现，实际应该从 ResourceAgent 获取
-        
+
         let content = match uri {
-            "agentmem://memory/core" => {
-                McpContent::Text {
-                    text: serde_json::json!({
-                        "type": "core_memory",
-                        "blocks": [],
-                        "templates": []
-                    }).to_string(),
-                }
-            }
-            "agentmem://memory/episodic" => {
-                McpContent::Text {
-                    text: serde_json::json!({
-                        "type": "episodic_memory",
-                        "events": []
-                    }).to_string(),
-                }
-            }
-            "agentmem://memory/semantic" => {
-                McpContent::Text {
-                    text: serde_json::json!({
-                        "type": "semantic_memory",
-                        "facts": []
-                    }).to_string(),
-                }
-            }
+            "agentmem://memory/core" => McpContent::Text {
+                text: serde_json::json!({
+                    "type": "core_memory",
+                    "blocks": [],
+                    "templates": []
+                })
+                .to_string(),
+            },
+            "agentmem://memory/episodic" => McpContent::Text {
+                text: serde_json::json!({
+                    "type": "episodic_memory",
+                    "events": []
+                })
+                .to_string(),
+            },
+            "agentmem://memory/semantic" => McpContent::Text {
+                text: serde_json::json!({
+                    "type": "semantic_memory",
+                    "facts": []
+                })
+                .to_string(),
+            },
             _ => {
                 return Err(McpError::ResourceNotFound(uri.to_string()));
             }
         };
-        
+
         Ok(ResourceContent {
             uri: uri.to_string(),
             content,
@@ -483,7 +478,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_resource() {
         let manager = ResourceManager::new(300);
-        let content = manager.read_resource("agentmem://memory/core").await.unwrap();
+        let content = manager
+            .read_resource("agentmem://memory/core")
+            .await
+            .unwrap();
 
         assert_eq!(content.uri, "agentmem://memory/core");
         assert!(content.last_modified.is_some());
@@ -530,10 +528,16 @@ mod tests {
         let manager = ResourceManager::new(300);
 
         // 第一次读取
-        let content1 = manager.read_resource("agentmem://memory/core").await.unwrap();
+        let content1 = manager
+            .read_resource("agentmem://memory/core")
+            .await
+            .unwrap();
 
         // 第二次读取应该从缓存获取
-        let content2 = manager.read_resource("agentmem://memory/core").await.unwrap();
+        let content2 = manager
+            .read_resource("agentmem://memory/core")
+            .await
+            .unwrap();
 
         assert_eq!(content1.uri, content2.uri);
     }
@@ -569,4 +573,3 @@ mod tests {
         assert!(stats.total_subscriptions > 0);
     }
 }
-

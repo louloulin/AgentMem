@@ -20,7 +20,11 @@ impl ReportGenerator {
     }
 
     /// 保存单个场景的统计数据
-    pub async fn save_scenario_stats(&self, scenario_name: &str, stats: &StressTestStats) -> Result<()> {
+    pub async fn save_scenario_stats(
+        &self,
+        scenario_name: &str,
+        stats: &StressTestStats,
+    ) -> Result<()> {
         let file_path = format!("{}/{}.json", self.output_dir, scenario_name);
         let json = serde_json::to_string_pretty(stats)?;
         fs::write(&file_path, json)?;
@@ -29,18 +33,28 @@ impl ReportGenerator {
     }
 
     /// 生成综合报告
-    pub async fn generate_comprehensive_report(&self, all_stats: &[(&str, StressTestStats)]) -> Result<()> {
+    pub async fn generate_comprehensive_report(
+        &self,
+        all_stats: &[(&str, StressTestStats)],
+    ) -> Result<()> {
         let report_path = format!("{}/comprehensive-report.md", self.output_dir);
         let mut report = String::new();
 
         report.push_str("# AgentMem 综合压测报告\n\n");
-        report.push_str(&format!("**生成时间**: {}\n\n", chrono::Utc::now().to_rfc3339()));
+        report.push_str(&format!(
+            "**生成时间**: {}\n\n",
+            chrono::Utc::now().to_rfc3339()
+        ));
         report.push_str("---\n\n");
 
         // 总体摘要
         report.push_str("## 📊 总体摘要\n\n");
-        report.push_str("| 场景 | 总操作数 | 成功率 | 吞吐量 (ops/s) | P95延迟 (ms) | P99延迟 (ms) |\n");
-        report.push_str("|------|----------|--------|----------------|--------------|-------------|\n");
+        report.push_str(
+            "| 场景 | 总操作数 | 成功率 | 吞吐量 (ops/s) | P95延迟 (ms) | P99延迟 (ms) |\n",
+        );
+        report.push_str(
+            "|------|----------|--------|----------------|--------------|-------------|\n",
+        );
 
         for (name, stats) in all_stats {
             let success_rate = if stats.total_operations > 0 {
@@ -51,8 +65,12 @@ impl ReportGenerator {
 
             report.push_str(&format!(
                 "| {} | {} | {:.2}% | {:.2} | {:.2} | {:.2} |\n",
-                name, stats.total_operations, success_rate, stats.throughput, 
-                stats.latency_p95, stats.latency_p99
+                name,
+                stats.total_operations,
+                success_rate,
+                stats.throughput,
+                stats.latency_p95,
+                stats.latency_p99
             ));
         }
 
@@ -82,9 +100,15 @@ impl ReportGenerator {
 
         section.push_str("### 基本统计\n\n");
         section.push_str(&format!("- **总操作数**: {}\n", stats.total_operations));
-        section.push_str(&format!("- **成功操作**: {}\n", stats.successful_operations));
+        section.push_str(&format!(
+            "- **成功操作**: {}\n",
+            stats.successful_operations
+        ));
         section.push_str(&format!("- **失败操作**: {}\n", stats.failed_operations));
-        section.push_str(&format!("- **运行时间**: {:.2}秒\n", stats.duration_seconds));
+        section.push_str(&format!(
+            "- **运行时间**: {:.2}秒\n",
+            stats.duration_seconds
+        ));
         section.push_str(&format!("- **吞吐量**: {:.2} ops/s\n\n", stats.throughput));
 
         section.push_str("### 延迟分布\n\n");
@@ -100,7 +124,10 @@ impl ReportGenerator {
         section.push_str(&format!("- **平均 CPU**: {:.2}%\n", stats.avg_cpu_usage));
         section.push_str(&format!("- **峰值 CPU**: {:.2}%\n", stats.peak_cpu_usage));
         section.push_str(&format!("- **平均内存**: {:.2} MB\n", stats.avg_memory_mb));
-        section.push_str(&format!("- **峰值内存**: {:.2} MB\n\n", stats.peak_memory_mb));
+        section.push_str(&format!(
+            "- **峰值内存**: {:.2} MB\n\n",
+            stats.peak_memory_mb
+        ));
 
         section.push_str("---\n\n");
 
@@ -166,11 +193,13 @@ impl ReportGenerator {
             }
 
             if stats.latency_p95 > 50.0 {
-                recommendations.push_str("- 🔧 **延迟优化**: 增加缓存、优化数据库查询、使用连接池\n");
+                recommendations
+                    .push_str("- 🔧 **延迟优化**: 增加缓存、优化数据库查询、使用连接池\n");
             }
 
             if stats.peak_memory_mb > 1000.0 {
-                recommendations.push_str("- 🔧 **内存优化**: 实现内存池、减少大对象分配、优化数据结构\n");
+                recommendations
+                    .push_str("- 🔧 **内存优化**: 实现内存池、减少大对象分配、优化数据结构\n");
             }
 
             if stats.error_rate > 0.01 {
@@ -201,7 +230,8 @@ impl ReportGenerator {
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 let content = fs::read_to_string(&path)?;
                 let stats: StressTestStats = serde_json::from_str(&content)?;
-                let name = path.file_stem()
+                let name = path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown");
                 all_stats.push((name.to_string(), stats));
@@ -209,7 +239,8 @@ impl ReportGenerator {
         }
 
         // 转换为引用
-        let stats_refs: Vec<(&str, StressTestStats)> = all_stats.iter()
+        let stats_refs: Vec<(&str, StressTestStats)> = all_stats
+            .iter()
             .map(|(name, stats)| (name.as_str(), stats.clone()))
             .collect();
 
@@ -218,4 +249,3 @@ impl ReportGenerator {
         Ok(())
     }
 }
-

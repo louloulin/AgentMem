@@ -27,11 +27,11 @@ pub struct TimeoutConfig {
 impl Default for TimeoutConfig {
     fn default() -> Self {
         Self {
-            fact_extraction_timeout_secs: 90,  // 增加到 90 秒，适配 Zhipu AI 等慢速 LLM
-            decision_timeout_secs: 120,  // 增加到 120 秒
-            rerank_timeout_secs: 30,  // 增加到 30 秒
-            conflict_detection_timeout_secs: 60,  // 增加到 60 秒
-            search_timeout_secs: 10,  // 增加到 10 秒
+            fact_extraction_timeout_secs: 90, // 增加到 90 秒，适配 Zhipu AI 等慢速 LLM
+            decision_timeout_secs: 120,       // 增加到 120 秒
+            rerank_timeout_secs: 30,          // 增加到 30 秒
+            conflict_detection_timeout_secs: 60, // 增加到 60 秒
+            search_timeout_secs: 10,          // 增加到 10 秒
         }
     }
 }

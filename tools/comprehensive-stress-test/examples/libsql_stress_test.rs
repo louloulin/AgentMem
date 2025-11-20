@@ -7,8 +7,8 @@
 //! cargo run --release --example libsql_stress_test
 //! ```
 
-use comprehensive_stress_test::{LibSQLStressTestConfig, LibSQLStressTestEnv};
 use agent_mem::AddMemoryOptions;
+use comprehensive_stress_test::{LibSQLStressTestConfig, LibSQLStressTestEnv};
 use std::time::Instant;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -90,8 +90,12 @@ async fn test_memory_creation(
 
     for i in 0..count {
         let content = format!("Test memory {} - Created at {}", i, chrono::Utc::now());
-        
-        match env.memory.add_with_options(content, AddMemoryOptions::default()).await {
+
+        match env
+            .memory
+            .add_with_options(content, AddMemoryOptions::default())
+            .await
+        {
             Ok(result) => {
                 if !result.results.is_empty() {
                     success += 1;
@@ -130,7 +134,7 @@ async fn test_memory_search(
 
     for i in 0..count {
         let query = format!("Test memory {}", i % 10);
-        
+
         match env.memory.search(&query).await {
             Ok(results) => {
                 if !results.is_empty() {
@@ -181,7 +185,11 @@ async fn test_batch_operations(
             ));
         }
 
-        match env.memory.add_batch(contents, AddMemoryOptions::default()).await {
+        match env
+            .memory
+            .add_batch(contents, AddMemoryOptions::default())
+            .await
+        {
             Ok(results) => {
                 if results.len() == batch_size {
                     success += 1;
@@ -218,4 +226,3 @@ struct TestResult {
     duration_secs: f64,
     throughput: f64,
 }
-

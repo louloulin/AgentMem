@@ -3,7 +3,7 @@
 // All routes now use Repository Traits and work with both LibSQL and PostgreSQL
 pub mod agents;
 pub mod chat;
-pub mod chat_lumosai;  // LumosAI集成
+pub mod chat_lumosai; // LumosAI集成
 pub mod docs;
 // Graph routes require PostgreSQL-specific managers (temporarily disabled for LibSQL)
 #[cfg(feature = "postgres")]
@@ -170,10 +170,7 @@ pub async fn create_router(
             get(chat::get_chat_history),
         )
         // ===== ✅ Task 1.5: 兼容路由（向后兼容，解决404错误）=====
-        .route(
-            "/api/agents/:agent_id/chat",
-            post(chat::send_chat_message),
-        )
+        .route("/api/agents/:agent_id/chat", post(chat::send_chat_message))
         .route(
             "/api/agents/:agent_id/chat/stream",
             post(chat::send_chat_message_stream),

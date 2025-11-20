@@ -4,8 +4,8 @@ use agent_mem_traits::{AgentMemError, LLMConfig, LLMProvider, Message, ModelInfo
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::pin::Pin;
+use std::time::Duration;
 
 /// Ollama API请求结构
 #[derive(Debug, Serialize)]

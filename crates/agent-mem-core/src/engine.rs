@@ -7,7 +7,7 @@ use crate::{
         ConflictResolver, DefaultConflictResolver, DefaultImportanceScorer, ImportanceScorer,
         IntelligenceConfig,
     },
-    storage::conversion::{db_to_memory, memory_to_db, v4_to_legacy, legacy_to_v4},
+    storage::conversion::{db_to_memory, legacy_to_v4, memory_to_db, v4_to_legacy},
 };
 use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory};
 use serde::{Deserialize, Serialize};
@@ -129,7 +129,10 @@ impl MemoryEngine {
         // Add to hierarchy
         let hierarchical_memory = self.hierarchy_manager.add_memory(memory).await?;
 
-        info!("Added memory {} to engine", hierarchical_memory.memory.id.as_str());
+        info!(
+            "Added memory {} to engine",
+            hierarchical_memory.memory.id.as_str()
+        );
         Ok(hierarchical_memory.memory.id.as_str().to_string())
     }
 
@@ -224,10 +227,10 @@ impl MemoryEngine {
                 Some(MemoryScope::Global) => {
                     // 🔧 修复: Global Scope使用search方法进行LIKE查询，而不是list()
                     info!("🔍 Global Scope: 使用search方法查询: '{}'", query);
-                memory_repo
+                    memory_repo
                         .search(query, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                        .await
+                        .map_err(|e| crate::CoreError::Storage(e.to_string()))?
                 }
                 _ => {
                     // 其他scope使用原有逻辑
@@ -238,33 +241,35 @@ impl MemoryEngine {
                             .find_by_user_id(uid, fetch_limit * 2)
                             .await
                             .map_err(|e| crate::CoreError::Storage(e.to_string()))?;
-                        
+
                         // 如果查询不为空，过滤包含查询的记忆
                         if !query.trim().is_empty() {
-                            user_memories.into_iter()
-                                .filter(|m| {
-                                    match &m.content {
-                                        agent_mem_traits::Content::Text(t) => t.contains(query),
-                                        _ => false,
-                                    }
+                            user_memories
+                                .into_iter()
+                                .filter(|m| match &m.content {
+                                    agent_mem_traits::Content::Text(t) => t.contains(query),
+                                    _ => false,
                                 })
                                 .take(fetch_limit as usize)
                                 .collect()
                         } else {
-                            user_memories.into_iter().take(fetch_limit as usize).collect()
+                            user_memories
+                                .into_iter()
+                                .take(fetch_limit as usize)
+                                .collect()
                         }
-            } else if let Some(aid) = agent_id {
-                // 回退到agent_id过滤
-                memory_repo
-                    .find_by_agent_id(aid, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
-            } else {
+                    } else if let Some(aid) = agent_id {
+                        // 回退到agent_id过滤
+                        memory_repo
+                            .find_by_agent_id(aid, fetch_limit)
+                            .await
+                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                    } else {
                         // 无scope限制，使用search方法
-                memory_repo
+                        memory_repo
                             .search(query, fetch_limit)
-                    .await
-                    .map_err(|e| crate::CoreError::Storage(e.to_string()))?
+                            .await
+                            .map_err(|e| crate::CoreError::Storage(e.to_string()))?
                     }
                 }
             };
@@ -378,7 +383,7 @@ impl MemoryEngine {
                 use regex::Regex;
                 Regex::new(r"P\d{6}").unwrap().is_match(query)
             };
-            
+
             scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
                 // 辅助函数：检查是否是精确商品匹配 (V4: 使用 Content 和 attributes 访问)
                 let is_exact_product_match = |mem: &Memory, q: &str| -> bool {
@@ -392,29 +397,30 @@ impl MemoryEngine {
                             agent_mem_traits::Content::Structured(v) => v.to_string(),
                             _ => String::new(),
                         };
-                        
-                        content_text.contains(&format!("商品ID: {}", product_id)) ||
-                        mem.attributes
-                            .get(&agent_mem_traits::AttributeKey::user("product_id"))
-                            .and_then(|v| v.as_string())
-                            .map(|pid| pid == product_id)
-                            .unwrap_or(false)
+
+                        content_text.contains(&format!("商品ID: {}", product_id))
+                            || mem
+                                .attributes
+                                .get(&agent_mem_traits::AttributeKey::user("product_id"))
+                                .and_then(|v| v.as_string())
+                                .map(|pid| pid == product_id)
+                                .unwrap_or(false)
                     } else {
                         false
                     }
                 };
-                
+
                 if is_product_query {
                     // 1. 精确匹配优先
                     let a_exact = is_exact_product_match(mem_a, query);
                     let b_exact = is_exact_product_match(mem_b, query);
-                    
+
                     match (a_exact, b_exact) {
-                        (true, false) => return std::cmp::Ordering::Less,   // a 排在前面
+                        (true, false) => return std::cmp::Ordering::Less, // a 排在前面
                         (false, true) => return std::cmp::Ordering::Greater, // b 排在前面
                         _ => {}
                     }
-                    
+
                     // 2. 工作记忆降权（虽然已经过滤，但保留逻辑以防万一）(V4: 使用属性访问)
                     let get_memory_type = |mem: &Memory| -> String {
                         mem.attributes
@@ -423,17 +429,17 @@ impl MemoryEngine {
                             .unwrap_or(&String::from("episodic"))
                             .clone()
                     };
-                    
+
                     let a_working = get_memory_type(mem_a).to_lowercase() == "working";
                     let b_working = get_memory_type(mem_b).to_lowercase() == "working";
-                    
+
                     match (a_working, b_working) {
-                        (true, false) => return std::cmp::Ordering::Greater,  // a 排在后面
-                        (false, true) => return std::cmp::Ordering::Less,     // b 排在后面
+                        (true, false) => return std::cmp::Ordering::Greater, // a 排在后面
+                        (false, true) => return std::cmp::Ordering::Less,    // b 排在后面
                         _ => {}
                     }
                 }
-                
+
                 // 3. 按分数排序
                 score_b
                     .partial_cmp(score_a)
@@ -447,7 +453,7 @@ impl MemoryEngine {
                 .map(|(mut mem, score)| {
                     mem.attributes.insert(
                         agent_mem_traits::AttributeKey::system("score"),
-                        agent_mem_traits::AttributeValue::Number(score)
+                        agent_mem_traits::AttributeValue::Number(score),
                     );
                     mem
                 })
@@ -569,30 +575,32 @@ impl MemoryEngine {
     /// Calculate relevance score for a memory based on query
     fn calculate_relevance_score(&self, memory: &LegacyMemory, query: &str) -> f64 {
         use regex::Regex;
-        
+
         // 🔧 修复: 检测商品ID查询，优先处理精确ID匹配
         let product_id_pattern = Regex::new(r"P\d{6}").unwrap();
         if let Some(product_id) = product_id_pattern.find(query) {
             let product_id = product_id.as_str();
-            
+
             // 1. 精确ID匹配（最高分）
-            if memory.content.contains(&format!("商品ID: {}", product_id)) ||
-               memory.metadata
-                   .get("product_id")
-                   .and_then(|v| v.as_str())
-                   .map(|pid| pid == product_id)
-                   .unwrap_or(false) {
+            if memory.content.contains(&format!("商品ID: {}", product_id))
+                || memory
+                    .metadata
+                    .get("product_id")
+                    .and_then(|v| v.as_str())
+                    .map(|pid| pid == product_id)
+                    .unwrap_or(false)
+            {
                 info!("✅ 精确商品ID匹配: product_id={}", product_id);
-                return 2.0;  // 精确匹配：最高分
+                return 2.0; // 精确匹配：最高分
             }
-            
+
             // 2. 包含ID但不精确（中等分）
             if memory.content.contains(product_id) {
                 info!("✅ 包含商品ID: product_id={}", product_id);
                 return 1.5;
             }
         }
-        
+
         let query_lower = query.to_lowercase();
         let content_lower = memory.content.to_lowercase();
 

@@ -9,9 +9,9 @@ use serde_json::Value as JsonValue;
 use sqlx::PgPool;
 use std::sync::Arc;
 
+use crate::storage::conversion::{db_to_memory, memory_to_db};
 use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
-use crate::storage::conversion::{memory_to_db, db_to_memory};
 
 /// PostgreSQL 实现的 Memory repository
 pub struct PostgresMemoryRepository {
@@ -89,9 +89,7 @@ impl MemoryRepositoryTrait for PostgresMemoryRepository {
         .bind(id)
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to find memory by id: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to find memory by id: {e}")))?;
 
         // 2. 转换到 Memory V4
         match db_memory {
@@ -171,9 +169,7 @@ impl MemoryRepositoryTrait for PostgresMemoryRepository {
         .bind(limit)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to search memories: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to search memories: {e}")))?;
 
         // 2. 转换到 Memory V4
         let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
@@ -214,9 +210,7 @@ impl MemoryRepositoryTrait for PostgresMemoryRepository {
         .bind(&db_memory.last_updated_by_id)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to update memory: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to update memory: {e}")))?;
 
         if result.rows_affected() == 0 {
             return Err(AgentMemError::NotFound(format!(
@@ -242,9 +236,7 @@ impl MemoryRepositoryTrait for PostgresMemoryRepository {
         .bind(Utc::now())
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to delete memory: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to delete memory: {e}")))?;
 
         if result.rows_affected() == 0 {
             return Err(AgentMemError::NotFound(format!("Memory not found: {}", id)));
@@ -290,13 +282,10 @@ impl MemoryRepositoryTrait for PostgresMemoryRepository {
         .bind(offset)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to list memories: {e}"))
-        })?;
+        .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories: {e}")))?;
 
         // 2. 转换到 Memory V4
         let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
         memories
     }
 }
-

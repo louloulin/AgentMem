@@ -7,14 +7,14 @@
 use crate::operations::MemoryOperations;
 use crate::storage::libsql::LibSqlMemoryRepository;
 use crate::storage::traits::MemoryRepositoryTrait;
-use crate::types::{MemoryQuery, MemorySearchResult, MemoryStats, MemoryType, MatchType};
+use crate::types::{MatchType, MemoryQuery, MemorySearchResult, MemoryStats, MemoryType};
 use agent_mem_traits::{MemoryV4 as Memory, Result};
 use agent_mem_utils::jaccard_similarity;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// LibSQL implementation of MemoryOperations
-/// 
+///
 /// This adapter wraps LibSqlMemoryRepository to implement the MemoryOperations trait,
 /// providing persistent storage backed by SQLite via LibSQL.
 pub struct LibSqlMemoryOperations {
@@ -28,7 +28,7 @@ impl LibSqlMemoryOperations {
             repo: Arc::new(Mutex::new(repo)),
         }
     }
-    
+
     /// Get a reference to the underlying repository
     pub fn repo(&self) -> Arc<Mutex<LibSqlMemoryRepository>> {
         self.repo.clone()
@@ -69,10 +69,10 @@ impl MemoryOperations for LibSqlMemoryOperations {
 
     async fn search_memories(&self, query: MemoryQuery) -> Result<Vec<MemorySearchResult>> {
         let repo = self.repo.lock().await;
-        
+
         // Get all memories for the agent
         let all_memories = repo.find_by_agent_id(&query.agent_id, 1000).await?;
-        
+
         // Apply filters
         let current_time = chrono::Utc::now().timestamp();
         let filtered_memories: Vec<&Memory> = all_memories
@@ -84,7 +84,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
                         return false;
                     }
                 }
-                
+
                 // Memory type filter
                 if let Some(memory_type) = query.memory_type {
                     let type_str = memory_type.as_str();
@@ -99,7 +99,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
                         return false;
                     }
                 }
-                
+
                 // Age filter
                 if let Some(max_age) = query.max_age_seconds {
                     let created_timestamp = memory.metadata.created_at.timestamp();
@@ -108,11 +108,11 @@ impl MemoryOperations for LibSqlMemoryOperations {
                         return false;
                     }
                 }
-                
+
                 true
             })
             .collect();
-        
+
         // Perform search
         let mut results = if let Some(ref text_query) = query.text_query {
             self.search_by_text(&filtered_memories, text_query)
@@ -127,14 +127,14 @@ impl MemoryOperations for LibSqlMemoryOperations {
                 })
                 .collect()
         };
-        
+
         // Sort by score descending
         results.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        
+
         // Apply limit
         results.truncate(query.limit);
         Ok(results)
@@ -157,7 +157,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
     ) -> Result<Vec<Memory>> {
         let repo = self.repo.lock().await;
         let all_memories = repo.find_by_agent_id(agent_id, 1000).await?;
-        
+
         // Filter by memory type
         let type_str = memory_type.as_str();
         let filtered: Vec<Memory> = all_memories
@@ -170,7 +170,7 @@ impl MemoryOperations for LibSqlMemoryOperations {
 
     async fn get_memory_stats(&self, agent_id: Option<&str>) -> Result<MemoryStats> {
         let repo = self.repo.lock().await;
-        
+
         // Get memories
         let memories = if let Some(agent_id) = agent_id {
             repo.find_by_agent_id(agent_id, 10000).await?
@@ -179,38 +179,32 @@ impl MemoryOperations for LibSqlMemoryOperations {
             // For now, return empty stats if no agent_id
             return Ok(MemoryStats::default());
         };
-        
+
         let mut stats = MemoryStats::default();
         stats.total_memories = memories.len();
-        
+
         if memories.is_empty() {
             return Ok(stats);
         }
-        
+
         // Calculate statistics
         let mut total_importance = 0.0;
         let mut total_access_count = 0u64;
         let mut most_accessed_count = 0u64;
         let mut oldest_timestamp = i64::MAX;
         let current_time = chrono::Utc::now().timestamp();
-        
+
         for memory in &memories {
             // Type distribution
             if let Some(memory_type_str) = memory.memory_type() {
                 if let Ok(memory_type) = memory_type_str.parse::<crate::types::MemoryType>() {
-                    *stats
-                        .memories_by_type
-                        .entry(memory_type)
-                        .or_insert(0) += 1;
+                    *stats.memories_by_type.entry(memory_type).or_insert(0) += 1;
                 }
             }
 
             // Agent distribution
             if let Some(agent_id) = memory.agent_id() {
-                *stats
-                    .memories_by_agent
-                    .entry(agent_id)
-                    .or_insert(0) += 1;
+                *stats.memories_by_agent.entry(agent_id).or_insert(0) += 1;
             }
 
             // Importance and access stats
@@ -224,48 +218,51 @@ impl MemoryOperations for LibSqlMemoryOperations {
                 most_accessed_count = access_count;
                 stats.most_accessed_memory_id = Some(memory.id.0.clone());
             }
-            
+
             // Created timestamp
             let created_timestamp = memory.metadata.created_at.timestamp();
             if created_timestamp < oldest_timestamp {
                 oldest_timestamp = created_timestamp;
             }
         }
-        
+
         stats.average_importance = (total_importance / memories.len() as f64) as f32;
         stats.total_access_count = total_access_count;
         stats.oldest_memory_age_days = (current_time - oldest_timestamp) as f32 / (24.0 * 3600.0);
-        
+
         Ok(stats)
     }
 
     async fn batch_create_memories(&mut self, memories: Vec<Memory>) -> Result<Vec<String>> {
         let repo = self.repo.lock().await;
-        
+
         // Convert Vec<Memory> to Vec<&Memory> for batch_create
         let memory_refs: Vec<&Memory> = memories.iter().collect();
         let created = repo.batch_create(&memory_refs).await?;
-        
-        // Return created IDs  
-        Ok(created.into_iter().map(|m| m.id.as_str().to_string()).collect())
+
+        // Return created IDs
+        Ok(created
+            .into_iter()
+            .map(|m| m.id.as_str().to_string())
+            .collect())
     }
 
     async fn batch_delete_memories(&mut self, memory_ids: Vec<String>) -> Result<usize> {
         let repo = self.repo.lock().await;
         let mut deleted_count = 0;
-        
+
         for memory_id in memory_ids {
             if let Some(mut memory) = repo.find_by_id(&memory_id).await? {
                 // Soft delete by setting attribute flag (V4 compatible)
                 memory.attributes.insert(
                     agent_mem_traits::AttributeKey::system("is_deleted"),
-                    agent_mem_traits::AttributeValue::Boolean(true)
+                    agent_mem_traits::AttributeValue::Boolean(true),
                 );
                 repo.update(&memory).await?;
                 deleted_count += 1;
             }
         }
-        
+
         Ok(deleted_count)
     }
 }
@@ -275,24 +272,24 @@ impl LibSqlMemoryOperations {
     fn search_by_text(&self, memories: &[&Memory], query: &str) -> Vec<MemorySearchResult> {
         let query_lower = query.to_lowercase();
         let mut results = Vec::new();
-        
+
         for memory in memories {
             let content_text = match &memory.content {
                 agent_mem_traits::Content::Text(text) => text.clone(),
                 _ => continue, // Skip non-text content
             };
             let content_lower = content_text.to_lowercase();
-            
+
             if content_lower.contains(&query_lower) {
                 let match_type = if content_lower == query_lower {
                     MatchType::ExactText
                 } else {
                     MatchType::PartialText
                 };
-                
+
                 // Calculate text similarity score
                 let similarity = jaccard_similarity(&query_lower, &content_lower);
-                
+
                 results.push(MemorySearchResult {
                     memory: (*memory).clone(),
                     score: similarity,
@@ -300,7 +297,7 @@ impl LibSqlMemoryOperations {
                 });
             }
         }
-        
+
         // Sort by score descending
         results.sort_by(|a, b| {
             b.score

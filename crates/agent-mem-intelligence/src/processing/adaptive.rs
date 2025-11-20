@@ -3,7 +3,7 @@
 //! Implements intelligent memory lifecycle management including
 //! archiving, deletion, and capacity management.
 
-use agent_mem_traits::{MemoryV4 as Memory, Result, AttributeKey, AttributeValue};
+use agent_mem_traits::{AttributeKey, AttributeValue, MemoryV4 as Memory, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
@@ -224,8 +224,7 @@ impl AdaptiveMemoryManager {
         current_time: i64,
     ) -> Result<LifecycleAction> {
         let age = current_time - memory.metadata.created_at.timestamp();
-        let time_since_access =
-            current_time - memory.metadata.updated_at.timestamp();
+        let time_since_access = current_time - memory.metadata.updated_at.timestamp();
 
         // Check for deletion conditions
         if age > self.thresholds.delete_age_threshold
@@ -365,9 +364,7 @@ impl AdaptiveMemoryManager {
             };
             debug!(
                 "Compressed memory {} from {} to {} bytes",
-                memory.id,
-                original_size,
-                new_size
+                memory.id, original_size, new_size
             );
         }
 
@@ -420,7 +417,12 @@ impl AdaptiveMemoryManager {
         // Mark worst memories for deletion
         let mut deleted_count = 0;
         for (i, _) in memory_scores.iter().take(excess_count) {
-            if memories[*i].content.as_text().map(|s| !s.is_empty()).unwrap_or(true) {
+            if memories[*i]
+                .content
+                .as_text()
+                .map(|s| !s.is_empty())
+                .unwrap_or(true)
+            {
                 // Don't double-delete
                 memories[*i].content = agent_mem_traits::Content::Text(String::new()); // Mark for deletion
                 deleted_count += 1;
@@ -445,7 +447,11 @@ impl AdaptiveMemoryManager {
     /// Clean up memories marked for deletion
     pub fn cleanup_deleted_memories(&self, memories: &mut Vec<Memory>) {
         memories.retain(|memory| {
-            memory.content.as_text().map(|s| !s.is_empty()).unwrap_or(true)
+            memory
+                .content
+                .as_text()
+                .map(|s| !s.is_empty())
+                .unwrap_or(true)
         });
     }
 }
@@ -458,7 +464,10 @@ mod tests {
     use std::collections::HashMap;
 
     fn create_test_memory(id: &str, importance: f32, access_count: u32, age_days: i64) -> Memory {
-        use agent_mem_traits::{MemoryId, Content, AttributeSet, AttributeKey, AttributeValue, RelationGraph, MetadataV4 as Metadata};
+        use agent_mem_traits::{
+            AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4 as Metadata,
+            RelationGraph,
+        };
         let current_time = Utc::now();
         let age_duration = chrono::Duration::days(age_days);
         let created_at = current_time - age_duration;
@@ -471,8 +480,8 @@ mod tests {
                 created_at,
                 updated_at: created_at,
                 accessed_at: current_time - age_duration / 2,
-            access_count,
-            version: 1,
+                access_count,
+                version: 1,
                 hash: None,
             },
         };

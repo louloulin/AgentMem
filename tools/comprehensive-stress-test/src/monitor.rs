@@ -3,7 +3,7 @@
 use anyhow::Result;
 use std::sync::Arc;
 use std::time::Duration;
-use sysinfo::{System, Pid};
+use sysinfo::{Pid, System};
 use tokio::sync::RwLock;
 use tokio::time::interval;
 use tracing::debug;
@@ -82,13 +82,14 @@ impl SystemMonitor {
 
         // 当前进程的资源使用
         let pid = std::process::id();
-        let (process_memory_mb, process_cpu_usage) = if let Some(process) = system.process(Pid::from_u32(pid)) {
-            let mem = process.memory() as f64 / 1024.0 / 1024.0; // MB
-            let cpu = process.cpu_usage() as f64;
-            (mem, cpu)
-        } else {
-            (0.0, 0.0)
-        };
+        let (process_memory_mb, process_cpu_usage) =
+            if let Some(process) = system.process(Pid::from_u32(pid)) {
+                let mem = process.memory() as f64 / 1024.0 / 1024.0; // MB
+                let cpu = process.cpu_usage() as f64;
+                (mem, cpu)
+            } else {
+                (0.0, 0.0)
+            };
 
         SystemStats {
             cpu_usage,
@@ -121,4 +122,3 @@ mod tests {
         assert!(stats.memory_usage_percent >= 0.0 && stats.memory_usage_percent <= 100.0);
     }
 }
-

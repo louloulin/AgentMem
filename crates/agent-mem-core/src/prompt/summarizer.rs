@@ -2,7 +2,6 @@
 ///
 /// This module provides various strategies to compress memory content
 /// while preserving the most important information.
-
 use std::fmt;
 
 /// Summarization strategies
@@ -67,7 +66,10 @@ impl MemorySummarizer {
 
     /// Create a new summarizer with custom strategy
     pub fn with_strategy(max_chars: usize, strategy: SummarizationStrategy) -> Self {
-        Self { max_chars, strategy }
+        Self {
+            max_chars,
+            strategy,
+        }
     }
 
     /// Summarize content according to configured strategy
@@ -199,11 +201,7 @@ mod tests {
     #[test]
     fn test_smart_truncate_long_content() {
         let summarizer = MemorySummarizer::new(100);
-        let text = format!("{}{}{}",
-            "START",
-            "x".repeat(200),
-            "END"
-        );
+        let text = format!("{}{}{}", "START", "x".repeat(200), "END");
         let result = summarizer.summarize(&text);
 
         assert!(result.contains("START"), "Should preserve start");
@@ -215,11 +213,7 @@ mod tests {
     #[test]
     fn test_smart_truncate_with_unicode() {
         let summarizer = MemorySummarizer::new(50);
-        let text = format!("{}{}{}",
-            "开始",
-            "中".repeat(100),
-            "结束"
-        );
+        let text = format!("{}{}{}", "开始", "中".repeat(100), "结束");
         let result = summarizer.summarize(&text);
 
         assert!(result.contains("开始"), "Should preserve Chinese start");
@@ -238,7 +232,7 @@ mod tests {
         let summarizer = MemorySummarizer::with_strategy(100, SummarizationStrategy::KeySentences);
         let text = "a".repeat(200);
         let result = summarizer.summarize(&text);
-        
+
         // Should fall back to smart truncate
         assert!(result.contains("省略"));
     }
@@ -259,4 +253,3 @@ mod tests {
         assert!(!result.contains("..."));
     }
 }
-

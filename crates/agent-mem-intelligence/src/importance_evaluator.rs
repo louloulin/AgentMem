@@ -7,8 +7,8 @@
 //! - 用户行为分析
 
 use crate::fact_extraction::{EntityType, RelationType, StructuredFact};
-use agent_mem_traits::{MemoryV4 as Memory, Result};
 use agent_mem_llm::LLMProvider;
+use agent_mem_traits::{MemoryV4 as Memory, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -157,7 +157,10 @@ impl ImportanceEvaluator {
         let mut evaluations = Vec::new();
 
         for memory in memories {
-            let facts = facts_map.get(memory.id.as_str()).cloned().unwrap_or_default();
+            let facts = facts_map
+                .get(memory.id.as_str())
+                .cloned()
+                .unwrap_or_default();
             let evaluation = self
                 .evaluate_importance(memory, &facts, context_memories)
                 .await?;

@@ -127,11 +127,7 @@ pub struct ToolExecutionSandbox {
 
 impl ToolExecutionSandbox {
     /// 创建新的工具执行沙箱
-    pub fn new(
-        tool_name: String,
-        args: serde_json::Value,
-        sandbox_type: SandboxType,
-    ) -> Self {
+    pub fn new(tool_name: String, args: serde_json::Value, sandbox_type: SandboxType) -> Self {
         let local_config = LocalSandboxConfig::default();
         let sandbox_config = SandboxConfig {
             max_memory: 512 * 1024 * 1024, // 512MB
@@ -311,7 +307,10 @@ if __name__ == "__main__":
     ///
     /// 参考 MIRIX: run_local_dir_sandbox_venv()
     async fn run_with_venv(&self, script_path: &PathBuf) -> ToolResult<SandboxRunResult> {
-        let venv_path = self.local_config.sandbox_dir.join(&self.local_config.venv_name);
+        let venv_path = self
+            .local_config
+            .sandbox_dir
+            .join(&self.local_config.venv_name);
 
         // 检查虚拟环境是否存在
         if !venv_path.exists() {
@@ -364,4 +363,3 @@ if __name__ == "__main__":
         })
     }
 }
-
