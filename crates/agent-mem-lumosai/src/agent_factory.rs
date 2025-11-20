@@ -25,27 +25,41 @@ impl LumosAgentFactory {
         agent: &Agent,
         user_id: &str,
     ) -> anyhow::Result<BasicAgent> {
-        info!("Creating LumosAI agent for: {} (user: {})", agent.id, user_id);
+        let total_start = std::time::Instant::now();
+        info!("🏭 [FACTORY] Agent creation started");
+        info!("   Agent: {}, User: {}", agent.id, user_id);
         
         // 1. 解析LLM配置
+        let step1_start = std::time::Instant::now();
         let llm_config = self.parse_llm_config(agent)?;
+        let step1_duration = step1_start.elapsed();
+        info!("   ⏱️  [STEP1] Parse LLM config: {:?}", step1_duration);
         debug!("Parsed LLM config: provider={}, model={}", 
             llm_config.get("provider").and_then(|v| v.as_str()).unwrap_or("unknown"),
             llm_config.get("model").and_then(|v| v.as_str()).unwrap_or("unknown"));
         
         // 2. 创建LLM Provider
+        let step2_start = std::time::Instant::now();
         let llm_provider = self.create_llm_provider(&llm_config)?;
-        debug!("Created LLM provider: {}", llm_config.get("provider").and_then(|v| v.as_str()).unwrap_or("unknown"));
+        let step2_duration = step2_start.elapsed();
+        info!("   ⏱️  [STEP2] Create LLM provider: {:?}", step2_duration);
         
         // 3. 创建Memory Backend并配置
+        let step3_start = std::time::Instant::now();
+        info!("   🔄 [STEP3] Creating memory backend...");
         let memory_backend = self.create_memory_backend(agent, user_id).await?;
-        debug!("Created AgentMem backend");
+        let step3_duration = step3_start.elapsed();
+        info!("   ⏱️  [STEP3] Create memory backend: {:?}", step3_duration);
+        
+        if step3_duration.as_millis() > 100 {
+            warn!("   ⚠️  Memory backend creation took > 100ms");
+        }
         
         // 4. 使用AgentBuilder构建LumosAI Agent - 真正集成Memory Backend
         let agent_name = agent.name.as_ref().map(|s| s.as_str()).unwrap_or("assistant");
         
-        // ✅ 关键修复：使用AgentBuilder.build_async()而不是build()
-        // build_async()支持异步操作，且能正确处理memory字段
+        let step4_start = std::time::Instant::now();
+        info!("   🔄 [STEP4] Building BasicAgent...");
         use lumosai_core::agent::AgentBuilder;
         
         let mut lumos_agent = AgentBuilder::new()
@@ -54,27 +68,38 @@ impl LumosAgentFactory {
                 "You are a helpful AI assistant".to_string()
             ))
             .model(llm_provider)
-            .build()  // 先build基础Agent
+            .build()
             .map_err(|e| anyhow::anyhow!("Failed to build agent: {}", e))?;
         
-        // ✅ 设置Memory Backend
+        let step4_duration = step4_start.elapsed();
+        info!("   ⏱️  [STEP4] Build BasicAgent: {:?}", step4_duration);
+        
+        // 5. 设置Memory Backend
+        let step5_start = std::time::Instant::now();
+        info!("   🔄 [STEP5] Attaching memory backend...");
         lumos_agent = lumos_agent.with_memory(memory_backend);
+        let step5_duration = step5_start.elapsed();
+        info!("   ⏱️  [STEP5] Attach memory: {:?}", step5_duration);
         
         // 验证Memory是否被正确设置
         use lumosai_core::agent::Agent;
         if lumos_agent.has_own_memory() {
-            info!("✅ Memory Backend attached and verified!");
-            if let Some(mem) = lumos_agent.get_memory() {
-                info!("✅ get_memory() returns Some - Memory is accessible");
-                drop(mem); // 释放引用
-            } else {
-                warn!("⚠️  has_own_memory()=true but get_memory()=None - This is a bug!");
-            }
+            info!("   ✅ Memory verified: attached");
         } else {
-            warn!("❌ Memory Backend NOT attached - has_own_memory()=false");
+            warn!("   ⚠️  Memory verification failed");
         }
         
-        info!("✅ Successfully created LumosAI agent with integrated memory: {}", agent_name);
+        let total_duration = total_start.elapsed();
+        info!("✅ [FACTORY] Total agent creation: {:?}", total_duration);
+        
+        if total_duration.as_millis() > 100 {
+            warn!("⚠️  [FACTORY] Agent creation took > 100ms, breakdown:");
+            warn!("   STEP1 (parse):   {:?}", step1_duration);
+            warn!("   STEP2 (provider): {:?}", step2_duration);
+            warn!("   STEP3 (memory):   {:?}", step3_duration);
+            warn!("   STEP4 (build):    {:?}", step4_duration);
+            warn!("   STEP5 (attach):   {:?}", step5_duration);
+        }
         
         Ok(lumos_agent)
     }

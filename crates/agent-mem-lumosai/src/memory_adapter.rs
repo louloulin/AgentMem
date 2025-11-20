@@ -90,7 +90,7 @@ impl LumosMemory for AgentMemBackend {
     async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
         let retrieve_start = std::time::Instant::now();
         // ⚡ 性能优化: 减少检索数量以降低prompt tokens和响应时间
-        let limit = config.last_messages.unwrap_or(3);  // 从10降到3
+        let limit = config.last_messages.unwrap_or(1);  // ⭐ 优化: 只检索1条历史
         
         info!("🔍 [MEMORY-RETRIEVE] Starting");
         info!("   Agent: {}, User: {}, Limit: {}", 
