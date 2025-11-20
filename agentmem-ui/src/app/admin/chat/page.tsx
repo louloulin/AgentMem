@@ -244,11 +244,11 @@ function ChatPageInner() {
                   console.log('[Chat] 💬 Content chunk:', JSON.stringify(parsed.content), 
                              '| Total:', accumulatedContent.length, 'chars');
                   
-                  // 立即更新UI显示每个chunk（强制重新渲染）
+                  // 立即更新UI显示每个chunk（保持isStreaming状态）
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === agentMessageId
-                        ? { ...msg, content: accumulatedContent, timestamp: new Date() }
+                        ? { ...msg, content: accumulatedContent, isStreaming: true, timestamp: new Date() }
                         : msg
                     )
                   );
@@ -652,14 +652,14 @@ function MessageBubble({ message }: MessageBubbleProps) {
             } ${message.isStreaming ? 'shadow-lg' : ''}`}
           >
             {!message.content && message.isStreaming ? (
-              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">正在思考...</span>
-                <span className="animate-pulse">●</span>
-                <span className="animate-pulse animation-delay-200">●</span>
-                <span className="animate-pulse animation-delay-400">●</span>
+                <span className="text-sm font-medium">正在思考</span>
+                <span className="animate-bounce">●</span>
+                <span className="animate-bounce animation-delay-200">●</span>
+                <span className="animate-bounce animation-delay-400">●</span>
               </div>
-            ) : (
+            ) : message.content ? (
               <div className="text-sm whitespace-pre-wrap">
                 {message.content}
                 {message.isStreaming && (
@@ -670,6 +670,10 @@ function MessageBubble({ message }: MessageBubbleProps) {
                     }}
                   />
                 )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-400 dark:text-gray-500 italic">
+                (无内容)
               </div>
             )}
           </div>
