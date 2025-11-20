@@ -39,7 +39,7 @@ function ChatPageInner() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true); // 是否启用流式响应
-  const [useLumosAI, setUseLumosAI] = useState(false); // 🚀 是否使用 LumosAI 模式
+  const [useLumosAI, setUseLumosAI] = useState(true); // 🚀 默认使用 LumosAI 真实流式
   const [showMemoryPanel, setShowMemoryPanel] = useState(true); // ✨ 记忆面板显示状态
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
