@@ -13,10 +13,12 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+pub mod background_tasks;
 pub mod memory_extraction;
 pub mod memory_integration;
 pub mod tool_integration;
 
+use background_tasks::BackgroundTaskManager;
 use memory_extraction::MemoryExtractor;
 use memory_integration::MemoryIntegrator;
 use tool_integration::{ToolIntegrator, ToolIntegratorConfig};
@@ -242,12 +244,14 @@ pub struct AgentOrchestrator {
     llm_client: Arc<LLMClient>,
     tool_executor: Arc<ToolExecutor>,
     memory_integrator: MemoryIntegrator,
-    memory_extractor: MemoryExtractor,
+    memory_extractor: Arc<MemoryExtractor>,
     tool_integrator: ToolIntegrator,
     /// Working Memory Store - 用于会话级临时上下文（最小改动方案：直接使用Store而非Agent）
     working_store: Option<Arc<dyn agent_mem_traits::WorkingMemoryStore>>,
     /// ⭐ 性能监控
     metrics: Arc<std::sync::RwLock<PerformanceMetrics>>,
+    /// 后台任务管理器
+    background_tasks: Arc<BackgroundTaskManager>,
 }
 
 impl AgentOrchestrator {

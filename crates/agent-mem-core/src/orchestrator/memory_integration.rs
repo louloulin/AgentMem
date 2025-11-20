@@ -326,7 +326,7 @@ impl MemoryIntegrator {
                 agent_id: agent_id.to_string(),
                 user_id: uid.to_string(),
             };
-            
+
             let working_scope = session_id.map(|sid| MemoryScope::Session {
                 agent_id: agent_id.to_string(),
                 user_id: uid.to_string(),
@@ -366,8 +366,8 @@ impl MemoryIntegrator {
                     query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            if let Some(score) = memory.score() {
-                                memory.set_score(score * self.config.episodic_weight as f64);
+                        if let Some(score) = memory.score() {
+                            memory.set_score(score * self.config.episodic_weight as f64);
                             }
                             all_memories.push(memory);
                         }
@@ -377,20 +377,20 @@ impl MemoryIntegrator {
                 Err(e) => {
                     warn!("⚠️  Episodic Memory query failed: {}", e);
                 }
-            }
-            
+        }
+
             // 处理 Working 结果
             if let Some(Ok(memories)) = working_result {
-                let mut added = 0;
+                    let mut added = 0;
                 query_count += 1;
-                for memory in memories {
-                    if seen_ids.insert(memory.id.clone()) {
-                        all_memories.push(memory);
-                        added += 1;
+                    for memory in memories {
+                        if seen_ids.insert(memory.id.clone()) {
+                            all_memories.push(memory);
+                            added += 1;
+                        }
                     }
-                }
                 info!("🔄 Working Memory added {} memories", added);
-            }
+                }
         }
         
         // ✅ 优化2: 早停检查1 - Episodic + Working已足够
