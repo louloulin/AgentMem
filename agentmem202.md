@@ -1005,38 +1005,38 @@ test result: ok. 5 passed; 0 failed; 0 ignored
   }
   ```
 
-- [ ] **1.5.2 添加重定向日志** (0.25天)
+- [x] **1.5.2 添加重定向日志** (0.25天) - ✅ 已实现
   ```rust
   // 文件位置: crates/agent-mem-server/src/middleware/api_version.rs (新建)
-  
-  use axum::{
-      middleware::Next,
-      http::{Request, StatusCode},
-      response::Response,
-  };
-  
-  /// API版本兼容中间件
-  pub async fn api_version_compatibility<B>(
-      req: Request<B>,
-      next: Next<B>,
+  pub async fn api_version_compatibility_middleware(
+      req: Request,
+      next: Next,
   ) -> Result<Response, StatusCode> {
-      let path = req.uri().path();
-      
-      // 记录使用旧版本路由的请求
-      if path.starts_with("/api/agents") && !path.starts_with("/api/v1/") {
+      let path = req.uri().path().to_string();
+      let is_legacy_route = path.starts_with("/api/agents") 
+          && !path.starts_with("/api/v1/");
+  
+      if is_legacy_route {
           warn!(
-              "⚠️  Client using deprecated API path: {} (should use /api/v1/...)",
+              "⚠️  Client using deprecated API path: {} (recommended: /api/v1/...)",
               path
           );
-          
-          // TODO: Phase 2添加响应头提示升级
-          // response.headers_mut().insert(
-          //     "X-API-Version-Deprecated",
-          //     "Please upgrade to /api/v1/... endpoints"
-          // );
       }
-      
-      Ok(next.run(req).await)
+  
+      let mut response = next.run(req).await;
+  
+      if is_legacy_route {
+          response.headers_mut().insert(
+              "X-API-Deprecated",
+              "true".parse().unwrap(),
+          );
+          response.headers_mut().insert(
+              "X-API-Recommended",
+              format!("/api/v1{}", &path[4..]).parse().unwrap(),
+          );
+      }
+  
+      Ok(response)
   }
   ```
 
@@ -1090,6 +1090,35 @@ test result: ok. 5 passed; 0 failed; 0 ignored
 ✅ 前端统一使用buildApiPath()
 ✅ 404错误率 = 0%
 ```
+
+#### 实施总结
+
+**已完成的功能**:
+1. ✅ **路由兼容层**: 在 `routes/mod.rs` 中为 `/api/agents/...` 添加别名，覆盖 chat、chat/stream、chat/history、LumosAI 相关路径，彻底解决404。
+2. ✅ **API版本中间件**: 新增 `middleware/api_version.rs`，当检测到旧路径时记录`WARN`日志并在响应头添加 `X-API-Deprecated`、`X-API-Recommended` 提示，便于监控客户端升级情况。
+3. ✅ **Orchestrator配置同步**: 更新 `orchestrator_factory.rs` 以适配最新的 `OrchestratorConfig` 字段，保证服务端编排逻辑与核心库保持一致。
+4. ✅ **测试保障**:
+   - `cargo test --package agent-mem-server --test route_compatibility_test`
+   - `cargo test --package agent-mem-server middleware::api_version::tests`
+
+**测试结果**:
+```
+running 7 tests
+test tests::test_legacy_chat_route ... ok
+test tests::test_v1_chat_route ... ok
+test tests::test_agent_id_extraction ... ok
+test tests::test_legacy_history_route ... ok
+test tests::test_legacy_stream_route ... ok
+test tests::test_legacy_lumosai_stream_route ... ok
+test tests::test_legacy_lumosai_route ... ok
+
+test result: ok. 7 passed; 0 failed
+```
+
+**效果**:
+- 🔄 旧路径完全兼容，避免生产流量因路径差异触发404。
+- 📋 日志可观测性增强，便于统计仍在使用旧API的客户端。
+- 🧠 服务端编排配置与核心库对齐，避免未来升级冲突。
 
 ---
 
