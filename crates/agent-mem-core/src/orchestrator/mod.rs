@@ -836,23 +836,23 @@ impl AgentOrchestrator {
         // ✅ Task 1.1: 使用智能摘要压缩记忆内容
         // 创建摘要器：每条记忆最大200字符
         let summarizer = MemorySummarizer::new(200);
-        
+
         // ✅ 限制记忆数量为3条（减少90% Prompt大小）
         let limited_memories = memories.iter().take(3);
         
         let mut memory_text = String::new();
         for (i, mem) in limited_memories.enumerate() {
-            let content = match &mem.content {
-                agent_mem_traits::Content::Text(t) => t.as_str(),
-                _ => "[data]",
-            };
+                let content = match &mem.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    _ => "[data]",
+                };
             
             // ✅ 智能摘要化每条记忆（保留头尾信息）
             let summary = summarizer.summarize(content);
             
             // ✅ 极简格式：移除类型标签，节省空间
             memory_text.push_str(&format!("{}. {}\n", i + 1, summary));
-        }
+            }
         
         // ✅ 极简Prompt模板
         let system_message = if memory_text.is_empty() {
@@ -880,7 +880,7 @@ impl AgentOrchestrator {
             memories.iter().take(3).count(),
             memories.len()
         );
-        
+
         Ok(messages)
     }
 
