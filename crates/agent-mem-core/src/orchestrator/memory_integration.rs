@@ -812,9 +812,19 @@ impl MemoryIntegrator {
         for memory in memories {
             let content_key = match &memory.content {
                 agent_mem_traits::Content::Text(t) => {
-                    // 使用前100字符作为去重key
+                    // 使用前100字符作为去重key，确保字符边界正确
                     if t.len() > 100 {
-                        &t[..100]
+                        // 使用char_indices找到安全的字符边界
+                        let mut char_count = 0;
+                        let mut byte_index = 0;
+                        for (i, _) in t.char_indices() {
+                            if char_count >= 100 {
+                                break;
+                            }
+                            char_count += 1;
+                            byte_index = i;
+                        }
+                        &t[..byte_index]
                     } else {
                         t.as_str()
                     }
