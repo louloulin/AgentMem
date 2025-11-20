@@ -317,29 +317,57 @@ impl MemoryIntegrator {
             }
         }
 
-        // ========== Priority 1: Episodic Memory (Agent/User Scope) ==========
-        // 理论依据: Atkinson-Shiffrin模型 - Long-term Memory是主要来源
+        // ========== ✅ Task 1.2: 并行查询 Priority 1 & 2 (优化) ==========
+        let mut query_count = 0;
+        
+        // ✅ 优化1: 并行查询最重要的两层（Episodic + Working）
         if let Some(uid) = user_id {
             let episodic_scope = MemoryScope::User {
                 agent_id: agent_id.to_string(),
                 user_id: uid.to_string(),
             };
-
-            info!("📚 Priority 1: Querying Episodic Memory (Agent/User scope) - 主要来源");
-
-            // 查询更多数量（max_count * 2），因为这是主要来源
-            match self
-                .memory_engine
-                .search_memories(query, Some(episodic_scope), Some(max_count * 2))
-                .await
-            {
+            
+            let working_scope = session_id.map(|sid| MemoryScope::Session {
+                agent_id: agent_id.to_string(),
+                user_id: uid.to_string(),
+                session_id: sid.to_string(),
+            });
+            
+            info!("📚🔄 [1-2/4] Parallel querying Episodic + Working Memory");
+            
+            let episodic_query = self.memory_engine.search_memories(
+                query, 
+                Some(episodic_scope), 
+                Some(max_count * 2)
+            );
+            
+            let working_query = if let Some(ws) = working_scope {
+                Some(self.memory_engine.search_memories(
+                    query,
+                    Some(ws),
+                    Some(max_count / 2)
+                ))
+            } else {
+                None
+            };
+            
+            // ✅ 并行执行
+            let (episodic_result, working_result) = if let Some(wq) = working_query {
+                let (e, w) = tokio::join!(episodic_query, wq);
+                (e, Some(w))
+            } else {
+                (episodic_query.await, None)
+            };
+            
+            // 处理 Episodic 结果
+            match episodic_result {
                 Ok(memories) => {
                     let count = memories.len();
+                    query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            // 🎯 Episodic Memory 权重 (可配置，基于Adaptive Framework)
-                        if let Some(score) = memory.score() {
-                            memory.set_score(score * self.config.episodic_weight as f64);
+                            if let Some(score) = memory.score() {
+                                memory.set_score(score * self.config.episodic_weight as f64);
                             }
                             all_memories.push(memory);
                         }
@@ -350,50 +378,55 @@ impl MemoryIntegrator {
                     warn!("⚠️  Episodic Memory query failed: {}", e);
                 }
             }
-        }
-
-        // ========== Priority 2: Working Memory (Session Scope) ==========
-        // 理论依据: Working Memory作为补充上下文（容量7±2项）
-        if let (Some(uid), Some(sid)) = (user_id, session_id) {
-            let working_scope = MemoryScope::Session {
-                agent_id: agent_id.to_string(),
-                user_id: uid.to_string(),
-                session_id: sid.to_string(),
-            };
-
-            info!("🔄 Priority 2: Querying Working Memory (Session scope) - 补充上下文");
-
-            // 只查询少量（max_count / 2），因为只是补充
-            match self
-                .memory_engine
-                .search_memories(query, Some(working_scope), Some(max_count / 2))
-                .await
-            {
-                Ok(memories) => {
-                    let mut added = 0;
-                    for memory in memories {
-                        if seen_ids.insert(memory.id.clone()) {
-                            // 🎯 Working Memory 权重: 1.0（正常，因为新鲜且相关）
-                            all_memories.push(memory);
-                            added += 1;
-                        }
+            
+            // 处理 Working 结果
+            if let Some(Ok(memories)) = working_result {
+                let mut added = 0;
+                query_count += 1;
+                for memory in memories {
+                    if seen_ids.insert(memory.id.clone()) {
+                        all_memories.push(memory);
+                        added += 1;
                     }
-                    info!("🔄 Working Memory added {} memories as context", added);
                 }
-                Err(e) => {
-                    warn!("⚠️  Working Memory query failed: {}", e);
-                }
+                info!("🔄 Working Memory added {} memories", added);
             }
+        }
+        
+        // ✅ 优化2: 早停检查1 - Episodic + Working已足够
+        if all_memories.len() >= max_count {
+            let saved_queries = 2; // 节省了Semantic和Global查询
+            info!(
+                "✅ Early stop after Priority 1-2: {} >= target {}, saved {} queries",
+                all_memories.len(), max_count, saved_queries
+            );
+            
+            // 记录统计
+            self.record_query_stats(query_count, saved_queries);
+            
+            // 排序、去重、限制数量
+            all_memories.sort_by(|a, b| {
+                b.score().unwrap_or(0.0)
+                    .partial_cmp(&a.score().unwrap_or(0.0))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            
+            let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
+            
+            // 更新缓存
+            self.update_cache(cache_key.clone(), result.clone());
+            
+            return Ok(result);
         }
 
         // ========== Priority 3: Semantic Memory (Agent Scope) ==========
-        // 理论依据: 备选，如果前面不够则查询更广范围
+        // ✅ 优化3: 仅在需要时查询
         if all_memories.len() < max_count {
             let semantic_scope = MemoryScope::Agent(agent_id.to_string());
 
             let remaining = max_count.saturating_sub(all_memories.len());
             info!(
-                "📖 Priority 3: Querying Semantic Memory (Agent scope) - 需要 {} 更多",
+                "📖 [3/4] Querying Semantic Memory - need {} more",
                 remaining
             );
 
@@ -404,9 +437,9 @@ impl MemoryIntegrator {
             {
                 Ok(memories) => {
                     let mut added = 0;
+                    query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
-                            // 🎯 Semantic Memory 权重 (可配置，降低因为范围更广)
                             if let Some(score) = memory.score() {
                                 memory.set_score(score * self.config.semantic_weight as f64);
                             }
@@ -422,6 +455,28 @@ impl MemoryIntegrator {
                 Err(e) => {
                     warn!("⚠️  Semantic Memory query failed: {}", e);
                 }
+            }
+            
+            // ✅ 优化4: 早停检查2 - 加上Semantic已足够
+            if all_memories.len() >= max_count {
+                let saved_queries = 1; // 节省了Global查询
+                info!(
+                    "✅ Early stop after Priority 3: {} >= target {}, saved {} queries",
+                    all_memories.len(), max_count, saved_queries
+                );
+                
+                self.record_query_stats(query_count, saved_queries);
+                
+                all_memories.sort_by(|a, b| {
+                    b.score().unwrap_or(0.0)
+                        .partial_cmp(&a.score().unwrap_or(0.0))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                
+                let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
+                self.update_cache(cache_key.clone(), result.clone());
+                
+                return Ok(result);
             }
         }
 
@@ -651,5 +706,18 @@ impl MemoryIntegrator {
         
         info!("📦 Compressed: kept {} most important memories", result.len());
         result
+    }
+    
+    /// ✅ Task 1.2: 记录查询统计信息
+    /// 用于监控早停优化效果
+    fn record_query_stats(&self, actual_queries: usize, saved_queries: usize) {
+        if saved_queries > 0 {
+            info!(
+                "📊 Query optimization: executed {} queries, saved {} queries ({:.1}% reduction)",
+                actual_queries,
+                saved_queries,
+                (saved_queries as f64 / (actual_queries + saved_queries) as f64) * 100.0
+            );
+        }
     }
 }
