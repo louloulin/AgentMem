@@ -20,7 +20,7 @@ pub async fn api_version_compatibility_middleware(
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let path = req.uri().path();
+    let path = req.uri().path().to_string(); // ✅ 复制字符串避免借用问题
     
     // 检查是否使用旧版本路由
     let is_legacy_route = path.starts_with("/api/agents") 

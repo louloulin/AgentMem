@@ -123,6 +123,9 @@ pub async fn create_orchestrator(
         auto_extract_memories: true,
         memory_extraction_threshold: 0.5,
         enable_tool_calling: true, // ✅ 启用工具调用
+        enable_adaptive: false,    // ✅ Task 1.1-1.2优化后可启用
+        token_budget: 8000,        // ✅ Token预算
+        ttfb_threshold_ms: 500,    // ✅ TTFB阈值（毫秒）
     };
     debug!("Created OrchestratorConfig: {:?}", orchestrator_config);
 
