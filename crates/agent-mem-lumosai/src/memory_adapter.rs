@@ -33,8 +33,11 @@ impl AgentMemBackend {
 #[async_trait]
 impl LumosMemory for AgentMemBackend {
     async fn store(&self, message: &LumosMessage) -> LumosResult<()> {
-        info!("💾 Storing message to AgentMem: role={:?}, agent_id={}, user_id={}", 
-              message.role, self.agent_id, self.user_id);
+        let store_start = std::time::Instant::now();
+        
+        info!("💾 [MEMORY-STORE] Starting");
+        info!("   Role: {:?}, Content length: {}", 
+              message.role, message.content.len());
         
         // 转换LumosMessage为content string
         let role_str = match message.role {
@@ -63,21 +66,34 @@ impl LumosMemory for AgentMemBackend {
         };
         
         // ✅ 调用agent-mem的add_with_options API
+        let api_call_start = std::time::Instant::now();
         let _result = self.memory_api.add_with_options(content, options).await
             .map_err(|e| {
                 let err_msg = format!("Failed to store memory: {}", e);
-                warn!("{}", err_msg);
+                warn!("   ❌ {}", err_msg);
                 lumosai_core::Error::Other(err_msg)
             })?;
+        let api_call_duration = api_call_start.elapsed();
         
-        info!("✅ Stored memory to AgentMem");
+        info!("   ⏱️  API call: {:?}", api_call_duration);
+        
+        let total_duration = store_start.elapsed();
+        info!("✅ [MEMORY-STORE] Completed in {:?}", total_duration);
+        
+        if total_duration.as_millis() > 500 {
+            warn!("   ⚠️  Store took > 500ms, consider async storage");
+        }
+        
         Ok(())
     }
     
     async fn retrieve(&self, config: &MemoryConfig) -> LumosResult<Vec<LumosMessage>> {
+        let retrieve_start = std::time::Instant::now();
         // ⚡ 性能优化: 减少检索数量以降低prompt tokens和响应时间
         let limit = config.last_messages.unwrap_or(3);  // 从10降到3
-        info!("🔍 Retrieving memories: agent_id={}, user_id={}, limit={}", 
+        
+        info!("🔍 [MEMORY-RETRIEVE] Starting");
+        info!("   Agent: {}, User: {}, Limit: {}", 
               self.agent_id, self.user_id, limit);
         
         // ✅ 使用agent-mem的get_all API
@@ -88,17 +104,20 @@ impl LumosMemory for AgentMemBackend {
             ..Default::default()
         };
         
+        let db_query_start = std::time::Instant::now();
         let memories = self.memory_api.get_all(options).await
             .map_err(|e| {
                 let err_msg = format!("Failed to retrieve memories: {}", e);
-                warn!("{}", err_msg);
+                warn!("   ❌ {}", err_msg);
                 lumosai_core::Error::Other(err_msg)
             })?;
+        let db_query_duration = db_query_start.elapsed();
         
-        info!("✅ Retrieved {} historical messages from AgentMem", memories.len());
+        info!("   ⏱️  Database query: {:?}, Found: {} memories", 
+              db_query_duration, memories.len());
         
         // 转换MemoryItem为LumosMessage
-        let messages = memories.into_iter()
+        let messages: Vec<LumosMessage> = memories.into_iter()
             .filter_map(|mem| {
                 // 从metadata中提取role（metadata是HashMap<String, Value>）
                 let role_str = mem.metadata
@@ -120,17 +139,25 @@ impl LumosMemory for AgentMemBackend {
                         .to_string()
                 } else {
                     mem.content
-                };
-                
-                Some(LumosMessage {
-                    role,
-                    content,
-                    metadata: None,
-                    name: None,
-                })
+            };
+            
+            Some(LumosMessage {
+                role,
+                content,
+                metadata: None,
+                name: None,
             })
-            .collect();
-        
-        Ok(messages)
+        })
+        .collect();
+    
+    let total_duration = retrieve_start.elapsed();
+    info!("✅ [MEMORY-RETRIEVE] Completed in {:?}, Returned: {} messages", 
+          total_duration, messages.len());
+    
+    if total_duration.as_millis() > 100 {
+        warn!("   ⚠️  Retrieve took > 100ms, consider caching");
+    }
+    
+    Ok(messages)
     }
 }

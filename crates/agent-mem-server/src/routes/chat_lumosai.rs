@@ -52,39 +52,48 @@ pub async fn send_chat_message_lumosai(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Json<ApiResponse<ChatMessageResponse>>> {
-    let start_time = std::time::Instant::now();
-    info!("💬 Chat request (LumosAI): agent={}, message_len={}", agent_id, req.message.len());
+    let request_start = std::time::Instant::now();
+    let request_id = Uuid::new_v4();
+    
+    info!("🚀 [REQUEST-{}] Chat request started", request_id);
+    info!("   Agent: {}, Message length: {}, User: {}", 
+          agent_id, req.message.len(), req.user_id.as_deref().unwrap_or("default"));
     
     // 1. 验证Agent
+    let step1_start = std::time::Instant::now();
     let agent = repositories.agents
         .find_by_id(&agent_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to read agent: {}", e)))?
         .ok_or_else(|| ServerError::not_found("Agent not found"))?;
+    info!("   ⏱️  [STEP1] Agent query: {:?}", step1_start.elapsed());
     
-    debug!("Found agent: {}", agent.name.as_ref().map(|s| s.as_str()).unwrap_or("unnamed"));
+    debug!("   Found agent: {}", agent.name.as_ref().map(|s| s.as_str()).unwrap_or("unnamed"));
     
     // 2. 权限检查
+    let step2_start = std::time::Instant::now();
     if agent.organization_id != auth_user.org_id {
-        error!("Access denied: agent org {} != user org {}", agent.organization_id, auth_user.org_id);
+        error!("   ❌ Access denied: agent org {} != user org {}", agent.organization_id, auth_user.org_id);
         return Err(ServerError::forbidden("Access denied"));
     }
+    info!("   ⏱️  [STEP2] Permission check: {:?}", step2_start.elapsed());
     
     // 3. 获取user_id
     let user_id = req.user_id.as_ref().unwrap_or(&auth_user.user_id);
-    debug!("Using user_id: {}", user_id);
+    debug!("   Using user_id: {}", user_id);
     
     // 4. 创建LumosAI Agent (使用AgentMem作为记忆后端)
-    // ✅ 使用memory_manager中的memory API（统一接口）
+    let step3_start = std::time::Instant::now();
     let factory = LumosAgentFactory::new(memory_manager.memory.clone());
     let lumos_agent = factory.create_chat_agent(&agent, user_id)
         .await
         .map_err(|e| {
-            error!("Failed to create LumosAI agent: {}", e);
+            error!("   ❌ Failed to create LumosAI agent: {}", e);
             ServerError::internal_error(format!("Failed to create agent: {}", e))
         })?;
+    info!("   ⏱️  [STEP3] Agent creation: {:?}", step3_start.elapsed());
     
-    info!("✅ Created LumosAI agent with integrated Memory Backend");
+    info!("   ✅ LumosAI agent created with memory backend");
     
     // 5. 使用LumosAI的Memory集成API
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
@@ -108,23 +117,40 @@ pub async fn send_chat_message_lumosai(
     let mut all_messages = context_messages;
     all_messages.push(user_message.clone());
     
-    debug!("Calling LumosAI Agent.generate() with {} messages", all_messages.len());
-    
     // 8. 调用generate生成响应
+    let step4_start = std::time::Instant::now();
+    info!("   📤 Calling Agent.generate() with {} messages", all_messages.len());
+    
     let response = lumos_agent.generate(
         &all_messages,
         &AgentGenerateOptions::default()
     )
         .await
         .map_err(|e| {
-            error!("Agent generation failed: {}", e);
+            error!("   ❌ Agent generation failed: {}", e);
             ServerError::internal_error(format!("Agent failed: {}", e))
         })?;
+    
+    let step4_duration = step4_start.elapsed();
+    info!("   ⏱️  [STEP4] Agent.generate(): {:?}", step4_duration);
+    
+    if step4_duration.as_secs() > 30 {
+        warn!("   ⚠️  Generation took > 30s! Check performance");
+    }
     
     // 9. Memory存储由LumosAI的generate()方法自动完成
     // 不需要手动调用store()
     
-    let processing_time_ms = start_time.elapsed().as_millis() as u64;
+    let total_duration = request_start.elapsed();
+    let processing_time_ms = total_duration.as_millis() as u64;
+    
+    info!("✅ [REQUEST-{}] Completed in {:?}", request_id, total_duration);
+    info!("   Response length: {}, Steps: {}", 
+          response.response.len(), response.steps.len());
+    
+    if total_duration.as_secs() > 60 {
+        warn!("   ⚠️  Total time > 60s! Performance issue detected");
+    }
     info!("✅ Chat response generated in {}ms", processing_time_ms);
     
     // 10. 返回响应
@@ -138,7 +164,8 @@ pub async fn send_chat_message_lumosai(
 }
 
 /// Send chat message using LumosAI Agent with streaming (SSE)
-#[cfg(feature = "lumosai")]
+/// TODO: Fix streaming implementation - temporarily disabled
+#[cfg(all(feature = "lumosai", feature = "streaming_disabled"))]
 pub async fn send_chat_message_lumosai_stream(
     Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
@@ -146,7 +173,8 @@ pub async fn send_chat_message_lumosai_stream(
     Path(agent_id): Path<String>,
     Json(req): Json<ChatMessageRequest>,
 ) -> ServerResult<Sse<impl Stream<Item = Result<Event, axum::Error>>>> {
-    use lumosai_core::agent::streaming::{AgentEvent, StreamingAgentExt};
+    // TODO: Fix streaming implementation
+    // use lumosai_core::agent::streaming::{AgentEvent, StreamingAgentExt};
     use lumosai_core::llm::{Message as LumosMessage, Role as LumosRole};
     use lumosai_core::agent::types::AgentGenerateOptions;
     use lumosai_core::agent::Agent;
@@ -261,6 +289,19 @@ pub async fn send_chat_message_lumosai_stream(
     
     // 8. 返回 SSE 响应
     Ok(Sse::new(sse_stream).keep_alive(KeepAlive::default()))
+}
+
+/// Fallback for streaming when not enabled
+#[cfg(any(not(feature = "lumosai"), not(feature = "streaming_disabled")))]
+pub async fn send_chat_message_lumosai_stream(
+    _repositories: Extension<Arc<Repositories>>,
+    _auth_user: Extension<AuthUser>,
+    _agent_id: Path<String>,
+    _req: Json<ChatMessageRequest>,
+) -> ServerResult<Json<ApiResponse<ChatMessageResponse>>> {
+    Err(ServerError::internal_error(
+        "LumosAI integration or streaming not enabled. Compile with --features lumosai,streaming_disabled"
+    ))
 }
 
 /// Fallback when lumosai feature is not enabled
