@@ -14,6 +14,7 @@
 - 2025-01-XX: 完成 Agent Trait 拆分基础实现（P0任务），创建了 CoreAgent、MemoryAgent、ToolAgent、StreamingAgentTrait 和 FullAgent Trait，3个测试用例全部通过
 - 2025-01-XX: 完成性能监控系统完善（P2任务），为 PerformanceMonitor 添加了完整的测试验证，14个测试用例全部通过，并导出到 agent 模块
 - 2025-01-XX: 完成配置验证器完善（P2任务），为 ConfigValidator 添加了完整的测试验证，13个测试用例全部通过，并导出到 agent 模块
+- 2025-01-XX: 完成消息工具完善（P2任务），为 message_utils 添加了更多实用功能和完整的测试验证，9个测试用例全部通过，并导出到 agent 模块
 
 ---
 
@@ -1429,6 +1430,13 @@ let issues = ApiSpecChecker::check_naming_conventions(&methods);
   - ✅ 支持自定义验证规则
   - ✅ 支持必需字段检查
   - ✅ 13 个测试用例全部通过
+- ✅ 消息工具完善 **（已完成）**
+  - ✅ 基础消息创建函数（system_message, user_message, assistant_message, tool_message）
+  - ✅ 带元数据的消息创建（message_with_metadata）
+  - ✅ 带名称的消息创建（message_with_name）
+  - ✅ 消息格式化（format_messages, format_role）
+  - ✅ 消息过滤和统计（filter_messages_by_role, count_messages_by_role, extract_text_content）
+  - ✅ 9 个测试用例全部通过
 
 **性能指标**:
 - ✅ 工具调用并发性能提升 2-5x
