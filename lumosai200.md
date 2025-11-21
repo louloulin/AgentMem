@@ -15,6 +15,7 @@
 - 2025-01-XX: 完成性能监控系统完善（P2任务），为 PerformanceMonitor 添加了完整的测试验证，14个测试用例全部通过，并导出到 agent 模块
 - 2025-01-XX: 完成配置验证器完善（P2任务），为 ConfigValidator 添加了完整的测试验证，13个测试用例全部通过，并导出到 agent 模块
 - 2025-01-XX: 完成消息工具完善（P2任务），为 message_utils 添加了更多实用功能和完整的测试验证，9个测试用例全部通过，并导出到 agent 模块
+- 2025-01-XX: 完成评估指标系统完善（P2任务），为 evaluation 模块添加了复合指标、长度指标、相关性指标及完整测试验证，12 个测试用例全部通过，并导出到 agent 模块
 
 ---
 
@@ -783,12 +784,19 @@ pub struct Thread {
 ```
 
 **实施步骤**:
-1. 设计 Thread 和 Resource 数据结构
-2. 实现 Thread 管理接口
-3. 实现 Message Processor 系统
-4. 实现语义召回功能
-5. 迁移现有 Memory 实现
-6. 更新 Agent 集成
+1. ✅ 设计 Thread 和 Resource 数据结构（`memory/thread.rs` 内 MemoryThread/ThreadStats 等结构已补全）
+2. ✅ 实现 Thread 管理接口（新增 `InMemoryThreadStorage` + `MemoryThreadManager`，支持 CRUD/分页/过滤/统计）
+3. ✅ 实现 Message Processor 系统（MemoryThreadManager 支持 Processor 管线，新增 `add_processor`/`process_messages`）
+4. ⏳ 实现语义召回功能
+5. ⏳ 迁移现有 Memory 实现
+6. ⏳ 更新 Agent 集成
+
+**最新进展（2025-01-XX）**:
+- ✅ 完成线程与资源管理基础设施  
+  - 在 `memory/thread.rs` 新增 `InMemoryThreadStorage`，实现线程 CRUD、消息增删查、搜索与统计  
+  - `MemoryThreadManager` 现已具备资源/Agent 所有权校验，并新增 Processor 管线（支持注册、手动调用、默认套用在 `get_messages`）  
+  - 新增 7 个单元测试（线程 CRUD、消息过滤/统计、Processor 管线等）全部通过  
+- 🔜 下一步：将 Processor 能力与 `UnifiedMemory`/`BasicMemory` 入口打通，继续实现语义召回与统一接口
 
 **时间估算**: 3-4 周
 
@@ -1437,6 +1445,12 @@ let issues = ApiSpecChecker::check_naming_conventions(&methods);
   - ✅ 消息格式化（format_messages, format_role）
   - ✅ 消息过滤和统计（filter_messages_by_role, count_messages_by_role, extract_text_content）
   - ✅ 9 个测试用例全部通过
+- ✅ 评估指标系统完善 **（已完成）**
+  - ✅ RelevanceMetric（相关性指标）
+  - ✅ LengthMetric（长度指标）
+  - ✅ CompositeMetric（复合指标）
+  - ✅ EvaluationResult 序列化/反序列化支持
+  - ✅ 12 个测试用例全部通过
 
 **性能指标**:
 - ✅ 工具调用并发性能提升 2-5x
