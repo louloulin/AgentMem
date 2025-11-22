@@ -21,6 +21,7 @@
 - 2025-11-21: 完成 Memory Processor 管线与 UnifiedMemory 接入（P0任务补充），BasicMemory/UnifiedMemory 自动同步处理器并新增 2 个限制/检索回归测试
 - 2025-11-21: 完成 BasicAgent 重构（P0任务），将 2300+ 行的 BasicAgent 拆分为 4 个模块化组件（AgentCore、AgentExecutor、AgentGenerator、RefactoredAgent），实现多步骤生成、流式生成、工具调用等功能，11 个测试全部通过，并创建完整的使用示例
 - 2025-11-21: 完成错误处理系统集成（P1任务），在 AgentExecutor 和 AgentGenerator 中集成 RetryExecutor，自动包装 LLM 调用和工具调用，支持智能重试和错误恢复，2 个新测试通过，共 12 个 refactored 模块测试全部通过
+- 2025-11-21: 完善 RefactoredAgent API（P0任务补充），修复 `add_tool` 方法实现，添加 `tools()` 方法用于访问工具列表，支持在运行时动态添加工具，1 个新测试通过，共 13 个 refactored 模块测试全部通过
 
 ---
 
@@ -993,6 +994,13 @@ impl AgentGenerator {
      5. 流式生成
    - 在 Cargo.toml 中注册示例
    - 示例文件编译通过，可以直接运行
+
+10. ✅ 完善 RefactoredAgent API（已完成，2025-11-21）
+   - 修复 `add_tool` 方法实现，现在可以正常工作
+   - 将 `add_tool` 从 `&mut self` 改为 `&self`（因为工具存储在 `Arc<Mutex<...>>` 中）
+   - 添加 `tools()` 方法，用于访问工具列表
+   - 支持在运行时动态添加工具
+   - 添加测试验证（1 个新测试通过）
 
 **时间估算**: 2-3 周  
 **实际完成时间**: 1 天（2025-11-21）  
