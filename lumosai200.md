@@ -17,6 +17,8 @@
 - 2025-01-XX: 完成消息工具完善（P2任务），为 message_utils 添加了更多实用功能和完整的测试验证，9个测试用例全部通过，并导出到 agent 模块
 - 2025-01-XX: 完成评估指标系统完善（P2任务），为 evaluation 模块添加了复合指标、长度指标、相关性指标及完整测试验证，12 个测试用例全部通过，并导出到 agent 模块
 - 2025-11-21: 完成 BasicMemory 线程上下文对接与文档更新（P0任务补充），新增 3 个回归测试验证线程创建、消息存储与命名空间检索
+- 2025-11-21: 完成 BasicAgent `generate_with_memory` 线程上下文集成（P0任务补充），自动继承参数/元数据并增强 MemoryConfig
+- 2025-11-21: 完成 Memory Processor 管线与 UnifiedMemory 接入（P0任务补充），BasicMemory/UnifiedMemory 自动同步处理器并新增 2 个限制/检索回归测试
 
 ---
 
@@ -801,7 +803,20 @@ pub struct Thread {
   - `BasicAgent` 在持久化用户/助手消息前自动注入 `thread_id`/`resource_id` 元数据，确保 Memory 层感知线程上下文  
   - `BasicMemory` 现在能够基于元数据重用或自动创建线程，并支持按 `namespace`（thread_id）或 `store_id`（resource）检索历史  
   - 新增 3 个单元测试验证线程消息存储、按资源自动建线程以及命名空间检索，均已通过  
-- 🔜 下一步：将 Processor 能力与 `UnifiedMemory`/`BasicMemory` 入口打通，继续实现语义召回与统一接口
+- ✅ （2025-11-21）`generate_with_memory` 线程上下文增强  
+  - 自动继承调用入参 / 消息元数据中的 thread/resource，统一 MemoryConfig namespace/store_id  
+  - 默认根据 context_window 构建 last_messages，确保检索窗口一致  
+  - 新增 MockMemoryWithThreads 集成测试验证 thread 级持久化链路  
+- ✅ （2025-11-21）Processor 管线接入 `BasicMemory`/`UnifiedMemory`  
+  - BasicMemory 支持延迟注册 Processor，并在设置线程存储后自动同步  
+  - UnifiedMemory `add_processor`/`with_thread_storage` 自动把处理器下沉到基础内存  
+  - 新增 2 个回归测试验证限流 Processor 在 Basic/Unified 场景下生效  
+- ✅ （2025-11-21）语义召回统一接口完善  
+  - `BasicMemory::retrieve` 支持线程历史消息与语义召回结果合并，线程消息在前（按时间顺序），语义结果在后  
+  - `UnifiedMemory::semantic_recall` 新增专用方法，直接调用语义内存 search，避免混入线程历史  
+  - `UnifiedMemory::retrieve` 在 Hybrid 模式下正确合并线程历史与语义召回，保持顺序一致性  
+  - 修复 `GetMessagesParams::reverse_order` 确保 `last_messages` 返回最新消息  
+  - 新增 2 个集成测试验证语义召回与线程历史的混合检索逻辑
 
 **时间估算**: 3-4 周
 
@@ -1460,6 +1475,15 @@ let issues = ApiSpecChecker::check_naming_conventions(&methods);
   - ✅ BasicAgent 自动附加线程/资源元数据
   - ✅ BasicMemory 复用线程 + 支持 `namespace`/`store_id` 检索
   - ✅ 新增 3 个回归测试覆盖存储与检索逻辑
+- ✅ `generate_with_memory` 线程上下文增强 **（已完成，2025-11-21）**
+  - ✅ 自动继承调用入参 / 消息元数据中的 thread/resource
+  - ✅ 自动构建 MemoryConfig 并同步上下文窗口
+  - ✅ 基于 MockMemoryWithThreads 的集成测试验证真实持久化路径
+- ✅ 语义召回统一接口完善 **（已完成，2025-11-21）**
+  - ✅ BasicMemory/UnifiedMemory 支持线程历史与语义召回混合检索，保持顺序一致性
+  - ✅ UnifiedMemory 新增 `semantic_recall` 专用方法，支持纯语义搜索不混入线程历史
+  - ✅ 修复消息顺序问题，确保线程历史消息（最新在前）与语义召回结果正确合并
+  - ✅ 新增 2 个集成测试验证混合检索与纯语义召回场景
 
 **性能指标**:
 - ✅ 工具调用并发性能提升 2-5x
