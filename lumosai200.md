@@ -22,6 +22,11 @@
 - 2025-11-21: 完成 BasicAgent 重构（P0任务），将 2300+ 行的 BasicAgent 拆分为 4 个模块化组件（AgentCore、AgentExecutor、AgentGenerator、RefactoredAgent），实现多步骤生成、流式生成、工具调用等功能，11 个测试全部通过，并创建完整的使用示例
 - 2025-11-21: 完成错误处理系统集成（P1任务），在 AgentExecutor 和 AgentGenerator 中集成 RetryExecutor，自动包装 LLM 调用和工具调用，支持智能重试和错误恢复，2 个新测试通过，共 12 个 refactored 模块测试全部通过
 - 2025-11-21: 完善 RefactoredAgent API（P0任务补充），修复 `add_tool` 方法实现，添加 `tools()` 方法用于访问工具列表，支持在运行时动态添加工具，1 个新测试通过，共 13 个 refactored 模块测试全部通过
+- 2025-11-21: 集成并发工具执行器接口（P1任务），在 AgentExecutor 中添加 ConcurrentToolExecutor 支持，提供并发工具执行的配置接口，1 个新测试通过，共 14 个 refactored 模块测试全部通过（注意：实际并发执行逻辑因类型转换问题待进一步改进）
+- 2025-11-21: 完成动态配置支持文档和示例（P1任务），为动态配置功能添加了完整的使用示例和文档说明，展示如何使用 dynamic_instructions、dynamic_model、dynamic_tools 等功能
+- 2025-11-21: 完成 API 标准化集成（P1任务），在 AgentGenerator 中集成 ApiStandardizer，自动标准化所有生成的响应（空响应处理、标点符号处理），1 个新测试通过，共 15 个 refactored 模块测试全部通过
+- 2025-11-21: 完成 LLM Provider 智能路由集成（P1任务），在 AgentExecutor 和 AgentGenerator 中集成 LlmRouter，支持在每次 LLM 调用时动态选择最佳的 provider（基于负载、成本、延迟），2 个新测试通过，共 17 个 refactored 模块测试全部通过
+- 2025-11-21: 完成 Tool 系统增强集成（P1任务），在 AgentExecutor 中集成 ToolRegistry，支持工具发现（模式匹配）和依赖解析功能，1 个新测试通过，共 18 个 refactored 模块测试全部通过
 
 ---
 
@@ -1002,6 +1007,13 @@ impl AgentGenerator {
    - 支持在运行时动态添加工具
    - 添加测试验证（1 个新测试通过）
 
+**测试覆盖**:
+- AgentCore: 2 个测试 ✅
+- AgentExecutor: 6 个测试 ✅（包括 RetryExecutor、ConcurrentToolExecutor、LlmRouter 和 ToolRegistry 集成测试）
+- AgentGenerator: 7 个测试 ✅（包括 RetryExecutor、API 标准化和 LlmRouter 集成测试）
+- RefactoredAgent: 4 个测试 ✅（包括 add_tool 测试）
+- 总计: 18 个测试全部通过 ✅
+
 **时间估算**: 2-3 周  
 **实际完成时间**: 1 天（2025-11-21）  
 **完成度**: 100% ✅
@@ -1046,7 +1058,7 @@ impl AgentBuilder {
 2. ✅ 更新 AgentBuilder（已完成，支持 dynamic_instructions, dynamic_model, dynamic_tools）
 3. ✅ 实现运行时解析（已完成，resolve_dynamic_config 方法）
 4. ✅ 添加测试验证（已完成，test_agent_builder_dynamic_config 测试通过）
-5. ⏳ 更新文档和示例（进行中）
+5. ✅ 更新文档和示例（已完成，2025-11-21）
 
 **实际完成情况**:
 - ✅ DynamicArgument 类型已在 `dynamic_config.rs` 中实现
@@ -1057,6 +1069,7 @@ impl AgentBuilder {
   - `with_runtime_context()` - 运行时上下文设置
 - ✅ `build_async()` 方法已实现动态配置解析
 - ✅ 测试用例已添加并通过验证
+- ✅ 文档和示例已更新（2025-11-21）
 
 **时间估算**: 1-2 周  
 **实际耗时**: 已完成（基础实现已存在，本次完善了测试和集成）
@@ -1185,6 +1198,11 @@ impl ToolRegistry {
 4. ✅ 添加工具版本管理（已完成，get_tool_version、check_version_compatibility）
 5. ✅ 添加依赖图功能（已完成，get_dependency_graph）
 6. ✅ 添加测试验证（已完成，6 个测试用例全部通过）
+7. ✅ 更新 Agent 集成（已完成，2025-11-21）
+   - 在 AgentExecutor 中添加了 `tool_registry` 字段
+   - 添加了 `with_tool_registry()` 和 `tool_registry()` 方法
+   - 添加了 `discover_tools()` 和 `resolve_tool_dependencies()` 方法
+   - 添加了测试验证（1 个新测试通过）
 
 **实际完成情况**:
 - ✅ ToolRegistry 已存在并完善：
@@ -1202,6 +1220,11 @@ impl ToolRegistry {
   - `check_version_compatibility()` - 检查版本兼容性
   - `get_dependency_graph()` - 获取依赖关系图
 - ✅ 所有测试用例通过验证
+- ✅ 在 RefactoredAgent 中集成了 ToolRegistry（2025-11-21）
+  - AgentExecutor 支持可选的 ToolRegistry
+  - 提供 `discover_tools()` 方法用于模式匹配发现工具
+  - 提供 `resolve_tool_dependencies()` 方法用于解析工具依赖
+  - 添加了测试验证（1 个新测试通过，共 18 个 refactored 模块测试全部通过）
 
 **使用示例**:
 ```rust
@@ -1277,7 +1300,11 @@ impl ConcurrentToolExecutor {
 3. ✅ 实现保持顺序和乱序两种模式（已完成）
 4. ✅ 添加超时控制（已完成）
 5. ✅ 添加测试验证（已完成，4 个测试用例全部通过）
-6. ⏳ 更新 Agent 集成（待完成，可选）
+6. ✅ 更新 Agent 集成（已完成，2025-11-21）
+   - 在 AgentExecutor 中添加了 ConcurrentToolExecutor 支持
+   - 添加了 `with_concurrent_tool_executor()` 和 `concurrent_tool_executor()` 方法
+   - 添加了测试验证（1 个新测试通过）
+   - 注意：由于类型转换问题（Box<dyn Tool> vs Arc<dyn Tool>），实际并发执行逻辑暂时未完全实现，但接口已就绪
 
 **实际完成情况**:
 - ✅ 创建了 `concurrent_tool_executor.rs` 模块
@@ -1294,6 +1321,11 @@ impl ConcurrentToolExecutor {
 - ✅ 支持超时控制
 - ✅ 所有测试用例通过验证
 - ✅ 已导出到 `agent` 模块，可供使用
+- ✅ 在 AgentExecutor 中集成了 ConcurrentToolExecutor 接口（2025-11-21）
+  - 添加了 `with_concurrent_tool_executor()` 方法用于设置并发执行器
+  - 添加了 `concurrent_tool_executor()` 方法用于获取并发执行器
+  - 添加了测试验证（1 个新测试通过，共 14 个 refactored 模块测试全部通过）
+  - 注意：由于 AgentExecutor 使用 `Box<dyn Tool>` 而 ConcurrentToolExecutor 需要 `Arc<dyn Tool>`，实际并发执行逻辑需要进一步改进
 
 **使用示例**:
 ```rust
@@ -1355,7 +1387,11 @@ impl LlmRouter {
 2. ✅ 实现统计收集（已完成，ProviderStats）
 3. ✅ 实现路由器（已完成，LlmRouter）
 4. ✅ 添加测试验证（已完成，5 个测试用例全部通过）
-5. ⏳ 更新 Agent 集成（待完成，可选）
+5. ✅ 更新 Agent 集成（已完成，2025-11-21）
+   - 在 AgentExecutor 中添加了 `llm_router` 字段
+   - 添加了 `with_llm_router()` 和 `llm_router()` 方法
+   - 在 AgentGenerator 中集成 LlmRouter，在每次 LLM 调用时动态选择 provider
+   - 添加了测试验证（2 个新测试通过）
 
 **实际完成情况**:
 - ✅ 创建了 `router.rs` 模块
@@ -1380,6 +1416,11 @@ impl LlmRouter {
 - ✅ 支持成本估算（根据 provider 类型自动估算）
 - ✅ 所有测试用例通过验证
 - ✅ 已导出到 `llm` 模块，可供使用
+- ✅ 在 RefactoredAgent 中集成了 LlmRouter（2025-11-21）
+  - AgentExecutor 支持可选的 LlmRouter
+  - AgentGenerator 在每次 LLM 调用时使用 router 动态选择 provider（如果配置了 router）
+  - 如果没有配置 router，则使用固定的 provider（向后兼容）
+  - 添加了测试验证（2 个新测试通过，共 17 个 refactored 模块测试全部通过）
 
 **使用示例**:
 ```rust
@@ -1430,7 +1471,12 @@ router.record_success(provider.name(), latency).await;
 2. ✅ 实现 API 标准化工具（已完成，ApiStandardizer）
 3. ✅ 实现 API 规范检查器（已完成，ApiSpecChecker）
 4. ✅ 添加测试验证（已完成，5 个测试用例全部通过）
-5. ⏳ 重构 Agent API（部分完成，已有基础）
+5. ✅ 重构 Agent API（已完成，2025-11-21）
+   - 在 AgentGenerator 中集成了 ApiStandardizer
+   - 所有生成的响应都经过标准化处理
+   - 空响应会被替换为友好的默认消息
+   - 响应会自动添加适当的标点符号
+   - 添加了测试验证（1 个新测试通过）
 6. ⏳ 重构 Memory/Tool/Workflow API（待完成）
 
 **实际完成情况**:
@@ -1449,6 +1495,11 @@ router.record_success(provider.name(), latency).await;
   - `check_parameter_consistency()` - 检查参数一致性
 - ✅ 所有测试用例通过验证
 - ✅ 已导出到 `agent` 模块，可供使用
+- ✅ 在 AgentGenerator 中集成了 API 标准化（2025-11-21）
+  - 所有生成的响应都通过 `ApiStandardizer::standardize_response` 标准化
+  - 确保响应格式一致：空响应替换、标点符号处理
+  - 在 `generate()` 方法的所有返回路径中应用标准化
+  - 添加了测试验证（1 个新测试通过，共 15 个 refactored 模块测试全部通过）
 
 **使用示例**:
 ```rust
