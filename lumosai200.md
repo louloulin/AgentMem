@@ -19,6 +19,8 @@
 - 2025-11-21: 完成 BasicMemory 线程上下文对接与文档更新（P0任务补充），新增 3 个回归测试验证线程创建、消息存储与命名空间检索
 - 2025-11-21: 完成 BasicAgent `generate_with_memory` 线程上下文集成（P0任务补充），自动继承参数/元数据并增强 MemoryConfig
 - 2025-11-21: 完成 Memory Processor 管线与 UnifiedMemory 接入（P0任务补充），BasicMemory/UnifiedMemory 自动同步处理器并新增 2 个限制/检索回归测试
+- 2025-11-21: 完成 BasicAgent 重构（P0任务），将 2300+ 行的 BasicAgent 拆分为 4 个模块化组件（AgentCore、AgentExecutor、AgentGenerator、RefactoredAgent），实现多步骤生成、流式生成、工具调用等功能，11 个测试全部通过，并创建完整的使用示例
+- 2025-11-21: 完成错误处理系统集成（P1任务），在 AgentExecutor 和 AgentGenerator 中集成 RetryExecutor，自动包装 LLM 调用和工具调用，支持智能重试和错误恢复，2 个新测试通过，共 12 个 refactored 模块测试全部通过
 
 ---
 
@@ -981,6 +983,16 @@ impl AgentGenerator {
 8. ✅ 导出重构模块（已完成，2025-11-21）
    - 在 `agent` 模块中导出 `RefactoredAgent`、`AgentCore`、`AgentExecutor`、`AgentGenerator`
    - 方便用户直接使用重构后的模块
+9. ✅ 创建使用示例（已完成，2025-11-21）
+   - 创建 `refactored_agent_demo.rs` 示例文件
+   - 包含 5 个完整的使用示例：
+     1. 简单使用 RefactoredAgent
+     2. 使用模块化组件
+     3. 使用内存
+     4. 使用工具
+     5. 流式生成
+   - 在 Cargo.toml 中注册示例
+   - 示例文件编译通过，可以直接运行
 
 **时间估算**: 2-3 周  
 **实际完成时间**: 1 天（2025-11-21）  
@@ -1086,7 +1098,7 @@ pub trait ErrorRecovery {
 3. ✅ 实现错误恢复机制（已完成，ErrorRecovery trait、DefaultErrorRecovery）
 4. ✅ 实现 RetryExecutor（已完成，支持自动重试）
 5. ✅ 添加测试验证（已完成，6 个测试用例全部通过）
-6. ⏳ 在 AgentExecutor 中集成（待完成，可选）
+6. ✅ 在 AgentExecutor 中集成（已完成，2025-11-21）
 
 **实际完成情况**:
 - ✅ 创建了 `error_handling.rs` 模块
@@ -1097,6 +1109,9 @@ pub trait ErrorRecovery {
 - ✅ 实现了 `ErrorContext` 错误上下文追踪
 - ✅ 所有测试用例通过验证
 - ✅ 已导出到 `agent` 模块，可供使用
+- ✅ 在 `AgentExecutor` 中添加了可选的 `RetryExecutor` 支持（`with_retry_executor` 方法）
+- ✅ 在 `AgentGenerator` 中集成了 `RetryExecutor`，自动包装 LLM 调用和工具调用
+- ✅ 添加了集成测试验证（2 个新测试，共 12 个 refactored 模块测试全部通过）
 
 **使用示例**:
 ```rust
