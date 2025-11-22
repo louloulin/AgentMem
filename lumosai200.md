@@ -952,9 +952,20 @@ impl AgentGenerator {
    - 提供 `tools()`, `add_tool()`, `memory()`, `with_memory()` 等方法
    - 支持工作内存和基础内存的初始化
    - 添加 2 个单元测试，全部通过
-4. ⏳ 实现 AgentGenerator（进行中）
-5. ⏳ 迁移现有逻辑
-6. ⏳ 更新测试
+4. ✅ 实现 AgentGenerator（已完成，2025-11-21）
+   - 实现 `AgentGenerator` 结构体，协调 AgentCore 和 AgentExecutor
+   - 实现 `generate()` 方法，包含 5 个步骤：
+     1. 准备消息（从内存检索历史消息）
+     2. 准备工具（从执行器获取可用工具）
+     3. 调用 LLM（支持函数调用模式和普通模式）
+     4. 处理工具调用（完整实现，支持工具执行和结果处理）
+     5. 更新内存（将消息存储到内存）
+   - 提供 `prepare_messages()`, `prepare_tools()`, `call_llm()`, `call_llm_with_functions()`, `handle_tool_calls()`, `execute_tool_call()`, `update_memory()` 等辅助方法
+   - 支持函数调用模式：自动检测 LLM 是否支持函数调用，如果支持则使用函数调用模式
+   - 工具调用处理：完整实现工具调用执行、结果收集和错误处理
+   - 添加 3 个单元测试，全部通过（包括工具调用测试）
+5. ⏳ 迁移现有逻辑（待完成）
+6. ⏳ 更新测试（部分完成，基础测试已通过）
 
 **时间估算**: 2-3 周
 
