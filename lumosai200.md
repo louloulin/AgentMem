@@ -954,18 +954,22 @@ impl AgentGenerator {
    - 添加 2 个单元测试，全部通过
 4. ✅ 实现 AgentGenerator（已完成，2025-11-21）
    - 实现 `AgentGenerator` 结构体，协调 AgentCore 和 AgentExecutor
-   - 实现 `generate()` 方法，包含 5 个步骤：
+   - 实现 `generate()` 方法，支持多步骤生成循环：
      1. 准备消息（从内存检索历史消息）
      2. 准备工具（从执行器获取可用工具）
-     3. 调用 LLM（支持函数调用模式和普通模式）
-     4. 处理工具调用（完整实现，支持工具执行和结果处理）
-     5. 更新内存（将消息存储到内存）
-   - 提供 `prepare_messages()`, `prepare_tools()`, `call_llm()`, `call_llm_with_functions()`, `handle_tool_calls()`, `execute_tool_call()`, `update_memory()` 等辅助方法
+     3. 多步骤生成循环（支持 `max_steps` 参数，默认 5 步）：
+        - 调用 LLM（支持函数调用模式和普通模式）
+        - 处理工具调用（如果存在）
+        - 将工具结果添加到消息中，继续下一轮
+        - 如果没有工具调用，返回最终响应
+     4. 更新内存（将消息存储到内存）
+   - 提供 `prepare_messages()`, `prepare_tools()`, `call_llm()`, `call_llm_with_functions()`, `execute_tool_calls()`, `execute_tool_call()`, `update_memory()` 等辅助方法
    - 支持函数调用模式：自动检测 LLM 是否支持函数调用，如果支持则使用函数调用模式
    - 工具调用处理：完整实现工具调用执行、结果收集和错误处理
+   - 多步骤生成：支持多轮工具调用，直到完成或达到最大步数
    - 添加 3 个单元测试，全部通过（包括工具调用测试）
-5. ⏳ 迁移现有逻辑（待完成）
-6. ⏳ 更新测试（部分完成，基础测试已通过）
+5. ⏳ 迁移现有逻辑（部分完成，多步骤生成已实现）
+6. ✅ 更新测试（基础测试已通过，3个测试全部通过）
 
 **时间估算**: 2-3 周
 
