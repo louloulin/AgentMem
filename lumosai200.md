@@ -788,11 +788,30 @@ pub struct Thread {
 
 **实施步骤**:
 1. ✅ 设计 Thread 和 Resource 数据结构（`memory/thread.rs` 内 MemoryThread/ThreadStats 等结构已补全）
-2. ✅ 实现 Thread 管理接口（新增 `InMemoryThreadStorage` + `MemoryThreadManager`，支持 CRUD/分页/过滤/统计）
-3. ✅ 实现 Message Processor 系统（MemoryThreadManager 支持 Processor 管线，新增 `add_processor`/`process_messages`）
-4. ⏳ 实现语义召回功能
-5. ⏳ 迁移现有 Memory 实现
-6. ⏳ 更新 Agent 集成
+2. ✅ 实现 Thread 管理接口（已完成，2025-11-21）
+   - 新增 `InMemoryThreadStorage` + `MemoryThreadManager`，支持 CRUD/分页/过滤/统计
+   - Memory trait 新增 `get_threads_by_resource` 方法，支持资源隔离
+   - BasicMemory 和 UnifiedMemory 实现此方法
+   - 新增 1 个测试用例验证资源隔离功能
+3. ✅ 实现 Message Processor 系统（已完成，2025-11-21）
+   - MemoryThreadManager 支持 Processor 管线，新增 `add_processor`/`process_messages`
+   - Memory trait 新增 `add_processor` 和 `process_messages` 方法，提供默认实现
+   - BasicMemory 和 UnifiedMemory 实现这些方法，支持通过 trait 对象调用
+   - 新增 1 个测试用例验证通过 Memory trait 调用 Processor 方法的功能
+4. ✅ 实现语义召回功能（已完成，2025-11-21）
+   - Memory trait 新增 `semantic_recall` 方法，提供默认实现
+   - BasicMemory 和 UnifiedMemory 实现此方法，支持语义搜索
+   - 新增 1 个测试用例验证通过 Memory trait 调用语义召回功能
+5. ✅ 迁移现有 Memory 实现（已完成，2025-11-21）
+   - BasicMemory 和 UnifiedMemory 新增便捷的 Thread 管理方法（create_thread, get_thread, update_thread, delete_thread, list_threads, get_thread_stats）
+   - 支持通过 Memory 实例直接管理线程，无需先获取 thread_storage
+   - 新增 4 个测试用例验证 Thread 管理功能
+6. ✅ 更新 Agent 集成（已完成，2025-11-21）
+   - Memory trait 新增 Thread 管理方法，提供默认实现（返回错误）
+   - BasicMemory 和 UnifiedMemory 覆盖这些方法，提供真实实现
+   - 新增 ThreadManagementAgent trait，为 Agent 提供 Thread 管理便捷方法（可选扩展）
+   - 用户可通过 `agent.get_memory()?.create_thread(...)` 使用 Thread 管理功能
+   - 新增 1 个集成测试验证 Agent 通过 Memory 管理线程的功能
 
 **最新进展（2025-01-XX）**:
 - ✅ 完成线程与资源管理基础设施  
@@ -817,6 +836,55 @@ pub struct Thread {
   - `UnifiedMemory::retrieve` 在 Hybrid 模式下正确合并线程历史与语义召回，保持顺序一致性  
   - 修复 `GetMessagesParams::reverse_order` 确保 `last_messages` 返回最新消息  
   - 新增 2 个集成测试验证语义召回与线程历史的混合检索逻辑
+- ✅ （2025-11-21）Memory Thread 管理便捷方法  
+  - `BasicMemory` 新增 Thread 管理方法：`create_thread`, `get_thread`, `update_thread`, `delete_thread`, `list_threads`, `get_thread_stats`  
+  - `UnifiedMemory` 新增相同的 Thread 管理方法，提供统一的接口  
+  - 支持通过 Memory 实例直接管理线程，无需先获取 `thread_storage` 或创建 `MemoryThreadManager`  
+  - 新增 4 个测试用例验证 Thread 管理功能（BasicMemory 和 UnifiedMemory 各 2 个）
+- ✅ （2025-11-21）Agent Thread 管理集成  
+  - Memory trait 新增 Thread 管理方法，提供默认实现（返回错误）  
+  - BasicMemory 和 UnifiedMemory 覆盖这些方法，提供真实实现  
+  - 新增 ThreadManagementAgent trait，为 Agent 提供 Thread 管理便捷方法（可选扩展）  
+  - 用户可通过 `agent.get_memory()?.create_thread(...)` 使用 Thread 管理功能  
+  - 新增 1 个集成测试验证 Agent 通过 Memory 管理线程的功能
+- ✅ （2025-11-21）UnifiedMemory Memory Trait 实现完善  
+  - UnifiedMemory 的 `impl MemoryTrait for Memory` 新增 Thread 管理方法实现  
+  - 覆盖 Memory trait 的默认实现，支持通过 trait 对象调用 Thread 管理方法  
+  - 新增 1 个测试用例验证通过 Memory trait 调用 Thread 管理方法的功能
+- ✅ （2025-11-21）Memory Trait 语义召回方法完善  
+  - Memory trait 新增 `semantic_recall` 方法，提供默认实现（返回错误）  
+  - BasicMemory 和 UnifiedMemory 覆盖此方法，提供真实实现  
+  - BasicMemory 的 `semantic_recall` 直接调用语义内存的 `search` 方法  
+  - UnifiedMemory 的 `semantic_recall` 支持 Semantic 和 Hybrid 类型  
+  - 统一公共方法和 trait 方法实现，避免代码重复  
+  - 新增 1 个测试用例验证通过 Memory trait 调用 `semantic_recall` 方法的功能
+- ✅ （2025-11-21）MemoryAgent Trait generate_with_memory 默认实现完善  
+  - 完善 `MemoryAgent::generate_with_memory` 的默认实现，实现从内存检索历史消息的逻辑  
+  - 自动构建 MemoryConfig，支持 thread_id 作为 namespace  
+  - 自动提取用户最后一条消息作为语义搜索 query  
+  - 自动设置检索数量（使用 context_window 或默认值 10）  
+  - 将检索到的历史消息添加到输入消息前面，然后调用 generate 方法  
+  - 新增 1 个测试用例验证 MemoryAgent trait 默认实现的正确性
+- ✅ （2025-11-21）Memory Trait Processor 方法完善  
+  - Memory trait 新增 `add_processor` 方法，提供默认实现（不做任何操作）  
+  - Memory trait 新增 `process_messages` 方法，提供默认实现（直接返回输入消息）  
+  - BasicMemory 和 UnifiedMemory 覆盖这些方法，提供真实实现  
+  - BasicMemory 的 `add_processor` 将处理器添加到内部列表并同步到 thread_manager  
+  - BasicMemory 的 `process_messages` 使用 thread_manager 的 process_messages 方法  
+  - UnifiedMemory 的 `add_processor` 和 `process_messages` 委托给内部 BasicMemory 实现  
+  - 新增 1 个测试用例验证通过 Memory trait 调用 Processor 方法的功能
+- ✅ （2025-11-21）Memory Trait Resource 隔离方法完善  
+  - Memory trait 新增 `get_threads_by_resource` 方法，提供默认实现（委托给 `list_threads`）  
+  - 这是 `list_threads` 的便捷别名，提供与计划中接口名称的一致性  
+  - BasicMemory 和 UnifiedMemory 覆盖此方法，提供真实实现  
+  - 支持通过 resource_id 获取该资源的所有线程，实现资源隔离  
+  - 新增 1 个测试用例验证 `get_threads_by_resource` 方法的正确性
+- ✅ （2025-11-21）UnifiedMemory 代码重构优化  
+  - 提取重复的 `MemoryThreadManager` 创建逻辑为辅助方法 `get_thread_manager()`  
+  - 减少代码重复，统一错误处理逻辑  
+  - 所有 thread 管理方法（create_thread, get_thread, update_thread, delete_thread, list_threads, get_thread_stats）都使用统一的辅助方法  
+  - 提高代码可维护性和一致性  
+  - 所有相关测试通过（8个测试通过，包括 thread 管理相关测试）
 
 **时间估算**: 3-4 周
 
@@ -872,12 +940,21 @@ impl AgentGenerator {
 ```
 
 **实施步骤**:
-1. 设计新的模块结构
-2. 实现 AgentCore
-3. 实现 AgentExecutor
-4. 实现 AgentGenerator
-5. 迁移现有逻辑
-6. 更新测试
+1. ✅ 设计新的模块结构（已完成，2025-11-21）
+   - 创建 `agent/refactored/` 模块
+   - 定义模块结构和文档
+2. ✅ 实现 AgentCore（已完成，2025-11-21）
+   - 实现 `AgentCore` 结构体，管理核心配置和 LLM 提供者
+   - 提供 `name()`, `instructions()`, `llm()`, `config()` 等方法
+   - 添加 2 个单元测试，全部通过
+3. ✅ 实现 AgentExecutor（已完成，2025-11-21）
+   - 实现 `AgentExecutor` 结构体，管理工具和内存
+   - 提供 `tools()`, `add_tool()`, `memory()`, `with_memory()` 等方法
+   - 支持工作内存和基础内存的初始化
+   - 添加 2 个单元测试，全部通过
+4. ⏳ 实现 AgentGenerator（进行中）
+5. ⏳ 迁移现有逻辑
+6. ⏳ 更新测试
 
 **时间估算**: 2-3 周
 
@@ -1484,6 +1561,10 @@ let issues = ApiSpecChecker::check_naming_conventions(&methods);
   - ✅ UnifiedMemory 新增 `semantic_recall` 专用方法，支持纯语义搜索不混入线程历史
   - ✅ 修复消息顺序问题，确保线程历史消息（最新在前）与语义召回结果正确合并
   - ✅ 新增 2 个集成测试验证混合检索与纯语义召回场景
+- ✅ Memory Thread 管理便捷方法 **（已完成，2025-11-21）**
+  - ✅ BasicMemory 和 UnifiedMemory 新增 Thread 管理便捷方法（create_thread, get_thread, update_thread, delete_thread, list_threads, get_thread_stats）
+  - ✅ 支持通过 Memory 实例直接管理线程，简化使用流程
+  - ✅ 新增 4 个测试用例验证 Thread 管理功能
 
 **性能指标**:
 - ✅ 工具调用并发性能提升 2-5x
