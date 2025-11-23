@@ -712,11 +712,16 @@ pub trait StreamingAgent: Agent {
    - BasicAgent 已重构为模块化架构
    - 新的 BasicAgent 实现了所有必要的 Trait
    - 旧的单体实现已完全移除
-5. ⏳ 更新所有使用 Agent 的代码（进行中，部分完成）
+5. ✅ 更新所有使用 Agent 的代码（已完成，2025-11-21）
    - BasicAgent 已实现完整的 Agent trait
-   - 大部分代码已更新以使用新的 BasicAgent
-   - 部分其他模块的测试可能需要进一步更新
+   - 所有核心模块已更新以使用新的 BasicAgent
+   - streaming.rs、websocket_demo.rs、builder.rs 等已更新
+   - structured_output.rs、rag_integration.rs 等已更新
+   - 所有测试文件已更新
 6. ⏳ 废弃旧的 Agent Trait 方法（待完成，可选）
+   - 新的 BasicAgent 已实现所有 Agent trait 方法
+   - 旧的实现已完全移除
+   - 可以逐步废弃一些不常用的方法（如果需要）
 
 **实际完成情况**:
 - ✅ 创建了 `traits.rs` 模块
@@ -1041,7 +1046,7 @@ impl AgentGenerator {
      - 修复 `execute_tool_call` 方法中的 `MutexGuard` 跨 await 问题（使用同步块确保在 await 之前释放）
      - 修复 `get_tools_with_context` 方法中的生命周期问题
    - 添加测试验证（1 个新测试通过，共 22 个 refactored 模块测试全部通过）
-   - `RefactoredAgent` 现在完全实现了 `Agent` trait，可以与 `BasicAgent` 互换使用
+   - `BasicAgent` 现在完全实现了 `Agent` trait，可以与旧的 `BasicAgent` API 互换使用
 
 14. ✅ BasicAgent 重构完成 - 删除旧实现并重命名（已完成，2025-11-21）
    - 将 `RefactoredAgent` 重命名为 `BasicAgent`
