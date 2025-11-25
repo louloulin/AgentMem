@@ -24,10 +24,9 @@ pub use load_balancer::{LoadBalancer, LoadBalancerConfig, LoadBalancingStrategy}
 pub use replication::{ReplicationConfig, ReplicationManager, ReplicationStrategy};
 pub use sharding::{ShardConfig, ShardKey, ShardManager, ShardStrategy};
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;

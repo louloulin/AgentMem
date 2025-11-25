@@ -12,11 +12,10 @@ use agent_mem_intelligence::{
     decision_engine::{ExistingMemory, MemoryDecisionEngine},
     fact_extraction::{ExtractedFact, FactCategory, FactExtractor},
     importance_evaluator::{ImportanceEvaluator, ImportanceEvaluatorConfig},
-    intelligent_processor::IntelligentMemoryProcessor,
 };
-use agent_mem_llm::factory::{LLMFactory, RealLLMFactory};
+use agent_mem_llm::factory::LLMFactory;
 use agent_mem_traits::{
-    LLMConfig, MemoryItem, MemoryType, MemoryV4, Message, MessageRole, ProcessingResult, Session,
+    LLMConfig, MemoryItem, MemoryType, MemoryV4, Message, MessageRole, Session,
 };
 use anyhow::Result;
 use chrono::Utc;

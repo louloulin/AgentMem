@@ -6,9 +6,8 @@
 //! 3. 智能推荐
 //! 4. 多轮对话
 
-use agent_mem::{Memory, MemoryBuilder};
+use agent_mem::MemoryBuilder;
 use anyhow::Result;
-use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -106,7 +105,7 @@ async fn main() -> Result<()> {
 
     // 基于历史记忆进行智能推荐
     println!("🔍 分析用户兴趣...");
-    let interests = memory.search("性能 功能").await?;
+    let _interests = memory.search("性能 功能").await?;
 
     println!("✅ 用户画像分析：");
     println!("   • 关注产品性能");

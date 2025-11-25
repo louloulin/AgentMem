@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 /// Shard configuration
@@ -501,7 +501,7 @@ mod tests {
         let node_id = Uuid::new_v4();
         manager.add_node(node_id, 100).await.unwrap();
 
-        let node_shards = manager.get_node_shards(node_id).await.unwrap();
+        let _node_shards = manager.get_node_shards(node_id).await.unwrap();
         // After rebalancing, node should have some shards assigned
         // (exact count depends on consistent hashing implementation)
     }

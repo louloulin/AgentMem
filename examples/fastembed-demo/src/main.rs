@@ -3,7 +3,6 @@
 //! 展示如何使用 FastEmbed 进行本地嵌入生成
 
 use agent_mem_embeddings::EmbeddingFactory;
-use agent_mem_traits::Embedder; // For trait methods
 use anyhow::Result;
 use tracing::{info, Level};
 

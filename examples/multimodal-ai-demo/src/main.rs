@@ -242,7 +242,7 @@ async fn demo_video_analyzer() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ 创建视频分析器配置");
 
     // 创建分析器
-    let analyzer = VideoAnalyzer::new(config)?;
+    let _analyzer = VideoAnalyzer::new(config)?;
     println!("✓ 创建视频分析器");
 
     // 创建测试视频分析请求

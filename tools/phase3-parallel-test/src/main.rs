@@ -1,6 +1,6 @@
 use agent_mem::orchestrator::{MemoryOrchestrator, OrchestratorConfig};
 use std::time::Instant;
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber;
 
 #[tokio::main]

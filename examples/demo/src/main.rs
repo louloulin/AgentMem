@@ -101,7 +101,7 @@ use agent_mem_storage::{
     vector::{SimilarityCalculator, SimilarityMetric, VectorUtils},
     VectorStoreFactory,
 };
-use agent_mem_traits::{LLMConfig, MemoryProvider, Message, Session, VectorStoreConfig};
+use agent_mem_traits::{LLMConfig, Message, Session, VectorStoreConfig};
 use agent_mem_utils::{clean_text, compute_content_hash, extract_json, Timer};
 
 #[tokio::main]

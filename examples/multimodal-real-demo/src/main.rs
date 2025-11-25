@@ -5,10 +5,9 @@
 use agent_mem_intelligence::multimodal::{
     real_audio::{RealAudioProcessor, RealAudioProcessorConfig},
     real_image::{RealImageProcessor, RealImageProcessorConfig},
-    ContentType, MultimodalContent, MultimodalProcessor, ProcessingStatus,
+    ContentType, MultimodalContent, MultimodalProcessor,
 };
-use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -7,8 +7,7 @@
 //! 4. AI模型配置（OpenAI、Google、Azure、Local）
 
 use agent_mem_intelligence::multimodal::{
-    AIModelConfig, AIModelProvider, AudioProcessor, ContentType, DetailLevel, ImageProcessor,
-    MultimodalContent, VideoProcessor,
+    AIModelConfig, AudioProcessor, ContentType, ImageProcessor, MultimodalContent, VideoProcessor,
 };
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
@@ -76,7 +75,7 @@ fn demo_ai_model_config() {
     println!("       - Region: {}", azure_config.region.as_ref().unwrap());
 
     // 本地配置
-    let local_config = AIModelConfig::local();
+    let _local_config = AIModelConfig::local();
     println!("    ✅ Local: 本地模型（零成本）");
     println!("       - 无需API key，完全本地运行");
 }
@@ -84,7 +83,7 @@ fn demo_ai_model_config() {
 /// 演示图像处理
 async fn demo_image_processing() -> Result<()> {
     // 创建图像处理器
-    let processor = ImageProcessor::new()
+    let _processor = ImageProcessor::new()
         .with_ocr(true)
         .with_object_detection(true)
         .with_scene_analysis(true);
@@ -95,7 +94,7 @@ async fn demo_image_processing() -> Result<()> {
     println!("    ✅ 场景分析: 启用");
 
     // 模拟图像内容
-    let image_content = create_sample_image_content();
+    let _image_content = create_sample_image_content();
 
     println!("\n  📸 处理示例图像：");
     println!("    - 文件名: screenshot_dashboard.png");
@@ -124,7 +123,7 @@ async fn demo_image_processing() -> Result<()> {
 /// 演示音频处理
 async fn demo_audio_processing() -> Result<()> {
     // 创建音频处理器
-    let processor = AudioProcessor::new()
+    let _processor = AudioProcessor::new()
         .with_speech_to_text(true)
         .with_audio_analysis(true);
 
@@ -133,7 +132,7 @@ async fn demo_audio_processing() -> Result<()> {
     println!("    ✅ 音频分析: 启用");
 
     // 模拟音频内容
-    let audio_content = create_sample_audio_content();
+    let _audio_content = create_sample_audio_content();
 
     println!("\n  🎤 处理示例音频：");
     println!("    - 文件名: meeting_recording.mp3");
@@ -165,7 +164,7 @@ async fn demo_audio_processing() -> Result<()> {
 /// 演示视频处理
 async fn demo_video_processing() -> Result<()> {
     // 创建视频处理器
-    let processor = VideoProcessor::new()
+    let _processor = VideoProcessor::new()
         .with_keyframe_extraction(true)
         .with_audio_extraction(true)
         .with_scene_detection(true);
@@ -176,7 +175,7 @@ async fn demo_video_processing() -> Result<()> {
     println!("    ✅ 场景检测: 启用");
 
     // 模拟视频内容
-    let video_content = create_sample_video_content();
+    let _video_content = create_sample_video_content();
 
     println!("\n  📹 处理示例视频：");
     println!("    - 文件名: product_demo.mp4");

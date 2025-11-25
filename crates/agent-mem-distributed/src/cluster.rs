@@ -10,8 +10,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
-use tracing::{debug, error, info, warn};
+use tokio::time::interval;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Cluster configuration
@@ -232,7 +232,7 @@ impl ClusterManager {
 
     /// Start node discovery
     async fn start_node_discovery(&self) {
-        let nodes = Arc::clone(&self.nodes);
+        let _nodes = Arc::clone(&self.nodes);
         let is_running = Arc::clone(&self.is_running);
         let config = self.config.clone();
 
@@ -268,7 +268,7 @@ impl ClusterManager {
     pub async fn remove_node(&self, node_id: Uuid) -> Result<()> {
         let mut nodes = self.nodes.write().await;
 
-        if let Some(mut node) = nodes.get_mut(&node_id) {
+        if let Some(node) = nodes.get_mut(&node_id) {
             node.status = NodeStatus::Leaving;
             info!("Marked node {} as leaving", node_id);
         }

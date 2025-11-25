@@ -3,9 +3,9 @@
 //! 展示如何使用增强的混合检索系统
 
 use agent_mem_core::search::{
-    EnhancedHybridConfig, EnhancedHybridSearchEngineV2, QueryClassifier, SearchResult,
+    EnhancedHybridConfig, EnhancedHybridSearchEngineV2, SearchResult,
 };
-use agent_mem_storage::backends::{FTS5SearchResult, LibSQLFTS5Store};
+use agent_mem_storage::backends::LibSQLFTS5Store;
 use agent_mem_traits::Result;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -64,7 +64,7 @@ impl agent_mem_core::search::enhanced_hybrid_v2::VectorSearcher for MockVectorSe
     async fn search(
         &self,
         query: &str,
-        limit: usize,
+        _limit: usize,
         _threshold: f32,
     ) -> Result<Vec<SearchResult>> {
         // 这里应该实际调用LanceDB
@@ -137,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn insert_test_data(store: &LibSQLFTS5Store) -> anyhow::Result<()> {
+async fn insert_test_data(_store: &LibSQLFTS5Store) -> anyhow::Result<()> {
     // 这里应该调用store的insert方法
     // 由于我们使用的是内存数据库，这里只是演示
     info!("  ℹ️  Note: Using in-memory database for demo");

@@ -1,6 +1,6 @@
 //! Data replication for distributed AgentMem
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -50,7 +50,7 @@ impl ReplicationManager {
         Ok(())
     }
 
-    pub async fn replicate_data(&self, key: &str, data: &[u8], nodes: &[Uuid]) -> Result<()> {
+    pub async fn replicate_data(&self, key: &str, _data: &[u8], nodes: &[Uuid]) -> Result<()> {
         // Simplified replication logic
         info!("Replicating data for key {} to {} nodes", key, nodes.len());
         Ok(())
