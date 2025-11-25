@@ -108,7 +108,7 @@ impl LumosMemory for AgentMemBackend {
             info!("      Limit: {}", limit);
 
             let db_query_start = std::time::Instant::now();
-            
+
             // ✅ 使用agent-mem的search API（带options）
             use agent_mem::SearchOptions;
             let search_options = SearchOptions {
@@ -117,7 +117,7 @@ impl LumosMemory for AgentMemBackend {
                 limit: Some(limit),
                 ..Default::default()
             };
-            
+
             let results = self
                 .memory_api
                 .search_with_options(query, search_options)
@@ -233,7 +233,7 @@ impl LumosMemory for AgentMemBackend {
                 "   📋 历史[{}] role={:?}, 长度={}字符, 内容=\"{}\"",
                 idx,
                 msg.role,
-                msg.content.chars().count(),  // 使用字符数而非字节数
+                msg.content.chars().count(), // 使用字符数而非字节数
                 content_preview
             );
         }

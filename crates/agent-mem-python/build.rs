@@ -1,7 +1,7 @@
 fn main() {
     // Use pyo3-build-config to find Python
     pyo3_build_config::use_pyo3_cfgs();
-    
+
     // On macOS with Homebrew Python, we need to link against Python framework
     if cfg!(target_os = "macos") {
         // Get Python library path from python3-config
@@ -40,4 +40,3 @@ fn main() {
         }
     }
 }
-

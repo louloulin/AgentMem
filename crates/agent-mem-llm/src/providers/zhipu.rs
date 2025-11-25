@@ -269,10 +269,13 @@ impl LLMProvider for ZhipuProvider {
 
         info!("🔵 发送 HTTP 请求...");
         let http_start = std::time::Instant::now();
-        
+
         // 详细记录请求开始时间
         info!("   ⏱️  请求开始时间戳: {:?}", std::time::SystemTime::now());
-        info!("   📦 请求体大小: {} bytes", serde_json::to_string(&request).unwrap_or_default().len());
+        info!(
+            "   📦 请求体大小: {} bytes",
+            serde_json::to_string(&request).unwrap_or_default().len()
+        );
         info!("   🌐 目标URL: {}", url);
         info!("   🔍 开始DNS解析和TCP连接...");
 
@@ -305,7 +308,7 @@ impl LLMProvider for ZhipuProvider {
 
         let status = response.status();
         info!("   HTTP 状态码: {}", status);
-        
+
         // 记录响应头信息
         info!("   📊 响应头信息:");
         if let Some(content_length) = response.headers().get("content-length") {
@@ -320,7 +323,7 @@ impl LLMProvider for ZhipuProvider {
         if let Some(date) = response.headers().get("date") {
             info!("      Date: {:?}", date);
         }
-        
+
         // 计算网络传输速度
         let response_size = response.content_length().unwrap_or(0);
         if response_size > 0 && http_duration.as_secs_f64() > 0.0 {
@@ -351,19 +354,26 @@ impl LLMProvider for ZhipuProvider {
 
         info!("🔵 解析 JSON 响应...");
         let parse_start = std::time::Instant::now();
-        
+
         // 先读取原始响应文本以便分析
         let response_text = response.text().await.map_err(|e| {
             warn!("❌ 读取响应体失败: {}", e);
             AgentMemError::LLMError(format!("Failed to read response body: {e}"))
         })?;
-        
+
         let body_read_duration = parse_start.elapsed();
-        info!("   📥 响应体读取完成，耗时: {:?}, 大小: {} bytes", body_read_duration, response_text.len());
+        info!(
+            "   📥 响应体读取完成，耗时: {:?}, 大小: {} bytes",
+            body_read_duration,
+            response_text.len()
+        );
 
         let zhipu_response: ZhipuResponse = serde_json::from_str(&response_text).map_err(|e| {
             warn!("❌ JSON 解析失败: {}", e);
-            warn!("   响应文本前500字符: {}", &response_text.chars().take(500).collect::<String>());
+            warn!(
+                "   响应文本前500字符: {}",
+                &response_text.chars().take(500).collect::<String>()
+            );
             AgentMemError::LLMError(format!("Failed to parse Zhipu response: {e}"))
         })?;
 
@@ -372,23 +382,32 @@ impl LLMProvider for ZhipuProvider {
 
         let total_duration = start_time.elapsed();
         info!("✅ Zhipu API 调用完成，总耗时: {:?}", total_duration);
-        
+
         // 详细的时间分解
         info!("   ⏱️  时间分解:");
-        info!("      - HTTP等待: {:?} ({:.1}%)", http_duration, (http_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
-        info!("      - JSON解析: {:?} ({:.1}%)", parse_duration, (parse_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
-        
+        info!(
+            "      - HTTP等待: {:?} ({:.1}%)",
+            http_duration,
+            (http_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0
+        );
+        info!(
+            "      - JSON解析: {:?} ({:.1}%)",
+            parse_duration,
+            (parse_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0
+        );
+
         info!(
             "   📊 Token 使用: prompt={}, completion={}, total={}",
             zhipu_response.usage.prompt_tokens,
             zhipu_response.usage.completion_tokens,
             zhipu_response.usage.total_tokens
         );
-        
+
         // 计算生成速度
-        let tokens_per_second = zhipu_response.usage.completion_tokens as f64 / http_duration.as_secs_f64();
+        let tokens_per_second =
+            zhipu_response.usage.completion_tokens as f64 / http_duration.as_secs_f64();
         info!("   ⚡ 生成速度: {:.2} tokens/s", tokens_per_second);
-        
+
         // 如果速度异常慢，给出警告
         if tokens_per_second < 10.0 {
             warn!("   ⚠️  生成速度异常慢！正常应该 >20 tokens/s");
@@ -571,7 +590,7 @@ impl LLMProvider for ZhipuProvider {
                         // SSE格式：data: {...}\n\n
                         for line in chunk_str.lines() {
                             let line = line.trim();
-                            
+
                             // 跳过空行和注释
                             if line.is_empty() || line.starts_with(':') {
                                 continue;
@@ -580,7 +599,7 @@ impl LLMProvider for ZhipuProvider {
                             // 解析 data: 行
                             if let Some(data) = line.strip_prefix("data: ") {
                                 let data = data.trim();
-                                
+
                                 // 检查是否是结束标记
                                 if data == "[DONE]" {
                                     info!("✅ SSE流式数据传输完成");
@@ -600,7 +619,10 @@ impl LLMProvider for ZhipuProvider {
                                         }
                                     }
                                     Err(e) => {
-                                        debug!("⚠️  解析流式响应失败 (非关键): {}, 数据: {}", e, data);
+                                        debug!(
+                                            "⚠️  解析流式响应失败 (非关键): {}, 数据: {}",
+                                            e, data
+                                        );
                                         // 非关键错误，继续处理下一块
                                     }
                                 }

@@ -86,7 +86,9 @@ impl MultiLayerCache {
         Self {
             l1_memory: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(100).unwrap()))),
             l2_llm: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(1000).unwrap()))),
-            l3_embedding: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10000).unwrap()))),
+            l3_embedding: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(10000).unwrap(),
+            ))),
             metrics: CacheMetrics::new(),
         }
     }
@@ -197,7 +199,11 @@ impl MultiLayerCache {
     }
 
     /// Warm up the cache with common queries and embeddings
-    pub async fn warm_cache(&self, common_queries: Vec<String>, common_texts: Vec<String>) -> Result<WarmingStats> {
+    pub async fn warm_cache(
+        &self,
+        common_queries: Vec<String>,
+        common_texts: Vec<String>,
+    ) -> Result<WarmingStats> {
         let start = std::time::Instant::now();
         let items_warmed = common_queries.len() + common_texts.len();
         let failed = 0;
@@ -424,10 +430,7 @@ mod tests {
         assert!(cache.get_llm_response("prompt").is_none());
 
         cache.set_llm_response("prompt".to_string(), "hello".to_string());
-        assert_eq!(
-            cache.get_llm_response("prompt"),
-            Some("hello".to_string())
-        );
+        assert_eq!(cache.get_llm_response("prompt"), Some("hello".to_string()));
     }
 
     #[test]
@@ -442,28 +445,30 @@ mod tests {
     #[tokio::test]
     async fn test_cache_warming() {
         let cache = MultiLayerCache::new();
-        
+
         let common_queries = vec![
             "What is the weather today?".to_string(),
             "Tell me about AI".to_string(),
         ];
-        
+
         let common_texts = vec![
             "artificial intelligence".to_string(),
             "machine learning".to_string(),
         ];
-        
-        let result = cache.warm_cache(common_queries, common_texts).await.unwrap();
-        
+
+        let result = cache
+            .warm_cache(common_queries, common_texts)
+            .await
+            .unwrap();
+
         assert_eq!(result.total_warmings, 1);
         assert_eq!(result.total_items_warmed, 4);
         // Allow for very fast execution (could be 0ms)
         assert!(result.total_warming_time_ms >= 0);
-        
+
         let stats = cache.get_warming_stats();
         assert_eq!(stats.l1_entries, 0); // No actual memories were added
         assert_eq!(stats.l2_entries, 0); // No actual LLM responses were added
         assert_eq!(stats.l3_entries, 0); // No actual embeddings were added
     }
 }
-

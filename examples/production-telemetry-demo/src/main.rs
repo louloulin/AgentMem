@@ -13,14 +13,15 @@ use agent_mem_core::{
     hierarchy::MemoryScope,
 };
 use agent_mem_performance::telemetry::{ProductionTelemetryConfig, ProductionTelemetrySystem};
-use agent_mem_traits::{Content, MemoryItem, MemoryType, MemoryV4, Session};
-
+use agent_mem_traits::{
+    AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MemoryType, MemoryV4 as Memory,
+    MetadataV4, RelationGraph,
+};
 use anyhow::Result;
-use std::collections::HashMap;
+use chrono::Utc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -78,41 +79,11 @@ async fn demonstrate_memory_operations(
         let start = Instant::now();
         let user_id = format!("user_{}", i % 3); // Simulate 3 different users
 
-        // Create a test memory
-        let session = Session {
-            id: format!("session_{i}"),
-            user_id: Some(user_id.clone()),
-            agent_id: Some("demo_agent".to_string()),
-            run_id: None,
-            actor_id: None,
-            created_at: chrono::Utc::now(),
-            metadata: HashMap::new(),
-        };
-
-        let memory_item = MemoryItem {
-            id: Uuid::new_v4().to_string(),
-            content: format!("This is test message {i} for telemetry demonstration"),
-            hash: None,
-            metadata: HashMap::new(),
-            score: None,
-            created_at: chrono::Utc::now(),
-            updated_at: None,
-            session,
-            memory_type: MemoryType::Episodic,
-            entities: Vec::new(),
-            relations: Vec::new(),
-            agent_id: "demo_agent".to_string(),
-            user_id: Some(user_id.clone()),
-            importance: 0.5,
-            embedding: None,
-            last_accessed_at: chrono::Utc::now(),
-            access_count: 0,
-            expires_at: None,
-            version: 1,
-        };
-
-        // Convert to MemoryV4 and add memory with telemetry tracking
-        let memory = MemoryV4::from_legacy_item(&memory_item);
+        let memory = build_demo_memory(
+            format!("This is test message {i} for telemetry demonstration"),
+            &user_id,
+            0.5,
+        );
         let memory_result = engine.add_memory(memory).await;
 
         let duration = start.elapsed();
@@ -166,6 +137,45 @@ async fn demonstrate_memory_operations(
     }
 
     Ok(())
+}
+
+/// Build a MemoryV4 record in the new attribute-based format
+fn build_demo_memory(content: String, user_id: &str, importance: f32) -> Memory {
+    let mut attributes = AttributeSet::new();
+    attributes.set(
+        AttributeKey::core("user_id"),
+        AttributeValue::String(user_id.to_string()),
+    );
+    attributes.set(
+        AttributeKey::core("agent_id"),
+        AttributeValue::String("demo_agent".to_string()),
+    );
+    attributes.set(
+        AttributeKey::core("memory_type"),
+        AttributeValue::String(MemoryType::Episodic.as_str().to_string()),
+    );
+    attributes.set(
+        AttributeKey::core("importance"),
+        AttributeValue::Number(importance as f64),
+    );
+
+    let now = Utc::now();
+    let metadata = MetadataV4 {
+        created_at: now,
+        updated_at: now,
+        accessed_at: now,
+        access_count: 0,
+        version: 1,
+        hash: None,
+    };
+
+    Memory {
+        id: MemoryId::new(),
+        content: Content::text(content),
+        attributes,
+        relations: RelationGraph::new(),
+        metadata,
+    }
 }
 
 /// Demonstrate performance monitoring

@@ -27,7 +27,9 @@ impl LLMProvider for MockLLMProvider {
         &self,
         _messages: &[Message],
     ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
-        Err(agent_mem_traits::AgentMemError::unsupported_provider("mock_llm"))
+        Err(agent_mem_traits::AgentMemError::unsupported_provider(
+            "mock_llm",
+        ))
     }
 
     fn get_model_info(&self) -> ModelInfo {

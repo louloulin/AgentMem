@@ -6,7 +6,7 @@
 //! 3. 获取所有记忆
 //! 4. 删除记忆
 
-use agent_mem::{GetAllOptions, Memory, MemoryBuilder};
+use agent_mem::{GetAllOptions, MemoryBuilder};
 use anyhow::Result;
 
 #[tokio::main]

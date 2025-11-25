@@ -2,9 +2,7 @@
 //!
 //! 展示如何使用增强的混合检索系统
 
-use agent_mem_core::search::{
-    EnhancedHybridConfig, EnhancedHybridSearchEngineV2, SearchResult,
-};
+use agent_mem_core::search::{EnhancedHybridConfig, EnhancedHybridSearchEngineV2, SearchResult};
 use agent_mem_storage::backends::LibSQLFTS5Store;
 use agent_mem_traits::Result;
 use std::sync::Arc;

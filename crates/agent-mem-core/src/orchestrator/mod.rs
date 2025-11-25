@@ -412,8 +412,8 @@ impl AgentOrchestrator {
         self: Arc<Self>,
         request: ChatRequest,
     ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send + 'static>>> {
-        use futures::stream::{Stream, StreamExt};
         use futures::stream;
+        use futures::stream::{Stream, StreamExt};
 
         info!(
             "🌊 Starting REAL streaming conversation for agent_id={}, user_id={}",
@@ -436,7 +436,7 @@ impl AgentOrchestrator {
         adjusted_request.max_memories = adjusted_max_memories;
         let memories = self.retrieve_memories(&adjusted_request).await?;
         let memories_count = memories.len();
-        
+
         info!("   📚 检索到 {} 条记忆", memories_count);
 
         // 3. 构建消息
@@ -454,10 +454,28 @@ impl AgentOrchestrator {
         let request_clone = request.clone();
         let orchestrator = self.clone();
         let messages_clone = messages.clone();
-        
+
         let wrapped_stream = stream::unfold(
-            (llm_stream, String::new(), false, request_clone, orchestrator, messages_clone, memories_count, user_message_id),
-            |(mut stream, mut accumulated_content, mut is_done, req, orch, msgs, mem_count, _msg_id)| async move {
+            (
+                llm_stream,
+                String::new(),
+                false,
+                request_clone,
+                orchestrator,
+                messages_clone,
+                memories_count,
+                user_message_id,
+            ),
+            |(
+                mut stream,
+                mut accumulated_content,
+                mut is_done,
+                req,
+                orch,
+                msgs,
+                mem_count,
+                _msg_id,
+            )| async move {
                 if is_done {
                     return None;
                 }
@@ -466,26 +484,50 @@ impl AgentOrchestrator {
                     Some(Ok(chunk)) => {
                         // 累积内容
                         accumulated_content.push_str(&chunk);
-                        
+
                         // 返回当前块，继续流式
                         Some((
                             Ok(chunk),
-                            (stream, accumulated_content, is_done, req, orch, msgs, mem_count, _msg_id),
+                            (
+                                stream,
+                                accumulated_content,
+                                is_done,
+                                req,
+                                orch,
+                                msgs,
+                                mem_count,
+                                _msg_id,
+                            ),
                         ))
                     }
                     Some(Err(e)) => {
                         // 流式错误
                         warn!("❌ 流式传输错误: {}", e);
                         is_done = true;
-                        Some((Err(e), (stream, accumulated_content, is_done, req, orch, msgs, mem_count, _msg_id)))
+                        Some((
+                            Err(e),
+                            (
+                                stream,
+                                accumulated_content,
+                                is_done,
+                                req,
+                                orch,
+                                msgs,
+                                mem_count,
+                                _msg_id,
+                            ),
+                        ))
                     }
                     None => {
                         // 流结束，保存完整响应
-                        info!("   ✅ 流式传输完成，累积内容: {} 字符", accumulated_content.len());
-                        
+                        info!(
+                            "   ✅ 流式传输完成，累积内容: {} 字符",
+                            accumulated_content.len()
+                        );
+
                         // Note: 保存操作由外部调用者处理，这里只返回流数据
                         // TODO: 考虑在流结束后通过其他机制保存消息和更新记忆
-                        
+
                         is_done = true;
                         None
                     }
@@ -547,7 +589,10 @@ impl AgentOrchestrator {
         let retrieval_duration = retrieval_start.elapsed();
         info!(
             "Retrieved {} memories (adjusted from {} to {}) in {:?}",
-            memories_retrieved_count, request.max_memories, adjusted_max_memories, retrieval_duration
+            memories_retrieved_count,
+            request.max_memories,
+            adjusted_max_memories,
+            retrieval_duration
         );
 
         // 3. 构建 prompt（注入会话上下文和长期记忆）
@@ -558,7 +603,8 @@ impl AgentOrchestrator {
         let build_duration = build_start.elapsed();
         debug!(
             "Built {} messages with working context and memories in {:?}",
-            messages.len(), build_duration
+            messages.len(),
+            build_duration
         );
 
         // 4. 调用 LLM（可能需要多轮工具调用）
@@ -613,9 +659,21 @@ impl AgentOrchestrator {
             ttfb_ms, prompt_chars, memories_retrieved_count
         );
         info!("   ⏱️  详细时间分解:");
-        info!("      - 内存检索: {:?} ({:.1}%)", retrieval_duration, (retrieval_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
-        info!("      - 消息构建: {:?} ({:.1}%)", build_duration, (build_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
-        info!("      - LLM调用: {:?} ({:.1}%)", llm_duration, (llm_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0);
+        info!(
+            "      - 内存检索: {:?} ({:.1}%)",
+            retrieval_duration,
+            (retrieval_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0
+        );
+        info!(
+            "      - 消息构建: {:?} ({:.1}%)",
+            build_duration,
+            (build_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0
+        );
+        info!(
+            "      - LLM调用: {:?} ({:.1}%)",
+            llm_duration,
+            (llm_duration.as_secs_f64() / total_duration.as_secs_f64()) * 100.0
+        );
         info!("      - 总耗时: {:?}", total_duration);
 
         // 9. 返回响应（✅ memories_count 现在表示检索使用的记忆数量）

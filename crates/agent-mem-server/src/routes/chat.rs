@@ -324,7 +324,10 @@ pub async fn send_chat_message_stream(
         Ok(stream) => stream,
         Err(e) => {
             error!("Failed to start streaming: {}", e);
-            return Err(ServerError::internal_error(format!("Failed to start stream: {}", e)));
+            return Err(ServerError::internal_error(format!(
+                "Failed to start stream: {}",
+                e
+            )));
         }
     };
 
@@ -361,8 +364,10 @@ pub async fn send_chat_message_stream(
                         tool_call: None,
                         memories_count: None,
                     };
-                    let content_json = serde_json::to_string(&content_event_chunk)
-                        .unwrap_or_else(|_| "{\"chunk_type\":\"content\",\"content\":\"\"}".to_string());
+                    let content_json =
+                        serde_json::to_string(&content_event_chunk).unwrap_or_else(|_| {
+                            "{\"chunk_type\":\"content\",\"content\":\"\"}".to_string()
+                        });
                     let event = Ok::<Event, Infallible>(Event::default().data(content_json));
                     Some((event, (llm_stream, false, is_done)))
                 }
@@ -481,4 +486,3 @@ mod tests {
         assert_eq!(req.stream, false);
     }
 }
-
