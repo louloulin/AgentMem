@@ -50,6 +50,7 @@
 - 2025-01-XX: **完善 AgentGenerator 和 AgentExecutor Debug 支持**（P1任务补充），为 AgentExecutor 手动实现了 Debug trait（因为包含 trait 对象），为 AgentGenerator 手动实现了 Debug trait，为 AgentGenerator 添加了工具管理便捷方法（has_tools、tool_count），添加了测试验证，提高了代码的可调试性和可用性，1 个新测试通过，共 29 个 refactored 模块测试全部通过 ✅
 - 2025-01-XX: **完善 BasicAgent Debug 支持和配置检查方法**（P1任务补充），为 BasicAgent 手动实现了 Debug trait，修复了 AgentCore 的 Debug 实现（从 derive 改为手动实现），添加了配置检查方法（has_retry_executor、has_concurrent_tool_executor、has_llm_router、has_tool_registry），提供了便捷的配置状态查询功能，添加了测试验证，提高了代码的可调试性和可用性，1 个新测试通过，共 29 个 refactored 模块测试全部通过 ✅
 - 2025-01-XX: **添加 AgentGenerator 输入验证**（P1任务补充），为 `generate()` 和 `stream()` 方法添加了输入验证，检查消息列表不能为空，为 `execute_tool_calls()` 添加了空列表处理（返回空结果），提高了代码的健壮性和错误处理能力，添加了测试验证，1 个新测试通过，共 30 个 refactored 模块测试全部通过 ✅
+- 2025-01-XX: **延长 Week1 Agent 测试超时阈值**（P1任务补充），在 `week1_agent_tests` 中新增 `TEST_TIMEOUT`（180s）及 `run_with_test_timeout` 帮助函数，为所有需要访问 Zhipu API 的异步测试提供统一的 Timeout 包装，减少长时间运行时被测试框架强制中断的风险，32 个测试全部通过 ✅
 
 ---
 

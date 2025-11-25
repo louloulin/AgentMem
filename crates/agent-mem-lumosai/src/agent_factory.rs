@@ -120,7 +120,9 @@ Remember: Your memory system provides you with semantically relevant context. Us
         // 5. 设置Memory Backend
         let step5_start = std::time::Instant::now();
         info!("   🔄 [STEP5] Attaching memory backend...");
-        lumos_agent = lumos_agent.with_memory(memory_backend);
+        lumos_agent = lumos_agent
+            .with_memory(memory_backend)
+            .map_err(|e| anyhow::anyhow!("Failed to attach memory backend: {}", e))?;
         let step5_duration = step5_start.elapsed();
         info!("   ⏱️  [STEP5] Attach memory: {:?}", step5_duration);
 
