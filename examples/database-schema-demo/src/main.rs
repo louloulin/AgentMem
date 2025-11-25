@@ -241,7 +241,7 @@ async fn main() -> anyhow::Result<()> {
     println!("   - 版本: {}", comprehensive_memory.version());
     println!(
         "   - 访问次数: {}",
-        comprehensive_memory.metadata.accessed_count
+        comprehensive_memory.metadata.access_count
     );
     println!(
         "   - Metadata: {:?}",
