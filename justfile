@@ -150,6 +150,25 @@ start-server-no-auth:
     @echo "🚀 启动 HTTP API 服务器（无认证模式，后台）..."
     @bash start_server_no_auth.sh
 
+# 启动 HTTP API 服务器（带 LumosAI 功能，后台运行）
+start-server-lumosai:
+    @echo "🚀 启动 HTTP API 服务器（LumosAI 功能，后台）..."
+    @echo "   编译带 lumosai feature 的服务器..."
+    @cargo build --bin agent-mem-server --features lumosai
+    @echo "   启动服务器..."
+    @pkill -f agent-mem-server || true
+    @sleep 2
+    @export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="fastembed" && \
+    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/debug:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    nohup ./target/debug/agent-mem-server > backend-lumosai.log 2>&1 &
+    @sleep 8
+    @echo "   检查后端健康状态..."
+    @curl -s http://localhost:8080/health > /dev/null && echo "   ✅ 后端运行正常（LumosAI 已启用）" || echo "   ⚠️  后端可能未就绪"
+
 # 启动 HTTP API 服务器（带 ONNX Runtime 修复，后台运行）
 start-server-onnx:
     @echo "🚀 启动 HTTP API 服务器（ONNX Runtime 修复版，后台）..."
