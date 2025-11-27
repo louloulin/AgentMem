@@ -36,6 +36,20 @@ BUILD_UI=true
 BUILD_SERVER=true
 BUILD_MODE="release"
 CLEAN_BUILD=false
+TARGET_PLATFORM="auto"          # mac-arm64 | linux-amd64 | auto
+PLATFORM_OVERRIDE=false
+USE_DOCKER=false                # 使用 Docker 进行交叉编译
+USE_CROSS=false                 # 使用 cross 工具进行交叉编译
+
+# 主机环境信息
+HOST_OS="$(uname -s)"
+HOST_ARCH="$(uname -m)"
+
+# 平台配置（在 detect/configure 后赋值）
+PLATFORM_NAME="unknown"
+CARGO_TARGET_TRIPLE=""
+LIB_SOURCE_DIR=""
+LIB_PATTERN_DESC=""
 
 # 项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -75,6 +89,9 @@ AgentMem 打包发布脚本
   --release       发布模式（优化构建，默认）
   --dev           开发模式（快速构建）
   --clean         清理构建缓存
+  --platform      指定目标平台 (mac-arm64 | mac-amd64 | linux-amd64)，默认自动检测
+  --docker        使用 Docker 进行 Linux 交叉编译（推荐，避免 OpenSSL 问题）
+  --cross         使用 cross 工具进行交叉编译（需要先安装: cargo install cross）
   --help          显示帮助信息
 
 示例：
@@ -124,6 +141,24 @@ parse_args() {
                 CLEAN_BUILD=true
                 shift
                 ;;
+            --platform)
+                if [ -z "${2:-}" ]; then
+                    log_error "选项 --platform 需要一个参数 (mac-arm64 或 linux-amd64)"
+                    exit 1
+                fi
+                TARGET_PLATFORM="$2"
+                validate_platform_arg "$TARGET_PLATFORM"
+                PLATFORM_OVERRIDE=true
+                shift 2
+                ;;
+            --docker)
+                USE_DOCKER=true
+                shift
+                ;;
+            --cross)
+                USE_CROSS=true
+                shift
+                ;;
             --help)
                 show_help
                 exit 0
@@ -135,6 +170,124 @@ parse_args() {
                 ;;
         esac
     done
+}
+
+# 选择可用的库目录
+validate_platform_arg() {
+    case "$1" in
+        auto|mac-arm64|mac-amd64|linux-amd64)
+            ;;
+        *)
+            log_error "不支持的平台: $1 (可选值: mac-arm64 | mac-amd64 | linux-amd64 | auto)"
+            exit 1
+            ;;
+    esac
+}
+
+select_lib_source_dir() {
+    local pattern="$1"
+    shift
+
+    for relative_dir in "$@"; do
+        local candidate="$PROJECT_ROOT/$relative_dir"
+        if [ -d "$candidate" ]; then
+            if compgen -G "$candidate/$pattern" > /dev/null; then
+                LIB_SOURCE_DIR="$candidate"
+                return 0
+            fi
+        fi
+    done
+
+    LIB_SOURCE_DIR=""
+    return 0
+}
+
+# 自动检测平台
+detect_platform() {
+    if [ "$TARGET_PLATFORM" != "auto" ]; then
+        return
+    fi
+
+    case "$HOST_OS" in
+        Darwin)
+            if [ "$HOST_ARCH" = "arm64" ]; then
+                TARGET_PLATFORM="mac-arm64"
+            else
+                TARGET_PLATFORM="mac-amd64"
+            fi
+            ;;
+        Linux)
+            if [ "$HOST_ARCH" != "x86_64" ]; then
+                log_error "仅支持 Linux x86_64 (amd64)，当前架构: $HOST_ARCH"
+                exit 1
+            fi
+            TARGET_PLATFORM="linux-amd64"
+            ;;
+        *)
+            log_error "无法识别的主机平台: $HOST_OS ($HOST_ARCH)"
+            exit 1
+            ;;
+    esac
+}
+
+# 根据目标平台配置构建参数
+configure_platform() {
+    case "$TARGET_PLATFORM" in
+        mac-arm64|mac-amd64)
+            PLATFORM_NAME="macOS"
+            CARGO_TARGET_TRIPLE=""
+            LIB_PATTERN_DESC="libonnxruntime*.dylib"
+            select_lib_source_dir "libonnxruntime*.dylib" \
+                "lib/$TARGET_PLATFORM" \
+                "lib/macos" \
+                "lib"
+            ;;
+        linux-amd64)
+            PLATFORM_NAME="Linux (x86_64)"
+            if [ "$HOST_OS" = "Linux" ] && [ "$HOST_ARCH" = "x86_64" ] && [ "$PLATFORM_OVERRIDE" = false ]; then
+                CARGO_TARGET_TRIPLE=""
+            else
+                CARGO_TARGET_TRIPLE="x86_64-unknown-linux-gnu"
+                log_warning "将尝试交叉编译 linux-amd64 版本，请确保已安装对应的交叉编译工具链"
+            fi
+            LIB_PATTERN_DESC="libonnxruntime*.so"
+            select_lib_source_dir "libonnxruntime*.so*" \
+                "lib/linux-amd64" \
+                "lib/linux" \
+                "lib"
+            ;;
+        *)
+            log_error "不支持的目标平台: $TARGET_PLATFORM"
+            exit 1
+            ;;
+    esac
+}
+
+# 确保所需的 Rust target 已安装
+ensure_rust_target_installed() {
+    if [ -z "$CARGO_TARGET_TRIPLE" ]; then
+        return
+    fi
+
+    if rustup target list --installed | grep -q "$CARGO_TARGET_TRIPLE"; then
+        return
+    fi
+
+    log_info "安装 Rust target: $CARGO_TARGET_TRIPLE ..."
+    rustup target add "$CARGO_TARGET_TRIPLE"
+}
+
+# 拷贝运行时依赖库
+copy_runtime_libs() {
+    log_info "复制 ONNX Runtime 库文件..."
+    mkdir -p "$DIST_DIR/server/lib"
+
+    if [ -n "$LIB_SOURCE_DIR" ]; then
+        cp -r "$LIB_SOURCE_DIR"/. "$DIST_DIR/server/lib/" 2>/dev/null || true
+        log_success "已复制 $(basename "$LIB_SOURCE_DIR") 下的库文件"
+    else
+        log_warning "未找到匹配 $LIB_PATTERN_DESC 的库文件，请将对应平台的 ONNX Runtime 动态库放入 lib/${TARGET_PLATFORM}/ 目录"
+    fi
 }
 
 # 检查依赖
@@ -263,12 +416,70 @@ build_server() {
     
     # 构建后端
     log_info "构建 Rust 服务器..."
-    if [ "$BUILD_MODE" = "release" ]; then
-        cargo build --package agent-mem-server --release --features lumosai 
-        BINARY_PATH="target/release/agent-mem-server"
+    ensure_rust_target_installed
+    
+    # 检测是否使用交叉编译
+    local use_cross_compile=false
+    local cargo_binary="cargo"
+    
+    if [ -n "$CARGO_TARGET_TRIPLE" ] && [ "$HOST_OS" != "Linux" ]; then
+        use_cross_compile=true
+        log_info "检测到交叉编译: $HOST_OS -> $TARGET_PLATFORM"
+        
+        # 优先使用 cargo-zigbuild（更简单，自动处理 OpenSSL）
+        if command -v cargo-zigbuild &> /dev/null; then
+            log_info "使用 cargo-zigbuild 进行交叉编译（自动处理 OpenSSL）..."
+            cargo_binary="cargo zigbuild"
+        elif which x86_64-unknown-linux-gnu-gcc &> /dev/null; then
+            log_info "使用标准交叉编译工具链..."
+            export CC_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-gcc
+            export CXX_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-g++
+            export AR_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-ar
+            export PKG_CONFIG_ALLOW_CROSS=1
+        else
+            log_warning "未找到交叉编译工具链，尝试安装 cargo-zigbuild..."
+            log_info "安装 cargo-zigbuild: cargo install cargo-zigbuild --locked"
+            if cargo install cargo-zigbuild --locked 2>&1 | grep -q "Installed"; then
+                cargo_binary="cargo zigbuild"
+                log_success "cargo-zigbuild 安装成功"
+            else
+                log_error "无法安装 cargo-zigbuild，请手动安装或配置交叉编译工具链"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # 构建命令
+    local build_subdir="debug"
+    if [ "$cargo_binary" = "cargo zigbuild" ]; then
+        # cargo-zigbuild 使用不同的命令格式
+        local cargo_cmd=(cargo zigbuild --package agent-mem-server --features lumosai)
+        if [ "$BUILD_MODE" = "release" ]; then
+            cargo_cmd+=(--release)
+            build_subdir="release"
+        fi
+        if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+            cargo_cmd+=(--target "$CARGO_TARGET_TRIPLE")
+        fi
     else
-        cargo build --package agent-mem-server
-        BINARY_PATH="target/debug/agent-mem-server"
+        # 标准 cargo 命令
+        local cargo_cmd=(cargo build --package agent-mem-server --features lumosai)
+        if [ "$BUILD_MODE" = "release" ]; then
+            cargo_cmd+=(--release)
+            build_subdir="release"
+        fi
+        if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+            cargo_cmd+=(--target "$CARGO_TARGET_TRIPLE")
+        fi
+    fi
+
+    log_info "执行: ${cargo_cmd[*]}"
+    "${cargo_cmd[@]}"
+
+    if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+        BINARY_PATH="target/$CARGO_TARGET_TRIPLE/$build_subdir/agent-mem-server"
+    else
+        BINARY_PATH="target/$build_subdir/agent-mem-server"
     fi
     
     log_success "后端构建完成"
@@ -281,16 +492,7 @@ build_server() {
     cp "$BINARY_PATH" "$DIST_DIR/server/"
 
     # 复制 ONNX Runtime 库文件
-    log_info "复制 ONNX Runtime 库文件..."
-    mkdir -p "$DIST_DIR/server/lib"
-
-    # 检查并复制 lib 目录下的所有库文件
-    if [ -d "lib" ]; then
-        cp -r lib/* "$DIST_DIR/server/lib/" 2>/dev/null || true
-        log_success "已复制 lib 目录下的库文件"
-    else
-        log_warning "未找到 lib 目录，跳过库文件复制"
-    fi
+    copy_runtime_libs
 
     # 创建配置文件示例
     cat > "$DIST_DIR/server/config.example.toml" << 'EOF'
@@ -604,6 +806,13 @@ export ENABLE_AUTH="false"  # 禁用认证（测试用）
 **Linux:**
 - `libonnxruntime.so.1.22.0`
 
+我们建议将不同平台的库文件放置在以下目录中，构建脚本会自动按平台优先级选择：
+
+| 平台 | 推荐目录 | 需要包含的文件 |
+|------|----------|----------------|
+| macOS (arm64/x86_64) | `lib/macos-arm64/`、`lib/macos/` 或 `lib/` | `libonnxruntime*.dylib` |
+| Linux x86_64 | `lib/linux-amd64/`、`lib/linux/` 或 `lib/` | `libonnxruntime*.so*` |
+
 如果启动时提示找不到库文件，请确保：
 1. `lib/` 目录存在且包含正确的库文件
 2. 启动脚本正确设置了 `DYLD_LIBRARY_PATH` (macOS) 或 `LD_LIBRARY_PATH` (Linux)
@@ -738,6 +947,12 @@ main() {
     
     # 解析参数
     parse_args "$@"
+    detect_platform
+    configure_platform
+    log_info "目标平台: $PLATFORM_NAME ($TARGET_PLATFORM)"
+    if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+        log_info "Cargo Target Triple: $CARGO_TARGET_TRIPLE"
+    fi
     
     # 检查依赖
     check_dependencies

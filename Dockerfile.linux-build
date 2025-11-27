@@ -1,0 +1,121 @@
+# AgentMem Linux amd64 交叉编译 Dockerfile
+# 使用多阶段构建优化编译速度和镜像大小
+# 
+# 使用方法:
+#   docker build -f Dockerfile.linux-build -t agentmem-linux-build .
+#   docker create --name temp agentmem-linux-build
+#   docker cp temp:/workspace/target/x86_64-unknown-linux-gnu/release/agent-mem-server ./dist/server/
+#   docker rm temp
+
+# ============================================================================
+# Stage 1: Builder - 构建 Rust 应用（Linux x86_64）
+# ============================================================================
+FROM rust:1.91-slim AS builder
+
+LABEL maintainer="AgentMem Team"
+LABEL description="AgentMem Linux amd64 cross-compilation builder"
+LABEL target="x86_64-unknown-linux-gnu"
+
+WORKDIR /workspace
+
+# 安装构建依赖
+# 配置代理（如果提供）
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+# 设置环境变量以绕过 aws-lc-sys 的编译器检查
+ENV AWS_LC_SYS_SKIP_COMPILER_CHECK=1
+
+# 安装系统依赖和交叉编译工具链
+# 启用多架构支持以安装 x86_64 的库
+RUN dpkg --add-architecture amd64 && \
+    apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    git \
+    gcc-x86-64-linux-gnu \
+    g++-x86-64-linux-gnu \
+    libssl-dev:amd64 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 添加 Linux target 和配置交叉编译环境
+RUN rustup target add x86_64-unknown-linux-gnu && \
+    export CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc && \
+    export CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ && \
+    export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar
+
+# 复制 Cargo 配置文件（利用 Docker 层缓存）
+COPY Cargo.toml Cargo.lock ./
+
+# 复制所有 crates 的 Cargo.toml（用于依赖缓存优化）
+# 直接复制整个目录，后续会覆盖
+COPY crates ./crates/
+COPY lumosai ./lumosai/
+# 创建所有 examples 目录结构（从 Cargo.toml 中提取的所有 examples）
+RUN mkdir -p examples && \
+    for example in agent-from-env-demo production-memory-demo env-config-demo importance-scoring-demo vector-search-demo llm-memory-analysis-demo error-handling-demo mcp-stdio-server langgraph-integration-demo user-management-demo migration-demo performance-demo performance-optimization-demo agent-lifecycle-demo database-schema-demo entity-relation-extraction-demo system-metrics-demo onnx-embedding-demo mcp-resources-demo mcp-prompts-demo mcp-transport-demo mcp-tool-discovery-demo mcp-auth-demo mcp-sampling-demo mcp-logging-demo multimodal-ai-demo advanced-reasoning-demo single-binary-demo observability-demo fastembed-demo mem0-api-demo quickstart-zero-config quickstart-simple-mode test-fastembed p0-real-verification demo simple-demo comprehensive-test phase1-integration-demo phase3-demo phase4-demo phase5-production-demo phase6-optimization-demo server-demo client-demo mem0-compat-demo client-server-integration-test comprehensive-verification intelligent-reasoning-demo intelligent-memory-demo graph-memory-demo test-cache simple-memory-demo simple-api-test litellm-demo embedding-demo vector-store-demo multimodal-real-demo storage-migration-demo embedded-mode-demo embedded-persistent-demo advanced-search-demo context-aware-demo personalization-demo enterprise-security-demo intelligent-compression-demo multi-agent-collaboration-demo enterprise-monitoring-demo storage-optimization-demo compute-optimization-demo cloud-integration-demo procedural-memory-demo deepseek-test multimodal-demo intelligence-demo mem5-demo enhanced-messages-demo production-telemetry-demo real-implementation-demo llm-provider-demo api-server-demo multi-tenant-demo cloud-native-demo performance-benchmark system-prompt-demo chat-demo demo-memory-api demo-multimodal demo-intelligent-chat demo-performance-benchmark demo-codebase-memory demo-performance-simple demo-memory-viewer demo-performance-comparison enhanced-hybrid-search-demo product-search-demo hybrid-search-server-demo; do \
+        mkdir -p "examples/$example/src" && \
+        printf '[package]\nname = "%s"\nversion = "0.1.0"\nedition = "2021"\n\n[[bin]]\nname = "%s"\npath = "src/main.rs"\n' "$example" "$example" > "examples/$example/Cargo.toml" && \
+        echo 'fn main() {}' > "examples/$example/src/main.rs"; \
+    done || true
+
+# 创建缺失的 tools 目录结构（如果 Cargo.toml 中引用了但目录不存在）
+RUN mkdir -p tools/agentmem-cli/src \
+    tools/comprehensive-stress-test/src \
+    tools/libsql-stress-test/src \
+    tools/simple-perf-test/src \
+    tools/intelligent-mode-test/src \
+    tools/phase3-parallel-test/src \
+    tools/batch-mode-test/src && \
+    for tool in agentmem-cli comprehensive-stress-test libsql-stress-test simple-perf-test intelligent-mode-test phase3-parallel-test batch-mode-test; do \
+        printf '[package]\nname = "%s"\nversion = "0.1.0"\nedition = "2021"\n\n[[bin]]\nname = "%s"\npath = "src/main.rs"\n' "$tool" "$tool" > "tools/$tool/Cargo.toml" && \
+        echo 'fn main() {}' > "tools/$tool/src/main.rs"; \
+    done || true
+
+# 创建虚拟源文件以预构建依赖（优化 Docker 缓存）
+RUN mkdir -p crates/agent-mem-server/src \
+    crates/agent-mem-core/src \
+    crates/agent-mem-traits/src \
+    crates/agent-mem-llm/src \
+    crates/agent-mem-storage/src \
+    crates/agent-mem-intelligence/src \
+    && echo "fn main() {}" > crates/agent-mem-server/src/main.rs \
+    && echo "// dummy" > crates/agent-mem-core/src/lib.rs \
+    && echo "// dummy" > crates/agent-mem-traits/src/lib.rs \
+    && echo "// dummy" > crates/agent-mem-llm/src/lib.rs \
+    && echo "// dummy" > crates/agent-mem-storage/src/lib.rs \
+    && echo "// dummy" > crates/agent-mem-intelligence/src/lib.rs
+
+# 预构建依赖（利用 Docker 层缓存，加快后续构建）
+RUN cargo build --package agent-mem-server --features lumosai --release --target x86_64-unknown-linux-gnu 2>&1 | head -50 || true
+RUN rm -rf target/x86_64-unknown-linux-gnu/release/deps/agent_mem* || true
+
+# 复制实际源代码
+COPY crates ./crates
+COPY lumosai ./lumosai
+
+# 构建实际应用（设置交叉编译环境变量和 OpenSSL 路径）
+RUN export CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc && \
+    export CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ && \
+    export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar && \
+    export PKG_CONFIG_ALLOW_CROSS=1 && \
+    export PKG_CONFIG_SYSROOT_DIR=/ && \
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig && \
+    export OPENSSL_DIR=/usr && \
+    export OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu && \
+    export OPENSSL_INCLUDE_DIR=/usr/include && \
+    cargo build --package agent-mem-server --features lumosai --release --target x86_64-unknown-linux-gnu
+
+# 验证二进制文件
+RUN ls -lh target/x86_64-unknown-linux-gnu/release/agent-mem-server && \
+    file target/x86_64-unknown-linux-gnu/release/agent-mem-server && \
+    ldd target/x86_64-unknown-linux-gnu/release/agent-mem-server 2>/dev/null || echo "静态链接或无法检查依赖"
+
+# ============================================================================
+# Stage 2: Output - 仅包含二进制文件（用于提取）
+# ============================================================================
+FROM scratch AS output
+
+COPY --from=builder /workspace/target/x86_64-unknown-linux-gnu/release/agent-mem-server /agent-mem-server

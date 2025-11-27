@@ -1,0 +1,17 @@
+# 自定义 cross 构建镜像
+# 基于 cross 官方镜像，但设置环境变量以绕过 aws-lc-sys 的编译器检查
+
+FROM ghcr.io/cross-rs/x86_64-unknown-linux-gnu@sha256:40d364997006ac42675aefdb1f618a33eeeb53b76403fd9537793813db8dcc7f
+
+# 设置环境变量（在构建时可用）
+ENV AWS_LC_SYS_SKIP_COMPILER_CHECK=1
+
+# 确保环境变量在构建脚本中可用
+RUN echo 'export AWS_LC_SYS_SKIP_COMPILER_CHECK=1' >> /root/.bashrc && \
+    echo 'AWS_LC_SYS_SKIP_COMPILER_CHECK=1' >> /etc/environment
+
+# 安装 OpenSSL 开发库（如果需要）
+RUN apt-get update && \
+    apt-get install -y libssl-dev pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
