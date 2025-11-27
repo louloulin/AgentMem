@@ -20,16 +20,20 @@ WORKDIR /workspace
 
 # 安装构建依赖
 # 配置代理（如果提供）
+# 在 Docker 容器内，127.0.0.1 指向容器本身，需要使用 host.docker.internal
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-# 设置环境变量以绕过 aws-lc-sys 的编译器检查
+# 设置环境变量以绕过 aws-lc-sys 的编译器检查（虽然该版本不支持，但保留以防未来支持）
 ENV AWS_LC_SYS_SKIP_COMPILER_CHECK=1
 
 # 安装系统依赖和交叉编译工具链
 # 启用多架构支持以安装 x86_64 的库
-RUN dpkg --add-architecture amd64 && \
+# 在 RUN 命令中处理代理地址转换（127.0.0.1 -> host.docker.internal）
+RUN if [ -n "$HTTP_PROXY" ] && echo "$HTTP_PROXY" | grep -q "127.0.0.1"; then \
+        export HTTP_PROXY=$(echo "$HTTP_PROXY" | sed 's/127.0.0.1/host.docker.internal/g'); \
+        export HTTPS_PROXY=$(echo "$HTTPS_PROXY" | sed 's/127.0.0.1/host.docker.internal/g'); \
+    fi && \
+    dpkg --add-architecture amd64 && \
     apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \

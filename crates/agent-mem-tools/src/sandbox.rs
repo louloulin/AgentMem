@@ -143,6 +143,7 @@ impl SandboxManager {
                     }
                 }
             }
+            return 0;
         }
 
         #[cfg(target_os = "macos")]
@@ -150,19 +151,19 @@ impl SandboxManager {
             // On macOS, we can use task_info
             // For now, return 0 as a placeholder
             // In production, use proper system calls
-            0
+            return 0;
         }
 
         #[cfg(target_os = "windows")]
         {
             // On Windows, use GetProcessMemoryInfo
             // For now, return 0 as a placeholder
-            0
+            return 0;
         }
 
         #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
         {
-            0
+            return 0;
         }
     }
 

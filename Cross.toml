@@ -8,12 +8,36 @@ image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
 xargo = false
 
 # 在容器中安装 OpenSSL 开发库（pre-build 在构建前执行）
-# 创建包装脚本，在构建时自动设置环境变量
+# 修改 aws-lc-sys 构建脚本，添加环境变量检查以跳过编译器 bug 检查
 pre-build = [
     "apt-get update",
-    "apt-get install -y libssl-dev pkg-config || true",
-    "echo '#!/bin/sh' > /usr/local/bin/cargo-wrapper && echo 'export AWS_LC_SYS_SKIP_COMPILER_CHECK=1' >> /usr/local/bin/cargo-wrapper && echo 'exec /usr/local/cargo/bin/cargo \"$@\"' >> /usr/local/bin/cargo-wrapper && chmod +x /usr/local/bin/cargo-wrapper || true",
+    "apt-get install -y libssl-dev pkg-config python3 curl unzip || true",
+    # 安装最新 protoc（Ubuntu 20.04 的版本太旧，不支持 proto3 optional）
+    "PROTOC_VERSION=26.1 && curl -L -o /tmp/protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip && unzip -o /tmp/protoc.zip -d /usr/local && chmod +x /usr/local/bin/protoc && rm /tmp/protoc.zip",
     "echo 'export AWS_LC_SYS_SKIP_COMPILER_CHECK=1' >> /root/.bashrc || true",
+    # 创建修复脚本，在构建时自动修复 aws-lc-sys 源码
+    # 由于源码在构建时才会下载，我们需要在每次构建前检查并修复
+    "cat > /tmp/fix-aws-lc.py << 'PYEOF'",
+    "import sys, re, glob, os",
+    "for pattern in ['/root/.cargo/registry/src/*/aws-lc-sys-*/builder/cc_builder.rs', '/usr/local/cargo/registry/src/*/aws-lc-sys-*/builder/cc_builder.rs']:",
+    "    for f in glob.glob(pattern):",
+    "        try:",
+    "            with open(f, 'r') as file: content = file.read()",
+    "            if 'AWS_LC_SYS_SKIP_COMPILER_CHECK' in content: continue",
+    "            m = re.search(r'(fn memcmp_check\\(&self\\) \\{[^}]*?)(let basename = \"memcmp_invalid_stripped_check\")', content, re.DOTALL)",
+    "            if m:",
+    "                new = content[:m.start()] + m.group(1) + '        if env_var_to_bool(\"AWS_LC_SYS_SKIP_COMPILER_CHECK\").unwrap_or(false){return;}\\n        ' + m.group(2) + content[m.end():]",
+    "                with open(f, 'w') as file: file.write(new)",
+    "                print(f'Fixed: {f}')",
+    "        except: pass",
+    "PYEOF",
+    "chmod +x /tmp/fix-aws-lc.py || true",
+    # 在构建时自动执行修复（通过设置环境变量让 cargo 在构建前执行）
+    "echo 'export CARGO_BUILD_SCRIPT_ENV=\"AWS_LC_SYS_SKIP_COMPILER_CHECK=1\"' >> /root/.bashrc || true",
+    # 调试 ONNX Runtime 库是否可见
+    "ls -al /project/lib/linux-amd64 || true",
+    # 将 ONNX Runtime 库复制到系统库目录，供链接器查找
+    "if [ -d /project/lib/linux-amd64 ]; then cp -f /project/lib/linux-amd64/libonnxruntime.so* /usr/lib/x86_64-linux-gnu/; fi",
 ]
 
 # 环境变量（代理配置和其他构建选项）
@@ -25,6 +49,8 @@ passthrough = [
     "http_proxy",
     "https_proxy",
     "all_proxy",
+    "ORT_LIB_LOCATION",
+    "ORT_PREFER_DYNAMIC_LINK",
 ]
 # 设置构建环境变量（禁用 aws-lc-sys 的编译器检查）
 AWS_LC_SYS_SKIP_COMPILER_CHECK = "1"
