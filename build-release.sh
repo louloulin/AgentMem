@@ -454,7 +454,7 @@ build_server() {
     if [ "$cargo_binary" = "cargo zigbuild" ]; then
         # cargo-zigbuild 使用不同的命令格式
         local cargo_cmd=(cargo zigbuild --package agent-mem-server --features lumosai)
-        if [ "$BUILD_MODE" = "release" ]; then
+    if [ "$BUILD_MODE" = "release" ]; then
             cargo_cmd+=(--release)
             build_subdir="release"
         fi
