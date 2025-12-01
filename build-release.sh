@@ -377,28 +377,108 @@ build_ui() {
     cp package.json "$DIST_DIR/ui/"
     cp next.config.ts "$DIST_DIR/ui/"
     
-    # 创建启动脚本
+    # 创建启动脚本（使用 standalone 模式）
     cat > "$DIST_DIR/ui/start.sh" << 'EOF'
 #!/bin/bash
-# AgentMem UI 启动脚本
+# AgentMem UI 启动脚本 (Standalone 模式，无需安装依赖)
 
 # 设置环境变量
 export NODE_ENV=production
 export PORT=${PORT:-3000}
 export NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
 
-echo "启动 AgentMem UI..."
+# 获取脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "启动 AgentMem UI (Standalone 模式)"
+echo "=========================================="
+echo "工作目录: $SCRIPT_DIR"
 echo "端口: $PORT"
 echo "API URL: $NEXT_PUBLIC_API_URL"
+echo ""
 
-# 安装生产依赖
-if [ ! -d "node_modules" ]; then
-    echo "安装依赖..."
-    npm install --production
+# 检查 standalone 构建是否存在
+if [ ! -f ".next/standalone/server.js" ]; then
+    echo "❌ 错误: 未找到 standalone 构建"
+    echo "请先运行: npm run build"
+    exit 1
 fi
 
-# 启动服务
-npm start
+# 检查必要的目录和文件
+if [ ! -d ".next/static" ]; then
+    echo "⚠️  警告: .next/static 目录不存在"
+    echo "静态资源可能无法正常加载"
+fi
+
+if [ ! -d "public" ]; then
+    echo "⚠️  警告: public 目录不存在"
+    echo "公共资源可能无法正常加载"
+fi
+
+# 进入 standalone 目录
+cd .next/standalone
+
+# 强制重新创建符号链接（使用相对路径，避免绝对路径问题）
+# 删除可能存在的绝对路径符号链接
+if [ -L public ]; then
+    CURRENT_LINK=$(readlink public)
+    if [[ "$CURRENT_LINK" == /* ]]; then
+        echo "⚠️  发现绝对路径符号链接，将替换为相对路径..."
+        rm -f public
+    fi
+fi
+
+if [ -L .next/static ]; then
+    CURRENT_LINK=$(readlink .next/static)
+    if [[ "$CURRENT_LINK" == /* ]]; then
+        echo "⚠️  发现绝对路径符号链接，将替换为相对路径..."
+        rm -f .next/static
+    fi
+fi
+
+# 创建相对路径符号链接
+if [ ! -L public ] && [ -d "$SCRIPT_DIR/public" ]; then
+    echo "创建 public 符号链接（相对路径）..."
+    ln -sf "../../public" public
+fi
+
+if [ ! -d .next ]; then
+    mkdir -p .next
+fi
+
+if [ ! -L .next/static ] && [ -d "$SCRIPT_DIR/.next/static" ]; then
+    echo "创建 .next/static 符号链接（相对路径）..."
+    ln -sf "../../../.next/static" .next/static
+fi
+
+# 验证符号链接
+echo ""
+echo "验证资源路径..."
+if [ -L public ] && [ -L .next/static ]; then
+    echo "✅ public 符号链接: $(readlink public)"
+    echo "✅ .next/static 符号链接: $(readlink .next/static)"
+    
+    # 测试静态资源是否存在
+    if [ -d ".next/static" ]; then
+        STATIC_COUNT=$(find .next/static -type f | wc -l | tr -d ' ')
+        echo "✅ 找到 $STATIC_COUNT 个静态资源文件"
+    else
+        echo "❌ 警告: .next/static 目录不可访问"
+    fi
+else
+    echo "❌ 错误: 符号链接创建失败"
+    exit 1
+fi
+
+echo ""
+echo "✅ 启动服务器..."
+echo "=========================================="
+
+# 直接运行 server.js（standalone 模式已包含所有依赖）
+# 确保从 standalone 目录运行
+node server.js
 EOF
     
     chmod +x "$DIST_DIR/ui/start.sh"
