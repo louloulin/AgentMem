@@ -362,8 +362,12 @@ build_ui() {
     
     # 构建前端
     log_info "构建 Next.js 应用..."
+    # ✅ 重要：在构建时设置 NEXT_PUBLIC_API_URL，否则打包后配置不会生效
+    # Next.js 的 NEXT_PUBLIC_* 环境变量在构建时嵌入到代码中，运行时设置无效
+    export NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    log_info "构建时 API URL: $NEXT_PUBLIC_API_URL"
     # 始终使用 production 模式构建，避免 Next.js 警告
-    NODE_ENV=production npm run build
+    NODE_ENV=production NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL npm run build
     
     log_success "前端构建完成"
     

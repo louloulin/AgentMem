@@ -19,7 +19,7 @@ import { DEFAULT_USER_ID } from '@/lib/constants';
 import { MemoryPanel } from '@/components/MemoryPanel';
 import { useMemorySearch } from '@/hooks/use-memory-search';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 interface Message {
   id: string;
