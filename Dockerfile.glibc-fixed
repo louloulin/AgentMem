@@ -2,6 +2,7 @@
 # Optimized for security, performance, and minimal image size
 # Supports Linux amd64 architecture for production servers
 # Reference: feature-claudecode branch - simplified build approach
+# Fixed: GLIBC version compatibility issue
 
 # Build stage - using latest Rust for Cargo.lock v4 support
 FROM rust:latest AS builder
@@ -94,3 +95,4 @@ ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
 
 # Run the application
 CMD ["./agent-mem-server"]
+

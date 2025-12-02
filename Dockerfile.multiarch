@@ -1,0 +1,203 @@
+# Multi-architecture Docker build for AgentMem
+# Supports: linux/amd64, linux/arm64, linux/arm/v7
+# Optimized for China domestic network with Aliyun mirrors
+# 支持多架构构建
+
+# Build stage - using latest Rust for Cargo.lock v4 support
+FROM --platform=$BUILDPLATFORM rust:latest AS builder
+
+# Build arguments for cross-compilation
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
+# Configure Aliyun APT mirror for faster package downloads in China
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com\/debian-security/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+
+# Install build dependencies including protobuf-compiler
+# Also install cross-compilation toolchains based on target architecture
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    ca-certificates \
+    protobuf-compiler \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -m -u 1001 agentmem
+
+# Set working directory
+WORKDIR /app
+
+# Copy all source code
+COPY . .
+
+# Configure Cargo (optional mirror support via build arg)
+# Use official crates.io by default, or set CARGO_MIRROR build arg to use a mirror
+# Example: docker build --build-arg CARGO_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git
+ARG CARGO_MIRROR=""
+RUN mkdir -p /app/.cargo && \
+    if [ -n "$CARGO_MIRROR" ]; then \
+        echo "[source.crates-io]" > /app/.cargo/config.toml && \
+        echo "replace-with = 'mirror'" >> /app/.cargo/config.toml && \
+        echo "" >> /app/.cargo/config.toml && \
+        echo "[source.mirror]" >> /app/.cargo/config.toml && \
+        echo "registry = \"$CARGO_MIRROR\"" >> /app/.cargo/config.toml && \
+        echo "" >> /app/.cargo/config.toml && \
+        echo "[net]" >> /app/.cargo/config.toml && \
+        echo "git-fetch-with-cli = true" >> /app/.cargo/config.toml; \
+    else \
+        echo "[net]" > /app/.cargo/config.toml && \
+        echo "git-fetch-with-cli = true" >> /app/.cargo/config.toml; \
+    fi
+
+# Set CARGO_HOME to use our config
+ENV CARGO_HOME=/app/.cargo
+
+# Determine target triple based on TARGETARCH
+RUN case "$TARGETARCH" in \
+    amd64) echo "x86_64-unknown-linux-gnu" > /tmp/target_triple ;; \
+    arm64) echo "aarch64-unknown-linux-gnu" > /tmp/target_triple ;; \
+    arm) echo "armv7-unknown-linux-gnueabihf" > /tmp/target_triple ;; \
+    *) echo "x86_64-unknown-linux-gnu" > /tmp/target_triple ;; \
+    esac
+
+# Install cross-compilation target and toolchain
+# Always install the target triple, even for native builds (rustup target add is idempotent)
+# This is necessary when BUILDPLATFORM differs from TARGETPLATFORM (e.g., building amd64 on arm64)
+RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
+    rustup target add $TARGET_TRIPLE && \
+    case "$TARGETARCH" in \
+        amd64) \
+            dpkg --add-architecture amd64 2>/dev/null || true && \
+            apt-get update && apt-get install -y \
+                gcc-x86-64-linux-gnu \
+                g++-x86-64-linux-gnu \
+                libssl-dev:amd64 \
+                && rm -rf /var/lib/apt/lists/* \
+            ;; \
+        arm64) \
+            dpkg --add-architecture arm64 2>/dev/null || true && \
+            apt-get update && apt-get install -y \
+                gcc-aarch64-linux-gnu \
+                g++-aarch64-linux-gnu \
+                && rm -rf /var/lib/apt/lists/* \
+            ;; \
+        arm) \
+            dpkg --add-architecture armhf 2>/dev/null || true && \
+            apt-get update && apt-get install -y \
+                gcc-arm-linux-gnueabihf \
+                g++-arm-linux-gnueabihf \
+                && rm -rf /var/lib/apt/lists/* \
+            ;; \
+        *) \
+            echo "Unknown target architecture: $TARGETARCH" && exit 1 \
+            ;; \
+    esac
+
+# Build the application with RUSTFLAGS to handle SQLite linking conflicts
+# Set cross-compilation environment variables based on target architecture
+RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
+    case "$TARGETARCH" in \
+        amd64) \
+            export CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc && \
+            export CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ && \
+            export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar && \
+            export PKG_CONFIG_ALLOW_CROSS=1 && \
+            export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
+            ;; \
+        arm64) \
+            export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc && \
+            export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ && \
+            export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar && \
+            export PKG_CONFIG_ALLOW_CROSS=1 \
+            ;; \
+        arm) \
+            export CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc && \
+            export CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++ && \
+            export AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar && \
+            export PKG_CONFIG_ALLOW_CROSS=1 \
+            ;; \
+    esac && \
+    RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition" \
+    cargo build --release --workspace \
+    --bin agent-mem-server \
+    --target $TARGET_TRIPLE \
+    --exclude agent-mem-python \
+    --exclude demo-multimodal \
+    --exclude demo-codebase-memory
+
+# Determine the binary path based on target architecture
+RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
+    cp /app/target/$TARGET_TRIPLE/release/agent-mem-server /tmp/agent-mem-server
+
+# Runtime stage
+# Use debian:unstable-slim for GLIBC 2.38+ compatibility
+# bookworm-slim only has GLIBC 2.36, which is too old for binaries built with rust:latest
+# unstable-slim contains GLIBC 2.39, compatible with rust:latest builds
+FROM debian:unstable-slim
+
+# Configure Aliyun APT mirror for runtime dependencies (optional, for China network)
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com\/debian-security/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create app user and group
+RUN groupadd -r agentmem && useradd -r -g agentmem -u 1001 agentmem
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/config \
+    && chown -R agentmem:agentmem /app
+
+# Copy binary from builder stage
+COPY --from=builder /tmp/agent-mem-server /app/agent-mem-server
+
+# Copy configuration files
+COPY --chown=agentmem:agentmem docker/config/ /app/config/
+
+# Set permissions
+RUN chmod +x /app/agent-mem-server
+
+# Switch to non-root user
+USER agentmem
+
+# Set working directory
+WORKDIR /app
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Environment variables
+ENV RUST_LOG=info
+ENV AGENT_MEM_PORT=8080
+ENV AGENT_MEM_HOST=0.0.0.0
+ENV AGENT_MEM_DATA_DIR=/app/data
+ENV AGENT_MEM_LOG_DIR=/app/logs
+ENV AGENT_MEM_CONFIG_DIR=/app/config
+
+# LLM Provider configuration (Zhipu AI)
+# These can be overridden at runtime if needed
+ENV ZHIPU_API_KEY=""
+ENV LLM_PROVIDER="zhipu"
+ENV LLM_MODEL="glm-4.6"
+ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
+
+# Run the application
+CMD ["./agent-mem-server"]
+
