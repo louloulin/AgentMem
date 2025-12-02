@@ -11,6 +11,11 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
+# Build optimization arguments
+# CARGO_BUILD_JOBS: Limit parallel compilation jobs to reduce memory usage
+# Default to 2 for memory-constrained environments, can be overridden
+ARG CARGO_BUILD_JOBS=2
+
 # Configure Aliyun APT mirror for faster package downloads in China
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true && \
     sed -i 's/security.debian.org/mirrors.aliyun.com\/debian-security/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
@@ -47,13 +52,10 @@ RUN mkdir -p /app/.cargo && \
         echo "" >> /app/.cargo/config.toml && \
         echo "[source.mirror]" >> /app/.cargo/config.toml && \
         echo "registry = \"$CARGO_MIRROR\"" >> /app/.cargo/config.toml && \
-        echo "" >> /app/.cargo/config.toml && \
-        echo "[net]" >> /app/.cargo/config.toml && \
-        echo "git-fetch-with-cli = true" >> /app/.cargo/config.toml; \
-    else \
-        echo "[net]" > /app/.cargo/config.toml && \
-        echo "git-fetch-with-cli = true" >> /app/.cargo/config.toml; \
-    fi
+        echo "" >> /app/.cargo/config.toml; \
+    fi && \
+    echo "[net]" >> /app/.cargo/config.toml && \
+    echo "git-fetch-with-cli = true" >> /app/.cargo/config.toml
 
 # Set CARGO_HOME to use our config
 ENV CARGO_HOME=/app/.cargo
@@ -99,34 +101,66 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
             ;; \
     esac
 
+# Configure Cargo linker for cross-compilation
+# This must be done before building to ensure Rust uses the correct linker
+RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
+    case "$TARGETARCH" in \
+        amd64) \
+            echo "[target.x86_64-unknown-linux-gnu]" >> /app/.cargo/config.toml && \
+            echo "linker = \"x86_64-linux-gnu-gcc\"" >> /app/.cargo/config.toml \
+            ;; \
+        arm64) \
+            echo "[target.aarch64-unknown-linux-gnu]" >> /app/.cargo/config.toml && \
+            echo "linker = \"aarch64-linux-gnu-gcc\"" >> /app/.cargo/config.toml \
+            ;; \
+        arm) \
+            echo "[target.armv7-unknown-linux-gnueabihf]" >> /app/.cargo/config.toml && \
+            echo "linker = \"arm-linux-gnueabihf-gcc\"" >> /app/.cargo/config.toml \
+            ;; \
+    esac
+
 # Build the application with RUSTFLAGS to handle SQLite linking conflicts
 # Set cross-compilation environment variables based on target architecture
+# Memory optimization: Limit parallel jobs to reduce memory usage
+# SIMD optimization: Disable CPU-specific SIMD features for cross-compilation compatibility
 RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
+    # Initialize RUSTFLAGS with base flags
+    RUSTFLAGS_BASE="-C link-arg=-Wl,--allow-multiple-definition" && \
+    # Set architecture-specific environment variables and RUSTFLAGS
     case "$TARGETARCH" in \
         amd64) \
             export CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc && \
             export CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ && \
             export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar && \
             export PKG_CONFIG_ALLOW_CROSS=1 && \
-            export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
+            export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig && \
+            # Disable CPU-specific SIMD features for cross-compilation
+            # Use generic CPU target and explicitly disable AVX-512 to avoid linking issues
+            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic -C target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl" \
             ;; \
         arm64) \
             export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc && \
             export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ && \
             export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar && \
-            export PKG_CONFIG_ALLOW_CROSS=1 \
+            export PKG_CONFIG_ALLOW_CROSS=1 && \
+            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic" \
             ;; \
         arm) \
             export CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc && \
             export CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++ && \
             export AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar && \
-            export PKG_CONFIG_ALLOW_CROSS=1 \
+            export PKG_CONFIG_ALLOW_CROSS=1 && \
+            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic" \
             ;; \
     esac && \
-    RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition" \
+    # Verify RUSTFLAGS is set and export it
+    echo "RUSTFLAGS=${RUSTFLAGS}" && \
+    export CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS && \
+    # Build with the configured RUSTFLAGS
     cargo build --release --workspace \
     --bin agent-mem-server \
     --target $TARGET_TRIPLE \
+    --jobs $CARGO_BUILD_JOBS \
     --exclude agent-mem-python \
     --exclude demo-multimodal \
     --exclude demo-codebase-memory
@@ -193,8 +227,8 @@ ENV AGENT_MEM_LOG_DIR=/app/logs
 ENV AGENT_MEM_CONFIG_DIR=/app/config
 
 # LLM Provider configuration (Zhipu AI)
-# These can be overridden at runtime if needed
-ENV ZHIPU_API_KEY=""
+# Note: ZHIPU_API_KEY should be provided at runtime via environment variable or config file
+# Do not set sensitive values in ENV to avoid security warnings
 ENV LLM_PROVIDER="zhipu"
 ENV LLM_MODEL="glm-4.6"
 ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
