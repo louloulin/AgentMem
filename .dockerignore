@@ -7,10 +7,10 @@ dist/
 *.log
 
 # 开发工具和测试
-tools/
-examples/
+# tools/  # 注释掉：workspace member，需要 Cargo.toml
+# examples/  # 注释掉：workspace member，需要 Cargo.toml
+# benches/  # 注释掉：需要目录结构用于 Cargo.toml 验证
 tests/
-benches/
 benchmarks/
 
 # 文档
