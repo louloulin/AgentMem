@@ -34,10 +34,11 @@ RUN RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition" \
     --exclude demo-codebase-memory
 
 # Runtime stage
-# Use debian:unstable-slim for GLIBC 2.38+ compatibility
+# Use debian:sid-slim (unstable alias) for GLIBC 2.38+ compatibility
 # bookworm-slim only has GLIBC 2.36, which is too old for binaries built with rust:latest
-# unstable-slim contains GLIBC 2.39, compatible with rust:latest builds
-FROM debian:unstable-slim
+# sid-slim (unstable) contains GLIBC 2.39, compatible with rust:latest builds
+# Alternative: ubuntu:24.04 (also has GLIBC 2.39) if debian:sid-slim is unavailable
+FROM debian:sid-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \

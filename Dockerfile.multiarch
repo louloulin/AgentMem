@@ -136,10 +136,11 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     cp /app/target/$TARGET_TRIPLE/release/agent-mem-server /tmp/agent-mem-server
 
 # Runtime stage
-# Use debian:unstable-slim for GLIBC 2.38+ compatibility
+# Use debian:sid-slim (unstable alias) for GLIBC 2.38+ compatibility
 # bookworm-slim only has GLIBC 2.36, which is too old for binaries built with rust:latest
-# unstable-slim contains GLIBC 2.39, compatible with rust:latest builds
-FROM debian:unstable-slim
+# sid-slim (unstable) contains GLIBC 2.39, compatible with rust:latest builds
+# Alternative: ubuntu:24.04 (also has GLIBC 2.39) if debian:sid-slim is unavailable
+FROM debian:sid-slim
 
 # Configure Aliyun APT mirror for runtime dependencies (optional, for China network)
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true && \
