@@ -280,12 +280,22 @@ impl InitializationModule {
             }
         };
 
+        // 从环境变量读取 base_url（如果提供）
+        let base_url = match final_provider.to_lowercase().as_str() {
+            "zhipu" => std::env::var("ZHIPU_BASE_URL").ok(),
+            "openai" => std::env::var("OPENAI_BASE_URL").ok(),
+            "anthropic" => std::env::var("ANTHROPIC_BASE_URL").ok(),
+            "deepseek" => std::env::var("DEEPSEEK_BASE_URL").ok(),
+            "huawei_maas" => std::env::var("HUAWEI_MAAS_BASE_URL").ok(),
+            _ => None,
+        };
+
         // 创建 LLM Config
         let llm_config = LLMConfig {
             provider: final_provider.clone(),
             model: final_model.clone(),
             api_key,
-            base_url: None,
+            base_url,
             max_tokens: Some(4096),
             temperature: Some(0.7),
             top_p: Some(1.0),
@@ -316,11 +326,21 @@ impl InitializationModule {
         model: &str,
         api_key: Option<String>,
     ) -> Result<Option<Arc<dyn LLMProvider + Send + Sync>>> {
+        // 从环境变量读取 base_url（如果提供）
+        let base_url = match provider.to_lowercase().as_str() {
+            "zhipu" => std::env::var("ZHIPU_BASE_URL").ok(),
+            "openai" => std::env::var("OPENAI_BASE_URL").ok(),
+            "anthropic" => std::env::var("ANTHROPIC_BASE_URL").ok(),
+            "deepseek" => std::env::var("DEEPSEEK_BASE_URL").ok(),
+            "huawei_maas" => std::env::var("HUAWEI_MAAS_BASE_URL").ok(),
+            _ => None,
+        };
+
         let llm_config = LLMConfig {
             provider: provider.to_string(),
             model: model.to_string(),
             api_key,
-            base_url: None,
+            base_url,
             max_tokens: Some(4096),
             temperature: Some(0.7),
             top_p: Some(1.0),

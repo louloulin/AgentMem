@@ -82,5 +82,12 @@ ENV AGENT_MEM_DATA_DIR=/app/data
 ENV AGENT_MEM_LOG_DIR=/app/logs
 ENV AGENT_MEM_CONFIG_DIR=/app/config
 
+# LLM Provider configuration (Zhipu AI)
+# These can be overridden at runtime if needed
+ENV ZHIPU_API_KEY=""
+ENV LLM_PROVIDER="zhipu"
+ENV LLM_MODEL="glm-4.6"
+ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
+
 # Run the application
 CMD ["./agent-mem-server"]
