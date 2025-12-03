@@ -101,32 +101,28 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
             ;; \
     esac
 
-# Configure Cargo linker for cross-compilation
-# This must be done before building to ensure Rust uses the correct linker
+# Configure Cargo linker and rustflags for cross-compilation
+# This must be done before building to ensure Rust uses the correct linker and flags
+# Use printf for reliable TOML formatting
 RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     case "$TARGETARCH" in \
         amd64) \
-            echo "[target.x86_64-unknown-linux-gnu]" >> /app/.cargo/config.toml && \
-            echo "linker = \"x86_64-linux-gnu-gcc\"" >> /app/.cargo/config.toml \
+            printf '[target.x86_64-unknown-linux-gnu]\nlinker = "x86_64-linux-gnu-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic",\n    "-C", "target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl"\n]\n' >> /app/.cargo/config.toml \
             ;; \
         arm64) \
-            echo "[target.aarch64-unknown-linux-gnu]" >> /app/.cargo/config.toml && \
-            echo "linker = \"aarch64-linux-gnu-gcc\"" >> /app/.cargo/config.toml \
+            printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic"\n]\n' >> /app/.cargo/config.toml \
             ;; \
         arm) \
-            echo "[target.armv7-unknown-linux-gnueabihf]" >> /app/.cargo/config.toml && \
-            echo "linker = \"arm-linux-gnueabihf-gcc\"" >> /app/.cargo/config.toml \
+            printf '[target.armv7-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic"\n]\n' >> /app/.cargo/config.toml \
             ;; \
     esac
 
-# Build the application with RUSTFLAGS to handle SQLite linking conflicts
-# Set cross-compilation environment variables based on target architecture
+# Build the application with cross-compilation environment variables
+# RUSTFLAGS are configured in .cargo/config.toml for reliability
 # Memory optimization: Limit parallel jobs to reduce memory usage
 # SIMD optimization: Disable CPU-specific SIMD features for cross-compilation compatibility
 RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
-    # Initialize RUSTFLAGS with base flags
-    RUSTFLAGS_BASE="-C link-arg=-Wl,--allow-multiple-definition" && \
-    # Set architecture-specific environment variables and RUSTFLAGS
+    # Set architecture-specific environment variables
     case "$TARGETARCH" in \
         amd64) \
             export CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc && \
@@ -134,30 +130,51 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
             export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar && \
             export PKG_CONFIG_ALLOW_CROSS=1 && \
             export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig && \
-            # Disable CPU-specific SIMD features for cross-compilation
-            # Use generic CPU target and explicitly disable AVX-512 to avoid linking issues
-            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic -C target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl" \
+            # Also set RUSTFLAGS as environment variable for additional safety
+            export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic -C target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl" \
             ;; \
         arm64) \
             export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc && \
             export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ && \
             export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar && \
             export PKG_CONFIG_ALLOW_CROSS=1 && \
-            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic" \
+            export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic" \
             ;; \
         arm) \
             export CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc && \
             export CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++ && \
             export AR_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-ar && \
             export PKG_CONFIG_ALLOW_CROSS=1 && \
-            export RUSTFLAGS="${RUSTFLAGS_BASE} -C target-cpu=generic" \
+            export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic" \
             ;; \
     esac && \
-    # Verify RUSTFLAGS is set and export it
+    # Disable CPU feature detection in build scripts
+    # This prevents crates from detecting and using AVX-512 at build time
+    # Set multiple environment variables to ensure build scripts don't detect AVX-512
+    export CARGO_CFG_TARGET_FEATURE="" && \
+    export CARGO_CFG_TARGET_CPU="generic" && \
+    # Verify configuration
+    echo "=== Build Configuration ===" && \
+    echo "TARGET_TRIPLE=${TARGET_TRIPLE}" && \
+    echo "TARGETARCH=${TARGETARCH}" && \
     echo "RUSTFLAGS=${RUSTFLAGS}" && \
+    echo "CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}" && \
+    echo "CARGO_CFG_TARGET_FEATURE=${CARGO_CFG_TARGET_FEATURE}" && \
+    echo "CARGO_CFG_TARGET_CPU=${CARGO_CFG_TARGET_CPU}" && \
+    echo "=== Cargo Config ===" && \
+    cat /app/.cargo/config.toml && \
+    echo "=== Starting Build ===" && \
+    # Clean build cache to ensure fresh build with new flags
+    # This is critical for cross-compilation to ensure old cached artifacts don't interfere
+    # Clean both the target directory and Cargo's build cache
+    cargo clean --target $TARGET_TRIPLE || true && \
+    # Clean Cargo registry cache to force recompilation of dependencies
+    rm -rf /root/.cargo/registry/cache/* || true && \
+    rm -rf /root/.cargo/git/checkouts/* || true && \
+    # Build with the configured settings
+    # Use explicit RUSTFLAGS in the command to ensure they're applied
     export CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS && \
-    # Build with the configured RUSTFLAGS
-    cargo build --release --workspace \
+    RUSTFLAGS="${RUSTFLAGS}" cargo build --release --workspace \
     --bin agent-mem-server \
     --target $TARGET_TRIPLE \
     --jobs $CARGO_BUILD_JOBS \
