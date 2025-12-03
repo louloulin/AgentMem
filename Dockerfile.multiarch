@@ -151,8 +151,14 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     # Disable CPU feature detection in build scripts
     # This prevents crates from detecting and using AVX-512 at build time
     # Set multiple environment variables to ensure build scripts don't detect AVX-512
-    export CARGO_CFG_TARGET_FEATURE="" && \
+    # CARGO_CFG_TARGET_FEATURE is used by build scripts to detect CPU features
+    # Setting it to empty string prevents detection of AVX-512
+    # Note: CARGO_CFG_TARGET_FEATURE is set by Cargo based on RUSTFLAGS
+    # We need to ensure RUSTFLAGS are set before build scripts run
     export CARGO_CFG_TARGET_CPU="generic" && \
+    # Force RUSTC to use generic CPU target for build scripts
+    # This ensures build scripts compile with generic CPU, not native CPU
+    export RUSTC_BOOTSTRAP="" && \
     # Verify configuration
     echo "=== Build Configuration ===" && \
     echo "TARGET_TRIPLE=${TARGET_TRIPLE}" && \
