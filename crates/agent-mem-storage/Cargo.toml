@@ -35,7 +35,9 @@ reqwest = { version = "0.11", features = ["json"] }
 libsql = { version = "0.6", optional = true }
 
 # 向量存储依赖 (最新版本，已修复 chrono 冲突)
-lancedb = { version = "0.22.2", optional = true }
+# Disable default-features to avoid SIMD/AVX-512 issues in cross-compilation
+# This prevents lancedb from enabling CPU-specific optimizations that cause linking errors
+lancedb = { version = "0.22.2", optional = true, default-features = false }
 arrow = { version = "56", optional = true }
 
 # FAISS 向量搜索 (可选，需要系统级安装)

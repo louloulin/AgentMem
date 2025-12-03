@@ -41,6 +41,40 @@ WORKDIR /app
 # Copy all source code
 COPY . .
 
+# Prepare ONNX Runtime library for ort-sys build script
+# ort-sys will try to download ONNX Runtime from cdn.pyke.io, which may fail
+# We provide local library to avoid network issues during build
+RUN case "$TARGETARCH" in \
+    amd64) \
+        if [ -d "/app/lib/linux-amd64" ]; then \
+            mkdir -p /app/onnxruntime && \
+            cp -r /app/lib/linux-amd64/* /app/onnxruntime/ 2>/dev/null || true && \
+            echo "✅ ONNX Runtime library prepared for amd64" && \
+            ls -la /app/onnxruntime/ || true; \
+        else \
+            echo "⚠️  Warning: lib/linux-amd64 not found, ort-sys will try to download"; \
+        fi \
+        ;; \
+    arm64) \
+        if [ -d "/app/lib/linux-arm64" ]; then \
+            mkdir -p /app/onnxruntime && \
+            cp -r /app/lib/linux-arm64/* /app/onnxruntime/ 2>/dev/null || true && \
+            echo "✅ ONNX Runtime library prepared for arm64"; \
+        else \
+            echo "⚠️  Warning: lib/linux-arm64 not found, ort-sys will try to download"; \
+        fi \
+        ;; \
+    arm) \
+        if [ -d "/app/lib/linux-arm" ]; then \
+            mkdir -p /app/onnxruntime && \
+            cp -r /app/lib/linux-arm/* /app/onnxruntime/ 2>/dev/null || true && \
+            echo "✅ ONNX Runtime library prepared for arm"; \
+        else \
+            echo "⚠️  Warning: lib/linux-arm not found, ort-sys will try to download"; \
+        fi \
+        ;; \
+    esac
+
 # Configure Cargo (optional mirror support via build arg)
 # Use official crates.io by default, or set CARGO_MIRROR build arg to use a mirror
 # Example: docker build --build-arg CARGO_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git
@@ -102,12 +136,12 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     esac
 
 # Configure Cargo linker and rustflags for cross-compilation
-# This must be done before building to ensure Rust uses the correct linker and flags
-# Use printf for reliable TOML formatting
+# CRITICAL: This must be done BEFORE any build scripts run
+# Build scripts detect CPU features at compile time, so we must disable them early
 RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     case "$TARGETARCH" in \
         amd64) \
-            printf '[target.x86_64-unknown-linux-gnu]\nlinker = "x86_64-linux-gnu-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic",\n    "-C", "target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl"\n]\n' >> /app/.cargo/config.toml \
+            printf '[target.x86_64-unknown-linux-gnu]\nlinker = "x86_64-linux-gnu-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic",\n    "-C", "target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl,-avx2,-sse4.2"\n]\n' >> /app/.cargo/config.toml \
             ;; \
         arm64) \
             printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\nrustflags = [\n    "-C", "link-arg=-Wl,--allow-multiple-definition",\n    "-C", "target-cpu=generic"\n]\n' >> /app/.cargo/config.toml \
@@ -118,9 +152,8 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     esac
 
 # Build the application with cross-compilation environment variables
-# RUSTFLAGS are configured in .cargo/config.toml for reliability
-# Memory optimization: Limit parallel jobs to reduce memory usage
-# SIMD optimization: Disable CPU-specific SIMD features for cross-compilation compatibility
+# CRITICAL: Set environment variables BEFORE any cargo commands run
+# Build scripts check these variables at runtime to detect CPU features
 RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
     # Set architecture-specific environment variables
     case "$TARGETARCH" in \
@@ -130,8 +163,9 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
             export AR_x86_64_unknown_linux_gnu=x86_64-linux-gnu-ar && \
             export PKG_CONFIG_ALLOW_CROSS=1 && \
             export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig && \
-            # Also set RUSTFLAGS as environment variable for additional safety
-            export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic -C target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl" \
+            # CRITICAL: Disable ALL SIMD features including AVX2 and SSE4.2
+            # This prevents build scripts from detecting and using any SIMD optimizations
+            export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic -C target-feature=-avx512f,-avx512cd,-avx512bw,-avx512dq,-avx512vl,-avx2,-sse4.2" \
             ;; \
         arm64) \
             export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc && \
@@ -148,37 +182,57 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
             export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C target-cpu=generic" \
             ;; \
     esac && \
-    # Disable CPU feature detection in build scripts
-    # This prevents crates from detecting and using AVX-512 at build time
-    # Set multiple environment variables to ensure build scripts don't detect AVX-512
-    # CARGO_CFG_TARGET_FEATURE is used by build scripts to detect CPU features
-    # Setting it to empty string prevents detection of AVX-512
-    # Note: CARGO_CFG_TARGET_FEATURE is set by Cargo based on RUSTFLAGS
-    # We need to ensure RUSTFLAGS are set before build scripts run
+    # CRITICAL: Override build script CPU feature detection
+    # Build scripts use cfg!(target_feature = "...") which checks CARGO_CFG_TARGET_FEATURE
+    # Setting these to empty or generic prevents build scripts from detecting SIMD
     export CARGO_CFG_TARGET_CPU="generic" && \
-    # Force RUSTC to use generic CPU target for build scripts
-    # This ensures build scripts compile with generic CPU, not native CPU
-    export RUSTC_BOOTSTRAP="" && \
+    export CARGO_CFG_TARGET_FEATURE="" && \
+    # Explicitly disable all AVX-512 features for build scripts
+    # These are checked by build scripts using cfg!() macro
+    export CARGO_CFG_TARGET_FEATURE_AVX512F="" && \
+    export CARGO_CFG_TARGET_FEATURE_AVX512CD="" && \
+    export CARGO_CFG_TARGET_FEATURE_AVX512BW="" && \
+    export CARGO_CFG_TARGET_FEATURE_AVX512DQ="" && \
+    export CARGO_CFG_TARGET_FEATURE_AVX512VL="" && \
+    # Disable AVX2 and SSE4.2 as well to be safe
+    export CARGO_CFG_TARGET_FEATURE_AVX2="" && \
+    export CARGO_CFG_TARGET_FEATURE_SSE4_2="" && \
+    # Configure ort-sys to use local ONNX Runtime library
+    if [ -d "/app/onnxruntime" ] && ([ -f "/app/onnxruntime/libonnxruntime.so" ] || [ -f "/app/onnxruntime/lib/libonnxruntime.so" ]); then \
+        if [ -f "/app/onnxruntime/lib/libonnxruntime.so" ]; then \
+            export ORT_LIB_LOCATION="/app/onnxruntime/lib" && \
+            echo "✅ Using ONNX Runtime from /app/onnxruntime/lib"; \
+        else \
+            export ORT_LIB_LOCATION="/app/onnxruntime" && \
+            echo "✅ Using ONNX Runtime from /app/onnxruntime"; \
+        fi && \
+        export ORT_PREFER_DYNAMIC_LINK="1"; \
+    else \
+        echo "⚠️  Warning: Local ONNX Runtime not found, ort-sys will try to download"; \
+    fi && \
     # Verify configuration
     echo "=== Build Configuration ===" && \
     echo "TARGET_TRIPLE=${TARGET_TRIPLE}" && \
     echo "TARGETARCH=${TARGETARCH}" && \
     echo "RUSTFLAGS=${RUSTFLAGS}" && \
     echo "CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}" && \
-    echo "CARGO_CFG_TARGET_FEATURE=${CARGO_CFG_TARGET_FEATURE}" && \
     echo "CARGO_CFG_TARGET_CPU=${CARGO_CFG_TARGET_CPU}" && \
+    echo "CARGO_CFG_TARGET_FEATURE=${CARGO_CFG_TARGET_FEATURE}" && \
+    echo "ORT_LIB_LOCATION=${ORT_LIB_LOCATION:-not set}" && \
     echo "=== Cargo Config ===" && \
     cat /app/.cargo/config.toml && \
     echo "=== Starting Build ===" && \
-    # Clean build cache to ensure fresh build with new flags
-    # This is critical for cross-compilation to ensure old cached artifacts don't interfere
-    # Clean both the target directory and Cargo's build cache
-    cargo clean --target $TARGET_TRIPLE || true && \
-    # Clean Cargo registry cache to force recompilation of dependencies
+    # CRITICAL: Clean ALL build artifacts to remove any AVX-512 compiled code
+    # This is essential for cross-compilation to ensure old cached artifacts don't interfere
+    echo "🧹 Cleaning build cache..." && \
+    cargo clean || true && \
+    rm -rf /app/target/* || true && \
     rm -rf /root/.cargo/registry/cache/* || true && \
     rm -rf /root/.cargo/git/checkouts/* || true && \
+    rm -rf /root/.cargo/registry/src/* || true && \
+    echo "✅ Build cache cleaned" && \
     # Build with the configured settings
-    # Use explicit RUSTFLAGS in the command to ensure they're applied
+    # CRITICAL: Explicitly pass RUSTFLAGS to ensure they're applied to build scripts
     export CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS && \
     RUSTFLAGS="${RUSTFLAGS}" cargo build --release --workspace \
     --bin agent-mem-server \
@@ -194,45 +248,37 @@ RUN TARGET_TRIPLE=$(cat /tmp/target_triple) && \
 
 # Runtime stage
 # Use debian:sid-slim (unstable alias) for GLIBC 2.38+ compatibility
-# bookworm-slim only has GLIBC 2.36, which is too old for binaries built with rust:latest
-# sid-slim (unstable) contains GLIBC 2.39, compatible with rust:latest builds
-# Alternative: ubuntu:24.04 (also has GLIBC 2.39) if debian:sid-slim is unavailable
-FROM debian:sid-slim
-
-# Configure Aliyun APT mirror for runtime dependencies (optional, for China network)
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true && \
-    sed -i 's/security.debian.org/mirrors.aliyun.com\/debian-security/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+FROM debian:sid-slim AS runtime
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
     libpq5 \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
-# Create app user and group
-RUN groupadd -r agentmem && useradd -r -g agentmem -u 1001 agentmem
-
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/config \
-    && chown -R agentmem:agentmem /app
-
-# Copy binary from builder stage
-COPY --from=builder /tmp/agent-mem-server /app/agent-mem-server
-
-# Copy configuration files
-COPY --chown=agentmem:agentmem docker/config/ /app/config/
-
-# Set permissions
-RUN chmod +x /app/agent-mem-server
-
-# Switch to non-root user
-USER agentmem
+# Create app user
+RUN useradd -m -u 1001 agentmem
 
 # Set working directory
 WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /tmp/agent-mem-server /app/agent-mem-server
+
+# Copy ONNX Runtime library if available
+# Copy lib directory first, then conditionally copy libraries to /usr/lib
+COPY --from=builder /app/lib/ /app/lib/
+RUN mkdir -p /usr/lib && \
+    if [ -d /app/lib/linux-amd64 ]; then cp /app/lib/linux-amd64/libonnxruntime.so* /usr/lib/ 2>/dev/null || true; fi && \
+    if [ -d /app/lib/linux-arm64 ]; then cp /app/lib/linux-arm64/libonnxruntime.so* /usr/lib/ 2>/dev/null || true; fi && \
+    if [ -d /app/lib/linux-arm ]; then cp /app/lib/linux-arm/libonnxruntime.so* /usr/lib/ 2>/dev/null || true; fi
+
+# Set ownership
+RUN chown -R agentmem:agentmem /app
+
+# Switch to app user
+USER agentmem
 
 # Expose port
 EXPOSE 8080
@@ -241,21 +287,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Environment variables
-ENV RUST_LOG=info
-ENV AGENT_MEM_PORT=8080
-ENV AGENT_MEM_HOST=0.0.0.0
-ENV AGENT_MEM_DATA_DIR=/app/data
-ENV AGENT_MEM_LOG_DIR=/app/logs
-ENV AGENT_MEM_CONFIG_DIR=/app/config
-
-# LLM Provider configuration (Zhipu AI)
-# Note: ZHIPU_API_KEY should be provided at runtime via environment variable or config file
-# Do not set sensitive values in ENV to avoid security warnings
-ENV LLM_PROVIDER="zhipu"
-ENV LLM_MODEL="glm-4.6"
-ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
-
-# Run the application
+# Run the server
 CMD ["./agent-mem-server"]
-
