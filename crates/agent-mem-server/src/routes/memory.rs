@@ -639,7 +639,7 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// 添加新记忆（🔧 使用双写策略）
 #[utoipa::path(
@@ -818,29 +818,45 @@ pub async fn delete_memory(
 ) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
     info!("Deleting memory with ID: {}", id);
 
-    // 🔧 修复: 同时删除双层存储
-    // Step 1: 删除LibSQL Repository (主要存储)
-    repositories.memories.delete(&id).await.map_err(|e| {
-        error!("Failed to delete memory from repository: {}", e);
-        ServerError::MemoryError(format!("Failed to delete memory: {}", e))
-    })?;
-
-    info!("✅ Memory deleted from LibSQL");
-
-    // Step 2: 尝试删除Memory API (向量存储) - 如果失败不影响主流程
-    if let Err(e) = memory_manager.delete_memory(&id).await {
-        warn!(
-            "Failed to delete memory from Memory API (non-critical): {}",
-            e
-        );
+    // ✅ 修复: 确保双层存储都删除成功，保证数据一致性
+    // Step 1: 先尝试删除向量存储（如果失败，可以提前返回，不删除LibSQL）
+    let vector_delete_result = memory_manager.delete_memory(&id).await;
+    
+    // Step 2: 删除LibSQL Repository (主要存储)
+    let libsql_delete_result = repositories.memories.delete(&id).await;
+    
+    // Step 3: 检查删除结果，确保两个存储都删除成功
+    match (vector_delete_result, libsql_delete_result) {
+        (Ok(_), Ok(_)) => {
+            info!("✅ Memory deleted from both LibSQL and Vector Store: {}", id);
+            let response = crate::models::MemoryResponse {
+                id,
+                message: "Memory deleted successfully".to_string(),
+            };
+            Ok(Json(crate::models::ApiResponse::success(response)))
+        }
+        (Ok(_), Err(e)) => {
+            // LibSQL删除失败，但向量存储已删除
+            error!("Failed to delete from LibSQL after vector store deleted: {}", e);
+            Err(ServerError::MemoryError(format!(
+                "Memory deleted from vector store but failed to delete from LibSQL: {}", e
+            )))
+        }
+        (Err(e), Ok(_)) => {
+            // 向量存储删除失败，但LibSQL已删除 - 这是数据不一致的情况
+            error!("Failed to delete from vector store after LibSQL deleted: {}", e);
+            error!("⚠️  Data inconsistency: Memory deleted from LibSQL but still exists in vector store");
+            Err(ServerError::MemoryError(format!(
+                "Memory deleted from LibSQL but failed to delete from vector store: {}. \
+                The memory may still appear in search results.", e
+            )))
+        }
+        (Err(e1), Err(e2)) => {
+            // 两个存储都删除失败
+            error!("Failed to delete from both stores: vector={}, libsql={}", e1, e2);
+            Err(ServerError::MemoryError(format!("Failed to delete memory: {}", e2)))
+        }
     }
-
-    let response = crate::models::MemoryResponse {
-        id,
-        message: "Memory deleted successfully".to_string(),
-    };
-
-    Ok(Json(crate::models::ApiResponse::success(response)))
 }
 
 /// 搜索记忆
@@ -1088,7 +1104,7 @@ pub async fn search_memories(
     // 🔍 Phase 2: 向量语义搜索（降级或默认）
     info!("🔍 使用向量语义搜索: {}", request.query);
     let query_clone = request.query.clone(); // Clone for later use
-    let results = memory_manager
+    let mut results = memory_manager
         .search_memories(
             request.query,
             request.agent_id,
@@ -1101,6 +1117,28 @@ pub async fn search_memories(
             error!("Failed to search memories: {}", e);
             ServerError::MemoryError(e.to_string())
         })?;
+
+    // ✅ 修复：过滤已删除的记录，确保搜索结果与LibSQL状态一致
+    // 向量存储可能还包含已删除的记录，需要检查LibSQL中的实际状态
+    let mut valid_results = Vec::new();
+    for result in results {
+        // 检查LibSQL中是否存在且未删除
+        match repositories.memories.find_by_id(&result.id).await {
+            Ok(Some(_)) => {
+                // 记录存在且未删除（find_by_id已经过滤了is_deleted=0）
+                valid_results.push(result);
+            }
+            Ok(None) => {
+                // 记录不存在或已删除，跳过
+                debug!("Skipping deleted memory from search results: {}", result.id);
+            }
+            Err(e) => {
+                // 查询失败，为了安全起见，跳过该记录
+                warn!("Failed to check memory status in LibSQL: {}, skipping result", e);
+            }
+        }
+    }
+    results = valid_results;
 
     // 🔧 修复: 对于精确查询，优先返回精确匹配的结果
     let mut sorted_results = results;
