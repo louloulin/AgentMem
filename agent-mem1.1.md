@@ -3,50 +3,112 @@
 **版本**: 1.1.0  
 **日期**: 2025-01-XX  
 **目标**: 构建高内聚、低耦合的顶级记忆平台架构  
-**范围**: 整体架构重构、功能改造、存储查询优化
+**范围**: 渐进式架构优化、功能增强、存储查询优化  
+**核心原则**: **充分复用现有代码，渐进式改造，最小化破坏性变更**
 
 ---
 
 ## 📋 执行摘要
 
-基于对 AgentMem 代码库的全面分析，结合当前记忆平台的研究成果（MemGPT、Mem0、H-MEM等）和最佳实践，本改造计划旨在：
+基于对 AgentMem 代码库的全面分析，结合当前记忆平台的研究成果（MemGPT、Mem0、H-MEM等）和最佳实践，本改造计划采用**渐进式重构**策略：
 
-1. **解决架构问题**: 打破循环依赖、解耦存储层、分离基础特性与企业级特性
-2. **优化核心能力**: 增强记忆存储和查询性能，实现智能检索和推理
-3. **构建清晰架构**: 高内聚、低耦合的分层架构，支持灵活扩展
-4. **提升系统性能**: 优化存储引擎、查询引擎，支持大规模数据和高并发
+1. **充分复用现有代码**: 保留并增强现有的优秀实现（18个crate、88K+行代码）
+2. **渐进式架构优化**: 在现有基础上增强抽象层，而非推倒重来
+3. **最小化破坏性变更**: 保持API兼容性，通过适配器模式平滑过渡
+4. **增强核心能力**: 在现有存储和查询基础上优化性能，而非重写
+
+### 🎯 改造策略
+
+**核心原则**: 
+- ✅ **复用优先**: 充分利用现有的 `agent-mem-traits`、`RepositoryFactory`、5种搜索引擎等
+- ✅ **渐进式改造**: 通过适配器、装饰器模式增强现有代码
+- ✅ **向后兼容**: 保持现有API不变，新功能通过扩展方式添加
+- ✅ **最小化风险**: 分阶段实施，每阶段都可独立验证
 
 ---
 
-## 🔍 第一部分：现状分析
+## 🔍 第一部分：现状分析与复用策略
 
-### 1.1 现有架构优势
+### 1.1 现有架构优势（充分复用）
 
-#### ✅ 已实现的优秀特性
+#### ✅ 已实现的优秀特性（100%保留并增强）
 
-1. **分层记忆系统**
+1. **分层记忆系统** ✅ **完全复用**
    - ✅ 4层 Scope 系统（Global → Agent → User → Session）
+     - **位置**: `crates/agent-mem-core/src/hierarchy.rs`
+     - **状态**: 生产就绪，无需修改
    - ✅ 4层 Level 系统（Strategic → Tactical → Operational → Contextual）
+     - **位置**: `crates/agent-mem-core/src/hierarchy.rs`
+     - **状态**: 生产就绪，无需修改
    - ✅ 完整的继承机制（inheritance with decay）
    - ✅ 权限管理系统（MemoryPermissions）
 
-2. **多引擎支持**
+2. **多引擎支持** ✅ **完全复用**
    - ✅ 5种搜索引擎（Vector、BM25、FullText、Fuzzy、Hybrid）
+     - **位置**: `crates/agent-mem-core/src/search/`
+     - **状态**: 生产就绪，通过适配器增强
    - ✅ 多种向量存储后端（LanceDB、Redis、Pinecone、Qdrant）
+     - **位置**: `crates/agent-mem-storage/src/backends/`
+     - **状态**: 生产就绪，通过工厂模式复用
    - ✅ 多数据库后端（LibSQL、PostgreSQL）
+     - **位置**: `crates/agent-mem-core/src/storage/`
+     - **状态**: LibSQL 完全可用，PostgreSQL 通过 feature flag 控制
 
-3. **智能推理能力**
+3. **智能推理能力** ✅ **通过适配器复用**
    - ✅ DeepSeek 等 20+ LLM 提供商集成
+     - **位置**: `crates/agent-mem-llm/`
+     - **状态**: 生产就绪，完全复用
    - ✅ 自动事实提取（FactExtractor）
+     - **位置**: `crates/agent-mem-intelligence/`
+     - **策略**: 通过 trait 适配器复用，而非重写
    - ✅ 智能决策引擎（DecisionEngine）
+     - **策略**: 通过 trait 适配器复用
    - ✅ 冲突检测和解决（ConflictResolver）
+     - **策略**: 通过 trait 适配器复用
 
-4. **模块化设计**
+4. **模块化设计** ✅ **完全复用**
    - ✅ 18个专业化 crate
+     - **策略**: 保留现有结构，通过增强而非重构
    - ✅ 88,000+ 行生产级代码
+     - **策略**: 最大化复用，最小化重写
    - ✅ WASM 插件系统
+     - **位置**: `crates/agent-mem-plugins/`
+     - **状态**: 生产就绪，完全复用
 
-### 1.2 核心问题识别
+5. **已有优秀抽象层** ✅ **完全复用并增强**
+   - ✅ `agent-mem-traits` - 核心 trait 定义
+     - **位置**: `crates/agent-mem-traits/src/`
+     - **策略**: 在现有基础上增强，而非替换
+   - ✅ `RepositoryFactory` - 存储工厂模式
+     - **位置**: `crates/agent-mem-core/src/storage/factory.rs`
+     - **策略**: 完全复用，通过扩展增强
+   - ✅ `MemoryRepositoryTrait` - 统一存储接口
+     - **位置**: `crates/agent-mem-core/src/storage/traits.rs`
+     - **策略**: 完全复用，通过扩展增强
+   - ✅ `Memory` API - 统一记忆接口
+     - **位置**: `crates/agent-mem/src/memory.rs`
+     - **策略**: 完全复用，向后兼容
+
+### 1.2 复用策略
+
+#### 🎯 核心复用原则
+
+1. **保留现有实现**
+   - ✅ 所有已工作的代码100%保留
+   - ✅ 通过适配器模式增强，而非替换
+   - ✅ 通过装饰器模式添加新功能
+
+2. **渐进式增强**
+   - ✅ 在现有 trait 基础上扩展
+   - ✅ 通过 feature flags 控制可选特性
+   - ✅ 通过适配器桥接新旧代码
+
+3. **最小化破坏性变更**
+   - ✅ 保持现有 API 不变
+   - ✅ 新功能通过扩展方法添加
+   - ✅ 通过默认实现提供向后兼容
+
+### 1.3 核心问题识别与渐进式解决方案
 
 #### 🔴 问题 1: 循环依赖
 
@@ -59,125 +121,136 @@ agent-mem-intelligence (FactExtractor, DecisionEngine)
 agent-mem-core
 ```
 
-**影响**:
-- ❌ 无法将 `agent-mem-intelligence` 作为可选依赖
-- ❌ 增加编译时间和二进制大小
-- ❌ 阻塞 PyO3 绑定和嵌入式部署
+**渐进式解决方案**（复用优先）:
+1. ✅ **复用现有 trait**: `agent-mem-traits` 已定义 `FactExtractor`、`DecisionEngine` trait
+2. ✅ **适配器模式**: 在 `agent-mem-core` 中使用 trait，而非具体类型
+3. ✅ **可选依赖**: 通过 feature flag `intelligence` 控制
+4. ✅ **向后兼容**: 保持现有 API，新代码使用 trait
 
-**根本原因**:
-- `simple_memory.rs` 直接使用 `agent-mem-intelligence` 的具体类型
-- 缺少 trait 抽象层
+**实施策略**:
+```rust
+// ✅ 复用现有 trait（agent-mem-traits 已定义）
+use agent_mem_traits::{FactExtractor, DecisionEngine};
+
+// ✅ 适配器：将具体实现包装为 trait
+impl MemoryManager {
+    pub fn with_intelligence_optional(
+        fact_extractor: Option<Arc<dyn FactExtractor>>,  // ✅ 使用 trait
+        decision_engine: Option<Arc<dyn DecisionEngine>>,  // ✅ 使用 trait
+    ) -> Self {
+        // 复用现有实现
+    }
+}
+```
 
 #### 🔴 问题 2: SQLx 深度耦合
 
 **问题描述**:
-- 73 个编译错误，PostgreSQL 类型被广泛使用
-- 20+ 个模块依赖 PostgreSQL
-- 嵌入式存储（LibSQL/LanceDB）是后来添加的
+- PostgreSQL 类型被广泛使用
+- 嵌入式存储（LibSQL）已实现但未充分利用
 
-**受影响的模块**:
-```
-storage/
-  ├── agent_repository.rs      (使用 sqlx::PgPool)
-  ├── memory_repository.rs     (使用 sqlx::PgPool)
-  ├── models.rs                (使用 sqlx::FromRow)
-  └── ... (20+ 文件)
+**渐进式解决方案**（复用优先）:
+1. ✅ **复用现有 LibSQL 实现**: `LibSqlMemoryRepository` 已完全实现
+2. ✅ **Feature flags**: PostgreSQL 通过 `#[cfg(feature = "postgres")]` 控制
+3. ✅ **适配器模式**: 通过 `RepositoryFactory` 统一接口
+4. ✅ **默认使用 LibSQL**: 零配置场景默认使用 LibSQL
 
-core_memory/
-  ├── block_manager.rs         (使用 storage::models::Block)
-  └── compiler.rs              (使用 storage::models::Block)
-```
+**实施策略**:
+```rust
+// ✅ 复用现有工厂（已实现）
+use agent_mem_core::storage::factory::RepositoryFactory;
 
-**影响**:
-- ❌ 无法独立编译 `agent-mem-core`（无 PostgreSQL）
-- ❌ 阻塞嵌入式部署（零配置、零外部依赖）
-- ❌ 阻塞 WebAssembly 编译
+// ✅ 默认使用 LibSQL（已实现）
+let repos = RepositoryFactory::create_repositories(&config).await?;
 
-#### 🔴 问题 3: 架构设计缺陷
-
-**问题描述**:
-- 企业级特性和基础特性未分离
-- 存储抽象层不够清晰
-- 缺少统一的查询接口
-
-**当前架构**:
-```
-agent-mem-core (核心 + 企业级混合)
-  ├── simple_memory.rs        (基础 API)
-  ├── manager.rs              (核心管理器)
-  ├── storage/                (PostgreSQL 存储)
-  ├── core_memory/            (依赖 PostgreSQL)
-  └── managers/               (依赖 PostgreSQL)
+// ✅ PostgreSQL 通过 feature flag 控制（已实现）
+#[cfg(feature = "postgres")]
+let repos = RepositoryFactory::create_postgres_repositories(&config).await?;
 ```
 
-**理想架构**:
-```
-agent-mem-core (纯核心，无外部依赖)
-  ├── traits/                 (抽象接口)
-  ├── types/                  (核心类型)
-  └── manager.rs              (核心逻辑)
-
-agent-mem-storage-postgres (企业级，可选)
-  └── postgres_repository.rs  (PostgreSQL 实现)
-
-agent-mem-storage-libsql (嵌入式，默认)
-  └── libsql_repository.rs    (LibSQL 实现)
-```
-
-#### 🟡 问题 4: 存储和查询性能
+#### 🟡 问题 3: 存储和查询性能优化
 
 **问题描述**:
 - 查询优化不够完善
-- 缺少统一的查询接口
-- 索引策略不够优化
-
-**具体表现**:
-- 向量搜索延迟较高（> 100ms）
 - 缺少查询缓存机制
 - 批量操作性能不足
 
-#### 🟡 问题 5: 模块间耦合度高
+**渐进式解决方案**（增强而非重写）:
+1. ✅ **复用现有搜索引擎**: 5种引擎已实现，通过装饰器增强
+2. ✅ **增强缓存层**: 在现有搜索基础上添加缓存装饰器
+3. ✅ **优化批量操作**: 复用现有 `batch_create`，优化实现
+
+**实施策略**:
+```rust
+// ✅ 复用现有搜索引擎
+use agent_mem_core::search::{VectorSearchEngine, HybridSearchEngine};
+
+// ✅ 装饰器模式：添加缓存层
+pub struct CachedSearchEngine {
+    inner: Arc<dyn SearchEngine>,  // ✅ 复用现有实现
+    cache: Arc<dyn QueryCache>,
+}
+
+// ✅ 复用现有批量操作
+impl LibSqlMemoryRepository {
+    pub async fn batch_create(&self, memories: &[&Memory]) -> Result<Vec<Memory>> {
+        // ✅ 现有实现已优化，只需增强
+    }
+}
+```
+
+#### 🟡 问题 4: 模块间耦合度优化
 
 **问题描述**:
-- 模块间直接依赖具体实现
-- 缺少清晰的接口定义
-- 依赖注入不够完善
+- 部分模块直接依赖具体实现
+- 配置管理分散
 
-**具体表现**:
-- `MemoryManager` 直接依赖 `MemoryOperations` 实现
-- 缺少统一的存储抽象接口
-- 配置管理分散在各模块
+**渐进式解决方案**（适配器模式）:
+1. ✅ **复用现有 trait**: `MemoryRepositoryTrait` 已定义
+2. ✅ **适配器模式**: 将具体实现包装为 trait
+3. ✅ **统一配置**: 复用现有 `agent-mem-config`
+
+**实施策略**:
+```rust
+// ✅ 复用现有 trait
+use agent_mem_core::storage::traits::MemoryRepositoryTrait;
+
+// ✅ 适配器：具体实现 -> trait
+let repo: Arc<dyn MemoryRepositoryTrait> = Arc::new(LibSqlMemoryRepository::new(conn));
+
+// ✅ 复用现有配置
+use agent_mem_config::MemoryConfig;
+```
 
 ---
 
-## 🏗️ 第二部分：整体架构设计
+## 🏗️ 第二部分：渐进式架构优化（复用优先）
 
-### 2.1 新架构原则
+### 2.1 架构优化原则（基于现有代码）
 
 #### 核心原则
 
-1. **高内聚、低耦合**
-   - 每个模块职责单一、功能内聚
-   - 模块间通过 trait 接口交互
-   - 依赖注入管理模块依赖
+1. **复用优先，增强为辅**
+   - ✅ 保留所有现有实现（18个crate、88K+行代码）
+   - ✅ 通过适配器、装饰器模式增强
+   - ✅ 通过 trait 扩展统一接口
 
-2. **分层清晰**
-   - 接口层：API、CLI、SDK
-   - 服务层：业务逻辑、编排
-   - 核心层：记忆管理、存储抽象
-   - 存储层：具体存储实现
+2. **渐进式改造**
+   - ✅ 分阶段实施，每阶段独立验证
+   - ✅ 保持向后兼容
+   - ✅ 通过 feature flags 控制可选特性
 
-3. **可扩展性**
-   - 插件化设计
-   - 可选特性支持
-   - 多后端支持
+3. **最小化破坏性变更**
+   - ✅ 现有 API 保持不变
+   - ✅ 新功能通过扩展方法添加
+   - ✅ 通过默认实现提供兼容
 
-4. **性能优先**
-   - 异步优先设计
-   - 多级缓存
-   - 批量处理
+4. **充分利用现有抽象**
+   - ✅ 复用 `agent-mem-traits` 的所有 trait
+   - ✅ 复用 `RepositoryFactory` 工厂模式
+   - ✅ 复用 5种搜索引擎实现
 
-### 2.2 新架构图
+### 2.2 优化后的架构图（基于现有架构增强）
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -245,325 +318,291 @@ agent-mem-storage-libsql (嵌入式，默认)
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 模块重构方案
+### 2.3 渐进式模块优化（复用现有代码）
 
-#### 2.3.1 核心模块重构
+#### 2.3.1 核心模块优化策略
 
-**当前结构**:
+**现有结构**（100%保留）:
 ```
-agent-mem-core/
-  ├── manager.rs              (混合核心+企业级)
-  ├── storage/                (PostgreSQL 耦合)
-  ├── intelligence/            (循环依赖)
+agent-mem-core/              ✅ 保留
+  ├── manager.rs             ✅ 保留，通过适配器增强
+  ├── storage/               ✅ 保留
+  │   ├── traits.rs          ✅ 复用现有 trait
+  │   ├── factory.rs         ✅ 复用现有工厂
+  │   └── libsql/            ✅ 完全复用
+  ├── search/                ✅ 完全复用（5种引擎）
+  ├── hierarchy.rs           ✅ 完全复用
   └── ...
 ```
 
-**新结构**:
-```
-agent-mem-core/
-  ├── traits/                 (纯抽象接口)
-  │   ├── memory_store.rs     (MemoryStore trait)
-  │   ├── query.rs            (Query trait)
-  │   ├── intelligence.rs     (Intelligence trait)
-  │   └── cache.rs            (Cache trait)
-  ├── types/                  (核心类型)
-  │   ├── memory.rs           (Memory, MemoryScope, MemoryLevel)
-  │   ├── query.rs            (Query, SearchResult)
-  │   └── config.rs           (Config)
-  ├── manager.rs              (核心管理器，仅依赖 traits)
-  └── hierarchy.rs            (层级管理)
+**优化策略**（增强而非重构）:
+1. ✅ **复用现有 trait**: `agent-mem-core/src/storage/traits.rs` 已定义所有 Repository trait
+2. ✅ **适配器模式**: 在现有实现基础上添加适配器层
+3. ✅ **Feature flags**: 通过 `#[cfg(feature = "postgres")]` 控制可选特性
+4. ✅ **装饰器模式**: 在现有搜索、存储基础上添加缓存、优化层
 
-agent-mem-storage/            (存储抽象层)
-  ├── traits/
-  │   ├── repository.rs       (Repository trait)
-  │   └── vector_store.rs     (VectorStore trait)
-  ├── libsql/                 (LibSQL 实现)
-  ├── postgres/               (PostgreSQL 实现，可选)
-  └── factory.rs              (存储工厂)
+**具体优化**:
+```rust
+// ✅ 复用现有 trait（已存在）
+use agent_mem_core::storage::traits::MemoryRepositoryTrait;
 
-agent-mem-intelligence/       (智能推理，可选)
-  ├── traits/                 (实现 core::traits::intelligence)
-  ├── fact_extractor.rs       (事实提取)
-  ├── decision_engine.rs      (决策引擎)
-  └── conflict_resolver.rs    (冲突解决)
+// ✅ 适配器：将现有实现包装为统一接口
+pub struct UnifiedMemoryStore {
+    libsql: Option<Arc<dyn MemoryRepositoryTrait>>,  // ✅ 复用现有实现
+    postgres: Option<Arc<dyn MemoryRepositoryTrait>>,  // ✅ 通过 feature flag
+}
+
+// ✅ 装饰器：在现有搜索基础上添加缓存
+pub struct CachedSearchEngine {
+    inner: Arc<VectorSearchEngine>,  // ✅ 复用现有实现
+    cache: Arc<dyn QueryCache>,
+}
 ```
 
-#### 2.3.2 依赖关系重构
+#### 2.3.2 依赖关系优化（最小化变更）
 
-**当前依赖**:
+**现有依赖**（保留并优化）:
 ```
 agent-mem-core
-  ├── agent-mem-intelligence (循环依赖)
-  ├── sqlx (强制依赖)
-  └── postgres (强制依赖)
+  ├── agent-mem-traits       ✅ 完全复用
+  ├── agent-mem-storage      ✅ 完全复用
+  └── agent-mem-intelligence ⚠️ 通过 trait 解耦
 ```
 
-**新依赖**:
+**优化策略**:
+1. ✅ **复用现有 trait**: `agent-mem-traits` 已定义所有接口
+2. ✅ **可选依赖**: `agent-mem-intelligence` 通过 feature flag 控制
+3. ✅ **适配器模式**: 在 `agent-mem-core` 中使用 trait，而非具体类型
+
+**优化后的依赖**（最小化变更）:
 ```
-agent-mem-core (纯核心，无外部依赖)
-  ├── agent-mem-traits (仅 trait 定义)
-  └── agent-mem-types (仅类型定义)
+agent-mem-core
+  ├── agent-mem-traits       ✅ 复用（仅 trait 定义）
+  └── agent-mem-storage      ✅ 复用（存储实现）
 
-agent-mem-storage
-  ├── agent-mem-core (仅依赖 traits)
-  ├── libsql (可选)
-  └── postgres (可选)
-
-agent-mem-intelligence
-  ├── agent-mem-core (仅依赖 traits)
-  └── agent-mem-llm (LLM 集成)
+agent-mem-intelligence (可选)
+  ├── agent-mem-traits       ✅ 实现 trait
+  └── agent-mem-llm         ✅ 复用 LLM 集成
 ```
 
 ---
 
-## 🔧 第三部分：功能改造
+## 🔧 第三部分：功能增强（复用现有实现）
 
-### 3.1 记忆存储优化
+### 3.1 记忆存储优化（复用现有实现）
 
-#### 3.1.1 统一存储接口
+#### 3.1.1 统一存储接口（复用现有 trait）
 
-**目标**: 实现统一的存储抽象，支持多后端切换
+**现状**: ✅ `MemoryRepositoryTrait` 已定义在 `agent-mem-core/src/storage/traits.rs`
 
-**设计**:
+**复用策略**: 直接使用现有 trait，无需重新定义
+
 ```rust
-// agent-mem-core/src/traits/memory_store.rs
+// ✅ 复用现有 trait（已存在）
+use agent_mem_core::storage::traits::MemoryRepositoryTrait;
 
-/// 统一记忆存储接口
-#[async_trait]
-pub trait MemoryStore: Send + Sync {
-    /// 存储记忆
-    async fn store(&self, memory: Memory) -> Result<MemoryId>;
-    
-    /// 获取记忆
-    async fn get(&self, id: MemoryId) -> Result<Option<Memory>>;
-    
-    /// 更新记忆
-    async fn update(&self, memory: Memory) -> Result<()>;
-    
-    /// 删除记忆
-    async fn delete(&self, id: MemoryId) -> Result<bool>;
-    
-    /// 批量存储
-    async fn batch_store(&self, memories: Vec<Memory>) -> Result<Vec<MemoryId>>;
-    
-    /// 批量获取
-    async fn batch_get(&self, ids: Vec<MemoryId>) -> Result<Vec<Memory>>;
-}
-
-/// 记忆查询接口
-#[async_trait]
-pub trait MemoryQuery: Send + Sync {
-    /// 查询记忆
-    async fn query(&self, query: Query) -> Result<Vec<SearchResult>>;
-    
-    /// 按范围查询
-    async fn query_by_scope(&self, scope: MemoryScope) -> Result<Vec<Memory>>;
-    
-    /// 按级别查询
-    async fn query_by_level(&self, level: MemoryLevel) -> Result<Vec<Memory>>;
-}
+// ✅ 现有实现已支持所有核心方法
+// - create()
+// - find_by_id()
+// - search()
+// - update()
+// - delete()
+// - batch_create()  // ✅ 已优化
 ```
 
-#### 3.1.2 存储后端实现
+#### 3.1.2 存储后端实现（完全复用）
 
-**LibSQL 实现** (默认，嵌入式):
+**LibSQL 实现** ✅ **完全复用现有实现**:
 ```rust
-// agent-mem-storage/src/libsql/memory_store.rs
+// ✅ 复用现有实现（已存在）
+// crates/agent-mem-core/src/storage/libsql/memory_repository.rs
 
-pub struct LibSqlMemoryStore {
-    conn: Arc<Mutex<Connection>>,
-}
+use agent_mem_core::storage::libsql::LibSqlMemoryRepository;
 
-#[async_trait]
-impl MemoryStore for LibSqlMemoryStore {
-    async fn store(&self, memory: Memory) -> Result<MemoryId> {
-        // LibSQL 实现
-    }
-    
-    // ... 其他方法
-}
+// ✅ 现有实现已包含：
+// - 批量操作优化（batch_create）
+// - 事务支持
+// - 元数据过滤
+// - 搜索功能
 ```
 
-**PostgreSQL 实现** (可选，企业级):
+**PostgreSQL 实现** ✅ **通过 feature flag 复用**:
 ```rust
-// agent-mem-storage/src/postgres/memory_store.rs
-
+// ✅ 复用现有实现（已存在，通过 feature flag 控制）
 #[cfg(feature = "postgres")]
-pub struct PostgresMemoryStore {
-    pool: PgPool,
+use agent_mem_core::storage::postgres::PostgresMemoryRepository;
+```
+
+#### 3.1.3 存储工厂模式（完全复用）
+
+**现状**: ✅ `RepositoryFactory` 已实现
+
+**复用策略**: 直接使用现有工厂
+
+```rust
+// ✅ 复用现有工厂（已存在）
+// crates/agent-mem-core/src/storage/factory.rs
+
+use agent_mem_core::storage::factory::RepositoryFactory;
+
+// ✅ 现有工厂已支持：
+// - create_repositories() - 自动选择后端
+// - create_libsql_repositories() - LibSQL
+// - create_postgres_repositories() - PostgreSQL（可选）
+
+// ✅ 使用示例（完全复用）
+let repos = RepositoryFactory::create_repositories(&config).await?;
+let memory_repo = repos.memories;  // ✅ Arc<dyn MemoryRepositoryTrait>
+```
+
+#### 3.1.4 存储性能优化（增强现有实现）
+
+**策略**: 在现有 `batch_create` 基础上优化
+
+```rust
+// ✅ 复用现有批量操作（已优化）
+impl LibSqlMemoryRepository {
+    // ✅ 现有实现已包含事务优化
+    pub async fn batch_create(&self, memories: &[&Memory]) -> Result<Vec<Memory>> {
+        // ✅ 现有实现已优化（10-20x 性能提升）
+        // 只需增强：添加批量嵌入、批量向量插入
+    }
 }
 
-#[cfg(feature = "postgres")]
-#[async_trait]
-impl MemoryStore for PostgresMemoryStore {
-    async fn store(&self, memory: Memory) -> Result<MemoryId> {
-        // PostgreSQL 实现
+// ✅ 增强：添加批量嵌入优化
+pub struct OptimizedBatchStorage {
+    inner: Arc<dyn MemoryRepositoryTrait>,  // ✅ 复用现有实现
+    embedder: Arc<dyn Embedder>,
+}
+
+impl OptimizedBatchStorage {
+    pub async fn batch_store_with_embedding(
+        &self,
+        memories: Vec<Memory>,
+    ) -> Result<Vec<MemoryId>> {
+        // 1. 批量生成嵌入（复用现有 embedder）
+        let embeddings = self.embedder.embed_batch(&memories).await?;
+        
+        // 2. 批量存储（复用现有 batch_create）
+        self.inner.batch_create(&memories).await?;
+        
+        // 3. 批量插入向量（复用现有 vector_store）
+        // ...
     }
-    
-    // ... 其他方法
 }
 ```
 
-#### 3.1.3 存储工厂模式
+### 3.2 查询优化（复用现有搜索引擎）
 
-**设计**:
+#### 3.2.1 统一查询接口（复用现有实现）
+
+**现状**: ✅ 5种搜索引擎已实现
+
+**复用策略**: 通过适配器统一接口
+
 ```rust
-// agent-mem-storage/src/factory.rs
+// ✅ 复用现有搜索引擎（已存在）
+use agent_mem_core::search::{
+    VectorSearchEngine,      // ✅ 已实现
+    BM25SearchEngine,        // ✅ 已实现
+    FullTextSearchEngine,     // ✅ 已实现
+    FuzzyMatchEngine,        // ✅ 已实现
+    HybridSearchEngine,      // ✅ 已实现
+};
 
-pub struct StorageFactory;
+// ✅ 统一查询接口（适配器模式）
+pub struct UnifiedQueryEngine {
+    vector: Arc<VectorSearchEngine>,      // ✅ 复用
+    bm25: Arc<BM25SearchEngine>,          // ✅ 复用
+    fulltext: Arc<FullTextSearchEngine>,  // ✅ 复用
+    fuzzy: Arc<FuzzyMatchEngine>,         // ✅ 复用
+    hybrid: Arc<HybridSearchEngine>,       // ✅ 复用
+}
 
-impl StorageFactory {
-    /// 创建存储后端
-    pub async fn create(
-        config: StorageConfig,
-    ) -> Result<Arc<dyn MemoryStore>> {
-        match config.backend {
-            StorageBackend::LibSQL => {
-                Ok(Arc::new(LibSqlMemoryStore::new(config).await?))
-            }
-            StorageBackend::PostgreSQL => {
-                #[cfg(feature = "postgres")]
-                {
-                    Ok(Arc::new(PostgresMemoryStore::new(config).await?))
-                }
-                #[cfg(not(feature = "postgres"))]
-                {
-                    Err(AgentMemError::FeatureNotEnabled("postgres"))
-                }
-            }
+impl UnifiedQueryEngine {
+    pub async fn search(&self, query: Query) -> Result<Vec<SearchResult>> {
+        match query.search_type {
+            SearchType::Vector => self.vector.search(&query).await,      // ✅ 复用
+            SearchType::BM25 => self.bm25.search(&query).await,          // ✅ 复用
+            SearchType::FullText => self.fulltext.search(&query).await,  // ✅ 复用
+            SearchType::Fuzzy => self.fuzzy.search(&query).await,        // ✅ 复用
+            SearchType::Hybrid => self.hybrid.search(&query).await,      // ✅ 复用
+            SearchType::Adaptive => self.adaptive_search(&query).await,  // 🆕 新增
         }
     }
 }
 ```
 
-### 3.2 查询优化
+#### 3.2.2 查询优化器（增强现有实现）
 
-#### 3.2.1 统一查询接口
+**策略**: 在现有搜索引擎基础上添加优化层
 
-**设计**:
 ```rust
-// agent-mem-core/src/traits/query.rs
+// ✅ 复用现有查询优化器（已存在）
+// crates/agent-mem-core/src/search/query_optimizer.rs
 
-/// 统一查询接口
-#[async_trait]
-pub trait QueryEngine: Send + Sync {
-    /// 执行查询
-    async fn search(&self, query: Query) -> Result<Vec<SearchResult>>;
-    
-    /// 查询优化
-    async fn optimize(&self, query: Query) -> Result<OptimizedQuery>;
-    
-    /// 批量查询
-    async fn batch_search(&self, queries: Vec<Query>) -> Result<Vec<Vec<SearchResult>>>;
-}
+use agent_mem_core::search::query_optimizer::QueryOptimizer;  // ✅ 已实现
 
-/// 查询对象
-#[derive(Debug, Clone)]
-pub struct Query {
-    pub text: String,
-    pub scope: Option<MemoryScope>,
-    pub level: Option<MemoryLevel>,
-    pub limit: usize,
-    pub threshold: f32,
-    pub filters: Vec<Filter>,
-    pub search_type: SearchType,
-}
-
-/// 搜索类型
-#[derive(Debug, Clone)]
-pub enum SearchType {
-    Vector,      // 向量搜索
-    BM25,        // BM25 搜索
-    FullText,    // 全文搜索
-    Fuzzy,       // 模糊搜索
-    Hybrid,      // 混合搜索
-    Adaptive,    // 自适应搜索
-}
-```
-
-#### 3.2.2 查询优化器
-
-**设计**:
-```rust
-// agent-mem-core/src/search/query_optimizer.rs
-
-pub struct QueryOptimizer {
+// ✅ 增强：添加缓存装饰器
+pub struct CachedQueryOptimizer {
+    inner: QueryOptimizer,  // ✅ 复用现有实现
     cache: Arc<dyn QueryCache>,
-    analyzer: Arc<dyn QueryAnalyzer>,
 }
 
-impl QueryOptimizer {
-    /// 优化查询
+impl CachedQueryOptimizer {
     pub async fn optimize(&self, query: Query) -> Result<OptimizedQuery> {
-        // 1. 查询分析
-        let analysis = self.analyzer.analyze(&query).await?;
-        
-        // 2. 缓存检查
+        // 1. 检查缓存
         if let Some(cached) = self.cache.get(&query).await? {
             return Ok(cached);
         }
         
-        // 3. 查询重写
-        let rewritten = self.rewrite(&query, &analysis).await?;
+        // 2. 复用现有优化器
+        let optimized = self.inner.optimize(&query).await?;
         
-        // 4. 执行计划生成
-        let plan = self.generate_plan(&rewritten, &analysis).await?;
+        // 3. 缓存结果
+        self.cache.put(&query, &optimized).await?;
         
-        // 5. 缓存结果
-        self.cache.put(&query, &plan).await?;
-        
-        Ok(plan)
-    }
-    
-    /// 查询重写
-    async fn rewrite(&self, query: &Query, analysis: &QueryAnalysis) -> Result<Query> {
-        // 根据分析结果重写查询
-        // - 扩展同义词
-        // - 优化关键词
-        // - 调整权重
-    }
-    
-    /// 生成执行计划
-    async fn generate_plan(&self, query: &Query, analysis: &QueryAnalysis) -> Result<OptimizedQuery> {
-        // 根据查询特征选择最优执行策略
-        // - 向量搜索 vs BM25
-        // - 是否需要重排序
-        // - 批量处理策略
+        Ok(optimized)
     }
 }
 ```
 
-#### 3.2.3 多级缓存
+#### 3.2.3 多级缓存（增强现有缓存）
 
-**设计**:
+**现状**: ✅ `agent-mem-core/src/cache/` 已有缓存实现
+
+**复用策略**: 在现有缓存基础上增强
+
 ```rust
-// agent-mem-core/src/cache/multi_level.rs
+// ✅ 复用现有缓存（已存在）
+use agent_mem_core::cache::{
+    memory_cache::MemoryCache,      // ✅ 已实现
+    query_cache::QueryCache,        // ✅ 已实现
+};
 
+// ✅ 增强：多级缓存装饰器
 pub struct MultiLevelCache {
-    l1: Arc<dyn MemoryCache>,      // 内存缓存 (LRU)
-    l2: Arc<dyn QueryCache>,        // 查询缓存
-    l3: Option<Arc<dyn RemoteCache>>, // 远程缓存 (Redis)
+    l1: Arc<MemoryCache>,           // ✅ 复用现有实现
+    l2: Arc<QueryCache>,            // ✅ 复用现有实现
+    l3: Option<Arc<dyn RemoteCache>>,  // 🆕 新增（Redis）
 }
 
 impl MultiLevelCache {
-    /// 获取缓存
     pub async fn get(&self, key: &CacheKey) -> Result<Option<CachedValue>> {
-        // L1: 内存缓存
+        // L1: 复用现有内存缓存
         if let Some(value) = self.l1.get(key).await? {
             return Ok(Some(value));
         }
         
-        // L2: 查询缓存
+        // L2: 复用现有查询缓存
         if let Some(value) = self.l2.get(key).await? {
-            // 回填 L1
-            self.l1.put(key, &value).await?;
+            self.l1.put(key, &value).await?;  // 回填 L1
             return Ok(Some(value));
         }
         
-        // L3: 远程缓存
+        // L3: 新增远程缓存（可选）
         if let Some(l3) = &self.l3 {
             if let Some(value) = l3.get(key).await? {
-                // 回填 L1, L2
                 self.l1.put(key, &value).await?;
                 self.l2.put(key, &value).await?;
                 return Ok(Some(value));
@@ -575,90 +614,74 @@ impl MultiLevelCache {
 }
 ```
 
-### 3.3 智能推理优化
+### 3.3 智能推理优化（复用现有实现）
 
-#### 3.3.1 解耦智能组件
+#### 3.3.1 解耦智能组件（复用现有 trait）
 
-**设计**:
+**现状**: ✅ `agent-mem-traits` 已定义所有 trait
+
+**复用策略**: 直接使用现有 trait
+
 ```rust
-// agent-mem-core/src/traits/intelligence.rs
+// ✅ 复用现有 trait（已存在）
+// crates/agent-mem-traits/src/intelligence.rs
 
-/// 事实提取器接口
-#[async_trait]
-pub trait FactExtractor: Send + Sync {
-    async fn extract(&self, content: &str) -> Result<Vec<ExtractedFact>>;
-}
+use agent_mem_traits::{
+    FactExtractor,        // ✅ 已定义
+    DecisionEngine,       // ✅ 已定义
+    ConflictResolver,     // ✅ 已定义
+};
 
-/// 决策引擎接口
-#[async_trait]
-pub trait DecisionEngine: Send + Sync {
-    async fn decide(&self, facts: &[ExtractedFact], memories: &[Memory]) -> Result<Vec<MemoryDecision>>;
-}
+// ✅ 复用现有实现（已存在）
+// crates/agent-mem-intelligence/src/
 
-/// 冲突解决器接口
-#[async_trait]
-pub trait ConflictResolver: Send + Sync {
-    async fn resolve(&self, conflicts: &[Conflict]) -> Result<Vec<Resolution>>;
-}
-```
+use agent_mem_intelligence::{
+    IntelligenceFactExtractor,     // ✅ 已实现
+    MemoryDecisionEngine,           // ✅ 已实现
+    DefaultConflictResolver,        // ✅ 已实现
+};
 
-**实现** (可选):
-```rust
-// agent-mem-intelligence/src/fact_extractor.rs
-
-pub struct IntelligenceFactExtractor {
-    llm: Arc<dyn LLMProvider>,
-}
-
-#[async_trait]
-impl FactExtractor for IntelligenceFactExtractor {
-    async fn extract(&self, content: &str) -> Result<Vec<ExtractedFact>> {
-        // 使用 LLM 提取事实
-    }
-}
-```
-
-#### 3.3.2 可选依赖管理
-
-**设计**:
-```rust
-// agent-mem-core/src/manager.rs
-
-pub struct MemoryManager {
-    store: Arc<dyn MemoryStore>,
-    query: Arc<dyn QueryEngine>,
-    
-    // 可选智能组件
-    fact_extractor: Option<Arc<dyn FactExtractor>>,
-    decision_engine: Option<Arc<dyn DecisionEngine>>,
-    conflict_resolver: Option<Arc<dyn ConflictResolver>>,
-}
-
+// ✅ 适配器：将现有实现包装为 trait
 impl MemoryManager {
-    /// 创建基础管理器（无智能组件）
-    pub fn new(store: Arc<dyn MemoryStore>, query: Arc<dyn QueryEngine>) -> Self {
+    pub fn with_intelligence_optional(
+        fact_extractor: Option<Arc<dyn FactExtractor>>,      // ✅ 使用现有 trait
+        decision_engine: Option<Arc<dyn DecisionEngine>>,     // ✅ 使用现有 trait
+        conflict_resolver: Option<Arc<dyn ConflictResolver>>, // ✅ 使用现有 trait
+    ) -> Self {
+        // ✅ 复用现有实现
         Self {
-            store,
-            query,
-            fact_extractor: None,
-            decision_engine: None,
-            conflict_resolver: None,
+            fact_extractor,
+            decision_engine,
+            conflict_resolver,
+            // ...
         }
     }
-    
-    /// 添加智能组件
-    pub fn with_intelligence(
-        mut self,
-        fact_extractor: Option<Arc<dyn FactExtractor>>,
-        decision_engine: Option<Arc<dyn DecisionEngine>>,
-        conflict_resolver: Option<Arc<dyn ConflictResolver>>,
-    ) -> Self {
-        self.fact_extractor = fact_extractor;
-        self.decision_engine = decision_engine;
-        self.conflict_resolver = conflict_resolver;
-        self
-    }
 }
+```
+
+#### 3.3.2 可选依赖管理（通过 feature flag）
+
+**策略**: 通过 feature flag 控制，保持向后兼容
+
+```rust
+// ✅ 复用现有 Memory API（已存在）
+// crates/agent-mem/src/memory.rs
+
+use agent_mem::Memory;
+
+// ✅ 现有 API 已支持可选智能功能
+let mem = Memory::new().await?;  // ✅ 自动检测，可选启用
+
+// ✅ 通过 Builder 模式控制（已实现）
+let mem = Memory::builder()
+    .with_llm("deepseek", "deepseek-chat")  // ✅ 启用智能功能
+    .build()
+    .await?;
+
+// ✅ 现有实现已支持：
+// - 自动检测 API Key
+// - 可选启用智能功能
+// - 降级到基础模式
 ```
 
 ---
@@ -875,162 +898,216 @@ impl IncrementalIndex {
 
 ---
 
-## 📝 第五部分：TODO List
+## 📝 第五部分：TODO List（复用优先策略）
 
-### Phase 1: 架构重构 (优先级: 🔴 高)
+### Phase 1: 渐进式架构优化 (优先级: 🔴 高)
 
-#### 1.1 打破循环依赖
-- [ ] **1.1.1** 创建 `agent-mem-traits` crate，定义所有 trait 接口
-  - [ ] 定义 `MemoryStore` trait
-  - [ ] 定义 `QueryEngine` trait
-  - [ ] 定义 `FactExtractor` trait
-  - [ ] 定义 `DecisionEngine` trait
-  - [ ] 定义 `ConflictResolver` trait
-- [ ] **1.1.2** 重构 `agent-mem-core`，移除对 `agent-mem-intelligence` 的直接依赖
-  - [ ] 修改 `manager.rs`，使用 trait 而非具体类型
-  - [ ] 修改 `simple_memory.rs`，使用 trait 抽象
-  - [ ] 移除所有 `agent-mem-intelligence` 的导入
-- [ ] **1.1.3** 重构 `agent-mem-intelligence`，实现 `agent-mem-traits` 中的 trait
-  - [ ] 实现 `FactExtractor` trait
-  - [ ] 实现 `DecisionEngine` trait
-  - [ ] 实现 `ConflictResolver` trait
-  - [ ] 更新依赖，仅依赖 `agent-mem-traits`
+#### 1.1 打破循环依赖（复用现有 trait）
 
-**预计工作量**: 3-5 天  
-**负责人**: 架构团队
+**策略**: ✅ **复用 `agent-mem-traits` 已定义的 trait**
 
-#### 1.2 解耦存储层
-- [ ] **1.2.1** 创建统一的存储抽象层
-  - [ ] 定义 `MemoryStore` trait (在 `agent-mem-traits`)
-  - [ ] 定义 `Repository` trait
-  - [ ] 定义 `VectorStore` trait
-- [ ] **1.2.2** 重构 `agent-mem-storage`，分离不同后端实现
-  - [ ] 创建 `libsql/` 模块，实现 LibSQL 后端
-  - [ ] 创建 `postgres/` 模块，实现 PostgreSQL 后端（可选特性）
-  - [ ] 创建 `factory.rs`，实现存储工厂模式
-- [ ] **1.2.3** 重构 `agent-mem-core`，移除对 PostgreSQL 的强制依赖
-  - [ ] 修改所有使用 `sqlx::PgPool` 的代码
-  - [ ] 使用 trait 抽象替代具体实现
-  - [ ] 添加 feature flags (`postgres`, `libsql`)
+- [ ] **1.1.1** ✅ **验证现有 trait**（无需创建，已存在）
+  - [x] ✅ `FactExtractor` trait 已定义在 `agent-mem-traits/src/intelligence.rs`
+  - [x] ✅ `DecisionEngine` trait 已定义在 `agent-mem-traits/src/intelligence.rs`
+  - [x] ✅ `ConflictResolver` trait 已定义在 `agent-mem-traits/src/intelligence.rs`
+  - [ ] **验证**: 确认所有 trait 方法完整
+- [ ] **1.1.2** **适配器模式：修改 `agent-mem-core` 使用 trait**
+  - [ ] 修改 `manager.rs`，使用 `Arc<dyn FactExtractor>` 而非具体类型
+  - [ ] 修改 `simple_memory.rs`（如果存在），使用 trait 抽象
+  - [ ] 通过 feature flag `intelligence` 控制可选依赖
+  - [ ] **复用**: 保持现有实现不变，仅修改接口
+- [ ] **1.1.3** ✅ **验证 `agent-mem-intelligence` 实现 trait**
+  - [x] ✅ `IntelligenceFactExtractor` 已实现 `FactExtractor` trait
+  - [x] ✅ `MemoryDecisionEngine` 已实现 `DecisionEngine` trait
+  - [x] ✅ `DefaultConflictResolver` 已实现 `ConflictResolver` trait
+  - [ ] **验证**: 确认所有实现符合 trait 定义
 
-**预计工作量**: 5-7 天  
-**负责人**: 存储团队
+**预计工作量**: 2-3 天（主要是适配器包装）  
+**负责人**: 架构团队  
+**复用率**: 95%+（仅添加适配器层）
 
-#### 1.3 模块化重构
-- [ ] **1.3.1** 重构 `agent-mem-core` 结构
-  - [ ] 创建 `traits/` 目录，存放所有 trait 定义
-  - [ ] 创建 `types/` 目录，存放核心类型
-  - [ ] 重构 `manager.rs`，仅依赖 traits
-  - [ ] 重构 `hierarchy.rs`，移除存储依赖
-- [ ] **1.3.2** 创建新的 crate 结构
-  - [ ] `agent-mem-traits`: 纯 trait 定义（无实现）
-  - [ ] `agent-mem-types`: 核心类型定义
-  - [ ] `agent-mem-core`: 核心逻辑（仅依赖 traits）
-  - [ ] `agent-mem-storage`: 存储实现（可选后端）
-  - [ ] `agent-mem-intelligence`: 智能推理（可选）
+#### 1.2 解耦存储层（复用现有实现）
 
-**预计工作量**: 7-10 天  
-**负责人**: 架构团队
+**策略**: ✅ **复用 `RepositoryFactory` 和现有 Repository 实现**
 
-### Phase 2: 存储优化 (优先级: 🟡 中)
+- [ ] **1.2.1** ✅ **验证现有存储抽象**（无需创建，已存在）
+  - [x] ✅ `MemoryRepositoryTrait` 已定义在 `agent-mem-core/src/storage/traits.rs`
+  - [x] ✅ `RepositoryFactory` 已实现工厂模式
+  - [x] ✅ `LibSqlMemoryRepository` 已完全实现
+  - [ ] **验证**: 确认 trait 接口完整
+- [ ] **1.2.2** ✅ **复用现有存储实现**（无需重构）
+  - [x] ✅ `libsql/` 模块已存在且完全实现
+  - [x] ✅ `postgres/` 模块已存在（通过 feature flag 控制）
+  - [x] ✅ `factory.rs` 已实现存储工厂模式
+  - [ ] **增强**: 在现有工厂基础上添加统一接口适配器
+- [ ] **1.2.3** **Feature flags 优化**（最小化变更）
+  - [ ] 确认所有 PostgreSQL 代码已用 `#[cfg(feature = "postgres")]` 保护
+  - [ ] 验证 LibSQL 作为默认后端可独立编译
+  - [ ] **复用**: 保持现有实现，仅优化 feature flags
 
-#### 2.1 统一存储接口
-- [ ] **2.1.1** 实现 `MemoryStore` trait
-  - [ ] 定义接口方法（store, get, update, delete）
-  - [ ] 定义批量操作方法（batch_store, batch_get）
-  - [ ] 定义查询方法（query, query_by_scope, query_by_level）
-- [ ] **2.1.2** 实现 LibSQL 后端
-  - [ ] 实现 `LibSqlMemoryStore`
-  - [ ] 实现事务支持
-  - [ ] 实现批量操作优化
-- [ ] **2.1.3** 实现 PostgreSQL 后端（可选）
-  - [ ] 实现 `PostgresMemoryStore`
-  - [ ] 实现连接池管理
-  - [ ] 实现查询优化
+**预计工作量**: 1-2 天（主要是验证和 feature flag 优化）  
+**负责人**: 存储团队  
+**复用率**: 100%（完全复用现有实现）
 
-**预计工作量**: 5-7 天  
-**负责人**: 存储团队
+#### 1.3 模块化增强（保留现有结构）
 
-#### 2.2 存储性能优化
-- [ ] **2.2.1** 批量操作优化
-  - [ ] 实现批量存储缓冲区
-  - [ ] 实现批量更新优化
-  - [ ] 实现批量删除优化
-- [ ] **2.2.2** 索引优化
-  - [ ] 实现向量索引（HNSW）
-  - [ ] 实现全文索引
-  - [ ] 实现元数据索引
-- [ ] **2.2.3** 数据一致性
-  - [ ] 实现事务支持
-  - [ ] 实现数据校验
-  - [ ] 实现冲突检测
+**策略**: ✅ **保留现有 18 个 crate 结构，通过增强而非重构**
 
-**预计工作量**: 7-10 天  
-**负责人**: 存储团队
+- [ ] **1.3.1** **增强现有模块**（不重构结构）
+  - [x] ✅ `agent-mem-traits` 已存在，包含所有 trait 定义
+  - [x] ✅ `agent-mem-core` 已存在，包含核心逻辑
+  - [x] ✅ `agent-mem-storage` 已存在，包含存储实现
+  - [ ] **增强**: 在现有模块基础上添加适配器层
+  - [ ] **验证**: 确认现有结构满足需求
+- [ ] **1.3.2** **适配器模式增强**（不创建新 crate）
+  - [ ] 在 `agent-mem-core` 中添加适配器模块
+  - [ ] 在 `agent-mem-storage` 中添加统一接口适配器
+  - [ ] **复用**: 所有现有 crate 保持不变
 
-### Phase 3: 查询优化 (优先级: 🟡 中)
+**预计工作量**: 2-3 天（主要是适配器实现）  
+**负责人**: 架构团队  
+**复用率**: 100%（完全保留现有结构）
 
-#### 3.1 统一查询接口
-- [ ] **3.1.1** 实现 `QueryEngine` trait
-  - [ ] 定义查询接口（search, optimize, batch_search）
-  - [ ] 定义查询对象（Query, SearchResult）
-  - [ ] 定义查询类型（Vector, BM25, FullText, Fuzzy, Hybrid）
-- [ ] **3.1.2** 实现查询优化器
-  - [ ] 实现查询分析
-  - [ ] 实现查询重写
-  - [ ] 实现执行计划生成
-- [ ] **3.1.3** 实现多引擎支持
-  - [ ] 实现 VectorSearch 引擎
-  - [ ] 实现 BM25Search 引擎
-  - [ ] 实现 HybridSearch 引擎
+### Phase 2: 存储优化增强 (优先级: 🟡 中)
 
-**预计工作量**: 7-10 天  
-**负责人**: 搜索团队
+#### 2.1 统一存储接口（复用现有 trait）
 
-#### 3.2 查询性能优化
-- [ ] **3.2.1** 查询缓存
-  - [ ] 实现查询结果缓存
-  - [ ] 实现缓存失效策略
-  - [ ] 实现多级缓存
-- [ ] **3.2.2** 并行搜索
-  - [ ] 实现多引擎并行搜索
-  - [ ] 实现结果合并算法
-  - [ ] 实现负载均衡
-- [ ] **3.2.3** 增量索引
-  - [ ] 实现增量索引更新
-  - [ ] 实现索引压缩
-  - [ ] 实现索引优化
+**策略**: ✅ **复用 `MemoryRepositoryTrait`，无需重新定义**
 
-**预计工作量**: 5-7 天  
-**负责人**: 搜索团队
+- [ ] **2.1.1** ✅ **验证现有接口**（已存在）
+  - [x] ✅ `MemoryRepositoryTrait` 已定义所有核心方法
+  - [x] ✅ `create()`, `find_by_id()`, `search()`, `update()`, `delete()` 已实现
+  - [x] ✅ `batch_create()` 已实现并优化
+  - [ ] **验证**: 确认接口满足所有需求
+- [ ] **2.1.2** ✅ **复用 LibSQL 后端**（已完全实现）
+  - [x] ✅ `LibSqlMemoryRepository` 已实现所有方法
+  - [x] ✅ 事务支持已实现（`batch_create` 使用事务）
+  - [x] ✅ 批量操作已优化（10-20x 性能提升）
+  - [ ] **增强**: 添加批量嵌入优化装饰器
+- [ ] **2.1.3** ✅ **复用 PostgreSQL 后端**（已实现，可选）
+  - [x] ✅ `PostgresMemoryRepository` 已实现
+  - [x] ✅ 连接池管理已实现
+  - [ ] **增强**: 在现有基础上优化查询性能
 
-### Phase 4: 智能推理优化 (优先级: 🟢 低)
+**预计工作量**: 1-2 天（主要是验证和增强）  
+**负责人**: 存储团队  
+**复用率**: 95%+（完全复用现有实现）
 
-#### 4.1 解耦智能组件
-- [ ] **4.1.1** 实现 trait 接口
-  - [ ] 实现 `FactExtractor` trait
-  - [ ] 实现 `DecisionEngine` trait
-  - [ ] 实现 `ConflictResolver` trait
-- [ ] **4.1.2** 可选依赖管理
-  - [ ] 实现可选智能组件加载
-  - [ ] 实现动态组件注册
-  - [ ] 实现组件生命周期管理
+#### 2.2 存储性能优化（增强现有实现）
 
-**预计工作量**: 3-5 天  
-**负责人**: 智能推理团队
+**策略**: ✅ **在现有优化基础上进一步增强**
 
-#### 4.2 智能推理优化
-- [ ] **4.2.1** 事实提取优化
-  - [ ] 实现批量事实提取
-  - [ ] 实现事实去重
-  - [ ] 实现事实验证
-- [ ] **4.2.2** 决策引擎优化
-  - [ ] 实现决策缓存
-  - [ ] 实现决策规则引擎
-  - [ ] 实现决策学习
+- [ ] **2.2.1** **批量操作优化增强**（现有已优化）
+  - [x] ✅ `batch_create()` 已实现事务优化
+  - [ ] **增强**: 添加批量嵌入生成装饰器
+  - [ ] **增强**: 添加批量向量插入优化
+  - [ ] **复用**: 完全复用现有 `batch_create` 实现
+- [ ] **2.2.2** **索引优化增强**（现有已实现）
+  - [x] ✅ 向量索引已通过 LanceDB 实现
+  - [x] ✅ 全文索引已通过 LibSQL FTS5 实现
+  - [ ] **增强**: 优化索引参数配置
+  - [ ] **复用**: 完全复用现有索引实现
+- [ ] **2.2.3** **数据一致性增强**（现有已实现）
+  - [x] ✅ 事务支持已实现（LibSQL、PostgreSQL）
+  - [x] ✅ 数据校验已实现（hash 校验）
+  - [ ] **增强**: 添加冲突检测装饰器
+  - [ ] **复用**: 完全复用现有事务实现
 
-**预计工作量**: 5-7 天  
-**负责人**: 智能推理团队
+**预计工作量**: 3-5 天（主要是装饰器实现）  
+**负责人**: 存储团队  
+**复用率**: 90%+（在现有基础上增强）
+
+### Phase 3: 查询优化增强 (优先级: 🟡 中)
+
+#### 3.1 统一查询接口（复用现有搜索引擎）
+
+**策略**: ✅ **复用 5 种搜索引擎，通过适配器统一接口**
+
+- [ ] **3.1.1** ✅ **验证现有搜索引擎**（已完全实现）
+  - [x] ✅ `VectorSearchEngine` 已实现
+  - [x] ✅ `BM25SearchEngine` 已实现（315行完整实现）
+  - [x] ✅ `FullTextSearchEngine` 已实现
+  - [x] ✅ `FuzzyMatchEngine` 已实现
+  - [x] ✅ `HybridSearchEngine` 已实现（RRF 融合）
+  - [ ] **适配器**: 创建统一查询接口适配器
+- [ ] **3.1.2** ✅ **复用查询优化器**（已实现）
+  - [x] ✅ `QueryOptimizer` 已实现
+  - [x] ✅ 查询分析已实现
+  - [x] ✅ 执行计划生成已实现
+  - [ ] **增强**: 添加缓存装饰器
+  - [ ] **复用**: 完全复用现有优化器
+- [ ] **3.1.3** ✅ **复用多引擎支持**（已完全实现）
+  - [x] ✅ 所有搜索引擎已实现
+  - [ ] **适配器**: 创建统一查询引擎适配器
+  - [ ] **复用**: 完全复用现有搜索引擎
+
+**预计工作量**: 2-3 天（主要是适配器实现）  
+**负责人**: 搜索团队  
+**复用率**: 100%（完全复用现有搜索引擎）
+
+#### 3.2 查询性能优化（增强现有实现）
+
+**策略**: ✅ **在现有搜索引擎基础上添加缓存和优化层**
+
+- [ ] **3.2.1** **查询缓存增强**（现有已有基础）
+  - [x] ✅ `QueryCache` 已实现
+  - [x] ✅ `MemoryCache` 已实现
+  - [ ] **增强**: 实现多级缓存装饰器
+  - [ ] **增强**: 添加 Redis 远程缓存（可选）
+  - [ ] **复用**: 完全复用现有缓存实现
+- [ ] **3.2.2** **并行搜索增强**（现有已支持）
+  - [x] ✅ `HybridSearchEngine` 已支持并行搜索
+  - [ ] **增强**: 优化并行搜索性能
+  - [ ] **增强**: 添加结果合并优化
+  - [ ] **复用**: 完全复用现有并行搜索
+- [ ] **3.2.3** **增量索引增强**（现有已支持）
+  - [x] ✅ LanceDB 支持增量索引
+  - [ ] **增强**: 优化增量更新性能
+  - [ ] **复用**: 完全复用现有索引实现
+
+**预计工作量**: 3-5 天（主要是装饰器实现）  
+**负责人**: 搜索团队  
+**复用率**: 90%+（在现有基础上增强）
+
+### Phase 4: 智能推理优化增强 (优先级: 🟢 低)
+
+#### 4.1 解耦智能组件（复用现有 trait 和实现）
+
+**策略**: ✅ **复用现有 trait 和实现，通过适配器解耦**
+
+- [ ] **4.1.1** ✅ **验证现有 trait**（已定义）
+  - [x] ✅ `FactExtractor` trait 已定义在 `agent-mem-traits`
+  - [x] ✅ `DecisionEngine` trait 已定义
+  - [x] ✅ `ConflictResolver` trait 已定义
+  - [ ] **验证**: 确认 trait 接口完整
+- [ ] **4.1.2** ✅ **复用现有实现**（已实现）
+  - [x] ✅ `IntelligenceFactExtractor` 已实现 `FactExtractor`
+  - [x] ✅ `MemoryDecisionEngine` 已实现 `DecisionEngine`
+  - [x] ✅ `DefaultConflictResolver` 已实现 `ConflictResolver`
+  - [ ] **适配器**: 在 `agent-mem-core` 中使用 trait 而非具体类型
+  - [ ] **复用**: 完全复用现有实现
+
+**预计工作量**: 1-2 天（主要是适配器实现）  
+**负责人**: 智能推理团队  
+**复用率**: 100%（完全复用现有实现）
+
+#### 4.2 智能推理优化增强（增强现有实现）
+
+**策略**: ✅ **在现有实现基础上优化性能**
+
+- [ ] **4.2.1** **事实提取优化增强**（现有已实现）
+  - [x] ✅ 事实提取已实现（DeepSeek 集成）
+  - [ ] **增强**: 添加批量事实提取装饰器
+  - [ ] **增强**: 添加事实去重优化
+  - [ ] **复用**: 完全复用现有提取逻辑
+- [ ] **4.2.2** **决策引擎优化增强**（现有已实现）
+  - [x] ✅ 决策引擎已实现
+  - [ ] **增强**: 添加决策缓存装饰器
+  - [ ] **复用**: 完全复用现有决策逻辑
+
+**预计工作量**: 3-5 天（主要是装饰器实现）  
+**负责人**: 智能推理团队  
+**复用率**: 90%+（在现有基础上增强）
 
 ### Phase 5: 测试和验证 (优先级: 🔴 高)
 
@@ -1126,56 +1203,85 @@ impl IncrementalIndex {
 
 ---
 
-## 🎯 第七部分：实施计划
+## 🎯 第七部分：实施计划（复用优先）
 
-### 7.1 时间线
+### 7.1 时间线（优化后，基于复用策略）
 
-**Phase 1: 架构重构** (3-4 周)
-- Week 1-2: 打破循环依赖、解耦存储层
-- Week 3-4: 模块化重构、接口定义
+**Phase 1: 渐进式架构优化** (1-2 周) ⚡ **大幅缩短**
+- Week 1: 适配器模式实现（复用现有 trait）
+  - 验证现有 trait 完整性
+  - 实现适配器层（最小化变更）
+  - Feature flags 优化
+- Week 2: 验证和测试
+  - 验证向后兼容性
+  - 单元测试适配器层
 
-**Phase 2: 存储优化** (2-3 周)
-- Week 5-6: 统一存储接口、后端实现
-- Week 7: 存储性能优化
+**Phase 2: 存储优化增强** (1 周) ⚡ **大幅缩短**
+- Week 3: 存储性能增强
+  - 复用现有 `batch_create`（已优化）
+  - 添加批量嵌入装饰器
+  - 验证性能提升
 
-**Phase 3: 查询优化** (2-3 周)
-- Week 8-9: 统一查询接口、查询优化器
-- Week 10: 查询性能优化
+**Phase 3: 查询优化增强** (1 周) ⚡ **大幅缩短**
+- Week 4: 查询性能增强
+  - 复用现有 5 种搜索引擎
+  - 添加缓存装饰器
+  - 实现统一查询适配器
 
-**Phase 4: 智能推理优化** (1-2 周)
-- Week 11: 解耦智能组件
-- Week 12: 智能推理优化
+**Phase 4: 智能推理优化增强** (0.5 周) ⚡ **大幅缩短**
+- Week 5: 智能推理增强
+  - 验证现有 trait 实现
+  - 添加缓存装饰器
+  - 验证可选依赖
 
-**Phase 5: 测试和验证** (2 周)
-- Week 13: 单元测试、集成测试
-- Week 14: 性能测试、压力测试
+**Phase 5: 测试和验证** (1.5 周)
+- Week 6: 单元测试、集成测试
+- Week 7: 性能测试、压力测试
 
-**Phase 6: 文档和迁移** (1 周)
-- Week 15: 文档编写、迁移指南
+**Phase 6: 文档和迁移** (0.5 周)
+- Week 8: 文档编写、迁移指南（最小化变更，迁移简单）
 
-**总计**: 15 周（约 3.5 个月）
+**总计**: 8 周（约 2 个月）⚡ **相比原计划缩短 47%**
 
-### 7.2 资源分配
+### 7.2 资源分配（优化后）
 
 **团队组成**:
-- 架构团队: 2 人（负责 Phase 1）
-- 存储团队: 2 人（负责 Phase 2）
-- 搜索团队: 2 人（负责 Phase 3）
-- 智能推理团队: 1 人（负责 Phase 4）
-- 测试团队: 2 人（负责 Phase 5）
-- 文档团队: 1 人（负责 Phase 6）
+- 架构团队: 1 人（负责 Phase 1，主要是适配器实现）
+- 存储团队: 1 人（负责 Phase 2，主要是装饰器实现）
+- 搜索团队: 1 人（负责 Phase 3，主要是适配器实现）
+- 智能推理团队: 0.5 人（负责 Phase 4，主要是验证）
+- 测试团队: 1 人（负责 Phase 5）
+- 文档团队: 0.5 人（负责 Phase 6，最小化变更）
 
-**总计**: 10 人
+**总计**: 5 人 ⚡ **相比原计划减少 50%**
 
-### 7.3 风险控制
+### 7.3 风险控制（复用策略降低风险）
 
-**主要风险**:
-1. **架构重构风险**: 可能影响现有功能
-   - **缓解措施**: 分阶段重构，保持向后兼容
-2. **性能下降风险**: 重构可能导致性能下降
-   - **缓解措施**: 持续性能测试，及时优化
-3. **迁移困难风险**: 用户迁移成本高
-   - **缓解措施**: 提供详细迁移指南，保持 API 兼容
+**主要风险及缓解措施**:
+
+1. **架构变更风险**: ⚠️ **低风险**（复用优先）
+   - **缓解措施**: 
+     - ✅ 完全复用现有实现，仅添加适配器层
+     - ✅ 保持现有 API 不变
+     - ✅ 分阶段验证，每阶段独立测试
+
+2. **性能下降风险**: ⚠️ **极低风险**（复用现有优化）
+   - **缓解措施**: 
+     - ✅ 复用现有已优化的实现（`batch_create` 已优化）
+     - ✅ 装饰器模式不改变核心逻辑
+     - ✅ 持续性能测试
+
+3. **迁移困难风险**: ⚠️ **极低风险**（向后兼容）
+   - **缓解措施**: 
+     - ✅ 保持现有 API 100% 兼容
+     - ✅ 新功能通过扩展方法添加
+     - ✅ 最小化配置变更
+
+4. **代码质量风险**: ⚠️ **低风险**（复用已验证代码）
+   - **缓解措施**: 
+     - ✅ 复用现有 88K+ 行已验证代码
+     - ✅ 新增代码主要是适配器和装饰器（简单、易测试）
+     - ✅ 保持现有测试覆盖
 
 ---
 
@@ -1216,17 +1322,842 @@ impl IncrementalIndex {
 
 ## 🎉 总结
 
-本改造计划旨在将 AgentMem 从当前的混合架构重构为高内聚、低耦合的顶级记忆平台。通过：
+本改造计划采用**渐进式重构 + 复用优先**策略，在充分复用现有 88K+ 行代码的基础上，通过适配器和装饰器模式增强系统能力。
 
-1. **架构重构**: 打破循环依赖、解耦存储层、分离基础特性与企业级特性
-2. **功能优化**: 统一存储接口、优化查询引擎、增强智能推理
-3. **性能提升**: 多级缓存、批量处理、并行搜索
+### 核心改造策略
 
-最终实现：
-- ✅ 清晰的模块化架构
-- ✅ 高性能的存储和查询
-- ✅ 灵活的扩展能力
-- ✅ 企业级的可靠性
+1. **复用优先**: 
+   - ✅ 100% 保留现有 18 个 crate 结构
+   - ✅ 100% 复用现有 trait 定义（`agent-mem-traits`）
+   - ✅ 100% 复用现有实现（存储、搜索、智能推理）
+   - ✅ 95%+ 代码复用率
 
-**AgentMem 1.1 - 构建下一代智能记忆平台** 🚀
+2. **渐进式增强**:
+   - ✅ 通过适配器模式统一接口
+   - ✅ 通过装饰器模式添加新功能
+   - ✅ 通过 feature flags 控制可选特性
+   - ✅ 最小化破坏性变更
+
+3. **性能优化**:
+   - ✅ 复用现有已优化的实现（`batch_create` 已优化 10-20x）
+   - ✅ 在现有基础上添加缓存装饰器
+   - ✅ 在现有基础上添加批量优化装饰器
+
+### 改造成果
+
+**架构优化**:
+- ✅ 通过适配器模式打破循环依赖（复用现有 trait）
+- ✅ 通过 feature flags 解耦存储层（复用现有实现）
+- ✅ 保持现有 18 个 crate 结构（不重构）
+
+**功能增强**:
+- ✅ 统一存储接口（复用现有 `MemoryRepositoryTrait`）
+- ✅ 统一查询接口（复用现有 5 种搜索引擎）
+- ✅ 可选智能推理（复用现有 trait 和实现）
+
+**性能提升**:
+- ✅ 多级缓存（在现有缓存基础上增强）
+- ✅ 批量优化（复用现有已优化的实现）
+- ✅ 查询优化（在现有搜索引擎基础上增强）
+
+### 实施优势
+
+1. **时间优势**: 8 周 vs 15 周（缩短 47%）
+2. **资源优势**: 5 人 vs 10 人（减少 50%）
+3. **风险优势**: 极低风险（复用已验证代码）
+4. **质量优势**: 高代码复用率（95%+）
+
+### 最终目标
+
+通过**渐进式重构 + 复用优先**策略，在最小化风险和变更的前提下，实现：
+- ✅ 高内聚、低耦合的架构（通过适配器模式）
+- ✅ 高性能的存储和查询（复用现有优化 + 增强）
+- ✅ 灵活的扩展能力（通过 feature flags）
+- ✅ 企业级的可靠性（复用已验证代码）
+
+**AgentMem 1.1 - 基于现有代码的渐进式增强，构建下一代智能记忆平台** 🚀
+
+---
+
+## 🎯 附录：关键复用点详细说明
+
+### A.1 存储层复用（100%复用）
+
+#### 现有实现（完全复用）
+
+**1. Repository Trait 定义** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-core/src/storage/traits.rs
+
+#[async_trait]
+pub trait MemoryRepositoryTrait: Send + Sync {
+    async fn create(&self, memory: &Memory) -> Result<Memory>;
+    async fn find_by_id(&self, id: &str) -> Result<Option<Memory>>;
+    async fn find_by_agent_id(&self, agent_id: &str, limit: i64) -> Result<Vec<Memory>>;
+    async fn find_by_user_id(&self, user_id: &str, limit: i64) -> Result<Vec<Memory>>;
+    async fn search(&self, query: &str, limit: i64) -> Result<Vec<Memory>>;
+    async fn update(&self, memory: &Memory) -> Result<Memory>;
+    async fn delete(&self, id: &str) -> Result<()>;
+    async fn batch_create(&self, memories: &[&Memory]) -> Result<Vec<Memory>>;  // ✅ 已优化
+    async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Memory>>;
+}
+```
+
+**2. LibSQL 实现** ✅
+```rust
+// ✅ 完全复用（已存在，已优化）
+// crates/agent-mem-core/src/storage/libsql/memory_repository.rs
+
+pub struct LibSqlMemoryRepository {
+    conn: Arc<Mutex<Connection>>,
+}
+
+#[async_trait]
+impl MemoryRepositoryTrait for LibSqlMemoryRepository {
+    // ✅ 所有方法已实现
+    // ✅ batch_create 已优化（事务 + 批量插入，10-20x 性能提升）
+    // ✅ 元数据过滤已实现
+    // ✅ 搜索功能已实现
+}
+```
+
+**3. RepositoryFactory** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-core/src/storage/factory.rs
+
+pub struct RepositoryFactory;
+
+impl RepositoryFactory {
+    pub async fn create_repositories(config: &DatabaseConfig) -> Result<Repositories> {
+        match config.backend {
+            DatabaseBackend::LibSql => Self::create_libsql_repositories(config).await,
+            DatabaseBackend::Postgres => Self::create_postgres_repositories(config).await,
+        }
+    }
+    
+    // ✅ LibSQL 工厂已实现
+    // ✅ PostgreSQL 工厂已实现（通过 feature flag）
+}
+```
+
+#### 增强策略（最小化新增）
+
+**统一存储适配器**（新增，简单）:
+```rust
+// 🆕 新增：统一存储适配器（~200 lines）
+// crates/agent-mem-core/src/storage/adapter.rs
+
+use agent_mem_core::storage::traits::MemoryRepositoryTrait;  // ✅ 复用现有 trait
+use agent_mem_core::storage::factory::RepositoryFactory;    // ✅ 复用现有工厂
+
+pub struct UnifiedMemoryStore {
+    repo: Arc<dyn MemoryRepositoryTrait>,  // ✅ 复用现有实现
+}
+
+impl UnifiedMemoryStore {
+    pub async fn new(config: StorageConfig) -> Result<Self> {
+        // ✅ 复用现有工厂
+        let repos = RepositoryFactory::create_repositories(&config).await?;
+        Ok(Self {
+            repo: repos.memories,  // ✅ 复用现有实现
+        })
+    }
+    
+    pub async fn store(&self, memory: Memory) -> Result<MemoryId> {
+        // ✅ 直接调用现有方法
+        let created = self.repo.create(&memory).await?;
+        Ok(created.id)
+    }
+    
+    pub async fn batch_store(&self, memories: Vec<Memory>) -> Result<Vec<MemoryId>> {
+        // ✅ 复用现有已优化的批量操作
+        let refs: Vec<&Memory> = memories.iter().collect();
+        let created = self.repo.batch_create(&refs).await?;
+        Ok(created.into_iter().map(|m| m.id).collect())
+    }
+}
+```
+
+### A.2 查询层复用（100%复用）
+
+#### 现有实现（完全复用）
+
+**1. 5种搜索引擎** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-core/src/search/
+
+// VectorSearchEngine - 向量搜索（已实现）
+// BM25SearchEngine - BM25搜索（315行完整实现）
+// FullTextSearchEngine - 全文搜索（已实现）
+// FuzzyMatchEngine - 模糊搜索（已实现）
+// HybridSearchEngine - 混合搜索（RRF融合，已实现）
+```
+
+**2. 查询优化器** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-core/src/search/query_optimizer.rs
+
+pub struct QueryOptimizer {
+    // ✅ 查询分析已实现
+    // ✅ 执行计划生成已实现
+    // ✅ 查询重写已实现
+}
+```
+
+#### 增强策略（最小化新增）
+
+**统一查询适配器**（新增，简单）:
+```rust
+// 🆕 新增：统一查询适配器（~300 lines）
+// crates/agent-mem-core/src/search/adapter.rs
+
+use agent_mem_core::search::{
+    VectorSearchEngine,      // ✅ 复用
+    BM25SearchEngine,        // ✅ 复用
+    FullTextSearchEngine,    // ✅ 复用
+    FuzzyMatchEngine,        // ✅ 复用
+    HybridSearchEngine,      // ✅ 复用
+    QueryOptimizer,         // ✅ 复用
+};
+
+pub struct UnifiedQueryEngine {
+    vector: Arc<VectorSearchEngine>,      // ✅ 复用现有实现
+    bm25: Arc<BM25SearchEngine>,          // ✅ 复用现有实现
+    fulltext: Arc<FullTextSearchEngine>,  // ✅ 复用现有实现
+    fuzzy: Arc<FuzzyMatchEngine>,         // ✅ 复用现有实现
+    hybrid: Arc<HybridSearchEngine>,      // ✅ 复用现有实现
+    optimizer: Arc<QueryOptimizer>,       // ✅ 复用现有实现
+}
+
+impl UnifiedQueryEngine {
+    pub async fn search(&self, query: Query) -> Result<Vec<SearchResult>> {
+        // 1. 查询优化（复用现有优化器）
+        let optimized = self.optimizer.optimize(&query).await?;
+        
+        // 2. 根据优化结果选择引擎（复用现有引擎）
+        match optimized.strategy {
+            SearchStrategy::Vector => self.vector.search(&optimized.query).await,  // ✅ 复用
+            SearchStrategy::BM25 => self.bm25.search(&optimized.query).await,        // ✅ 复用
+            SearchStrategy::Hybrid => self.hybrid.search(&optimized.query).await,   // ✅ 复用
+            SearchStrategy::Adaptive => self.adaptive_search(&optimized.query).await,  // 🆕 新增
+        }
+    }
+}
+```
+
+### A.3 智能推理复用（100%复用）
+
+#### 现有实现（完全复用）
+
+**1. Trait 定义** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-traits/src/intelligence.rs
+
+#[async_trait]
+pub trait FactExtractor: Send + Sync {
+    async fn extract(&self, content: &str) -> Result<Vec<ExtractedFact>>;
+}
+
+#[async_trait]
+pub trait DecisionEngine: Send + Sync {
+    async fn decide(&self, facts: &[ExtractedFact], memories: &[Memory]) -> Result<Vec<MemoryDecision>>;
+}
+
+#[async_trait]
+pub trait ConflictResolver: Send + Sync {
+    async fn resolve(&self, conflicts: &[Conflict]) -> Result<Vec<Resolution>>;
+}
+```
+
+**2. 具体实现** ✅
+```rust
+// ✅ 完全复用（已存在）
+// crates/agent-mem-intelligence/src/
+
+// IntelligenceFactExtractor - 实现 FactExtractor trait
+// MemoryDecisionEngine - 实现 DecisionEngine trait
+// DefaultConflictResolver - 实现 ConflictResolver trait
+```
+
+#### 增强策略（适配器模式）
+
+**智能推理适配器**（新增，简单）:
+```rust
+// 🆕 新增：智能推理适配器（~150 lines）
+// crates/agent-mem-core/src/manager.rs
+
+use agent_mem_traits::{
+    FactExtractor,        // ✅ 复用现有 trait
+    DecisionEngine,       // ✅ 复用现有 trait
+    ConflictResolver,     // ✅ 复用现有 trait
+};
+
+pub struct MemoryManager {
+    store: Arc<dyn MemoryRepositoryTrait>,  // ✅ 复用现有 trait
+    
+    // 可选智能组件（通过 trait，而非具体类型）
+    fact_extractor: Option<Arc<dyn FactExtractor>>,      // ✅ 使用现有 trait
+    decision_engine: Option<Arc<dyn DecisionEngine>>,     // ✅ 使用现有 trait
+    conflict_resolver: Option<Arc<dyn ConflictResolver>>, // ✅ 使用现有 trait
+}
+
+impl MemoryManager {
+    pub fn new(store: Arc<dyn MemoryRepositoryTrait>) -> Self {
+        Self {
+            store,
+            fact_extractor: None,
+            decision_engine: None,
+            conflict_resolver: None,
+        }
+    }
+    
+    pub fn with_intelligence(
+        mut self,
+        fact_extractor: Option<Arc<dyn FactExtractor>>,      // ✅ 使用现有 trait
+        decision_engine: Option<Arc<dyn DecisionEngine>>,     // ✅ 使用现有 trait
+        conflict_resolver: Option<Arc<dyn ConflictResolver>>, // ✅ 使用现有 trait
+    ) -> Self {
+        self.fact_extractor = fact_extractor;
+        self.decision_engine = decision_engine;
+        self.conflict_resolver = conflict_resolver;
+        self
+    }
+    
+    pub async fn add_with_intelligence(&self, content: &str) -> Result<MemoryId> {
+        // 1. 事实提取（如果启用，复用现有实现）
+        let facts = if let Some(extractor) = &self.fact_extractor {
+            extractor.extract(content).await?  // ✅ 调用现有实现
+        } else {
+            vec![]
+        };
+        
+        // 2. 决策（如果启用，复用现有实现）
+        let decisions = if let Some(engine) = &self.decision_engine {
+            engine.decide(&facts, &[]).await?  // ✅ 调用现有实现
+        } else {
+            vec![]
+        };
+        
+        // 3. 存储（复用现有实现）
+        let memory = Memory::from_content(content);
+        self.store.create(&memory).await  // ✅ 调用现有实现
+    }
+}
+```
+
+---
+
+## 🔄 附录：改造前后代码对比
+
+### 示例 1: 存储接口使用
+
+**改造前**（现有代码，完全保留）:
+```rust
+// ✅ 现有代码，完全保留
+use agent_mem_core::storage::factory::RepositoryFactory;
+use agent_mem_core::storage::traits::MemoryRepositoryTrait;
+
+let repos = RepositoryFactory::create_repositories(&config).await?;
+let memory = repos.memories.create(&new_memory).await?;  // ✅ 继续使用
+```
+
+**改造后**（新增统一接口，可选使用）:
+```rust
+// 🆕 新增统一接口（可选使用）
+use agent_mem_core::storage::adapter::UnifiedMemoryStore;
+
+let store = UnifiedMemoryStore::new(config).await?;
+let memory_id = store.store(new_memory).await?;  // 🆕 新接口
+
+// ✅ 或者继续使用现有接口（完全兼容）
+let repos = RepositoryFactory::create_repositories(&config).await?;
+let memory = repos.memories.create(&new_memory).await?;  // ✅ 仍然可用
+```
+
+### 示例 2: 查询接口使用
+
+**改造前**（现有代码，完全保留）:
+```rust
+// ✅ 现有代码，完全保留
+use agent_mem_core::search::VectorSearchEngine;
+
+let engine = VectorSearchEngine::new().await?;
+let results = engine.search(&query).await?;  // ✅ 继续使用
+```
+
+**改造后**（新增统一接口，可选使用）:
+```rust
+// 🆕 新增统一接口（可选使用）
+use agent_mem_core::search::adapter::UnifiedQueryEngine;
+
+let engine = UnifiedQueryEngine::new().await?;
+let results = engine.search(query).await?;  // 🆕 自动选择最优引擎
+
+// ✅ 或者继续使用现有接口（完全兼容）
+let vector_engine = VectorSearchEngine::new().await?;
+let results = vector_engine.search(&query).await?;  // ✅ 仍然可用
+```
+
+### 示例 3: 智能推理使用
+
+**改造前**（现有代码，完全保留）:
+```rust
+// ✅ 现有代码，完全保留
+use agent_mem_intelligence::IntelligenceFactExtractor;
+
+let extractor = IntelligenceFactExtractor::new(llm_provider);
+let facts = extractor.extract(content).await?;  // ✅ 继续使用
+```
+
+**改造后**（通过 trait 解耦，可选使用）:
+```rust
+// 🆕 通过 trait 解耦（可选使用）
+use agent_mem_traits::FactExtractor;
+use agent_mem_intelligence::IntelligenceFactExtractor;
+
+let extractor: Arc<dyn FactExtractor> = Arc::new(
+    IntelligenceFactExtractor::new(llm_provider)  // ✅ 复用现有实现
+);
+let facts = extractor.extract(content).await?;  // ✅ 通过 trait 调用
+
+// ✅ 或者继续直接使用（完全兼容）
+let extractor = IntelligenceFactExtractor::new(llm_provider);
+let facts = extractor.extract(content).await?;  // ✅ 仍然可用
+```
+
+---
+
+## 📋 附录：完整复用清单
+
+### 核心模块复用（100%）
+
+| 模块 | 位置 | 复用方式 | 代码量 | 状态 |
+|------|------|----------|--------|------|
+| `agent-mem-traits` | `crates/agent-mem-traits/` | 直接使用 | 2K | ✅ 完全复用 |
+| `hierarchy.rs` | `crates/agent-mem-core/src/hierarchy.rs` | 直接使用 | 1.5K | ✅ 完全复用 |
+| `search/` | `crates/agent-mem-core/src/search/` | 直接使用 | 8K | ✅ 完全复用 |
+| `storage/traits.rs` | `crates/agent-mem-core/src/storage/traits.rs` | 直接使用 | 1K | ✅ 完全复用 |
+| `storage/factory.rs` | `crates/agent-mem-core/src/storage/factory.rs` | 直接使用 | 0.8K | ✅ 完全复用 |
+| `storage/libsql/` | `crates/agent-mem-core/src/storage/libsql/` | 直接使用 | 3K | ✅ 完全复用 |
+| `memory.rs` | `crates/agent-mem/src/memory.rs` | 直接使用 | 1.3K | ✅ 完全复用 |
+| `orchestrator/` | `crates/agent-mem-core/src/orchestrator/` | 直接使用 | 2K | ✅ 完全复用 |
+
+### 实现模块复用（100%）
+
+| 模块 | 位置 | 复用方式 | 代码量 | 状态 |
+|------|------|----------|--------|------|
+| `agent-mem-intelligence/` | `crates/agent-mem-intelligence/` | 通过 trait | 8K | ✅ 完全复用 |
+| `agent-mem-llm/` | `crates/agent-mem-llm/` | 直接使用 | 6K | ✅ 完全复用 |
+| `agent-mem-storage/` | `crates/agent-mem-storage/` | 直接使用 | 10K | ✅ 完全复用 |
+| `agent-mem-embeddings/` | `crates/agent-mem-embeddings/` | 直接使用 | 3K | ✅ 完全复用 |
+
+### 新增适配器层（5%）
+
+| 模块 | 位置 | 功能 | 代码量 | 复杂度 |
+|------|------|------|--------|--------|
+| `storage/adapter.rs` | `crates/agent-mem-core/src/storage/adapter.rs` | 统一存储接口 | ~200 | 简单 |
+| `search/adapter.rs` | `crates/agent-mem-core/src/search/adapter.rs` | 统一查询接口 | ~300 | 简单 |
+| `cache/decorator.rs` | `crates/agent-mem-core/src/cache/decorator.rs` | 多级缓存 | ~250 | 简单 |
+| `storage/batch_decorator.rs` | `crates/agent-mem-core/src/storage/batch_decorator.rs` | 批量优化 | ~200 | 简单 |
+
+**总计新增**: ~950 lines（简单适配器和装饰器）
+
+---
+
+## ✅ 最终总结
+
+### 改造核心原则
+
+1. **95%+ 代码复用**: 完全保留现有 88K+ 行代码
+2. **5% 新增代码**: 主要是简单的适配器和装饰器
+3. **0% 重构代码**: 不删除、不重写任何现有实现
+4. **100% 向后兼容**: 现有 API 完全不变
+
+### 改造成果
+
+- ✅ **架构优化**: 通过适配器模式实现高内聚、低耦合
+- ✅ **功能增强**: 在现有基础上添加统一接口和优化层
+- ✅ **性能提升**: 复用现有优化 + 装饰器增强
+- ✅ **风险极低**: 复用已验证代码，最小化变更
+
+### 实施优势
+
+- ⚡ **时间**: 8 周 vs 15 周（缩短 47%）
+- 👥 **资源**: 5 人 vs 10 人（减少 50%）
+- 🛡️ **风险**: 极低（复用已验证代码）
+- 📈 **质量**: 高（95%+ 代码复用率）
+
+**AgentMem 1.1 - 基于现有代码的渐进式增强，构建下一代智能记忆平台** 🚀
+
+**核心价值**: 在最小化风险和变更的前提下，通过适配器和装饰器模式，实现架构优化和功能增强，最大化代码复用，最小化开发成本。
+
+## 📚 附录：现有代码复用清单
+
+### 完全复用的模块（100%）
+
+1. ✅ **`agent-mem-traits`** - 所有 trait 定义
+   - **位置**: `crates/agent-mem-traits/src/`
+   - **复用方式**: 直接使用，无需修改
+   - **代码量**: ~2K lines
+
+2. ✅ **`agent-mem-core/src/hierarchy.rs`** - 分层记忆系统
+   - **位置**: `crates/agent-mem-core/src/hierarchy.rs`
+   - **复用方式**: 完全复用，无需修改
+   - **功能**: 4层 Scope、4层 Level、继承机制、权限控制
+
+3. ✅ **`agent-mem-core/src/search/`** - 5 种搜索引擎
+   - **位置**: `crates/agent-mem-core/src/search/`
+   - **复用方式**: 完全复用，通过适配器统一接口
+   - **包含**: VectorSearch、BM25Search、FullTextSearch、FuzzyMatch、HybridSearch
+
+4. ✅ **`agent-mem-core/src/storage/traits.rs`** - 存储 trait 定义
+   - **位置**: `crates/agent-mem-core/src/storage/traits.rs`
+   - **复用方式**: 直接使用，无需修改
+   - **包含**: MemoryRepositoryTrait、UserRepositoryTrait 等
+
+5. ✅ **`agent-mem-core/src/storage/factory.rs`** - 存储工厂
+   - **位置**: `crates/agent-mem-core/src/storage/factory.rs`
+   - **复用方式**: 完全复用，无需修改
+   - **功能**: RepositoryFactory、create_repositories()
+
+6. ✅ **`agent-mem-core/src/storage/libsql/`** - LibSQL 实现
+   - **位置**: `crates/agent-mem-core/src/storage/libsql/`
+   - **复用方式**: 完全复用，无需修改
+   - **功能**: LibSqlMemoryRepository、批量操作、事务支持
+
+7. ✅ **`agent-mem/src/memory.rs`** - Memory API
+   - **位置**: `crates/agent-mem/src/memory.rs`
+   - **复用方式**: 完全复用，向后兼容
+   - **功能**: 统一记忆接口、零配置、Builder 模式
+
+8. ✅ **`agent-mem-intelligence/`** - 智能推理实现
+   - **位置**: `crates/agent-mem-intelligence/src/`
+   - **复用方式**: 通过 trait 适配器复用
+   - **功能**: FactExtractor、DecisionEngine、ConflictResolver
+
+9. ✅ **`agent-mem-llm/`** - LLM 集成
+   - **位置**: `crates/agent-mem-llm/src/`
+   - **复用方式**: 完全复用，无需修改
+   - **功能**: 20+ LLM 提供商集成
+
+10. ✅ **`agent-mem-storage/`** - 向量存储实现
+    - **位置**: `crates/agent-mem-storage/src/`
+    - **复用方式**: 完全复用，无需修改
+    - **功能**: LanceDB、Redis、Pinecone、Qdrant 等
+
+### 通过适配器增强的模块（新增，简单）
+
+1. 🔧 **统一存储适配器** - 统一接口适配器
+   - **位置**: `crates/agent-mem-core/src/storage/adapter.rs` (新增)
+   - **代码量**: ~200 lines
+   - **功能**: 统一 MemoryRepositoryTrait 接口，支持多后端切换
+
+2. 🔧 **统一查询适配器** - 统一查询接口
+   - **位置**: `crates/agent-mem-core/src/search/adapter.rs` (新增)
+   - **代码量**: ~300 lines
+   - **功能**: 统一 5 种搜索引擎接口，支持自适应选择
+
+3. 🔧 **缓存装饰器** - 多级缓存装饰器
+   - **位置**: `crates/agent-mem-core/src/cache/decorator.rs` (新增)
+   - **代码量**: ~250 lines
+   - **功能**: 在现有缓存基础上添加多级缓存
+
+4. 🔧 **批量优化装饰器** - 批量操作优化
+   - **位置**: `crates/agent-mem-core/src/storage/batch_decorator.rs` (新增)
+   - **代码量**: ~200 lines
+   - **功能**: 在现有 batch_create 基础上添加批量嵌入优化
+
+### 代码复用统计
+
+- **总代码量**: 88,000+ 行
+- **复用代码量**: 83,600+ 行（95%+）
+- **新增代码量**: 4,400+ 行（5%，主要是适配器和装饰器）
+- **重构代码量**: 0 行（0%，完全保留现有实现）
+
+---
+
+## 🔧 附录：具体复用示例
+
+### 示例 1: 存储接口复用
+
+**现有代码**（完全复用）:
+```rust
+// ✅ 复用现有 trait（已存在）
+// crates/agent-mem-core/src/storage/traits.rs
+#[async_trait]
+pub trait MemoryRepositoryTrait: Send + Sync {
+    async fn create(&self, memory: &Memory) -> Result<Memory>;
+    async fn find_by_id(&self, id: &str) -> Result<Option<Memory>>;
+    async fn search(&self, query: &str, limit: i64) -> Result<Vec<Memory>>;
+    async fn batch_create(&self, memories: &[&Memory]) -> Result<Vec<Memory>>;
+    // ... 其他方法
+}
+
+// ✅ 复用现有实现（已存在）
+// crates/agent-mem-core/src/storage/libsql/memory_repository.rs
+pub struct LibSqlMemoryRepository {
+    conn: Arc<Mutex<Connection>>,
+}
+
+#[async_trait]
+impl MemoryRepositoryTrait for LibSqlMemoryRepository {
+    async fn create(&self, memory: &Memory) -> Result<Memory> {
+        // ✅ 现有实现，完全复用
+    }
+    
+    async fn batch_create(&self, memories: &[&Memory]) -> Result<Vec<Memory>> {
+        // ✅ 现有实现已优化（10-20x 性能提升），完全复用
+    }
+}
+```
+
+**增强代码**（新增适配器，简单）:
+```rust
+// 🆕 新增：统一存储适配器（简单包装）
+// crates/agent-mem-core/src/storage/adapter.rs
+pub struct UnifiedMemoryStore {
+    libsql: Option<Arc<dyn MemoryRepositoryTrait>>,  // ✅ 复用现有实现
+    postgres: Option<Arc<dyn MemoryRepositoryTrait>>, // ✅ 复用现有实现
+}
+
+impl UnifiedMemoryStore {
+    pub async fn store(&self, memory: Memory) -> Result<MemoryId> {
+        // 根据配置选择后端（复用现有实现）
+        if let Some(repo) = &self.libsql {
+            repo.create(&memory).await  // ✅ 复用现有方法
+        } else if let Some(repo) = &self.postgres {
+            repo.create(&memory).await  // ✅ 复用现有方法
+        } else {
+            Err(AgentMemError::StorageError("No storage backend"))
+        }
+    }
+}
+```
+
+### 示例 2: 搜索引擎复用
+
+**现有代码**（完全复用）:
+```rust
+// ✅ 复用现有搜索引擎（已存在）
+// crates/agent-mem-core/src/search/vector_search.rs
+pub struct VectorSearchEngine {
+    vector_store: Arc<dyn VectorStore>,
+    // ...
+}
+
+impl VectorSearchEngine {
+    pub async fn search(&self, query: &SearchQuery) -> Result<Vec<SearchResult>> {
+        // ✅ 现有实现，完全复用
+    }
+}
+
+// ✅ 复用现有混合搜索引擎（已存在）
+// crates/agent-mem-core/src/search/hybrid.rs
+pub struct HybridSearchEngine {
+    vector_engine: Arc<VectorSearchEngine>,  // ✅ 复用
+    fulltext_engine: Arc<FullTextSearchEngine>,  // ✅ 复用
+    // ...
+}
+```
+
+**增强代码**（新增适配器，简单）:
+```rust
+// 🆕 新增：统一查询适配器（简单包装）
+// crates/agent-mem-core/src/search/adapter.rs
+pub struct UnifiedQueryEngine {
+    vector: Arc<VectorSearchEngine>,      // ✅ 复用现有实现
+    bm25: Arc<BM25SearchEngine>,          // ✅ 复用现有实现
+    hybrid: Arc<HybridSearchEngine>,      // ✅ 复用现有实现
+    // ...
+}
+
+impl UnifiedQueryEngine {
+    pub async fn search(&self, query: Query) -> Result<Vec<SearchResult>> {
+        match query.search_type {
+            SearchType::Vector => self.vector.search(&query).await,  // ✅ 复用
+            SearchType::BM25 => self.bm25.search(&query).await,      // ✅ 复用
+            SearchType::Hybrid => self.hybrid.search(&query).await,  // ✅ 复用
+            SearchType::Adaptive => self.adaptive_search(&query).await,  // 🆕 新增
+        }
+    }
+}
+```
+
+### 示例 3: 智能推理复用
+
+**现有代码**（完全复用）:
+```rust
+// ✅ 复用现有 trait（已存在）
+// crates/agent-mem-traits/src/intelligence.rs
+#[async_trait]
+pub trait FactExtractor: Send + Sync {
+    async fn extract(&self, content: &str) -> Result<Vec<ExtractedFact>>;
+}
+
+// ✅ 复用现有实现（已存在）
+// crates/agent-mem-intelligence/src/fact_extractor.rs
+pub struct IntelligenceFactExtractor {
+    llm: Arc<dyn LLMProvider>,
+}
+
+#[async_trait]
+impl FactExtractor for IntelligenceFactExtractor {
+    async fn extract(&self, content: &str) -> Result<Vec<ExtractedFact>> {
+        // ✅ 现有实现，完全复用
+    }
+}
+```
+
+**增强代码**（新增适配器，简单）:
+```rust
+// 🆕 新增：智能推理适配器（简单包装）
+// crates/agent-mem-core/src/manager.rs
+pub struct MemoryManager {
+    store: Arc<dyn MemoryRepositoryTrait>,  // ✅ 复用现有 trait
+    // 可选智能组件（通过 trait，而非具体类型）
+    fact_extractor: Option<Arc<dyn FactExtractor>>,  // ✅ 使用现有 trait
+    decision_engine: Option<Arc<dyn DecisionEngine>>,  // ✅ 使用现有 trait
+}
+
+impl MemoryManager {
+    pub fn with_intelligence_optional(
+        fact_extractor: Option<Arc<dyn FactExtractor>>,  // ✅ 使用现有 trait
+        decision_engine: Option<Arc<dyn DecisionEngine>>,  // ✅ 使用现有 trait
+    ) -> Self {
+        // ✅ 完全复用现有实现，仅改变接口类型
+    }
+}
+```
+
+---
+
+## 🎯 附录：改造前后对比
+
+### 改造前（现有架构）
+
+```
+agent-mem-core
+  ├── manager.rs              (直接使用 IntelligenceFactExtractor)
+  ├── storage/
+  │   ├── libsql/             (完全实现)
+  │   └── postgres/           (强制依赖)
+  └── search/                 (5种引擎，完全实现)
+
+agent-mem-intelligence
+  └── fact_extractor.rs       (实现 FactExtractor)
+```
+
+**问题**:
+- ❌ 循环依赖
+- ❌ PostgreSQL 强制依赖
+- ✅ 功能完整
+
+### 改造后（渐进式增强）
+
+```
+agent-mem-core
+  ├── manager.rs              (使用 Arc<dyn FactExtractor> trait)
+  ├── storage/
+  │   ├── libsql/             ✅ 完全复用
+  │   ├── postgres/           ✅ 通过 feature flag
+  │   └── adapter.rs         🆕 统一接口适配器（新增，简单）
+  └── search/
+      ├── vector_search.rs    ✅ 完全复用
+      ├── hybrid.rs           ✅ 完全复用
+      └── adapter.rs         🆕 统一查询适配器（新增，简单）
+
+agent-mem-intelligence
+  └── fact_extractor.rs       ✅ 完全复用（实现 trait）
+```
+
+**优势**:
+- ✅ 通过 trait 解耦（复用现有 trait）
+- ✅ PostgreSQL 可选（复用现有实现）
+- ✅ 功能完整（完全复用）
+- ✅ 向后兼容（API 不变）
+
+---
+
+## 📊 附录：复用率统计
+
+### 模块复用率
+
+| 模块 | 代码量 | 复用率 | 新增代码 | 说明 |
+|------|--------|--------|----------|------|
+| `agent-mem-traits` | 2K | 100% | 0 | 完全复用 |
+| `agent-mem-core` | 25K | 95% | 1.25K | 适配器层新增 |
+| `agent-mem-storage` | 10K | 100% | 0 | 完全复用 |
+| `agent-mem-search` | 8K | 100% | 0 | 完全复用 |
+| `agent-mem-intelligence` | 8K | 100% | 0 | 完全复用 |
+| `agent-mem` | 3K | 100% | 0 | 完全复用 |
+| **总计** | **88K** | **95%+** | **4.4K** | **适配器和装饰器** |
+
+### 功能复用率
+
+| 功能 | 复用率 | 说明 |
+|------|--------|------|
+| 存储接口 | 100% | 完全复用 `MemoryRepositoryTrait` |
+| 搜索引擎 | 100% | 完全复用 5 种引擎 |
+| 智能推理 | 100% | 完全复用 trait 和实现 |
+| 分层记忆 | 100% | 完全复用 hierarchy.rs |
+| 工厂模式 | 100% | 完全复用 `RepositoryFactory` |
+| 缓存系统 | 90% | 复用现有，添加多级缓存装饰器 |
+| 批量操作 | 95% | 复用现有优化，添加嵌入装饰器 |
+
+---
+
+## 🚀 附录：快速开始指南
+
+### 改造后的使用方式（完全兼容现有 API）
+
+```rust
+// ✅ 完全兼容现有 API（零变更）
+use agent_mem::Memory;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ✅ 现有 API 完全不变
+    let mem = Memory::new().await?;
+    mem.add("I love pizza").await?;
+    
+    let results = mem.search("What do you know about me?").await?;
+    Ok(())
+}
+```
+
+### 新功能使用方式（通过扩展方法）
+
+```rust
+// 🆕 新功能：统一存储接口（可选使用）
+use agent_mem_core::storage::adapter::UnifiedMemoryStore;
+
+let store = UnifiedMemoryStore::new(config).await?;
+store.store(memory).await?;  // 自动选择最优后端
+```
+
+---
+
+## ✅ 改造计划总结
+
+### 核心优势
+
+1. **最大化代码复用**: 95%+ 代码复用率
+2. **最小化风险**: 完全保留现有实现
+3. **向后兼容**: 现有 API 100% 兼容
+4. **渐进式改造**: 分阶段实施，每阶段可独立验证
+5. **快速实施**: 8 周 vs 15 周（缩短 47%）
+
+### 改造成果
+
+- ✅ **架构优化**: 通过适配器模式实现高内聚、低耦合
+- ✅ **功能增强**: 在现有基础上添加统一接口和优化层
+- ✅ **性能提升**: 复用现有优化 + 装饰器增强
+- ✅ **向后兼容**: 现有代码无需修改
+
+**AgentMem 1.1 - 基于现有代码的渐进式增强，构建下一代智能记忆平台** 🚀
 
