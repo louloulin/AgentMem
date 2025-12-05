@@ -4,7 +4,9 @@
 //! to ensure data consistency and provide unified interface.
 
 use agent_mem_traits::{AgentMemError, MemoryV4 as Memory, Result, VectorStore};
+use lru::LruCache;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -17,8 +19,8 @@ pub struct UnifiedStorageCoordinator {
     sql_repository: Arc<dyn MemoryRepositoryTrait>,
     /// Vector store for embeddings
     vector_store: Arc<dyn VectorStore + Send + Sync>,
-    /// In-memory L1 cache (LRU-like)
-    l1_cache: Arc<RwLock<HashMap<String, Memory>>>,
+    /// In-memory L1 cache (true LRU)
+    l1_cache: Arc<RwLock<LruCache<String, Memory>>>,
     /// Cache configuration
     cache_config: CacheConfig,
     /// Statistics
@@ -76,11 +78,15 @@ impl UnifiedStorageCoordinator {
         vector_store: Arc<dyn VectorStore + Send + Sync>,
         cache_config: Option<CacheConfig>,
     ) -> Self {
+        let config = cache_config.unwrap_or_default();
+        let cache_capacity = NonZeroUsize::new(config.l1_capacity)
+            .unwrap_or(NonZeroUsize::new(1000).unwrap());
+        
         Self {
             sql_repository,
             vector_store,
-            l1_cache: Arc::new(RwLock::new(HashMap::new())),
-            cache_config: cache_config.unwrap_or_default(),
+            l1_cache: Arc::new(RwLock::new(LruCache::new(cache_capacity))),
+            cache_config: config,
             stats: Arc::new(RwLock::new(CoordinatorStats::default())),
         }
     }
@@ -209,13 +215,14 @@ impl UnifiedStorageCoordinator {
     pub async fn get_memory(&self, id: &str) -> Result<Option<Memory>> {
         // Step 1: Try L1 cache
         if self.cache_config.l1_enabled {
-            let cache = self.l1_cache.read().await;
+            let mut cache = self.l1_cache.write().await;
             if let Some(memory) = cache.get(id) {
                 debug!("Cache hit (L1): {}", id);
                 {
                     let mut stats = self.stats.write().await;
                     stats.cache_hits += 1;
                 }
+                // LRU cache automatically moves accessed item to front
                 return Ok(Some(memory.clone()));
             }
         }
@@ -302,6 +309,16 @@ impl UnifiedStorageCoordinator {
         let mut cache = self.l1_cache.write().await;
         cache.clear();
         info!("L1 cache cleared");
+    }
+
+    /// Get cache hit rate
+    pub async fn get_cache_hit_rate(&self) -> f64 {
+        let stats = self.stats.read().await;
+        let total = stats.cache_hits + stats.cache_misses;
+        if total == 0 {
+            return 0.0;
+        }
+        stats.cache_hits as f64 / total as f64
     }
 
     /// Batch add memories with optimized performance
@@ -460,21 +477,13 @@ impl UnifiedStorageCoordinator {
 
     async fn update_l1_cache(&self, id: &str, memory: Memory) {
         let mut cache = self.l1_cache.write().await;
-
-        // If cache is full, remove oldest entry (simple FIFO)
-        if cache.len() >= self.cache_config.l1_capacity && !cache.contains_key(id) {
-            // Remove first entry (oldest)
-            if let Some(key) = cache.keys().next().cloned() {
-                cache.remove(&key);
-            }
-        }
-
-        cache.insert(id.to_string(), memory);
+        // LRU cache automatically evicts least recently used entry when full
+        cache.put(id.to_string(), memory);
     }
 
     async fn remove_from_l1_cache(&self, id: &str) {
         let mut cache = self.l1_cache.write().await;
-        cache.remove(id);
+        cache.pop(id);
     }
 }
 
@@ -613,14 +622,17 @@ mod tests {
 
         async fn health_check(&self) -> Result<agent_mem_traits::HealthStatus> {
             Ok(agent_mem_traits::HealthStatus {
-                healthy: true,
+                status: "healthy".to_string(),
                 message: "OK".to_string(),
+                timestamp: chrono::Utc::now(),
+                details: HashMap::new(),
             })
         }
 
         async fn get_stats(&self) -> Result<agent_mem_traits::VectorStoreStats> {
             Ok(agent_mem_traits::VectorStoreStats {
                 total_vectors: 0,
+                dimension: 1536,
                 index_size: 0,
             })
         }
@@ -648,8 +660,6 @@ mod tests {
     }
 
     fn create_test_memory(id: &str) -> Memory {
-        use agent_mem_traits::{AttributeKey, AttributeValue};
-        
         let mut memory = Memory::new(
             "agent-1",
             Some("user-1".to_string()),
@@ -951,6 +961,80 @@ mod tests {
         let result = coordinator.batch_delete_memories(Vec::new()).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_lru_cache_eviction() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        // Create coordinator with small cache capacity (2 entries)
+        let mut cache_config = CacheConfig::default();
+        cache_config.l1_capacity = 2;
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(cache_config),
+        );
+
+        // Add 3 memories (should evict the first one)
+        let memory1 = create_test_memory("lru-1");
+        let memory2 = create_test_memory("lru-2");
+        let memory3 = create_test_memory("lru-3");
+
+        coordinator.add_memory(&memory1, None).await.unwrap();
+        coordinator.add_memory(&memory2, None).await.unwrap();
+        coordinator.add_memory(&memory3, None).await.unwrap();
+
+        // Access memory2 to make it recently used
+        let _ = coordinator.get_memory("lru-2").await.unwrap();
+
+        // memory1 should be evicted (least recently used)
+        let cached = coordinator.get_memory("lru-1").await.unwrap();
+        assert!(cached.is_none(), "LRU-1 should be evicted from cache");
+
+        // memory2 and memory3 should still be in cache
+        let cached2 = coordinator.get_memory("lru-2").await.unwrap();
+        assert!(cached2.is_some(), "LRU-2 should be in cache");
+
+        let cached3 = coordinator.get_memory("lru-3").await.unwrap();
+        assert!(cached3.is_some(), "LRU-3 should be in cache");
+    }
+
+    #[tokio::test]
+    async fn test_lru_cache_hit_rate() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        let memory = create_test_memory("hit-rate-test");
+        coordinator.add_memory(&memory, None).await.unwrap();
+
+        // First access (cache miss)
+        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+        
+        // Second access (cache hit)
+        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+        
+        // Third access (cache hit)
+        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+
+        let hit_rate = coordinator.get_cache_hit_rate().await;
+        // Should be 2 hits / 3 total = 0.666...
+        assert!(hit_rate > 0.6 && hit_rate < 0.7, "Hit rate should be around 0.67");
     }
 }
 

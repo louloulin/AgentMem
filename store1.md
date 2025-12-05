@@ -1,9 +1,9 @@
 # AgentMem 记忆存储系统：全面分析与顶级改造计划
 
 **日期**: 2025-01-XX  
-**状态**: Phase 1.1 ✅ 已完成，Phase 1.2 ⏳ 部分完成，Phase 1.3 ✅ 已完成  
+**状态**: Phase 1.1 ✅ 已完成，Phase 1.2 ✅ 核心功能已完成，Phase 1.3 ✅ 已完成  
 **目标**: 达到顶级记忆平台存储标准  
-**最新更新**: 2025-01-XX - 完成统一存储协调层、L1缓存和批量操作优化，包含完整测试（8个测试用例）
+**最新更新**: 2025-01-XX - 完成统一存储协调层、LRU缓存和批量操作优化，包含完整测试（10个测试用例）
 
 ---
 
@@ -861,9 +861,10 @@ impl CacheStrategy {
 - [x] 实现L1内存缓存 ✅ (已完成，集成在`UnifiedStorageCoordinator`中)
 - [x] 缓存策略配置 ✅ (已完成，支持按memory_type配置TTL)
 - [x] 缓存统计 ✅ (已完成，包含命中率统计)
+- [x] 实现真正的LRU淘汰策略 ✅ (已完成，使用`lru::LruCache`替代简单FIFO)
+- [x] 缓存命中率计算 ✅ (已完成，`get_cache_hit_rate`方法)
 - [ ] 实现`RedisCache`作为L2缓存（可选，已有`HybridStorageManager`支持）
-- [ ] 实现真正的LRU淘汰策略（当前为简单FIFO）
-- [ ] 添加缓存预热功能
+- [ ] 添加缓存预热功能（可选）
 
 **预计时间**：5天  
 **实际完成时间**：1天（L1缓存已实现，L2缓存可复用现有Redis实现）
@@ -873,8 +874,17 @@ impl CacheStrategy {
 - ✅ 支持按memory_type配置不同的TTL（working: 5min, episodic: 1h, semantic: 24h）
 - ✅ 实现了缓存容量限制（默认1000条）
 - ✅ 实现了缓存命中/未命中统计
-- ⚠️ 当前使用简单FIFO淘汰，可升级为真正的LRU
+- ✅ **真正的LRU淘汰策略**：使用`lru::LruCache`替代简单FIFO，自动淘汰最久未使用的条目
+- ✅ **缓存命中率计算**：提供`get_cache_hit_rate`方法用于监控
+- ✅ **LRU测试覆盖**：添加了`test_lru_cache_eviction`和`test_lru_cache_hit_rate`测试
 - 💡 L2缓存可复用现有的`HybridStorageManager`中的Redis实现
+
+**LRU缓存改进**：
+- ✅ 从`HashMap`升级为`LruCache<String, Memory>`
+- ✅ 使用`lru::LruCache`实现真正的LRU淘汰
+- ✅ 自动管理访问顺序，最近访问的条目保持在缓存中
+- ✅ 容量满时自动淘汰最久未使用的条目
+- ✅ 提供缓存命中率统计方法
 
 ---
 
@@ -1225,7 +1235,7 @@ impl IntelligentPrefetch {
 | 功能 | 当前 | 改造后 | 状态 |
 |------|------|--------|------|
 | 数据一致性 | ⚠️ 部分 | ✅ 完全一致 | ✅ **已完成** |
-| L1缓存支持 | ❌ | ✅ 内存缓存 | ✅ **已完成** |
+| L1缓存支持 | ❌ | ✅ LRU内存缓存 | ✅ **已完成** |
 | 批量操作 | ⚠️ 基础 | ✅ 优化批量 | ✅ **已完成** |
 | 三维检索 | ❌ | ✅ 完整实现 |
 | 层次检索 | ❌ | ✅ 完整实现 |
@@ -1281,11 +1291,13 @@ impl IntelligentPrefetch {
 - ✅ 完整测试覆盖（4个测试用例）
 - ✅ 基于现有代码最小改造，充分利用现有接口
 
-#### ⏳ Phase 1.2: 多级缓存系统（部分完成）
-- ✅ L1内存缓存（已完成）
-- ⏳ L2 Redis缓存（可复用现有`HybridStorageManager`实现）
+#### ✅ Phase 1.2: 多级缓存系统（核心功能已完成）
+- ✅ L1内存缓存（已完成，使用真正的LRU淘汰策略）
+- ✅ LRU缓存实现（已完成，从FIFO升级为真正的LRU）
+- ✅ 缓存命中率统计（已完成，`get_cache_hit_rate`方法）
+- ⏳ L2 Redis缓存（可选，可复用现有`HybridStorageManager`实现）
 
-#### ⏳ Phase 1.3: 批量操作优化（待实施）
+#### ✅ Phase 1.3: 批量操作优化（已完成）
 
 #### ⏳ Phase 2: 检索系统增强（待实施）
 
@@ -1482,15 +1494,57 @@ pub struct CoordinatorStats {
 
 ---
 
+## ✅ Phase 1.2 LRU缓存改进完成验证
+
+### 代码验证
+- ✅ 从`HashMap<String, Memory>`升级为`LruCache<String, Memory>`
+- ✅ 使用`lru::LruCache`实现真正的LRU淘汰策略
+- ✅ 编译通过，无错误
+- ✅ 充分利用现有的`lru` crate（已在依赖中）
+
+### 功能验证
+- ✅ **真正的LRU淘汰**：自动淘汰最久未使用的条目
+- ✅ **自动访问顺序管理**：最近访问的条目保持在缓存中
+- ✅ **容量管理**：容量满时自动淘汰，无需手动管理
+- ✅ **缓存命中率**：提供`get_cache_hit_rate`方法用于监控
+
+### 测试覆盖
+- ✅ `test_lru_cache_eviction` - 验证LRU淘汰功能
+  - 测试容量满时自动淘汰最久未使用的条目
+  - 验证最近访问的条目保留在缓存中
+- ✅ `test_lru_cache_hit_rate` - 验证缓存命中率计算
+  - 测试多次访问后的命中率统计
+
+### 设计验证
+- ✅ **最小改造**：仅替换缓存实现，接口保持不变
+- ✅ **充分利用现有代码**：使用已有的`lru` crate依赖
+- ✅ **性能提升**：LRU比FIFO更智能，保留热点数据
+- ✅ **向后兼容**：不影响现有功能
+
+**改进对比**：
+- **之前**：简单FIFO淘汰（移除第一个条目）
+- **现在**：真正的LRU淘汰（移除最久未使用的条目）
+- **优势**：保留热点数据，提高缓存命中率
+
+**状态**: Phase 1.2 LRU缓存改进 ✅ **已完成并验证通过**
+
+---
+
 ## 📊 总体进度总结
 
 ### ✅ 已完成
 - ✅ **Phase 1.1**: 统一存储协调层
-  - 📍 代码：`crates/agent-mem-core/src/storage/coordinator.rs` (956行)
-  - ✅ 8个测试用例（4个基础操作 + 4个批量操作）
-  - ✅ L1内存缓存
+  - 📍 代码：`crates/agent-mem-core/src/storage/coordinator.rs` (1031行)
+  - ✅ 10个测试用例（4个基础操作 + 4个批量操作 + 2个LRU测试）
+  - ✅ L1内存缓存（真正的LRU淘汰策略）
   - ✅ 原子性写入/删除
   - ✅ 统计和监控
+
+- ✅ **Phase 1.2核心功能**: LRU缓存实现
+  - ✅ 从FIFO升级为真正的LRU淘汰策略
+  - ✅ 使用`lru::LruCache`实现
+  - ✅ 缓存命中率统计方法（`get_cache_hit_rate`）
+  - ✅ 2个LRU测试用例（`test_lru_cache_eviction`, `test_lru_cache_hit_rate`）
 
 - ✅ **Phase 1.3**: 批量操作优化
   - ✅ `batch_add_memories` (批量添加)
@@ -1498,8 +1552,8 @@ pub struct CoordinatorStats {
   - ✅ 4个批量操作测试用例
   - ✅ 集成在coordinator中，无需额外结构
 
-### ⏳ 进行中
-- ⏳ **Phase 1.2**: 多级缓存系统（L1已完成，L2可选）
+### ⏳ 可选功能
+- ⏳ **Phase 1.2可选功能**: L2 Redis缓存（可复用现有实现）
 
 ### ⏳ 待实施
 - ⏳ **Phase 2**: 检索系统增强（三维检索、层次检索）
