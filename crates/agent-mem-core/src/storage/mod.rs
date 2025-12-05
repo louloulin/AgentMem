@@ -13,6 +13,9 @@ pub mod conversion;
 // Repository factory (always available)
 pub mod factory;
 
+// Unified storage coordinator (always available)
+pub mod coordinator;
+
 // LibSQL backend (default, embedded mode)
 #[cfg(feature = "libsql")]
 pub mod libsql;
