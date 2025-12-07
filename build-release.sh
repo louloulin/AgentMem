@@ -594,6 +594,10 @@ allowed_origins = ["http://localhost:3000"]
 
 [mcp]
 enabled = true
+
+# Embedder 配置（支持中文）
+embedder_provider = "fastembed"
+embedder_model = "multilingual-e5-small"
 EOF
     
     # 创建启动脚本
@@ -621,9 +625,9 @@ fi
 
 export RUST_BACKTRACE=1
 
-# 配置 Embedder (使用 FastEmbed) - 推荐配置
+# 配置 Embedder (使用 FastEmbed) - 推荐配置（支持中文）
 export EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-"fastembed"}
-export EMBEDDER_MODEL=${EMBEDDER_MODEL:-"BAAI/bge-small-en-v1.5"}
+export EMBEDDER_MODEL=${EMBEDDER_MODEL:-"multilingual-e5-small"}
 
 # 配置 LLM Provider (可选)
 # 支持的 Provider: openai, zhipu, ollama 等
@@ -672,8 +676,15 @@ echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
 echo "   这可能需要几分钟时间，请耐心等待..."
 echo ""
 
-# 启动服务
-./agent-mem-server
+# 启动服务（支持配置文件）
+# 如果存在 config.toml，使用配置文件；否则仅使用环境变量
+if [ -f "config.toml" ]; then
+    echo "📝 使用配置文件: config.toml"
+    ./agent-mem-server --config config.toml
+else
+    echo "⚠️  未找到 config.toml，仅使用环境变量配置"
+    ./agent-mem-server
+fi
 EOF
     
     chmod +x "$DIST_DIR/server/start.sh"
@@ -703,9 +714,9 @@ fi
 
 export RUST_BACKTRACE=1
 
-# 配置 Embedder (使用 FastEmbed)
+# 配置 Embedder (使用 FastEmbed，支持中文)
 export EMBEDDER_PROVIDER="fastembed"
-export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
+export EMBEDDER_MODEL="multilingual-e5-small"
 
 # 配置 LLM Provider (智谱 AI)
 export ZHIPU_API_KEY="your_zhipu_api_key_here"
@@ -737,8 +748,15 @@ echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
 echo "   这可能需要几分钟时间，请耐心等待..."
 echo ""
 
-# 启动服务
-./agent-mem-server
+# 启动服务（支持配置文件）
+# 如果存在 config.toml，使用配置文件；否则仅使用环境变量
+if [ -f "config.toml" ]; then
+    echo "📝 使用配置文件: config.toml"
+    ./agent-mem-server --config config.toml
+else
+    echo "⚠️  未找到 config.toml，仅使用环境变量配置"
+    ./agent-mem-server
+fi
 EOF
 
     chmod +x "$DIST_DIR/server/start-with-zhipu.sh"
