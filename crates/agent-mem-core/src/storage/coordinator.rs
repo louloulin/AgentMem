@@ -27,6 +27,9 @@ pub struct UnifiedStorageCoordinator {
     stats: Arc<RwLock<CoordinatorStats>>,
 }
 
+// Note: update_cache_config requires &mut self, but coordinator is typically used as Arc
+// For runtime configuration updates, consider using interior mutability (Mutex/RwLock) if needed
+
 /// Cache configuration
 #[derive(Debug, Clone)]
 pub struct CacheConfig {
@@ -89,6 +92,14 @@ impl UnifiedStorageCoordinator {
             cache_config: config,
             stats: Arc::new(RwLock::new(CoordinatorStats::default())),
         }
+    }
+
+    /// Create a new unified storage coordinator with default configuration
+    pub fn with_defaults(
+        sql_repository: Arc<dyn MemoryRepositoryTrait>,
+        vector_store: Arc<dyn VectorStore + Send + Sync>,
+    ) -> Self {
+        Self::new(sql_repository, vector_store, None)
     }
 
     /// Add memory with atomic write to both stores
@@ -304,6 +315,22 @@ impl UnifiedStorageCoordinator {
         }
     }
 
+    /// Reset statistics
+    ///
+    /// This method resets all statistics counters to zero
+    pub async fn reset_stats(&self) {
+        let mut stats = self.stats.write().await;
+        *stats = CoordinatorStats::default();
+        info!("Statistics reset");
+    }
+
+    /// Get cache configuration (read-only)
+    ///
+    /// Returns a clone of the current cache configuration
+    pub fn get_cache_config(&self) -> CacheConfig {
+        self.cache_config.clone()
+    }
+
     /// Clear L1 cache
     pub async fn clear_cache(&self) {
         let mut cache = self.l1_cache.write().await;
@@ -485,6 +512,207 @@ impl UnifiedStorageCoordinator {
         let mut cache = self.l1_cache.write().await;
         cache.pop(id);
     }
+
+    /// Batch get memories by IDs (with cache optimization)
+    ///
+    /// This method efficiently retrieves multiple memories by:
+    /// 1. Checking L1 cache first for each ID
+    /// 2. Fetching missing memories from LibSQL
+    /// 3. Updating cache for fetched memories
+    pub async fn batch_get_memories(&self, ids: &[String]) -> Result<Vec<Memory>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        info!("Batch getting {} memories", ids.len());
+
+        let mut results = Vec::new();
+        let mut missing_ids = Vec::new();
+
+        // Step 1: Check L1 cache
+        if self.cache_config.l1_enabled {
+            let mut cache = self.l1_cache.write().await;
+            for id in ids {
+                if let Some(memory) = cache.get(id) {
+                    results.push(memory.clone());
+                } else {
+                    missing_ids.push(id.clone());
+                }
+            }
+        } else {
+            missing_ids = ids.to_vec();
+        }
+
+        // Step 2: Fetch missing memories from LibSQL
+        if !missing_ids.is_empty() {
+            for id in &missing_ids {
+                match self.sql_repository.find_by_id(id).await {
+                    Ok(Some(memory)) => {
+                        // Update cache
+                        if self.cache_config.l1_enabled {
+                            self.update_l1_cache(id, memory.clone()).await;
+                        }
+                        results.push(memory);
+                    }
+                    Ok(None) => {
+                        debug!("Memory not found: {}", id);
+                    }
+                    Err(e) => {
+                        warn!("Failed to fetch memory {}: {}", id, e);
+                    }
+                }
+            }
+        }
+
+        // Step 3: Update statistics
+        {
+            let mut stats = self.stats.write().await;
+            stats.total_ops += ids.len() as u64;
+            stats.successful_ops += results.len() as u64;
+        }
+
+        info!("✅ Batch retrieved {} memories ({} from cache, {} from LibSQL)", 
+            results.len(), 
+            ids.len() - missing_ids.len(),
+            missing_ids.len());
+        
+        Ok(results)
+    }
+
+    /// Check if memory exists
+    ///
+    /// This method checks both cache and LibSQL for memory existence
+    pub async fn memory_exists(&self, id: &str) -> Result<bool> {
+        // Step 1: Check L1 cache (using get to check without moving to front)
+        if self.cache_config.l1_enabled {
+            let mut cache = self.l1_cache.write().await;
+            if cache.get(id).is_some() {
+                return Ok(true);
+            }
+        }
+
+        // Step 2: Check LibSQL
+        match self.sql_repository.find_by_id(id).await {
+            Ok(Some(_)) => Ok(true),
+            Ok(None) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Get total count of memories
+    ///
+    /// This method gets the count from LibSQL (primary source of truth)
+    pub async fn count_memories(&self) -> Result<usize> {
+        // Use list with large limit to get count
+        // Note: This is a simple implementation. In production, you might want
+        // to add a dedicated count method to MemoryRepositoryTrait
+        let memories = self.sql_repository.list(10000, 0).await?;
+        Ok(memories.len())
+    }
+
+    /// Health check for both storage backends
+    ///
+    /// This method checks the health of both LibSQL and VectorStore
+    /// Returns a combined health status
+    pub async fn health_check(&self) -> Result<CoordinatorHealthStatus> {
+        let mut components = HashMap::new();
+        let mut overall_healthy = true;
+
+        // Check LibSQL repository (try a simple query)
+        let sql_health = match self.sql_repository.list(1, 0).await {
+            Ok(_) => {
+                components.insert("libsql".to_string(), ComponentHealth {
+                    status: "healthy".to_string(),
+                    message: Some("LibSQL repository is accessible".to_string()),
+                });
+                true
+            }
+            Err(e) => {
+                components.insert("libsql".to_string(), ComponentHealth {
+                    status: "unhealthy".to_string(),
+                    message: Some(format!("LibSQL repository error: {}", e)),
+                });
+                overall_healthy = false;
+                false
+            }
+        };
+
+        // Check VectorStore
+        let vector_health = match self.vector_store.health_check().await {
+            Ok(health_status) => {
+                let is_healthy = health_status.status == "healthy";
+                components.insert("vector_store".to_string(), ComponentHealth {
+                    status: health_status.status.clone(),
+                    message: Some(health_status.message.clone()),
+                });
+                if !is_healthy {
+                    overall_healthy = false;
+                }
+                is_healthy
+            }
+            Err(e) => {
+                components.insert("vector_store".to_string(), ComponentHealth {
+                    status: "unhealthy".to_string(),
+                    message: Some(format!("VectorStore error: {}", e)),
+                });
+                overall_healthy = false;
+                false
+            }
+        };
+
+        // Check L1 cache
+        let cache_health = if self.cache_config.l1_enabled {
+            let cache = self.l1_cache.read().await;
+            let cache_size = cache.len();
+            let cache_capacity = self.cache_config.l1_capacity;
+            let cache_usage = (cache_size as f64 / cache_capacity as f64) * 100.0;
+            
+            components.insert("l1_cache".to_string(), ComponentHealth {
+                status: "healthy".to_string(),
+                message: Some(format!("L1 cache: {}/{} entries ({:.1}% used)", 
+                    cache_size, cache_capacity, cache_usage)),
+            });
+            true
+        } else {
+            components.insert("l1_cache".to_string(), ComponentHealth {
+                status: "disabled".to_string(),
+                message: Some("L1 cache is disabled".to_string()),
+            });
+            true
+        };
+
+        Ok(CoordinatorHealthStatus {
+            overall_status: if overall_healthy { "healthy".to_string() } else { "degraded".to_string() },
+            components,
+            sql_healthy: sql_health,
+            vector_healthy: vector_health,
+            cache_healthy: cache_health,
+        })
+    }
+}
+
+/// Component health status
+#[derive(Debug, Clone)]
+pub struct ComponentHealth {
+    /// Health status: "healthy", "unhealthy", or "disabled"
+    pub status: String,
+    /// Optional message describing the health status
+    pub message: Option<String>,
+}
+
+/// Coordinator health status
+#[derive(Debug, Clone)]
+pub struct CoordinatorHealthStatus {
+    /// Overall health status: "healthy" or "degraded"
+    pub overall_status: String,
+    /// Health status of each component
+    pub components: HashMap<String, ComponentHealth>,
+    /// Whether LibSQL repository is healthy
+    pub sql_healthy: bool,
+    /// Whether VectorStore is healthy
+    pub vector_healthy: bool,
+    /// Whether L1 cache is healthy
+    pub cache_healthy: bool,
 }
 
 #[cfg(test)]
@@ -1035,6 +1263,211 @@ mod tests {
         let hit_rate = coordinator.get_cache_hit_rate().await;
         // Should be 2 hits / 3 total = 0.666...
         assert!(hit_rate > 0.6 && hit_rate < 0.7, "Hit rate should be around 0.67");
+    }
+
+    #[tokio::test]
+    async fn test_batch_get_memories() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Add memories
+        let memory1 = create_test_memory("batch-get-1");
+        let memory2 = create_test_memory("batch-get-2");
+        let memory3 = create_test_memory("batch-get-3");
+
+        coordinator.add_memory(&memory1, None).await.unwrap();
+        coordinator.add_memory(&memory2, None).await.unwrap();
+        coordinator.add_memory(&memory3, None).await.unwrap();
+
+        // Batch get
+        let ids = vec![
+            "batch-get-1".to_string(),
+            "batch-get-2".to_string(),
+            "batch-get-3".to_string(),
+        ];
+        let results = coordinator.batch_get_memories(&ids).await.unwrap();
+
+        assert_eq!(results.len(), 3);
+        assert!(results.iter().any(|m| m.id.0 == "batch-get-1"));
+        assert!(results.iter().any(|m| m.id.0 == "batch-get-2"));
+        assert!(results.iter().any(|m| m.id.0 == "batch-get-3"));
+    }
+
+    #[tokio::test]
+    async fn test_exists() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        let memory = create_test_memory("exists-test");
+        coordinator.add_memory(&memory, None).await.unwrap();
+
+        // Check existence
+        assert!(coordinator.memory_exists("exists-test").await.unwrap());
+        assert!(!coordinator.memory_exists("non-existent").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_count_memories() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Initially should be 0
+        let count = coordinator.count_memories().await.unwrap();
+        assert_eq!(count, 0);
+
+        // Add memories
+        coordinator.add_memory(&create_test_memory("count-1"), None).await.unwrap();
+        coordinator.add_memory(&create_test_memory("count-2"), None).await.unwrap();
+        coordinator.add_memory(&create_test_memory("count-3"), None).await.unwrap();
+
+        // Should be 3
+        let count = coordinator.count_memories().await.unwrap();
+        assert_eq!(count, 3);
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Perform health check
+        let health = coordinator.health_check().await.unwrap();
+
+        // Verify overall status
+        assert_eq!(health.overall_status, "healthy");
+
+        // Verify components
+        assert!(health.components.contains_key("libsql"));
+        assert!(health.components.contains_key("vector_store"));
+        assert!(health.components.contains_key("l1_cache"));
+
+        // Verify individual component statuses
+        assert!(health.sql_healthy);
+        assert!(health.vector_healthy);
+        assert!(health.cache_healthy);
+    }
+
+    #[tokio::test]
+    async fn test_reset_stats() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Perform some operations to generate stats
+        let memory = create_test_memory("stats-test");
+        coordinator.add_memory(&memory, None).await.unwrap();
+        let _ = coordinator.get_memory("stats-test").await.unwrap();
+
+        // Check stats are non-zero
+        let stats_before = coordinator.get_stats().await;
+        assert!(stats_before.total_ops > 0);
+        assert!(stats_before.successful_ops > 0);
+
+        // Reset stats
+        coordinator.reset_stats().await;
+
+        // Check stats are reset
+        let stats_after = coordinator.get_stats().await;
+        assert_eq!(stats_after.total_ops, 0);
+        assert_eq!(stats_after.successful_ops, 0);
+        assert_eq!(stats_after.failed_ops, 0);
+        assert_eq!(stats_after.cache_hits, 0);
+        assert_eq!(stats_after.cache_misses, 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_cache_config() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let mut cache_config = CacheConfig::default();
+        cache_config.l1_capacity = 2000;
+        cache_config.l1_enabled = true;
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(cache_config.clone()),
+        );
+
+        // Get config
+        let retrieved_config = coordinator.get_cache_config();
+        assert_eq!(retrieved_config.l1_capacity, 2000);
+        assert_eq!(retrieved_config.l1_enabled, true);
+        assert_eq!(retrieved_config.ttl_by_type.len(), cache_config.ttl_by_type.len());
+    }
+
+    #[tokio::test]
+    async fn test_with_defaults() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::with_defaults(
+            sql_repo.clone(),
+            vector_store.clone(),
+        );
+
+        // Verify default config
+        let config = coordinator.get_cache_config();
+        assert_eq!(config.l1_capacity, 1000);
+        assert!(config.l1_enabled);
     }
 }
 
