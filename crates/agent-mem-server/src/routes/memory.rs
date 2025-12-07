@@ -768,7 +768,11 @@ pub async fn update_memory(
 
     let updated_importance = request
         .importance
-        .unwrap_or(existing.importance().unwrap_or(0.5) as f32);
+        .unwrap_or_else(|| {
+            existing.importance()
+                .map(|v| v as f32)
+                .unwrap_or(0.5)
+        });
 
     // 使用builder模式构建更新后的Memory
     let mut updated = existing.clone();
@@ -862,9 +866,100 @@ pub async fn delete_memory(
 /// 搜索记忆
 // ========== 混合检索辅助函数 ==========
 
+/// 检测是否包含中文字符
+fn contains_chinese(text: &str) -> bool {
+    text.chars().any(|c| {
+        let code = c as u32;
+        // 中文字符范围：CJK统一汉字 (0x4E00-0x9FFF)
+        // 以及扩展A (0x3400-0x4DBF) 和扩展B (0x20000-0x2A6DF)
+        (code >= 0x4E00 && code <= 0x9FFF)
+            || (code >= 0x3400 && code <= 0x4DBF)
+            || (code >= 0x20000 && code <= 0x2A6DF)
+    })
+}
+
+/// 计算Recency评分（基于最后访问时间的指数衰减）
+/// 
+/// 使用指数衰减模型：recency = exp(-decay * hours_since_access)
+/// - 最近访问的记忆得分接近1.0
+/// - 随着时间推移，得分指数级衰减
+/// 
+/// # 参数
+/// - `last_accessed_at`: 最后访问时间（ISO 8601字符串）
+/// - `recency_decay`: 衰减系数（默认0.1，表示每小时衰减约10%）
+/// 
+/// # 返回
+/// Recency评分（0.0到1.0之间）
+fn calculate_recency_score(last_accessed_at: &str, recency_decay: f64) -> f64 {
+    use chrono::{DateTime, Utc};
+    
+    // 解析最后访问时间
+    let last_accessed = if let Ok(dt) = DateTime::parse_from_rfc3339(last_accessed_at) {
+        dt.with_timezone(&Utc)
+    } else if let Ok(dt) = last_accessed_at.parse::<DateTime<Utc>>() {
+        dt
+    } else {
+        // 如果解析失败，返回默认值（假设是最近访问的）
+        return 1.0;
+    };
+    
+    // 计算距离现在的小时数
+    let now = Utc::now();
+    let hours_since_access = (now - last_accessed).num_seconds() as f64 / 3600.0;
+    
+    // 指数衰减：exp(-decay * hours)
+    // 例如：decay=0.1时，1小时后约0.9，24小时后约0.08
+    let recency = (-recency_decay * hours_since_access.max(0.0)).exp();
+    
+    // 确保结果在[0.0, 1.0]范围内
+    recency.max(0.0).min(1.0)
+}
+
+/// 计算三维检索综合评分（Recency × Importance × Relevance）
+/// 
+/// 基于Generative Agents论文的三维检索模型：
+/// - Recency: 基于最后访问时间的指数衰减
+/// - Importance: 记忆的重要性分数（0.0-1.0）
+/// - Relevance: 向量搜索的相关性分数（0.0-1.0）
+/// 
+/// 综合评分 = Recency × Importance × Relevance
+/// 
+/// # 参数
+/// - `relevance`: 向量搜索的相关性分数（0.0-1.0）
+/// - `importance`: 记忆的重要性分数（0.0-1.0）
+/// - `last_accessed_at`: 最后访问时间（ISO 8601字符串）
+/// - `recency_decay`: Recency衰减系数（默认0.1）
+/// 
+/// # 返回
+/// 三维综合评分（0.0到1.0之间）
+fn calculate_3d_score(
+    relevance: f32,
+    importance: f32,
+    last_accessed_at: &str,
+    recency_decay: f64,
+) -> f64 {
+    // 计算Recency评分
+    let recency = calculate_recency_score(last_accessed_at, recency_decay);
+    
+    // 确保importance和relevance在有效范围内
+    let importance_clamped = importance.max(0.0).min(1.0) as f64;
+    let relevance_clamped = relevance.max(0.0).min(1.0) as f64;
+    
+    // 三维评分：Recency × Importance × Relevance
+    let composite_score = recency * importance_clamped * relevance_clamped;
+    
+    // 确保结果在[0.0, 1.0]范围内
+    composite_score.max(0.0).min(1.0)
+}
+
 /// 智能阈值计算：根据查询类型动态调整阈值
+/// 🔧 增强：添加中文检测，为中文查询降低阈值以提高召回率
 fn get_adaptive_threshold(query: &str) -> f32 {
     use regex::Regex;
+
+    // 🔧 新增：检测中文查询，降低阈值
+    let has_chinese = contains_chinese(query);
+    let chinese_adjustment = if has_chinese { -0.2 } else { 0.0 };
 
     // 检测商品ID格式: P + 6位数字
     if let Ok(pattern) = Regex::new(r"^P\d{6}$") {
@@ -890,7 +985,7 @@ fn get_adaptive_threshold(query: &str) -> f32 {
 
     // 短查询（< 5字符）
     if query.len() < 5 {
-        return 0.3; // 短查询: 低阈值
+        return (0.3f32 + chinese_adjustment).max(0.1f32); // 短查询: 低阈值，中文更低
     }
 
     // 包含商品相关关键词
@@ -900,18 +995,20 @@ fn get_adaptive_threshold(query: &str) -> f32 {
         || lower_query.contains("id")
         || lower_query.contains("product")
     {
-        return 0.4; // 商品相关: 中低阈值
+        return (0.4f32 + chinese_adjustment).max(0.2f32); // 商品相关: 中低阈值
     }
 
-    // 根据长度调整
+    // 根据长度调整（应用中文调整）
     let query_len = query.len();
-    if query_len < 20 {
-        0.3 // 短查询
+    let base_threshold = if query_len < 20 {
+        0.3f32 // 短查询
     } else if query_len < 50 {
-        0.5 // 中等长度查询
+        0.5f32 // 中等长度查询
     } else {
-        0.7 // 长查询用高阈值
-    }
+        0.7f32 // 长查询用高阈值
+    };
+    
+    (base_threshold + chinese_adjustment).max(0.1f32).min(0.9f32)
 }
 
 /// 检测是否是精确查询（商品ID、SKU等）
@@ -1104,6 +1201,11 @@ pub async fn search_memories(
     // 🔍 Phase 2: 向量语义搜索（降级或默认）
     info!("🔍 使用向量语义搜索: {}", request.query);
     let query_clone = request.query.clone(); // Clone for later use
+    
+    // 🔧 增强：计算自适应阈值用于后续过滤
+    let adaptive_threshold = get_adaptive_threshold(&request.query);
+    info!("📊 自适应阈值: query='{}', threshold={}", request.query, adaptive_threshold);
+    
     let mut results = memory_manager
         .search_memories(
             request.query,
@@ -1181,19 +1283,61 @@ pub async fn search_memories(
         sorted_results.extend(fuzzy_matches);
     }
 
-    // 🔧 修复: 过滤低相关度结果
-    let min_score_threshold = request.threshold.unwrap_or(0.7); // 默认最低阈值 0.7
-    info!("🎯 过滤阈值: {}", min_score_threshold);
-
-    // 转换为JSON，同时应用阈值过滤
-    let json_results: Vec<serde_json::Value> = sorted_results
+    // 🆕 Phase 2.1: 三维检索评分（Recency × Importance × Relevance）
+    // 获取recency_decay配置（默认0.1，表示每小时衰减约10%）
+    let recency_decay: f64 = std::env::var("RECENCY_DECAY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.1);
+    
+    // 为每个结果计算三维评分
+    let mut scored_results: Vec<(MemoryItem, f64, f64, f64, f64)> = sorted_results
         .into_iter()
-        .filter(|item| {
-            // 使用真实的 score，如果没有则使用 0.0
-            let score = item.score.unwrap_or(0.0);
-            score >= min_score_threshold
-        })
         .map(|item| {
+            // 获取各个维度分数
+            let relevance = item.score.unwrap_or(0.0);
+            let importance = item.importance.max(0.0).min(1.0);
+            let last_accessed = item.last_accessed_at.to_string();
+            
+            // 计算Recency评分
+            let recency = calculate_recency_score(&last_accessed, recency_decay);
+            
+            // 计算三维综合评分
+            let composite_score = calculate_3d_score(
+                relevance,
+                importance,
+                &last_accessed,
+                recency_decay,
+            );
+            
+            (item, composite_score, recency, importance as f64, relevance as f64)
+        })
+        .collect();
+    
+    // 按三维综合评分排序（降序）
+    scored_results.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    
+    info!("🎯 三维检索评分完成: recency_decay={}, 结果数={}", 
+        recency_decay, scored_results.len());
+
+    // 🔧 修复: 过滤低相关度结果（使用自适应阈值）
+    // 优先使用用户指定的阈值，否则使用自适应阈值，最后才使用默认值
+    let min_score_threshold = request.threshold.unwrap_or(adaptive_threshold);
+    info!("🎯 过滤阈值: {} (用户指定: {}, 自适应: {})", 
+        min_score_threshold,
+        request.threshold.map(|t| t.to_string()).unwrap_or_else(|| "未指定".to_string()),
+        adaptive_threshold);
+
+    // 转换为JSON，同时应用阈值过滤（使用原始relevance分数进行阈值过滤）
+    let json_results: Vec<serde_json::Value> = scored_results
+        .into_iter()
+        .filter(|(item, _, _, _, relevance)| {
+            // 使用原始的relevance分数进行阈值过滤
+            *relevance >= min_score_threshold as f64
+        })
+        .map(|(item, composite_score, recency, importance, relevance)| {
             serde_json::json!({
                 "id": item.id,
                 "agent_id": item.agent_id,
@@ -1206,7 +1350,10 @@ pub async fn search_memories(
                 "access_count": item.access_count,
                 "metadata": item.metadata,
                 "hash": item.hash,
-                "score": item.score.unwrap_or(0.0),  // 🔧 修复: 使用真实的 score
+                "score": relevance,  // 原始relevance分数（用于阈值过滤）
+                "composite_score": composite_score,  // 🆕 三维综合评分
+                "recency": recency,  // 🆕 Recency评分
+                "relevance": relevance,  // 🆕 Relevance评分（与score相同）
             })
         })
         .collect();
@@ -1711,6 +1858,55 @@ pub async fn list_all_memories(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 测试辅助函数
+    #[test]
+    fn test_contains_chinese() {
+        // 测试中文字符
+        assert!(contains_chinese("仓颉"));
+        assert!(contains_chinese("中文测试"));
+        assert!(contains_chinese("Hello 世界"));
+        assert!(!contains_chinese("Hello World"));
+        assert!(!contains_chinese("123456"));
+    }
+
+    #[test]
+    fn test_get_adaptive_threshold_chinese() {
+        // 中文短查询应该使用较低阈值
+        let threshold1 = get_adaptive_threshold("仓颉");
+        assert!(threshold1 < 0.3, "中文短查询阈值应该 < 0.3, 实际: {}", threshold1);
+        assert!(threshold1 >= 0.1, "阈值应该 >= 0.1, 实际: {}", threshold1);
+        
+        // 中文中等长度查询
+        let threshold2 = get_adaptive_threshold("仓颉是造字圣人");
+        assert!(threshold2 < 0.5, "中文中等查询阈值应该 < 0.5, 实际: {}", threshold2);
+    }
+
+    #[test]
+    fn test_get_adaptive_threshold_english() {
+        // 英文短查询（注意：单个单词可能被识别为精确ID，使用带空格的查询）
+        let threshold1 = get_adaptive_threshold("test query");
+        assert!(threshold1 >= 0.3, "英文短查询阈值应该 >= 0.3, 实际: {}", threshold1);
+        
+        // 英文中等长度查询
+        let threshold2 = get_adaptive_threshold("This is a test query");
+        assert!(threshold2 >= 0.5, "英文中等查询阈值应该 >= 0.5, 实际: {}", threshold2);
+        
+        // 英文长查询
+        let threshold3 = get_adaptive_threshold("This is a very long test query that should have a higher threshold");
+        assert!(threshold3 >= 0.7, "英文长查询阈值应该 >= 0.7, 实际: {}", threshold3);
+    }
+
+    #[test]
+    fn test_get_adaptive_threshold_exact_id() {
+        // 商品ID格式
+        let threshold1 = get_adaptive_threshold("P123456");
+        assert_eq!(threshold1, 0.1, "商品ID阈值应该为0.1");
+        
+        // UUID格式
+        let threshold2 = get_adaptive_threshold("550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(threshold2, 0.1, "UUID阈值应该为0.1");
+    }
 
     #[tokio::test]
     async fn test_memory_manager_creation() {

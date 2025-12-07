@@ -102,5 +102,88 @@ mod tests {
         let threshold3 = get_adaptive_threshold("a");
         assert!(threshold3 >= 0.1 && threshold3 <= 0.9);
     }
+
+    /// 测试Recency评分计算
+    #[test]
+    fn test_calculate_recency_score() {
+        use chrono::{DateTime, Utc};
+        
+        // 测试最近访问（应该接近1.0）
+        let now = Utc::now();
+        let recent_time = now.to_rfc3339();
+        let recency1 = calculate_recency_score(&recent_time, 0.1);
+        assert!(recency1 > 0.9, "最近访问的recency应该 > 0.9, 实际: {}", recency1);
+        
+        // 测试1小时前访问（decay=0.1时应该约0.9）
+        let one_hour_ago = (now - chrono::Duration::hours(1)).to_rfc3339();
+        let recency2 = calculate_recency_score(&one_hour_ago, 0.1);
+        assert!(recency2 > 0.85 && recency2 < 0.95, "1小时前访问的recency应该在0.85-0.95之间, 实际: {}", recency2);
+        
+        // 测试24小时前访问（decay=0.1时应该约0.08）
+        let one_day_ago = (now - chrono::Duration::hours(24)).to_rfc3339();
+        let recency3 = calculate_recency_score(&one_day_ago, 0.1);
+        assert!(recency3 > 0.05 && recency3 < 0.15, "24小时前访问的recency应该在0.05-0.15之间, 实际: {}", recency3);
+        
+        // 测试无效时间格式（应该返回1.0作为默认值）
+        let invalid_time = "invalid-time";
+        let recency4 = calculate_recency_score(invalid_time, 0.1);
+        assert_eq!(recency4, 1.0, "无效时间格式应该返回1.0");
+    }
+
+    /// 测试三维检索综合评分计算
+    #[test]
+    fn test_calculate_3d_score() {
+        use chrono::{DateTime, Utc};
+        
+        // 测试完美记忆（高relevance、高importance、最近访问）
+        let now = Utc::now();
+        let recent_time = now.to_rfc3339();
+        let score1 = calculate_3d_score(0.9, 0.9, &recent_time, 0.1);
+        assert!(score1 > 0.7, "完美记忆的综合评分应该 > 0.7, 实际: {}", score1);
+        
+        // 测试低relevance记忆（即使importance和recency高，综合评分也应该低）
+        let score2 = calculate_3d_score(0.1, 0.9, &recent_time, 0.1);
+        assert!(score2 < 0.2, "低relevance记忆的综合评分应该 < 0.2, 实际: {}", score2);
+        
+        // 测试低importance记忆
+        let score3 = calculate_3d_score(0.9, 0.1, &recent_time, 0.1);
+        assert!(score3 < 0.2, "低importance记忆的综合评分应该 < 0.2, 实际: {}", score3);
+        
+        // 测试旧记忆（低recency）
+        let old_time = (now - chrono::Duration::hours(48)).to_rfc3339();
+        let score4 = calculate_3d_score(0.9, 0.9, &old_time, 0.1);
+        assert!(score4 < 0.5, "旧记忆的综合评分应该 < 0.5, 实际: {}", score4);
+        
+        // 测试边界值（所有维度都是0）
+        let score5 = calculate_3d_score(0.0, 0.0, &recent_time, 0.1);
+        assert_eq!(score5, 0.0, "所有维度为0的综合评分应该为0.0");
+        
+        // 测试边界值（所有维度都是1.0）
+        let score6 = calculate_3d_score(1.0, 1.0, &recent_time, 0.1);
+        assert!(score6 > 0.9, "所有维度为1.0的综合评分应该 > 0.9, 实际: {}", score6);
+    }
+
+    /// 测试三维检索评分边界情况
+    #[test]
+    fn test_calculate_3d_score_boundaries() {
+        use chrono::{DateTime, Utc};
+        
+        let now = Utc::now();
+        let recent_time = now.to_rfc3339();
+        
+        // 测试超出范围的relevance（应该被clamp到[0.0, 1.0]）
+        let score1 = calculate_3d_score(1.5, 0.5, &recent_time, 0.1);
+        assert!(score1 <= 1.0, "超出范围的relevance应该被clamp, 实际: {}", score1);
+        
+        let score2 = calculate_3d_score(-0.5, 0.5, &recent_time, 0.1);
+        assert!(score2 >= 0.0, "负值的relevance应该被clamp, 实际: {}", score2);
+        
+        // 测试超出范围的importance（应该被clamp到[0.0, 1.0]）
+        let score3 = calculate_3d_score(0.5, 1.5, &recent_time, 0.1);
+        assert!(score3 <= 1.0, "超出范围的importance应该被clamp, 实际: {}", score3);
+        
+        let score4 = calculate_3d_score(0.5, -0.5, &recent_time, 0.1);
+        assert!(score4 >= 0.0, "负值的importance应该被clamp, 实际: {}", score4);
+    }
 }
 
