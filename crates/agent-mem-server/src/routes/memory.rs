@@ -1428,8 +1428,56 @@ pub async fn search_memories(
         request.threshold.map(|t| t.to_string()).unwrap_or_else(|| "未指定".to_string()),
         adaptive_threshold);
 
+    // 🆕 Phase 2.5: 搜索结果去重（基于content hash）
+    // 使用HashSet去重，保留综合评分最高的结果
+    use std::collections::HashMap;
+    let mut hash_map: HashMap<String, (MemoryItem, f64, f64, f64, f64)> = HashMap::new();
+    let original_count = scored_results.len();
+    
+    for (item, composite_score, recency, importance, relevance) in scored_results {
+        // 使用hash字段进行去重（如果hash为None或空，使用content的前100字符作为key）
+        let dedup_key = item.hash.as_ref()
+            .filter(|h| !h.is_empty())
+            .cloned()
+            .unwrap_or_else(|| {
+                // 如果hash为空，使用content的前100字符作为去重key
+                if item.content.len() > 100 {
+                    // 使用char_indices找到安全的字符边界
+                    let mut char_count = 0;
+                    let mut byte_index = 0;
+                    for (i, _) in item.content.char_indices() {
+                        if char_count >= 100 {
+                            break;
+                        }
+                        char_count += 1;
+                        byte_index = i;
+                    }
+                    item.content[..byte_index].to_string()
+                } else {
+                    item.content.clone()
+                }
+            });
+        
+        // 如果hash已存在，比较综合评分，保留评分更高的
+        match hash_map.get_mut(&dedup_key) {
+            Some(existing) => {
+                // 比较综合评分，如果新结果评分更高，替换旧结果
+                if composite_score > existing.1 {
+                    *existing = (item, composite_score, recency, importance, relevance);
+                }
+            }
+            None => {
+                // 新hash，直接添加
+                hash_map.insert(dedup_key, (item, composite_score, recency, importance, relevance));
+            }
+        }
+    }
+    
+    let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64)> = hash_map.into_values().collect();
+    info!("🔄 搜索结果去重: {} → {} 条结果", original_count, deduplicated_results.len());
+
     // 转换为JSON，同时应用阈值过滤（使用原始relevance分数进行阈值过滤）
-    let json_results: Vec<serde_json::Value> = scored_results
+    let json_results: Vec<serde_json::Value> = deduplicated_results
         .into_iter()
         .filter(|(item, _, _, _, relevance)| {
             // 使用原始的relevance分数进行阈值过滤

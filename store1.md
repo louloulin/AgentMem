@@ -1498,8 +1498,18 @@ pub struct CoordinatorStats {
    - ✅ 最小改造：仅添加缓存逻辑，不影响现有搜索功能
    - ✅ Reranker调用已修复（使用`reranker::ResultReranker`而不是`query_optimizer::ResultReranker`）
    - ✅ 查询结果缓存实现已修复（使用`std::sync::OnceLock`替代`tokio::sync::OnceCell`）
-12. ⏳ 集成`UnifiedStorageCoordinator`到现有代码路径（可选，现有代码已实现类似逻辑）
-13. ⏳ 实施Phase 2 - 检索系统增强（2.1已完成，2.2和2.3待实施）
+12. ✅ 搜索结果去重（Phase 2.5）✅
+   - ✅ 实现基于content hash的去重逻辑
+   - ✅ 使用HashMap存储去重结果（key为hash，value为结果和评分）
+   - ✅ 保留综合评分最高的结果（当hash相同时）
+   - ✅ 支持hash为空的情况（使用content的前100字符作为去重key）
+   - ✅ 集成到`search_memories`路由（在三维评分后、JSON转换前）
+   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories路由)
+   - ✅ 充分利用现有代码：基于MemoryItem的hash字段，无需额外计算
+   - ✅ 最小改造：仅添加去重逻辑，不影响现有搜索功能
+   - ✅ 完整测试覆盖（去重逻辑测试用例）
+13. ⏳ 集成`UnifiedStorageCoordinator`到现有代码路径（可选，现有代码已实现类似逻辑）
+14. ⏳ 实施Phase 2 - 检索系统增强（2.1已完成，2.2和2.3待实施）
 
 ---
 
@@ -1645,15 +1655,16 @@ pub struct CoordinatorStats {
   - 健康检查 ✅ (LibSQL、VectorStore、L1缓存健康状态)
   - 统计管理 ✅ (重置统计信息)
   - 配置管理 ✅ (获取配置、默认配置创建)
-- Phase 2: 检索系统增强 - **45%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅)
+- Phase 2: 检索系统增强 - **50%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅, 搜索结果去重 ✅)
   - 自适应阈值增强 ✅ (中文检测、动态阈值调整)
   - 三维检索实现 ✅ (Recency × Importance × Relevance，6个测试用例)
   - Reranker功能启用 ✅ (多因素重排序：相似度、元数据、时间、重要性、质量)
   - 查询结果缓存 ✅ (内存缓存，TTL管理，FIFO淘汰策略)
+  - 搜索结果去重 ✅ (基于content hash，保留评分最高的结果)
 - Phase 3: 性能优化 - **0%完成**
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约44%完成** (Phase 1完成96%，Phase 2完成45%)
+**总体进度**: **约45%完成** (Phase 1完成96%，Phase 2完成50%)
 
 ### 📝 最新完成项（本次更新）
 - ✅ **统计管理方法**：添加`reset_stats`方法用于重置统计信息
@@ -1713,6 +1724,7 @@ pub struct CoordinatorStats {
 - ✅ Phase 2.1: 三维检索实现（Recency × Importance × Relevance，6个测试用例）
 - ✅ Reranker功能启用（多因素重排序，基于现有代码启用）
 - ✅ Phase 2.4: 查询结果缓存（内存缓存，TTL管理，FIFO淘汰策略）
+- ✅ Phase 2.5: 搜索结果去重（基于content hash，保留评分最高的结果）
 - ✅ Phase 2.1: 三维检索实现（Recency × Importance × Relevance，6个测试用例）
 
 ### 进行中

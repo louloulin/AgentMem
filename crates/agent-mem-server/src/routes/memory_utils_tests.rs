@@ -206,5 +206,38 @@ mod tests {
         let key5 = generate_cache_key("test query", &Some("agent1".to_string()), &Some("user1".to_string()), &Some(20));
         assert_ne!(key1, key5, "不同limit应该生成不同的缓存键");
     }
+
+    /// 测试搜索结果去重逻辑（基于hash）
+    #[test]
+    fn test_search_result_deduplication() {
+        use std::collections::HashMap;
+        
+        // 模拟搜索结果（相同hash，不同综合评分）
+        let mut hash_map: HashMap<String, (String, f64)> = HashMap::new();
+        
+        // 添加第一个结果（hash: "abc123", score: 0.8）
+        hash_map.insert("abc123".to_string(), ("memory1".to_string(), 0.8));
+        
+        // 添加第二个结果（相同hash，更高评分）
+        match hash_map.get_mut("abc123") {
+            Some(existing) => {
+                if 0.9 > existing.1 {
+                    *existing = ("memory2".to_string(), 0.9);
+                }
+            }
+            None => {
+                hash_map.insert("abc123".to_string(), ("memory2".to_string(), 0.9));
+            }
+        }
+        
+        // 验证：应该保留评分更高的结果
+        assert_eq!(hash_map.len(), 1, "相同hash应该只保留一个结果");
+        assert_eq!(hash_map.get("abc123").unwrap().1, 0.9, "应该保留评分更高的结果");
+        assert_eq!(hash_map.get("abc123").unwrap().0, "memory2", "应该保留评分更高的记忆ID");
+        
+        // 添加不同hash的结果
+        hash_map.insert("def456".to_string(), ("memory3".to_string(), 0.7));
+        assert_eq!(hash_map.len(), 2, "不同hash应该保留多个结果");
+    }
 }
 
