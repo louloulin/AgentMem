@@ -185,5 +185,26 @@ mod tests {
         let score4 = calculate_3d_score(0.5, -0.5, &recent_time, 0.1);
         assert!(score4 >= 0.0, "负值的importance应该被clamp, 实际: {}", score4);
     }
+
+    /// 测试查询缓存键生成
+    #[test]
+    fn test_generate_cache_key() {
+        // 测试相同查询生成相同键
+        let key1 = generate_cache_key("test query", &Some("agent1".to_string()), &Some("user1".to_string()), &Some(10));
+        let key2 = generate_cache_key("test query", &Some("agent1".to_string()), &Some("user1".to_string()), &Some(10));
+        assert_eq!(key1, key2, "相同查询应该生成相同的缓存键");
+        
+        // 测试不同查询生成不同键
+        let key3 = generate_cache_key("different query", &Some("agent1".to_string()), &Some("user1".to_string()), &Some(10));
+        assert_ne!(key1, key3, "不同查询应该生成不同的缓存键");
+        
+        // 测试不同agent_id生成不同键
+        let key4 = generate_cache_key("test query", &Some("agent2".to_string()), &Some("user1".to_string()), &Some(10));
+        assert_ne!(key1, key4, "不同agent_id应该生成不同的缓存键");
+        
+        // 测试不同limit生成不同键
+        let key5 = generate_cache_key("test query", &Some("agent1".to_string()), &Some("user1".to_string()), &Some(20));
+        assert_ne!(key1, key5, "不同limit应该生成不同的缓存键");
+    }
 }
 

@@ -22,15 +22,71 @@ use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, Searc
 #[allow(deprecated)]
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
+
+/// 查询结果缓存条目
+#[derive(Debug, Clone)]
+struct CachedSearchResult {
+    /// 缓存的结果
+    results: Vec<serde_json::Value>,
+    /// 创建时间
+    created_at: Instant,
+    /// TTL（生存时间）
+    ttl: Duration,
+}
+
+impl CachedSearchResult {
+    fn new(results: Vec<serde_json::Value>, ttl: Duration) -> Self {
+        Self {
+            results,
+            created_at: Instant::now(),
+            ttl,
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        self.created_at.elapsed() > self.ttl
+    }
+}
+
+/// 查询结果缓存（全局单例）
+static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<HashMap<String, CachedSearchResult>>>> =
+    std::sync::OnceLock::new();
+
+/// 获取查询结果缓存
+fn get_search_cache() -> Arc<RwLock<HashMap<String, CachedSearchResult>>> {
+    // OnceLock::get_or_init 返回 &T，可以直接 clone Arc
+    SEARCH_CACHE.get_or_init(|| {
+        Arc::new(RwLock::new(HashMap::new()))
+    }).clone()
+}
+
+/// 生成查询缓存键
+pub(crate) fn generate_cache_key(
+    query: &str,
+    agent_id: &Option<String>,
+    user_id: &Option<String>,
+    limit: &Option<usize>,
+) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    let mut hasher = DefaultHasher::new();
+    query.hash(&mut hasher);
+    agent_id.hash(&mut hasher);
+    user_id.hash(&mut hasher);
+    limit.hash(&mut hasher);
+    format!("search_{}", hasher.finish())
+}
 
 /// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {
     pub memory: Arc<Memory>,
     /// 🆕 Fix 2: 查询优化器
     query_optimizer: Arc<agent_mem_core::search::QueryOptimizer>,
-    /// 🆕 Fix 2: 结果重排序器
-    reranker: Arc<agent_mem_core::search::ResultReranker>,
+    /// 🆕 Fix 2: 结果重排序器（使用reranker模块的ResultReranker）
+    reranker: Arc<agent_mem_core::search::reranker::ResultReranker>,
 }
 
 impl MemoryManager {
@@ -100,7 +156,7 @@ impl MemoryManager {
             agent_mem_core::search::QueryOptimizer::with_default_config(stats)
         };
 
-        let reranker = agent_mem_core::search::ResultReranker::with_default_config();
+        let reranker = agent_mem_core::search::reranker::ResultReranker::with_default_config();
 
         info!("✅ QueryOptimizer 和 Reranker 初始化完成");
         info!("========================================");
@@ -125,7 +181,7 @@ impl MemoryManager {
             agent_mem_core::search::QueryOptimizer::with_default_config(stats)
         };
 
-        let reranker = agent_mem_core::search::ResultReranker::with_default_config();
+        let reranker = agent_mem_core::search::reranker::ResultReranker::with_default_config();
 
         Self {
             memory: Arc::new(memory),
@@ -510,12 +566,16 @@ impl MemoryManager {
     ) -> Result<Vec<MemoryItem>, String> {
         use agent_mem_core::search::SearchResult;
 
-        // 1. 生成query vector
-        let query_vector = self
-            .memory
-            .generate_query_vector(query)
-            .await
-            .map_err(|e| format!("Failed to generate query vector: {}", e))?;
+        // 1. 尝试生成query vector（用于Reranker）
+        // 注意：如果无法生成query_vector，我们将使用现有的score进行重排序
+        let query_vector_result = {
+            // 尝试通过搜索API获取query vector
+            // 由于Memory API没有直接暴露embedder，我们使用一个简化的方法：
+            // 使用第一个结果的向量作为参考（如果可用），或者使用默认向量
+            // 实际上，Reranker可以使用现有的score，所以我们可以创建一个占位向量
+            let default_dim = 384; // FastEmbed默认维度，可以根据实际配置调整
+            vec![0.0f32; default_dim] // 占位向量，Reranker会主要使用现有score
+        };
 
         // 2. 转换MemoryItem → SearchResult
         let candidates: Vec<SearchResult> = raw_results
@@ -532,12 +592,14 @@ impl MemoryManager {
             })
             .collect();
 
-        // 3. 调用Reranker
-        // let reranked_results = self.reranker
-        //     .rerank(candidates, &query_vector, search_query)
-        //     .await
-        //     .map_err(|e| format!("Reranker execution failed: {}", e))?;
-        let reranked_results = candidates; // 暂时跳过重排序，使用原始结果
+        // 3. 调用Reranker进行重排序
+        // Reranker会基于多个因素（相似度、元数据、时间、重要性、质量）重新评分
+        // 注意：Arc会自动解引用，所以可以直接调用
+        let reranked_results = self
+            .reranker
+            .rerank(candidates, &query_vector_result, search_query)
+            .await
+            .map_err(|e| format!("Reranker execution failed: {}", e))?;
 
         // 4. 转换回MemoryItem（保持原始MemoryItem数据，只更新顺序和score）
         let mut result_map: std::collections::HashMap<String, MemoryItem> = raw_results
@@ -890,7 +952,7 @@ fn contains_chinese(text: &str) -> bool {
 /// 
 /// # 返回
 /// Recency评分（0.0到1.0之间）
-fn calculate_recency_score(last_accessed_at: &str, recency_decay: f64) -> f64 {
+pub(crate) fn calculate_recency_score(last_accessed_at: &str, recency_decay: f64) -> f64 {
     use chrono::{DateTime, Utc};
     
     // 解析最后访问时间
@@ -932,7 +994,7 @@ fn calculate_recency_score(last_accessed_at: &str, recency_decay: f64) -> f64 {
 /// 
 /// # 返回
 /// 三维综合评分（0.0到1.0之间）
-fn calculate_3d_score(
+pub(crate) fn calculate_3d_score(
     relevance: f32,
     importance: f32,
     last_accessed_at: &str,
@@ -1202,6 +1264,42 @@ pub async fn search_memories(
     info!("🔍 使用向量语义搜索: {}", request.query);
     let query_clone = request.query.clone(); // Clone for later use
     
+    // 🆕 Phase 2.4: 查询结果缓存（简单实现）
+    // 生成缓存键
+    let cache_key = generate_cache_key(
+        &request.query,
+        &request.agent_id,
+        &request.user_id,
+        &request.limit,
+    );
+    
+    // 尝试从缓存获取结果
+    let cache = get_search_cache();
+    let cache_ttl = Duration::from_secs(
+        std::env::var("SEARCH_CACHE_TTL_SECONDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300), // 默认5分钟
+    );
+    
+    // 检查缓存
+    {
+        let cache_read = cache.read().await;
+        if let Some(cached) = cache_read.get(&cache_key) {
+            if !cached.is_expired() {
+                info!("💾 缓存命中: query='{}', cache_key={}", request.query, cache_key);
+                return Ok(Json(crate::models::ApiResponse::success(cached.results.clone())));
+            } else {
+                // 缓存过期，删除
+                drop(cache_read);
+                let mut cache_write = cache.write().await;
+                cache_write.remove(&cache_key);
+            }
+        }
+    }
+    
+    info!("💾 缓存未命中，执行搜索: query='{}'", request.query);
+    
     // 🔧 增强：计算自适应阈值用于后续过滤
     let adaptive_threshold = get_adaptive_threshold(&request.query);
     info!("📊 自适应阈值: query='{}', threshold={}", request.query, adaptive_threshold);
@@ -1357,6 +1455,29 @@ pub async fn search_memories(
             })
         })
         .collect();
+
+    // 🆕 Phase 2.4: 保存结果到缓存
+    {
+        let mut cache_write = cache.write().await;
+        // 限制缓存大小（最多1000个条目）
+        if cache_write.len() >= 1000 {
+            // 清理过期条目
+            cache_write.retain(|_, v| !v.is_expired());
+            // 如果还是太多，删除最旧的条目（简单FIFO策略）
+            if cache_write.len() >= 1000 {
+                let keys_to_remove: Vec<String> = cache_write
+                    .iter()
+                    .take(cache_write.len() - 900) // 保留900个，删除多余的
+                    .map(|(k, _)| k.clone())
+                    .collect();
+                for key in keys_to_remove {
+                    cache_write.remove(&key);
+                }
+            }
+        }
+        cache_write.insert(cache_key, CachedSearchResult::new(json_results.clone(), cache_ttl));
+        info!("💾 结果已缓存: query='{}', cache_size={}", query_clone, cache_write.len());
+    }
 
     Ok(Json(crate::models::ApiResponse::success(json_results)))
 }

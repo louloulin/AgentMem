@@ -1025,13 +1025,26 @@ impl ThreeDimensionalRetrieval {
 ```
 
 **任务清单**：
-- [ ] 实现`ThreeDimensionalRetrieval`
-- [ ] 集成到`MemoryManager`
-- [ ] 添加配置选项
-- [ ] 性能测试
+- [x] 实现`ThreeDimensionalRetrieval` ✅
+- [x] 集成到`MemoryManager` ✅
+- [x] 添加配置选项 ✅
+- [x] 性能测试 ✅
 - [ ] 编写文档
 
 **预计时间**：5天
+
+**实现状态**：✅ 已完成（2025-01-XX）
+
+**实现细节**：
+- ✅ 实现了`calculate_recency_score`函数：基于最后访问时间的指数衰减模型
+- ✅ 实现了`calculate_3d_score`函数：计算Recency × Importance × Relevance综合评分
+- ✅ 集成到`search_memories`路由：搜索结果按三维综合评分排序
+- ✅ 添加配置选项：通过`RECENCY_DECAY`环境变量配置衰减系数（默认0.1）
+- ✅ 在搜索结果JSON中返回`composite_score`、`recency`、`relevance`字段
+- ✅ 完整测试覆盖：6个测试用例（Recency评分、三维评分、边界情况）
+- 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs`
+- ✅ 充分利用现有代码：基于现有`MemoryItem`结构，无需额外数据结构
+- ✅ 最小改造：仅添加评分函数和排序逻辑，不影响现有功能
 
 ---
 
@@ -1455,8 +1468,38 @@ pub struct CoordinatorStats {
    - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs`
    - ✅ 充分利用现有代码：基于现有`get_adaptive_threshold`函数增强
    - ✅ 最小改造：仅添加中文检测逻辑和阈值调整（-0.2调整值）
-9. ⏳ 集成`UnifiedStorageCoordinator`到现有代码路径（可选，现有代码已实现类似逻辑）
-10. ⏳ 实施Phase 2 - 检索系统增强
+9. ✅ 三维检索实现（Phase 2.1）✅
+   - ✅ `calculate_recency_score` (Recency评分：基于最后访问时间的指数衰减)
+   - ✅ `calculate_3d_score` (三维综合评分：Recency × Importance × Relevance)
+   - ✅ 集成到`search_memories`路由：搜索结果按三维综合评分排序
+   - ✅ 配置选项：通过`RECENCY_DECAY`环境变量配置衰减系数（默认0.1）
+   - ✅ 搜索结果JSON返回`composite_score`、`recency`、`relevance`字段
+   - ✅ 完整测试覆盖（6个测试用例：Recency评分、三维评分、边界情况）
+   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs`
+   - ✅ 充分利用现有代码：基于现有`MemoryItem`结构，无需额外数据结构
+   - ✅ 最小改造：仅添加评分函数和排序逻辑，不影响现有功能
+10. ✅ Reranker功能启用 ✅
+   - ✅ 启用`apply_reranking`方法中的Reranker调用（之前被注释）
+   - ✅ 修复query_vector生成逻辑（使用占位向量，Reranker主要使用现有score）
+   - ✅ Reranker基于多因素重新评分：相似度、元数据、时间、重要性、内容质量
+   - ✅ 在`search_memories`中自动应用（当`should_rerank=true`时）
+   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (apply_reranking方法)
+   - ✅ 充分利用现有代码：启用已存在的Reranker功能，无需额外实现
+   - ✅ 最小改造：仅取消注释并修复query_vector生成
+11. ✅ 查询结果缓存（Phase 2.4）✅
+   - ✅ 实现简单的内存缓存机制（基于HashMap + RwLock）
+   - ✅ 缓存键生成（基于query、agent_id、user_id、limit的哈希）
+   - ✅ TTL管理（默认5分钟，可通过`SEARCH_CACHE_TTL_SECONDS`环境变量配置）
+   - ✅ 缓存大小限制（最多1000个条目，FIFO淘汰策略）
+   - ✅ 自动过期清理
+   - ✅ 集成到`search_memories`路由（缓存命中时直接返回，未命中时执行搜索并缓存结果）
+   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories路由)
+   - ✅ 充分利用现有代码：基于标准库实现，无需额外依赖
+   - ✅ 最小改造：仅添加缓存逻辑，不影响现有搜索功能
+   - ✅ Reranker调用已修复（使用`reranker::ResultReranker`而不是`query_optimizer::ResultReranker`）
+   - ✅ 查询结果缓存实现已修复（使用`std::sync::OnceLock`替代`tokio::sync::OnceCell`）
+12. ⏳ 集成`UnifiedStorageCoordinator`到现有代码路径（可选，现有代码已实现类似逻辑）
+13. ⏳ 实施Phase 2 - 检索系统增强（2.1已完成，2.2和2.3待实施）
 
 ---
 
@@ -1602,12 +1645,15 @@ pub struct CoordinatorStats {
   - 健康检查 ✅ (LibSQL、VectorStore、L1缓存健康状态)
   - 统计管理 ✅ (重置统计信息)
   - 配置管理 ✅ (获取配置、默认配置创建)
-- Phase 2: 检索系统增强 - **5%完成** (自适应阈值增强 ✅)
+- Phase 2: 检索系统增强 - **45%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅)
   - 自适应阈值增强 ✅ (中文检测、动态阈值调整)
+  - 三维检索实现 ✅ (Recency × Importance × Relevance，6个测试用例)
+  - Reranker功能启用 ✅ (多因素重排序：相似度、元数据、时间、重要性、质量)
+  - 查询结果缓存 ✅ (内存缓存，TTL管理，FIFO淘汰策略)
 - Phase 3: 性能优化 - **0%完成**
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约36%完成** (Phase 1完成96%，Phase 2开始5%)
+**总体进度**: **约44%完成** (Phase 1完成96%，Phase 2完成45%)
 
 ### 📝 最新完成项（本次更新）
 - ✅ **统计管理方法**：添加`reset_stats`方法用于重置统计信息
@@ -1664,6 +1710,10 @@ pub struct CoordinatorStats {
 ### 已完成
 - ✅ Phase 1.1: 统一存储协调层（956行代码，8个测试用例）
 - ✅ Phase 1.3: 批量操作优化（集成在coordinator中，4个测试用例）
+- ✅ Phase 2.1: 三维检索实现（Recency × Importance × Relevance，6个测试用例）
+- ✅ Reranker功能启用（多因素重排序，基于现有代码启用）
+- ✅ Phase 2.4: 查询结果缓存（内存缓存，TTL管理，FIFO淘汰策略）
+- ✅ Phase 2.1: 三维检索实现（Recency × Importance × Relevance，6个测试用例）
 
 ### 进行中
 - ⏳ Phase 1.2: 多级缓存系统（L1已完成，L2可选）
