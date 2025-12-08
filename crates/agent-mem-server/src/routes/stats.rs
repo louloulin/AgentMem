@@ -11,6 +11,7 @@
 use crate::error::{ServerError, ServerResult};
 use crate::routes::memory::MemoryManager;
 use agent_mem_core::storage::factory::Repositories;
+use agent_mem_core::storage::libsql::connection::LibSqlConnectionManager;
 use axum::{extract::Extension, response::Json};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -867,4 +868,131 @@ mod tests {
         assert!(json.contains("2024-01-01"));
         assert!(json.contains("\"total\":100"));
     }
+
+    /// 测试数据库连接池统计API响应结构
+    #[test]
+    fn test_database_pool_stats_structure() {
+        let stats = DatabasePoolStats {
+            size_bytes: 1024 * 1024, // 1MB
+            size_mb: 1.0,
+            page_count: 256,
+            page_size: 4096,
+            health_status: "healthy".to_string(),
+            pool_status: "active".to_string(),
+        };
+
+        // 验证字段存在
+        assert_eq!(stats.size_bytes, 1024 * 1024);
+        assert_eq!(stats.size_mb, 1.0);
+        assert_eq!(stats.page_count, 256);
+        assert_eq!(stats.page_size, 4096);
+        assert_eq!(stats.health_status, "healthy");
+        assert_eq!(stats.pool_status, "active");
+
+        // 验证序列化
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("size_bytes"));
+        assert!(json.contains("size_mb"));
+        assert!(json.contains("page_count"));
+        assert!(json.contains("health_status"));
+        assert!(json.contains("pool_status"));
+    }
+
+    /// 测试数据库连接池统计API响应验证
+    #[test]
+    fn test_database_pool_stats_validation() {
+        // 测试健康状态
+        let healthy_stats = DatabasePoolStats {
+            size_bytes: 1024,
+            size_mb: 0.001,
+            page_count: 1,
+            page_size: 1024,
+            health_status: "healthy".to_string(),
+            pool_status: "active".to_string(),
+        };
+        assert_eq!(healthy_stats.health_status, "healthy");
+
+        // 测试不健康状态
+        let unhealthy_stats = DatabasePoolStats {
+            size_bytes: 0,
+            size_mb: 0.0,
+            page_count: 0,
+            page_size: 4096,
+            health_status: "unhealthy".to_string(),
+            pool_status: "inactive".to_string(),
+        };
+        assert_eq!(unhealthy_stats.health_status, "unhealthy");
+    }
+}
+
+/// Database connection pool statistics response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DatabasePoolStats {
+    /// Database size in bytes
+    pub size_bytes: u64,
+    /// Database size in megabytes
+    pub size_mb: f64,
+    /// Total number of pages
+    pub page_count: u64,
+    /// Page size in bytes
+    pub page_size: u64,
+    /// Database health status
+    pub health_status: String,
+    /// Connection pool status (simplified)
+    pub pool_status: String,
+}
+
+/// Get database connection pool statistics
+/// 
+/// 🆕 Phase 3.2: 连接池管理 - 提供数据库连接统计信息
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats/database/pool",
+    tag = "statistics",
+    responses(
+        (status = 200, description = "Database pool statistics retrieved successfully", body = DatabasePoolStats),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_database_pool_stats() -> ServerResult<Json<DatabasePoolStats>> {
+    info!("📊 获取数据库连接池统计信息");
+
+    // 获取数据库路径
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+
+    // 创建连接管理器
+    let manager = LibSqlConnectionManager::new(&db_path)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to create connection manager: {}", e)))?;
+
+    // 获取数据库统计信息
+    let db_stats = manager
+        .get_stats()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to get database stats: {}", e)))?;
+
+    // 检查数据库健康状态
+    let health_status = match manager.health_check().await {
+        Ok(_) => "healthy".to_string(),
+        Err(_) => "unhealthy".to_string(),
+    };
+
+    // 简化的连接池状态（LibSQL使用单连接模式，这里标记为active）
+    let pool_status = "active".to_string();
+
+    let response = DatabasePoolStats {
+        size_bytes: db_stats.size_bytes,
+        size_mb: db_stats.size_mb(),
+        page_count: db_stats.page_count,
+        page_size: db_stats.page_size,
+        health_status,
+        pool_status,
+    };
+
+    info!("📊 数据库统计: 大小={:.2}MB, 页数={}, 健康状态={}", 
+        response.size_mb, response.page_count, response.health_status);
+
+    Ok(Json(response))
 }

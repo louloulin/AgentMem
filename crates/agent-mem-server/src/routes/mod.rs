@@ -121,6 +121,10 @@ pub async fn create_router(
         .route(
             "/api/v1/stats/memory/quality",
             get(stats::get_memory_quality_stats),
+        )
+        .route(
+            "/api/v1/stats/database/pool",
+            get(stats::get_database_pool_stats),
         );
 
     // Add all routes (now database-agnostic via Repository Traits)
@@ -380,6 +384,7 @@ pub async fn create_router(
         stats::get_memory_growth,
         stats::get_agent_activity_stats,
         stats::get_memory_quality_stats,
+        stats::get_database_pool_stats,
     ),
     components(
         schemas(
