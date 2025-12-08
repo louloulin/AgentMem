@@ -62,7 +62,7 @@ static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<LruCache<String, CachedSearc
 
 /// 搜索统计信息（全局单例）
 #[derive(Debug, Clone)]
-struct SearchStatistics {
+pub(crate) struct SearchStatistics {
     /// 总搜索次数
     total_searches: u64,
     /// 缓存命中次数
@@ -97,7 +97,7 @@ impl SearchStatistics {
     }
 
     /// 获取缓存命中率
-    fn cache_hit_rate(&self) -> f64 {
+    pub(crate) fn cache_hit_rate(&self) -> f64 {
         if self.total_searches == 0 {
             return 0.0;
         }
@@ -105,11 +105,32 @@ impl SearchStatistics {
     }
 
     /// 获取平均搜索延迟（毫秒）
-    fn avg_latency_ms(&self) -> f64 {
+    pub(crate) fn avg_latency_ms(&self) -> f64 {
         if self.total_searches == 0 {
             return 0.0;
         }
         (self.total_latency_us as f64) / (self.total_searches as f64) / 1000.0
+    }
+
+    /// 🆕 Phase 4.2: 获取搜索统计的公共访问方法
+    pub(crate) fn get_total_searches(&self) -> u64 {
+        self.total_searches
+    }
+
+    pub(crate) fn get_cache_hits(&self) -> u64 {
+        self.cache_hits
+    }
+
+    pub(crate) fn get_cache_misses(&self) -> u64 {
+        self.cache_misses
+    }
+
+    pub(crate) fn get_exact_queries(&self) -> u64 {
+        self.exact_queries
+    }
+
+    pub(crate) fn get_vector_searches(&self) -> u64 {
+        self.vector_searches
     }
 }
 
@@ -118,14 +139,14 @@ static SEARCH_STATS: std::sync::OnceLock<Arc<RwLock<SearchStatistics>>> =
     std::sync::OnceLock::new();
 
 /// 获取搜索统计
-fn get_search_stats() -> Arc<RwLock<SearchStatistics>> {
+pub(crate) fn get_search_stats() -> Arc<RwLock<SearchStatistics>> {
     SEARCH_STATS.get_or_init(|| {
         Arc::new(RwLock::new(SearchStatistics::new()))
     }).clone()
 }
 
 /// 获取查询结果缓存
-fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
+pub(crate) fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
     // OnceLock::get_or_init 返回 &T，可以直接 clone Arc
     SEARCH_CACHE.get_or_init(|| {
         // 默认缓存容量：1000个条目
