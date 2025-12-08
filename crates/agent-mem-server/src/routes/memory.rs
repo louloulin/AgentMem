@@ -1843,26 +1843,43 @@ pub async fn batch_add_memories(
 ) -> ServerResult<(StatusCode, Json<crate::models::BatchResponse>)> {
     info!("Batch adding {} memories", request.memories.len());
 
+    // 🆕 Phase 3.2: 并行写入优化 - 使用并行处理替代串行循环
+    let add_futures: Vec<_> = request.memories
+        .into_iter()
+        .map(|memory_req| {
+            let memory_manager_clone = memory_manager.clone();
+            let repositories_clone = repositories.clone();
+            async move {
+                memory_manager_clone
+                    .add_memory(
+                        repositories_clone,
+                        memory_req.agent_id,
+                        memory_req.user_id,
+                        memory_req.content,
+                        memory_req.memory_type,
+                        memory_req.importance,
+                        memory_req.metadata,
+                    )
+                    .await
+            }
+        })
+        .collect();
+    
+    // 并行执行所有添加操作
+    let add_results = future::join_all(add_futures).await;
+    
+    // 收集结果和错误
     let mut results = Vec::new();
     let mut errors = Vec::new();
-
-    for memory_req in request.memories {
-        match memory_manager
-            .add_memory(
-                repositories.clone(), // 传递repositories用于LibSQL持久化
-                memory_req.agent_id,
-                memory_req.user_id,
-                memory_req.content,
-                memory_req.memory_type,
-                memory_req.importance,
-                memory_req.metadata,
-            )
-            .await
-        {
+    
+    for result in add_results {
+        match result {
             Ok(id) => results.push(id),
             Err(e) => errors.push(e.to_string()),
         }
     }
+    
+    info!("✅ 并行批量添加完成: 成功 {} 个, 失败 {} 个", results.len(), errors.len());
 
     let response = crate::models::BatchResponse {
         successful: results.len(),
@@ -1892,15 +1909,36 @@ pub async fn batch_delete_memories(
 ) -> ServerResult<Json<crate::models::BatchResponse>> {
     info!("Batch deleting {} memories", ids.len());
 
+    // 🆕 Phase 3.2: 并行写入优化 - 使用并行处理替代串行循环
+    let delete_futures: Vec<_> = ids
+        .iter()
+        .map(|id| {
+            let memory_manager_clone = memory_manager.clone();
+            let id_clone = id.clone();
+            async move {
+                memory_manager_clone
+                    .delete_memory(&id_clone)
+                    .await
+                    .map_err(|e| format!("Failed to delete {}: {}", id_clone, e))
+            }
+        })
+        .collect();
+    
+    // 并行执行所有删除操作
+    let delete_results = future::join_all(delete_futures).await;
+    
+    // 收集结果和错误
     let mut successful = 0;
     let mut errors = Vec::new();
-
-    for id in &ids {
-        match memory_manager.delete_memory(id).await {
+    
+    for result in delete_results {
+        match result {
             Ok(_) => successful += 1,
-            Err(e) => errors.push(format!("Failed to delete {id}: {e}")),
+            Err(e) => errors.push(e),
         }
     }
+    
+    info!("✅ 并行批量删除完成: 成功 {} 个, 失败 {} 个", successful, errors.len());
 
     let response = crate::models::BatchResponse {
         successful,

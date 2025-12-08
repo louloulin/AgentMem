@@ -668,5 +668,107 @@ mod tests {
         assert!(success_ids.contains(&"id_3".to_string()));
         assert!(success_ids.contains(&"id_5".to_string()));
     }
+
+    /// 测试并行写入优化的概念
+    /// 
+    /// 验证并行写入比串行写入更快
+    #[tokio::test]
+    async fn test_parallel_write_optimization() {
+        use futures::future;
+        use std::time::Instant;
+        
+        // 模拟10个写入任务
+        let write_tasks: Vec<String> = (1..=10).map(|i| format!("task_{}", i)).collect();
+        
+        // 串行写入（模拟旧方式）
+        let serial_start = Instant::now();
+        let mut serial_results = Vec::new();
+        for task in &write_tasks {
+            // 模拟写入延迟（20ms）
+            tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+            serial_results.push(task.clone());
+        }
+        let serial_duration = serial_start.elapsed();
+        
+        // 并行写入（新方式）
+        let parallel_start = Instant::now();
+        let write_futures: Vec<_> = write_tasks
+            .iter()
+            .map(|task| {
+                let task_clone = task.clone();
+                async move {
+                    // 模拟写入延迟（20ms）
+                    tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+                    task_clone
+                }
+            })
+            .collect();
+        let parallel_results = future::join_all(write_futures).await;
+        let parallel_duration = parallel_start.elapsed();
+        
+        // 验证结果一致
+        assert_eq!(serial_results.len(), parallel_results.len());
+        
+        // 验证并行写入更快（理论上应该快约10倍，但实际可能受限于并发限制）
+        // 这里只验证并行写入不慢于串行写入
+        assert!(
+            parallel_duration <= serial_duration,
+            "并行写入应该不慢于串行写入: 串行={:?}, 并行={:?}",
+            serial_duration,
+            parallel_duration
+        );
+        
+        // 验证并行写入确实更快（至少快2倍）
+        assert!(
+            parallel_duration.as_millis() < serial_duration.as_millis() / 2,
+            "并行写入应该明显快于串行写入: 串行={:?}, 并行={:?}",
+            serial_duration,
+            parallel_duration
+        );
+    }
+
+    /// 测试并行写入的错误处理
+    /// 
+    /// 验证即使部分写入失败，其他写入仍能正常完成
+    #[tokio::test]
+    async fn test_parallel_write_error_handling() {
+        use futures::future;
+        
+        // 模拟5个写入任务，其中2个会失败
+        let write_tasks: Vec<String> = (1..=5).map(|i| format!("task_{}", i)).collect();
+        
+        let write_futures: Vec<_> = write_tasks
+            .iter()
+            .map(|task| {
+                let task_clone = task.clone();
+                async move {
+                    // 模拟写入：task_2和task_4会失败
+                    if task_clone == "task_2" || task_clone == "task_4" {
+                        Err(format!("Write failed for {}", task_clone))
+                    } else {
+                        Ok(task_clone)
+                    }
+                }
+            })
+            .collect();
+        
+        let results = future::join_all(write_futures).await;
+        
+        // 验证结果：3个成功，2个失败
+        let successes: Vec<_> = results.iter().filter(|r| r.is_ok()).collect();
+        let failures: Vec<_> = results.iter().filter(|r| r.is_err()).collect();
+        
+        assert_eq!(successes.len(), 3, "应该有3个成功的写入");
+        assert_eq!(failures.len(), 2, "应该有2个失败的写入");
+        
+        // 验证成功的写入结果
+        let success_tasks: Vec<String> = successes
+            .iter()
+            .map(|r| r.as_ref().unwrap().clone())
+            .collect();
+        assert!(success_tasks.contains(&"task_1".to_string()));
+        assert!(success_tasks.contains(&"task_3".to_string()));
+        assert!(success_tasks.contains(&"task_5".to_string()));
+    }
 }
 
