@@ -2210,7 +2210,7 @@ pub(crate) async fn cleanup_memories(
     let mut deleted_count = 0;
     for memory_id in &memory_ids {
         if let Ok(Some(memory)) = repositories.memories.find_by_id(memory_id).await {
-            if repositories.memories.delete(&memory.id).await.is_ok() {
+            if repositories.memories.delete(&memory.id.to_string()).await.is_ok() {
                 deleted_count += 1;
             }
         }
@@ -2691,7 +2691,8 @@ pub async fn batch_search_memories(
         {
             Ok(Json(api_response)) => {
                 // 🆕 Phase 2.13: 从SearchResponse提取results
-                if let serde_json::Value::Object(obj) = api_response.data {
+                // api_response.data是SearchResponse类型，需要提取results字段
+                if let serde_json::Value::Object(obj) = &api_response.data {
                     if let Some(serde_json::Value::Array(results_array)) = obj.get("results") {
                         results.push(results_array.clone());
                     } else {
@@ -2765,6 +2766,275 @@ pub async fn get_search_statistics(
         response.cache_hit_rate * 100.0,
         response.avg_latency_ms);
 
+    Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 4.7: 记忆去重功能
+/// 
+/// 基于content hash检测和删除重复记忆，保留重要性最高的记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/deduplicate",
+    tag = "memory",
+    params(
+        ("dry_run" = Option<bool>, Query, description = "是否仅预览不实际删除（默认false）"),
+        ("min_importance_diff" = Option<f32>, Query, description = "最小重要性差异阈值（默认0.1）")
+    ),
+    responses(
+        (status = 200, description = "Memory deduplication completed successfully", body = crate::models::ApiResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn deduplicate_memories(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("🔍 开始记忆去重");
+    
+    let dry_run = params
+        .get("dry_run")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(false);
+    let min_importance_diff = params
+        .get("min_importance_diff")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.1);
+    
+    use libsql::{params, Builder};
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+    
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    
+    let conn = db
+        .connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    // 查询所有记忆，按hash分组
+    let query = "SELECT id, hash, content, importance, agent_id, user_id 
+                 FROM memories 
+                 WHERE is_deleted = 0 
+                 AND hash IS NOT NULL 
+                 AND hash != ''";
+    
+    let mut stmt = conn
+        .prepare(query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+    
+    let mut rows = stmt
+        .query(params![])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+    
+    // 按hash分组记忆
+    use std::collections::HashMap;
+    let mut hash_groups: HashMap<String, Vec<(String, f64, String, String)>> = HashMap::new();
+    
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
+        let id: String = row.get(0).unwrap_or_default();
+        let hash: String = row.get(1).unwrap_or_default();
+        let importance: f64 = row.get(3).unwrap_or(0.5);
+        let agent_id: String = row.get(4).unwrap_or_default();
+        let user_id: String = row.get(5).unwrap_or_default();
+        
+        hash_groups
+            .entry(hash)
+            .or_insert_with(Vec::new)
+            .push((id, importance, agent_id, user_id));
+    }
+    
+    // 找出重复的记忆（hash相同的组，且组内有多条记录）
+    let mut duplicate_groups = Vec::new();
+    let mut total_duplicates = 0;
+    
+    for (hash, memories) in &hash_groups {
+        if memories.len() > 1 {
+            // 按importance排序，保留最高的
+            let mut sorted = memories.clone();
+            sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            
+            let keep_id = &sorted[0].0;
+            let keep_importance = sorted[0].1;
+            let duplicates: Vec<String> = sorted[1..]
+                .iter()
+                .filter(|(_, imp, _, _)| (keep_importance - imp).abs() >= min_importance_diff as f64)
+                .map(|(id, _, _, _)| id.clone())
+                .collect();
+            
+            if !duplicates.is_empty() {
+                duplicate_groups.push((hash.clone(), keep_id.clone(), duplicates.clone()));
+                total_duplicates += duplicates.len();
+            }
+        }
+    }
+    
+    if dry_run {
+        let response = serde_json::json!({
+            "duplicate_groups": duplicate_groups.len(),
+            "total_duplicates": total_duplicates,
+            "duplicate_details": duplicate_groups,
+            "dry_run": true,
+            "message": format!("预览模式: 找到 {} 组重复记忆，共 {} 条重复", duplicate_groups.len(), total_duplicates)
+        });
+        
+        info!("✅ 去重预览完成: {} 组重复, {} 条重复记忆", duplicate_groups.len(), total_duplicates);
+        return Ok(Json(crate::models::ApiResponse::success(response)));
+    }
+    
+    // 实际删除重复记忆
+    let mut deleted_count = 0;
+    let mut deleted_ids = Vec::new();
+    
+    for (_, _, duplicates) in &duplicate_groups {
+        for memory_id in duplicates {
+            if let Ok(Some(memory)) = repositories.memories.find_by_id(memory_id).await {
+                if repositories.memories.delete(&memory.id.to_string()).await.is_ok() {
+                    deleted_count += 1;
+                    deleted_ids.push(memory_id.clone());
+                }
+            }
+        }
+    }
+    
+    info!("✅ 去重完成: 删除了 {} 条重复记忆", deleted_count);
+    
+    let response = serde_json::json!({
+        "duplicate_groups": duplicate_groups.len(),
+        "total_duplicates": total_duplicates,
+        "deleted_count": deleted_count,
+        "deleted_ids": deleted_ids,
+        "dry_run": false,
+        "message": format!("去重完成: 删除了 {} 条重复记忆", deleted_count)
+    });
+    
+    Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 4.6: 记忆导入功能
+/// 
+/// 从JSON格式导入记忆，支持批量导入
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/import",
+    tag = "memory",
+    request_body = serde_json::Value,
+    responses(
+        (status = 200, description = "Memory import completed successfully", body = crate::models::ApiResponse),
+        (status = 400, description = "Invalid import data"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn import_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Json(import_data): Json<serde_json::Value>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("📥 开始导入记忆");
+    
+    // 解析导入数据
+    let memories_array = import_data
+        .get("memories")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| ServerError::BadRequest("Invalid import data: missing 'memories' array".to_string()))?;
+    
+    let mut successful = 0;
+    let mut failed = 0;
+    let mut errors = Vec::new();
+    let mut imported_ids = Vec::new();
+    
+    // 遍历导入的记忆
+    for (index, memory_json) in memories_array.iter().enumerate() {
+        // 解析记忆数据
+        let id = memory_json.get("id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let agent_id = memory_json.get("agent_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServerError::BadRequest(format!("Memory {}: missing agent_id", index)))?;
+        let user_id = memory_json.get("user_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let content = memory_json.get("content")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServerError::BadRequest(format!("Memory {}: missing content", index)))?;
+        let memory_type = memory_json.get("memory_type")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let importance = memory_json.get("importance")
+            .and_then(|v| v.as_f64())
+            .map(|f| f as f32);
+        let metadata = memory_json.get("metadata")
+            .and_then(|v| v.as_object())
+            .map(|obj| {
+                let mut map = std::collections::HashMap::new();
+                for (k, v) in obj {
+                    if let Some(s) = v.as_str() {
+                        map.insert(k.clone(), s.to_string());
+                    }
+                }
+                map
+            });
+        
+        // 构建MemoryRequest
+        let memory_request = crate::models::MemoryRequest {
+            agent_id: Some(agent_id.clone()),
+            user_id: user_id.clone(),
+            content: content.clone(),
+            memory_type: memory_type.and_then(|mt| {
+                match mt.as_str() {
+                    "episodic" => Some(agent_mem_traits::MemoryType::Episodic),
+                    "semantic" => Some(agent_mem_traits::MemoryType::Semantic),
+                    "procedural" => Some(agent_mem_traits::MemoryType::Procedural),
+                    "working" => Some(agent_mem_traits::MemoryType::Working),
+                    _ => None,
+                }
+            }),
+            importance,
+            metadata,
+        };
+        
+        // 使用现有的add_memory功能
+        match add_memory(
+            Extension(memory_manager.clone()),
+            Extension(repositories.clone()),
+            Json(memory_request),
+        ).await {
+            Ok((_, response)) => {
+                if let Some(data) = response.data.as_object() {
+                    if let Some(mem_id) = data.get("id").and_then(|v| v.as_str()) {
+                        imported_ids.push(mem_id.to_string());
+                        successful += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                let error_msg = format!("Memory {}: {}", index, e);
+                errors.push(error_msg.clone());
+                failed += 1;
+                warn!("⚠️ 导入失败: {}", error_msg);
+            }
+        }
+    }
+    
+    info!("✅ 导入完成: 成功 {} 个, 失败 {} 个", successful, failed);
+    
+    let response = serde_json::json!({
+        "imported_count": successful,
+        "failed_count": failed,
+        "imported_ids": imported_ids,
+        "errors": errors,
+        "total": memories_array.len(),
+    });
+    
     Ok(Json(crate::models::ApiResponse::success(response)))
 }
 

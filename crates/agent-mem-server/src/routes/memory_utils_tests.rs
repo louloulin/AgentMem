@@ -1381,5 +1381,113 @@ mod tests {
         assert_eq!(memory["agent_id"], "agent_1");
         assert_eq!(memory["content"], "Test content");
     }
+
+    /// 🆕 Phase 4.6: 测试记忆导入功能结构
+    #[test]
+    fn test_import_memories_structure() {
+        // 测试导入数据的结构验证
+        let import_data = serde_json::json!({
+            "memories": [
+                {
+                    "id": "mem_1",
+                    "agent_id": "agent_1",
+                    "user_id": "user_1",
+                    "content": "Test content 1",
+                    "memory_type": "episodic",
+                    "importance": 0.8,
+                    "metadata": {
+                        "key1": "value1"
+                    }
+                },
+                {
+                    "id": "mem_2",
+                    "agent_id": "agent_1",
+                    "user_id": "user_1",
+                    "content": "Test content 2",
+                    "memory_type": "semantic",
+                    "importance": 0.6,
+                    "metadata": {}
+                }
+            ]
+        });
+        
+        // 验证导入数据结构
+        assert!(import_data["memories"].is_array());
+        assert_eq!(import_data["memories"].as_array().unwrap().len(), 2);
+        
+        // 验证第一个记忆的结构
+        let memory1 = &import_data["memories"][0];
+        assert_eq!(memory1["agent_id"], "agent_1");
+        assert_eq!(memory1["content"], "Test content 1");
+        assert_eq!(memory1["memory_type"], "episodic");
+        assert_eq!(memory1["importance"], 0.8);
+        
+        // 验证第二个记忆的结构
+        let memory2 = &import_data["memories"][1];
+        assert_eq!(memory2["memory_type"], "semantic");
+        assert_eq!(memory2["importance"], 0.6);
+    }
+
+    /// 🆕 Phase 4.7: 测试记忆去重功能逻辑
+    #[test]
+    fn test_deduplicate_memories_logic() {
+        // 测试去重逻辑
+        use std::collections::HashMap;
+        
+        // 模拟重复记忆数据
+        let mut hash_groups: HashMap<String, Vec<(String, f64)>> = HashMap::new();
+        hash_groups.insert("hash1".to_string(), vec![
+            ("mem1".to_string(), 0.8),
+            ("mem2".to_string(), 0.5),
+            ("mem3".to_string(), 0.3),
+        ]);
+        hash_groups.insert("hash2".to_string(), vec![
+            ("mem4".to_string(), 0.9),
+            ("mem5".to_string(), 0.85),
+        ]);
+        hash_groups.insert("hash3".to_string(), vec![
+            ("mem6".to_string(), 0.7),
+        ]);
+        
+        // 找出重复的记忆
+        let mut duplicate_groups = Vec::new();
+        let min_importance_diff = 0.1;
+        
+        for (hash, memories) in &hash_groups {
+            if memories.len() > 1 {
+                // 按importance排序，保留最高的
+                let mut sorted = memories.clone();
+                sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                
+                let keep_id = &sorted[0].0;
+                let keep_importance = sorted[0].1;
+                let duplicates: Vec<String> = sorted[1..]
+                    .iter()
+                    .filter(|(_, imp)| (keep_importance - imp).abs() >= min_importance_diff)
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                
+                if !duplicates.is_empty() {
+                    duplicate_groups.push((hash.clone(), keep_id.clone(), duplicates.clone()));
+                }
+            }
+        }
+        
+        // 验证去重逻辑
+        assert_eq!(duplicate_groups.len(), 2, "应该找到2组重复记忆");
+        
+        // 验证第一组（hash1）
+        let group1 = &duplicate_groups[0];
+        assert_eq!(group1.0, "hash1");
+        assert_eq!(group1.1, "mem1", "应该保留importance最高的mem1");
+        assert!(group1.2.contains(&"mem2".to_string()), "应该包含mem2");
+        assert!(group1.2.contains(&"mem3".to_string()), "应该包含mem3");
+        
+        // 验证第二组（hash2）
+        let group2 = &duplicate_groups[1];
+        assert_eq!(group2.0, "hash2");
+        assert_eq!(group2.1, "mem4", "应该保留importance最高的mem4");
+        // mem5的importance差异小于0.1，可能不会被标记为重复（取决于实现）
+    }
 }
 

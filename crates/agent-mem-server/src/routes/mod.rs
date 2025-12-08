@@ -125,6 +125,14 @@ pub async fn create_router(
             "/api/v1/memories/export",
             get(memory::export_memories),
         )
+        .route(
+            "/api/v1/memories/import",
+            post(memory::import_memories),
+        )
+        .route(
+            "/api/v1/memories/deduplicate",
+            post(memory::deduplicate_memories),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))
