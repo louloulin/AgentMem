@@ -1,9 +1,9 @@
 # AgentMem 记忆存储系统：全面分析与顶级改造计划
 
 **日期**: 2025-01-XX  
-**状态**: Phase 1.1 ✅ 已完成，Phase 1.2 ✅ 核心功能已完成，Phase 1.3 ✅ 已完成  
+**状态**: Phase 1 ✅ 已完成，Phase 2 ✅ 已完成，Phase 3 ✅ 已完成，Phase 4 ✅ 83%完成  
 **目标**: 达到顶级记忆平台存储标准  
-**最新更新**: 2025-01-XX - 完成统一存储协调层、LRU缓存、批量操作优化、辅助方法增强、健康检查、统计管理、配置管理和自适应阈值增强（中文支持），包含完整测试（coordinator 17个 + 搜索增强4个 = 21个测试用例）
+**最新更新**: 2025-01-XX - 完成层次检索实现、索引性能监控、简单请求追踪功能，包含完整测试（层次检索3个 + 索引监控3个 + 请求追踪2个 = 8个测试用例）
 
 ---
 
@@ -1333,6 +1333,8 @@ impl IntelligentPrefetch {
 
 **预计时间**：7天
 
+**说明**：这是一个可选的高级功能，当前单机部署已满足大部分需求。分布式存储支持可以在需要时实施。
+
 ---
 
 #### 4.2 监控和可观测性
@@ -1347,7 +1349,8 @@ impl IntelligentPrefetch {
 - [x] 添加简单请求追踪 ✅ (已完成，基于audit日志系统)
 - [x] 添加性能分析 ✅
 
-**预计时间**：3天
+**预计时间**：3天  
+**实际完成时间**：0.5天（基于现有代码，最小改造）
 
 **实现详情**：
 - ✅ **真实系统指标收集**：实现服务器运行时间、内存使用、CPU使用率等指标
@@ -1382,6 +1385,20 @@ impl IntelligentPrefetch {
   - ✅ 3个测试用例（`test_performance_score_calculation`, `test_bottleneck_identification`, `test_recommendations_generation`）
   - ✅ 充分利用现有代码：基于现有的`SearchStatistics`和性能基准测试功能
   - ✅ 最小改造：仅添加性能分析、瓶颈识别和优化建议生成逻辑
+  - ✅ 编译通过，无错误
+
+- ✅ **简单请求追踪功能**：基于audit日志系统实现请求追踪
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/logs.rs` (`get_trace`函数)
+  - 📍 中间件位置：`crates/agent-mem-server/src/middleware/audit.rs` (`audit_logging_middleware`函数)
+  - ✅ 请求追踪API端点：`GET /api/v1/traces/{trace_id}` - 查询特定trace_id的所有请求
+  - ✅ Trace ID生成：自动为每个请求生成UUID trace_id（如果请求头中没有x-trace-id）
+  - ✅ Trace ID传递：支持从请求头`x-trace-id`提取trace_id（支持分布式追踪）
+  - ✅ 响应头返回：在响应头`x-trace-id`中返回trace_id，便于客户端追踪
+  - ✅ 基于audit日志：充分利用现有的audit日志系统，无需额外存储
+  - ✅ 追踪信息：提供请求列表、总耗时、错误检测等完整追踪信息
+  - ✅ 2个测试用例（`test_trace_response_structure`, `test_trace_error_detection`）
+  - ✅ 充分利用现有代码：基于现有的`AuditLog`结构和audit日志文件系统
+  - ✅ 最小改造：仅添加trace_id字段到AuditLog，添加查询API端点
   - ✅ 编译通过，无错误
 
 ---
@@ -1797,7 +1814,7 @@ pub struct CoordinatorStats {
 - ⏳ **Phase 1.2可选功能**: L2 Redis缓存（可复用现有实现）
 
 ### ⏳ 待实施
-- ⏳ **Phase 4**: 扩展性增强（分布式存储）
+- ⏳ **Phase 4.1**: 分布式存储支持（分片策略、副本管理、一致性协议）
 
 ### 📈 完成度
 - Phase 1: 存储架构优化 - **100%完成** (1.1 ✅, 1.2 ✅ L1和L2缓存, 1.3 ✅, 辅助方法 ✅, 健康检查 ✅, 统计管理 ✅, 配置管理 ✅)
@@ -1825,12 +1842,40 @@ pub struct CoordinatorStats {
   - 3.1: SQL复合索引优化 ✅
   - 3.1: 索引性能监控和优化建议 ✅ (基于QueryOptimizer，3个测试用例)
   - 3.2: 异步优化 ✅ (并行写入、并行查询)
-- Phase 2: 检索系统增强 - **99%完成** (三维检索 ✅, Reranker ✅, 查询结果缓存 ✅, 搜索结果去重 ✅, 批量搜索 ✅, 搜索统计 ✅, LRU缓存优化 ✅, 搜索超时控制 ✅, 质量评分 ✅, 简单缓存预热 ✅, 访问模式分析 ✅, 简化版MemoryPredictor ✅, 简化版IntelligentPrefetch ✅)
-- Phase 4: 扩展性增强 - **67%完成** (监控和可观测性增强 ✅, 日志聚合 ✅, 性能分析 ✅)
+- Phase 4: 扩展性增强 - **83%完成** (监控和可观测性增强 ✅, 日志聚合 ✅, 性能分析 ✅, 简单请求追踪 ✅)
+  - 4.2: 监控和可观测性 ✅ (指标收集、日志聚合、性能分析、简单请求追踪)
 
-**总体进度**: **约91%完成** (Phase 1完成100%，Phase 2完成100%，Phase 3完成100%，Phase 4完成67%)
+**总体进度**: **约92%完成** (Phase 1完成100%，Phase 2完成100%，Phase 3完成100%，Phase 4完成83%)
 
 ### 📝 最新完成项（本次更新）
+
+#### ✅ Phase 2.2: 层次检索实现（已完成）
+- ✅ 实现`apply_hierarchical_sorting`函数：基于scope字段对搜索结果进行层次排序
+- ✅ 集成到`search_memories`路由：通过`ENABLE_HIERARCHICAL_SEARCH`环境变量控制
+- ✅ 3个测试用例（`test_hierarchical_sorting`, `test_hierarchical_sorting_same_scope_by_importance`, `test_hierarchical_sorting_unknown_scope`）
+- ✅ 充分利用现有代码：基于现有scope字段和搜索结果，最小改造
+- ✅ 编译通过，无错误
+
+#### ✅ Phase 3.1: 索引性能监控和优化建议（已完成）
+- ✅ 实现`get_index_performance_stats`函数：基于QueryOptimizer提供索引性能监控
+- ✅ 索引性能监控API端点：`GET /api/v1/stats/index/performance`
+- ✅ 自动索引类型推荐：根据数据规模推荐最优索引类型
+- ✅ 优化建议生成：索引类型升级、索引重建等建议
+- ✅ 性能指标估算：查询延迟、召回率、索引大小
+- ✅ 3个测试用例（`test_index_performance_stats_structure`, `test_performance_metrics_calculation`, `test_expected_improvement_calculation`）
+- ✅ 充分利用现有代码：基于现有的`IndexStatistics`和索引类型选择逻辑
+- ✅ 编译通过，无错误
+
+#### ✅ Phase 4.2: 简单请求追踪（已完成）
+- ✅ 实现trace_id生成和传递：在audit中间件中自动生成/提取trace_id
+- ✅ 响应头返回trace_id：在响应头`x-trace-id`中返回，便于客户端追踪
+- ✅ 请求追踪API端点：`GET /api/v1/traces/{trace_id}` - 查询特定trace_id的所有请求
+- ✅ 基于audit日志：充分利用现有的audit日志系统，无需额外存储
+- ✅ 2个测试用例（`test_trace_response_structure`, `test_trace_error_detection`）
+- ✅ 充分利用现有代码：基于现有的`AuditLog`结构和audit日志文件系统
+- ✅ 编译通过，无错误
+
+### 📝 历史完成项
 - ✅ **日志聚合功能**：提供日志统计、查询和聚合分析
   - 📍 代码位置：`crates/agent-mem-server/src/routes/logs.rs`
   - ✅ 日志统计API端点：`GET /api/v1/logs/stats` - 提供日志统计信息（总行数、按级别统计、文件大小等）
