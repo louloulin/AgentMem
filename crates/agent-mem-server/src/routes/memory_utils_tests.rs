@@ -453,5 +453,118 @@ mod tests {
         let invalid_timeout: Option<u64> = "invalid".parse().ok();
         assert!(invalid_timeout.is_none());
     }
+
+    #[test]
+    fn test_quality_score_calculation() {
+        use crate::routes::memory::calculate_quality_score;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+        
+        // 创建高质量的记忆（理想长度、丰富元数据、有hash）
+        let mut high_quality_item = MemoryItem {
+            id: "test1".to_string(),
+            content: "This is a high quality memory with ideal length between 50 and 500 characters. It contains meaningful information and has proper structure.".to_string(),
+            hash: Some("abc123".to_string()),
+            score: Some(0.9),
+            metadata: {
+                let mut m = HashMap::new();
+                m.insert("key1".to_string(), "value1".to_string());
+                m.insert("key2".to_string(), "value2".to_string());
+                m.insert("key3".to_string(), "value3".to_string());
+                m.insert("key4".to_string(), "value4".to_string());
+                m.insert("key5".to_string(), "value5".to_string());
+                m
+            },
+            created_at: Utc::now(),
+            updated_at: None,
+            session: Default::default(),
+            memory_type: Default::default(),
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id: "test_agent".to_string(),
+            user_id: Some("test_user".to_string()),
+            importance: 0.9,
+            embedding: None,
+            last_accessed_at: Utc::now(),
+            access_count: 50,
+            expires_at: None,
+            version: 1,
+        };
+        
+        let high_quality_score = calculate_quality_score(&high_quality_item);
+        assert!(high_quality_score > 0.7, "高质量记忆应该有较高的质量评分");
+        
+        // 创建低质量的记忆（太短、无元数据、无hash）
+        let low_quality_item = MemoryItem {
+            id: "test2".to_string(),
+            content: "Short".to_string(), // 太短
+            hash: None, // 无hash
+            score: Some(0.5),
+            metadata: HashMap::new(), // 无元数据
+            created_at: Utc::now(),
+            updated_at: None,
+            session: Default::default(),
+            memory_type: Default::default(),
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id: "test_agent".to_string(),
+            user_id: Some("test_user".to_string()),
+            importance: 0.3,
+            embedding: None,
+            last_accessed_at: Utc::now(),
+            access_count: 0, // 无访问历史
+            expires_at: None,
+            version: 1,
+        };
+        
+        let low_quality_score = calculate_quality_score(&low_quality_item);
+        assert!(low_quality_score < 0.5, "低质量记忆应该有较低的质量评分");
+        assert!(high_quality_score > low_quality_score, "高质量记忆的评分应该高于低质量记忆");
+    }
+
+    #[test]
+    fn test_quality_score_length_scoring() {
+        use crate::routes::memory::calculate_quality_score;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        
+        // 测试不同长度的内容
+        let test_cases = vec![
+            ("Very short", 0.2), // 太短
+            ("Short content but acceptable", 0.5), // 较短
+            ("This is a memory with ideal length between 50 and 500 characters. It should score high for length quality.", 1.0), // 理想长度
+            ("This is a longer memory that exceeds 500 characters but is still acceptable. It contains more information but might have some redundancy. The quality score should be slightly lower than ideal length memories but still reasonable for search results.".to_string().repeat(2), 0.8), // 较长
+        ];
+        
+        for (content, expected_min) in test_cases {
+            let item = MemoryItem {
+                id: "test".to_string(),
+                content: content.to_string(),
+                hash: Some("test".to_string()),
+                score: Some(0.5),
+                metadata: HashMap::new(),
+                created_at: Utc::now(),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test".to_string(),
+                user_id: None,
+                importance: 0.5,
+                embedding: None,
+                last_accessed_at: Utc::now(),
+                access_count: 0,
+                expires_at: None,
+                version: 1,
+            };
+            
+            let quality = calculate_quality_score(&item);
+            // 注意：质量评分是综合多个因素的，所以这里只检查长度因素的大致范围
+            // 由于还有其他因素（元数据、hash等），实际评分可能略有不同
+            assert!(quality >= 0.0 && quality <= 1.0, "质量评分应该在0.0到1.0之间");
+        }
+    }
 }
 

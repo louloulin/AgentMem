@@ -1088,6 +1088,75 @@ pub(crate) fn calculate_3d_score(
     composite_score.max(0.0).min(1.0)
 }
 
+/// 🆕 Phase 2.10: 计算搜索结果质量评分
+/// 
+/// 基于内容质量、完整性和元数据丰富度评估搜索结果的质量
+/// 返回0.0到1.0之间的质量分数
+pub(crate) fn calculate_quality_score(item: &MemoryItem) -> f64 {
+    let mut quality_score = 0.0;
+    let mut weight_sum = 0.0;
+    
+    // 1. 内容长度评分（理想长度：50-500字符）
+    let content_len = item.content.len();
+    let length_score = if content_len < 10 {
+        0.2 // 太短，质量低
+    } else if content_len < 50 {
+        0.5 // 较短，质量中等
+    } else if content_len <= 500 {
+        1.0 // 理想长度
+    } else if content_len <= 2000 {
+        0.8 // 较长，但可接受
+    } else {
+        0.6 // 太长，可能包含冗余信息
+    };
+    quality_score += length_score * 0.3;
+    weight_sum += 0.3;
+    
+    // 2. 元数据丰富度评分
+    let metadata_score = if item.metadata.is_empty() {
+        0.3 // 无元数据
+    } else if item.metadata.len() < 3 {
+        0.6 // 少量元数据
+    } else if item.metadata.len() <= 10 {
+        1.0 // 丰富的元数据
+    } else {
+        0.9 // 元数据很多，但可能冗余
+    };
+    quality_score += metadata_score * 0.2;
+    weight_sum += 0.2;
+    
+    // 3. 内容完整性评分（是否有hash）
+    let completeness_score = if item.hash.is_some() && !item.hash.as_ref().unwrap().is_empty() {
+        1.0 // 有hash，完整性好
+    } else {
+        0.5 // 无hash，完整性一般
+    };
+    quality_score += completeness_score * 0.2;
+    weight_sum += 0.2;
+    
+    // 4. 访问历史评分（有访问历史的质量更高）
+    let access_score = if item.access_count > 0 {
+        // 访问次数越多，质量越高（但有限制）
+        (item.access_count.min(100) as f64 / 100.0).min(1.0)
+    } else {
+        0.5 // 无访问历史
+    };
+    quality_score += access_score * 0.15;
+    weight_sum += 0.15;
+    
+    // 5. 重要性评分（重要性越高，质量越高）
+    let importance_score = item.importance.max(0.0).min(1.0) as f64;
+    quality_score += importance_score * 0.15;
+    weight_sum += 0.15;
+    
+    // 归一化（确保在0.0到1.0之间）
+    if weight_sum > 0.0 {
+        quality_score / weight_sum
+    } else {
+        0.5 // 默认中等质量
+    }
+}
+
 /// 智能阈值计算：根据查询类型动态调整阈值
 /// 🔧 增强：添加中文检测，为中文查询降低阈值以提高召回率
 fn get_adaptive_threshold(query: &str) -> f32 {
@@ -1524,8 +1593,8 @@ pub async fn search_memories(
         .and_then(|v| v.parse().ok())
         .unwrap_or(0.1);
     
-    // 为每个结果计算三维评分
-    let mut scored_results: Vec<(MemoryItem, f64, f64, f64, f64)> = sorted_results
+    // 为每个结果计算三维评分和质量评分
+    let mut scored_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = sorted_results
         .into_iter()
         .map(|item| {
             // 获取各个维度分数
@@ -1544,7 +1613,13 @@ pub async fn search_memories(
                 recency_decay,
             );
             
-            (item, composite_score, recency, importance as f64, relevance as f64)
+            // 🆕 Phase 2.10: 计算质量评分
+            let quality = calculate_quality_score(&item);
+            
+            // 将质量评分纳入综合评分（质量权重：0.1）
+            let final_score = composite_score * 0.9 + quality * 0.1;
+            
+            (item, final_score, recency, importance as f64, relevance as f64, quality)
         })
         .collect();
     
@@ -1567,10 +1642,10 @@ pub async fn search_memories(
     // 🆕 Phase 2.5: 搜索结果去重（基于content hash）
     // 使用HashSet去重，保留综合评分最高的结果
     use std::collections::HashMap;
-    let mut hash_map: HashMap<String, (MemoryItem, f64, f64, f64, f64)> = HashMap::new();
+    let mut hash_map: HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = HashMap::new();
     let original_count = scored_results.len();
     
-    for (item, composite_score, recency, importance, relevance) in scored_results {
+    for (item, final_score, recency, importance, relevance, quality) in scored_results {
         // 使用hash字段进行去重（如果hash为None或空，使用content的前100字符作为key）
         let dedup_key = item.hash.as_ref()
             .filter(|h| !h.is_empty())
@@ -1594,32 +1669,32 @@ pub async fn search_memories(
                 }
             });
         
-        // 如果hash已存在，比较综合评分，保留评分更高的
-        match hash_map.get_mut(&dedup_key) {
-            Some(existing) => {
-                // 比较综合评分，如果新结果评分更高，替换旧结果
-                if composite_score > existing.1 {
-                    *existing = (item, composite_score, recency, importance, relevance);
+            // 如果hash已存在，比较综合评分，保留评分更高的
+            match hash_map.get_mut(&dedup_key) {
+                Some(existing) => {
+                    // 比较综合评分，如果新结果评分更高，替换旧结果
+                    if final_score > existing.1 {
+                        *existing = (item, final_score, recency, importance, relevance, quality);
+                    }
+                }
+                None => {
+                    // 新hash，直接添加
+                    hash_map.insert(dedup_key, (item, final_score, recency, importance, relevance, quality));
                 }
             }
-            None => {
-                // 新hash，直接添加
-                hash_map.insert(dedup_key, (item, composite_score, recency, importance, relevance));
-            }
         }
-    }
-    
-    let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64)> = hash_map.into_values().collect();
+        
+        let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = hash_map.into_values().collect();
     info!("🔄 搜索结果去重: {} → {} 条结果", original_count, deduplicated_results.len());
 
     // 转换为JSON，同时应用阈值过滤（使用原始relevance分数进行阈值过滤）
     let json_results: Vec<serde_json::Value> = deduplicated_results
         .into_iter()
-        .filter(|(item, _, _, _, relevance)| {
+        .filter(|(item, _, _, _, relevance, _)| {
             // 使用原始的relevance分数进行阈值过滤
             *relevance >= min_score_threshold as f64
         })
-        .map(|(item, composite_score, recency, importance, relevance)| {
+        .map(|(item, final_score, recency, importance, relevance, quality)| {
             serde_json::json!({
                 "id": item.id,
                 "agent_id": item.agent_id,
@@ -1633,9 +1708,10 @@ pub async fn search_memories(
                 "metadata": item.metadata,
                 "hash": item.hash,
                 "score": relevance,  // 原始relevance分数（用于阈值过滤）
-                "composite_score": composite_score,  // 🆕 三维综合评分
+                "composite_score": final_score,  // 🆕 最终综合评分（包含质量评分）
                 "recency": recency,  // 🆕 Recency评分
                 "relevance": relevance,  // 🆕 Relevance评分（与score相同）
+                "quality": quality,  // 🆕 Phase 2.10: 质量评分
             })
         })
         .collect();
