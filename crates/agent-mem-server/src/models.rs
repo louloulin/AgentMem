@@ -83,6 +83,22 @@ pub struct SearchRequest {
     /// Similarity threshold
     #[validate(range(min = 0.0, max = 1.0))]
     pub threshold: Option<f32>,
+
+    /// 🆕 Phase 2.12: 智能过滤参数
+    /// Minimum importance threshold (0.0-1.0, optional)
+    #[validate(range(min = 0.0, max = 1.0))]
+    pub min_importance: Option<f32>,
+
+    /// Maximum age in days (optional, filters out memories older than this)
+    pub max_age_days: Option<u64>,
+
+    /// Minimum access count (optional, filters out memories with fewer accesses)
+    pub min_access_count: Option<i64>,
+
+    /// 🆕 Phase 2.13: 分页参数
+    /// Offset for pagination (optional, default: 0)
+    #[validate(range(min = 0))]
+    pub offset: Option<usize>,
 }
 
 /// Response for search operations
@@ -93,6 +109,16 @@ pub struct SearchResponse {
 
     /// Total number of results
     pub total: usize,
+
+    /// 🆕 Phase 2.13: 分页信息
+    /// Current offset
+    pub offset: usize,
+
+    /// Current limit
+    pub limit: usize,
+
+    /// Whether there are more results
+    pub has_more: bool,
 }
 
 /// Request for batch search operations

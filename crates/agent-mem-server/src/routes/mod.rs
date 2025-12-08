@@ -113,6 +113,10 @@ pub async fn create_router(
             "/api/v1/memories/performance/benchmark",
             post(memory::performance_benchmark),
         )
+        .route(
+            "/api/v1/memories/importance/update",
+            post(memory::batch_update_importance),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))
@@ -140,6 +144,10 @@ pub async fn create_router(
         .route(
             "/api/v1/stats/index/performance",
             get(stats::get_index_performance_stats),
+        )
+        .route(
+            "/api/v1/stats/memory/usage",
+            get(stats::get_memory_usage_stats),
         )
         // 🆕 Phase 4.2: 日志聚合路由
         .route("/api/v1/logs/stats", get(logs::get_log_stats))
@@ -413,6 +421,7 @@ pub async fn create_router(
         stats::get_memory_quality_stats,
         stats::get_database_pool_stats,
         stats::get_index_performance_stats,
+        stats::get_memory_usage_stats,
         logs::get_log_stats,
         logs::query_logs,
         logs::get_trace,
@@ -438,6 +447,7 @@ pub async fn create_router(
             stats::IndexInfo,
             stats::OptimizationRecommendation,
             stats::PerformanceMetrics,
+            stats::MemoryUsageStats,
             logs::TraceResponse,
             logs::TraceRequest,
             users::RegisterRequest,

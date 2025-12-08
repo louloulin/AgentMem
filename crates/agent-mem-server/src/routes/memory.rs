@@ -478,6 +478,39 @@ impl MemoryManager {
             .await
             .map_err(|e| format!("Failed to fetch row: {}", e))?
         {
+            let memory_id = row.get::<String>(0).unwrap_or_default();
+            
+            // 🆕 Phase 2.11: 自动更新访问统计和重要性
+            // 更新access_count和last_accessed
+            let now = chrono::Utc::now().timestamp();
+            let current_access_count: i64 = row.get(8).unwrap_or(0);
+            let new_access_count = current_access_count + 1;
+            
+            // 基于访问模式自动调整importance
+            let current_importance: f64 = row.get(5).unwrap_or(0.5);
+            let last_accessed_ts: Option<i64> = row.get(7).ok();
+            let new_importance = calculate_auto_importance(
+                current_importance,
+                new_access_count,
+                last_accessed_ts,
+            );
+            
+            // 更新数据库（异步，不阻塞返回）
+            let db_path_clone = db_path.clone();
+            let id_clone = memory_id.clone();
+            tokio::spawn(async move {
+                if let Ok(update_db) = Builder::new_local(&db_path_clone).build().await {
+                    if let Ok(update_conn) = update_db.connect() {
+                        let update_query = "UPDATE memories SET access_count = ?, last_accessed = ?, importance = ?, updated_at = ? WHERE id = ?";
+                        if let Ok(mut update_stmt) = update_conn.prepare(update_query).await {
+                            let _ = update_stmt
+                                .execute(params![new_access_count, now, new_importance, now, id_clone])
+                                .await;
+                        }
+                    }
+                }
+            });
+            
             // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
             use chrono::{DateTime, Utc};
 
@@ -486,21 +519,21 @@ impl MemoryManager {
                 .and_then(|ts| DateTime::from_timestamp(ts, 0))
                 .map(|dt| dt.to_rfc3339());
 
-            let last_accessed_ts: Option<i64> = row.get(7).ok();
-            let last_accessed_str = last_accessed_ts
-                .and_then(|ts| DateTime::from_timestamp(ts, 0))
-                .map(|dt| dt.to_rfc3339());
+            // 使用当前时间作为last_accessed（因为刚刚更新）
+            let last_accessed_str = DateTime::from_timestamp(now, 0)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_else(|| Utc::now().to_rfc3339());
 
             let json = serde_json::json!({
-                "id": row.get::<String>(0).unwrap_or_default(),
+                "id": memory_id,
                 "agent_id": row.get::<String>(1).unwrap_or_default(),
                 "user_id": row.get::<String>(2).unwrap_or_default(),
                 "content": row.get::<String>(3).unwrap_or_default(),
                 "memory_type": row.get::<Option<String>>(4).ok().flatten(),
-                "importance": row.get::<Option<f64>>(5).ok().flatten(),
+                "importance": new_importance,  // 🆕 使用更新后的importance
                 "created_at": created_at_str,
-                "last_accessed_at": last_accessed_str,
-                "access_count": row.get::<Option<i64>>(8).ok().flatten(),
+                "last_accessed_at": last_accessed_str,  // 🆕 使用当前时间
+                "access_count": new_access_count,  // 🆕 使用更新后的access_count
                 "metadata": row.get::<Option<String>>(9).ok().flatten(),
                 "hash": row.get::<Option<String>>(10).ok().flatten(),
                 "scope": row.get::<Option<String>>(11).ok().flatten(),  // 🆕 Phase 2 Server: 返回scope字段
@@ -1508,7 +1541,7 @@ pub async fn search_memories(
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Json(request): Json<crate::models::SearchRequest>,
-) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
+) -> ServerResult<Json<crate::models::ApiResponse<crate::models::SearchResponse>>> {
     info!("🔍 搜索记忆: query={}", request.query);
 
     // 🆕 Phase 2.7: 搜索统计收集 - 记录搜索开始时间
@@ -1537,9 +1570,23 @@ pub async fn search_memories(
 
         // 尝试LibSQL精确匹配
         let limit = request.limit.unwrap_or(10);
-        match search_by_libsql_exact(&repositories, &request.query, limit).await {
+        match search_by_libsql_exact(&repositories, &request.query, limit * 2).await { // 获取更多结果以支持分页
             Ok(json_results) if !json_results.is_empty() => {
                 info!("✅ LibSQL精确匹配找到 {} 条结果", json_results.len());
+                
+                // 🆕 Phase 2.13: 应用分页（精确查询）
+                let offset = request.offset.unwrap_or(0);
+                let total = json_results.len();
+                let paginated_results: Vec<serde_json::Value> = if offset < total {
+                    json_results
+                        .into_iter()
+                        .skip(offset)
+                        .take(limit)
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let has_more = offset + limit < total;
                 
                 // 🆕 Phase 2.7: 更新统计（精确查询）
                 let search_latency = search_start.elapsed();
@@ -1551,7 +1598,16 @@ pub async fn search_memories(
                     stats_write.last_updated = Instant::now();
                 }
                 
-                return Ok(Json(crate::models::ApiResponse::success(json_results)));
+                // 🆕 Phase 2.13: 返回带分页信息的响应
+                let search_response = crate::models::SearchResponse {
+                    results: paginated_results,
+                    total,
+                    offset,
+                    limit,
+                    has_more,
+                };
+                
+                return Ok(Json(crate::models::ApiResponse::success(search_response)));
             }
             Ok(_) => {
                 info!("⚠️  LibSQL未找到结果，降级到向量搜索");
@@ -1885,8 +1941,39 @@ pub async fn search_memories(
         let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = hash_map.into_values().collect();
     info!("🔄 搜索结果去重: {} → {} 条结果", original_count, deduplicated_results.len());
 
+    // 🆕 Phase 2.12: 应用智能过滤（在转换为JSON之前）
+    // 从请求中获取过滤参数（如果提供）
+    let min_importance = request.min_importance;
+    let max_age_days = request.max_age_days;
+    let min_access_count = request.min_access_count;
+    
+    // 应用智能过滤
+    let filtered_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = if min_importance.is_some() || max_age_days.is_some() || min_access_count.is_some() {
+        let original_count = deduplicated_results.len();
+        let items: Vec<MemoryItem> = deduplicated_results.iter().map(|(item, _, _, _, _, _)| item.clone()).collect();
+        let filtered_items = apply_intelligent_filtering(items, min_importance, max_age_days, min_access_count);
+        
+        // 重新构建带评分的元组
+        let filtered_map: std::collections::HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = deduplicated_results
+            .iter()
+            .map(|(item, final_score, recency, importance, relevance, quality)| {
+                (item.id.clone(), (item.clone(), *final_score, *recency, *importance, *relevance, *quality))
+            })
+            .collect();
+        
+        let filtered = filtered_items
+            .into_iter()
+            .filter_map(|item| filtered_map.get(&item.id).cloned())
+            .collect::<Vec<_>>();
+        
+        info!("🔍 智能过滤完成: {} → {} 条结果", original_count, filtered.len());
+        filtered
+    } else {
+        deduplicated_results
+    };
+    
     // 转换为JSON，同时应用阈值过滤（使用原始relevance分数进行阈值过滤）
-    let json_results: Vec<serde_json::Value> = deduplicated_results
+    let json_results: Vec<serde_json::Value> = filtered_results
         .into_iter()
         .filter(|(item, _, _, _, relevance, _)| {
             // 使用原始的relevance分数进行阈值过滤
@@ -1932,6 +2019,27 @@ pub async fn search_memories(
         info!("💾 结果已缓存: query='{}', cache_size={}", query_clone, cache_write.len());
     }
 
+    // 🆕 Phase 2.13: 应用分页（在返回结果前）
+    let offset = request.offset.unwrap_or(0);
+    let limit = request.limit.unwrap_or(10);
+    let total = json_results.len();
+    
+    // 应用分页
+    let paginated_results: Vec<serde_json::Value> = if offset < total {
+        json_results
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    
+    let has_more = offset + limit < total;
+    
+    info!("📄 分页结果: offset={}, limit={}, total={}, returned={}, has_more={}", 
+        offset, limit, total, paginated_results.len(), has_more);
+
     // 🆕 Phase 2.7: 更新统计（向量搜索完成）
     let search_latency = search_start.elapsed();
     {
@@ -1942,7 +2050,16 @@ pub async fn search_memories(
         stats_write.last_updated = Instant::now();
     }
 
-    Ok(Json(crate::models::ApiResponse::success(json_results)))
+    // 🆕 Phase 2.13: 返回带分页信息的响应
+    let search_response = crate::models::SearchResponse {
+        results: paginated_results,
+        total,
+        offset,
+        limit,
+        has_more,
+    };
+
+    Ok(Json(crate::models::ApiResponse::success(search_response)))
 }
 
 /// 🆕 Phase 2.2: 层次检索排序（H-MEM风格，简化版）
@@ -1995,6 +2112,93 @@ pub(crate) fn apply_hierarchical_sorting(mut items: Vec<MemoryItem>) -> Vec<Memo
     });
     
     items
+}
+
+/// 🆕 Phase 2.12: 智能过滤搜索结果
+/// 
+/// 基于时间范围和重要性阈值对搜索结果进行过滤
+/// - min_importance: 最小重要性阈值（默认0.0，不过滤）
+/// - max_age_days: 最大年龄（天数，默认不过滤）
+/// - min_access_count: 最小访问次数（默认0，不过滤）
+pub(crate) fn apply_intelligent_filtering(
+    items: Vec<MemoryItem>,
+    min_importance: Option<f32>,
+    max_age_days: Option<u64>,
+    min_access_count: Option<i64>,
+) -> Vec<MemoryItem> {
+    use chrono::Utc;
+    
+    let min_importance = min_importance.unwrap_or(0.0);
+    let min_access_count = min_access_count.unwrap_or(0) as u32; // 转换为u32以匹配MemoryItem类型
+    let now = Utc::now();
+    
+    items
+        .into_iter()
+        .filter(|item| {
+            // 重要性过滤
+            if item.importance < min_importance {
+                return false;
+            }
+            
+            // 访问次数过滤
+            if item.access_count < min_access_count {
+                return false;
+            }
+            
+            // 年龄过滤
+            if let Some(max_age) = max_age_days {
+                let age_days = (now - item.created_at).num_days() as u64;
+                if age_days > max_age {
+                    return false;
+                }
+            }
+            
+            true
+        })
+        .collect()
+}
+
+/// 🆕 Phase 2.11: 自动计算记忆重要性（基于访问模式）
+/// 
+/// 根据访问频率和最近访问时间自动调整importance
+/// 公式：new_importance = base_importance + access_bonus + recency_bonus
+/// - access_bonus: 基于访问频率的奖励（访问越多，重要性越高）
+/// - recency_bonus: 基于最近访问时间的奖励（最近访问，重要性提升）
+pub(crate) fn calculate_auto_importance(
+    current_importance: f64,
+    access_count: i64,
+    last_accessed_ts: Option<i64>,
+) -> f32 {
+    use chrono::Utc;
+    
+    let base_importance = current_importance.max(0.0).min(1.0) as f32;
+    
+    // 访问频率奖励（对数增长，避免过度增长）
+    let access_bonus = if access_count > 0 {
+        (access_count as f32).ln() / 10.0 // 对数增长，最大约0.7
+    } else {
+        0.0
+    };
+    
+    // 最近访问奖励（指数衰减）
+    let recency_bonus = if let Some(ts) = last_accessed_ts {
+        let hours_since_access = (Utc::now().timestamp() - ts) as f64 / 3600.0;
+        // 最近24小时内访问，给予奖励
+        if hours_since_access < 24.0 {
+            (1.0 - hours_since_access / 24.0) * 0.1 // 最多0.1的奖励
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    
+    // 计算新的importance（限制在[0.0, 1.0]范围内）
+    let new_importance = (base_importance + access_bonus + recency_bonus as f32)
+        .max(0.0)
+        .min(1.0);
+    
+    new_importance
 }
 
 /// 🆕 Phase 2.3: 计算访问模式评分（用于智能缓存预热）
@@ -2359,6 +2563,9 @@ pub async fn batch_search_memories(
 
         // 构建完整的SearchRequest
         let full_search_req = crate::models::SearchRequest {
+            min_importance: None,
+            max_age_days: None,
+            min_access_count: None,
             query: search_req.query,
             prefetch: search_req.prefetch,
             agent_id,
@@ -2366,6 +2573,7 @@ pub async fn batch_search_memories(
             memory_type: search_req.memory_type,
             limit: search_req.limit,
             threshold: search_req.threshold,
+            offset: None,
         };
 
         // 调用现有的search_memories函数
@@ -2444,6 +2652,106 @@ pub async fn get_search_statistics(
         response.cache_hit_rate * 100.0,
         response.avg_latency_ms);
 
+    Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 2.11: 批量更新记忆重要性
+/// 
+/// 基于访问模式自动更新多个记忆的重要性
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/importance/update",
+    tag = "memory",
+    params(
+        ("limit" = Option<usize>, Query, description = "要更新的记忆数量限制（默认: 100）")
+    ),
+    responses(
+        (status = 200, description = "Importance updated successfully", body = crate::models::ApiResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn batch_update_importance(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("🔄 开始批量更新记忆重要性");
+    
+    let limit = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100);
+    
+    // 获取需要更新的记忆（访问次数>0或最近访问过）
+    use libsql::{params, Builder};
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+    
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    
+    let conn = db
+        .connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    let query = "SELECT id, importance, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND (access_count > 0 OR last_accessed IS NOT NULL) LIMIT ?";
+    let mut stmt = conn
+        .prepare(query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+    
+    let mut rows = stmt
+        .query(params![limit as i64])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+    
+    let mut update_count = 0;
+    let now = chrono::Utc::now().timestamp();
+    
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
+        let id: String = row.get(0).unwrap_or_default();
+        let current_importance: f64 = row.get(1).unwrap_or(0.5);
+        let access_count: i64 = row.get(2).unwrap_or(0);
+        let last_accessed_ts: Option<i64> = row.get(3).ok();
+        
+        // 计算新的importance
+        let new_importance = calculate_auto_importance(
+            current_importance,
+            access_count,
+            last_accessed_ts,
+        );
+        
+        // 如果importance有变化，更新数据库
+        if (new_importance - current_importance as f32).abs() > 0.01 {
+            // 使用repositories更新
+            if let Ok(Some(memory)) = repositories.memories.find_by_id(&id).await {
+                let mut updated = memory.clone();
+                updated.attributes.set(
+                    agent_mem_traits::AttributeKey::system("importance"),
+                    agent_mem_traits::AttributeValue::Number(new_importance as f64),
+                );
+                
+                if repositories.memories.update(&updated).await.is_ok() {
+                    update_count += 1;
+                }
+            }
+        }
+    }
+    
+    info!("✅ 批量更新重要性完成: 更新了 {} 条记忆", update_count);
+    
+    let response = serde_json::json!({
+        "updated_count": update_count,
+        "total_checked": limit,
+        "message": format!("Successfully updated importance for {} memories", update_count)
+    });
+    
     Ok(Json(crate::models::ApiResponse::success(response)))
 }
 

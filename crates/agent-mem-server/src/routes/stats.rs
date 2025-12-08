@@ -1328,3 +1328,291 @@ fn calculate_performance_metrics(stats: &IndexStatistics) -> PerformanceMetrics 
         estimated_index_size_mb: index_size_mb,
     }
 }
+
+/// 🆕 Phase 4.3: 记忆使用情况统计响应
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MemoryUsageStats {
+    /// 总记忆数
+    pub total_memories: i64,
+    
+    /// 按访问频率分布
+    pub access_frequency_distribution: HashMap<String, i64>,
+    
+    /// 按最近访问时间分布
+    pub recency_distribution: HashMap<String, i64>,
+    
+    /// 平均访问次数
+    pub avg_access_count: f64,
+    
+    /// 最近访问的记忆数（24小时内）
+    pub recently_accessed: i64,
+    
+    /// 从未访问的记忆数
+    pub never_accessed: i64,
+    
+    /// 高访问记忆数（访问次数 > 10）
+    pub high_access_memories: i64,
+    
+    /// 时间戳
+    pub timestamp: DateTime<Utc>,
+}
+
+/// 🆕 Phase 4.3: 获取记忆使用情况统计
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats/memory/usage",
+    tag = "statistics",
+    responses(
+        (status = 200, description = "Memory usage statistics retrieved successfully", body = MemoryUsageStats),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_memory_usage_stats(
+    Extension(_repositories): Extension<Arc<Repositories>>,
+) -> ServerResult<Json<MemoryUsageStats>> {
+    info!("📊 获取记忆使用情况统计");
+    
+    use libsql::{params, Builder};
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+    
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    
+    let conn = db
+        .connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    // 查询总记忆数和平均访问次数
+    let basic_query = "SELECT COUNT(*), AVG(COALESCE(access_count, 0)) 
+                       FROM memories 
+                       WHERE is_deleted = 0";
+    
+    let mut stmt = conn
+        .prepare(basic_query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare basic query: {}", e)))?;
+    
+    let mut rows = stmt
+        .query(params![])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute basic query: {}", e)))?;
+    
+    let (total_memories, avg_access_count) = if let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch basic row: {}", e)))?
+    {
+        let count: i64 = row.get(0).unwrap_or(0);
+        let avg: Option<f64> = row.get(1).ok();
+        (count, avg.unwrap_or(0.0))
+    } else {
+        (0, 0.0)
+    };
+    
+    // 查询访问频率分布
+    let mut access_frequency_distribution = HashMap::new();
+    let frequency_queries = vec![
+        ("0", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (access_count IS NULL OR access_count = 0)"),
+        ("1-5", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count >= 1 AND access_count <= 5"),
+        ("6-10", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count >= 6 AND access_count <= 10"),
+        ("11-50", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count >= 11 AND access_count <= 50"),
+        ("51+", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count > 50"),
+    ];
+    
+    for (range, query) in frequency_queries {
+        let mut stmt2 = conn
+            .prepare(query)
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare frequency query: {}", e)))?;
+        
+        let mut rows2 = stmt2
+            .query(params![])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute frequency query: {}", e)))?;
+        
+        if let Some(row) = rows2
+            .next()
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch frequency row: {}", e)))?
+        {
+            let count: i64 = row.get(0).unwrap_or(0);
+            access_frequency_distribution.insert(range.to_string(), count);
+        }
+    }
+    
+    // 查询最近访问时间分布
+    let mut recency_distribution = HashMap::new();
+    let now = Utc::now().timestamp();
+    let one_day_ago = now - 86400;
+    let one_week_ago = now - 604800;
+    let one_month_ago = now - 2592000;
+    
+    let recency_queries = vec![
+        ("24小时内", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {}", one_day_ago)),
+        ("1周内", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {} AND last_accessed < {}", one_week_ago, one_day_ago)),
+        ("1月内", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {} AND last_accessed < {}", one_month_ago, one_week_ago)),
+        ("1月前", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed < {}", one_month_ago)),
+        ("从未访问", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (last_accessed IS NULL OR last_accessed = 0)"),
+    ];
+    
+    for (range, query) in recency_queries {
+        let mut stmt3 = conn
+            .prepare(&query)
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare recency query: {}", e)))?;
+        
+        let mut rows3 = stmt3
+            .query(params![])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute recency query: {}", e)))?;
+        
+        if let Some(row) = rows3
+            .next()
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch recency row: {}", e)))?
+        {
+            let count: i64 = row.get(0).unwrap_or(0);
+            recency_distribution.insert(range.to_string(), count);
+        }
+    }
+    
+    // 查询最近访问的记忆数（24小时内）
+    let recently_accessed_query = format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {}", one_day_ago);
+    let mut stmt4 = conn
+        .prepare(&recently_accessed_query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare recently accessed query: {}", e)))?;
+    
+    let recently_accessed = if let Some(row) = stmt4
+        .query(params![])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute recently accessed query: {}", e)))?
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch recently accessed row: {}", e)))?
+    {
+        row.get::<i64>(0).unwrap_or(0)
+    } else {
+        0
+    };
+    
+    // 查询从未访问的记忆数
+    let never_accessed_query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (access_count IS NULL OR access_count = 0)";
+    let mut stmt5 = conn
+        .prepare(never_accessed_query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare never accessed query: {}", e)))?;
+    
+    let never_accessed = if let Some(row) = stmt5
+        .query(params![])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute never accessed query: {}", e)))?
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch never accessed row: {}", e)))?
+    {
+        row.get::<i64>(0).unwrap_or(0)
+    } else {
+        0
+    };
+    
+    // 查询高访问记忆数（访问次数 > 10）
+    let high_access_query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count > 10";
+    let mut stmt6 = conn
+        .prepare(high_access_query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare high access query: {}", e)))?;
+    
+    let high_access_memories = if let Some(row) = stmt6
+        .query(params![])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute high access query: {}", e)))?
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch high access row: {}", e)))?
+    {
+        row.get::<i64>(0).unwrap_or(0)
+    } else {
+        0
+    };
+    
+    let stats = MemoryUsageStats {
+        total_memories,
+        access_frequency_distribution,
+        recency_distribution,
+        avg_access_count,
+        recently_accessed,
+        never_accessed,
+        high_access_memories,
+        timestamp: Utc::now(),
+    };
+    
+    info!("✅ 记忆使用情况统计完成: 总记忆数={}, 平均访问次数={:.2}", total_memories, avg_access_count);
+    
+    Ok(Json(stats))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 🆕 Phase 4.3: 测试记忆使用情况统计结构
+    #[test]
+    fn test_memory_usage_stats_structure() {
+        let stats = MemoryUsageStats {
+            total_memories: 100,
+            access_frequency_distribution: {
+                let mut map = HashMap::new();
+                map.insert("0".to_string(), 50);
+                map.insert("1-5".to_string(), 30);
+                map.insert("6-10".to_string(), 15);
+                map.insert("11-50".to_string(), 4);
+                map.insert("51+".to_string(), 1);
+                map
+            },
+            recency_distribution: {
+                let mut map = HashMap::new();
+                map.insert("24小时内".to_string(), 20);
+                map.insert("1周内".to_string(), 30);
+                map.insert("1月内".to_string(), 25);
+                map.insert("1月前".to_string(), 15);
+                map.insert("从未访问".to_string(), 10);
+                map
+            },
+            avg_access_count: 5.5,
+            recently_accessed: 20,
+            never_accessed: 10,
+            high_access_memories: 5,
+            timestamp: Utc::now(),
+        };
+        
+        assert_eq!(stats.total_memories, 100);
+        assert_eq!(stats.avg_access_count, 5.5);
+        assert_eq!(stats.recently_accessed, 20);
+        assert_eq!(stats.never_accessed, 10);
+        assert_eq!(stats.high_access_memories, 5);
+        assert_eq!(stats.access_frequency_distribution.len(), 5);
+        assert_eq!(stats.recency_distribution.len(), 5);
+    }
+
+    /// 🆕 Phase 4.3: 测试访问频率分布计算
+    #[test]
+    fn test_access_frequency_distribution() {
+        let mut distribution = HashMap::new();
+        distribution.insert("0".to_string(), 50);
+        distribution.insert("1-5".to_string(), 30);
+        distribution.insert("6-10".to_string(), 15);
+        distribution.insert("11-50".to_string(), 4);
+        distribution.insert("51+".to_string(), 1);
+        
+        let total: i64 = distribution.values().sum();
+        assert_eq!(total, 100, "访问频率分布总和应该等于总记忆数");
+        
+        assert!(distribution.contains_key("0"), "应该包含从未访问的分布");
+        assert!(distribution.contains_key("51+"), "应该包含高访问的分布");
+    }
+}

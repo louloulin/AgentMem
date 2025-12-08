@@ -1129,5 +1129,174 @@ mod tests {
         // no_scope应该被视为global，排在unknown之前
         assert_eq!(sorted[3].id, "unknown_1", "未知scope应该排在最后");
     }
+
+    /// 🆕 Phase 2.11: 测试重要性自动计算
+    #[test]
+    fn test_calculate_auto_importance() {
+        use crate::routes::memory::calculate_auto_importance;
+        use chrono::Utc;
+        
+        // 测试1: 高访问频率 + 最近访问 = 高importance
+        let now = Utc::now().timestamp();
+        let importance1 = calculate_auto_importance(0.5, 100, Some(now));
+        assert!(importance1 > 0.5, "高访问频率且最近访问应该提升importance");
+        assert!(importance1 <= 1.0, "importance应该 <= 1.0");
+        
+        // 测试2: 低访问频率 + 很久未访问 = 低importance
+        let old_time = now - 86400 * 7; // 7天前
+        let importance2 = calculate_auto_importance(0.5, 1, Some(old_time));
+        assert!(importance2 < importance1, "低访问频率且很久未访问应该importance较低");
+        assert!(importance2 >= 0.0, "importance应该 >= 0.0");
+        
+        // 测试3: 边界值（importance已经是1.0）
+        let importance3 = calculate_auto_importance(1.0, 1000, Some(now));
+        assert_eq!(importance3, 1.0, "importance已经是1.0时应该保持1.0");
+        
+        // 测试4: 边界值（importance是0.0）
+        let importance4 = calculate_auto_importance(0.0, 10, Some(now));
+        assert!(importance4 > 0.0, "有访问历史时importance应该 > 0.0");
+    }
+
+    /// 🆕 Phase 2.11: 测试重要性自动计算的访问频率奖励
+    #[test]
+    fn test_auto_importance_access_bonus() {
+        use crate::routes::memory::calculate_auto_importance;
+        use chrono::Utc;
+        
+        let now = Utc::now().timestamp();
+        
+        // 测试访问频率对importance的影响
+        let importance_low_access = calculate_auto_importance(0.5, 1, Some(now));
+        let importance_high_access = calculate_auto_importance(0.5, 100, Some(now));
+        
+        assert!(importance_high_access > importance_low_access, "高访问频率应该产生更高的importance");
+    }
+
+    /// 🆕 Phase 2.12: 测试智能过滤功能
+    #[test]
+    fn test_apply_intelligent_filtering() {
+        use crate::routes::memory::apply_intelligent_filtering;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+        
+        let now = Utc::now();
+        let mut create_item = |id: &str, importance: f32, access_count: u32, age_days: i64| -> MemoryItem {
+            MemoryItem {
+                id: id.to_string(),
+                content: format!("Content for {}", id),
+                hash: Some(format!("hash_{}", id)),
+                score: Some(0.8),
+                metadata: HashMap::new(),
+                created_at: now - chrono::Duration::days(age_days),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test_agent".to_string(),
+                user_id: Some("test_user".to_string()),
+                importance,
+                embedding: None,
+                last_accessed_at: now,
+                access_count,
+                expires_at: None,
+                version: 1,
+            }
+        };
+        
+        let items = vec![
+            create_item("high_importance", 0.9, 100, 1),  // 高重要性，高访问，新
+            create_item("low_importance", 0.2, 5, 1),     // 低重要性，低访问，新
+            create_item("old_memory", 0.8, 50, 100),      // 高重要性，但很旧
+            create_item("low_access", 0.7, 2, 5),          // 中等重要性，但访问少
+        ];
+        
+        // 测试1: 按重要性过滤
+        let filtered = apply_intelligent_filtering(items.clone(), Some(0.5), None, None);
+        assert_eq!(filtered.len(), 3, "应该过滤掉低重要性的记忆");
+        assert!(filtered.iter().all(|item| item.importance >= 0.5));
+        
+        // 测试2: 按年龄过滤
+        let filtered = apply_intelligent_filtering(items.clone(), None, Some(30), None);
+        assert_eq!(filtered.len(), 3, "应该过滤掉超过30天的记忆");
+        
+        // 测试3: 按访问次数过滤
+        let filtered = apply_intelligent_filtering(items.clone(), None, None, Some(10));
+        assert_eq!(filtered.len(), 2, "应该过滤掉访问次数少于10的记忆");
+        
+        // 测试4: 组合过滤
+        let filtered = apply_intelligent_filtering(items.clone(), Some(0.5), Some(30), Some(10));
+        assert_eq!(filtered.len(), 1, "应该只保留高重要性、新且访问多的记忆");
+        assert_eq!(filtered[0].id, "high_importance");
+    }
+
+    /// 🆕 Phase 2.13: 测试搜索结果分页
+    #[test]
+    fn test_search_results_pagination() {
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+        
+        // 创建测试数据
+        let mut create_item = |id: &str| -> MemoryItem {
+            MemoryItem {
+                id: id.to_string(),
+                content: format!("Content for {}", id),
+                hash: Some(format!("hash_{}", id)),
+                score: Some(0.8),
+                metadata: HashMap::new(),
+                created_at: Utc::now(),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test_agent".to_string(),
+                user_id: Some("test_user".to_string()),
+                importance: 0.5,
+                embedding: None,
+                last_accessed_at: Utc::now(),
+                access_count: 0,
+                expires_at: None,
+                version: 1,
+            }
+        };
+        
+        let items: Vec<serde_json::Value> = (0..10)
+            .map(|i| {
+                let item = create_item(&format!("item_{}", i));
+                serde_json::json!({
+                    "id": item.id,
+                    "content": item.content,
+                })
+            })
+            .collect();
+        
+        // 测试1: 第一页（offset=0, limit=5）
+        let offset = 0;
+        let limit = 5;
+        let total = items.len();
+        let page1: Vec<_> = items.iter().skip(offset).take(limit).cloned().collect();
+        assert_eq!(page1.len(), 5, "第一页应该返回5条结果");
+        assert_eq!(page1[0]["id"], "item_0");
+        assert_eq!(page1[4]["id"], "item_4");
+        let has_more1 = offset + limit < total;
+        assert!(has_more1, "应该有更多结果");
+        
+        // 测试2: 第二页（offset=5, limit=5）
+        let offset = 5;
+        let page2: Vec<_> = items.iter().skip(offset).take(limit).cloned().collect();
+        assert_eq!(page2.len(), 5, "第二页应该返回5条结果");
+        assert_eq!(page2[0]["id"], "item_5");
+        assert_eq!(page2[4]["id"], "item_9");
+        let has_more2 = offset + limit < total;
+        assert!(!has_more2, "不应该有更多结果");
+        
+        // 测试3: 超出范围（offset=10, limit=5）
+        let offset = 10;
+        let page3: Vec<_> = items.iter().skip(offset).take(limit).cloned().collect();
+        assert_eq!(page3.len(), 0, "超出范围应该返回空结果");
+    }
 }
 
