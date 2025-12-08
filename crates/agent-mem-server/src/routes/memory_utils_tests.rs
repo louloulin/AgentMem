@@ -249,6 +249,7 @@ mod tests {
             queries: vec![
                 SearchRequest {
                     query: "test query 1".to_string(),
+                    prefetch: None,
                     agent_id: None,
                     user_id: None,
                     memory_type: None,
@@ -257,6 +258,7 @@ mod tests {
                 },
                 SearchRequest {
                     query: "test query 2".to_string(),
+                    prefetch: None,
                     agent_id: None,
                     user_id: None,
                     memory_type: None,
@@ -946,6 +948,186 @@ mod tests {
         let default_operations = vec!["search"];
         assert_eq!(default_operations.len(), 1);
         assert!(default_operations.contains(&"search"));
+    }
+
+    /// 🆕 Phase 2.3: 测试预取候选排序
+    #[test]
+    fn test_compute_prefetch_candidates_order_and_limit() {
+        use crate::routes::memory::compute_prefetch_candidates;
+        use chrono::Utc;
+
+        let now = Utc::now().timestamp();
+        let rows = vec![
+            ("id_old_low".to_string(), 5, Some(now - 48 * 3600)), // 访问次数低且很久未访问
+            ("id_fresh_high".to_string(), 20, Some(now)),         // 访问次数高且最近访问
+            ("id_mid".to_string(), 10, Some(now - 3600)),         // 中等
+        ];
+
+        let top = compute_prefetch_candidates(rows, 2);
+        assert_eq!(top.len(), 2, "应限制返回数量");
+        assert_eq!(top[0], "id_fresh_high", "最近且高频应优先");
+        assert_eq!(top[1], "id_mid", "次优应位于第二");
+    }
+
+    /// 🆕 Phase 2.2: 测试层次检索排序
+    #[test]
+    fn test_hierarchical_sorting() {
+        use crate::routes::memory::apply_hierarchical_sorting;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+
+        // 创建不同scope的记忆
+        let mut create_item = |id: &str, scope: &str, importance: f32| -> MemoryItem {
+            let mut metadata = HashMap::new();
+            metadata.insert("scope".to_string(), serde_json::Value::String(scope.to_string()));
+            MemoryItem {
+                id: id.to_string(),
+                content: format!("Content for {}", id),
+                hash: Some(format!("hash_{}", id)),
+                score: Some(0.8),
+                metadata,
+                created_at: Utc::now(),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test_agent".to_string(),
+                user_id: Some("test_user".to_string()),
+                importance,
+                embedding: None,
+                last_accessed_at: Utc::now(),
+                access_count: 0,
+                expires_at: None,
+                version: 1,
+            }
+        };
+
+        let mut items = vec![
+            create_item("global_1", "global", 0.9),      // 最抽象，但重要性高
+            create_item("run_1", "run", 0.5),            // 最具体
+            create_item("session_1", "session", 0.6),    // 会话级别
+            create_item("agent_1", "agent", 0.7),        // Agent级别
+            create_item("user_1", "user", 0.8),         // 用户级别
+        ];
+
+        // 应用层次排序
+        let sorted = apply_hierarchical_sorting(items.clone());
+
+        // 验证排序结果：最具体的scope应该在前
+        assert_eq!(sorted.len(), 5);
+        assert_eq!(sorted[0].id, "run_1", "run scope应该排在最前面（最具体）");
+        assert_eq!(sorted[1].id, "session_1", "session scope应该排在第二位");
+        assert_eq!(sorted[2].id, "agent_1", "agent scope应该排在第三位");
+        assert_eq!(sorted[3].id, "user_1", "user scope应该排在第四位");
+        assert_eq!(sorted[4].id, "global_1", "global scope应该排在最后（最抽象）");
+    }
+
+    /// 🆕 Phase 2.2: 测试层次检索排序 - 相同scope按重要性排序
+    #[test]
+    fn test_hierarchical_sorting_same_scope_by_importance() {
+        use crate::routes::memory::apply_hierarchical_sorting;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+
+        // 创建相同scope但不同重要性的记忆
+        let mut create_item = |id: &str, importance: f32| -> MemoryItem {
+            let mut metadata = HashMap::new();
+            metadata.insert("scope".to_string(), serde_json::Value::String("agent".to_string()));
+            MemoryItem {
+                id: id.to_string(),
+                content: format!("Content for {}", id),
+                hash: Some(format!("hash_{}", id)),
+                score: Some(0.8),
+                metadata,
+                created_at: Utc::now(),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test_agent".to_string(),
+                user_id: Some("test_user".to_string()),
+                importance,
+                embedding: None,
+                last_accessed_at: Utc::now(),
+                access_count: 0,
+                expires_at: None,
+                version: 1,
+            }
+        };
+
+        let mut items = vec![
+            create_item("agent_low", 0.3),   // 低重要性
+            create_item("agent_high", 0.9), // 高重要性
+            create_item("agent_mid", 0.6),   // 中等重要性
+        ];
+
+        // 应用层次排序
+        let sorted = apply_hierarchical_sorting(items.clone());
+
+        // 验证排序结果：相同scope时，重要性高的应该在前
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].id, "agent_high", "高重要性应该排在最前面");
+        assert_eq!(sorted[1].id, "agent_mid", "中等重要性应该排在第二位");
+        assert_eq!(sorted[2].id, "agent_low", "低重要性应该排在最后");
+    }
+
+    /// 🆕 Phase 2.2: 测试层次检索排序 - 未知scope处理
+    #[test]
+    fn test_hierarchical_sorting_unknown_scope() {
+        use crate::routes::memory::apply_hierarchical_sorting;
+        use agent_mem_traits::MemoryItem;
+        use chrono::Utc;
+        use std::collections::HashMap;
+
+        // 创建包含未知scope的记忆
+        let mut create_item = |id: &str, scope: Option<&str>| -> MemoryItem {
+            let mut metadata = HashMap::new();
+            if let Some(s) = scope {
+                metadata.insert("scope".to_string(), serde_json::Value::String(s.to_string()));
+            }
+            MemoryItem {
+                id: id.to_string(),
+                content: format!("Content for {}", id),
+                hash: Some(format!("hash_{}", id)),
+                score: Some(0.8),
+                metadata,
+                created_at: Utc::now(),
+                updated_at: None,
+                session: Default::default(),
+                memory_type: Default::default(),
+                entities: Vec::new(),
+                relations: Vec::new(),
+                agent_id: "test_agent".to_string(),
+                user_id: Some("test_user".to_string()),
+                importance: 0.5,
+                embedding: None,
+                last_accessed_at: Utc::now(),
+                access_count: 0,
+                expires_at: None,
+                version: 1,
+            }
+        };
+
+        let mut items = vec![
+            create_item("run_1", Some("run")),
+            create_item("unknown_1", Some("unknown_scope")), // 未知scope
+            create_item("agent_1", Some("agent")),
+            create_item("no_scope", None), // 无scope（应该被视为global）
+        ];
+
+        // 应用层次排序
+        let sorted = apply_hierarchical_sorting(items.clone());
+
+        // 验证排序结果：未知scope应该排在最后
+        assert_eq!(sorted.len(), 4);
+        assert_eq!(sorted[0].id, "run_1", "run scope应该排在最前面");
+        assert_eq!(sorted[1].id, "agent_1", "agent scope应该排在第二位");
+        // no_scope应该被视为global，排在unknown之前
+        assert_eq!(sorted[3].id, "unknown_1", "未知scope应该排在最后");
     }
 }
 

@@ -97,6 +97,7 @@ async fn test_04_type_compatibility() {
     // 验证SearchRequest
     let search_req = SearchRequest {
         query: "test".to_string(),
+        prefetch: None,
         agent_id: Some("test-agent".to_string()),
         user_id: Some("alice".to_string()),
         memory_type: Some(MemoryType::Semantic),

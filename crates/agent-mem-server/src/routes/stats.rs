@@ -12,6 +12,7 @@ use crate::error::{ServerError, ServerResult};
 use crate::routes::memory::MemoryManager;
 use agent_mem_core::storage::factory::Repositories;
 use agent_mem_core::storage::libsql::connection::LibSqlConnectionManager;
+use agent_mem_core::search::query_optimizer::{IndexStatistics, IndexType};
 use axum::{extract::Extension, response::Json};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -923,6 +924,86 @@ mod tests {
         };
         assert_eq!(unhealthy_stats.health_status, "unhealthy");
     }
+
+    /// 🆕 Phase 3.1: 测试索引性能监控响应结构
+    #[test]
+    fn test_index_performance_stats_structure() {
+        use chrono::Utc;
+        
+        let stats = IndexPerformanceStats {
+            current_index: IndexInfo {
+                index_type: "Flat".to_string(),
+                total_vectors: 5000,
+                dimension: 1536,
+                avg_vector_norm: 1.0,
+                last_updated: Utc::now(),
+            },
+            recommended_index: "HNSW".to_string(),
+            recommendations: vec![
+                OptimizationRecommendation {
+                    recommendation_type: "index_type".to_string(),
+                    severity: "high".to_string(),
+                    description: "建议升级索引".to_string(),
+                    expected_improvement: Some(50.0),
+                }
+            ],
+            performance_metrics: PerformanceMetrics {
+                estimated_latency_ms: 10,
+                estimated_recall: 0.95,
+                estimated_index_size_mb: 50.0,
+            },
+            timestamp: Utc::now(),
+        };
+
+        // 验证字段存在
+        assert_eq!(stats.current_index.index_type, "Flat");
+        assert_eq!(stats.current_index.total_vectors, 5000);
+        assert_eq!(stats.recommended_index, "HNSW");
+        assert_eq!(stats.recommendations.len(), 1);
+        assert_eq!(stats.performance_metrics.estimated_recall, 0.95);
+
+        // 验证序列化
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("current_index"));
+        assert!(json.contains("recommendations"));
+        assert!(json.contains("performance_metrics"));
+    }
+
+    /// 🆕 Phase 3.1: 测试性能指标计算
+    #[test]
+    fn test_performance_metrics_calculation() {
+        use agent_mem_core::search::query_optimizer::IndexStatistics;
+        
+        // 测试小数据集（Flat索引）
+        let small_stats = IndexStatistics::new(1000, 1536);
+        let small_metrics = calculate_performance_metrics(&small_stats);
+        assert_eq!(small_metrics.estimated_recall, 1.0, "Flat索引应该有100%召回率");
+        assert!(small_metrics.estimated_latency_ms < 100, "小数据集延迟应该很低");
+
+        // 测试大数据集（HNSW索引）
+        let large_stats = IndexStatistics::new(50_000, 1536);
+        let large_metrics = calculate_performance_metrics(&large_stats);
+        assert!(large_metrics.estimated_recall >= 0.95, "HNSW索引应该有高召回率");
+        assert!(large_metrics.estimated_index_size_mb > 0.0, "应该有索引大小估算");
+    }
+
+    /// 🆕 Phase 3.1: 测试预期性能提升计算
+    #[test]
+    fn test_expected_improvement_calculation() {
+        use agent_mem_core::search::query_optimizer::IndexType;
+        
+        // 测试从Flat升级到HNSW（大数据集）
+        let improvement1 = calculate_expected_improvement(&IndexType::Flat, &IndexType::HNSW, 50_000);
+        assert!(improvement1 >= 60.0, "大数据集从Flat升级到HNSW应该有显著提升");
+
+        // 测试从Flat升级到IVF_HNSW（超大数据集）
+        let improvement2 = calculate_expected_improvement(&IndexType::Flat, &IndexType::IVF_HNSW, 200_000);
+        assert!(improvement2 >= 80.0, "超大数据集从Flat升级到IVF_HNSW应该有更大提升");
+
+        // 测试从HNSW升级到IVF_HNSW
+        let improvement3 = calculate_expected_improvement(&IndexType::HNSW, &IndexType::IVF_HNSW, 200_000);
+        assert!(improvement3 >= 30.0, "从HNSW升级到IVF_HNSW应该有中等提升");
+    }
 }
 
 /// Database connection pool statistics response
@@ -995,4 +1076,255 @@ pub async fn get_database_pool_stats() -> ServerResult<Json<DatabasePoolStats>> 
         response.size_mb, response.page_count, response.health_status);
 
     Ok(Json(response))
+}
+
+/// 🆕 Phase 3.1: 索引性能监控和优化建议响应
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IndexPerformanceStats {
+    /// 当前索引统计信息
+    pub current_index: IndexInfo,
+    /// 推荐的索引类型
+    pub recommended_index: String,
+    /// 优化建议列表
+    pub recommendations: Vec<OptimizationRecommendation>,
+    /// 性能指标
+    pub performance_metrics: PerformanceMetrics,
+    /// 时间戳
+    pub timestamp: DateTime<Utc>,
+}
+
+/// 索引信息
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IndexInfo {
+    /// 索引类型
+    pub index_type: String,
+    /// 总向量数
+    pub total_vectors: usize,
+    /// 向量维度
+    pub dimension: usize,
+    /// 平均向量范数
+    pub avg_vector_norm: f32,
+    /// 最后更新时间
+    pub last_updated: DateTime<Utc>,
+}
+
+/// 优化建议
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct OptimizationRecommendation {
+    /// 建议类型
+    pub recommendation_type: String,
+    /// 严重程度 (low, medium, high)
+    pub severity: String,
+    /// 建议描述
+    pub description: String,
+    /// 预期性能提升（百分比）
+    pub expected_improvement: Option<f64>,
+}
+
+/// 性能指标
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PerformanceMetrics {
+    /// 预期查询延迟（毫秒）
+    pub estimated_latency_ms: u64,
+    /// 预期召回率（0.0-1.0）
+    pub estimated_recall: f32,
+    /// 索引大小估算（MB）
+    pub estimated_index_size_mb: f64,
+}
+
+/// 🆕 Phase 3.1: 获取索引性能监控和优化建议
+/// 
+/// 基于QueryOptimizer的IndexStatistics提供索引性能监控和优化建议
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats/index/performance",
+    tag = "statistics",
+    responses(
+        (status = 200, description = "Index performance statistics retrieved successfully", body = IndexPerformanceStats),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_index_performance_stats(
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
+) -> ServerResult<Json<IndexPerformanceStats>> {
+    info!("📊 获取索引性能监控和优化建议");
+
+    // 获取当前向量数量（从数据库查询）
+    let total_vectors = {
+        use libsql::{params, Builder};
+        let db_path = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+            .replace("file:", "");
+        
+        let db = Builder::new_local(&db_path)
+            .build()
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        
+        let conn = db
+            .connect()
+            .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        
+        let mut stmt = conn
+            .prepare("SELECT COUNT(*) FROM memories WHERE is_deleted = 0")
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        
+        let mut rows = stmt
+            .query(params![])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+        
+        if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        {
+            row.get::<i64>(0).unwrap_or(0) as usize
+        } else {
+            0
+        }
+    };
+
+    // 创建IndexStatistics（基于实际数据）
+    let dimension = 1536; // 默认OpenAI embedding维度
+    let stats = IndexStatistics::new(total_vectors, dimension);
+    
+    // 获取当前索引信息
+    let current_index = IndexInfo {
+        index_type: format!("{:?}", stats.index_type),
+        total_vectors: stats.total_vectors,
+        dimension: stats.dimension,
+        avg_vector_norm: stats.avg_vector_norm,
+        last_updated: Utc::now(), // 简化版：使用当前时间
+    };
+
+    // 生成优化建议
+    let mut recommendations = Vec::new();
+    
+    // 建议1: 根据数据规模推荐索引类型
+    let recommended_index = stats.index_type;
+    if stats.index_type != recommended_index {
+        recommendations.push(OptimizationRecommendation {
+            recommendation_type: "index_type".to_string(),
+            severity: "high".to_string(),
+            description: format!(
+                "建议使用 {:?} 索引类型以优化性能。当前使用 {:?}，数据规模为 {} 条向量",
+                recommended_index, stats.index_type, total_vectors
+            ),
+            expected_improvement: Some(calculate_expected_improvement(&stats.index_type, &recommended_index, total_vectors)),
+        });
+    }
+    
+    // 建议2: 小数据集优化
+    if total_vectors < 1000 {
+        recommendations.push(OptimizationRecommendation {
+            recommendation_type: "dataset_size".to_string(),
+            severity: "low".to_string(),
+            description: "数据集较小，当前索引配置已足够。".to_string(),
+            expected_improvement: None,
+        });
+    } else if total_vectors >= 100_000 && stats.index_type == IndexType::Flat {
+        recommendations.push(OptimizationRecommendation {
+            recommendation_type: "index_upgrade".to_string(),
+            severity: "high".to_string(),
+            description: format!(
+                "数据集规模较大（{} 条向量），建议升级到 HNSW 或 IVF_HNSW 索引以提升查询性能",
+                total_vectors
+            ),
+            expected_improvement: Some(50.0), // 预期50%性能提升
+        });
+    }
+    
+    // 建议3: 索引重建建议（简化版：基于统计信息）
+    let hours_since_update = stats.last_updated.elapsed().as_secs() / 3600;
+    if hours_since_update > 24 * 7 { // 超过7天
+        recommendations.push(OptimizationRecommendation {
+            recommendation_type: "index_rebuild".to_string(),
+            severity: "medium".to_string(),
+            description: format!(
+                "索引已 {} 天未更新，建议重建索引以优化性能",
+                hours_since_update / 24
+            ),
+            expected_improvement: Some(10.0), // 预期10%性能提升
+        });
+    }
+
+    // 计算性能指标
+    let performance_metrics = calculate_performance_metrics(&stats);
+
+    // 保存建议数量（在move之前）
+    let recommendations_count = recommendations.len();
+
+    let response = IndexPerformanceStats {
+        current_index,
+        recommended_index: format!("{:?}", recommended_index),
+        recommendations,
+        performance_metrics,
+        timestamp: Utc::now(),
+    };
+
+    info!("📊 索引性能监控: 向量数={}, 索引类型={:?}, 建议数={}", 
+        total_vectors, stats.index_type, recommendations_count);
+
+    Ok(Json(response))
+}
+
+/// 计算预期性能提升（百分比）
+fn calculate_expected_improvement(
+    current: &IndexType,
+    recommended: &IndexType,
+    total_vectors: usize,
+) -> f64 {
+    // 简化的性能提升计算
+    match (current, recommended) {
+        (IndexType::Flat, IndexType::HNSW) if total_vectors > 10_000 => 60.0,
+        (IndexType::Flat, IndexType::IVF_HNSW) if total_vectors > 100_000 => 80.0,
+        (IndexType::HNSW, IndexType::IVF_HNSW) if total_vectors > 100_000 => 30.0,
+        _ => 20.0, // 默认20%提升
+    }
+}
+
+/// 计算性能指标
+fn calculate_performance_metrics(stats: &IndexStatistics) -> PerformanceMetrics {
+    // 基于索引类型估算性能
+    let (latency_ms, recall, index_size_mb) = match stats.index_type {
+        IndexType::None | IndexType::Flat => {
+            // 线性扫描：O(n)
+            let latency = (stats.total_vectors as f64 * 0.0001) as u64; // 每个向量0.1μs
+            (latency, 1.0, 0.0) // 精确搜索，100%召回，无索引大小
+        }
+        IndexType::HNSW => {
+            // HNSW：O(log n)
+            let latency = ((stats.total_vectors as f64).ln() * 2.0) as u64;
+            let recall = 0.95; // 95%召回
+            let index_size = (stats.total_vectors as f64 * stats.dimension as f64 * 4.0) / (1024.0 * 1024.0); // 估算索引大小
+            (latency, recall, index_size)
+        }
+        IndexType::IVF => {
+            // IVF：O(nprobe * cluster_size)
+            let cluster_size = if stats.total_vectors > 0 && stats.total_vectors >= 100 {
+                stats.total_vectors / 100
+            } else {
+                1
+            }; // 假设100个聚类
+            let latency = (10 * cluster_size) as u64 / 10000;
+            let recall = 0.93; // 93%召回
+            let index_size = (stats.total_vectors as f64 * stats.dimension as f64 * 2.0) / (1024.0 * 1024.0);
+            (latency, recall, index_size)
+        }
+        IndexType::IVF_HNSW => {
+            // 混合：最快
+            let latency = ((stats.total_vectors as f64).ln() * 1.5) as u64;
+            let recall = 0.95; // 95%召回
+            let index_size = (stats.total_vectors as f64 * stats.dimension as f64 * 3.0) / (1024.0 * 1024.0);
+            (latency, recall, index_size)
+        }
+    };
+
+    PerformanceMetrics {
+        estimated_latency_ms: latency_ms,
+        estimated_recall: recall,
+        estimated_index_size_mb: index_size_mb,
+    }
 }

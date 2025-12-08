@@ -20,6 +20,8 @@ pub mod tools;
 pub mod users;
 pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait
 pub mod logs; // 🆕 Phase 4.2: 日志聚合功能
+pub mod performance; // 🆕 Phase 4.2: 性能分析功能
+pub mod predictor; // 🆕 Phase 2.3: 记忆预测功能
 
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
@@ -135,9 +137,17 @@ pub async fn create_router(
             "/api/v1/stats/database/pool",
             get(stats::get_database_pool_stats),
         )
+        .route(
+            "/api/v1/stats/index/performance",
+            get(stats::get_index_performance_stats),
+        )
         // 🆕 Phase 4.2: 日志聚合路由
         .route("/api/v1/logs/stats", get(logs::get_log_stats))
-        .route("/api/v1/logs/query", get(logs::query_logs));
+        .route("/api/v1/logs/query", get(logs::query_logs))
+        // 🆕 Phase 4.2: 性能分析路由
+        .route("/api/v1/performance/analysis", get(performance::get_performance_analysis))
+        // 🆕 Phase 2.3: 记忆预测路由
+        .route("/api/v1/memories/predict", post(predictor::predict_memories));
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app
@@ -400,6 +410,7 @@ pub async fn create_router(
         stats::get_agent_activity_stats,
         stats::get_memory_quality_stats,
         stats::get_database_pool_stats,
+        stats::get_index_performance_stats,
     ),
     components(
         schemas(
@@ -418,6 +429,10 @@ pub async fn create_router(
             stats::MemoryGrowthResponse,
             stats::AgentActivityStats,
             stats::AgentActivityResponse,
+            stats::IndexPerformanceStats,
+            stats::IndexInfo,
+            stats::OptimizationRecommendation,
+            stats::PerformanceMetrics,
             users::RegisterRequest,
             users::LoginRequest,
             users::LoginResponse,

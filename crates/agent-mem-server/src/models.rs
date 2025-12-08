@@ -62,6 +62,9 @@ pub struct SearchRequest {
     #[validate(length(min = 1, max = 1000))]
     pub query: String,
 
+    /// Whether to prefetch memories before search (optional, default: false)
+    pub prefetch: Option<bool>,
+
     /// Agent ID (optional)
     #[validate(length(max = 255))]
     pub agent_id: Option<String>,
@@ -309,6 +312,7 @@ mod tests {
     fn test_search_request_validation() {
         let request = SearchRequest {
             query: "test query".to_string(),
+            prefetch: None,
             agent_id: Some("test_agent".to_string()),
             user_id: Some("test_user".to_string()),
             memory_type: Some(MemoryType::Semantic),

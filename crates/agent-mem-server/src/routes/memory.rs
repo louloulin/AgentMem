@@ -28,7 +28,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
-use futures::future;
+use futures::future::{self, join_all};
 use lru::LruCache;
 
 /// 查询结果缓存条目
@@ -1385,6 +1385,114 @@ fn convert_memory_to_json(item: agent_mem_traits::MemoryItem) -> serde_json::Val
     })
 }
 
+/// 🆕 Phase 2.3: 预取候选计算 - 基于访问模式评分选出前N个
+pub(crate) fn compute_prefetch_candidates(
+    rows: Vec<(String, i64, Option<i64>)>,
+    limit: usize,
+) -> Vec<String> {
+    let mut scored: Vec<(String, f64)> = rows
+        .into_iter()
+        .map(|(id, count, ts)| (id, calculate_access_pattern_score(count, ts)))
+        .collect();
+
+    // 按评分降序排序
+    scored.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    scored
+        .into_iter()
+        .take(limit)
+        .map(|(id, _)| id)
+        .collect()
+}
+
+/// 🆕 Phase 2.3: 智能预取（简化版） - 基于访问模式和搜索历史预取
+async fn prefetch_for_query(
+    repositories: Arc<agent_mem_core::storage::factory::Repositories>,
+    memory_manager: Arc<MemoryManager>,
+    request: &crate::models::SearchRequest,
+) -> ServerResult<usize> {
+    use libsql::Builder;
+
+    let fetch_limit = request.limit.unwrap_or(10).saturating_mul(2).min(50).max(1);
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+
+    let conn = db
+        .connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+
+    // 根据过滤条件构建查询
+    let mut rows = if let Some(agent_id) = &request.agent_id {
+        let mut stmt = conn
+            .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        stmt.query(libsql::params![agent_id.clone(), fetch_limit as i64])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+    } else if let Some(user_id) = &request.user_id {
+        let mut stmt = conn
+            .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND user_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        stmt.query(libsql::params![user_id.clone(), fetch_limit as i64])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+    } else {
+        let mut stmt = conn
+            .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        stmt.query(libsql::params![fetch_limit as i64])
+            .await
+            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+    };
+
+    // 收集行数据
+    let mut collected: Vec<(String, i64, Option<i64>)> = Vec::new();
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
+        let id: String = row
+            .get(0)
+            .map_err(|e| ServerError::Internal(format!("Failed to get id: {}", e)))?;
+        let access_count: i64 = row.get(1).unwrap_or(0);
+        let last_accessed_ts: Option<i64> = row.get(2).ok();
+        collected.push((id, access_count, last_accessed_ts));
+    }
+
+    // 计算候选并预取
+    let candidate_ids = compute_prefetch_candidates(collected, request.limit.unwrap_or(10));
+    if candidate_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let fetch_futures = candidate_ids.iter().map(|id| {
+        let mm = memory_manager.clone();
+        let id_clone = id.clone();
+        async move {
+            match mm.get_memory(&id_clone).await {
+                Ok(Some(_)) => 1usize,
+                _ => 0usize,
+            }
+        }
+    });
+
+    let warmed_count: usize = join_all(fetch_futures).await.into_iter().sum();
+    Ok(warmed_count)
+}
+
 #[utoipa::path(
     post,
     path = "/api/v1/memories/search",
@@ -1406,6 +1514,20 @@ pub async fn search_memories(
     // 🆕 Phase 2.7: 搜索统计收集 - 记录搜索开始时间
     let search_start = Instant::now();
     let stats = get_search_stats();
+
+    // 🆕 Phase 2.3: 可选预取（异步，不阻塞主搜索流程）
+    if request.prefetch.unwrap_or(false) {
+        let repositories_clone = repositories.clone();
+        let memory_manager_clone = memory_manager.clone();
+        let request_clone = request.clone();
+        tokio::spawn(async move {
+            match prefetch_for_query(repositories_clone, memory_manager_clone, &request_clone).await
+            {
+                Ok(count) => info!("🧠 预取完成: warmed {} memories", count),
+                Err(e) => warn!("⚠️ 预取失败: {}", e),
+            }
+        });
+    }
 
     // 🎯 Phase 1: LibSQL精确查询（商品ID等）
     let is_exact_query = detect_exact_query(&request.query);
@@ -1685,6 +1807,36 @@ pub async fn search_memories(
         request.threshold.map(|t| t.to_string()).unwrap_or_else(|| "未指定".to_string()),
         adaptive_threshold);
 
+    // 🆕 Phase 2.2: 层次检索排序（可选，基于scope字段）
+    // 如果启用层次检索，先按scope层次排序，再应用其他排序逻辑
+    let use_hierarchical = std::env::var("ENABLE_HIERARCHICAL_SEARCH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(false);
+    
+    if use_hierarchical {
+        info!("🔍 启用层次检索排序");
+        // 提取MemoryItem并应用层次排序
+        let items: Vec<MemoryItem> = scored_results.iter().map(|(item, _, _, _, _, _)| item.clone()).collect();
+        let hierarchical_sorted = apply_hierarchical_sorting(items);
+        
+        // 重新构建scored_results，保持层次顺序
+        let mut new_scored_results = Vec::new();
+        let item_map: std::collections::HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = scored_results
+            .into_iter()
+            .map(|(item, score, recency, importance, relevance, quality)| (item.id.clone(), (item, score, recency, importance, relevance, quality)))
+            .collect();
+        
+        for item in hierarchical_sorted {
+            if let Some((_, score, recency, importance, relevance, quality)) = item_map.get(&item.id) {
+                new_scored_results.push((item, *score, *recency, *importance, *relevance, *quality));
+            }
+        }
+        
+        scored_results = new_scored_results;
+        info!("✅ 层次检索排序完成: {} 条结果", scored_results.len());
+    }
+    
     // 🆕 Phase 2.5: 搜索结果去重（基于content hash）
     // 使用HashSet去重，保留综合评分最高的结果
     use std::collections::HashMap;
@@ -1791,6 +1943,58 @@ pub async fn search_memories(
     }
 
     Ok(Json(crate::models::ApiResponse::success(json_results)))
+}
+
+/// 🆕 Phase 2.2: 层次检索排序（H-MEM风格，简化版）
+/// 
+/// 基于scope字段对搜索结果进行层次排序，优先返回最具体scope的结果
+/// 层次顺序（从最具体到最抽象）：run -> session -> agent -> user -> organization -> global
+/// 
+/// # 参数
+/// - `items`: 搜索结果列表
+/// 
+/// # 返回
+/// 按scope层次排序的结果（最具体的在前）
+pub(crate) fn apply_hierarchical_sorting(mut items: Vec<MemoryItem>) -> Vec<MemoryItem> {
+    // Scope层次映射（数字越小越具体，优先级越高）
+    let scope_level = |scope: &str| -> usize {
+        match scope {
+            "run" => 0,
+            "session" => 1,
+            "agent" => 2,
+            "user" => 3,
+            "organization" => 4,
+            "global" => 5,
+            _ => 6, // 未知scope放在最后
+        }
+    };
+    
+    // 按scope层次和重要性排序
+    items.sort_by(|a, b| {
+        let scope_a = a.metadata
+            .get("scope")
+            .and_then(|v| v.as_str())
+            .unwrap_or("global");
+        let scope_b = b.metadata
+            .get("scope")
+            .and_then(|v| v.as_str())
+            .unwrap_or("global");
+        
+        let level_a = scope_level(scope_a);
+        let level_b = scope_level(scope_b);
+        
+        // 首先按scope层次排序（level越小越具体，优先级越高）
+        match level_a.cmp(&level_b) {
+            std::cmp::Ordering::Equal => {
+                // 相同层次时，按重要性排序（重要性高的在前）
+                b.importance.partial_cmp(&a.importance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }
+            other => other,
+        }
+    });
+    
+    items
 }
 
 /// 🆕 Phase 2.3: 计算访问模式评分（用于智能缓存预热）
@@ -2156,6 +2360,7 @@ pub async fn batch_search_memories(
         // 构建完整的SearchRequest
         let full_search_req = crate::models::SearchRequest {
             query: search_req.query,
+            prefetch: search_req.prefetch,
             agent_id,
             user_id,
             memory_type: search_req.memory_type,
