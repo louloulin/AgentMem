@@ -28,6 +28,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
+use futures::future;
 use lru::LruCache;
 
 /// 查询结果缓存条目
@@ -1524,25 +1525,49 @@ pub async fn search_memories(
     };
 
     // ✅ 修复：过滤已删除的记录，确保搜索结果与LibSQL状态一致
+    // 🆕 Phase 3.2: 并行查询优化 - 使用并行查询批量检查结果状态
     // 向量存储可能还包含已删除的记录，需要检查LibSQL中的实际状态
-    let mut valid_results = Vec::new();
-    for result in results {
-        // 检查LibSQL中是否存在且未删除
-        match repositories.memories.find_by_id(&result.id).await {
-            Ok(Some(_)) => {
-                // 记录存在且未删除（find_by_id已经过滤了is_deleted=0）
-                valid_results.push(result);
-            }
-            Ok(None) => {
-                // 记录不存在或已删除，跳过
-                debug!("Skipping deleted memory from search results: {}", result.id);
-            }
-            Err(e) => {
-                // 查询失败，为了安全起见，跳过该记录
-                warn!("Failed to check memory status in LibSQL: {}, skipping result", e);
+    let valid_results = if results.is_empty() {
+        Vec::new()
+    } else {
+        // 并行执行所有find_by_id查询
+        let check_futures: Vec<_> = results
+            .iter()
+            .map(|result| {
+                let id = result.id.clone();
+                let repo = &repositories.memories;
+                async move {
+                    let status = repo.find_by_id(&id).await;
+                    (result.clone(), status)
+                }
+            })
+            .collect();
+        
+        // 等待所有查询完成
+        let check_results = future::join_all(check_futures).await;
+        
+        // 过滤有效结果
+        let mut valid = Vec::new();
+        for (result, status) in check_results {
+            match status {
+                Ok(Some(_)) => {
+                    // 记录存在且未删除（find_by_id已经过滤了is_deleted=0）
+                    valid.push(result);
+                }
+                Ok(None) => {
+                    // 记录不存在或已删除，跳过
+                    debug!("Skipping deleted memory from search results: {}", result.id);
+                }
+                Err(e) => {
+                    // 查询失败，为了安全起见，跳过该记录
+                    warn!("Failed to check memory status in LibSQL: {}, skipping result", e);
+                }
             }
         }
-    }
+        valid
+    };
+    
+    info!("🔄 并行验证完成: {} → {} 条有效结果", results.len(), valid_results.len());
     results = valid_results;
 
     // 🔧 修复: 对于精确查询，优先返回精确匹配的结果

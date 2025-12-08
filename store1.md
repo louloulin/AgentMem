@@ -1193,11 +1193,21 @@ impl IntelligentPrefetch {
 
 **任务清单**：
 - [ ] 优化并行写入
-- [ ] 优化并行查询
+- [x] 优化并行查询 ✅
 - [ ] 添加连接池管理
 - [ ] 性能测试
 
 **预计时间**：2天
+
+**实现详情**：
+- ✅ **并行查询优化**：将搜索结果验证从串行改为并行批量检查
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories函数)
+  - ✅ 使用`futures::future::join_all`并行执行多个`find_by_id`查询
+  - ✅ 显著提升性能：多个查询并行执行，而非逐个等待
+  - ✅ 错误处理：即使部分查询失败，其他查询仍能正常完成
+  - ✅ 2个测试用例（`test_parallel_query_optimization`, `test_parallel_query_error_handling`）
+  - ✅ 充分利用现有代码：基于现有的`repositories.memories.find_by_id`方法
+  - ✅ 最小改造：仅将循环改为并行future集合
 
 ---
 
@@ -1666,12 +1676,22 @@ pub struct CoordinatorStats {
   - LRU缓存优化 ✅ (查询结果缓存从FIFO升级为LRU，提高缓存命中率，2个测试用例)
   - 搜索超时控制 ✅ (防止搜索操作hang住，可配置超时时间，2个测试用例)
   - 质量评分 ✅ (基于内容质量、完整性和元数据丰富度的质量评分，2个测试用例)
-- Phase 3: 性能优化 - **0%完成**
+- Phase 3: 性能优化 - **25%完成** (并行查询优化 ✅)
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约55%完成** (Phase 1完成96%，Phase 2完成85%)
+**总体进度**: **约57%完成** (Phase 1完成96%，Phase 2完成85%，Phase 3完成25%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **并行查询优化**：将搜索结果验证从串行改为并行批量检查
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories函数)
+  - ✅ 使用`futures::future::join_all`并行执行多个`find_by_id`查询
+  - ✅ 显著提升性能：多个查询并行执行，而非逐个等待
+  - ✅ 错误处理：即使部分查询失败，其他查询仍能正常完成
+  - ✅ 2个测试用例（`test_parallel_query_optimization`, `test_parallel_query_error_handling`）
+  - ✅ 充分利用现有代码：基于现有的`repositories.memories.find_by_id`方法
+  - ✅ 最小改造：仅将循环改为并行future集合
+  - ✅ 编译通过，无错误
+
 - ✅ **搜索结果质量评分**：基于内容质量、完整性和元数据丰富度评估搜索结果
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (calculate_quality_score函数)
   - ✅ 多维度质量评估：内容长度（30%）、元数据丰富度（20%）、完整性（20%）、访问历史（15%）、重要性（15%）

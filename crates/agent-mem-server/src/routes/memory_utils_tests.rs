@@ -566,5 +566,107 @@ mod tests {
             assert!(quality >= 0.0 && quality <= 1.0, "质量评分应该在0.0到1.0之间");
         }
     }
+
+    /// 测试并行查询优化的概念
+    /// 
+    /// 验证并行查询比串行查询更快
+    #[tokio::test]
+    async fn test_parallel_query_optimization() {
+        use futures::future;
+        use std::time::Instant;
+        
+        // 模拟10个查询任务
+        let query_ids: Vec<String> = (1..=10).map(|i| format!("id_{}", i)).collect();
+        
+        // 串行查询（模拟旧方式）
+        let serial_start = Instant::now();
+        let mut serial_results = Vec::new();
+        for id in &query_ids {
+            // 模拟查询延迟（10ms）
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            serial_results.push(id.clone());
+        }
+        let serial_duration = serial_start.elapsed();
+        
+        // 并行查询（新方式）
+        let parallel_start = Instant::now();
+        let query_futures: Vec<_> = query_ids
+            .iter()
+            .map(|id| {
+                let id_clone = id.clone();
+                async move {
+                    // 模拟查询延迟（10ms）
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    id_clone
+                }
+            })
+            .collect();
+        let parallel_results = future::join_all(query_futures).await;
+        let parallel_duration = parallel_start.elapsed();
+        
+        // 验证结果一致
+        assert_eq!(serial_results.len(), parallel_results.len());
+        
+        // 验证并行查询更快（理论上应该快约10倍，但实际可能受限于并发限制）
+        // 这里只验证并行查询不慢于串行查询
+        assert!(
+            parallel_duration <= serial_duration,
+            "并行查询应该不慢于串行查询: 串行={:?}, 并行={:?}",
+            serial_duration,
+            parallel_duration
+        );
+        
+        // 验证并行查询确实更快（至少快2倍）
+        assert!(
+            parallel_duration.as_millis() < serial_duration.as_millis() / 2,
+            "并行查询应该明显快于串行查询: 串行={:?}, 并行={:?}",
+            serial_duration,
+            parallel_duration
+        );
+    }
+
+    /// 测试并行查询的错误处理
+    /// 
+    /// 验证即使部分查询失败，其他查询仍能正常完成
+    #[tokio::test]
+    async fn test_parallel_query_error_handling() {
+        use futures::future;
+        
+        // 模拟5个查询，其中2个会失败
+        let query_ids: Vec<String> = (1..=5).map(|i| format!("id_{}", i)).collect();
+        
+        let query_futures: Vec<_> = query_ids
+            .iter()
+            .map(|id| {
+                let id_clone = id.clone();
+                async move {
+                    // 模拟查询：id_2和id_4会失败
+                    if id_clone == "id_2" || id_clone == "id_4" {
+                        Err(format!("Query failed for {}", id_clone))
+                    } else {
+                        Ok(id_clone)
+                    }
+                }
+            })
+            .collect();
+        
+        let results = future::join_all(query_futures).await;
+        
+        // 验证结果：3个成功，2个失败
+        let successes: Vec<_> = results.iter().filter(|r| r.is_ok()).collect();
+        let failures: Vec<_> = results.iter().filter(|r| r.is_err()).collect();
+        
+        assert_eq!(successes.len(), 3, "应该有3个成功的查询");
+        assert_eq!(failures.len(), 2, "应该有2个失败的查询");
+        
+        // 验证成功的查询结果
+        let success_ids: Vec<String> = successes
+            .iter()
+            .map(|r| r.as_ref().unwrap().clone())
+            .collect();
+        assert!(success_ids.contains(&"id_1".to_string()));
+        assert!(success_ids.contains(&"id_3".to_string()));
+        assert!(success_ids.contains(&"id_5".to_string()));
+    }
 }
 
