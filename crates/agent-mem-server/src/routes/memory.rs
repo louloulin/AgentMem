@@ -27,6 +27,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tokio::time::timeout;
 use lru::LruCache;
 
 /// 查询结果缓存条目
@@ -1413,19 +1414,45 @@ pub async fn search_memories(
     let adaptive_threshold = get_adaptive_threshold(&request.query);
     info!("📊 自适应阈值: query='{}', threshold={}", request.query, adaptive_threshold);
     
-    let mut results = memory_manager
-        .search_memories(
-            request.query,
-            request.agent_id,
-            request.user_id,
-            request.limit,
-            request.memory_type,
-        )
-        .await
-        .map_err(|e| {
+    // 🆕 Phase 2.9: 搜索超时控制
+    let search_timeout_secs = std::env::var("SEARCH_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30); // 默认30秒
+    
+    let memory_manager_clone = memory_manager.clone();
+    let query_clone_for_timeout = request.query.clone();
+    let agent_id_clone = request.agent_id.clone();
+    let user_id_clone = request.user_id.clone();
+    let limit_clone = request.limit;
+    let memory_type_clone = request.memory_type.clone();
+    
+    let search_future = async move {
+        memory_manager_clone
+            .search_memories(
+                query_clone_for_timeout,
+                agent_id_clone,
+                user_id_clone,
+                limit_clone,
+                memory_type_clone,
+            )
+            .await
+    };
+    
+    let mut results = match timeout(Duration::from_secs(search_timeout_secs), search_future).await {
+        Ok(Ok(results)) => results,
+        Ok(Err(e)) => {
             error!("Failed to search memories: {}", e);
-            ServerError::MemoryError(e.to_string())
-        })?;
+            return Err(ServerError::MemoryError(e.to_string()));
+        }
+        Err(_) => {
+            error!("Search operation timed out after {} seconds", search_timeout_secs);
+            return Err(ServerError::Internal(format!(
+                "Search operation timed out after {} seconds",
+                search_timeout_secs
+            )));
+        }
+    };
 
     // ✅ 修复：过滤已删除的记录，确保搜索结果与LibSQL状态一致
     // 向量存储可能还包含已删除的记录，需要检查LibSQL中的实际状态
