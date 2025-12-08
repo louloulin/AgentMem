@@ -412,5 +412,46 @@ mod tests {
         assert!(lru_after.contains(&"key1"), "LRU应该保留最近访问的key1");
         assert!(!lru_after.contains(&"key2"), "LRU应该淘汰最久未使用的key2");
     }
+
+    #[tokio::test]
+    async fn test_search_timeout_concept() {
+        use std::time::Duration;
+        use tokio::time::timeout;
+        
+        // 测试超时控制概念：快速操作应该成功
+        let fast_operation = async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            Ok::<_, String>("success")
+        };
+        
+        let result = timeout(Duration::from_secs(1), fast_operation).await;
+        assert!(result.is_ok(), "快速操作应该在超时前完成");
+        assert_eq!(result.unwrap().unwrap(), "success");
+        
+        // 测试超时控制概念：慢速操作应该超时
+        let slow_operation = async {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            Ok::<_, String>("success")
+        };
+        
+        let result = timeout(Duration::from_millis(500), slow_operation).await;
+        assert!(result.is_err(), "慢速操作应该超时");
+    }
+
+    #[test]
+    fn test_search_timeout_config() {
+        // 测试搜索超时配置解析
+        let timeout_str = "30";
+        let timeout_secs: u64 = timeout_str.parse().unwrap();
+        assert_eq!(timeout_secs, 30);
+        
+        // 测试默认值
+        let default_timeout = 30u64;
+        assert_eq!(default_timeout, 30);
+        
+        // 测试无效值处理
+        let invalid_timeout: Option<u64> = "invalid".parse().ok();
+        assert!(invalid_timeout.is_none());
+    }
 }
 

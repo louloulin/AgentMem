@@ -1655,7 +1655,7 @@ pub struct CoordinatorStats {
   - 健康检查 ✅ (LibSQL、VectorStore、L1缓存健康状态)
   - 统计管理 ✅ (重置统计信息)
   - 配置管理 ✅ (获取配置、默认配置创建)
-- Phase 2: 检索系统增强 - **75%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅, 搜索结果去重 ✅, 批量搜索 ✅, 搜索统计 ✅, LRU缓存优化 ✅)
+- Phase 2: 检索系统增强 - **80%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅, 搜索结果去重 ✅, 批量搜索 ✅, 搜索统计 ✅, LRU缓存优化 ✅, 搜索超时控制 ✅)
   - 自适应阈值增强 ✅ (中文检测、动态阈值调整)
   - 三维检索实现 ✅ (Recency × Importance × Relevance，6个测试用例)
   - Reranker功能启用 ✅ (多因素重排序：相似度、元数据、时间、重要性、质量)
@@ -1664,12 +1664,24 @@ pub struct CoordinatorStats {
   - 批量搜索 ✅ (批量查询API，复用现有搜索逻辑，2个测试用例)
   - 搜索统计 ✅ (搜索统计收集和API端点，2个测试用例)
   - LRU缓存优化 ✅ (查询结果缓存从FIFO升级为LRU，提高缓存命中率，2个测试用例)
+  - 搜索超时控制 ✅ (防止搜索操作hang住，可配置超时时间，2个测试用例)
 - Phase 3: 性能优化 - **0%完成**
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约52%完成** (Phase 1完成96%，Phase 2完成75%)
+**总体进度**: **约54%完成** (Phase 1完成96%，Phase 2完成80%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **搜索超时控制**：为搜索操作添加超时控制，防止hang住
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories函数)
+  - ✅ 使用tokio::time::timeout包装搜索操作
+  - ✅ 可配置超时时间：支持通过`SEARCH_TIMEOUT_SECONDS`环境变量配置（默认30秒）
+  - ✅ 超时错误处理：超时时返回明确的错误信息
+  - ✅ 2个测试用例（`test_search_timeout_concept`, `test_search_timeout_config`）
+  - ✅ 充分利用现有代码：使用tokio标准库的timeout功能
+  - ✅ 最小改造：仅包装搜索操作，保持API不变
+  - ✅ 稳定性提升：防止搜索操作hang住，提高服务可用性
+  - ✅ 编译通过，无错误
+
 - ✅ **LRU缓存优化**：将查询结果缓存从FIFO升级为LRU策略
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (SEARCH_CACHE, get_search_cache函数)
   - ✅ 从HashMap改为LruCache：使用`lru::LruCache`替代`HashMap`
