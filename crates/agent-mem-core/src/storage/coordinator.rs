@@ -11,6 +11,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+#[cfg(feature = "redis-cache")]
+use redis::{AsyncCommands, Client};
+#[cfg(feature = "redis-cache")]
+use serde_json;
+
 use super::traits::MemoryRepositoryTrait;
 
 /// Unified storage coordinator that manages LibSQL and VectorStore
@@ -21,6 +26,9 @@ pub struct UnifiedStorageCoordinator {
     vector_store: Arc<dyn VectorStore + Send + Sync>,
     /// In-memory L1 cache (true LRU)
     l1_cache: Arc<RwLock<LruCache<String, Memory>>>,
+    /// L2 Redis cache (optional)
+    #[cfg(feature = "redis-cache")]
+    l2_cache: Option<Arc<Client>>,
     /// Cache configuration
     cache_config: CacheConfig,
     /// Statistics
@@ -35,10 +43,16 @@ pub struct UnifiedStorageCoordinator {
 pub struct CacheConfig {
     /// Enable L1 cache
     pub l1_enabled: bool,
+    /// Enable L2 Redis cache
+    #[cfg(feature = "redis-cache")]
+    pub l2_enabled: bool,
     /// L1 cache capacity
     pub l1_capacity: usize,
     /// Default TTL for different memory types (in seconds)
     pub ttl_by_type: HashMap<String, u64>,
+    /// Redis URL (optional, for L2 cache)
+    #[cfg(feature = "redis-cache")]
+    pub redis_url: Option<String>,
 }
 
 impl Default for CacheConfig {
@@ -51,8 +65,12 @@ impl Default for CacheConfig {
 
         Self {
             l1_enabled: true,
+            #[cfg(feature = "redis-cache")]
+            l2_enabled: false,
             l1_capacity: 1000,
             ttl_by_type,
+            #[cfg(feature = "redis-cache")]
+            redis_url: None,
         }
     }
 }
@@ -85,10 +103,34 @@ impl UnifiedStorageCoordinator {
         let cache_capacity = NonZeroUsize::new(config.l1_capacity)
             .unwrap_or(NonZeroUsize::new(1000).unwrap());
         
+        // 🆕 Phase 1.2: L2 Redis缓存初始化（可选）
+        #[cfg(feature = "redis-cache")]
+        let l2_cache = if config.l2_enabled {
+            if let Some(ref redis_url) = config.redis_url {
+                match Client::open(redis_url.as_str()) {
+                    Ok(client) => {
+                        info!("L2 Redis cache enabled: {}", redis_url);
+                        Some(Arc::new(client))
+                    }
+                    Err(e) => {
+                        warn!("Failed to initialize L2 Redis cache: {}, continuing without L2 cache", e);
+                        None
+                    }
+                }
+            } else {
+                warn!("L2 Redis cache enabled but no Redis URL provided, continuing without L2 cache");
+                None
+            }
+        } else {
+            None
+        };
+        
         Self {
             sql_repository,
             vector_store,
             l1_cache: Arc::new(RwLock::new(LruCache::new(cache_capacity))),
+            #[cfg(feature = "redis-cache")]
+            l2_cache,
             cache_config: config,
             stats: Arc::new(RwLock::new(CoordinatorStats::default())),
         }
@@ -143,6 +185,12 @@ impl UnifiedStorageCoordinator {
             self.update_l1_cache(&memory.id.0, memory.clone()).await;
         }
 
+        // 🆕 Phase 1.2: Update L2 Redis cache
+        #[cfg(feature = "redis-cache")]
+        if let Some(ref l2_client) = self.l2_cache {
+            let _ = self.set_to_l2_cache(&memory.id.0, memory, l2_client).await;
+        }
+
         // Step 4: Update statistics
         {
             let mut stats = self.stats.write().await;
@@ -170,6 +218,11 @@ impl UnifiedStorageCoordinator {
                 // Remove from L1 cache
                 if self.cache_config.l1_enabled {
                     self.remove_from_l1_cache(id).await;
+                }
+                // 🆕 Phase 1.2: Remove from L2 Redis cache
+                #[cfg(feature = "redis-cache")]
+                if let Some(ref l2_client) = self.l2_cache {
+                    self.remove_from_l2_cache(id, l2_client).await;
                 }
                 // Update statistics
                 {
@@ -199,6 +252,11 @@ impl UnifiedStorageCoordinator {
                 if self.cache_config.l1_enabled {
                     self.remove_from_l1_cache(id).await;
                 }
+                // 🆕 Phase 1.2: Remove from L2 Redis cache
+                #[cfg(feature = "redis-cache")]
+                if let Some(ref l2_client) = self.l2_cache {
+                    self.remove_from_l2_cache(id, l2_client).await;
+                }
                 {
                     let mut stats = self.stats.write().await;
                     stats.total_ops += 1;
@@ -222,7 +280,7 @@ impl UnifiedStorageCoordinator {
         }
     }
 
-    /// Get memory with cache-first strategy
+    /// Get memory with cache-first strategy (L1 -> L2 -> LibSQL)
     pub async fn get_memory(&self, id: &str) -> Result<Option<Memory>> {
         // Step 1: Try L1 cache
         if self.cache_config.l1_enabled {
@@ -238,16 +296,40 @@ impl UnifiedStorageCoordinator {
             }
         }
 
-        // Step 2: Query LibSQL (primary source)
+        // 🆕 Phase 1.2: Step 2: Try L2 Redis cache (if enabled)
+        #[cfg(feature = "redis-cache")]
+        if let Some(ref l2_client) = self.l2_cache {
+            if let Ok(memory) = self.get_from_l2_cache(id, l2_client).await {
+                if let Some(mem) = memory {
+                    debug!("Cache hit (L2): {}", id);
+                    // 回填L1缓存
+                    if self.cache_config.l1_enabled {
+                        self.update_l1_cache(id, mem.clone()).await;
+                    }
+                    {
+                        let mut stats = self.stats.write().await;
+                        stats.cache_hits += 1;
+                    }
+                    return Ok(Some(mem));
+                }
+            }
+        }
+
+        // Step 3: Query LibSQL (primary source)
         let memory = self.sql_repository.find_by_id(id).await.map_err(|e| {
             error!("Failed to get memory from LibSQL: {}", e);
             AgentMemError::StorageError(format!("Failed to get memory: {}", e))
         })?;
 
-        // Step 3: Update cache if found
+        // Step 4: Update caches if found
         if let Some(ref mem) = memory {
             if self.cache_config.l1_enabled {
                 self.update_l1_cache(id, mem.clone()).await;
+            }
+            // 🆕 Phase 1.2: 回填L2缓存
+            #[cfg(feature = "redis-cache")]
+            if let Some(ref l2_client) = self.l2_cache {
+                let _ = self.set_to_l2_cache(id, mem, l2_client).await;
             }
             {
                 let mut stats = self.stats.write().await;
@@ -293,6 +375,12 @@ impl UnifiedStorageCoordinator {
         // Step 3: Update L1 cache
         if self.cache_config.l1_enabled {
             self.update_l1_cache(&memory.id.0, updated_memory.clone()).await;
+        }
+
+        // 🆕 Phase 1.2: Update L2 Redis cache
+        #[cfg(feature = "redis-cache")]
+        if let Some(ref l2_client) = self.l2_cache {
+            let _ = self.set_to_l2_cache(&memory.id.0, &updated_memory, l2_client).await;
         }
 
         // Step 4: Update statistics
@@ -511,6 +599,86 @@ impl UnifiedStorageCoordinator {
     async fn remove_from_l1_cache(&self, id: &str) {
         let mut cache = self.l1_cache.write().await;
         cache.pop(id);
+    }
+
+    /// 🆕 Phase 1.2: Get memory from L2 Redis cache
+    #[cfg(feature = "redis-cache")]
+    async fn get_from_l2_cache(&self, id: &str, client: &Client) -> Result<Option<Memory>> {
+        let cache_key = format!("agentmem:memory:{}", id);
+        
+        match client.get_async_connection().await {
+            Ok(mut conn) => {
+                match conn.get::<_, Option<String>>(&cache_key).await {
+                    Ok(Some(data)) => {
+                        match serde_json::from_str::<Memory>(&data) {
+                            Ok(memory) => Ok(Some(memory)),
+                            Err(e) => {
+                                warn!("Failed to deserialize memory from L2 cache: {}", e);
+                                Ok(None)
+                            }
+                        }
+                    }
+                    Ok(None) => Ok(None),
+                    Err(e) => {
+                        warn!("Failed to get memory from L2 cache: {}", e);
+                        Ok(None) // 不阻塞主流程，返回None
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to get Redis connection for L2 cache: {}", e);
+                Ok(None) // 不阻塞主流程，返回None
+            }
+        }
+    }
+
+    /// 🆕 Phase 1.2: Set memory to L2 Redis cache
+    #[cfg(feature = "redis-cache")]
+    async fn set_to_l2_cache(&self, id: &str, memory: &Memory, client: &Client) -> Result<()> {
+        let cache_key = format!("agentmem:memory:{}", id);
+        
+        // 获取TTL（根据memory_type）
+        let ttl = self.cache_config.ttl_by_type
+            .get(&memory.memory_type.to_string())
+            .copied()
+            .unwrap_or(3600); // 默认1小时
+        
+        match serde_json::to_string(memory) {
+            Ok(data) => {
+                match client.get_async_connection().await {
+                    Ok(mut conn) => {
+                        if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, data, ttl as usize).await {
+                            warn!("Failed to set memory to L2 cache: {}", e);
+                            // 不阻塞主流程，仅记录警告
+                        }
+                        Ok(())
+                    }
+                    Err(e) => {
+                        warn!("Failed to get Redis connection for L2 cache: {}", e);
+                        Ok(()) // 不阻塞主流程
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to serialize memory for L2 cache: {}", e);
+                Ok(()) // 不阻塞主流程
+            }
+        }
+    }
+
+    /// 🆕 Phase 1.2: Remove memory from L2 Redis cache
+    #[cfg(feature = "redis-cache")]
+    async fn remove_from_l2_cache(&self, id: &str, client: &Client) {
+        let cache_key = format!("agentmem:memory:{}", id);
+        
+        if let Ok(mut conn) = client.get_async_connection().await {
+            if let Err(e) = conn.del::<_, ()>(&cache_key).await {
+                warn!("Failed to delete memory from L2 cache: {}", e);
+                // 不阻塞主流程，仅记录警告
+            }
+        } else {
+            warn!("Failed to get Redis connection for L2 cache deletion");
+        }
     }
 
     /// Batch get memories by IDs (with cache optimization)

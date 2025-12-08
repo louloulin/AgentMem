@@ -863,8 +863,8 @@ impl CacheStrategy {
 - [x] 缓存统计 ✅ (已完成，包含命中率统计)
 - [x] 实现真正的LRU淘汰策略 ✅ (已完成，使用`lru::LruCache`替代简单FIFO)
 - [x] 缓存命中率计算 ✅ (已完成，`get_cache_hit_rate`方法)
-- [ ] 实现`RedisCache`作为L2缓存（可选，已有`HybridStorageManager`支持）
-- [ ] 添加缓存预热功能（可选）
+- [x] 实现`RedisCache`作为L2缓存 ✅ (已完成，集成到`UnifiedStorageCoordinator`中)
+- [x] 添加缓存预热功能 ✅ (已完成，提供`warmup_cache` API端点)
 
 **预计时间**：5天  
 **实际完成时间**：1天（L1缓存已实现，L2缓存可复用现有Redis实现）
@@ -877,7 +877,16 @@ impl CacheStrategy {
 - ✅ **真正的LRU淘汰策略**：使用`lru::LruCache`替代简单FIFO，自动淘汰最久未使用的条目
 - ✅ **缓存命中率计算**：提供`get_cache_hit_rate`方法用于监控
 - ✅ **LRU测试覆盖**：添加了`test_lru_cache_eviction`和`test_lru_cache_hit_rate`测试
-- 💡 L2缓存可复用现有的`HybridStorageManager`中的Redis实现
+- ✅ **L2 Redis缓存集成**：已集成到`UnifiedStorageCoordinator`中，支持可选的L2 Redis缓存
+  - 📍 代码位置：`crates/agent-mem-core/src/storage/coordinator.rs`
+  - ✅ 支持可选的L2 Redis缓存（通过`redis-cache` feature启用）
+  - ✅ 实现L2缓存的get/set/delete方法
+  - ✅ 实现L1缓存未命中时从L2缓存获取并回填L1的逻辑
+  - ✅ 在`add_memory`、`update_memory`、`delete_memory`中同时操作L2缓存
+  - ✅ 支持按memory_type配置不同的TTL
+  - ✅ 充分利用现有代码：基于现有的Redis客户端实现
+  - ✅ 最小改造：仅添加L2缓存字段和辅助方法
+  - ✅ 编译通过，无错误
 
 **LRU缓存改进**：
 - ✅ 从`HashMap`升级为`LruCache<String, Memory>`
@@ -1328,9 +1337,9 @@ impl IntelligentPrefetch {
    - ✅ L1内存缓存
    - ✅ 统计和监控
    - 📍 位置：`crates/agent-mem-core/src/storage/coordinator.rs`
-2. ⏳ **多级缓存系统**（提升性能）✅ **L1已完成，L2可选**
+2. ✅ **多级缓存系统**（提升性能）✅ **L1和L2已完成**
    - ✅ L1内存缓存（已集成）
-   - ⏳ L2 Redis缓存（可复用现有实现）
+   - ✅ L2 Redis缓存（已集成到`UnifiedStorageCoordinator`中）
 3. ⏳ **三维检索实现**（提升检索质量）- 待实施
 
 ### P1（重要，2周内）
@@ -1732,9 +1741,20 @@ pub struct CoordinatorStats {
 - Phase 3: 性能优化 - **100%完成** (并行查询优化 ✅, 并行写入优化 ✅, 连接池管理 ✅, SQL复合索引优化 ✅, 性能测试 ✅)
 - Phase 4: 扩展性增强 - **33%完成** (监控和可观测性增强 ✅)
 
-**总体进度**: **约71%完成** (Phase 1完成96%，Phase 2完成90%，Phase 3完成100%，Phase 4完成33%)
+**总体进度**: **约72%完成** (Phase 1完成100%，Phase 2完成90%，Phase 3完成100%，Phase 4完成33%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **L2 Redis缓存集成**：实现多级缓存系统
+  - 📍 代码位置：`crates/agent-mem-core/src/storage/coordinator.rs`
+  - ✅ 支持可选的L2 Redis缓存（通过`redis-cache` feature启用）
+  - ✅ 实现L2缓存的get/set/delete方法
+  - ✅ 实现L1缓存未命中时从L2缓存获取并回填L1的逻辑
+  - ✅ 在`add_memory`、`update_memory`、`delete_memory`中同时操作L2缓存
+  - ✅ 支持按memory_type配置不同的TTL
+  - ✅ 充分利用现有代码：基于现有的Redis客户端实现
+  - ✅ 最小改造：仅添加L2缓存字段和辅助方法
+  - ✅ 编译通过，无错误
+
 - ✅ **监控和可观测性增强**：实现真实系统指标收集
   - 📍 代码位置：`crates/agent-mem-server/src/routes/metrics.rs` (get_metrics函数)
   - ✅ 服务器运行时间跟踪：使用`OnceLock<Instant>`跟踪启动时间，计算运行时间（秒、小时、天）
