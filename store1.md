@@ -1192,7 +1192,7 @@ impl IntelligentPrefetch {
 **目标**：优化异步处理流程
 
 **任务清单**：
-- [ ] 优化并行写入
+- [x] 优化并行写入 ✅
 - [x] 优化并行查询 ✅
 - [ ] 添加连接池管理
 - [ ] 性能测试
@@ -1200,6 +1200,16 @@ impl IntelligentPrefetch {
 **预计时间**：2天
 
 **实现详情**：
+- ✅ **并行写入优化**：将批量添加和批量删除从串行改为并行处理
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (batch_add_memories, batch_delete_memories函数)
+  - ✅ 使用`futures::future::join_all`并行执行多个添加/删除操作
+  - ✅ 显著提升性能：多个写入操作并行执行，而非逐个等待
+  - ✅ 错误处理：即使部分写入失败，其他写入仍能正常完成
+  - ✅ 2个测试用例（`test_parallel_write_optimization`, `test_parallel_write_error_handling`）
+  - ✅ 充分利用现有代码：基于现有的`memory_manager.add_memory`和`delete_memory`方法
+  - ✅ 最小改造：仅将循环改为并行future集合
+  - ✅ 编译通过，无错误
+
 - ✅ **并行查询优化**：将搜索结果验证从串行改为并行批量检查
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories函数)
   - ✅ 使用`futures::future::join_all`并行执行多个`find_by_id`查询
@@ -1676,12 +1686,22 @@ pub struct CoordinatorStats {
   - LRU缓存优化 ✅ (查询结果缓存从FIFO升级为LRU，提高缓存命中率，2个测试用例)
   - 搜索超时控制 ✅ (防止搜索操作hang住，可配置超时时间，2个测试用例)
   - 质量评分 ✅ (基于内容质量、完整性和元数据丰富度的质量评分，2个测试用例)
-- Phase 3: 性能优化 - **25%完成** (并行查询优化 ✅)
+- Phase 3: 性能优化 - **50%完成** (并行查询优化 ✅, 并行写入优化 ✅)
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约57%完成** (Phase 1完成96%，Phase 2完成85%，Phase 3完成25%)
+**总体进度**: **约60%完成** (Phase 1完成96%，Phase 2完成85%，Phase 3完成50%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **并行写入优化**：将批量添加和批量删除从串行改为并行处理
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (batch_add_memories, batch_delete_memories函数)
+  - ✅ 使用`futures::future::join_all`并行执行多个添加/删除操作
+  - ✅ 显著提升性能：多个写入操作并行执行，而非逐个等待
+  - ✅ 错误处理：即使部分写入失败，其他写入仍能正常完成
+  - ✅ 2个测试用例（`test_parallel_write_optimization`, `test_parallel_write_error_handling`）
+  - ✅ 充分利用现有代码：基于现有的`memory_manager.add_memory`和`delete_memory`方法
+  - ✅ 最小改造：仅将循环改为并行future集合
+  - ✅ 编译通过，无错误
+
 - ✅ **并行查询优化**：将搜索结果验证从串行改为并行批量检查
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (search_memories函数)
   - ✅ 使用`futures::future::join_all`并行执行多个`find_by_id`查询
