@@ -19,6 +19,7 @@ pub mod stats;
 pub mod tools;
 pub mod users;
 pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait
+pub mod logs; // 🆕 Phase 4.2: 日志聚合功能
 
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
@@ -133,7 +134,10 @@ pub async fn create_router(
         .route(
             "/api/v1/stats/database/pool",
             get(stats::get_database_pool_stats),
-        );
+        )
+        // 🆕 Phase 4.2: 日志聚合路由
+        .route("/api/v1/logs/stats", get(logs::get_log_stats))
+        .route("/api/v1/logs/query", get(logs::query_logs));
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app

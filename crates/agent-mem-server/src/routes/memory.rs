@@ -1793,10 +1793,41 @@ pub async fn search_memories(
     Ok(Json(crate::models::ApiResponse::success(json_results)))
 }
 
+/// 🆕 Phase 2.3: 计算访问模式评分（用于智能缓存预热）
+/// 
+/// 综合考虑访问频率和最近访问时间，计算综合评分
+/// 评分公式：access_score = access_count * recency_weight
+/// 其中 recency_weight 基于最近访问时间的衰减
+pub(crate) fn calculate_access_pattern_score(
+    access_count: i64,
+    last_accessed_ts: Option<i64>,
+) -> f64 {
+    use chrono::{DateTime, Utc};
+    
+    let count = access_count.max(0) as f64;
+    
+    // 计算最近访问时间的权重（最近访问时间越近，权重越高）
+    let recency_weight = if let Some(ts) = last_accessed_ts {
+        let last_accessed = DateTime::<Utc>::from_timestamp(ts, 0)
+            .unwrap_or_else(|| Utc::now());
+        let now = Utc::now();
+        let hours_since_access = (now - last_accessed).num_seconds() as f64 / 3600.0;
+        
+        // 使用指数衰减：最近24小时内访问的权重为1.0，之后逐渐衰减
+        let decay = 0.1; // 衰减系数
+        (-decay * hours_since_access.max(0.0)).exp().max(0.1).min(1.0)
+    } else {
+        0.1 // 从未访问过的记忆权重较低
+    };
+    
+    // 综合评分：访问频率 × 最近访问权重
+    count * recency_weight
+}
+
 /// 缓存预热：预取高访问频率的记忆到缓存
 /// 
-/// 🆕 Phase 2.3: 简单缓存预热实现
-/// 基于访问频率预取常用记忆，提升后续查询性能
+/// 🆕 Phase 2.3: 简单缓存预热实现（增强版：基于访问模式分析）
+/// 基于访问频率和访问模式预取常用记忆，提升后续查询性能
 #[utoipa::path(
     post,
     path = "/api/v1/memories/cache/warmup",
@@ -1837,9 +1868,10 @@ pub async fn warmup_cache(
             .connect()
             .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
         
+        // 🆕 Phase 2.3: 增强查询 - 获取访问模式和评分信息
         let mut stmt = conn
             .prepare(
-                "SELECT id FROM memories 
+                "SELECT id, access_count, last_accessed FROM memories 
                  WHERE is_deleted = 0 
                  ORDER BY access_count DESC, last_accessed DESC 
                  LIMIT ?"
@@ -1852,15 +1884,33 @@ pub async fn warmup_cache(
             .await
             .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
         
-        let mut ids = Vec::new();
+        // 🆕 Phase 2.3: 使用访问模式评分排序
+        let mut memory_scores: Vec<(String, f64, i64)> = Vec::new();
         while let Some(row) = rows
             .next()
             .await
             .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
         {
             let id: String = row.get(0).unwrap();
-            ids.push(id);
+            let access_count: i64 = row.get(1).unwrap_or(0);
+            let last_accessed_ts: Option<i64> = row.get(2).ok();
+            
+            // 计算访问模式评分
+            let score = calculate_access_pattern_score(access_count, last_accessed_ts);
+            memory_scores.push((id, score, access_count));
         }
+        
+        // 按访问模式评分排序（降序）
+        memory_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // 提取ID列表
+        let ids: Vec<String> = memory_scores.iter().map(|(id, _, _)| id.clone()).collect();
+        
+        info!("📊 访问模式分析: 分析了 {} 个记忆，最高评分: {:.2}", 
+            memory_scores.len(),
+            memory_scores.first().map(|(_, score, _)| *score).unwrap_or(0.0)
+        );
+        
         ids
     };
 

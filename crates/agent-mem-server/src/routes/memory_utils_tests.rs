@@ -815,6 +815,63 @@ mod tests {
         );
     }
 
+    /// 🆕 Phase 2.3: 测试访问模式评分计算
+    #[test]
+    fn test_access_pattern_score_calculation() {
+        use crate::routes::memory::calculate_access_pattern_score;
+        use chrono::Utc;
+        
+        // 测试1: 高访问频率 + 最近访问 = 高评分
+        let now = Utc::now().timestamp();
+        let score1 = calculate_access_pattern_score(100, Some(now));
+        assert!(score1 > 50.0, "高访问频率且最近访问应该得到高评分");
+        
+        // 测试2: 高访问频率 + 很久未访问 = 中等评分
+        let old_time = now - 86400 * 7; // 7天前
+        let score2 = calculate_access_pattern_score(100, Some(old_time));
+        assert!(score2 < score1, "很久未访问的评分应该低于最近访问的");
+        assert!(score2 > 0.0, "即使很久未访问，高访问频率也应该有评分");
+        
+        // 测试3: 低访问频率 + 最近访问 = 低评分
+        let score3 = calculate_access_pattern_score(1, Some(now));
+        assert!(score3 < score1, "低访问频率应该得到较低评分");
+        
+        // 测试4: 从未访问 = 最低评分
+        let score4 = calculate_access_pattern_score(0, None);
+        assert!(score4 < score3, "从未访问应该得到最低评分");
+        
+        // 测试5: 访问频率为0但有访问时间 = 低评分
+        let score5 = calculate_access_pattern_score(0, Some(now));
+        assert!(score5 >= 0.0, "访问频率为0时评分应该 >= 0");
+    }
+
+    /// 🆕 Phase 2.3: 测试访问模式评分的时间衰减
+    #[test]
+    fn test_access_pattern_score_time_decay() {
+        use crate::routes::memory::calculate_access_pattern_score;
+        use chrono::Utc;
+        
+        let base_count = 50;
+        let now = Utc::now().timestamp();
+        
+        // 测试不同时间间隔的评分衰减
+        let score_now = calculate_access_pattern_score(base_count, Some(now));
+        let score_1h = calculate_access_pattern_score(base_count, Some(now - 3600)); // 1小时前
+        let score_24h = calculate_access_pattern_score(base_count, Some(now - 86400)); // 24小时前
+        let score_7d = calculate_access_pattern_score(base_count, Some(now - 86400 * 7)); // 7天前
+        
+        // 验证时间衰减：越近的访问评分越高
+        assert!(score_now >= score_1h, "当前访问评分应该 >= 1小时前");
+        assert!(score_1h >= score_24h, "1小时前评分应该 >= 24小时前");
+        assert!(score_24h >= score_7d, "24小时前评分应该 >= 7天前");
+        
+        // 验证所有评分都 > 0（因为有访问频率）
+        assert!(score_now > 0.0);
+        assert!(score_1h > 0.0);
+        assert!(score_24h > 0.0);
+        assert!(score_7d > 0.0);
+    }
+
     /// 测试缓存预热参数验证
     #[test]
     fn test_cache_warmup_params() {
