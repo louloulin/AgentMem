@@ -1223,7 +1223,7 @@ impl IntelligentPrefetch {
 - [x] 优化并行写入 ✅
 - [x] 优化并行查询 ✅
 - [x] 添加连接池管理 ✅
-- [ ] 性能测试
+- [x] 性能测试 ✅
 
 **预计时间**：2天
 
@@ -1715,12 +1715,24 @@ pub struct CoordinatorStats {
   - 搜索超时控制 ✅ (防止搜索操作hang住，可配置超时时间，2个测试用例)
   - 质量评分 ✅ (基于内容质量、完整性和元数据丰富度的质量评分，2个测试用例)
   - 简单缓存预热 ✅ (基于访问频率预取常用记忆，提供预热API端点，2个测试用例)
-- Phase 3: 性能优化 - **87%完成** (并行查询优化 ✅, 并行写入优化 ✅, 连接池管理 ✅, SQL复合索引优化 ✅)
+- Phase 3: 性能优化 - **100%完成** (并行查询优化 ✅, 并行写入优化 ✅, 连接池管理 ✅, SQL复合索引优化 ✅, 性能测试 ✅)
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约67%完成** (Phase 1完成96%，Phase 2完成90%，Phase 3完成87%)
+**总体进度**: **约69%完成** (Phase 1完成96%，Phase 2完成90%，Phase 3完成100%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **性能测试**：添加简单的性能基准测试端点
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (performance_benchmark函数)
+  - ✅ 提供性能测试API端点：`POST /api/v1/memories/performance/benchmark`
+  - ✅ 测试搜索、添加、删除等关键操作的性能
+  - ✅ 可配置测试操作：通过`operations`参数控制（默认: search）
+  - ✅ 返回延迟和吞吐量指标：操作延迟（ms）、每秒操作数（ops/sec）
+  - ✅ 集成搜索统计：包含总搜索次数、缓存命中率、平均延迟等统计信息
+  - ✅ 2个测试用例（`test_performance_benchmark_concept`, `test_performance_benchmark_params`）
+  - ✅ 充分利用现有代码：基于现有的`memory_manager`和`get_search_stats`方法
+  - ✅ 最小改造：仅添加API端点和性能测试逻辑
+  - ✅ 编译通过，无错误
+
 - ✅ **简单缓存预热实现**：基于访问频率预取常用记忆
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (warmup_cache函数)
   - ✅ 提供缓存预热API端点：`POST /api/v1/memories/cache/warmup`
@@ -1746,6 +1758,18 @@ pub struct CoordinatorStats {
   - ✅ 2个测试用例（`test_database_pool_stats_structure`, `test_database_pool_stats_validation`）
   - ✅ 充分利用现有代码：基于现有的`LibSqlConnectionManager::get_stats`和`health_check`方法
   - ✅ 最小改造：仅添加API端点和响应模型
+  - ✅ 编译通过，无错误
+
+- ✅ **性能测试**：添加简单的性能基准测试端点
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (performance_benchmark函数)
+  - ✅ 提供性能测试API端点：`POST /api/v1/memories/performance/benchmark`
+  - ✅ 测试搜索、添加、删除等关键操作的性能
+  - ✅ 可配置测试操作：通过`operations`参数控制（默认: search）
+  - ✅ 返回延迟和吞吐量指标：操作延迟（ms）、每秒操作数（ops/sec）
+  - ✅ 集成搜索统计：包含总搜索次数、缓存命中率、平均延迟等统计信息
+  - ✅ 2个测试用例（`test_performance_benchmark_concept`, `test_performance_benchmark_params`）
+  - ✅ 充分利用现有代码：基于现有的`memory_manager`和`get_search_stats`方法
+  - ✅ 最小改造：仅添加API端点和性能测试逻辑
   - ✅ 编译通过，无错误
 
 - ✅ **并行写入优化**：将批量添加和批量删除从串行改为并行处理

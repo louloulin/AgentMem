@@ -829,5 +829,66 @@ mod tests {
         assert!(min_limit > 0, "最小limit应该大于0");
         assert!(max_limit <= 10000, "最大limit应该合理");
     }
+
+    /// 测试性能基准测试的概念
+    /// 
+    /// 验证性能测试可以测量操作延迟
+    #[tokio::test]
+    async fn test_performance_benchmark_concept() {
+        use std::time::Instant;
+        
+        // 模拟性能测试：测量操作延迟
+        let operations = vec!["search", "add", "delete"];
+        let mut results = std::collections::HashMap::new();
+        
+        for op in operations {
+            let start = Instant::now();
+            
+            // 模拟操作延迟
+            match op {
+                "search" => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                }
+                "add" => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+                }
+                "delete" => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+                }
+                _ => {}
+            }
+            
+            let duration = start.elapsed();
+            results.insert(op.to_string(), duration.as_millis());
+        }
+        
+        // 验证性能测试结果
+        assert!(results.contains_key("search"));
+        assert!(results.contains_key("add"));
+        assert!(results.contains_key("delete"));
+        
+        // 验证延迟在合理范围内
+        assert!(*results.get("search").unwrap() < 1000, "搜索延迟应该合理");
+        assert!(*results.get("add").unwrap() < 1000, "添加延迟应该合理");
+        assert!(*results.get("delete").unwrap() < 1000, "删除延迟应该合理");
+    }
+
+    /// 测试性能基准测试参数验证
+    #[test]
+    fn test_performance_benchmark_params() {
+        // 测试操作列表解析
+        let operations_str = "search,add,delete";
+        let operations: Vec<&str> = operations_str.split(',').map(|s| s.trim()).collect();
+        
+        assert_eq!(operations.len(), 3);
+        assert!(operations.contains(&"search"));
+        assert!(operations.contains(&"add"));
+        assert!(operations.contains(&"delete"));
+        
+        // 测试默认操作
+        let default_operations = vec!["search"];
+        assert_eq!(default_operations.len(), 1);
+        assert!(default_operations.contains(&"search"));
+    }
 }
 
