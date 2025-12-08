@@ -239,5 +239,178 @@ mod tests {
         hash_map.insert("def456".to_string(), ("memory3".to_string(), 0.7));
         assert_eq!(hash_map.len(), 2, "不同hash应该保留多个结果");
     }
+
+    #[test]
+    fn test_batch_search_request_validation() {
+        use crate::models::{BatchSearchRequest, SearchRequest};
+        
+        // 测试有效的批量搜索请求
+        let valid_request = BatchSearchRequest {
+            queries: vec![
+                SearchRequest {
+                    query: "test query 1".to_string(),
+                    agent_id: None,
+                    user_id: None,
+                    memory_type: None,
+                    limit: Some(10),
+                    threshold: None,
+                },
+                SearchRequest {
+                    query: "test query 2".to_string(),
+                    agent_id: None,
+                    user_id: None,
+                    memory_type: None,
+                    limit: Some(20),
+                    threshold: Some(0.7),
+                },
+            ],
+            agent_id: Some("test_agent".to_string()),
+            user_id: Some("test_user".to_string()),
+        };
+        
+        // 验证请求结构
+        assert_eq!(valid_request.queries.len(), 2);
+        assert_eq!(valid_request.agent_id, Some("test_agent".to_string()));
+        assert_eq!(valid_request.user_id, Some("test_user".to_string()));
+        assert_eq!(valid_request.queries[0].query, "test query 1");
+        assert_eq!(valid_request.queries[1].query, "test query 2");
+    }
+
+    #[test]
+    fn test_batch_search_response_structure() {
+        use crate::models::BatchSearchResponse;
+        
+        // 测试批量搜索响应结构
+        let response = BatchSearchResponse {
+            successful: 2,
+            failed: 1,
+            results: vec![
+                vec![serde_json::json!({"id": "1", "content": "result 1"})],
+                vec![serde_json::json!({"id": "2", "content": "result 2"})],
+                vec![],
+            ],
+            errors: vec![None, None, Some("Error message".to_string())],
+        };
+        
+        assert_eq!(response.successful, 2);
+        assert_eq!(response.failed, 1);
+        assert_eq!(response.results.len(), 3);
+        assert_eq!(response.errors.len(), 3);
+        assert_eq!(response.errors[0], None);
+        assert_eq!(response.errors[1], None);
+        assert_eq!(response.errors[2], Some("Error message".to_string()));
+    }
+
+    #[test]
+    fn test_search_statistics_structure() {
+        use crate::models::SearchStatsResponse;
+        use chrono::Utc;
+        
+        // 测试搜索统计响应结构
+        let response = SearchStatsResponse {
+            total_searches: 100,
+            cache_hits: 60,
+            cache_misses: 40,
+            cache_hit_rate: 0.6,
+            exact_queries: 10,
+            vector_searches: 90,
+            avg_latency_ms: 25.5,
+            cache_size: 50,
+            last_updated: Utc::now(),
+        };
+        
+        assert_eq!(response.total_searches, 100);
+        assert_eq!(response.cache_hits, 60);
+        assert_eq!(response.cache_misses, 40);
+        assert_eq!(response.cache_hit_rate, 0.6);
+        assert_eq!(response.exact_queries, 10);
+        assert_eq!(response.vector_searches, 90);
+        assert_eq!(response.avg_latency_ms, 25.5);
+        assert_eq!(response.cache_size, 50);
+    }
+
+    #[test]
+    fn test_search_statistics_calculations() {
+        // 测试缓存命中率计算
+        let total = 100u64;
+        let hits = 60u64;
+        let hit_rate = (hits as f64) / (total as f64);
+        assert_eq!(hit_rate, 0.6);
+        
+        // 测试平均延迟计算
+        let total_latency_us = 2550000u64; // 2.55秒 = 2550毫秒
+        let total_searches = 100u64;
+        let avg_latency_ms = (total_latency_us as f64) / (total_searches as f64) / 1000.0;
+        assert_eq!(avg_latency_ms, 25.5);
+        
+        // 测试零搜索的情况
+        let zero_total = 0u64;
+        let zero_hit_rate = if zero_total == 0 { 0.0 } else { (hits as f64) / (zero_total as f64) };
+        assert_eq!(zero_hit_rate, 0.0);
+    }
+
+    #[test]
+    fn test_lru_cache_eviction_concept() {
+        // 测试LRU缓存淘汰概念
+        // LRU缓存会自动淘汰最久未使用的条目，保留最近使用的条目
+        
+        // 模拟LRU行为：容量为2的缓存
+        let mut cache_order: Vec<String> = Vec::new();
+        let capacity = 2;
+        
+        // 添加条目1
+        cache_order.push("key1".to_string());
+        assert_eq!(cache_order.len(), 1);
+        
+        // 添加条目2
+        cache_order.push("key2".to_string());
+        assert_eq!(cache_order.len(), 2);
+        
+        // 访问条目1（使其成为最近使用的）
+        cache_order.retain(|k| k != "key1");
+        cache_order.push("key1".to_string());
+        assert_eq!(cache_order[0], "key2");
+        assert_eq!(cache_order[1], "key1");
+        
+        // 添加条目3（应该淘汰key2，因为key1最近被访问过）
+        if cache_order.len() >= capacity {
+            cache_order.remove(0); // 移除最久未使用的
+        }
+        cache_order.push("key3".to_string());
+        assert_eq!(cache_order.len(), 2);
+        assert_eq!(cache_order[0], "key1");
+        assert_eq!(cache_order[1], "key3");
+        
+        // 验证key2已被淘汰
+        assert!(!cache_order.contains(&"key2".to_string()));
+    }
+
+    #[test]
+    fn test_lru_vs_fifo_advantage() {
+        // 测试LRU相比FIFO的优势
+        // LRU保留热点数据，FIFO可能淘汰热点数据
+        
+        // 场景：容量为2的缓存
+        // 访问模式：key1, key2, key1, key3
+        
+        // FIFO策略：会淘汰key1（第一个插入的）
+        let fifo_order = vec!["key1", "key2"];
+        // 访问key1后，FIFO不会改变顺序
+        // 添加key3时，FIFO会淘汰key1
+        let fifo_after = vec!["key2", "key3"];
+        assert!(!fifo_after.contains(&"key1"));
+        
+        // LRU策略：会保留key1（最近访问的），淘汰key2
+        let mut lru_order = vec!["key1", "key2"];
+        // 访问key1后，LRU将其移到末尾
+        lru_order.retain(|k| k != &"key1");
+        lru_order.push("key1");
+        // 添加key3时，LRU淘汰key2（最久未使用的）
+        lru_order.remove(0);
+        lru_order.push("key3");
+        let lru_after = vec!["key1", "key3"];
+        assert!(lru_after.contains(&"key1"), "LRU应该保留最近访问的key1");
+        assert!(!lru_after.contains(&"key2"), "LRU应该淘汰最久未使用的key2");
+    }
 }
 

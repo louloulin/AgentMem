@@ -48,6 +48,9 @@ tracing-appender = "0.2"
 
 # Error handling
 anyhow = "1.0"
+
+# LRU cache
+lru = "0.12"
 thiserror = "1.0"
 
 # Authentication and security

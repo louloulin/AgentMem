@@ -94,6 +94,14 @@ pub async fn create_router(
             "/api/v1/memories/batch/delete",
             post(memory::batch_delete_memories),
         )
+        .route(
+            "/api/v1/memories/search/batch",
+            post(memory::batch_search_memories),
+        )
+        .route(
+            "/api/v1/memories/search/stats",
+            get(memory::get_search_statistics),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))

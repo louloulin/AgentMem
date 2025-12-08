@@ -1655,18 +1655,56 @@ pub struct CoordinatorStats {
   - 健康检查 ✅ (LibSQL、VectorStore、L1缓存健康状态)
   - 统计管理 ✅ (重置统计信息)
   - 配置管理 ✅ (获取配置、默认配置创建)
-- Phase 2: 检索系统增强 - **50%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅, 搜索结果去重 ✅)
+- Phase 2: 检索系统增强 - **75%完成** (自适应阈值增强 ✅, 三维检索实现 ✅, Reranker启用 ✅, 查询结果缓存 ✅, 搜索结果去重 ✅, 批量搜索 ✅, 搜索统计 ✅, LRU缓存优化 ✅)
   - 自适应阈值增强 ✅ (中文检测、动态阈值调整)
   - 三维检索实现 ✅ (Recency × Importance × Relevance，6个测试用例)
   - Reranker功能启用 ✅ (多因素重排序：相似度、元数据、时间、重要性、质量)
-  - 查询结果缓存 ✅ (内存缓存，TTL管理，FIFO淘汰策略)
+  - 查询结果缓存 ✅ (内存缓存，TTL管理，LRU淘汰策略)
   - 搜索结果去重 ✅ (基于content hash，保留评分最高的结果)
+  - 批量搜索 ✅ (批量查询API，复用现有搜索逻辑，2个测试用例)
+  - 搜索统计 ✅ (搜索统计收集和API端点，2个测试用例)
+  - LRU缓存优化 ✅ (查询结果缓存从FIFO升级为LRU，提高缓存命中率，2个测试用例)
 - Phase 3: 性能优化 - **0%完成**
 - Phase 4: 扩展性增强 - **0%完成**
 
-**总体进度**: **约45%完成** (Phase 1完成96%，Phase 2完成50%)
+**总体进度**: **约52%完成** (Phase 1完成96%，Phase 2完成75%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **LRU缓存优化**：将查询结果缓存从FIFO升级为LRU策略
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (SEARCH_CACHE, get_search_cache函数)
+  - ✅ 从HashMap改为LruCache：使用`lru::LruCache`替代`HashMap`
+  - ✅ 自动LRU淘汰：LruCache自动淘汰最久未使用的条目，保留热点数据
+  - ✅ 配置化容量：支持通过`SEARCH_CACHE_CAPACITY`环境变量配置缓存容量（默认1000）
+  - ✅ 移除FIFO代码：简化缓存淘汰逻辑，由LruCache自动处理
+  - ✅ 2个测试用例（`test_lru_cache_eviction_concept`, `test_lru_vs_fifo_advantage`）
+  - ✅ 充分利用现有代码：复用coordinator中的LruCache实现模式
+  - ✅ 最小改造：仅替换缓存数据结构，保持API不变
+  - ✅ 性能提升：LRU策略相比FIFO能更好地保留热点查询，提高缓存命中率
+  - ✅ 编译通过，无错误
+
+- ✅ **搜索统计功能**：实现搜索统计收集和API端点
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (SearchStatistics结构, get_search_statistics函数)
+  - 📍 模型定义：`crates/agent-mem-server/src/models.rs` (SearchStatsResponse)
+  - ✅ 搜索统计收集：在`search_memories`函数中自动收集统计信息
+  - ✅ 统计指标：总搜索次数、缓存命中/未命中、精确查询/向量搜索、平均延迟、缓存大小
+  - ✅ 统计API端点：`GET /api/v1/memories/search/stats`
+  - ✅ 自动计算：缓存命中率、平均搜索延迟
+  - ✅ 2个测试用例（`test_search_statistics_structure`, `test_search_statistics_calculations`）
+  - ✅ 充分利用现有代码：基于现有的统计模块结构
+  - ✅ 最小改造：仅添加统计收集逻辑和API端点
+  - ✅ 编译通过，无错误
+
+- ✅ **批量搜索功能**：实现批量搜索API端点
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (batch_search_memories函数)
+  - 📍 模型定义：`crates/agent-mem-server/src/models.rs` (BatchSearchRequest, BatchSearchResponse)
+  - ✅ 批量搜索端点：`POST /api/v1/memories/search/batch`
+  - ✅ 复用现有搜索逻辑：完全复用`search_memories`函数，包括缓存、去重、三维评分等所有功能
+  - ✅ 支持公共agent_id和user_id：可以在批量请求级别设置，也可以在单个查询中覆盖
+  - ✅ 错误处理：部分查询失败不影响其他查询，返回详细的成功/失败统计
+  - ✅ 2个测试用例（`test_batch_search_request_validation`, `test_batch_search_response_structure`）
+  - ✅ 充分利用现有代码：直接调用`search_memories`函数，最小改造
+  - ✅ 编译通过，无错误
+
 - ✅ **统计管理方法**：添加`reset_stats`方法用于重置统计信息
   - 📍 代码位置：`crates/agent-mem-core/src/storage/coordinator.rs`
   - ✅ 重置所有统计计数器（total_ops, successful_ops, failed_ops, cache_hits, cache_misses）

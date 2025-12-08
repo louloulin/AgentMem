@@ -92,6 +92,38 @@ pub struct SearchResponse {
     pub total: usize,
 }
 
+/// Request for batch search operations
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+pub struct BatchSearchRequest {
+    /// List of search queries
+    #[validate(length(min = 1, max = 50))]
+    pub queries: Vec<SearchRequest>,
+
+    /// Common agent ID (optional, can be overridden by individual queries)
+    #[validate(length(max = 255))]
+    pub agent_id: Option<String>,
+
+    /// Common user ID (optional, can be overridden by individual queries)
+    #[validate(length(max = 255))]
+    pub user_id: Option<String>,
+}
+
+/// Response for batch search operations
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct BatchSearchResponse {
+    /// Number of successful searches
+    pub successful: usize,
+
+    /// Number of failed searches
+    pub failed: usize,
+
+    /// Search results for each query (in order)
+    pub results: Vec<Vec<serde_json::Value>>,
+
+    /// Error messages for failed searches (in order, None if successful)
+    pub errors: Vec<Option<String>>,
+}
+
 /// Request for batch operations
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct BatchRequest {
@@ -114,6 +146,37 @@ pub struct BatchResponse {
 
     /// Error messages from failed operations
     pub errors: Vec<String>,
+}
+
+/// Search statistics response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SearchStatsResponse {
+    /// Total number of searches
+    pub total_searches: u64,
+
+    /// Number of cache hits
+    pub cache_hits: u64,
+
+    /// Number of cache misses
+    pub cache_misses: u64,
+
+    /// Cache hit rate (0.0 to 1.0)
+    pub cache_hit_rate: f64,
+
+    /// Number of exact queries (LibSQL)
+    pub exact_queries: u64,
+
+    /// Number of vector searches
+    pub vector_searches: u64,
+
+    /// Average search latency in milliseconds
+    pub avg_latency_ms: f64,
+
+    /// Current cache size
+    pub cache_size: usize,
+
+    /// Timestamp of last update
+    pub last_updated: DateTime<Utc>,
 }
 
 /// Component health status

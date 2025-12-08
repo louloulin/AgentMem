@@ -12,8 +12,8 @@
 use crate::{
     error::{ServerError, ServerResult},
     models::{
-        BatchRequest, BatchResponse, MemoryRequest, MemoryResponse, SearchRequest, SearchResponse,
-        UpdateMemoryRequest,
+        BatchRequest, BatchResponse, BatchSearchRequest, BatchSearchResponse, MemoryRequest,
+        MemoryResponse, SearchRequest, SearchResponse, UpdateMemoryRequest,
     },
 };
 use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions};
@@ -23,9 +23,11 @@ use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, Searc
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use lru::LruCache;
 
 /// 查询结果缓存条目
 #[derive(Debug, Clone)]
@@ -52,15 +54,86 @@ impl CachedSearchResult {
     }
 }
 
-/// 查询结果缓存（全局单例）
-static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<HashMap<String, CachedSearchResult>>>> =
+/// 查询结果缓存（全局单例，使用LRU策略）
+static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<LruCache<String, CachedSearchResult>>>> =
     std::sync::OnceLock::new();
 
+/// 搜索统计信息（全局单例）
+#[derive(Debug, Clone)]
+struct SearchStatistics {
+    /// 总搜索次数
+    total_searches: u64,
+    /// 缓存命中次数
+    cache_hits: u64,
+    /// 缓存未命中次数
+    cache_misses: u64,
+    /// 精确查询次数（LibSQL）
+    exact_queries: u64,
+    /// 向量搜索次数
+    vector_searches: u64,
+    /// 总搜索延迟（微秒）
+    total_latency_us: u64,
+    /// 最后更新时间
+    last_updated: Instant,
+}
+
+impl SearchStatistics {
+    fn new() -> Self {
+        Self {
+            total_searches: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+            exact_queries: 0,
+            vector_searches: 0,
+            total_latency_us: 0,
+            last_updated: Instant::now(),
+        }
+    }
+
+    fn default() -> Self {
+        Self::new()
+    }
+
+    /// 获取缓存命中率
+    fn cache_hit_rate(&self) -> f64 {
+        if self.total_searches == 0 {
+            return 0.0;
+        }
+        (self.cache_hits as f64) / (self.total_searches as f64)
+    }
+
+    /// 获取平均搜索延迟（毫秒）
+    fn avg_latency_ms(&self) -> f64 {
+        if self.total_searches == 0 {
+            return 0.0;
+        }
+        (self.total_latency_us as f64) / (self.total_searches as f64) / 1000.0
+    }
+}
+
+/// 搜索统计（全局单例）
+static SEARCH_STATS: std::sync::OnceLock<Arc<RwLock<SearchStatistics>>> =
+    std::sync::OnceLock::new();
+
+/// 获取搜索统计
+fn get_search_stats() -> Arc<RwLock<SearchStatistics>> {
+    SEARCH_STATS.get_or_init(|| {
+        Arc::new(RwLock::new(SearchStatistics::new()))
+    }).clone()
+}
+
 /// 获取查询结果缓存
-fn get_search_cache() -> Arc<RwLock<HashMap<String, CachedSearchResult>>> {
+fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
     // OnceLock::get_or_init 返回 &T，可以直接 clone Arc
     SEARCH_CACHE.get_or_init(|| {
-        Arc::new(RwLock::new(HashMap::new()))
+        // 默认缓存容量：1000个条目
+        let capacity = std::env::var("SEARCH_CACHE_CAPACITY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1000);
+        let cache_capacity = NonZeroUsize::new(capacity)
+            .unwrap_or(NonZeroUsize::new(1000).unwrap());
+        Arc::new(RwLock::new(LruCache::new(cache_capacity)))
     }).clone()
 }
 
@@ -1238,6 +1311,10 @@ pub async fn search_memories(
 ) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
     info!("🔍 搜索记忆: query={}", request.query);
 
+    // 🆕 Phase 2.7: 搜索统计收集 - 记录搜索开始时间
+    let search_start = Instant::now();
+    let stats = get_search_stats();
+
     // 🎯 Phase 1: LibSQL精确查询（商品ID等）
     let is_exact_query = detect_exact_query(&request.query);
 
@@ -1249,6 +1326,17 @@ pub async fn search_memories(
         match search_by_libsql_exact(&repositories, &request.query, limit).await {
             Ok(json_results) if !json_results.is_empty() => {
                 info!("✅ LibSQL精确匹配找到 {} 条结果", json_results.len());
+                
+                // 🆕 Phase 2.7: 更新统计（精确查询）
+                let search_latency = search_start.elapsed();
+                {
+                    let mut stats_write = stats.write().await;
+                    stats_write.total_searches += 1;
+                    stats_write.exact_queries += 1;
+                    stats_write.total_latency_us += search_latency.as_micros() as u64;
+                    stats_write.last_updated = Instant::now();
+                }
+                
                 return Ok(Json(crate::models::ApiResponse::success(json_results)));
             }
             Ok(_) => {
@@ -1282,23 +1370,44 @@ pub async fn search_memories(
             .unwrap_or(300), // 默认5分钟
     );
     
-    // 检查缓存
-    {
-        let cache_read = cache.read().await;
-        if let Some(cached) = cache_read.get(&cache_key) {
+    // 检查缓存（LruCache的get需要&mut，所以使用write锁）
+    let cache_hit = {
+        let mut cache_write = cache.write().await;
+        if let Some(cached) = cache_write.get(&cache_key) {
             if !cached.is_expired() {
                 info!("💾 缓存命中: query='{}', cache_key={}", request.query, cache_key);
+                
+                // 🆕 Phase 2.7: 更新统计（缓存命中）
+                let search_latency = search_start.elapsed();
+                {
+                    let mut stats_write = stats.write().await;
+                    stats_write.total_searches += 1;
+                    stats_write.cache_hits += 1;
+                    stats_write.vector_searches += 1;
+                    stats_write.total_latency_us += search_latency.as_micros() as u64;
+                    stats_write.last_updated = Instant::now();
+                }
+                
                 return Ok(Json(crate::models::ApiResponse::success(cached.results.clone())));
             } else {
                 // 缓存过期，删除
-                drop(cache_read);
-                let mut cache_write = cache.write().await;
-                cache_write.remove(&cache_key);
+                cache_write.pop(&cache_key);
+                false
             }
+        } else {
+            false
+        }
+    };
+    
+    if !cache_hit {
+        info!("💾 缓存未命中，执行搜索: query='{}'", request.query);
+        
+        // 🆕 Phase 2.7: 更新统计（缓存未命中）
+        {
+            let mut stats_write = stats.write().await;
+            stats_write.cache_misses += 1;
         }
     }
-    
-    info!("💾 缓存未命中，执行搜索: query='{}'", request.query);
     
     // 🔧 增强：计算自适应阈值用于后续过滤
     let adaptive_threshold = get_adaptive_threshold(&request.query);
@@ -1504,27 +1613,32 @@ pub async fn search_memories(
         })
         .collect();
 
-    // 🆕 Phase 2.4: 保存结果到缓存
+    // 🆕 Phase 2.4: 保存结果到缓存（使用LRU策略）
     {
         let mut cache_write = cache.write().await;
-        // 限制缓存大小（最多1000个条目）
-        if cache_write.len() >= 1000 {
-            // 清理过期条目
-            cache_write.retain(|_, v| !v.is_expired());
-            // 如果还是太多，删除最旧的条目（简单FIFO策略）
-            if cache_write.len() >= 1000 {
-                let keys_to_remove: Vec<String> = cache_write
-                    .iter()
-                    .take(cache_write.len() - 900) // 保留900个，删除多余的
-                    .map(|(k, _)| k.clone())
-                    .collect();
-                for key in keys_to_remove {
-                    cache_write.remove(&key);
-                }
-            }
+        // LRU缓存会自动处理容量限制，但我们需要清理过期条目
+        // 先清理过期条目（LruCache不支持retain，需要手动清理）
+        let expired_keys: Vec<String> = cache_write
+            .iter()
+            .filter(|(_, v)| v.is_expired())
+            .map(|(k, _)| k.clone())
+            .collect();
+        for key in expired_keys {
+            cache_write.pop(&key);
         }
-        cache_write.insert(cache_key, CachedSearchResult::new(json_results.clone(), cache_ttl));
+        // 插入新结果（LRU会自动淘汰最久未使用的条目）
+        cache_write.put(cache_key, CachedSearchResult::new(json_results.clone(), cache_ttl));
         info!("💾 结果已缓存: query='{}', cache_size={}", query_clone, cache_write.len());
+    }
+
+    // 🆕 Phase 2.7: 更新统计（向量搜索完成）
+    let search_latency = search_start.elapsed();
+    {
+        let mut stats_write = stats.write().await;
+        stats_write.total_searches += 1;
+        stats_write.vector_searches += 1;
+        stats_write.total_latency_us += search_latency.as_micros() as u64;
+        stats_write.last_updated = Instant::now();
     }
 
     Ok(Json(crate::models::ApiResponse::success(json_results)))
@@ -1668,6 +1782,125 @@ pub async fn batch_delete_memories(
     };
 
     Ok(Json(response))
+}
+
+/// 批量搜索记忆（🆕 Phase 2.6: 批量搜索功能）
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/search/batch",
+    tag = "batch",
+    request_body = crate::models::BatchSearchRequest,
+    responses(
+        (status = 200, description = "Batch search completed", body = crate::models::BatchSearchResponse),
+        (status = 400, description = "Invalid batch search request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn batch_search_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Json(request): Json<crate::models::BatchSearchRequest>,
+) -> ServerResult<Json<crate::models::BatchSearchResponse>> {
+    info!("🔍 批量搜索记忆: {} 个查询", request.queries.len());
+
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
+    let mut successful = 0;
+    let mut failed = 0;
+
+    // 为每个查询执行搜索（复用现有的search_memories逻辑）
+    for search_req in request.queries {
+        // 合并公共的agent_id和user_id（如果查询中没有指定）
+        let agent_id = search_req.agent_id.or(request.agent_id.clone());
+        let user_id = search_req.user_id.or(request.user_id.clone());
+
+        // 构建完整的SearchRequest
+        let full_search_req = crate::models::SearchRequest {
+            query: search_req.query,
+            agent_id,
+            user_id,
+            memory_type: search_req.memory_type,
+            limit: search_req.limit,
+            threshold: search_req.threshold,
+        };
+
+        // 调用现有的search_memories函数
+        match search_memories(
+            Extension(memory_manager.clone()),
+            Extension(repositories.clone()),
+            Json(full_search_req),
+        )
+        .await
+        {
+            Ok(Json(api_response)) => {
+                // 提取results字段（data是Vec<serde_json::Value>）
+                results.push(api_response.data);
+                errors.push(None);
+                successful += 1;
+            }
+            Err(e) => {
+                let error_msg = format!("搜索失败: {}", e);
+                error!("{}", error_msg);
+                results.push(Vec::new());
+                errors.push(Some(error_msg));
+                failed += 1;
+            }
+        }
+    }
+
+    let response = crate::models::BatchSearchResponse {
+        successful,
+        failed,
+        results,
+        errors,
+    };
+
+    info!("✅ 批量搜索完成: 成功 {} 个, 失败 {} 个", successful, failed);
+    Ok(Json(response))
+}
+
+/// 获取搜索统计信息（🆕 Phase 2.7: 搜索统计功能）
+#[utoipa::path(
+    get,
+    path = "/api/v1/memories/search/stats",
+    tag = "memory",
+    responses(
+        (status = 200, description = "Search statistics retrieved successfully", body = crate::models::SearchStatsResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_search_statistics(
+) -> ServerResult<Json<crate::models::ApiResponse<crate::models::SearchStatsResponse>>> {
+    info!("📊 获取搜索统计信息");
+
+    let stats = get_search_stats();
+    let cache = get_search_cache();
+
+    // 读取统计信息
+    let stats_read = stats.read().await;
+    let cache_size = {
+        let cache_read = cache.write().await; // LruCache的len()需要&mut
+        cache_read.len()
+    };
+
+    let response = crate::models::SearchStatsResponse {
+        total_searches: stats_read.total_searches,
+        cache_hits: stats_read.cache_hits,
+        cache_misses: stats_read.cache_misses,
+        cache_hit_rate: stats_read.cache_hit_rate(),
+        exact_queries: stats_read.exact_queries,
+        vector_searches: stats_read.vector_searches,
+        avg_latency_ms: stats_read.avg_latency_ms(),
+        cache_size,
+        last_updated: chrono::Utc::now(), // 使用当前时间，因为Instant不能序列化
+    };
+
+    info!("📊 搜索统计: 总数={}, 缓存命中率={:.2}%, 平均延迟={:.2}ms", 
+        response.total_searches, 
+        response.cache_hit_rate * 100.0,
+        response.avg_latency_ms);
+
+    Ok(Json(crate::models::ApiResponse::success(response)))
 }
 
 /// 获取特定Agent的所有记忆
