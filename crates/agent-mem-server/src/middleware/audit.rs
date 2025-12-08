@@ -22,6 +22,7 @@ use tracing::{debug, info, warn};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLog {
     pub timestamp: i64,
+    pub trace_id: Option<String>, // 🆕 Phase 4.2: 请求追踪ID
     pub user_id: Option<String>,
     pub organization_id: Option<String>,
     pub action: String,
@@ -172,10 +173,28 @@ fn extract_ip_address<B>(request: &axum::http::Request<B>) -> Option<String> {
     None
 }
 
+/// 🆕 Phase 4.2: 生成或提取trace_id
+fn get_or_generate_trace_id(request: &Request) -> String {
+    // 尝试从请求头获取trace_id（支持分布式追踪）
+    if let Some(trace_header) = request.headers().get("x-trace-id") {
+        if let Ok(trace_id) = trace_header.to_str() {
+            if !trace_id.is_empty() {
+                return trace_id.to_string();
+            }
+        }
+    }
+    
+    // 如果不存在，生成新的trace_id
+    uuid::Uuid::new_v4().to_string()
+}
+
 /// Audit logging middleware
 pub async fn audit_logging_middleware(request: Request, next: Next) -> Response {
     let start = Instant::now();
     let timestamp = Utc::now().timestamp();
+
+    // 🆕 Phase 4.2: 生成或提取trace_id
+    let trace_id = get_or_generate_trace_id(&request);
 
     // Extract request information
     let method = request.method().to_string();
@@ -195,7 +214,15 @@ pub async fn audit_logging_middleware(request: Request, next: Next) -> Response 
     let organization_id = auth_user.as_ref().map(|u| u.org_id.clone());
 
     // Process request
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
+
+    // 🆕 Phase 4.2: 在响应头中添加trace_id
+    response.headers_mut().insert(
+        axum::http::HeaderName::from_static("x-trace-id"),
+        axum::http::HeaderValue::from_str(&trace_id).unwrap_or_else(|_| {
+            axum::http::HeaderValue::from_static("unknown")
+        }),
+    );
 
     // Calculate duration
     let duration_ms = start.elapsed().as_millis() as u64;
@@ -207,6 +234,7 @@ pub async fn audit_logging_middleware(request: Request, next: Next) -> Response 
     // Create audit log entry
     let audit_log = AuditLog {
         timestamp,
+        trace_id: Some(trace_id), // 🆕 Phase 4.2: 添加trace_id
         user_id,
         organization_id,
         action,

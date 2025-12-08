@@ -4,8 +4,9 @@
 //! 提供日志统计、查询和聚合分析功能
 
 use crate::error::{ServerError, ServerResult};
+use crate::middleware::audit::AuditLog;
 use crate::models;
-use axum::{extract::Query, response::Json};
+use axum::{extract::{Path as AxumPath, Query}, response::Json};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -236,6 +237,123 @@ pub async fn query_logs(
     Ok(Json(models::ApiResponse::success(response)))
 }
 
+/// 🆕 Phase 4.2: 请求追踪响应
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TraceResponse {
+    /// Trace ID
+    pub trace_id: String,
+    /// 追踪的请求列表（按时间排序）
+    pub requests: Vec<TraceRequest>,
+    /// 总请求数
+    pub total_requests: usize,
+    /// 总耗时（毫秒）
+    pub total_duration_ms: u64,
+    /// 是否有错误
+    pub has_errors: bool,
+    /// 时间戳
+    pub timestamp: DateTime<Utc>,
+}
+
+/// 追踪的请求信息
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TraceRequest {
+    /// 请求时间戳
+    pub timestamp: i64,
+    /// HTTP方法
+    pub method: String,
+    /// 请求路径
+    pub path: String,
+    /// 状态码
+    pub status_code: u16,
+    /// 耗时（毫秒）
+    pub duration_ms: u64,
+    /// 用户ID（如果有）
+    pub user_id: Option<String>,
+    /// 错误信息（如果有）
+    pub error: Option<String>,
+}
+
+/// 🆕 Phase 4.2: 查询请求追踪信息
+/// 
+/// 基于audit日志查询特定trace_id的所有请求
+#[utoipa::path(
+    get,
+    path = "/api/v1/traces/{trace_id}",
+    tag = "traces",
+    params(
+        ("trace_id" = String, Path, description = "Trace ID to query")
+    ),
+    responses(
+        (status = 200, description = "Trace information retrieved successfully", body = TraceResponse),
+        (status = 404, description = "Trace not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_trace(
+    AxumPath(trace_id): AxumPath<String>,
+) -> ServerResult<Json<models::ApiResponse<TraceResponse>>> {
+    info!("🔍 查询请求追踪: trace_id={}", trace_id);
+
+    // 确定audit日志文件路径（查询最近7天的日志）
+    let mut all_requests = Vec::new();
+    let today = chrono::Local::now().date_naive();
+    
+    // 查询最近7天的audit日志
+    for day_offset in 0..7 {
+        let date = today - chrono::Days::new(day_offset);
+        let log_file = format!("logs/audit/audit-{}.jsonl", date.format("%Y-%m-%d"));
+        
+        if !Path::new(&log_file).exists() {
+            continue;
+        }
+        
+        // 读取audit日志文件
+        if let Ok(content) = fs::read_to_string(&log_file).await {
+            for line in content.lines() {
+                if let Ok(audit_log) = serde_json::from_str::<AuditLog>(line) {
+                    // 匹配trace_id
+                    if audit_log.trace_id.as_ref().map(|t| t == &trace_id).unwrap_or(false) {
+                        all_requests.push(TraceRequest {
+                            timestamp: audit_log.timestamp,
+                            method: audit_log.method,
+                            path: audit_log.path,
+                            status_code: audit_log.status_code,
+                            duration_ms: audit_log.duration_ms,
+                            user_id: audit_log.user_id,
+                            error: audit_log.error,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    // 按时间排序
+    all_requests.sort_by_key(|r| r.timestamp);
+    
+    if all_requests.is_empty() {
+        return Err(ServerError::NotFound(format!("Trace {} not found", trace_id)));
+    }
+    
+    // 计算总耗时和错误状态
+    let total_duration_ms = all_requests.iter().map(|r| r.duration_ms).sum();
+    let has_errors = all_requests.iter().any(|r| r.status_code >= 400);
+    
+    let response = TraceResponse {
+        trace_id,
+        requests: all_requests.clone(),
+        total_requests: all_requests.len(),
+        total_duration_ms,
+        has_errors,
+        timestamp: Utc::now(),
+    };
+    
+    info!("✅ 追踪查询完成: trace_id={}, 请求数={}, 总耗时={}ms", 
+        response.trace_id, response.total_requests, response.total_duration_ms);
+    
+    Ok(Json(models::ApiResponse::success(response)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,6 +429,84 @@ mod tests {
             .collect();
         assert_eq!(warn_lines.len(), 1);
         assert!(warn_lines[0].contains("WARN"));
+    }
+
+    /// 🆕 Phase 4.2: 测试请求追踪响应结构
+    #[test]
+    fn test_trace_response_structure() {
+        let response = TraceResponse {
+            trace_id: "test-trace-id".to_string(),
+            requests: vec![
+                TraceRequest {
+                    timestamp: 1234567890,
+                    method: "GET".to_string(),
+                    path: "/api/v1/memories".to_string(),
+                    status_code: 200,
+                    duration_ms: 50,
+                    user_id: Some("user1".to_string()),
+                    error: None,
+                },
+                TraceRequest {
+                    timestamp: 1234567900,
+                    method: "POST".to_string(),
+                    path: "/api/v1/memories".to_string(),
+                    status_code: 201,
+                    duration_ms: 100,
+                    user_id: Some("user1".to_string()),
+                    error: None,
+                },
+            ],
+            total_requests: 2,
+            total_duration_ms: 150,
+            has_errors: false,
+            timestamp: Utc::now(),
+        };
+
+        assert_eq!(response.trace_id, "test-trace-id");
+        assert_eq!(response.total_requests, 2);
+        assert_eq!(response.total_duration_ms, 150);
+        assert!(!response.has_errors);
+
+        // 验证序列化
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("trace_id"));
+        assert!(json.contains("requests"));
+        assert!(json.contains("total_requests"));
+    }
+
+    /// 🆕 Phase 4.2: 测试请求追踪错误检测
+    #[test]
+    fn test_trace_error_detection() {
+        let response_with_errors = TraceResponse {
+            trace_id: "test-trace-id".to_string(),
+            requests: vec![
+                TraceRequest {
+                    timestamp: 1234567890,
+                    method: "GET".to_string(),
+                    path: "/api/v1/memories".to_string(),
+                    status_code: 200,
+                    duration_ms: 50,
+                    user_id: None,
+                    error: None,
+                },
+                TraceRequest {
+                    timestamp: 1234567900,
+                    method: "GET".to_string(),
+                    path: "/api/v1/memories/invalid".to_string(),
+                    status_code: 404,
+                    duration_ms: 10,
+                    user_id: None,
+                    error: Some("HTTP 404".to_string()),
+                },
+            ],
+            total_requests: 2,
+            total_duration_ms: 60,
+            has_errors: true,
+            timestamp: Utc::now(),
+        };
+
+        assert!(response_with_errors.has_errors, "应该检测到错误");
+        assert_eq!(response_with_errors.requests[1].status_code, 404);
     }
 }
 

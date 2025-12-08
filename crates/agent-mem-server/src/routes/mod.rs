@@ -144,6 +144,8 @@ pub async fn create_router(
         // 🆕 Phase 4.2: 日志聚合路由
         .route("/api/v1/logs/stats", get(logs::get_log_stats))
         .route("/api/v1/logs/query", get(logs::query_logs))
+        // 🆕 Phase 4.2: 请求追踪路由
+        .route("/api/v1/traces/:trace_id", get(logs::get_trace))
         // 🆕 Phase 4.2: 性能分析路由
         .route("/api/v1/performance/analysis", get(performance::get_performance_analysis))
         // 🆕 Phase 2.3: 记忆预测路由
@@ -411,6 +413,9 @@ pub async fn create_router(
         stats::get_memory_quality_stats,
         stats::get_database_pool_stats,
         stats::get_index_performance_stats,
+        logs::get_log_stats,
+        logs::query_logs,
+        logs::get_trace,
     ),
     components(
         schemas(
@@ -433,6 +438,8 @@ pub async fn create_router(
             stats::IndexInfo,
             stats::OptimizationRecommendation,
             stats::PerformanceMetrics,
+            logs::TraceResponse,
+            logs::TraceRequest,
             users::RegisterRequest,
             users::LoginRequest,
             users::LoginResponse,
