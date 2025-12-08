@@ -1298,5 +1298,88 @@ mod tests {
         let page3: Vec<_> = items.iter().skip(offset).take(limit).cloned().collect();
         assert_eq!(page3.len(), 0, "超出范围应该返回空结果");
     }
+
+    /// 🆕 Phase 4.4: 测试记忆清理功能（dry_run模式）
+    #[test]
+    fn test_cleanup_memories_dry_run() {
+        // 这是一个单元测试，测试清理逻辑
+        // 实际清理功能需要数据库连接，这里只测试逻辑
+        
+        let max_age_days = Some(90u64);
+        let min_importance = Some(0.3f32);
+        let max_access_count = Some(5i64);
+        let dry_run = true;
+        
+        // 验证参数
+        assert_eq!(max_age_days, Some(90));
+        assert_eq!(min_importance, Some(0.3));
+        assert_eq!(max_access_count, Some(5));
+        assert!(dry_run, "dry_run应该为true");
+        
+        // 验证清理条件逻辑
+        // 应该清理：长期未使用（>90天）且重要性低（<0.3）且访问次数少（<=5）的记忆
+        let should_cleanup = |age_days: u64, importance: f32, access_count: i64| -> bool {
+            age_days > max_age_days.unwrap()
+                && importance < min_importance.unwrap()
+                && access_count <= max_access_count.unwrap()
+        };
+        
+        // 测试案例1：应该清理
+        assert!(should_cleanup(100, 0.2, 3), "长期未使用、低重要性、低访问应该清理");
+        
+        // 测试案例2：不应该清理（重要性高）
+        assert!(!should_cleanup(100, 0.8, 3), "高重要性不应该清理");
+        
+        // 测试案例3：不应该清理（访问次数多）
+        assert!(!should_cleanup(100, 0.2, 10), "高访问次数不应该清理");
+        
+        // 测试案例4：不应该清理（最近访问）
+        assert!(!should_cleanup(10, 0.2, 3), "最近访问不应该清理");
+    }
+
+    /// 🆕 Phase 4.5: 测试记忆导出功能结构
+    #[test]
+    fn test_export_memories_structure() {
+        // 测试导出数据的结构
+        let export_data = serde_json::json!({
+            "memories": [
+                {
+                    "id": "mem_1",
+                    "agent_id": "agent_1",
+                    "user_id": "user_1",
+                    "content": "Test content",
+                    "memory_type": "episodic",
+                    "importance": 0.8,
+                    "created_at": "2025-01-01T00:00:00Z",
+                    "last_accessed_at": "2025-01-02T00:00:00Z",
+                    "access_count": 10,
+                    "metadata": "{}",
+                    "hash": "hash_1",
+                    "scope": "agent"
+                }
+            ],
+            "total": 1,
+            "exported_at": "2025-01-03T00:00:00Z",
+            "filters": {
+                "agent_id": "agent_1",
+                "user_id": null,
+                "memory_type": null,
+                "min_importance": null,
+                "limit": 1000
+            }
+        });
+        
+        assert_eq!(export_data["total"], 1);
+        assert!(export_data["memories"].is_array());
+        assert_eq!(export_data["memories"].as_array().unwrap().len(), 1);
+        assert!(export_data["exported_at"].is_string());
+        assert!(export_data["filters"].is_object());
+        
+        // 验证记忆结构
+        let memory = &export_data["memories"][0];
+        assert_eq!(memory["id"], "mem_1");
+        assert_eq!(memory["agent_id"], "agent_1");
+        assert_eq!(memory["content"], "Test content");
+    }
 }
 

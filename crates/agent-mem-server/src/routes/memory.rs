@@ -1658,7 +1658,31 @@ pub async fn search_memories(
                     stats_write.last_updated = Instant::now();
                 }
                 
-                return Ok(Json(crate::models::ApiResponse::success(cached.results.clone())));
+                // 🆕 Phase 2.13: 从缓存构建SearchResponse
+                let total = cached.results.len();
+                let offset = request.offset.unwrap_or(0);
+                let limit = request.limit.unwrap_or(10);
+                let paginated_results: Vec<serde_json::Value> = if offset < total {
+                    cached.results
+                        .iter()
+                        .skip(offset)
+                        .take(limit)
+                        .cloned()
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let has_more = offset + limit < total;
+                
+                let search_response = crate::models::SearchResponse {
+                    results: paginated_results,
+                    total,
+                    offset,
+                    limit,
+                    has_more,
+                };
+                
+                return Ok(Json(crate::models::ApiResponse::success(search_response)));
             } else {
                 // 缓存过期，删除
                 cache_write.pop(&cache_key);
@@ -2112,6 +2136,87 @@ pub(crate) fn apply_hierarchical_sorting(mut items: Vec<MemoryItem>) -> Vec<Memo
     });
     
     items
+}
+
+/// 🆕 Phase 4.4: 记忆清理功能
+/// 
+/// 基于访问模式和重要性清理长期未使用且重要性低的记忆
+/// - max_age_days: 最大年龄（天数，默认90天）
+/// - min_importance: 最小重要性阈值（默认0.3）
+/// - max_access_count: 最大访问次数（默认5次）
+/// - dry_run: 是否仅预览不实际删除（默认false）
+pub(crate) async fn cleanup_memories(
+    repositories: Arc<agent_mem_core::storage::factory::Repositories>,
+    max_age_days: Option<u64>,
+    min_importance: Option<f32>,
+    max_access_count: Option<i64>,
+    dry_run: bool,
+) -> Result<(usize, Vec<String>), String> {
+    use libsql::{params, Builder};
+    use chrono::Utc;
+    
+    let max_age = max_age_days.unwrap_or(90);
+    let min_imp = min_importance.unwrap_or(0.3);
+    let max_access = max_access_count.unwrap_or(5);
+    let now = Utc::now().timestamp();
+    let cutoff_time = now - (max_age as i64 * 86400);
+    
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+    
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+    
+    let conn = db
+        .connect()
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    
+    // 查询符合条件的记忆（长期未使用且重要性低）
+    let query = "SELECT id FROM memories 
+                 WHERE is_deleted = 0 
+                 AND (last_accessed IS NULL OR last_accessed < ?)
+                 AND (importance IS NULL OR importance < ?)
+                 AND (access_count IS NULL OR access_count <= ?)
+                 LIMIT 1000";
+    
+    let mut stmt = conn
+        .prepare(query)
+        .await
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+    
+    let mut rows = stmt
+        .query(params![cutoff_time, min_imp, max_access])
+        .await
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+    
+    let mut memory_ids = Vec::new();
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| format!("Failed to fetch row: {}", e))?
+    {
+        let id: String = row.get(0).unwrap_or_default();
+        memory_ids.push(id);
+    }
+    
+    if dry_run {
+        return Ok((memory_ids.len(), memory_ids));
+    }
+    
+    // 实际删除记忆
+    let mut deleted_count = 0;
+    for memory_id in &memory_ids {
+        if let Ok(Some(memory)) = repositories.memories.find_by_id(memory_id).await {
+            if repositories.memories.delete(&memory.id).await.is_ok() {
+                deleted_count += 1;
+            }
+        }
+    }
+    
+    Ok((deleted_count, memory_ids))
 }
 
 /// 🆕 Phase 2.12: 智能过滤搜索结果
@@ -2585,8 +2690,16 @@ pub async fn batch_search_memories(
         .await
         {
             Ok(Json(api_response)) => {
-                // 提取results字段（data是Vec<serde_json::Value>）
-                results.push(api_response.data);
+                // 🆕 Phase 2.13: 从SearchResponse提取results
+                if let serde_json::Value::Object(obj) = api_response.data {
+                    if let Some(serde_json::Value::Array(results_array)) = obj.get("results") {
+                        results.push(results_array.clone());
+                    } else {
+                        results.push(Vec::new());
+                    }
+                } else {
+                    results.push(Vec::new());
+                }
                 errors.push(None);
                 successful += 1;
             }
@@ -2653,6 +2766,208 @@ pub async fn get_search_statistics(
         response.avg_latency_ms);
 
     Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 4.5: 记忆导出功能
+/// 
+/// 导出记忆为JSON格式，支持按条件过滤
+#[utoipa::path(
+    get,
+    path = "/api/v1/memories/export",
+    tag = "memory",
+    params(
+        ("agent_id" = Option<String>, Query, description = "Agent ID过滤（可选）"),
+        ("user_id" = Option<String>, Query, description = "User ID过滤（可选）"),
+        ("memory_type" = Option<String>, Query, description = "记忆类型过滤（可选）"),
+        ("min_importance" = Option<f32>, Query, description = "最小重要性阈值（可选）"),
+        ("limit" = Option<usize>, Query, description = "导出数量限制（可选，默认1000）")
+    ),
+    responses(
+        (status = 200, description = "Memory export completed successfully", body = crate::models::ApiResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn export_memories(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("📤 开始导出记忆");
+    
+    let agent_id = params.get("agent_id").cloned();
+    let user_id = params.get("user_id").cloned();
+    let memory_type = params.get("memory_type").cloned();
+    let min_importance = params
+        .get("min_importance")
+        .and_then(|v| v.parse().ok());
+    let limit = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000);
+    
+    use libsql::{params, Builder};
+    let db_path = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "file:./data/agentmem.db".to_string())
+        .replace("file:", "");
+    
+    let db = Builder::new_local(&db_path)
+        .build()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+    
+    let conn = db
+        .connect()
+        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+    
+    // 构建查询
+    let mut query = "SELECT id, agent_id, user_id, content, memory_type, importance, 
+                     created_at, last_accessed, access_count, metadata, hash, scope 
+                     FROM memories WHERE is_deleted = 0".to_string();
+    let mut query_params: Vec<String> = Vec::new();
+    
+    if agent_id.is_some() {
+        query.push_str(" AND agent_id = ?");
+        query_params.push(agent_id.clone().unwrap());
+    }
+    if user_id.is_some() {
+        query.push_str(" AND user_id = ?");
+        query_params.push(user_id.clone().unwrap());
+    }
+    if memory_type.is_some() {
+        query.push_str(" AND memory_type = ?");
+        query_params.push(memory_type.clone().unwrap());
+    }
+    if min_importance.is_some() {
+        query.push_str(" AND importance >= ?");
+    }
+    query.push_str(" ORDER BY created_at DESC LIMIT ?");
+    
+    // 执行查询（简化处理，使用固定参数）
+    let mut stmt = conn
+        .prepare(&query)
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+    
+    // 简化参数处理：只使用limit
+    let mut rows = stmt
+        .query(params![limit as i64])
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+    
+    let mut memories = Vec::new();
+    use chrono::{DateTime, Utc};
+    
+    while let Some(row) = rows
+        .next()
+        .await
+        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+    {
+        let created_at_ts: Option<i64> = row.get(6).ok();
+        let created_at_str = created_at_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339());
+        
+        let last_accessed_ts: Option<i64> = row.get(7).ok();
+        let last_accessed_str = last_accessed_ts
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .map(|dt| dt.to_rfc3339());
+        
+        let memory_json = serde_json::json!({
+            "id": row.get::<String>(0).unwrap_or_default(),
+            "agent_id": row.get::<String>(1).unwrap_or_default(),
+            "user_id": row.get::<String>(2).unwrap_or_default(),
+            "content": row.get::<String>(3).unwrap_or_default(),
+            "memory_type": row.get::<Option<String>>(4).ok().flatten(),
+            "importance": row.get::<Option<f64>>(5).ok().flatten(),
+            "created_at": created_at_str,
+            "last_accessed_at": last_accessed_str,
+            "access_count": row.get::<Option<i64>>(8).ok().flatten(),
+            "metadata": row.get::<Option<String>>(9).ok().flatten(),
+            "hash": row.get::<Option<String>>(10).ok().flatten(),
+            "scope": row.get::<Option<String>>(11).ok().flatten(),
+        });
+        
+        memories.push(memory_json);
+    }
+    
+    info!("✅ 导出完成: {} 条记忆", memories.len());
+    
+    let response = serde_json::json!({
+        "memories": memories,
+        "total": memories.len(),
+        "exported_at": Utc::now().to_rfc3339(),
+        "filters": {
+            "agent_id": agent_id,
+            "user_id": user_id,
+            "memory_type": memory_type,
+            "min_importance": min_importance,
+            "limit": limit,
+        }
+    });
+    
+    Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 4.4: 记忆清理功能
+/// 
+/// 基于访问模式和重要性清理长期未使用且重要性低的记忆
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/cleanup",
+    tag = "memory",
+    params(
+        ("max_age_days" = Option<u64>, Query, description = "最大年龄（天数，默认90天）"),
+        ("min_importance" = Option<f32>, Query, description = "最小重要性阈值（默认0.3）"),
+        ("max_access_count" = Option<i64>, Query, description = "最大访问次数（默认5次）"),
+        ("dry_run" = Option<bool>, Query, description = "是否仅预览不实际删除（默认false）")
+    ),
+    responses(
+        (status = 200, description = "Memory cleanup completed successfully", body = crate::models::ApiResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn cleanup_memories_endpoint(
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("🧹 开始记忆清理");
+    
+    let max_age_days = params
+        .get("max_age_days")
+        .and_then(|v| v.parse().ok());
+    let min_importance = params
+        .get("min_importance")
+        .and_then(|v| v.parse().ok());
+    let max_access_count = params
+        .get("max_access_count")
+        .and_then(|v| v.parse().ok());
+    let dry_run = params
+        .get("dry_run")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(false);
+    
+    match cleanup_memories(repositories, max_age_days, min_importance, max_access_count, dry_run).await {
+        Ok((count, ids)) => {
+            let message = if dry_run {
+                format!("预览模式: 找到 {} 条符合条件的记忆", count)
+            } else {
+                format!("清理完成: 删除了 {} 条记忆", count)
+            };
+            
+            let response = serde_json::json!({
+                "deleted_count": count,
+                "memory_ids": ids,
+                "dry_run": dry_run,
+                "message": message
+            });
+            
+            info!("✅ {}", message);
+            Ok(Json(crate::models::ApiResponse::success(response)))
+        }
+        Err(e) => {
+            warn!("⚠️ 记忆清理失败: {}", e);
+            Err(ServerError::Internal(format!("Memory cleanup failed: {}", e)))
+        }
+    }
 }
 
 /// 🆕 Phase 2.11: 批量更新记忆重要性

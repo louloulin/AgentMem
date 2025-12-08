@@ -117,6 +117,14 @@ pub async fn create_router(
             "/api/v1/memories/importance/update",
             post(memory::batch_update_importance),
         )
+        .route(
+            "/api/v1/memories/cleanup",
+            post(memory::cleanup_memories_endpoint),
+        )
+        .route(
+            "/api/v1/memories/export",
+            get(memory::export_memories),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))
