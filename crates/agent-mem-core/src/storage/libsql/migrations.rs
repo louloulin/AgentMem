@@ -546,6 +546,10 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_messages_deleted ON messages(is_deleted)",
+        // 🆕 Phase 3.1: 复合索引优化 - 优化常见查询模式
+        "CREATE INDEX IF NOT EXISTS idx_messages_agent_deleted ON messages(agent_id, is_deleted)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_user_deleted ON messages(user_id, is_deleted)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_agent_created_deleted ON messages(agent_id, created_at, is_deleted)",
         // Tool indexes
         "CREATE INDEX IF NOT EXISTS idx_tools_org_id ON tools(organization_id)",
         "CREATE INDEX IF NOT EXISTS idx_tools_name ON tools(name)",
@@ -555,6 +559,11 @@ async fn create_indexes(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_memories_deleted ON memories(is_deleted)",
+        // 🆕 Phase 3.1: 复合索引优化 - 优化常见查询模式
+        "CREATE INDEX IF NOT EXISTS idx_memories_agent_deleted ON memories(agent_id, is_deleted)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_user_deleted ON memories(user_id, is_deleted)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_importance_deleted ON memories(importance, is_deleted)",
+        "CREATE INDEX IF NOT EXISTS idx_memories_agent_type_deleted ON memories(agent_id, memory_type, is_deleted)",
         // API Key indexes
         "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)",
@@ -760,5 +769,67 @@ mod tests {
         let row = rows.next().await.unwrap().unwrap();
         let count: i64 = row.get(0).unwrap();
         assert_eq!(count, 14); // 14 migrations (including memory_vectors)
+    }
+
+    /// 测试复合索引是否被正确创建
+    #[tokio::test]
+    async fn test_composite_indexes_created() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+
+        // Run migrations
+        run_migrations(conn.clone()).await.unwrap();
+
+        // Check if composite indexes exist by querying sqlite_master
+        let conn_guard = conn.lock().await;
+        
+        // Get all index names
+        let mut rows = conn_guard
+            .query(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+                (),
+            )
+            .await
+            .unwrap();
+        
+        let mut index_names = Vec::new();
+        while let Some(row) = rows.next().await.unwrap() {
+            let name: String = row.get(0).unwrap();
+            index_names.push(name);
+        }
+
+        // Verify composite indexes for memories table
+        assert!(
+            index_names.contains(&"idx_memories_agent_deleted".to_string()),
+            "idx_memories_agent_deleted index should exist. Found indexes: {:?}",
+            index_names
+        );
+        assert!(
+            index_names.contains(&"idx_memories_user_deleted".to_string()),
+            "idx_memories_user_deleted index should exist"
+        );
+        assert!(
+            index_names.contains(&"idx_memories_importance_deleted".to_string()),
+            "idx_memories_importance_deleted index should exist"
+        );
+        assert!(
+            index_names.contains(&"idx_memories_agent_type_deleted".to_string()),
+            "idx_memories_agent_type_deleted index should exist"
+        );
+
+        // Verify composite indexes for messages table
+        assert!(
+            index_names.contains(&"idx_messages_agent_deleted".to_string()),
+            "idx_messages_agent_deleted index should exist"
+        );
+        assert!(
+            index_names.contains(&"idx_messages_user_deleted".to_string()),
+            "idx_messages_user_deleted index should exist"
+        );
+        assert!(
+            index_names.contains(&"idx_messages_agent_created_deleted".to_string()),
+            "idx_messages_agent_created_deleted index should exist"
+        );
     }
 }

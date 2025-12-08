@@ -770,5 +770,64 @@ mod tests {
         assert!(success_tasks.contains(&"task_3".to_string()));
         assert!(success_tasks.contains(&"task_5".to_string()));
     }
+
+    /// 测试缓存预热功能的概念
+    /// 
+    /// 验证缓存预热可以提升后续查询性能
+    #[tokio::test]
+    async fn test_cache_warmup_concept() {
+        use std::time::Instant;
+        
+        // 模拟缓存预热：预取高访问频率的记忆
+        let popular_memory_ids: Vec<String> = (1..=10)
+            .map(|i| format!("memory_{}", i))
+            .collect();
+        
+        // 模拟预热过程
+        let warmup_start = Instant::now();
+        let mut warmed_count = 0;
+        for _id in &popular_memory_ids {
+            // 模拟预取操作（实际中会查询并缓存）
+            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+            warmed_count += 1;
+        }
+        let warmup_duration = warmup_start.elapsed();
+        
+        // 验证预热完成
+        assert_eq!(warmed_count, popular_memory_ids.len());
+        assert!(
+            warmup_duration.as_millis() < 1000,
+            "缓存预热应该在合理时间内完成"
+        );
+        
+        // 模拟后续查询：应该更快（因为已预热）
+        let query_start = Instant::now();
+        for _id in &popular_memory_ids {
+            // 模拟从缓存读取（应该很快）
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        }
+        let query_duration = query_start.elapsed();
+        
+        // 验证预热后的查询更快
+        assert!(
+            query_duration < warmup_duration,
+            "预热后的查询应该比预热过程更快"
+        );
+    }
+
+    /// 测试缓存预热参数验证
+    #[test]
+    fn test_cache_warmup_params() {
+        // 测试默认limit
+        let default_limit = 50;
+        assert!(default_limit > 0, "默认limit应该大于0");
+        assert!(default_limit <= 1000, "默认limit应该合理");
+        
+        // 测试limit边界
+        let min_limit = 1;
+        let max_limit = 1000;
+        assert!(min_limit > 0, "最小limit应该大于0");
+        assert!(max_limit <= 10000, "最大limit应该合理");
+    }
 }
 

@@ -102,6 +102,14 @@ pub async fn create_router(
             "/api/v1/memories/search/stats",
             get(memory::get_search_statistics),
         )
+        .route(
+            "/api/v1/memories/cache/warmup",
+            post(memory::warmup_cache),
+        )
+        .route(
+            "/api/v1/memories/performance/benchmark",
+            post(memory::performance_benchmark),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))
