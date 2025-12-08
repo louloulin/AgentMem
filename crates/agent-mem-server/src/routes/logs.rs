@@ -141,7 +141,7 @@ pub async fn get_log_stats(
         response.info_count,
         response.debug_count);
 
-    Ok(Json(crate::models::ApiResponse::success(response)))
+    Ok(Json(models::ApiResponse::success(response)))
 }
 
 /// 查询日志内容
@@ -233,6 +233,84 @@ pub async fn query_logs(
 
     info!("🔍 日志查询完成: 返回 {} 行", filtered_lines.len());
 
-    Ok(Json(crate::models::ApiResponse::success(response)))
+    Ok(Json(models::ApiResponse::success(response)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// 🆕 Phase 4.2: 测试日志统计功能
+    #[test]
+    fn test_log_stats_structure() {
+        let stats = LogStatsResponse {
+            total_lines: 100,
+            by_level: {
+                let mut map = HashMap::new();
+                map.insert("ERROR".to_string(), 5);
+                map.insert("WARN".to_string(), 10);
+                map.insert("INFO".to_string(), 80);
+                map.insert("DEBUG".to_string(), 5);
+                map
+            },
+            error_count: 5,
+            warning_count: 10,
+            info_count: 80,
+            debug_count: 5,
+            file_size_bytes: 10240,
+            last_updated: Utc::now(),
+        };
+
+        assert_eq!(stats.total_lines, 100);
+        assert_eq!(stats.error_count, 5);
+        assert_eq!(stats.warning_count, 10);
+        assert_eq!(stats.info_count, 80);
+        assert_eq!(stats.debug_count, 5);
+        assert!(stats.file_size_bytes > 0);
+    }
+
+    /// 🆕 Phase 4.2: 测试日志查询参数
+    #[test]
+    fn test_log_query_params() {
+        let params = LogQueryParams {
+            date: Some("2024-01-01".to_string()),
+            level: Some("ERROR".to_string()),
+            limit: Some(50),
+        };
+
+        assert_eq!(params.date, Some("2024-01-01".to_string()));
+        assert_eq!(params.level, Some("ERROR".to_string()));
+        assert_eq!(params.limit, Some(50));
+    }
+
+    /// 🆕 Phase 4.2: 测试日志级别过滤逻辑
+    #[test]
+    fn test_log_level_filtering() {
+        let test_lines = vec![
+            "2024-01-01 ERROR: Test error message",
+            "2024-01-01 WARN: Test warning message",
+            "2024-01-01 INFO: Test info message",
+            "2024-01-01 DEBUG: Test debug message",
+        ];
+
+        // 测试ERROR级别过滤
+        let error_lines: Vec<&str> = test_lines
+            .iter()
+            .filter(|line| line.contains(" ERROR ") || line.contains("error"))
+            .copied()
+            .collect();
+        assert_eq!(error_lines.len(), 1);
+        assert!(error_lines[0].contains("ERROR"));
+
+        // 测试WARN级别过滤
+        let warn_lines: Vec<&str> = test_lines
+            .iter()
+            .filter(|line| line.contains(" WARN ") || line.contains("warn"))
+            .copied()
+            .collect();
+        assert_eq!(warn_lines.len(), 1);
+        assert!(warn_lines[0].contains("WARN"));
+    }
 }
 

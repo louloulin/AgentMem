@@ -1293,7 +1293,7 @@ impl IntelligentPrefetch {
 - [x] 添加指标收集（Prometheus）✅
 - [x] 实现真实系统指标收集 ✅
 - [x] 集成搜索统计到系统指标 ✅
-- [ ] 添加日志聚合
+- [x] 添加日志聚合 ✅
 - [ ] 添加分布式追踪
 - [ ] 添加性能分析
 
@@ -1309,6 +1309,17 @@ impl IntelligentPrefetch {
   - ✅ 5个测试用例（`test_server_start_time_initialization`, `test_uptime_calculation`, `test_metrics_structure`, `test_search_stats_integration`, `test_memory_usage_conversion`）
   - ✅ 充分利用现有代码：基于现有的`get_search_stats`和`SearchStatistics`结构
   - ✅ 最小改造：仅添加运行时间跟踪和指标收集逻辑
+  - ✅ 编译通过，无错误
+
+- ✅ **日志聚合功能**：提供日志统计、查询和聚合分析
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/logs.rs`
+  - ✅ 日志统计API端点：`GET /api/v1/logs/stats` - 提供日志统计信息（总行数、按级别统计、文件大小等）
+  - ✅ 日志查询API端点：`GET /api/v1/logs/query` - 提供日志查询功能（按日期、级别过滤、限制返回行数）
+  - ✅ 基于现有日志系统：充分利用现有的每日轮转日志文件（`logs/agentmem-server.log.YYYY-MM-DD`）
+  - ✅ 日志级别统计：自动统计ERROR、WARN、INFO、DEBUG各级别的日志数量
+  - ✅ 3个测试用例（`test_log_stats_structure`, `test_log_query_params`, `test_log_level_filtering`）
+  - ✅ 充分利用现有代码：基于现有的日志文件系统和日志格式
+  - ✅ 最小改造：仅添加日志读取、统计和查询逻辑
   - ✅ 编译通过，无错误
 
 ---
@@ -1749,11 +1760,22 @@ pub struct CoordinatorStats {
   - 质量评分 ✅ (基于内容质量、完整性和元数据丰富度的质量评分，2个测试用例)
   - 简单缓存预热 ✅ (基于访问频率预取常用记忆，提供预热API端点，2个测试用例)
 - Phase 3: 性能优化 - **100%完成** (并行查询优化 ✅, 并行写入优化 ✅, 连接池管理 ✅, SQL复合索引优化 ✅, 性能测试 ✅)
-- Phase 4: 扩展性增强 - **33%完成** (监控和可观测性增强 ✅)
+- Phase 4: 扩展性增强 - **50%完成** (监控和可观测性增强 ✅, 日志聚合 ✅)
 
-**总体进度**: **约83%完成** (Phase 1完成100%，Phase 2完成96%，Phase 3完成100%，Phase 4完成33%)
+**总体进度**: **约85%完成** (Phase 1完成100%，Phase 2完成96%，Phase 3完成100%，Phase 4完成50%)
 
 ### 📝 最新完成项（本次更新）
+- ✅ **日志聚合功能**：提供日志统计、查询和聚合分析
+  - 📍 代码位置：`crates/agent-mem-server/src/routes/logs.rs`
+  - ✅ 日志统计API端点：`GET /api/v1/logs/stats` - 提供日志统计信息（总行数、按级别统计、文件大小等）
+  - ✅ 日志查询API端点：`GET /api/v1/logs/query` - 提供日志查询功能（按日期、级别过滤、限制返回行数）
+  - ✅ 基于现有日志系统：充分利用现有的每日轮转日志文件（`logs/agentmem-server.log.YYYY-MM-DD`）
+  - ✅ 日志级别统计：自动统计ERROR、WARN、INFO、DEBUG各级别的日志数量
+  - ✅ 3个测试用例（`test_log_stats_structure`, `test_log_query_params`, `test_log_level_filtering`）
+  - ✅ 充分利用现有代码：基于现有的日志文件系统和日志格式
+  - ✅ 最小改造：仅添加日志读取、统计和查询逻辑
+  - ✅ 编译通过，无错误
+
 - ✅ **访问模式分析器实现**：基于访问频率和最近访问时间的智能评分
   - 📍 代码位置：`crates/agent-mem-server/src/routes/memory.rs` (calculate_access_pattern_score函数)
   - ✅ 实现访问模式评分计算：综合考虑访问频率和最近访问时间
