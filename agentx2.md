@@ -11,6 +11,7 @@
 
 #### 2.0.1 配置安全与默认值
 - **配置安全**：`Justfile` 仍硬编码 `ZHIPU_API_KEY`、默认 `LLM_PROVIDER=zhipu`，与“零配置体验”相反且有泄漏风险。`start-server` 等命令直接导出模型参数，没有“缺省安全”逻辑。
+- **脚本默认导出敏感变量**：`start_server_no_auth.sh` 默认导出 `ZHIPU_API_KEY` 并设置 `http_proxy/https_proxy`，缺少“无 key 自动降级/无代理”分支，易在本地暴露敏感配置。
 - **默认配置缺失**：
   - `auto_config.rs` 支持环境变量检测，但无 Mem0 兼容默认
   - `Memory::new()` 零配置模式存在，但需要环境变量支持
@@ -103,7 +104,7 @@
 |------|----------|------|------|
 | **路由文件大小** | 4044 行（单文件） | ~226 行（server/main.py） | **18倍差异** |
 | **默认配置** | 分散在 env/Justfile，需显式配置 | `MemoryConfig()` 默认值集中 | 上手门槛高 |
-| **错误处理** | **125 个 unwrap/expect**（实际统计） | Pydantic 校验 + HTTPException | **严重 panic 风险** |
+| **错误处理** | **122 个 unwrap/expect**（最新统计） | Pydantic 校验 + HTTPException | **严重 panic 风险** |
 | **兼容层** | `agent-mem-compat` 存在但无默认入口 | 原生 | 可信度不足 |
 | **API 易用性** | `Memory::builder().with_*()` 链式调用 | `Memory()` 即用 | 复杂度高 |
 
@@ -115,12 +116,12 @@
 - 统计逻辑（`SearchStatistics`）
 - 存储/向量/LLM 调度
 - **22 个路由处理函数**
-- **125 个 `unwrap/expect` 调用**（实际统计，远超预期）
+- **122 个 `unwrap/expect` 调用**（最新统计，远超预期）
 
 **影响**：
 - 难以维护和测试（单文件过大）
 - 耦合度高，修改风险大
-- **125 个 panic 风险点**（远超预期的12个）
+- **122 个 panic 风险点**（远超预期的12个）
 - 代码审查困难
 - 性能优化困难
 
@@ -130,8 +131,8 @@
 static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<LruCache<String, CachedSearchResult>>>> = 
     std::sync::OnceLock::new();
 
-// 实际统计：125 个 unwrap/expect 调用
-// grep 结果：Found 125 matching lines
+// 实际统计：122 个 unwrap/expect 调用
+// grep 结果：Found 122 matching lines
 // 4044 行单文件（wc -l 验证）
 ```
 
@@ -172,7 +173,7 @@ pub use client::Mem0Client;
 
 ### 3.4 错误处理不友好（P1）
 **问题**：
-- 路由中 **125 个 `unwrap/expect`**（实际统计）
+- 路由中 **122 个 `unwrap/expect`**（最新统计）
 - 错误提示不够友好
 - 缺少参数校验引导
 - 大量使用 `unwrap_or_else` 提供默认值，但无错误引导
@@ -186,7 +187,7 @@ let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agen
 // 其他典型问题：
 // - unwrap_or(0) 可能掩盖数据问题
 // - unwrap_or_default() 可能产生无效数据
-// - 125 个调用点需要逐一审查
+// - 122 个调用点需要逐一审查
 ```
 
 **对比 Mem0**：
@@ -484,7 +485,7 @@ just demo-open-browser
 - [ ] 验证：无 key 时使用本地默认
 
 ### 8.4 错误处理改进（P0-4）⭐ **高优先级**
-- [ ] **移除 125 个 `unwrap/expect`**（实际统计，非12个）
+- [ ] **移除 122 个 `unwrap/expect`**（最新统计，非12个）
 - [ ] 分类处理：
   - 配置错误 → 4xx + 引导信息
   - 数据错误 → 4xx + 数据验证提示
@@ -538,11 +539,10 @@ just demo-verify-data
 $ wc -l crates/agent-mem-server/src/routes/memory.rs
 4044 crates/agent-mem-server/src/routes/memory.rs  ✅ 确认
 
-# unwrap/expect 统计验证
-$ grep -r "unwrap\|expect" crates/agent-mem-server/src/routes/memory.rs | wc -l
-125  ✅ 确认（远超预期的12个）
+# unwrap/expect 统计验证（含 unwrap_or*）
+$ rg "unwrap" crates/agent-mem-server/src/routes/memory.rs | wc -l
+122  ✅ 确认（远超预期的12个）
 
-# 路由函数统计
 $ grep -r "pub async fn" crates/agent-mem-server/src/routes/memory.rs | wc -l
 22  ✅ 确认
 ```
@@ -593,7 +593,7 @@ $ grep -r "mem0_mode\|Memory::mem0" crates/agent-mem-compat/
 ### 10.1 第一轮：代码结构分析
 **发现**：
 - 路由文件 4044 行（vs Mem0 226 行，18倍差异）
-- 125 个 `unwrap/expect`（vs 预期的12个，10倍差异）
+- 122 个 `unwrap/expect`（vs 预期的12个，10倍差异）
 - 硬编码 API key 在 Justfile
 - 兼容层存在但无默认入口
 
@@ -613,24 +613,24 @@ $ grep -r "mem0_mode\|Memory::mem0" crates/agent-mem-compat/
 
 ### 10.4 第四轮：错误处理深度分析
 **发现**：
-- 实际 `unwrap/expect` 数量：**125 个**（远超预期）
+- 实际 `unwrap/expect` 数量：**122 个**（最新统计）
 - 大量使用 `unwrap_or_else` 提供默认值，但无错误引导
 - 缺少统一的错误处理规范
 - 错误消息不够友好
 
 ### 10.5 核心问题优先级（最终）
-1. **P0-1：路由文件巨石化**（4044行，22个函数，125个unwrap）
+1. **P0-1：路由文件巨石化**（4044行，22个函数，122个unwrap）
 2. **P0-2：默认配置缺失**（无 Mem0 兼容模式，硬编码 key）
-3. **P0-3：错误处理不友好**（125个unwrap，无引导）
+3. **P0-3：错误处理不友好**（122个unwrap，无引导）
 4. **P1-1：兼容层未闭环**（存在但无默认入口）
 5. **P1-2：UI/MCP 闭环缺失**（缺少一键启动和状态检查）
 
 ---
 
 **结论**：通过**多轮真实代码分析**，发现 AgentMem 的**最核心问题**是：
-1. **路由文件巨石化**（4044行，125个unwrap，18倍于Mem0）
+1. **路由文件巨石化**（4044行，122个unwrap，18倍于Mem0）
 2. **默认配置缺失**（无 Mem0 兼容模式，硬编码 key 安全风险）
-3. **错误处理不友好**（125个unwrap远超预期，无引导信息）
+3. **错误处理不友好**（122个unwrap远超预期，无引导信息）
 
 **改造策略**：优先修复 P0 问题（路由拆分、默认配置、错误处理），然后补齐 Mem0 兼容性与生态集成，才能在保持技术优势的同时提升易用性。
 
@@ -651,7 +651,7 @@ $ grep -r "mem0_mode\|Memory::mem0" crates/agent-mem-compat/
    - `agent-mem-server` 增加 `--mem0-defaults`/`MEM0_MODE=true`，路由默认走 mem0 配置。
    - `just mem0-start`：一键编译+启动后端，附 `/health` 检查。
 2) **路由拆分与错误兜底（P0）**
-   - 拆 `routes/memory.rs` 为 `handlers/cache/stats/errors` 四块，移除 125 个 `unwrap/expect`。
+   - 拆 `routes/memory.rs` 为 `handlers/cache/stats/errors` 四块，移除 122 个 `unwrap/expect`。
    - 统一错误格式（4xx 引导、5xx 日志），补单测。
 3) **多 Agent 最小可用（P1）**
    - 在 orchestrator 默认流程挂接 `Episodic/Semantic/Procedural` 至 add/search，可选并行。
@@ -666,22 +666,18 @@ $ grep -r "mem0_mode\|Memory::mem0" crates/agent-mem-compat/
 ### 12.3 实际验证结果（2025-12-09 执行）
 
 #### 12.3.1 后端启动验证
-**执行命令**：`bash start_server_no_auth.sh --skip-build`
+**执行命令（现状检查）**：`just start-server-no-auth`（内部调用 `bash start_server_no_auth.sh`）
 
-**结果**：
-```bash
-❌ 后端未启动成功
-原因：./target/release/agent-mem-server: No such file or directory
-```
+**观察**：
+- 当前直接执行失败：`cargo build --release --bin agent-mem-server --exclude agent-mem-python` 报错 “--exclude can only be used together with --workspace”，导致启动中止（未进入运行态）。
+- 默认会在缺少二进制时自动编译（`SKIP_BUILD=false`），但使用 `--skip-build` 仍会在缺少二进制时直接失败。
+- 启动前要求存在 `lib/libonnxruntime.1.22.0.dylib`，缺失即退出。
+- 脚本默认导出 `ZHIPU_API_KEY`、`http_proxy/https_proxy`，无“本地纯离线”分支。
 
-**问题分析**：
-- 需要先执行 `just build-server` 编译后端
-- `start_server_no_auth.sh` 有 `--skip-build` 选项，但二进制不存在时仍会失败
-- 脚本应自动检测并触发编译
-
-**修复建议**：
-- `start_server_no_auth.sh` 应自动检测二进制存在性，不存在时自动编译
-- 或 `just start-server-no-auth` 应自动调用 `just build-server`
+**改进建议**：
+- 修复构建命令：移除 `--exclude agent-mem-python` 或在 `cargo build --workspace` 前使用 `--exclude`，确保启动链路可走通。
+- 保留自动构建，但对 `--skip-build` 增加存在性检查与友好提示。
+- 提供 `MEM0_MODE=true` 分支：不导出 Zhipu Key/代理，直接使用本地 embedder + libsql。
 
 #### 12.3.2 多 Agent 使用分析
 **代码分析结果**：
@@ -824,7 +820,7 @@ just start-ui  # 执行 cd agentmem-ui && npm run dev
 - [ ] 添加 `--mem0-defaults` CLI 选项
 - [ ] 实现 `just mem0-start`：一键编译+启动+健康检查
 
-**3. 路由拆分（125个unwrap修复）**
+**3. 路由拆分（122个unwrap修复）**
 - [ ] 拆分 `routes/memory.rs` 为 4 个模块
 - [ ] 移除所有 `unwrap/expect`，改为 `?` 和友好错误
 - [ ] 添加错误处理规范文档
