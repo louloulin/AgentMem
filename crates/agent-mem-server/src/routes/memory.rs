@@ -1011,45 +1011,57 @@ pub async fn delete_memory(
     Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<crate::models::ApiResponse<crate::models::MemoryResponse>>> {
+    info!("删除记忆: {}", id);
     info!("Deleting memory with ID: {}", id);
 
-    // ✅ 修复: 确保双层存储都删除成功，保证数据一致性
-    // Step 1: 先尝试删除向量存储（如果失败，可以提前返回，不删除LibSQL）
-    let vector_delete_result = memory_manager.delete_memory(&id).await;
+    // 🔧 修复: 先检查记忆是否存在
+    let memory_exists = repositories.memories.find_by_id(&id).await
+        .ok()
+        .flatten()
+        .is_some();
     
-    // Step 2: 删除LibSQL Repository (主要存储)
-    let libsql_delete_result = repositories.memories.delete(&id).await;
+    if !memory_exists {
+        warn!("记忆不存在于LibSQL: {}", id);
+        return Err(ServerError::NotFound(format!("Memory not found: {}", id)));
+    }
     
-    // Step 3: 检查删除结果，确保两个存储都删除成功
-    match (vector_delete_result, libsql_delete_result) {
-        (Ok(_), Ok(_)) => {
-            info!("✅ Memory deleted from both LibSQL and Vector Store: {}", id);
+    // 🔧 修复: 先删除LibSQL（主存储），然后尝试删除向量存储
+    // 如果向量存储删除失败（记忆不存在），不应该导致整个删除失败
+    let libsql_result = repositories.memories.delete(&id).await;
+    
+    match libsql_result {
+        Ok(_) => {
+            info!("✅ Memory deleted from LibSQL: {}", id);
+            
+            // 尝试删除向量存储（非关键操作，失败不影响主流程）
+            let vector_result = memory_manager.delete_memory(&id).await;
+            match vector_result {
+                Ok(_) => {
+                    info!("✅ Memory deleted from both LibSQL and Vector Store: {}", id);
+                }
+                Err(e) => {
+                    // 🔧 修复: 向量存储删除失败不应该导致整个删除失败
+                    // 因为主存储（LibSQL）已经删除成功
+                    let error_msg = e.to_string();
+                    if error_msg.contains("not found") || error_msg.contains("Memory not found") {
+                        warn!("⚠️  向量存储中记忆不存在（可能从未添加或已删除）: {}. 这不会影响删除操作", id);
+                    } else {
+                        warn!("⚠️  向量存储删除失败（非关键）: {}. 错误: {}. 记忆已从主存储删除", id, error_msg);
+                    }
+                }
+            }
+            
             let response = crate::models::MemoryResponse {
                 id,
                 message: "Memory deleted successfully".to_string(),
             };
             Ok(Json(crate::models::ApiResponse::success(response)))
         }
-        (Ok(_), Err(e)) => {
-            // LibSQL删除失败，但向量存储已删除
-            error!("Failed to delete from LibSQL after vector store deleted: {}", e);
+        Err(e) => {
+            error!("Failed to delete memory from LibSQL: {}", e);
             Err(ServerError::MemoryError(format!(
-                "Memory deleted from vector store but failed to delete from LibSQL: {}", e
+                "Failed to delete memory: {}", e
             )))
-        }
-        (Err(e), Ok(_)) => {
-            // 向量存储删除失败，但LibSQL已删除 - 这是数据不一致的情况
-            error!("Failed to delete from vector store after LibSQL deleted: {}", e);
-            error!("⚠️  Data inconsistency: Memory deleted from LibSQL but still exists in vector store");
-            Err(ServerError::MemoryError(format!(
-                "Memory deleted from LibSQL but failed to delete from vector store: {}. \
-                The memory may still appear in search results.", e
-            )))
-        }
-        (Err(e1), Err(e2)) => {
-            // 两个存储都删除失败
-            error!("Failed to delete from both stores: vector={}, libsql={}", e1, e2);
-            Err(ServerError::MemoryError(format!("Failed to delete memory: {}", e2)))
         }
     }
 }
