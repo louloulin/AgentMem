@@ -232,7 +232,7 @@ impl RetrievalModule {
             info!("向量搜索完成: {} 个结果", search_results.len());
 
             // 3. 转换为 MemoryItem
-            let memory_items: Vec<MemoryItem> = search_results
+            let mut memory_items: Vec<MemoryItem> = search_results
                 .into_iter()
                 .map(|result| {
                     let metadata_json: HashMap<String, serde_json::Value> = result
@@ -268,6 +268,47 @@ impl RetrievalModule {
                     }
                 })
                 .collect();
+
+            // 🔧 修复: 验证记忆是否在LibSQL中存在且未删除
+            // 过滤掉已删除的记忆（is_deleted=1）
+            if let Some(manager) = &orchestrator.memory_manager {
+                use futures::future;
+                use std::sync::Arc;
+                
+                // 并行检查每个记忆是否存在
+                let check_futures: Vec<_> = memory_items
+                    .iter()
+                    .map(|item| {
+                        let id = item.id.clone();
+                        let manager = Arc::clone(manager);
+                        async move {
+                            // 使用MemoryManager的get_memory方法检查记忆是否存在
+                            // get_memory内部会检查is_deleted=0
+                            manager.get_memory(&id).await
+                                .map(|opt| opt.is_some())
+                                .unwrap_or(false)
+                        }
+                    })
+                    .collect();
+                
+                let check_results = future::join_all(check_futures).await;
+                
+                // 过滤有效结果（只保留在LibSQL中存在且未删除的记忆）
+                memory_items = memory_items
+                    .into_iter()
+                    .zip(check_results.into_iter())
+                    .filter_map(|(item, exists)| {
+                        if exists {
+                            Some(item)
+                        } else {
+                            debug!("过滤已删除的记忆: {}", item.id);
+                            None
+                        }
+                    })
+                    .collect();
+                
+                info!("🔄 验证完成: 过滤后剩余 {} 条有效结果", memory_items.len());
+            }
 
             Ok(memory_items)
         } else {
