@@ -674,7 +674,13 @@ class ApiClient {
    * Search memories
    */
   async searchMemories(query: string, agentId?: string, userId?: string): Promise<Memory[]> {
-    const response = await this.request<ApiResponse<Memory[]>>(
+    const response = await this.request<ApiResponse<{
+      results: Memory[];
+      total: number;
+      offset: number;
+      limit: number;
+      has_more: boolean;
+    }>>(
       `/api/v1/memories/search`,
       {
         method: 'POST',
@@ -688,7 +694,8 @@ class ApiClient {
         }),
       }
     );
-    return response.data;
+    // 🔧 修复: 后端返回的是 SearchResponse，需要从 results 字段获取数据
+    return response.data?.results || response.data || [];
   }
 
   // ==================== User APIs ====================

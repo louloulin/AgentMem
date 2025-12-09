@@ -440,12 +440,23 @@ export default function MemoriesPageEnhanced() {
                       <TableHead className="w-[40%]">Content</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Agent</TableHead>
+                      <TableHead>Relevance</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {displayMemories.map((memory) => (
+                    {displayMemories.map((memory) => {
+                      // 🔧 获取相关性分数（从score字段）
+                      const relevanceScore = (memory as any).score || 0;
+                      const relevancePercent = (relevanceScore * 100).toFixed(0);
+                      const relevanceColor = relevanceScore >= 0.8 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : relevanceScore >= 0.5 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-600 dark:text-gray-400';
+                      
+                      return (
                       <TableRow key={memory.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <TableCell className="font-medium">
                           <div className="max-w-md truncate" title={memory.content}>
@@ -459,6 +470,15 @@ export default function MemoriesPageEnhanced() {
                         </TableCell>
                         <TableCell>
                           {(agents || []).find((a) => a.id === memory.agent_id)?.name || 'Unknown'}
+                        </TableCell>
+                        <TableCell>
+                          {relevanceScore > 0 ? (
+                            <span className={`text-sm font-semibold ${relevanceColor}`}>
+                              {relevancePercent}%
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-gray-600 dark:text-gray-400">
                           {formatDate(memory.created_at)}
@@ -487,7 +507,8 @@ export default function MemoriesPageEnhanced() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

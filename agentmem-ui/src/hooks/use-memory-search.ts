@@ -82,8 +82,11 @@ export function useMemorySearch({
         
         const data = await response.json();
         
+        // 🔧 修复: 后端返回的是 SearchResponse，需要从 results 字段获取数据
+        const results = data.data?.results || data.data || [];
+        
         // Transform API response to display format
-        const displayMemories: MemoryDisplayItem[] = (data.data || []).map((mem: any) => ({
+        const displayMemories: MemoryDisplayItem[] = results.map((mem: any) => ({
           id: mem.id,
           title: extractTitle(mem.content),
           content: mem.content,
