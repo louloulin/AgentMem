@@ -133,6 +133,10 @@ pub async fn create_router(
             "/api/v1/memories/deduplicate",
             post(memory::deduplicate_memories),
         )
+        .route(
+            "/api/v1/memories/batch/update",
+            post(memory::batch_update_memories),
+        )
         // Health and monitoring
         .route("/health", get(health::health_check))
         .route("/health/live", get(health::liveness_check))

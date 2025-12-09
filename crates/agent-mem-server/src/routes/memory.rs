@@ -2691,16 +2691,8 @@ pub async fn batch_search_memories(
         {
             Ok(Json(api_response)) => {
                 // 🆕 Phase 2.13: 从SearchResponse提取results
-                // api_response.data是SearchResponse类型，需要提取results字段
-                if let serde_json::Value::Object(obj) = &api_response.data {
-                    if let Some(serde_json::Value::Array(results_array)) = obj.get("results") {
-                        results.push(results_array.clone());
-                    } else {
-                        results.push(Vec::new());
-                    }
-                } else {
-                    results.push(Vec::new());
-                }
+                // api_response.data是SearchResponse类型，直接使用results字段
+                results.push(api_response.data.results);
                 errors.push(None);
                 successful += 1;
             }
@@ -2766,6 +2758,123 @@ pub async fn get_search_statistics(
         response.cache_hit_rate * 100.0,
         response.avg_latency_ms);
 
+    Ok(Json(crate::models::ApiResponse::success(response)))
+}
+
+/// 🆕 Phase 4.8: 记忆批量更新功能
+/// 
+/// 批量更新多个记忆的字段（importance、metadata等）
+#[utoipa::path(
+    post,
+    path = "/api/v1/memories/batch/update",
+    tag = "memory",
+    request_body = serde_json::Value,
+    responses(
+        (status = 200, description = "Batch update completed successfully", body = crate::models::ApiResponse),
+        (status = 400, description = "Invalid batch update request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn batch_update_memories(
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Json(request): Json<serde_json::Value>,
+) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
+    info!("🔄 开始批量更新记忆");
+    
+    // 解析请求数据
+    let memory_ids = request
+        .get("memory_ids")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| ServerError::BadRequest("Invalid request: missing 'memory_ids' array".to_string()))?;
+    
+    let updates = request
+        .get("updates")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| ServerError::BadRequest("Invalid request: missing 'updates' object".to_string()))?;
+    
+    let importance = updates.get("importance").and_then(|v| v.as_f64()).map(|f| f as f32);
+    let metadata = updates.get("metadata")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            let mut map = std::collections::HashMap::new();
+            for (k, v) in obj {
+                if let Some(s) = v.as_str() {
+                    map.insert(k.clone(), s.to_string());
+                }
+            }
+            map
+        });
+    
+    let mut successful = 0;
+    let mut failed = 0;
+    let mut errors = Vec::new();
+    let mut updated_ids = Vec::new();
+    
+    // 遍历所有记忆ID，批量更新
+    for memory_id_value in memory_ids {
+        let memory_id = memory_id_value
+            .as_str()
+            .ok_or_else(|| ServerError::BadRequest("Invalid memory_id format".to_string()))?;
+        
+        // 获取现有记忆
+        match repositories.memories.find_by_id(memory_id).await {
+            Ok(Some(memory)) => {
+                // 构建更新数据
+                let mut updated = memory.clone();
+                
+                if let Some(imp) = importance {
+                    updated.attributes.set(
+                        agent_mem_traits::AttributeKey::system("importance"),
+                        agent_mem_traits::AttributeValue::Number(imp as f64),
+                    );
+                }
+                
+                if let Some(meta) = &metadata {
+                    for (k, v) in meta {
+                        updated.attributes.set(
+                            agent_mem_traits::AttributeKey::system(k),
+                            agent_mem_traits::AttributeValue::String(v.clone()),
+                        );
+                    }
+                }
+                
+                // 更新记忆
+                match repositories.memories.update(&updated).await {
+                    Ok(_) => {
+                        updated_ids.push(memory_id.to_string());
+                        successful += 1;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Memory {}: {}", memory_id, e);
+                        errors.push(error_msg);
+                        failed += 1;
+                    }
+                }
+            }
+            Ok(None) => {
+                let error_msg = format!("Memory {}: not found", memory_id);
+                errors.push(error_msg);
+                failed += 1;
+            }
+            Err(e) => {
+                let error_msg = format!("Memory {}: {}", memory_id, e);
+                errors.push(error_msg);
+                failed += 1;
+            }
+        }
+    }
+    
+    info!("✅ 批量更新完成: 成功 {} 个, 失败 {} 个", successful, failed);
+    
+    let response = serde_json::json!({
+        "updated_count": successful,
+        "failed_count": failed,
+        "updated_ids": updated_ids,
+        "errors": errors,
+        "total": memory_ids.len(),
+    });
+    
     Ok(Json(crate::models::ApiResponse::success(response)))
 }
 
@@ -3009,12 +3118,9 @@ pub async fn import_memories(
             Json(memory_request),
         ).await {
             Ok((_, response)) => {
-                if let Some(data) = response.data.as_object() {
-                    if let Some(mem_id) = data.get("id").and_then(|v| v.as_str()) {
-                        imported_ids.push(mem_id.to_string());
-                        successful += 1;
-                    }
-                }
+                // response.data是MemoryResponse类型，直接使用id字段
+                imported_ids.push(response.data.id.clone());
+                successful += 1;
             }
             Err(e) => {
                 let error_msg = format!("Memory {}: {}", index, e);
@@ -3066,7 +3172,7 @@ pub async fn export_memories(
     let agent_id = params.get("agent_id").cloned();
     let user_id = params.get("user_id").cloned();
     let memory_type = params.get("memory_type").cloned();
-    let min_importance = params
+    let min_importance: Option<f32> = params
         .get("min_importance")
         .and_then(|v| v.parse().ok());
     let limit = params

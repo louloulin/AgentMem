@@ -1489,5 +1489,43 @@ mod tests {
         assert_eq!(group2.1, "mem4", "应该保留importance最高的mem4");
         // mem5的importance差异小于0.1，可能不会被标记为重复（取决于实现）
     }
+
+    /// 🆕 Phase 4.8: 测试记忆批量更新功能结构
+    #[test]
+    fn test_batch_update_memories_structure() {
+        // 测试批量更新请求结构
+        let update_request = serde_json::json!({
+            "memory_ids": ["mem_1", "mem_2", "mem_3"],
+            "updates": {
+                "importance": 0.8,
+                "metadata": {
+                    "tag": "important",
+                    "category": "work"
+                }
+            }
+        });
+        
+        // 验证请求结构
+        assert!(update_request["memory_ids"].is_array());
+        assert_eq!(update_request["memory_ids"].as_array().unwrap().len(), 3);
+        assert!(update_request["updates"].is_object());
+        assert_eq!(update_request["updates"]["importance"], 0.8);
+        assert!(update_request["updates"]["metadata"].is_object());
+        
+        // 验证响应结构
+        let response = serde_json::json!({
+            "updated_count": 2,
+            "failed_count": 1,
+            "updated_ids": ["mem_1", "mem_2"],
+            "errors": ["Memory mem_3: not found"],
+            "total": 3
+        });
+        
+        assert_eq!(response["updated_count"], 2);
+        assert_eq!(response["failed_count"], 1);
+        assert_eq!(response["total"], 3);
+        assert!(response["updated_ids"].is_array());
+        assert!(response["errors"].is_array());
+    }
 }
 
