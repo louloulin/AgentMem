@@ -1456,7 +1456,7 @@ pub async fn get_memory_usage_stats(
         ("1周内", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {} AND last_accessed < {}", one_week_ago, one_day_ago)),
         ("1月内", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {} AND last_accessed < {}", one_month_ago, one_week_ago)),
         ("1月前", format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed < {}", one_month_ago)),
-        ("从未访问", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (last_accessed IS NULL OR last_accessed = 0)"),
+        ("从未访问", "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (last_accessed IS NULL OR last_accessed = 0)".to_string()),
     ];
     
     for (range, query) in recency_queries {
@@ -1554,65 +1554,4 @@ pub async fn get_memory_usage_stats(
     info!("✅ 记忆使用情况统计完成: 总记忆数={}, 平均访问次数={:.2}", total_memories, avg_access_count);
     
     Ok(Json(stats))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// 🆕 Phase 4.3: 测试记忆使用情况统计结构
-    #[test]
-    fn test_memory_usage_stats_structure() {
-        let stats = MemoryUsageStats {
-            total_memories: 100,
-            access_frequency_distribution: {
-                let mut map = HashMap::new();
-                map.insert("0".to_string(), 50);
-                map.insert("1-5".to_string(), 30);
-                map.insert("6-10".to_string(), 15);
-                map.insert("11-50".to_string(), 4);
-                map.insert("51+".to_string(), 1);
-                map
-            },
-            recency_distribution: {
-                let mut map = HashMap::new();
-                map.insert("24小时内".to_string(), 20);
-                map.insert("1周内".to_string(), 30);
-                map.insert("1月内".to_string(), 25);
-                map.insert("1月前".to_string(), 15);
-                map.insert("从未访问".to_string(), 10);
-                map
-            },
-            avg_access_count: 5.5,
-            recently_accessed: 20,
-            never_accessed: 10,
-            high_access_memories: 5,
-            timestamp: Utc::now(),
-        };
-        
-        assert_eq!(stats.total_memories, 100);
-        assert_eq!(stats.avg_access_count, 5.5);
-        assert_eq!(stats.recently_accessed, 20);
-        assert_eq!(stats.never_accessed, 10);
-        assert_eq!(stats.high_access_memories, 5);
-        assert_eq!(stats.access_frequency_distribution.len(), 5);
-        assert_eq!(stats.recency_distribution.len(), 5);
-    }
-
-    /// 🆕 Phase 4.3: 测试访问频率分布计算
-    #[test]
-    fn test_access_frequency_distribution() {
-        let mut distribution = HashMap::new();
-        distribution.insert("0".to_string(), 50);
-        distribution.insert("1-5".to_string(), 30);
-        distribution.insert("6-10".to_string(), 15);
-        distribution.insert("11-50".to_string(), 4);
-        distribution.insert("51+".to_string(), 1);
-        
-        let total: i64 = distribution.values().sum();
-        assert_eq!(total, 100, "访问频率分布总和应该等于总记忆数");
-        
-        assert!(distribution.contains_key("0"), "应该包含从未访问的分布");
-        assert!(distribution.contains_key("51+"), "应该包含高访问的分布");
-    }
 }

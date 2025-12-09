@@ -497,6 +497,7 @@ mod tests {
         // Create test audit log
         let log = AuditLog {
             timestamp: Utc::now().timestamp(),
+            trace_id: None,
             user_id: Some("test_user".to_string()),
             organization_id: Some("test_org".to_string()),
             action: "create".to_string(),
@@ -612,6 +613,7 @@ mod tests {
         for i in 0..5 {
             let log = AuditLog {
                 timestamp: Utc::now().timestamp(),
+                trace_id: None,
                 user_id: Some(format!("user_{}", i)),
                 organization_id: Some("test_org".to_string()),
                 action: "read".to_string(),

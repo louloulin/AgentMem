@@ -344,6 +344,10 @@ mod tests {
             memory_type: Some(MemoryType::Semantic),
             limit: Some(10),
             threshold: Some(0.3), // 🔧 降低阈值以支持商品ID等精确查询
+            min_importance: None,
+            max_age_days: None,
+            min_access_count: None,
+            offset: None,
         };
 
         assert!(request.validate().is_ok());

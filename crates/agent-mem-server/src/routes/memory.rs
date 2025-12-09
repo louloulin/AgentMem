@@ -3113,8 +3113,8 @@ pub async fn import_memories(
         
         // 使用现有的add_memory功能
         match add_memory(
-            Extension(memory_manager.clone()),
             Extension(repositories.clone()),
+            Extension(memory_manager.clone()),
             Json(memory_request),
         ).await {
             Ok((_, response)) => {
