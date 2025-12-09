@@ -1929,13 +1929,35 @@ pub async fn search_memories(
         info!("✅ 层次检索排序完成: {} 条结果", scored_results.len());
     }
     
-    // 🆕 Phase 2.5: 搜索结果去重（基于content hash）
-    // 使用HashSet去重，保留综合评分最高的结果
+    // 🆕 Phase 2.5: 搜索结果去重
+    // 第一步：基于ID去重（确保同一条记忆只出现一次）
+    // 第二步：基于content hash去重（确保内容重复的记忆只保留一条）
     use std::collections::HashMap;
-    let mut hash_map: HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = HashMap::new();
     let original_count = scored_results.len();
     
+    // 第一步：基于ID去重，保留评分最高的
+    let mut id_map: HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = HashMap::new();
     for (item, final_score, recency, importance, relevance, quality) in scored_results {
+        match id_map.get_mut(&item.id) {
+            Some(existing) => {
+                // 如果ID已存在，比较综合评分，保留评分更高的
+                if final_score > existing.1 {
+                    *existing = (item, final_score, recency, importance, relevance, quality);
+                }
+            }
+            None => {
+                // 新ID，直接添加
+                id_map.insert(item.id.clone(), (item, final_score, recency, importance, relevance, quality));
+            }
+        }
+    }
+    
+    let id_dedup_count = id_map.len();
+    info!("🔄 ID去重: {} → {} 条结果", original_count, id_dedup_count);
+    
+    // 第二步：基于hash/content去重，保留评分最高的
+    let mut hash_map: HashMap<String, (MemoryItem, f64, f64, f64, f64, f64)> = HashMap::new();
+    for (item, final_score, recency, importance, relevance, quality) in id_map.into_values() {
         // 使用hash字段进行去重（如果hash为None或空，使用content的前100字符作为key）
         let dedup_key = item.hash.as_ref()
             .filter(|h| !h.is_empty())
@@ -1959,23 +1981,24 @@ pub async fn search_memories(
                 }
             });
         
-            // 如果hash已存在，比较综合评分，保留评分更高的
-            match hash_map.get_mut(&dedup_key) {
-                Some(existing) => {
-                    // 比较综合评分，如果新结果评分更高，替换旧结果
-                    if final_score > existing.1 {
-                        *existing = (item, final_score, recency, importance, relevance, quality);
-                    }
-                }
-                None => {
-                    // 新hash，直接添加
-                    hash_map.insert(dedup_key, (item, final_score, recency, importance, relevance, quality));
+        // 如果hash已存在，比较综合评分，保留评分更高的
+        match hash_map.get_mut(&dedup_key) {
+            Some(existing) => {
+                // 比较综合评分，如果新结果评分更高，替换旧结果
+                if final_score > existing.1 {
+                    *existing = (item, final_score, recency, importance, relevance, quality);
                 }
             }
+            None => {
+                // 新hash，直接添加
+                hash_map.insert(dedup_key, (item, final_score, recency, importance, relevance, quality));
+            }
         }
-        
-        let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = hash_map.into_values().collect();
-    info!("🔄 搜索结果去重: {} → {} 条结果", original_count, deduplicated_results.len());
+    }
+    
+    let deduplicated_results: Vec<(MemoryItem, f64, f64, f64, f64, f64)> = hash_map.into_values().collect();
+    info!("🔄 搜索结果去重完成: {} → {} → {} 条结果 (ID去重 → Hash去重)", 
+        original_count, id_dedup_count, deduplicated_results.len());
 
     // 🆕 Phase 2.12: 应用智能过滤（在转换为JSON之前）
     // 从请求中获取过滤参数（如果提供）
