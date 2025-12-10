@@ -7,12 +7,16 @@ use crate::{
         ConflictResolver, DefaultConflictResolver, DefaultImportanceScorer, ImportanceScorer,
         IntelligenceConfig,
     },
+    search::{
+        EnhancedHybridConfig, EnhancedHybridSearchEngineV2, SearchResult,
+    },
     storage::conversion::{db_to_memory, legacy_to_v4, memory_to_db, v4_to_legacy},
 };
-use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory};
+use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory, Result as AgentMemResult};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
+use async_trait::async_trait;
 
 /// Memory engine configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +35,16 @@ pub struct MemoryEngineConfig {
 
     /// Maximum memories to process in one batch
     pub max_batch_size: usize,
+
+    /// Enable enhanced hybrid search (EnhancedHybridSearchEngineV2)
+    /// If enabled, uses advanced search with query classification, adaptive thresholds, etc.
+    /// If disabled, falls back to simple memory_repository.search()
+    #[serde(default = "default_enhanced_search")]
+    pub enable_enhanced_search: bool,
+}
+
+fn default_enhanced_search() -> bool {
+    false // Default to false for backward compatibility
 }
 
 impl Default for MemoryEngineConfig {
@@ -41,6 +55,7 @@ impl Default for MemoryEngineConfig {
             auto_processing: true,
             processing_interval_seconds: 300, // 5 minutes
             max_batch_size: 100,
+            enable_enhanced_search: false, // Default to false for backward compatibility
         }
     }
 }
@@ -64,6 +79,7 @@ impl From<&agent_mem_config::memory::MemoryConfig> for MemoryEngineConfig {
             auto_processing: config.intelligence.importance_scoring,
             processing_interval_seconds: 300,
             max_batch_size: 100,
+            enable_enhanced_search: false, // Default to false for backward compatibility
         }
     }
 }
@@ -76,6 +92,9 @@ pub struct MemoryEngine {
     conflict_resolver: Arc<dyn ConflictResolver>,
     /// Optional LibSQL memory repository for persistent storage
     memory_repository: Option<Arc<dyn crate::storage::traits::MemoryRepositoryTrait>>,
+    /// Optional enhanced hybrid search engine (EnhancedHybridSearchEngineV2)
+    /// Used when enable_enhanced_search is true
+    enhanced_search_engine: Option<Arc<EnhancedHybridSearchEngineV2>>,
 }
 
 impl MemoryEngine {
@@ -91,6 +110,7 @@ impl MemoryEngine {
             importance_scorer,
             conflict_resolver,
             memory_repository: None,
+            enhanced_search_engine: None,
         }
     }
 
@@ -103,12 +123,39 @@ impl MemoryEngine {
         let importance_scorer = Arc::new(DefaultImportanceScorer::new(config.intelligence.clone()));
         let conflict_resolver = Arc::new(DefaultConflictResolver::new(config.intelligence.clone()));
 
+        // 🆕 Phase 1: 如果启用了增强搜索，创建 EnhancedHybridSearchEngineV2
+        let enhanced_search_engine = if config.enable_enhanced_search {
+            let search_config = EnhancedHybridConfig::default();
+            let repo_clone = memory_repository.clone();
+            
+            // 创建适配器，将 memory_repository 适配到搜索器 trait
+            let vector_searcher = Arc::new(RepositoryVectorSearcherAdapter {
+                repository: repo_clone.clone(),
+            });
+            let bm25_searcher = Arc::new(RepositoryBM25SearcherAdapter {
+                repository: repo_clone.clone(),
+            });
+            let exact_matcher = Arc::new(RepositoryExactMatcherAdapter {
+                repository: repo_clone,
+            });
+
+            Some(Arc::new(
+                EnhancedHybridSearchEngineV2::new(search_config)
+                    .with_vector_searcher(vector_searcher)
+                    .with_bm25_searcher(bm25_searcher)
+                    .with_exact_matcher(exact_matcher),
+            ))
+        } else {
+            None
+        };
+
         Self {
             config,
             hierarchy_manager,
             importance_scorer,
             conflict_resolver,
             memory_repository: Some(memory_repository),
+            enhanced_search_engine,
         }
     }
 
@@ -198,7 +245,54 @@ impl MemoryEngine {
             query, scope, limit
         );
 
-        // ✅ 优先使用 LibSQL Repository（持久化存储）
+        // 🆕 Phase 1: 如果启用了增强搜索，优先使用 EnhancedHybridSearchEngineV2
+        if let Some(search_engine) = &self.enhanced_search_engine {
+            info!("Using EnhancedHybridSearchEngineV2 for search");
+            let search_limit = limit.unwrap_or(10);
+            
+            // 使用增强搜索引擎进行搜索
+            let search_result = search_engine
+                .search(query, search_limit)
+                .await
+                .map_err(|e| crate::CoreError::Storage(format!("Enhanced search failed: {}", e)))?;
+
+            // 将 SearchResult 转换为 Memory
+            let mut memories = Vec::new();
+            if let Some(memory_repo) = &self.memory_repository {
+                for result in search_result.results {
+                    if let Ok(Some(memory)) = memory_repo.find_by_id(&result.id).await {
+                        // 应用 scope 过滤
+                        if let Some(ref scope_filter) = scope {
+                            if !self.matches_scope(&memory, scope_filter) {
+                                continue;
+                            }
+                        }
+                        
+                        // 设置搜索分数
+                        let mut mem = memory;
+                        mem.attributes.insert(
+                            agent_mem_traits::AttributeKey::system("score"),
+                            agent_mem_traits::AttributeValue::Number(result.score as f64),
+                        );
+                        memories.push(mem);
+                    }
+                }
+            }
+
+            // 应用 limit
+            let final_limit = limit.unwrap_or(10);
+            memories.truncate(final_limit);
+
+            info!(
+                "Enhanced search returned {} memories (query_type={:?}, strategy={:?})",
+                memories.len(),
+                search_result.query_type,
+                search_result.strategy
+            );
+            return Ok(memories);
+        }
+
+        // ✅ 回退到原有实现：使用 LibSQL Repository（持久化存储）
         if let Some(memory_repo) = &self.memory_repository {
             info!("Using LibSQL memory repository for persistent search");
 
@@ -715,6 +809,145 @@ impl MemoryEngine {
             inheritance_relationships: hierarchy_stats.inheritance_relationships,
             level_utilization: hierarchy_stats.level_utilization,
         })
+    }
+}
+
+// ============================================================================
+// 适配器：将 MemoryRepository 适配到 EnhancedHybridSearchEngineV2 的搜索器 trait
+// ============================================================================
+
+/// 将 MemoryRepository 适配为 VectorSearcher
+struct RepositoryVectorSearcherAdapter {
+    repository: Arc<dyn crate::storage::traits::MemoryRepositoryTrait>,
+}
+
+#[async_trait]
+impl crate::search::enhanced_hybrid_v2::VectorSearcher for RepositoryVectorSearcherAdapter {
+    async fn search(
+        &self,
+        query: &str,
+        limit: usize,
+        _threshold: f32,
+    ) -> AgentMemResult<Vec<SearchResult>> {
+        // 使用 repository 的 search 方法进行文本搜索
+        // 注意：这是一个简化的实现，真正的向量搜索需要向量存储
+        let memories = self
+            .repository
+            .search(query, limit as i64)
+            .await
+            .map_err(|e| agent_mem_traits::AgentMemError::StorageError(e.to_string()))?;
+
+        // 转换为 SearchResult
+        let results: Vec<SearchResult> = memories
+            .into_iter()
+            .map(|mem| {
+                let content_text = match &mem.content {
+                    agent_mem_traits::Content::Text(t) => t.clone(),
+                    agent_mem_traits::Content::Structured(v) => v.to_string(),
+                    _ => String::new(),
+                };
+                SearchResult {
+                    id: mem.id.as_str().to_string(),
+                    content: content_text,
+                    score: mem.score().unwrap_or(0.5) as f32,
+                    vector_score: mem.score().map(|s| s as f32),
+                    fulltext_score: None,
+                    metadata: None,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+}
+
+/// 将 MemoryRepository 适配为 BM25Searcher
+struct RepositoryBM25SearcherAdapter {
+    repository: Arc<dyn crate::storage::traits::MemoryRepositoryTrait>,
+}
+
+#[async_trait]
+impl crate::search::enhanced_hybrid_v2::BM25Searcher for RepositoryBM25SearcherAdapter {
+    async fn search(&self, query: &str, limit: usize) -> AgentMemResult<Vec<SearchResult>> {
+        // 使用 repository 的 search 方法进行全文搜索
+        let memories = self
+            .repository
+            .search(query, limit as i64)
+            .await
+            .map_err(|e| agent_mem_traits::AgentMemError::StorageError(e.to_string()))?;
+
+        // 转换为 SearchResult
+        let results: Vec<SearchResult> = memories
+            .into_iter()
+            .map(|mem| {
+                let content_text = match &mem.content {
+                    agent_mem_traits::Content::Text(t) => t.clone(),
+                    agent_mem_traits::Content::Structured(v) => v.to_string(),
+                    _ => String::new(),
+                };
+                SearchResult {
+                    id: mem.id.as_str().to_string(),
+                    content: content_text,
+                    score: 0.7, // BM25 分数（简化实现）
+                    vector_score: None,
+                    fulltext_score: Some(0.7),
+                    metadata: None,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+}
+
+/// 将 MemoryRepository 适配为 ExactMatcher
+struct RepositoryExactMatcherAdapter {
+    repository: Arc<dyn crate::storage::traits::MemoryRepositoryTrait>,
+}
+
+#[async_trait]
+impl crate::search::enhanced_hybrid_v2::ExactMatcher for RepositoryExactMatcherAdapter {
+    async fn match_exact(&self, query: &str, limit: usize) -> AgentMemResult<Vec<SearchResult>> {
+        // 精确匹配：检查是否是商品ID等精确格式
+        use regex::Regex;
+        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();
+        
+        if product_id_pattern.is_match(query) {
+            // 商品ID查询：使用 search 方法
+            let memories = self
+                .repository
+                .search(query, limit as i64)
+                .await
+                .map_err(|e| agent_mem_traits::AgentMemError::StorageError(e.to_string()))?;
+
+            // 转换为 SearchResult，精确匹配给高分
+            let results: Vec<SearchResult> = memories
+                .into_iter()
+                .map(|mem| {
+                    let content_text = match &mem.content {
+                        agent_mem_traits::Content::Text(t) => t.clone(),
+                        agent_mem_traits::Content::Structured(v) => v.to_string(),
+                        _ => String::new(),
+                    };
+                    // 检查是否是精确匹配
+                    let is_exact = content_text.contains(&format!("商品ID: {}", query))
+                        || content_text == query;
+                    SearchResult {
+                        id: mem.id.as_str().to_string(),
+                        content: content_text,
+                        score: if is_exact { 1.0 } else { 0.8 },
+                        vector_score: None,
+                        fulltext_score: None,
+                        metadata: None,
+                    }
+                })
+                .collect();
+
+            Ok(results)
+        } else {
+            // 非精确格式查询，返回空结果
+            Ok(Vec::new())
+        }
     }
 }
 
