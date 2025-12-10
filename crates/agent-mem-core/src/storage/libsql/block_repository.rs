@@ -15,13 +15,43 @@ use crate::storage::traits::BlockRepositoryTrait;
 
 /// LibSQL implementation of Block repository
 pub struct LibSqlBlockRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlBlockRepository {
     /// Create a new LibSQL block repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 
     /// Helper function to convert row to Block
@@ -85,7 +115,8 @@ impl LibSqlBlockRepository {
 #[async_trait]
 impl BlockRepositoryTrait for LibSqlBlockRepository {
     async fn create(&self, block: &Block) -> Result<Block> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let metadata_json = block
             .metadata_
@@ -124,7 +155,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Block>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -155,7 +187,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn find_by_agent_id(&self, agent_id: &str) -> Result<Vec<Block>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -190,7 +223,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn update(&self, block: &Block) -> Result<Block> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let metadata_json = block
             .metadata_
@@ -226,7 +260,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE blocks SET is_deleted = 1, updated_at = ? WHERE id = ?",
@@ -239,7 +274,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn link_to_agent(&self, block_id: &str, agent_id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Get block label for the junction table
         let mut stmt = conn
@@ -279,7 +315,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn unlink_from_agent(&self, block_id: &str, agent_id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "DELETE FROM blocks_agents WHERE block_id = ? AND agent_id = ?",
@@ -294,7 +331,8 @@ impl BlockRepositoryTrait for LibSqlBlockRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Block>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(

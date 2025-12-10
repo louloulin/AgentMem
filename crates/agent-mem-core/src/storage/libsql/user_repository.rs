@@ -2,6 +2,7 @@
 
 use crate::storage::models::User;
 use crate::storage::traits::UserRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 use agent_mem_traits::{AgentMemError, Result};
 use async_trait::async_trait;
 use libsql::Connection;
@@ -10,20 +11,51 @@ use tokio::sync::Mutex;
 
 /// LibSQL implementation of UserRepository
 pub struct LibSqlUserRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlUserRepository {
-    /// Create a new LibSQL user repository
+    /// Create a new LibSQL user repository (legacy single-connection mode)
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL user repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 }
 
 #[async_trait]
 impl UserRepositoryTrait for LibSqlUserRepository {
     async fn create(&self, user: &User) -> Result<User> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Serialize roles to JSON
         let roles_json = user
@@ -58,7 +90,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<User>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut rows = conn
             .query(
@@ -131,7 +164,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn find_by_email(&self, email: &str, org_id: &str) -> Result<Option<User>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut rows = conn
             .query(
@@ -204,7 +238,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn email_exists(&self, email: &str, org_id: &str) -> Result<bool> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut rows = conn
             .query(
@@ -229,7 +264,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<User>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut rows = conn
             .query(
@@ -303,7 +339,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn update(&self, user: &User) -> Result<User> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE users SET organization_id = ?, name = ?, status = ?, timezone = ?, updated_at = ?, last_updated_by_id = ?
@@ -325,7 +362,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn update_password(&self, user_id: &str, password_hash: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND is_deleted = 0",
@@ -338,7 +376,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE users SET is_deleted = 1, updated_at = ? WHERE id = ?",
@@ -351,7 +390,8 @@ impl UserRepositoryTrait for LibSqlUserRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<User>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut rows = conn
             .query(

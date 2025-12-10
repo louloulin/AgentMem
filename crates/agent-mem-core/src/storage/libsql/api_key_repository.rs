@@ -9,23 +9,55 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::ApiKey;
 use crate::storage::traits::ApiKeyRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of the API key repository
 pub struct LibSqlApiKeyRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlApiKeyRepository {
     /// Create a new LibSQL API key repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 }
 
 #[async_trait]
 impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     async fn create(&self, api_key: &ApiKey) -> Result<ApiKey> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO api_keys (
@@ -52,7 +84,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     }
 
     async fn find_by_key(&self, key_hash: &str) -> Result<Option<ApiKey>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -104,7 +137,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     }
 
     async fn find_by_user_id(&self, user_id: &str) -> Result<Vec<ApiKey>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -161,7 +195,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
         let api_key_id = api_key.id.clone();
 
         {
-            let conn = self.conn.lock().await;
+            let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
             let rows_affected = conn
                 .execute(
@@ -200,7 +235,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let rows_affected = conn
             .execute(
@@ -220,7 +256,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     }
 
     async fn revoke(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let rows_affected = conn
             .execute(
@@ -240,7 +277,8 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<ApiKey>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(

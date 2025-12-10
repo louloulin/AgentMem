@@ -113,44 +113,47 @@ impl RepositoryFactory {
     async fn create_libsql_repositories(config: &DatabaseConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
 
-        // Create connection pool (new pooled path for memories)
+        // ✅ Create connection pool for all repositories (performance optimization)
         let pool = create_libsql_pool_with_config(&config.url, LibSqlPoolConfig::default())
             .await
             .map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to create LibSQL pool: {e}"))
             })?;
 
-        // Legacy single connection (kept for non-memory repos to minimize churn)
-        let conn = create_libsql_pool(&config.url).await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}"))
+        // Get a connection for migrations (using pool)
+        let conn_for_migrations = pool.get().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get connection for migrations: {e}"))
         })?;
 
         // Run migrations if auto_migrate is enabled
         if config.auto_migrate {
-            run_migrations(conn.clone()).await.map_err(|e| {
+            run_migrations(conn_for_migrations.clone()).await.map_err(|e| {
                 AgentMemError::StorageError(format!("Failed to run migrations: {e}"))
             })?;
         }
 
-        // Create repository instances
-        // Note: All repositories share the same connection pool for consistency
+        // Create repository instances - all using connection pool for better performance
         Ok(Repositories {
-            users: Arc::new(LibSqlUserRepository::new(conn.clone())),
-            organizations: Arc::new(LibSqlOrganizationRepository::new(conn.clone())),
-            agents: Arc::new(LibSqlAgentRepository::new(conn.clone())),
-            messages: Arc::new(LibSqlMessageRepository::new(conn.clone())),
-            tools: Arc::new(LibSqlToolRepository::new(conn.clone())),
-            api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
-            // 🆕 Memory repository uses pooled connections
+            // ✅ All repositories now use connection pool via helper method
+            users: Arc::new(LibSqlUserRepository::new_with_pool(pool.clone())),
+            organizations: Arc::new(LibSqlOrganizationRepository::new_with_pool(pool.clone())),
+            agents: Arc::new(LibSqlAgentRepository::new_with_pool(pool.clone())),
+            messages: Arc::new(LibSqlMessageRepository::new_with_pool(pool.clone())),
+            tools: Arc::new(LibSqlToolRepository::new_with_pool(pool.clone())),
+            api_keys: Arc::new(LibSqlApiKeyRepository::new_with_pool(pool.clone())),
             memories: Arc::new(LibSqlMemoryRepository::new_with_pool(pool.clone())),
             working_memory: {
                 // ✅ WorkingMemory uses the unified memories table internally
                 // This is an implementation detail hidden behind the trait
                 use agent_mem_storage::backends::LibSqlWorkingStore;
-                Arc::new(LibSqlWorkingStore::new(conn.clone()))
+                // WorkingStore also needs pool support, but for now use a connection from pool
+                let conn = pool.get().await.map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get connection for working store: {e}"))
+                })?;
+                Arc::new(LibSqlWorkingStore::new(conn))
             },
-            blocks: Arc::new(LibSqlBlockRepository::new(conn.clone())),
-            associations: Arc::new(LibSqlAssociationRepository::new(conn.clone())),
+            blocks: Arc::new(LibSqlBlockRepository::new_with_pool(pool.clone())),
+            associations: Arc::new(LibSqlAssociationRepository::new_with_pool(pool.clone())),
         })
     }
 
@@ -475,33 +478,45 @@ impl StorageFactory {
     async fn create_embedded(config: EmbeddedModeConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
 
-        // 1. Create LibSQL connection
-        let conn = create_libsql_pool(&config.database_path.to_string_lossy())
-            .await
-            .map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}"))
-            })?;
+        // ✅ Create connection pool for all repositories (performance optimization)
+        let pool = create_libsql_pool_with_config(
+            &config.database_path.to_string_lossy(),
+            LibSqlPoolConfig::default(),
+        )
+        .await
+        .map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to create LibSQL pool: {e}"))
+        })?;
+
+        // Get a connection for migrations (using pool)
+        let conn_for_migrations = pool.get().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get connection for migrations: {e}"))
+        })?;
 
         // 2. Run migrations
-        run_migrations(conn.clone())
+        run_migrations(conn_for_migrations.clone())
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to run migrations: {e}")))?;
 
-        // 3. Create repository instances
+        // 3. Create repository instances - all using connection pool for better performance
         Ok(Repositories {
-            users: Arc::new(LibSqlUserRepository::new(conn.clone())),
-            organizations: Arc::new(LibSqlOrganizationRepository::new(conn.clone())),
-            agents: Arc::new(LibSqlAgentRepository::new(conn.clone())),
-            messages: Arc::new(LibSqlMessageRepository::new(conn.clone())),
-            tools: Arc::new(LibSqlToolRepository::new(conn.clone())),
-            api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
-            memories: Arc::new(LibSqlMemoryRepository::new(conn.clone())),
+            users: Arc::new(LibSqlUserRepository::new_with_pool(pool.clone())),
+            organizations: Arc::new(LibSqlOrganizationRepository::new_with_pool(pool.clone())),
+            agents: Arc::new(LibSqlAgentRepository::new_with_pool(pool.clone())),
+            messages: Arc::new(LibSqlMessageRepository::new_with_pool(pool.clone())),
+            tools: Arc::new(LibSqlToolRepository::new_with_pool(pool.clone())),
+            api_keys: Arc::new(LibSqlApiKeyRepository::new_with_pool(pool.clone())),
+            memories: Arc::new(LibSqlMemoryRepository::new_with_pool(pool.clone())),
             working_memory: {
                 use agent_mem_storage::backends::LibSqlWorkingStore;
-                Arc::new(LibSqlWorkingStore::new(conn.clone()))
+                // WorkingStore also needs pool support, but for now use a connection from pool
+                let conn = pool.get().await.map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to get connection for working store: {e}"))
+                })?;
+                Arc::new(LibSqlWorkingStore::new(conn))
             },
-            blocks: Arc::new(LibSqlBlockRepository::new(conn.clone())),
-            associations: Arc::new(LibSqlAssociationRepository::new(conn.clone())),
+            blocks: Arc::new(LibSqlBlockRepository::new_with_pool(pool.clone())),
+            associations: Arc::new(LibSqlAssociationRepository::new_with_pool(pool.clone())),
         })
     }
 

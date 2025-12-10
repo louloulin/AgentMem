@@ -8,16 +8,47 @@ use chrono::Utc;
 use libsql::Connection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Tool repository
 pub struct LibSqlToolRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlToolRepository {
     /// Create a new LibSQL tool repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 
     /// Helper function to serialize JSON fields
@@ -47,7 +78,8 @@ impl LibSqlToolRepository {
 #[async_trait]
 impl ToolRepositoryTrait for LibSqlToolRepository {
     async fn create(&self, tool: &Tool) -> Result<Tool> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO tools (
@@ -79,7 +111,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Tool>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let query = "SELECT 
             id, organization_id, name, description, json_schema, 
@@ -132,7 +165,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
     }
 
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<Tool>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let query = "SELECT
             id, organization_id, name, description, json_schema,
@@ -190,7 +224,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
             return self.find_by_organization_id(org_id).await;
         }
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Build query to find tools that have any of the specified tags
         // Tags are stored as JSON array, so we need to check if any tag matches
@@ -261,7 +296,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
         let tool_id = tool.id.clone();
 
         {
-            let conn = self.conn.lock().await;
+            let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
             let rows_affected = conn
                 .execute(
@@ -302,7 +338,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let rows_affected = conn
             .execute(
@@ -322,7 +359,8 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Tool>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let query = "SELECT 
             id, organization_id, name, description, json_schema, 

@@ -10,16 +10,47 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::Agent;
 use crate::storage::traits::AgentRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Agent repository
 pub struct LibSqlAgentRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlAgentRepository {
     /// Create a new LibSQL agent repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 
     /// Helper function to serialize JSON fields
@@ -50,7 +81,8 @@ impl LibSqlAgentRepository {
 #[async_trait]
 impl AgentRepositoryTrait for LibSqlAgentRepository {
     async fn create(&self, agent: &Agent) -> Result<Agent> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO agents (
@@ -90,7 +122,8 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Agent>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -202,7 +235,8 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
     }
 
     async fn find_by_organization_id(&self, org_id: &str) -> Result<Vec<Agent>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -315,7 +349,8 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
     }
 
     async fn update(&self, agent: &Agent) -> Result<Agent> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE agents SET 
@@ -351,7 +386,8 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE agents SET is_deleted = 1 WHERE id = ?",
@@ -364,7 +400,8 @@ impl AgentRepositoryTrait for LibSqlAgentRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Agent>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(

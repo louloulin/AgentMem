@@ -10,16 +10,47 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::Message;
 use crate::storage::traits::MessageRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Message repository
 pub struct LibSqlMessageRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlMessageRepository {
     /// Create a new LibSQL message repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 
     /// Helper function to serialize JSON fields
@@ -38,7 +69,8 @@ impl LibSqlMessageRepository {
 #[async_trait]
 impl MessageRepositoryTrait for LibSqlMessageRepository {
     async fn create(&self, message: &Message) -> Result<Message> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO messages (
@@ -77,7 +109,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Message>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -185,7 +218,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn find_by_agent_id(&self, agent_id: &str, limit: i64) -> Result<Vec<Message>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -292,7 +326,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn find_by_user_id(&self, user_id: &str, limit: i64) -> Result<Vec<Message>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -399,7 +434,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn update(&self, message: &Message) -> Result<Message> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE messages SET 
@@ -433,7 +469,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE messages SET is_deleted = 1 WHERE id = ?",
@@ -446,7 +483,8 @@ impl MessageRepositoryTrait for LibSqlMessageRepository {
     }
 
     async fn delete_by_agent_id(&self, agent_id: &str) -> Result<u64> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let rows_affected = conn
             .execute(

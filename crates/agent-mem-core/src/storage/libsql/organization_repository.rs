@@ -13,20 +13,51 @@ use crate::storage::traits::OrganizationRepositoryTrait;
 
 /// LibSQL implementation of Organization repository
 pub struct LibSqlOrganizationRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlOrganizationRepository {
     /// Create a new LibSQL organization repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 }
 
 #[async_trait]
 impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     async fn create(&self, org: &Organization) -> Result<Organization> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO organizations (id, name, created_at, updated_at, is_deleted) 
@@ -46,7 +77,8 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Organization>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE id = ? AND is_deleted = 0")
@@ -98,7 +130,8 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     }
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Organization>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE name = ? AND is_deleted = 0")
@@ -150,7 +183,8 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     }
 
     async fn update(&self, org: &Organization) -> Result<Organization> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE organizations SET name = ?, updated_at = ? WHERE id = ? AND is_deleted = 0",
@@ -163,7 +197,8 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE organizations SET is_deleted = 1 WHERE id = ?",
@@ -176,7 +211,8 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Organization>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare("SELECT id, name, created_at, updated_at, is_deleted FROM organizations WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?")

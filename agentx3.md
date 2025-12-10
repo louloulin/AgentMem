@@ -7219,6 +7219,6 @@ for memory in memories {
 
 ---
 
-**文档版本**: v3.16 Final（核心功能与性能深度分析完整版 + 代码去重实施 + 测试修复 + 服务验证 + 完整测试验证 + EnhancedHybridSearchEngineV2 集成 + LLM 并行化完善 + LibSQL 批量优化 + 连接池基础实现 + MemoryRepository 连接池集成）  
+**文档版本**: v3.17 Final（核心功能与性能深度分析完整版 + 代码去重实施 + 测试修复 + 服务验证 + 完整测试验证 + EnhancedHybridSearchEngineV2 集成 + LLM 并行化完善 + LibSQL 批量优化 + 连接池基础实现 + MemoryRepository 连接池集成 + LLM 并行化文档更新）  
 **最后更新**: 2025-12-10  
-**文档行数**: 7200+ 行
+**文档行数**: 7220+ 行

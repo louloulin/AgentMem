@@ -7,14 +7,45 @@ use libsql::Connection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::debug;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 pub struct LibSqlAssociationRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlAssociationRepository {
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 }
 
@@ -30,7 +61,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
             AgentMemError::StorageError(format!("Failed to serialize metadata: {e}"))
         })?;
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "INSERT INTO memory_associations (
@@ -63,7 +95,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     async fn find_by_id(&self, id: &str) -> Result<Option<MemoryAssociation>> {
         debug!("Finding association by ID: {}", id);
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -150,7 +183,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     ) -> Result<Vec<MemoryAssociation>> {
         debug!("Finding associations for memory: {}", memory_id);
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -246,7 +280,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
             association_type, memory_id
         );
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -336,7 +371,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     async fn update_strength(&self, id: &str, strength: f32) -> Result<()> {
         debug!("Updating association strength: {} to {}", id, strength);
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
         let now = chrono::Utc::now().timestamp();
 
         conn.execute(
@@ -352,7 +388,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     async fn delete(&self, id: &str) -> Result<()> {
         debug!("Deleting association: {}", id);
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute("DELETE FROM memory_associations WHERE id = ?", [id])
             .await
@@ -364,7 +401,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     }
 
     async fn count_by_user(&self, user_id: &str) -> Result<i64> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare("SELECT COUNT(*) FROM memory_associations WHERE user_id = ?")
@@ -393,7 +431,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     }
 
     async fn count_by_type(&self, user_id: &str) -> Result<Vec<(String, i64)>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -431,7 +470,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     }
 
     async fn avg_strength(&self, user_id: &str) -> Result<f32> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare("SELECT AVG(strength) FROM memory_associations WHERE user_id = ?")
@@ -462,7 +502,8 @@ impl AssociationRepositoryTrait for LibSqlAssociationRepository {
     async fn find_strongest(&self, user_id: &str, limit: i64) -> Result<Vec<MemoryAssociation>> {
         debug!("Finding strongest associations for user: {}", user_id);
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
