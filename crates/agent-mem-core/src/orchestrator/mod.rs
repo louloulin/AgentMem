@@ -1322,10 +1322,11 @@ mod tests {
         let config = OrchestratorConfig::default();
 
         assert_eq!(config.max_tool_rounds, 5);
-        assert_eq!(config.max_memories, 10);
+        assert_eq!(config.max_memories, 3); // Phase 2/3优化: 从10降到3
         assert!(config.auto_extract_memories);
         assert_eq!(config.memory_extraction_threshold, 0.5);
         assert!(!config.enable_tool_calling);
+        assert!(config.enable_adaptive); // Phase 4: 自适应默认启用
     }
 
     #[test]
