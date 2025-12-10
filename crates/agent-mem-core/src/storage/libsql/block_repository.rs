@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::Block;
 use crate::storage::traits::BlockRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Block repository
 pub struct LibSqlBlockRepository {

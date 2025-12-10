@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 
 use crate::storage::models::Organization;
 use crate::storage::traits::OrganizationRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Organization repository
 pub struct LibSqlOrganizationRepository {
