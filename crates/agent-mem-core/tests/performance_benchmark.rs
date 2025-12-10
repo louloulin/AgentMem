@@ -7,7 +7,7 @@
 
 use agent_mem_core::storage::{
     agent_repository::AgentRepository,
-    batch::BatchOperations,
+    batch_optimized::OptimizedBatchOperations,
     memory_repository::MemoryRepository,
     models::*,
     postgres::PostgresStorage,
@@ -162,7 +162,7 @@ async fn benchmark_batch_operations() {
     let pool = storage.pool().clone();
     let org_repo = OrganizationRepository::new(pool.clone());
     let user_repo = UserRepository::new(pool.clone());
-    let batch_ops = BatchOperations::new(pool);
+    let batch_ops = OptimizedBatchOperations::new(pool);
 
     // Create test organization and user
     let org = Organization::new("Benchmark Org".to_string());
@@ -188,7 +188,7 @@ async fn benchmark_batch_operations() {
 
     let start = Instant::now();
     batch_ops
-        .batch_insert_agents(&agents)
+        .batch_insert_agents_optimized(&agents)
         .await
         .expect("Failed to batch insert");
 

@@ -14,11 +14,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use agent_mem_traits::abstractions::Memory as MemoryV4;
+
 /// Cache entry for memory queries
 #[derive(Debug, Clone)]
 struct MemoryCacheEntry {
     /// Cached memories
-    memories: Vec<crate::Memory>,
+    memories: Vec<MemoryV4>,
     /// When the entry was created
     created_at: Instant,
     /// Time-to-live for the entry
@@ -94,7 +96,7 @@ impl MultiLayerCache {
     }
 
     /// Get memories from L1 cache
-    pub fn get_memories(&self, key: &str) -> Option<Vec<crate::Memory>> {
+    pub fn get_memories(&self, key: &str) -> Option<Vec<MemoryV4>> {
         if let Ok(mut cache) = self.l1_memory.write() {
             if let Some(entry) = cache.get(key) {
                 if entry.is_valid() {
@@ -110,7 +112,7 @@ impl MultiLayerCache {
     }
 
     /// Set memories in L1 cache
-    pub fn set_memories(&self, key: String, memories: Vec<crate::Memory>) {
+    pub fn set_memories(&self, key: String, memories: Vec<MemoryV4>) {
         if let Ok(mut cache) = self.l1_memory.write() {
             let evicted = cache.put(
                 key,
@@ -413,7 +415,7 @@ pub struct WarmingStats {
 #[cfg(test)]
 mod tests {
     use super::MultiLayerCache;
-    use crate::Memory;
+    use agent_mem_traits::abstractions::Memory;
 
     #[test]
     fn test_l1_memories_cache() {

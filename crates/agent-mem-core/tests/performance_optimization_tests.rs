@@ -7,8 +7,10 @@
 //! - Task 2.1.4: 多层缓存性能测试
 
 use agent_mem_core::cache::multi_layer::MultiLayerCache;
-use agent_mem_core::Memory;
-use agent_mem_traits::Result;
+use agent_mem_traits::{
+    abstractions::Memory,
+    Result,
+};
 use std::sync::Arc;
 use tokio;
 
@@ -22,10 +24,11 @@ async fn test_multi_layer_cache_performance() -> Result<()> {
     for i in 0..1000 {
         let key = format!("test_key_{}", i);
         let memory = Memory::new(
-            format!("mem_{}", i),
-            agent_mem_traits::MemoryType::Episodic,
-            agent_mem_traits::Content::Text("test content".to_string()),
-            None,
+            format!("agent_{}", i),
+            Some(format!("user_{}", i)),
+            "episodic",
+            "test content",
+            0.8,
         );
         cache.set_memories(key.clone(), vec![memory]);
         cache.get_memories(&key);
@@ -132,10 +135,11 @@ async fn test_cache_concurrent_performance() -> Result<()> {
 
             // L1缓存操作
             let memory = Memory::new(
-                format!("mem_{}", i),
-                agent_mem_traits::MemoryType::Episodic,
-                agent_mem_traits::Content::Text("test content".to_string()),
-                None,
+                format!("agent_{}", i),
+                Some(format!("user_{}", i)),
+                "episodic",
+                "test content",
+                0.8,
             );
             cache_clone.set_memories(format!("{}_mem", key), vec![memory]);
             let _mem_result = cache_clone.get_memories(&format!("{}_mem", key));
@@ -165,7 +169,7 @@ async fn test_cache_concurrent_performance() -> Result<()> {
         "100个并发操作应在500ms内完成"
     );
 
-    let metrics = cache.metrics();
+    let _metrics = cache.metrics();
     println!(
         "并发测试: 300次操作，耗时{:?}，平均每次{:?}ms",
         concurrent_duration,

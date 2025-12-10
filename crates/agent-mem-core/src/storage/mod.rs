@@ -25,8 +25,7 @@ pub mod libsql;
 pub mod agent_repository;
 #[cfg(feature = "postgres")]
 pub mod api_key_repository;
-#[cfg(feature = "postgres")]
-pub mod batch;
+// Removed: batch - replaced by batch_optimized (true multi-row INSERT)
 #[cfg(feature = "postgres")]
 pub mod batch_optimized;
 #[cfg(feature = "postgres")]

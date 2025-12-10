@@ -7,7 +7,7 @@
 
 use agent_mem_core::storage::{
     agent_repository::AgentRepository,
-    batch::BatchOperations,
+    batch_optimized::OptimizedBatchOperations,
     memory_repository::MemoryRepository,
     models::*,
     postgres::PostgresStorage,
@@ -144,7 +144,7 @@ async fn test_memory_repository() {
         .expect("Failed to create agent");
 
     // Create memory
-    let memory = Memory {
+    let memory = DbMemory {
         id: generate_id("memory"),
         organization_id: org.id.clone(),
         user_id: user.id.clone(),
@@ -213,7 +213,7 @@ async fn test_batch_operations() {
     let pool = storage.pool().clone();
     let org_repo = OrganizationRepository::new(pool.clone());
     let user_repo = UserRepository::new(pool.clone());
-    let batch_ops = BatchOperations::new(pool);
+    let batch_ops = OptimizedBatchOperations::new(pool);
 
     // Create organization and user
     let org = Organization::new("Test Org".to_string());
@@ -240,15 +240,15 @@ async fn test_batch_operations() {
         .collect();
 
     let inserted = batch_ops
-        .batch_insert_agents(&agents)
+        .batch_insert_agents_optimized(&agents)
         .await
         .expect("Failed to batch insert agents");
     assert_eq!(inserted, 5);
 
     // Batch insert memories
     let agent_id = agents[0].id.clone();
-    let memories: Vec<Memory> = (0..10)
-        .map(|i| Memory {
+    let memories: Vec<DbMemory> = (0..10)
+        .map(|i| DbMemory {
             id: generate_id("memory"),
             organization_id: org.id.clone(),
             user_id: user.id.clone(),
@@ -272,7 +272,7 @@ async fn test_batch_operations() {
         .collect();
 
     let inserted = batch_ops
-        .batch_insert_memories(&memories)
+        .batch_insert_memories_optimized(&memories)
         .await
         .expect("Failed to batch insert memories");
     assert_eq!(inserted, 10);

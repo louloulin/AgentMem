@@ -128,6 +128,93 @@ impl OptimizedBatchOperations {
         .await
     }
 
+    /// Batch insert agents using multi-row INSERT
+    ///
+    /// Performance: ~2-3x faster than looping inserts
+    pub async fn batch_insert_agents_optimized(&self, agents: &[Agent]) -> CoreResult<u64> {
+        if agents.is_empty() {
+            return Ok(0);
+        }
+
+        const CHUNK_SIZE: usize = 1000;
+        let mut total_inserted = 0;
+
+        for chunk in agents.chunks(CHUNK_SIZE) {
+            let inserted = self.insert_agent_chunk(chunk).await?;
+            total_inserted += inserted;
+        }
+
+        Ok(total_inserted)
+    }
+
+    async fn insert_agent_chunk(&self, chunk: &[Agent]) -> CoreResult<u64> {
+        let pool = self.pool.clone();
+        let chunk = chunk.to_vec();
+
+        retry_operation(self.retry_config.clone(), || {
+            let pool = pool.clone();
+            let chunk = chunk.clone();
+            async move {
+                let mut query = String::from(
+                    r#"
+                    INSERT INTO agents (
+                        id, organization_id, agent_type, name, description,
+                        system, topic, message_ids, metadata_, llm_config,
+                        embedding_config, tool_rules, mcp_tools,
+                        created_at, updated_at, is_deleted,
+                        created_by_id, last_updated_by_id
+                    ) VALUES
+                    "#,
+                );
+
+                let mut values = Vec::new();
+                for (i, _) in chunk.iter().enumerate() {
+                    let base = i * 18;
+                    values.push(format!(
+                        "(${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${}, ${})",
+                        base + 1, base + 2, base + 3, base + 4, base + 5,
+                        base + 6, base + 7, base + 8, base + 9, base + 10,
+                        base + 11, base + 12, base + 13, base + 14, base + 15,
+                        base + 16, base + 17, base + 18
+                    ));
+                }
+
+                query.push_str(&values.join(", "));
+                query.push_str(" ON CONFLICT (id) DO NOTHING");
+
+                let mut sql_query = sqlx::query(&query);
+                for agent in &chunk {
+                    sql_query = sql_query
+                        .bind(&agent.id)
+                        .bind(&agent.organization_id)
+                        .bind(&agent.agent_type)
+                        .bind(&agent.name)
+                        .bind(&agent.description)
+                        .bind(&agent.system)
+                        .bind(&agent.topic)
+                        .bind(&agent.message_ids)
+                        .bind(&agent.metadata_)
+                        .bind(&agent.llm_config)
+                        .bind(&agent.embedding_config)
+                        .bind(&agent.tool_rules)
+                        .bind(&agent.mcp_tools)
+                        .bind(&agent.created_at)
+                        .bind(&agent.updated_at)
+                        .bind(&agent.is_deleted)
+                        .bind(&agent.created_by_id)
+                        .bind(&agent.last_updated_by_id);
+                }
+
+                let result = sql_query.execute(&pool).await.map_err(|e| {
+                    CoreError::Database(format!("Failed to batch insert agents: {}", e))
+                })?;
+
+                Ok(result.rows_affected())
+            }
+        })
+        .await
+    }
+
     /// Batch insert messages using multi-row INSERT
     pub async fn batch_insert_messages_optimized(&self, messages: &[Message]) -> CoreResult<u64> {
         if messages.is_empty() {
@@ -291,6 +378,41 @@ impl OptimizedBatchOperations {
             .map_err(|e| CoreError::Database(format!("Failed to batch insert: {}", e)))?;
 
         Ok(result.rows_affected())
+    }
+
+    /// Batch soft delete by IDs
+    ///
+    /// This is optimized to use a single UPDATE statement with ANY()
+    pub async fn batch_soft_delete(&self, table: &str, ids: &[String]) -> CoreResult<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        let pool = self.pool.clone();
+        let table = table.to_string();
+        let ids = ids.to_vec();
+
+        retry_operation(self.retry_config.clone(), || {
+            let pool = pool.clone();
+            let table = table.clone();
+            let ids = ids.clone();
+            async move {
+                let query = format!(
+                    "UPDATE {} SET is_deleted = TRUE, updated_at = $1 WHERE id = ANY($2) AND is_deleted = FALSE",
+                    table
+                );
+
+                let result = sqlx::query(&query)
+                    .bind(chrono::Utc::now())
+                    .bind(&ids)
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| CoreError::Database(format!("Failed to batch soft delete: {}", e)))?;
+
+                Ok(result.rows_affected())
+            }
+        })
+        .await
     }
 }
 

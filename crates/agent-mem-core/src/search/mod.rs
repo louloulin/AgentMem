@@ -18,10 +18,8 @@ pub mod adaptive_threshold;
 pub mod bm25;
 /// Week 7-8: Cached adaptive engine with parallel search
 pub mod cached_adaptive_engine;
-#[cfg(feature = "redis-cache")]
-pub mod cached_vector_search;
-#[cfg(feature = "postgres")]
-pub mod enhanced_hybrid;
+// Removed: cached_vector_search - functionality integrated into enhanced_hybrid_v2
+// Removed: enhanced_hybrid - replaced by enhanced_hybrid_v2
 pub mod enhanced_hybrid_v2;
 /// 外部重排序器（Cohere等）
 pub mod external_reranker;
@@ -46,10 +44,8 @@ pub use adaptive_threshold::{
     AdaptiveThresholdCalculator, AdaptiveThresholdConfig, ThresholdCalculation,
 };
 pub use bm25::{BM25Params, BM25SearchEngine};
-#[cfg(feature = "redis-cache")]
-pub use cached_vector_search::{CachedVectorSearchConfig, CachedVectorSearchEngine};
-#[cfg(feature = "postgres")]
-pub use enhanced_hybrid::EnhancedHybridSearchEngine;
+// Removed: CachedVectorSearchEngine - functionality integrated into EnhancedHybridSearchEngineV2
+// Removed: EnhancedHybridSearchEngine - replaced by EnhancedHybridSearchEngineV2
 pub use enhanced_hybrid_v2::{
     EnhancedHybridConfig, EnhancedHybridSearchEngine as EnhancedHybridSearchEngineV2,
     EnhancedSearchResult, EnhancedSearchStats,
