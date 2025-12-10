@@ -6887,8 +6887,9 @@ test result: ok. 426 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out
    - ✅ 实现了 `LibSqlConnectionPool` 基础结构
    - ✅ 支持连接池配置（min/max connections, timeouts）
    - ✅ 实现了连接获取和统计功能
-   - ⏳ 待完成: 集成到 Repository（需要重构现有代码）
-   - **状态**: ⚠️ 部分完成（基础结构已实现，待集成）
+   - ✅ **MemoryRepository 已切换为连接池获取连接**
+   - ⏳ 待完成: 其余 LibSQL 仓库集成（users/orgs/messages 等）
+   - **状态**: ⚠️ 部分完成（MemoryRepo 已接入池，其他仓库待改）
 2. ✅ **LibSQL 真批量实现**（2-3 天）- **已完成**
    - ✅ 优化 `batch_create` 使用 prepared statement
    - ✅ 减少 SQL 解析开销，提升性能 15-25%
