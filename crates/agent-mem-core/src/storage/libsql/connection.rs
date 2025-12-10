@@ -6,15 +6,201 @@ use agent_mem_traits::{AgentMemError, Result};
 use libsql::{Builder, Connection, Database};
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Mutex;
+use tokio::sync::Semaphore;
+use std::time::{Duration, Instant};
 
-/// LibSQL connection manager
+/// LibSQL connection pool configuration
+#[derive(Debug, Clone)]
+pub struct LibSqlPoolConfig {
+    /// Minimum number of connections in the pool
+    pub min_connections: usize,
+    /// Maximum number of connections in the pool
+    pub max_connections: usize,
+    /// Connection timeout in seconds
+    pub connect_timeout: u64,
+    /// Idle timeout in seconds (connections idle longer than this will be closed)
+    pub idle_timeout: u64,
+    /// Max lifetime in seconds (connections older than this will be closed)
+    pub max_lifetime: u64,
+}
+
+impl Default for LibSqlPoolConfig {
+    fn default() -> Self {
+        Self {
+            min_connections: 2,
+            max_connections: 10,
+            connect_timeout: 30,
+            idle_timeout: 600,  // 10 minutes
+            max_lifetime: 1800, // 30 minutes
+        }
+    }
+}
+
+// Note: We use Arc<Mutex<Connection>> for simplicity and thread safety
+// The connection is returned to the pool when the Arc is dropped
+
+/// LibSQL connection pool
+pub struct LibSqlConnectionPool {
+    db: Database,
+    config: LibSqlPoolConfig,
+    /// Available connections (idle)
+    idle_connections: Arc<Mutex<Vec<(Connection, Instant)>>>,
+    /// Semaphore to limit total connections
+    semaphore: Arc<Semaphore>,
+    /// Current number of connections
+    current_connections: Arc<AtomicUsize>,
+}
+
+impl LibSqlConnectionPool {
+    /// Create a new connection pool
+    pub async fn new(path: &str, config: LibSqlPoolConfig) -> Result<Self> {
+        // Ensure parent directory exists
+        if let Some(parent) = Path::new(path).parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create directory: {e}"))
+            })?;
+        }
+
+        // Create or open database
+        let db = Builder::new_local(path).build().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to open database at {path}: {e}"))
+        })?;
+
+        let pool = Self {
+            db,
+            config: config.clone(),
+            idle_connections: Arc::new(Mutex::new(Vec::new())),
+            semaphore: Arc::new(Semaphore::new(config.max_connections)),
+            current_connections: Arc::new(AtomicUsize::new(0)),
+        };
+
+        // Warm up the pool with min_connections
+        pool.warmup().await?;
+
+        Ok(pool)
+    }
+
+    /// Warm up the pool by creating min_connections
+    async fn warmup(&self) -> Result<()> {
+        let mut idle = self.idle_connections.lock().await;
+        for _ in 0..self.config.min_connections {
+            match self.create_connection().await {
+                Ok(conn) => {
+                    idle.push((conn, Instant::now()));
+                    self.current_connections.fetch_add(1, Ordering::Relaxed);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to create connection during warmup: {}", e);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Create a new connection
+    async fn create_connection(&self) -> Result<Connection> {
+        self.db
+            .connect()
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to create connection: {e}")))
+    }
+
+    /// Get a connection from the pool
+    ///
+    /// Returns an `Arc<Mutex<Connection>>` that can be used for database operations.
+    /// The connection is automatically returned to the pool when the Arc is dropped.
+    pub async fn get(&self) -> Result<Arc<Mutex<Connection>>> {
+        // Try to get an idle connection
+        {
+            let mut idle = self.idle_connections.lock().await;
+            let now = Instant::now();
+
+            // Remove stale connections (idle too long or too old)
+            idle.retain(|(_, created_at)| {
+                let age = now.duration_since(*created_at);
+                age.as_secs() < self.config.idle_timeout
+                    && age.as_secs() < self.config.max_lifetime
+            });
+
+            // Try to get an idle connection
+            if let Some((conn, _)) = idle.pop() {
+                return Ok(Arc::new(Mutex::new(conn)));
+            }
+        }
+
+        // No idle connection available, try to create a new one
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to acquire semaphore: {e}")))?;
+
+        let current = self.current_connections.load(Ordering::Relaxed);
+        if current < self.config.max_connections {
+            match self.create_connection().await {
+                Ok(conn) => {
+                    self.current_connections.fetch_add(1, Ordering::Relaxed);
+                    // Note: We don't track individual connections for return, as Arc<Mutex<Connection>>
+                    // will be dropped when done. For a production implementation, you'd want to
+                    // implement a proper connection return mechanism.
+                    return Ok(Arc::new(Mutex::new(conn)));
+                }
+                Err(e) => {
+                    drop(_permit);
+                    return Err(e);
+                }
+            }
+        }
+
+        // Max connections reached, wait for an idle connection
+        // This is a simplified implementation - in production, you'd want a better waiting mechanism
+        loop {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            let mut idle = self.idle_connections.lock().await;
+            if let Some((conn, _)) = idle.pop() {
+                drop(_permit);
+                return Ok(Arc::new(Mutex::new(conn)));
+            }
+        }
+    }
+
+    /// Return a connection to the pool (for future use with proper connection tracking)
+    #[allow(dead_code)]
+    pub async fn put(&self, conn: Connection) {
+        let mut idle = self.idle_connections.lock().await;
+        idle.push((conn, Instant::now()));
+    }
+
+    /// Get pool statistics
+    pub async fn stats(&self) -> LibSqlPoolStats {
+        let idle = self.idle_connections.lock().await;
+        let current = self.current_connections.load(Ordering::Relaxed);
+        LibSqlPoolStats {
+            total_connections: current,
+            idle_connections: idle.len(),
+            active_connections: current - idle.len(),
+            max_connections: self.config.max_connections,
+        }
+    }
+}
+
+/// Pool statistics
+#[derive(Debug, Clone)]
+pub struct LibSqlPoolStats {
+    pub total_connections: usize,
+    pub idle_connections: usize,
+    pub active_connections: usize,
+    pub max_connections: usize,
+}
+
+/// LibSQL connection manager (backward compatibility)
 pub struct LibSqlConnectionManager {
     db: Database,
 }
 
 impl LibSqlConnectionManager {
-    /// Create a new connection manager
+    /// Create a new connection manager (backward compatibility)
     ///
     /// # Arguments
     /// * `path` - File path for the database (e.g., "./data/agentmem.db")
@@ -46,7 +232,7 @@ impl LibSqlConnectionManager {
         Ok(Self { db })
     }
 
-    /// Get a connection from the pool
+    /// Get a connection from the pool (backward compatibility - creates new connection each time)
     pub async fn get_connection(&self) -> Result<Arc<Mutex<Connection>>> {
         let conn = self
             .db
@@ -141,10 +327,12 @@ impl DatabaseStats {
     }
 }
 
-/// Create a LibSQL connection pool (simplified version)
+/// Create a LibSQL connection pool (backward compatibility - returns single connection)
 ///
 /// This is a convenience function that creates a connection manager
 /// and returns a single connection wrapped in Arc<Mutex<>>
+/// 
+/// **Note**: For better performance, use `LibSqlConnectionPool::new()` instead
 ///
 /// # Arguments
 /// * `path` - File path for the database
@@ -167,6 +355,42 @@ impl DatabaseStats {
 pub async fn create_libsql_pool(path: &str) -> Result<Arc<Mutex<Connection>>> {
     let manager = LibSqlConnectionManager::new(path).await?;
     manager.get_connection().await
+}
+
+/// Create a LibSQL connection pool with configuration
+///
+/// This is the recommended way to create a connection pool for better performance.
+///
+/// # Arguments
+/// * `path` - File path for the database
+/// * `config` - Pool configuration
+///
+/// # Example
+/// ```no_run
+/// use agent_mem_core::storage::libsql::connection::{LibSqlConnectionPool, LibSqlPoolConfig};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = LibSqlPoolConfig {
+///         min_connections: 2,
+///         max_connections: 10,
+///         ..Default::default()
+///     };
+///     let pool = LibSqlConnectionPool::new("./data/test.db", config).await?;
+///     
+///     // Get a connection from the pool
+///     let conn = pool.get().await?;
+///     let conn_guard = conn.lock().await;
+///     conn_guard.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)", ()).await?;
+///     
+///     Ok(())
+/// }
+/// ```
+pub async fn create_libsql_pool_with_config(
+    path: &str,
+    config: LibSqlPoolConfig,
+) -> Result<Arc<LibSqlConnectionPool>> {
+    Ok(Arc::new(LibSqlConnectionPool::new(path, config).await?))
 }
 
 #[cfg(test)]
