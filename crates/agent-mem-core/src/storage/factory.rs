@@ -18,10 +18,10 @@ use crate::storage::traits::*;
 
 #[cfg(feature = "libsql")]
 use crate::storage::libsql::{
-    create_libsql_pool, run_migrations, LibSqlAgentRepository, LibSqlApiKeyRepository,
-    LibSqlAssociationRepository, LibSqlBlockRepository, LibSqlMemoryRepository,
-    LibSqlMessageRepository, LibSqlOrganizationRepository, LibSqlToolRepository,
-    LibSqlUserRepository,
+    create_libsql_pool, create_libsql_pool_with_config, run_migrations, LibSqlAgentRepository,
+    LibSqlApiKeyRepository, LibSqlAssociationRepository, LibSqlBlockRepository,
+    LibSqlConnectionPool, LibSqlMemoryRepository, LibSqlMessageRepository,
+    LibSqlOrganizationRepository, LibSqlPoolConfig, LibSqlToolRepository, LibSqlUserRepository,
 };
 
 // Note: PostgreSQL repository implementations are being refactored.
@@ -113,7 +113,14 @@ impl RepositoryFactory {
     async fn create_libsql_repositories(config: &DatabaseConfig) -> Result<Repositories> {
         use agent_mem_traits::AgentMemError;
 
-        // Create connection pool
+        // Create connection pool (new pooled path for memories)
+        let pool = create_libsql_pool_with_config(&config.url, LibSqlPoolConfig::default())
+            .await
+            .map_err(|e| {
+                AgentMemError::StorageError(format!("Failed to create LibSQL pool: {e}"))
+            })?;
+
+        // Legacy single connection (kept for non-memory repos to minimize churn)
         let conn = create_libsql_pool(&config.url).await.map_err(|e| {
             AgentMemError::StorageError(format!("Failed to create LibSQL connection: {e}"))
         })?;
@@ -134,7 +141,8 @@ impl RepositoryFactory {
             messages: Arc::new(LibSqlMessageRepository::new(conn.clone())),
             tools: Arc::new(LibSqlToolRepository::new(conn.clone())),
             api_keys: Arc::new(LibSqlApiKeyRepository::new(conn.clone())),
-            memories: Arc::new(LibSqlMemoryRepository::new(conn.clone())),
+            // 🆕 Memory repository uses pooled connections
+            memories: Arc::new(LibSqlMemoryRepository::new_with_pool(pool.clone())),
             working_memory: {
                 // ✅ WorkingMemory uses the unified memories table internally
                 // This is an implementation detail hidden behind the trait

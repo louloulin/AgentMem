@@ -14,16 +14,48 @@ use crate::search::metadata_filter::{LogicalOperator, MetadataFilterSystem};
 use crate::storage::conversion::{db_to_memory, memory_to_db};
 use crate::storage::models::DbMemory;
 use crate::storage::traits::MemoryRepositoryTrait;
+use crate::storage::libsql::connection::LibSqlConnectionPool;
 
 /// LibSQL implementation of Memory repository
 pub struct LibSqlMemoryRepository {
-    conn: Arc<Mutex<Connection>>,
+    /// Legacy single-connection mode (Arc<Mutex<Connection>>)
+    conn: Option<Arc<Mutex<Connection>>>,
+    /// Preferred pooled mode
+    pool: Option<Arc<LibSqlConnectionPool>>,
 }
 
 impl LibSqlMemoryRepository {
     /// Create a new LibSQL memory repository
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        Self {
+            conn: Some(conn),
+            pool: None,
+        }
+    }
+
+    /// Create a new LibSQL memory repository backed by a connection pool
+    pub fn new_with_pool(pool: Arc<LibSqlConnectionPool>) -> Self {
+        Self {
+            conn: None,
+            pool: Some(pool),
+        }
+    }
+
+    /// Helper to get a connection (from pool if available, otherwise the single conn)
+    async fn get_conn(&self) -> Result<Arc<Mutex<Connection>>> {
+        if let Some(pool) = &self.pool {
+            // Each call gets a pooled connection
+            return pool
+                .get()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get pooled conn: {e}")));
+        }
+        if let Some(conn) = &self.conn {
+            return Ok(conn.clone());
+        }
+        Err(AgentMemError::StorageError(
+            "No connection or pool available".to_string(),
+        ))
     }
 
     /// Batch create memories (optimized for performance with prepared statements)
@@ -40,7 +72,8 @@ impl LibSqlMemoryRepository {
             return Ok(Vec::new());
         }
 
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Start transaction
         conn.execute("BEGIN TRANSACTION", libsql::params![])
@@ -197,7 +230,8 @@ impl LibSqlMemoryRepository {
 #[async_trait]
 impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     async fn create(&self, memory: &Memory) -> Result<Memory> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Convert V4 Memory to DbMemory
         let db_memory = memory_to_db(memory);
@@ -241,7 +275,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Memory>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -274,7 +309,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn find_by_agent_id(&self, agent_id: &str, limit: i64) -> Result<Vec<Memory>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -309,7 +345,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn find_by_user_id(&self, user_id: &str, limit: i64) -> Result<Vec<Memory>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -344,7 +381,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn search(&self, query: &str, limit: i64) -> Result<Vec<Memory>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let search_pattern = format!("%{query}%");
 
@@ -381,7 +419,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn update(&self, memory: &Memory) -> Result<Memory> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         // Convert V4 Memory to DbMemory
         let db_memory = memory_to_db(memory);
@@ -423,7 +462,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         conn.execute(
             "UPDATE memories SET is_deleted = 1, updated_at = ? WHERE id = ?",
@@ -436,7 +476,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn delete_by_agent_id(&self, agent_id: &str) -> Result<u64> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let result = conn.execute(
             "UPDATE memories SET is_deleted = 1, updated_at = ? WHERE agent_id = ? AND is_deleted = 0",
@@ -449,7 +490,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
     }
 
     async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Memory>> {
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let mut stmt = conn
             .prepare(
@@ -498,7 +540,8 @@ impl LibSqlMemoryRepository {
     ) -> Result<Vec<Memory>> {
         // 简化实现：先获取所有结果，然后在内存中过滤
         // TODO: 优化为SQL级别的过滤
-        let conn = self.conn.lock().await;
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
 
         let search_pattern = if query.is_empty() {
             String::new()

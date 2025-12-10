@@ -21,7 +21,10 @@ pub use agent_repository::LibSqlAgentRepository;
 pub use api_key_repository::LibSqlApiKeyRepository;
 pub use association_repository::LibSqlAssociationRepository;
 pub use block_repository::LibSqlBlockRepository;
-pub use connection::{create_libsql_pool, DatabaseStats, LibSqlConnectionManager};
+pub use connection::{
+    create_libsql_pool, create_libsql_pool_with_config, DatabaseStats, LibSqlConnectionManager,
+    LibSqlConnectionPool, LibSqlPoolConfig,
+};
 pub use learning_repository::{LearningRepositoryTrait, LibSqlLearningRepository};
 pub use memory_repository::LibSqlMemoryRepository;
 pub use message_repository::LibSqlMessageRepository;
