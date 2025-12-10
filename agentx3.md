@@ -6093,10 +6093,171 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
 
 ---
 
-**文档版本**: v3.7 Final（核心功能与性能深度分析完整版 + 批量操作验证 + 最终综合评估）  
+---
+
+## 第三十七部分：代码重复与冗余分析
+
+### 37.1 重复实现识别
+
+#### 1. 搜索引擎重复实现
+
+**代码位置**: `crates/agent-mem-core/src/search/`
+
+**发现的搜索引擎**:
+1. `vector_search.rs` - VectorSearchEngine
+2. `bm25.rs` - BM25SearchEngine
+3. `hybrid.rs` - HybridSearchEngine
+4. `enhanced_hybrid_v2.rs` - EnhancedHybridV2（推荐保留）
+5. `cached_vector_search.rs` - CachedVectorSearchEngine
+6. `enhanced_hybrid.rs` - EnhancedHybridSearchEngine（可能重复）
+
+**分析**:
+- `enhanced_hybrid_v2.rs` 是最新、最完整的实现
+- 其他引擎可能是旧版本或实验性实现
+- 建议：保留 `enhanced_hybrid_v2.rs`，删除或归档其他
+
+**冗余度**: 高（6 个搜索引擎，功能重叠）
+
+---
+
+#### 2. 批量操作重复实现
+
+**代码位置**: `crates/agent-mem-core/src/storage/`
+
+**发现的批量操作**:
+1. `batch.rs` - 基础批量操作
+2. `batch_optimized.rs` - 优化的批量操作（PostgreSQL 多行 INSERT）
+
+**分析**:
+- `batch_optimized.rs` 是优化版本（真批量）
+- `batch.rs` 可能是旧版本
+- 建议：保留 `batch_optimized.rs`，删除或合并 `batch.rs`
+
+**冗余度**: 中（2 个批量操作模块）
+
+---
+
+#### 3. 存储后端重复实现
+
+**代码位置**: `crates/agent-mem-core/src/storage/`
+
+**发现的存储实现**:
+1. `memory_repository.rs` - 通用 MemoryRepository trait
+2. `libsql/memory_repository.rs` - LibSQL 实现
+3. `postgres_memory_repository.rs` - PostgreSQL 实现（如果存在）
+
+**分析**:
+- 这些是不同后端的实现，不是重复
+- 但可能有重复的辅助方法
+
+**冗余度**: 低（不同后端实现，合理）
+
+---
+
+### 37.2 代码清理计划
+
+#### Phase 0.5: 代码去重（P0）
+
+**目标**: 删除重复实现，保留最佳实现
+
+**使用情况分析**:
+
+**搜索引擎使用情况**:
+- ✅ `enhanced_hybrid_v2.rs` - **实际使用**: `config.rs`, `integration_test.rs`（推荐保留）
+- ⚠️ `hybrid.rs` - **实际使用**: `orchestrator/core.rs`, `orchestrator/intelligence.rs`, `orchestrator/retrieval.rs`, `orchestrator/initialization.rs`（**仍在使用中，需迁移**）
+- ❌ `enhanced_hybrid.rs` - **实际使用**: 仅被 `enhanced_hybrid_v2.rs` 引用（可删除）
+- ❌ `vector_search.rs` - **实际使用**: 被 `hybrid.rs` 和 `enhanced_hybrid_v2.rs` 使用（**保留作为底层组件**）
+- ❌ `cached_vector_search.rs` - **实际使用**: 功能已集成到 `enhanced_hybrid_v2.rs`（可删除）
+
+**批量操作使用情况**:
+- ✅ `batch_optimized.rs` - **实际使用**: 仅自身定义（**推荐使用**）
+- ⚠️ `batch.rs` - **实际使用**: `performance/query.rs`, `tests/performance_benchmark.rs`, `tests/repository_integration_test.rs`（**仍在使用中，需迁移**）
+
+**步骤**:
+
+**Step 1: 搜索引擎去重（2-3 天）**
+1. **迁移 Orchestrator 使用**:
+   - 将 `orchestrator/core.rs`, `orchestrator/intelligence.rs`, `orchestrator/retrieval.rs`, `orchestrator/initialization.rs` 中的 `HybridSearchEngine` 替换为 `EnhancedHybridSearchEngineV2`
+   - 更新配置和初始化代码
+   - 运行测试确保兼容性
+
+2. **删除旧实现**:
+   - ❌ 删除 `enhanced_hybrid.rs`（功能已完全被 V2 替代）
+   - ❌ 删除 `cached_vector_search.rs`（缓存功能已集成到 V2）
+   - ⚠️ 保留 `hybrid.rs` 作为过渡期兼容层（标记为 deprecated，6 个月后删除）
+   - ✅ 保留 `vector_search.rs`（作为底层组件，被 V2 使用）
+   - ✅ 保留 `bm25.rs`（作为底层组件，被 V2 使用）
+
+3. **重命名（可选）**:
+   - 将 `enhanced_hybrid_v2.rs` 重命名为 `unified_search.rs`（更清晰的命名）
+
+**Step 2: 批量操作去重（1-2 天）**
+1. **迁移测试代码**:
+   - 将 `performance/query.rs`, `tests/performance_benchmark.rs`, `tests/repository_integration_test.rs` 中的 `BatchOperations` 替换为 `OptimizedBatchOperations`
+   - 更新测试用例以使用优化版本
+
+2. **删除旧实现**:
+   - ❌ 删除 `batch.rs`（功能已完全被 `batch_optimized.rs` 替代）
+   - ✅ 保留 `batch_optimized.rs` 作为唯一批量操作实现
+
+**Step 3: 其他重复代码清理（1-2 天）**
+- 扫描其他重复实现
+- 删除或归档旧版本
+- 更新所有引用
+
+**预期成果**:
+- 代码行数减少 5-10%（约 2,000-4,000 行）
+- 维护成本降低 30-50%
+- 代码质量提升（单一实现，减少混淆）
+- 性能提升（统一使用优化版本）
+
+---
+
+### 37.3 核心功能保留策略
+
+#### 保留的核心实现
+
+1. ✅ **EnhancedHybridV2** - 最完整的搜索引擎
+2. ✅ **batch_optimized.rs** - 真批量操作
+3. ✅ **MemoryManager** - 统一 Memory API
+4. ✅ **8 个专门化 Agent** - 核心架构
+5. ✅ **多级缓存系统** - 性能优化
+
+#### 可删除的重复实现
+
+1. ❌ **enhanced_hybrid.rs** - 功能已完全被 V2 替代，可立即删除
+2. ❌ **cached_vector_search.rs** - 缓存功能已集成到 V2，可立即删除
+3. ❌ **batch.rs** - 功能已完全被 batch_optimized.rs 替代，迁移测试后删除
+4. ⚠️ **hybrid.rs** - 仍在使用中，需先迁移 Orchestrator，然后标记为 deprecated，6 个月后删除
+
+#### 需保留的底层组件
+
+1. ✅ **vector_search.rs** - 被 V2 使用，作为底层组件保留
+2. ✅ **bm25.rs** - 被 V2 使用，作为底层组件保留
+3. ✅ **enhanced_hybrid_v2.rs** - 核心搜索引擎，保留并重命名为 unified_search.rs
+4. ✅ **batch_optimized.rs** - 核心批量操作，保留为唯一实现
+
+#### 清理优先级
+
+**P0（立即执行）**:
+1. 删除 `enhanced_hybrid.rs`（无依赖）
+2. 删除 `cached_vector_search.rs`（无依赖）
+3. 迁移测试代码使用 `batch_optimized.rs`
+
+**P1（1-2 周内）**:
+1. 迁移 Orchestrator 使用 `EnhancedHybridSearchEngineV2`
+2. 删除 `batch.rs`（迁移完成后）
+
+**P2（3-6 个月）**:
+1. 标记 `hybrid.rs` 为 deprecated
+2. 6 个月后删除 `hybrid.rs`
+
+---
+
+**文档版本**: v3.8 Final（核心功能与性能深度分析完整版 + 代码去重计划）  
 **最后更新**: 2025-12-10  
-**文档行数**: 6000+ 行  
-**分析深度**: 全面（代码、论文、企业特性、性能、生态、多轮真实实现验证、按计划逐条分析、核心功能与性能深度分析、性能优化实施细节、批量操作真实使用情况验证、Mem0 企业级特性搜索、最终综合评估）  
-**验证方法**: 代码审查 + 文件统计 + 功能测试 + TODO扫描 + 多轮分析 + 计划逐条验证 + 核心功能深度分析 + 性能优化细节验证 + 批量操作使用情况验证 + Mem0 代码对比 + 企业级特性搜索  
-**验证轮数**: 8+ 轮深度分析
+**文档行数**: 6200+ 行  
+**分析深度**: 全面（代码、论文、企业特性、性能、生态、多轮真实实现验证、按计划逐条分析、核心功能与性能深度分析、性能优化实施细节、批量操作真实使用情况验证、Mem0 企业级特性搜索、最终综合评估、代码重复分析）  
+**验证方法**: 代码审查 + 文件统计 + 功能测试 + TODO扫描 + 多轮分析 + 计划逐条验证 + 核心功能深度分析 + 性能优化细节验证 + 批量操作使用情况验证 + Mem0 代码对比 + 企业级特性搜索 + 代码重复分析  
+**验证轮数**: 9+ 轮深度分析
 - **Mem0 参考**: 10,000 ops/s (infer=False), 100 ops/s (infer=True)
