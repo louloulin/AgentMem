@@ -7168,26 +7168,51 @@ for memory in memories {
 
 **代码行数**: ~220 行（新增连接池实现）
 
-### 44.2 待完成工作
+### 44.2 MemoryRepository 连接池集成（已完成）
 
-- ⏳ **集成到 Repository**: 需要更新 `LibSqlMemoryRepository` 使用连接池
-- ⏳ **更新工厂方法**: 需要更新 `create_libsql_pool` 使用连接池
-- ⏳ **连接返回机制**: 需要实现连接的自动返回（当前使用 Arc<Mutex<Connection>>）
+#### 实施内容
+
+**文件**: `crates/agent-mem-core/src/storage/libsql/memory_repository.rs`
+
+**变更内容**:
+- ✅ 修改 `LibSqlMemoryRepository` 结构，支持连接池和单连接双模式
+- ✅ 添加 `new_with_pool()` 方法创建池化仓库
+- ✅ 添加 `get_conn()` 辅助方法，优先从池获取连接
+- ✅ 更新所有 11 处 `self.conn.lock().await` 为 `self.get_conn().await?.lock().await`
+
+**文件**: `crates/agent-mem-core/src/storage/factory.rs`
+
+**变更内容**:
+- ✅ 更新 `create_libsql_repositories` 创建连接池
+- ✅ MemoryRepository 使用 `new_with_pool()` 创建
+- ✅ 其他仓库保持单连接模式（向后兼容）
+
+**文件**: `crates/agent-mem-core/src/storage/libsql/mod.rs`
+
+**变更内容**:
+- ✅ 导出 `LibSqlConnectionPool`, `LibSqlPoolConfig`, `create_libsql_pool_with_config`
 
 ### 44.3 验证结果
 
 - ✅ **编译状态**: `cargo build` 成功
-- ✅ **基础功能**: 连接池结构已实现
-- ⚠️ **集成状态**: 待集成到 Repository
+- ✅ **测试状态**: `cargo test` 426/426 通过
+- ✅ **集成状态**: MemoryRepository 已集成连接池
+- ⏳ **待完成**: 其他 LibSQL 仓库（users/orgs/messages 等）待集成
 
 ### 44.4 性能影响
 
-- **当前**: 单连接 + Mutex（404 ops/s）
-- **预期（连接池）**: 2,000-4,000 ops/s（5-10x 提升）
-- **状态**: 基础结构已实现，待集成
+- **当前**: MemoryRepository 使用连接池，其他仓库仍使用单连接
+- **预期（全部集成后）**: 2,000-4,000 ops/s（5-10x 提升）
+- **状态**: MemoryRepository 已集成，其他仓库待集成
+
+### 44.5 代码统计
+
+- **新增代码**: ~250 行（连接池 + MemoryRepository 集成）
+- **修改代码**: ~15 处（MemoryRepository 中的连接获取）
+- **测试覆盖**: ✅ 426/426 通过
 
 ---
 
-**文档版本**: v3.15 Final（核心功能与性能深度分析完整版 + 代码去重实施 + 测试修复 + 服务验证 + 完整测试验证 + EnhancedHybridSearchEngineV2 集成 + LLM 并行化完善 + LibSQL 批量优化 + 连接池基础实现）  
+**文档版本**: v3.16 Final（核心功能与性能深度分析完整版 + 代码去重实施 + 测试修复 + 服务验证 + 完整测试验证 + EnhancedHybridSearchEngineV2 集成 + LLM 并行化完善 + LibSQL 批量优化 + 连接池基础实现 + MemoryRepository 连接池集成）  
 **最后更新**: 2025-12-10  
-**文档行数**: 7100+ 行
+**文档行数**: 7200+ 行
