@@ -5,6 +5,12 @@ echo "============================================================"
 echo "Mem0 vs AgentMem 性能对比测试"
 echo "============================================================"
 
+# 配置代理（如果存在代理配置脚本）
+if [ -f "./setup_proxy.sh" ]; then
+    echo "配置代理..."
+    source ./setup_proxy.sh
+fi
+
 # 检查 Python 环境
 if ! command -v python3 &> /dev/null; then
     echo "错误: 未找到 python3"

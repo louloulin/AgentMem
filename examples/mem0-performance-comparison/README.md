@@ -10,6 +10,21 @@
 - `agentmem_benchmark.rs`: AgentMem (Rust) 性能测试脚本
 - `run_comparison.sh`: 运行对比测试的脚本
 
+## 配置代理（如果需要）
+
+如果需要在代理环境下运行测试，请先配置代理：
+
+```bash
+# 方法 1: 使用配置脚本（推荐）
+source setup_proxy.sh
+
+# 方法 2: 手动设置
+export https_proxy="http://127.0.0.1:4780"
+export http_proxy="http://127.0.0.1:4780"
+```
+
+详细说明请参考 `PROXY_SETUP.md`。
+
 ## 运行测试
 
 ### 1. 运行 Mem0 测试
@@ -19,20 +34,23 @@
 pip install mem0
 
 # 运行测试
-python mem0_benchmark.py
+python3 mem0_simple_benchmark.py
 ```
 
 ### 2. 运行 AgentMem 测试
 
 ```bash
 # 运行测试
-cargo run --bin agentmem_benchmark --release
+./target/release/agentmem_benchmark
+
+# 或使用脚本
+./run_agentmem_test.sh
 ```
 
 ### 3. 运行完整对比
 
 ```bash
-# 运行对比脚本（如果存在）
+# 运行对比脚本
 ./run_comparison.sh
 ```
 

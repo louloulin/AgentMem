@@ -37,8 +37,13 @@ impl BatchModule {
         let contents: Vec<String> = items.iter().map(|(c, _, _, _, _)| c.clone()).collect();
 
         let embeddings = if let Some(embedder) = &orchestrator.embedder {
-            embedder.embed_batch(&contents).await?
+            info!("开始批量生成嵌入: {} 个文本", contents.len());
+            let result = embedder.embed_batch(&contents).await?;
+            info!("批量嵌入生成成功: {} 个向量", result.len());
+            result
         } else {
+            warn!("Embedder 未初始化，无法批量生成嵌入");
+            warn!("Orchestrator embedder 状态: None");
             return Err(agent_mem_traits::AgentMemError::embedding_error(
                 "Embedder not initialized",
             ));
@@ -191,6 +196,17 @@ impl BatchModule {
         }
 
         info!("批量优化添加 {} 个记忆", contents.len());
+        
+        // 检查 embedder 是否初始化（添加详细日志）
+        if orchestrator.embedder.is_none() {
+            warn!("Embedder 未初始化，无法进行批量添加");
+            warn!("Orchestrator embedder 状态: None");
+            return Err(agent_mem_traits::AgentMemError::embedding_error(
+                "Embedder not initialized",
+            ));
+        } else {
+            info!("✅ Embedder 已初始化，可以进行批量添加");
+        }
 
         // 转换 metadata 类型: HashMap<String, String> -> HashMap<String, serde_json::Value>
         let metadata_json: HashMap<String, serde_json::Value> = metadata

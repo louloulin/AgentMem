@@ -41,13 +41,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn create_test_memory() -> Result<Memory, Box<dyn std::error::Error>> {
+    // 使用内存模式初始化（避免连接池问题）
+    Memory::builder()
+        .with_storage("memory://")  // 使用内存模式，避免连接池超时
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .enable_embedding_queue(64, 20)  // 启用队列优化
+        .disable_intelligent_features()  // 禁用 LLM 推理，类似 infer=False
+        .build()
+        .await
+        .map_err(|e| format!("初始化失败: {}", e).into())
+}
+
 async fn benchmark_agentmem_add(num_items: usize) -> Result<f64, Box<dyn std::error::Error>> {
     println!("测试项数: {}", num_items);
 
-    // 使用 mem0_mode 初始化（类似 Mem0 的默认配置）
-    let mem = Memory::mem0_mode()
-        .await
-        .map_err(|e| format!("初始化失败: {}", e))?;
+    // 使用内存模式初始化（避免连接池问题）
+    let mem = create_test_memory().await?;
 
     // 准备测试数据
     let test_contents: Vec<String> = (0..num_items)
@@ -87,10 +97,10 @@ async fn benchmark_agentmem_add(num_items: usize) -> Result<f64, Box<dyn std::er
 async fn benchmark_agentmem_batch_add(num_items: usize) -> Result<f64, Box<dyn std::error::Error>> {
     println!("测试项数: {}", num_items);
 
-    // 使用 mem0_mode 初始化
-    let mem = Memory::mem0_mode()
-        .await
-        .map_err(|e| format!("初始化失败: {}", e))?;
+    // 使用内存模式初始化（避免连接池问题）
+    let mem = create_test_memory().await?;
+    
+    // 注意：批量添加不需要单独验证 embedder，如果失败会有明确的错误信息
 
     // 准备测试数据
     let test_contents: Vec<String> = (0..num_items)
@@ -131,9 +141,14 @@ async fn benchmark_agentmem_concurrent_add(
     println!("并发数: {}, 每任务项数: {}", concurrency, items_per_task);
     let total_items = concurrency * items_per_task;
 
-    // 使用 mem0_mode 初始化（启用队列）
+    // 使用内存模式初始化（启用队列，避免连接池问题）
     let mem = std::sync::Arc::new(
-        Memory::mem0_mode()
+        Memory::builder()
+            .with_storage("memory://")  // 使用内存模式，避免连接池超时
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .enable_embedding_queue(64, 20)  // 启用队列优化
+            .disable_intelligent_features()  // 禁用 LLM 推理，类似 infer=False
+            .build()
             .await
             .map_err(|e| format!("初始化失败: {}", e))?,
     );

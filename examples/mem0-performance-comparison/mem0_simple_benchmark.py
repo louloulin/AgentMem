@@ -4,8 +4,14 @@ Mem0 简化性能基准测试
 真实运行 Mem0 的性能测试
 """
 
+import os
 import time
 import sys
+
+# 配置代理（如果需要）
+if "https_proxy" in os.environ:
+    print(f"使用代理: {os.environ['https_proxy']}")
+
 from mem0 import Memory
 
 def benchmark_mem0_simple(num_items=50, infer=False):
