@@ -17,6 +17,7 @@ mod p1_optimizations_tests {
     use async_trait::async_trait;
     use futures::stream;
     use std::sync::Arc;
+    use std::pin::Pin;
 
     // Mock implementations for testing
     struct MockLLMProvider;
@@ -46,11 +47,12 @@ mod p1_optimizations_tests {
         async fn generate_stream(
             &self,
             _messages: &[Message],
-        ) -> TraitResult<Box<dyn futures::Stream<Item = TraitResult<String>> + Send + Unpin>>
-        {
+        ) -> TraitResult<
+            Pin<Box<dyn futures::Stream<Item = TraitResult<String>> + Send>>,
+        > {
             use futures::stream;
             let items = vec![Ok("Mock stream response".to_string())];
-            Ok(Box::new(stream::iter(items)))
+            Ok(Box::pin(stream::iter(items)))
         }
 
         fn validate_config(&self) -> TraitResult<()> {

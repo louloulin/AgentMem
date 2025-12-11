@@ -181,7 +181,14 @@ impl MemoryOrchestrator {
         let db_path = config
             .storage_url
             .as_ref()
-            .map(|u| u.as_str())
+            .map(|u| {
+                // 处理 memory:// URL，转换为 SQLite 内存数据库
+                if u == "memory://" {
+                    ":memory:"
+                } else {
+                    u.as_str()
+                }
+            })
             .unwrap_or("./data/agentmem.db");
         info!("🔧 Phase 0: 使用 LibSQL 后端: {}", db_path);
         let operations =

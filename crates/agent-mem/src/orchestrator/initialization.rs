@@ -888,6 +888,13 @@ impl InitializationModule {
 
         info!("✅ 获取LibSQL连接成功");
 
+        // Step 2.5: 运行迁移创建表
+        use agent_mem_core::storage::libsql::run_migrations;
+        run_migrations(conn.clone()).await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to run migrations: {}", e))
+        })?;
+        info!("✅ 数据库迁移完成");
+
         // Step 3: 创建repository
         let repo = LibSqlMemoryRepository::new(conn);
         info!("✅ LibSqlMemoryRepository创建成功");

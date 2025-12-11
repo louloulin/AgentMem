@@ -4,10 +4,20 @@
 
 use agent_mem::{AddMemoryOptions, Memory};
 
+async fn create_in_memory_mem() -> Memory {
+    Memory::builder()
+        .with_storage("memory://")
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .disable_intelligent_features()
+        .build()
+        .await
+        .expect("内存模式初始化失败")
+}
+
 #[tokio::test]
 async fn test_add_batch_basic() {
     // 测试基本的批量添加
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_in_memory_mem().await;
 
     let contents = vec![
         "我喜欢喝咖啡".to_string(),
@@ -15,10 +25,12 @@ async fn test_add_batch_basic() {
         "我在学习 Rust".to_string(),
     ];
 
-    let results = mem
-        .add_batch(contents, AddMemoryOptions::default())
-        .await
-        .expect("批量添加失败");
+    let options = AddMemoryOptions {
+        infer: false,
+        ..Default::default()
+    };
+
+    let results = mem.add_batch(contents, options).await.expect("批量添加失败");
 
     assert_eq!(results.len(), 3, "应该成功添加 3 条记忆");
 
@@ -32,12 +44,13 @@ async fn test_add_batch_basic() {
 #[tokio::test]
 async fn test_add_batch_with_user_scope() {
     // 测试带用户作用域的批量添加
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_in_memory_mem().await;
 
     let contents = vec!["记忆1".to_string(), "记忆2".to_string()];
 
     let options = AddMemoryOptions {
         user_id: Some("alice".to_string()),
+        infer: false,
         ..Default::default()
     };
 
@@ -53,15 +66,17 @@ async fn test_add_batch_with_user_scope() {
 #[tokio::test]
 async fn test_add_batch_performance() {
     // 测试批量添加的性能
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_in_memory_mem().await;
 
     let contents: Vec<String> = (0..10).map(|i| format!("测试记忆 {}", i)).collect();
 
     let start = std::time::Instant::now();
-    let results = mem
-        .add_batch(contents, AddMemoryOptions::default())
-        .await
-        .expect("批量添加失败");
+    let options = AddMemoryOptions {
+        infer: false,
+        ..Default::default()
+    };
+
+    let results = mem.add_batch(contents, options).await.expect("批量添加失败");
     let duration = start.elapsed();
 
     assert_eq!(results.len(), 10);
@@ -75,7 +90,7 @@ async fn test_add_batch_performance() {
 #[tokio::test]
 async fn test_add_batch_with_infer_false() {
     // 测试批量添加（禁用智能功能）
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_in_memory_mem().await;
 
     let contents = vec!["原始内容1".to_string(), "原始内容2".to_string()];
 
@@ -84,10 +99,7 @@ async fn test_add_batch_with_infer_false() {
         ..Default::default()
     };
 
-    let results = mem
-        .add_batch(contents, options)
-        .await
-        .expect("批量添加失败");
+    let results = mem.add_batch(contents, options).await.expect("批量添加失败");
 
     assert_eq!(results.len(), 2);
     println!("✅ 批量添加（简单模式）测试通过");
@@ -96,12 +108,17 @@ async fn test_add_batch_with_infer_false() {
 #[tokio::test]
 async fn test_add_batch_empty() {
     // 测试空批量添加
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_in_memory_mem().await;
 
     let contents: Vec<String> = vec![];
 
+    let options = AddMemoryOptions {
+        infer: false,
+        ..Default::default()
+    };
+
     let results = mem
-        .add_batch(contents, AddMemoryOptions::default())
+        .add_batch(contents, options)
         .await
         .expect("空批量添加应该成功");
 

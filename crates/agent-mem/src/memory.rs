@@ -167,6 +167,21 @@ impl Memory {
             .await
     }
 
+    /// 便捷 API：为指定用户添加记忆（Mem0 风格）
+    ///
+    /// 避免手动构造 `AddMemoryOptions`，直接绑定 `user_id` 并保持智能行为默认开启。
+    pub async fn add_for_user(
+        &self,
+        content: impl Into<String>,
+        user_id: impl Into<String>,
+    ) -> Result<AddResult> {
+        let options = AddMemoryOptions {
+            user_id: Some(user_id.into()),
+            ..Default::default()
+        };
+        self.add_with_options(content, options).await
+    }
+
     /// 添加记忆（带选项）- mem0 兼容版本
     ///
     /// # 参数
@@ -344,6 +359,23 @@ impl Memory {
             .await
     }
 
+    /// 便捷 API：获取指定用户的所有记忆（Mem0 风格）
+    ///
+    /// 可选 `limit`，未提供时沿用默认值。
+    pub async fn get_all_for_user(
+        &self,
+        user_id: impl Into<String>,
+        limit: Option<usize>,
+    ) -> Result<Vec<MemoryItem>> {
+        let options = GetAllOptions {
+            user_id: Some(user_id.into()),
+            limit,
+            ..Default::default()
+        };
+        self.get_all(options).await
+    }
+
+
     /// 更新记忆（mem0 兼容）
     ///
     /// # 参数
@@ -502,6 +534,21 @@ impl Memory {
     pub async fn search(&self, query: impl Into<String>) -> Result<Vec<MemoryItem>> {
         self.search_with_options(query, SearchOptions::default())
             .await
+    }
+
+    /// 便捷 API：为指定用户搜索记忆（Mem0 风格）
+    ///
+    /// 使用默认 limit（10）与搜索模式，直接绑定 `user_id`。
+    pub async fn search_for_user(
+        &self,
+        query: impl Into<String>,
+        user_id: impl Into<String>,
+    ) -> Result<Vec<MemoryItem>> {
+        let options = SearchOptions {
+            user_id: Some(user_id.into()),
+            ..Default::default()
+        };
+        self.search_with_options(query, options).await
     }
 
     /// 搜索记忆（带选项）

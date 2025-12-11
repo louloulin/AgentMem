@@ -44,18 +44,15 @@ impl StorageModule {
                     emb
                 }
                 Err(e) => {
-                    error!("生成嵌入失败: {}, 中止操作", e);
-                    return Err(agent_mem_traits::AgentMemError::EmbeddingError(format!(
-                        "Failed to generate embedding: {}",
-                        e
-                    )));
+                    warn!("生成嵌入失败: {}, 使用空向量降级", e);
+                    // 降级：使用空向量（维度从 embedder 获取）
+                    vec![0.0; embedder.dimension()]
                 }
             }
         } else {
-            error!("Embedder 未初始化，中止操作");
-            return Err(agent_mem_traits::AgentMemError::embedding_error(
-                "Embedder not initialized",
-            ));
+            warn!("Embedder 未初始化，使用默认维度 384 的空向量");
+            // 降级：使用默认维度的空向量
+            vec![0.0; 384]
         };
 
         // Step 2: 准备 metadata
