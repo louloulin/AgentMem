@@ -30,6 +30,12 @@ pub struct OrchestratorConfig {
     pub vector_store_url: Option<String>,
     /// 是否启用智能功能
     pub enable_intelligent_features: bool,
+    /// 是否启用嵌入队列（P1 优化：自动批量处理并发请求）
+    pub enable_embedding_queue: Option<bool>,
+    /// 嵌入批处理大小（默认 32）
+    pub embedding_batch_size: Option<usize>,
+    /// 嵌入批处理间隔（毫秒，默认 10ms）
+    pub embedding_batch_interval_ms: Option<u64>,
 }
 
 impl Default for OrchestratorConfig {
@@ -42,6 +48,9 @@ impl Default for OrchestratorConfig {
             embedder_model: None,
             vector_store_url: None,
             enable_intelligent_features: true,
+            enable_embedding_queue: Some(true), // 默认启用队列优化
+            embedding_batch_size: Some(32),
+            embedding_batch_interval_ms: Some(10),
         }
     }
 }
