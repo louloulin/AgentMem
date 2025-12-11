@@ -49,8 +49,8 @@ impl Default for OrchestratorConfig {
             vector_store_url: None,
             enable_intelligent_features: true,
             enable_embedding_queue: Some(true), // 默认启用队列优化
-            embedding_batch_size: Some(32),
-            embedding_batch_interval_ms: Some(10),
+            embedding_batch_size: Some(64), // 优化：增加批处理大小（32 → 64）
+            embedding_batch_interval_ms: Some(20), // 优化：增加批处理间隔（10ms → 20ms）
         }
     }
 }

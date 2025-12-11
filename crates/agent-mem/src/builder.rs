@@ -199,8 +199,8 @@ impl MemoryBuilder {
     /// 预期性能提升：2x（对于并发场景）
     ///
     /// # 参数
-    /// - `batch_size`: 批处理大小（默认 32）
-    /// - `batch_interval_ms`: 批处理间隔（毫秒，默认 10ms）
+    /// - `batch_size`: 批处理大小（默认 64，推荐 64-128 用于高并发场景）
+    /// - `batch_interval_ms`: 批处理间隔（毫秒，默认 20ms，推荐 20-50ms 用于高并发场景）
     ///
     /// # 示例
     ///
@@ -223,6 +223,13 @@ impl MemoryBuilder {
         self.config.enable_embedding_queue = Some(true);
         self.config.embedding_batch_size = Some(batch_size);
         self.config.embedding_batch_interval_ms = Some(batch_interval_ms);
+        // 性能优化提示
+        if batch_size < 32 {
+            tracing::warn!("批处理大小 {} 可能太小，推荐使用 64-128 用于高并发场景", batch_size);
+        }
+        if batch_interval_ms < 10 {
+            tracing::warn!("批处理间隔 {}ms 可能太短，推荐使用 20-50ms 用于高并发场景", batch_interval_ms);
+        }
         self
     }
 

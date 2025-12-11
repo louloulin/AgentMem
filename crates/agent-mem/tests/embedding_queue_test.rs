@@ -11,7 +11,7 @@ async fn create_test_memory_with_queue() -> Memory {
     Memory::builder()
         .with_storage("memory://")
         .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
-        .enable_embedding_queue(10, 10) // 批处理大小 10，间隔 10ms
+        .enable_embedding_queue(32, 20) // 批处理大小 32，间隔 20ms（测试用较小值）
         .disable_intelligent_features()
         .build()
         .await
