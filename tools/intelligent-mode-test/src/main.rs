@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         embedder_model: Some("all-MiniLM-L6-v2".to_string()),
         vector_store_url: Some("./data/intelligent_lancedb".to_string()),
         enable_intelligent_features: true,
+        ..Default::default()
     };
 
     println!("📦 初始化 Orchestrator（智能模式）...");

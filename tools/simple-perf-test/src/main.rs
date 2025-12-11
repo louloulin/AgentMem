@@ -26,6 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         embedder_model: Some("all-MiniLM-L6-v2".to_string()), // 更快的嵌入模型
         vector_store_url: Some("./data/perf_lancedb".to_string()),
         enable_intelligent_features: false,
+        ..Default::default()
     };
 
     println!("📦 初始化 Orchestrator...");

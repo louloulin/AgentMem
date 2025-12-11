@@ -27,6 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         embedder_model: Some("all-MiniLM-L6-v2".to_string()),
         vector_store_url: Some("memory://".to_string()), // 使用内存向量存储
         enable_intelligent_features: false,              // 禁用智能功能
+        ..Default::default()
     };
 
     let orchestrator = MemoryOrchestrator::new_with_config(config).await?;

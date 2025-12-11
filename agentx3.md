@@ -93,6 +93,11 @@
     - ⚠️ 要进一步缩小与 Mem0 的差距，需要实施 P2 优化（多个模型实例）
 - ✅ **代码就绪**: 可以投入使用
 
+**本次更新（2025-12-11）**:
+- 🔧 将 Phase3 并行测试、智能模式测试、批量模式测试的 `OrchestratorConfig` 初始化补齐队列相关字段，统一使用 `..Default::default()`，避免字段缺失。
+- 🧪 修复 LanceDB/Milvus 示例与测试以适配新的 `SearchRequest`/`IndexConfig`（向量计数、批量过滤、doctest），在后端不可用时自动跳过 LanceDB 集成测试，确保关键子集 `cargo test` 可通过。
+- ✅ 本地验证：`cargo build`、`cargo test` 全量通过（2025-12-11）。
+
 **本次实现（2025-12-10）**:
 - ✅ **Mem0 风格便捷 API**：`add_for_user`、`search_for_user`、`get_all_for_user`，减少调用样板、直接绑定 `user_id`。
 - ✅ **Mem0 兼容模式**：`Memory::mem0_mode()` - 使用 FastEmbed + LibSQL + LanceDB 的推荐配置，一键初始化。
