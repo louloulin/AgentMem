@@ -185,6 +185,9 @@ impl MemoryOrchestrator {
                 // 处理 memory:// URL，转换为 SQLite 内存数据库
                 if u == "memory://" {
                     ":memory:"
+                } else if u.starts_with("libsql://") {
+                    // 处理 libsql:// 前缀，提取实际文件路径
+                    u.strip_prefix("libsql://").unwrap_or(u.as_str())
                 } else {
                     u.as_str()
                 }

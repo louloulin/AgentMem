@@ -881,7 +881,14 @@ impl InitializationModule {
 
         // 对于内存模式（:memory:），使用单连接避免连接池的复杂性
         // 对于文件模式，使用连接池提升性能
-        let use_pool = !db_path.starts_with(":memory:");
+        // 处理 libsql:// 前缀，提取实际文件路径
+        let actual_db_path = if db_path.starts_with("libsql://") {
+            db_path.strip_prefix("libsql://").unwrap_or(db_path)
+        } else {
+            db_path
+        };
+        
+        let use_pool = !actual_db_path.starts_with(":memory:");
         
         if use_pool {
             // Step 1: 创建连接池（性能优化：使用连接池替代单连接）
@@ -893,7 +900,7 @@ impl InitializationModule {
                 max_lifetime: 1800,
             };
 
-            let pool = create_libsql_pool_with_config(db_path, pool_config)
+            let pool = create_libsql_pool_with_config(actual_db_path, pool_config)
                 .await
                 .map_err(|e| {
                     AgentMemError::StorageError(format!(
@@ -923,7 +930,7 @@ impl InitializationModule {
 
             info!(
                 "✅ Phase 0: LibSQL Memory Operations 创建成功（连接池模式） - 数据将持久化到 {}",
-                db_path
+                actual_db_path
             );
             return Ok(Box::new(operations));
         } else {
@@ -931,7 +938,7 @@ impl InitializationModule {
             info!("🔧 内存模式：使用单连接（避免连接池复杂性）");
             
             // Step 1: 创建连接管理器
-            let conn_mgr = LibSqlConnectionManager::new(db_path).await.map_err(|e| {
+            let conn_mgr = LibSqlConnectionManager::new(actual_db_path).await.map_err(|e| {
                 AgentMemError::StorageError(format!(
                     "Failed to create LibSQL connection manager: {}",
                     e
@@ -963,7 +970,7 @@ impl InitializationModule {
 
             info!(
                 "✅ Phase 0: LibSQL Memory Operations 创建成功（单连接模式） - 数据将持久化到 {}",
-                db_path
+                actual_db_path
             );
             return Ok(Box::new(operations));
         }
