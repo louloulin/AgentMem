@@ -450,6 +450,23 @@ impl InitializationModule {
 
                 match EmbeddingFactory::create_openai_embedder(api_key).await {
                     Ok(embedder) => {
+                        // P1 优化：如果启用嵌入队列，包装为队列化嵌入器
+                        let embedder = if config.enable_embedding_queue.unwrap_or(true) {
+                            use agent_mem_embeddings::providers::QueuedEmbedder;
+                            let queued = QueuedEmbedder::new(
+                                embedder,
+                                config.embedding_batch_size.unwrap_or(32),
+                                config.embedding_batch_interval_ms.unwrap_or(10),
+                                true,
+                            );
+                            info!("✅ 嵌入队列已启用（批处理大小: {}, 间隔: {}ms）", 
+                                config.embedding_batch_size.unwrap_or(32),
+                                config.embedding_batch_interval_ms.unwrap_or(10));
+                            Arc::new(queued) as Arc<dyn Embedder + Send + Sync>
+                        } else {
+                            embedder
+                        };
+                        
                         info!("成功创建 OpenAI Embedder (text-embedding-ada-002, 1536维)");
                         Ok(Some(embedder))
                     }

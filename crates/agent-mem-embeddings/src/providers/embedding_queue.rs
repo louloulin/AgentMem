@@ -15,6 +15,9 @@ struct EmbedRequest {
     responder: oneshot::Sender<Result<Vec<f32>>>,
 }
 
+// 注意：oneshot::Sender 不能直接克隆，我们需要使用不同的方法
+// 改为在发送时直接使用，而不是克隆
+
 /// 嵌入批处理队列
 /// 
 /// 收集并发请求，定期批量处理，减少 Mutex 锁竞争
@@ -91,7 +94,7 @@ impl EmbeddingQueue {
                             None => {
                                 // 通道关闭，处理剩余请求后退出
                                 if !batch.is_empty() {
-                                    Self::process_batch(&embedder, &mut batch).await;
+                                    Self::process_batch(&embedder, batch).await;
                                 }
                                 return;
                             }
@@ -108,7 +111,8 @@ impl EmbeddingQueue {
             if !batch.is_empty() {
                 let elapsed = last_batch_time.elapsed();
                 if elapsed >= batch_interval || batch.len() >= batch_size {
-                    Self::process_batch(&embedder, &mut batch).await;
+                    let batch_to_process = std::mem::take(&mut batch); // 移动 batch
+                    Self::process_batch(&embedder, batch_to_process).await;
                     last_batch_time = Instant::now();
                 }
             }
@@ -118,7 +122,7 @@ impl EmbeddingQueue {
     /// 处理一批请求
     async fn process_batch(
         embedder: &Arc<dyn Embedder + Send + Sync>,
-        batch: &mut Vec<EmbedRequest>,
+        batch: Vec<EmbedRequest>,
     ) {
         if batch.is_empty() {
             return;
@@ -141,9 +145,9 @@ impl EmbeddingQueue {
                     elapsed / batch_size as u32
                 );
                 
-                // 发送结果
-                for (i, (req, embedding)) in batch.iter().zip(embeddings.iter()).enumerate() {
-                    if let Err(_) = req.responder.send(Ok(embedding.clone())) {
+                // 发送结果（移动 batch，因为 oneshot::Sender 不能克隆）
+                for (i, (req, embedding)) in batch.into_iter().zip(embeddings.into_iter()).enumerate() {
+                    if let Err(_) = req.responder.send(Ok(embedding)) {
                         warn!("无法发送嵌入结果（接收端已关闭）: {}", i);
                     }
                 }
@@ -151,17 +155,13 @@ impl EmbeddingQueue {
             Err(e) => {
                 warn!("批量嵌入生成失败: {}", e);
                 
-                // 发送错误
-                for req in batch.iter() {
-                    let _ = req.responder.send(Err(AgentMemError::embedding_error(format!(
-                        "批量嵌入失败: {}",
-                        e
-                    ))));
+                // 发送错误（移动 batch，为每个请求创建新的错误）
+                let error_msg = format!("批量嵌入失败: {}", e);
+                for req in batch.into_iter() {
+                    let _ = req.responder.send(Err(AgentMemError::embedding_error(error_msg.clone())));
                 }
             }
         }
-        
-        batch.clear();
     }
     
     /// 提交嵌入请求

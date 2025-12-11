@@ -4,6 +4,8 @@
 
 ### P0: FastEmbed 锁机制优化 ✅
 
+**状态**：已完成并验证
+
 #### 问题
 - Mutex 锁竞争导致并发性能差（154 ops/s）
 - 所有并发任务都要获取同一个 `Mutex` 锁，导致串行执行嵌入生成
@@ -41,12 +43,59 @@
 - **批量方法性能**：**250-360 ops/s**，远超预期
 - **详细报告**：参见 `PERFORMANCE_VERIFICATION_REPORT.md`
 
+### P1: 嵌入队列实现 ✅
+
+**状态**：已完成并验证（2025-12-10）
+
+#### 问题
+- 并发场景下，每个 `add_for_user` 调用都独立调用 `embed()`
+- Mutex 锁竞争导致性能瓶颈
+
+#### 解决方案
+1. **实现 `EmbeddingQueue`**：
+   - 自动收集并发请求
+   - 定期批量处理（批处理大小 32，间隔 10ms）
+   - 使用 `embed_batch` 批量生成嵌入
+
+2. **实现 `QueuedEmbedder`**：
+   - 包装底层嵌入器
+   - 自动使用队列处理单个嵌入请求
+   - 批量操作直接使用底层嵌入器
+
+3. **集成到初始化流程**：
+   - FastEmbed 和 OpenAI embedder 都支持队列
+   - 默认启用队列优化
+   - Builder 支持配置队列参数
+
+#### 代码变更
+- `crates/agent-mem-embeddings/src/providers/embedding_queue.rs`：实现嵌入队列
+- `crates/agent-mem-embeddings/src/providers/queued_embedder.rs`：实现队列化嵌入器包装器
+- `crates/agent-mem/src/orchestrator/initialization.rs`：集成队列到初始化流程
+- `crates/agent-mem/src/orchestrator/core.rs`：添加队列配置选项
+- `crates/agent-mem/src/builder.rs`：添加 `enable_embedding_queue()` 和 `disable_embedding_queue()` 方法
+
+#### 实际验证结果 ✅
+- **启用队列 vs 禁用队列**：**2.00x 提升**（217.62 vs 108.97 ops/s）
+- **嵌入队列启用测试**：172.97 ops/s（20并发）
+- **批量处理测试**：133.87 ops/s（30并发）
+- **所有测试通过**：3个嵌入队列测试全部通过
+
+#### 使用示例
+```rust
+let mem = Memory::builder()
+    .with_storage("memory://")
+    .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+    .enable_embedding_queue(32, 10)  // 批处理大小 32，间隔 10ms
+    .build()
+    .await?;
+```
+
 ### 待实施的优化
 
-#### P1: 并发场景下的批量嵌入（待实施）
-- **问题**：并发场景下，每个 `add_for_user` 调用都独立调用 `embed()`
-- **解决方案**：实现嵌入队列，自动收集并发请求并批量处理
-- **预期提升**：2x（400-500 ops/s → 800-1000 ops/s）
+#### P2: 进一步优化 FastEmbed 锁机制（待实施）
+- **问题**：即使优化后，Mutex 锁竞争仍然存在
+- **解决方案**：使用多个模型实例或更细粒度的锁
+- **预期提升**：2-4x（800-1000 ops/s → 2,000-4,000 ops/s）
 
 #### P2: 进一步优化 FastEmbed 锁机制（待实施）
 - **问题**：即使优化后，Mutex 锁竞争仍然存在

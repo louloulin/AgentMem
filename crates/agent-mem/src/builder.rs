@@ -193,6 +193,61 @@ impl MemoryBuilder {
         self
     }
 
+    /// 启用嵌入队列（P1 优化：自动批量处理并发请求）
+    ///
+    /// 嵌入队列会自动收集并发请求，批量处理嵌入生成，显著减少 Mutex 锁竞争。
+    /// 预期性能提升：2x（对于并发场景）
+    ///
+    /// # 参数
+    /// - `batch_size`: 批处理大小（默认 32）
+    /// - `batch_interval_ms`: 批处理间隔（毫秒，默认 10ms）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_storage("libsql://agentmem.db")
+    ///     .enable_embedding_queue(32, 10)  // 批处理大小 32，间隔 10ms
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn enable_embedding_queue(
+        mut self,
+        batch_size: usize,
+        batch_interval_ms: u64,
+    ) -> Self {
+        self.config.enable_embedding_queue = Some(true);
+        self.config.embedding_batch_size = Some(batch_size);
+        self.config.embedding_batch_interval_ms = Some(batch_interval_ms);
+        self
+    }
+
+    /// 禁用嵌入队列
+    ///
+    /// 禁用嵌入队列，直接使用底层嵌入器（适用于不需要批量优化的场景）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_storage("libsql://agentmem.db")
+    ///     .disable_embedding_queue()
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn disable_embedding_queue(mut self) -> Self {
+        self.config.enable_embedding_queue = Some(false);
+        self
+    }
+
     /// 设置默认用户
     ///
     /// # 示例
