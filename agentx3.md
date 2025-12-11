@@ -40,6 +40,7 @@
 
 **本次实现（2025-12-10）**:
 - ✅ 新增 Mem0 风格便捷 API：`add_for_user`、`search_for_user`、`get_all_for_user`，减少调用样板、直接绑定 `user_id`。
+- ✅ 实现 Mem0 兼容模式：`Memory::mem0_mode()` - 使用 FastEmbed + LibSQL + LanceDB 的推荐配置，一键初始化。
 - ✅ 修复批量操作测试：解决内存存储模式下的数据库表初始化问题，确保 `memory://` URL 正确转换为 SQLite 内存数据库。
 - ✅ 优化 `add_memory_fast`：在 embedder 不可用时使用降级策略（空向量），提高容错性。
 - ✅ 完善测试覆盖：添加批量操作测试和 Mem0 风格 API 测试，所有核心测试通过（14个测试通过）。
@@ -97,18 +98,18 @@ let mem = Memory::builder()
 - ⚠️ 缺少 Mem0 兼容的默认配置
 - ⚠️ 配置分散在多个地方
 
-#### AgentMem 初始化（目标）
+#### AgentMem 初始化（目标 - ✅ 已实现）
 
 ```rust
 use agent_mem::Memory;
 
-// 零配置模式 - 对标 Mem0
+// 零配置模式 - 对标 Mem0（✅ 已存在）
 let mem = Memory::new().await?;  // 自动检测环境变量，智能默认值
 
-// Mem0 兼容模式
+// Mem0 兼容模式（✅ 已实现）
 let mem = Memory::mem0_mode().await?;  // FastEmbed + LibSQL + LanceDB
 
-// Builder 模式（高级用户）
+// Builder 模式（高级用户）（✅ 已存在）
 let mem = Memory::builder()
     .with_llm("openai", "gpt-4")
     .with_embedder("openai", "text-embedding-3-small")

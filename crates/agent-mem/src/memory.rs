@@ -114,6 +114,40 @@ impl Memory {
         ))
     }
 
+    /// Mem0 兼容模式初始化
+    ///
+    /// 使用 Mem0 推荐的默认配置：
+    /// - FastEmbed (BAAI/bge-small-en-v1.5) - 本地嵌入模型，无需 API Key
+    /// - LibSQL - 轻量级 SQLite 数据库
+    /// - LanceDB - 高性能向量数据库
+    /// - 智能功能默认启用（如果配置了 LLM API Key）
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use agent_mem::Memory;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mem = Memory::mem0_mode().await?;
+    ///     mem.add_for_user("I love pizza", "user123").await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn mem0_mode() -> Result<Self> {
+        info!("初始化 Memory (Mem0 兼容模式)");
+
+        let mem = Memory::builder()
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .with_storage("libsql://./data/agentmem.db")
+            .with_vector_store("lancedb://./data/vectors.lance")
+            .enable_intelligent_features() // 如果配置了 LLM API Key 会自动启用
+            .build()
+            .await?;
+
+        Ok(mem)
+    }
+
     /// 使用 Builder 模式初始化
     ///
     /// # 示例
