@@ -21,15 +21,33 @@ def benchmark_mem0_simple(num_items=50, infer=False):
     print(f"{'='*60}")
     print(f"测试项数: {num_items}")
     
-    # 初始化 Memory（使用默认配置）
+    # 初始化 Memory（默认优先本地 fastembed，无需 API Key）
     print("\n初始化 Memory...")
     try:
-        mem = Memory()
+        if not os.getenv("OPENAI_API_KEY"):
+            print("⚠️  未设置 OPENAI_API_KEY，使用本地 fastembed 配置（禁用 LLM）...")
+            mem = Memory.from_config({
+                "vector_store": {
+                    "provider": "qdrant",
+                    "config": {
+                        "collection_name": "mem0",
+                        "path": "./qdrant_db"
+                    }
+                },
+                "embedder": {
+                    "provider": "fastembed",
+                    "config": {
+                        "model_name": "BAAI/bge-small-en-v1.5"
+                    }
+                }
+            })
+        else:
+            mem = Memory()
         print("✅ Memory 初始化成功")
     except Exception as e:
         print(f"❌ Memory 初始化失败: {e}")
-        print("\n提示: 请确保已安装 mem0:")
-        print("  pip install mem0")
+        print("\n提示: 请确保已安装 mem0 及 fastembed:")
+        print("  pip install mem0ai fastembed")
         return 0, 0
     
     # 准备测试数据

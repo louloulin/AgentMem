@@ -17,28 +17,37 @@ def benchmark_mem0_add(num_items=100, infer=False):
     print(f"\n=== Mem0 性能测试 (infer={infer}) ===")
     print(f"测试项数: {num_items}")
     
-    # 初始化 Memory（使用默认配置，类似 AgentMem 的 mem0_mode）
-    # Mem0 的默认配置会自动使用 FastEmbed 和 Qdrant
+    # 初始化 Memory：若无 OPENAI_API_KEY，则使用本地 fastembed + 本地 Qdrant，并注入一个 dummy key 避免校验
     try:
-        # 尝试使用配置初始化
-        mem = Memory.from_config({
-            "embedder": {
-                "provider": "fastembed",
-                "config": {
-                    "model": "BAAI/bge-small-en-v1.5"
-                }
-            },
-            "vector_store": {
-                "provider": "qdrant",
-                "config": {
-                    "path": "/tmp/mem0_benchmark"  # 使用临时目录
-                }
-            }
-        })
+        if os.getenv("OPENAI_API_KEY"):
+            mem = Memory()
+        else:
+            print("⚠️  未设置 OPENAI_API_KEY，使用本地 fastembed + 本地 Qdrant（注入 dummy key 避免校验）...")
+            os.environ["OPENAI_API_KEY"] = "DUMMY_NO_CALL"
+            mem = Memory.from_config({
+                "embedder": {
+                    "provider": "fastembed",
+                    "config": {
+                        "model": "BAAI/bge-small-en-v1.5"
+                    }
+                },
+                "vector_store": {
+                    "provider": "qdrant",
+                    "config": {
+                        "path": "/tmp/mem0_benchmark"
+                    }
+                },
+                "llm": {
+                    "provider": "openai",
+                    "config": {
+                        "api_key": "DUMMY_NO_CALL"
+                    }
+                },
+            })
+        print("✅ Memory 初始化成功")
     except Exception as e:
-        print(f"配置初始化失败，使用默认配置: {e}")
-        # 使用默认配置（Mem0 会自动选择 FastEmbed 和 Qdrant）
-        mem = Memory()
+        print(f"❌ Memory 初始化失败: {e}")
+        return 0, 0
     
     # 准备测试数据
     test_contents = [f"Test memory item {i}: This is a test memory for performance benchmarking." for i in range(num_items)]
@@ -79,27 +88,37 @@ def benchmark_mem0_batch_add(num_items=100, infer=False):
     print(f"\n=== Mem0 批量添加性能测试 (infer={infer}) ===")
     print(f"测试项数: {num_items}")
     
-    # 初始化 Memory
+    # 初始化 Memory：若无 OPENAI_API_KEY，则使用本地 fastembed + 本地 Qdrant，并注入一个 dummy key 避免校验
     try:
-        # 尝试使用配置初始化
-        mem = Memory.from_config({
-            "embedder": {
-                "provider": "fastembed",
-                "config": {
-                    "model": "BAAI/bge-small-en-v1.5"
-                }
-            },
-            "vector_store": {
-                "provider": "qdrant",
-                "config": {
-                    "path": "/tmp/mem0_benchmark_batch"  # 使用临时目录
-                }
-            }
-        })
+        if os.getenv("OPENAI_API_KEY"):
+            mem = Memory()
+        else:
+            print("⚠️  未设置 OPENAI_API_KEY，使用本地 fastembed + 本地 Qdrant（注入 dummy key 避免校验）...")
+            os.environ["OPENAI_API_KEY"] = "DUMMY_NO_CALL"
+            mem = Memory.from_config({
+                "embedder": {
+                    "provider": "fastembed",
+                    "config": {
+                        "model": "BAAI/bge-small-en-v1.5"
+                    }
+                },
+                "vector_store": {
+                    "provider": "qdrant",
+                    "config": {
+                        "path": "/tmp/mem0_benchmark_batch"
+                    }
+                },
+                "llm": {
+                    "provider": "openai",
+                    "config": {
+                        "api_key": "DUMMY_NO_CALL"
+                    }
+                },
+            })
+        print("✅ Memory 初始化成功")
     except Exception as e:
-        print(f"配置初始化失败，使用默认配置: {e}")
-        # 使用默认配置（Mem0 会自动选择 FastEmbed 和 Qdrant）
-        mem = Memory()
+        print(f"❌ Memory 初始化失败: {e}")
+        return 0, 0
     
     # 准备测试数据
     test_contents = [f"Test memory item {i}: This is a test memory for performance benchmarking." for i in range(num_items)]

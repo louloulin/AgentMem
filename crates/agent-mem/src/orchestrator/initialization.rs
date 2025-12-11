@@ -971,23 +971,23 @@ impl InitializationModule {
         } else {
             // 内存模式：使用单连接（避免连接池在内存模式下的问题）
             info!("🔧 内存模式：使用单连接（避免连接池复杂性）");
-            
-            // Step 1: 创建连接管理器
+
+        // Step 1: 创建连接管理器
             let conn_mgr = LibSqlConnectionManager::new(actual_db_path).await.map_err(|e| {
-                AgentMemError::StorageError(format!(
-                    "Failed to create LibSQL connection manager: {}",
-                    e
-                ))
-            })?;
+            AgentMemError::StorageError(format!(
+                "Failed to create LibSQL connection manager: {}",
+                e
+            ))
+        })?;
 
-            info!("✅ LibSQL连接管理器创建成功");
+        info!("✅ LibSQL连接管理器创建成功");
 
-            // Step 2: 获取连接
-            let conn = conn_mgr.get_connection().await.map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e))
-            })?;
+        // Step 2: 获取连接
+        let conn = conn_mgr.get_connection().await.map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e))
+        })?;
 
-            info!("✅ 获取LibSQL连接成功");
+        info!("✅ 获取LibSQL连接成功");
 
             // Step 2.5: 运行迁移创建表
             use agent_mem_core::storage::libsql::run_migrations;
@@ -996,17 +996,17 @@ impl InitializationModule {
             })?;
             info!("✅ 数据库迁移完成");
 
-            // Step 3: 创建repository
-            let repo = LibSqlMemoryRepository::new(conn);
-            info!("✅ LibSqlMemoryRepository创建成功");
+        // Step 3: 创建repository
+        let repo = LibSqlMemoryRepository::new(conn);
+        info!("✅ LibSqlMemoryRepository创建成功");
 
-            // Step 4: 包装为operations（实现MemoryOperations trait）
-            let operations = LibSqlMemoryOperations::new(repo);
+        // Step 4: 包装为operations（实现MemoryOperations trait）
+        let operations = LibSqlMemoryOperations::new(repo);
 
-            info!(
+        info!(
                 "✅ Phase 0: LibSQL Memory Operations 创建成功（单连接模式） - 数据将持久化到 {}",
                 actual_db_path
-            );
+        );
             return Ok(Box::new(operations));
         }
     }
