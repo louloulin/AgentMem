@@ -22,14 +22,22 @@ echo ""
 echo "============================================================"
 echo "运行 Mem0 测试..."
 echo "============================================================"
-python3 mem0_benchmark.py
+if [ -f "run_mem0_test.sh" ]; then
+    ./run_mem0_test.sh
+else
+    python3 mem0_benchmark.py
+fi
 
 # 运行 AgentMem 测试
 echo ""
 echo "============================================================"
 echo "运行 AgentMem 测试..."
 echo "============================================================"
-cargo run --bin agentmem_benchmark --release
+if [ -f "run_agentmem_test.sh" ]; then
+    ./run_agentmem_test.sh
+else
+    cargo run --bin agentmem_benchmark --release
+fi
 
 echo ""
 echo "============================================================"
@@ -42,4 +50,8 @@ echo "注意:"
 echo "  - Mem0 目标性能: 10,000 ops/s (infer=False)"
 echo "  - AgentMem 当前性能: ~470 ops/s (批量添加)"
 echo "  - 性能差距主要来自 FastEmbed 的内部优化差异"
+echo ""
+echo "单独运行测试:"
+echo "  - Mem0: ./run_mem0_test.sh"
+echo "  - AgentMem: ./run_agentmem_test.sh"
 echo ""
