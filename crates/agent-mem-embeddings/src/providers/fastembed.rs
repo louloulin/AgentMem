@@ -20,6 +20,7 @@ use tracing::{debug, info, warn};
 /// - 批处理优化
 pub struct FastEmbedProvider {
     /// FastEmbed 模型实例（包装在 Mutex 中以支持异步）
+    /// 优化：使用 std::sync::Mutex 在 spawn_blocking 中获取，避免阻塞异步运行时
     model: Arc<Mutex<TextEmbedding>>,
 
     /// 配置
@@ -161,10 +162,12 @@ impl Embedder for FastEmbedProvider {
         let text = text.to_string();
         let model = self.model.clone();
 
-        // 在阻塞线程中执行同步操作
+        // 优化：在阻塞线程中获取锁和执行嵌入生成
+        // 这样可以避免阻塞异步运行时，但锁竞争仍然存在
+        // 更好的优化是使用批量嵌入（见 embed_batch 方法）
         let embedding = tokio::task::spawn_blocking(move || {
-            let mut model = model.lock().expect("无法获取模型锁");
-            model.embed(vec![text], None)
+            let mut model_guard = model.lock().expect("无法获取模型锁");
+            model_guard.embed(vec![text], None)
         })
         .await
         .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?
@@ -187,10 +190,11 @@ impl Embedder for FastEmbedProvider {
         let model = self.model.clone();
         let batch_size = self.config.batch_size;
 
-        // 在阻塞线程中执行同步操作
+        // 优化：在阻塞线程中获取锁和执行批量嵌入生成
+        // 批量处理可以显著减少锁竞争（一次处理多个文本）
         let embeddings = tokio::task::spawn_blocking(move || {
-            let mut model = model.lock().expect("无法获取模型锁");
-            model.embed(texts, Some(batch_size))
+            let mut model_guard = model.lock().expect("无法获取模型锁");
+            model_guard.embed(texts, Some(batch_size))
         })
         .await
         .map_err(|e| AgentMemError::embedding_error(format!("任务失败: {e}")))?

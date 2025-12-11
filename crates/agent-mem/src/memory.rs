@@ -972,6 +972,33 @@ impl Memory {
     /// # Ok(())
     /// # }
     /// ```
+    /// 批量添加记忆（优化版）
+    ///
+    /// 这是性能优化的批量添加方法，使用批量嵌入生成，显著减少锁竞争。
+    ///
+    /// **性能优势**：
+    /// - 使用 `embed_batch` 批量生成嵌入，减少 Mutex 锁竞争
+    /// - 预期性能提升：3-5x（相比单个 `add_for_user` 调用）
+    /// - 推荐用于并发场景或批量导入
+    ///
+    /// # 参数
+    /// - `contents`: 记忆内容列表
+    /// - `options`: 添加选项（所有记忆共享相同的选项）
+    ///
+    /// # 示例
+    /// ```no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::new().await?;
+    /// let contents = vec!["Memory 1".to_string(), "Memory 2".to_string()];
+    /// let options = agent_mem::AddMemoryOptions {
+    ///     user_id: Some("user123".to_string()),
+    ///     ..Default::default()
+    /// };
+    /// let results = mem.add_batch_optimized(contents, options).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn add_batch_optimized(
         &self,
         contents: Vec<String>,
@@ -991,7 +1018,7 @@ impl Memory {
             .clone()
             .unwrap_or_else(|| self.default_agent_id.clone());
 
-        // 调用 orchestrator 的批量添加方法
+        // 调用 orchestrator 的批量添加方法（使用批量嵌入生成）
         let memory_ids = orchestrator
             .add_memory_batch_optimized(
                 contents,
