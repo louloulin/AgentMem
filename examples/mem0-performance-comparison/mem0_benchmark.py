@@ -17,33 +17,32 @@ def benchmark_mem0_add(num_items=100, infer=False):
     print(f"\n=== Mem0 性能测试 (infer={infer}) ===")
     print(f"测试项数: {num_items}")
     
-    # 初始化 Memory：若无 OPENAI_API_KEY，则使用本地 fastembed + 本地 Qdrant，并注入一个 dummy key 避免校验
+    # 初始化 Memory：默认使用本地 fastembed + 本地 Qdrant，LLM 使用 dummy key（infer=False 时不会调用）
     try:
-        if os.getenv("OPENAI_API_KEY"):
-            mem = Memory()
-        else:
-            print("⚠️  未设置 OPENAI_API_KEY，使用本地 fastembed + 本地 Qdrant（注入 dummy key 避免校验）...")
-            os.environ["OPENAI_API_KEY"] = "DUMMY_NO_CALL"
-            mem = Memory.from_config({
-                "embedder": {
-                    "provider": "fastembed",
-                    "config": {
-                        "model": "BAAI/bge-small-en-v1.5"
-                    }
-                },
-                "vector_store": {
-                    "provider": "qdrant",
-                    "config": {
-                        "path": "/tmp/mem0_benchmark"
-                    }
-                },
-                "llm": {
-                    "provider": "openai",
-                    "config": {
-                        "api_key": "DUMMY_NO_CALL"
-                    }
-                },
-            })
+        os.environ.setdefault("OPENAI_API_KEY", "sk-DUMMY-NO-CALL")
+
+        mem = Memory.from_config({
+            "embedder": {
+                "provider": "fastembed",
+                "config": {
+                    "model": "BAAI/bge-small-en-v1.5"
+                }
+            },
+            "vector_store": {
+                "provider": "qdrant",
+                "config": {
+                    "collection_name": "mem0_benchmark_fe",
+                    "path": "/tmp/mem0_benchmark_fe",
+                    "embedding_model_dims": 384
+                }
+            },
+            "llm": {
+                "provider": "openai",
+                "config": {
+                    "api_key": "sk-DUMMY-NO-CALL"
+                }
+            }
+        })
         print("✅ Memory 初始化成功")
     except Exception as e:
         print(f"❌ Memory 初始化失败: {e}")
@@ -88,33 +87,32 @@ def benchmark_mem0_batch_add(num_items=100, infer=False):
     print(f"\n=== Mem0 批量添加性能测试 (infer={infer}) ===")
     print(f"测试项数: {num_items}")
     
-    # 初始化 Memory：若无 OPENAI_API_KEY，则使用本地 fastembed + 本地 Qdrant，并注入一个 dummy key 避免校验
+    # 初始化 Memory：默认使用本地 fastembed + 本地 Qdrant，LLM 使用 dummy key（infer=False 时不会调用）
     try:
-        if os.getenv("OPENAI_API_KEY"):
-            mem = Memory()
-        else:
-            print("⚠️  未设置 OPENAI_API_KEY，使用本地 fastembed + 本地 Qdrant（注入 dummy key 避免校验）...")
-            os.environ["OPENAI_API_KEY"] = "DUMMY_NO_CALL"
-            mem = Memory.from_config({
-                "embedder": {
-                    "provider": "fastembed",
-                    "config": {
-                        "model": "BAAI/bge-small-en-v1.5"
-                    }
-                },
-                "vector_store": {
-                    "provider": "qdrant",
-                    "config": {
-                        "path": "/tmp/mem0_benchmark_batch"
-                    }
-                },
-                "llm": {
-                    "provider": "openai",
-                    "config": {
-                        "api_key": "DUMMY_NO_CALL"
-                    }
-                },
-            })
+        os.environ.setdefault("OPENAI_API_KEY", "sk-DUMMY-NO-CALL")
+
+        mem = Memory.from_config({
+            "embedder": {
+                "provider": "fastembed",
+                "config": {
+                    "model": "BAAI/bge-small-en-v1.5"
+                }
+            },
+            "vector_store": {
+                "provider": "qdrant",
+                "config": {
+                    "collection_name": "mem0_benchmark_batch_fe",
+                    "path": "/tmp/mem0_benchmark_batch_fe",
+                    "embedding_model_dims": 384
+                }
+            },
+            "llm": {
+                "provider": "openai",
+                "config": {
+                    "api_key": "sk-DUMMY-NO-CALL"
+                }
+            }
+        })
         print("✅ Memory 初始化成功")
     except Exception as e:
         print(f"❌ Memory 初始化失败: {e}")
