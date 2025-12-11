@@ -153,9 +153,20 @@ impl LibSqlConnectionPool {
             }
         }
 
-        // Max connections reached, wait for an idle connection
-        // This is a simplified implementation - in production, you'd want a better waiting mechanism
+        // Max connections reached, wait for an idle connection with timeout
+        let timeout = Duration::from_secs(self.config.connect_timeout);
+        let start = Instant::now();
+        
         loop {
+            // Check timeout
+            if start.elapsed() > timeout {
+                drop(_permit);
+                return Err(AgentMemError::StorageError(format!(
+                    "Connection pool timeout: waited {}s for available connection",
+                    self.config.connect_timeout
+                )));
+            }
+            
             tokio::time::sleep(Duration::from_millis(10)).await;
             let mut idle = self.idle_connections.lock().await;
             if let Some((conn, _)) = idle.pop() {

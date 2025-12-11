@@ -5,6 +5,7 @@
 use agent_mem::{AddMemoryOptions, Memory};
 
 async fn create_in_memory_mem() -> Memory {
+    // 使用内存存储和最小的 embedder 配置，加快测试速度
     Memory::builder()
         .with_storage("memory://")
         .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
