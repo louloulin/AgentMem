@@ -772,21 +772,27 @@ impl IntelligenceModule {
             });
         }
 
-        // Step 4: 重要性评估
-        info!("Step 4: 重要性评估");
-        let importance_evaluations = Self::evaluate_importance(
-            orchestrator,
-            &structured_facts,
-            &agent_id_for_importance,
-            user_id_for_importance.clone(),
-        )
-        .await?;
+        // Step 4-5: 并行执行重要性评估和搜索相似记忆（优化：这两个步骤可以并行）
+        info!("Step 4-5: 并行执行重要性评估和搜索相似记忆");
+        let (importance_evaluations, existing_memories) = tokio::join!(
+            async {
+                info!("并行任务 1: 重要性评估");
+                Self::evaluate_importance(
+                    orchestrator,
+                    &structured_facts,
+                    &agent_id_for_importance,
+                    user_id_for_importance.clone(),
+                )
+                .await
+            },
+            async {
+                info!("并行任务 2: 搜索相似记忆");
+                Self::search_similar_memories_internal(orchestrator, &content, &agent_id, 10).await
+            }
+        );
+        let importance_evaluations = importance_evaluations?;
+        let existing_memories = existing_memories?;
         info!("完成 {} 个事实的重要性评估", importance_evaluations.len());
-
-        // Step 5: 搜索相似记忆
-        info!("Step 5: 搜索相似记忆");
-        let existing_memories =
-            Self::search_similar_memories_internal(orchestrator, &content, &agent_id, 10).await?;
         info!("找到 {} 个相似记忆", existing_memories.len());
 
         // Step 6: 冲突检测

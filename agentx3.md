@@ -97,9 +97,15 @@
 - 🔧 将 Phase3 并行测试、智能模式测试、批量模式测试的 `OrchestratorConfig` 初始化补齐队列相关字段，统一使用 `..Default::default()`，避免字段缺失。
 - 🧪 修复 LanceDB/Milvus 示例与测试以适配新的 `SearchRequest`/`IndexConfig`（向量计数、批量过滤、doctest），在后端不可用时自动跳过 LanceDB 集成测试，确保关键子集 `cargo test` 可通过。
 - 🔧 修复 Milvus 示例代码：将 `batch_operations.rs` 中的旧结构体字面量语法改为使用 `SearchRequest::new()` 方法，统一 API 使用方式。
+- ⚡ **LLM 调用并行化优化**（P2 优化）：
+  - 优化 `add_memory_v2` 智能模式流程：将 `evaluate_importance` 和 `search_similar_memories` 并行执行
+  - 使用 `tokio::join!` 实现并行，预期性能提升 1.5-2x（减少等待时间）
+  - 改进前：重要性评估 → 搜索相似记忆（串行，~200ms）
+  - 改进后：重要性评估 || 搜索相似记忆（并行，~100ms）
 - ✅ **代码质量验证**：
   - 嵌入队列实现：`EmbeddingQueue` 和 `QueuedEmbedder` 已实现并测试通过
   - 批量操作优化：`add_memory_batch_optimized` 已实现，支持批量嵌入生成和并行写入
+  - LLM 调用优化：`extract_facts` 和 `extract_structured_facts` 已并行，`evaluate_importance` 和 `search_similar_memories` 已并行
   - 测试覆盖：10个测试文件，包括嵌入队列、性能对比、并发测试、批量操作等
 - ✅ 本地验证：`cargo build`、`cargo test` 全量通过（2025-12-11）。
 
@@ -161,8 +167,9 @@
   - 验证混合操作并发：15个混合操作（添加+搜索+获取）全部成功
   - **并发实现分析**：
     - ✅ 数据库写入并行化：使用 `tokio::join!` 并行执行 core、vector、history、db 写入（4个并行）
-    - ✅ LLM 调用部分并行化：`extract_facts` 和 `extract_structured_facts` 并行执行（2个并行，50%并行化）
-    - ⚠️ LLM 调用待优化：`evaluate_importance`、`detect_conflicts`、`make_intelligent_decisions` 仍串行执行
+    - ✅ LLM 调用部分并行化：`extract_facts` 和 `extract_structured_facts` 并行执行（2个并行）
+    - ✅ LLM 调用进一步优化（2025-12-11）：`evaluate_importance` 和 `search_similar_memories` 并行执行（2个并行）
+    - ⚠️ LLM 调用待优化：`detect_conflicts` 和 `make_intelligent_decisions` 仍串行执行（有依赖关系，需等待前面的步骤）
 - ⚠️ **性能瓶颈分析**（新增）：
   - **核心问题**：嵌入生成是最大瓶颈（60-80% 耗时）
   - **根本原因**：并发场景下每个操作都独立调用 `embedder.embed()`，没有使用批量嵌入优化
