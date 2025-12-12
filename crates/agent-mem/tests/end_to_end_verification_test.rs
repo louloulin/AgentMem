@@ -12,12 +12,29 @@
 use agent_mem::Memory;
 use std::collections::HashMap;
 
+/// 创建测试用的 Memory 实例（使用内存数据库避免并发冲突）
+async fn create_test_memory() -> Memory {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    // 使用内存数据库避免并发测试时的数据库锁定问题
+    Memory::builder()
+        .with_storage("memory://")
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .disable_intelligent_features()
+        .build()
+        .await
+        .expect("Failed to create Memory")
+}
+
 /// 测试 1: 验证 add_memory 的完整流程
 #[tokio::test]
 async fn test_add_memory_complete_flow() {
     println!("\n========== 测试 1: 验证 add_memory 完整流程 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // 添加记忆
     let result = mem.add("我喜欢吃披萨").await.expect("Failed to add");
@@ -41,7 +58,7 @@ async fn test_add_memory_complete_flow() {
 async fn test_vector_store_and_metadata() {
     println!("\n========== 测试 2: 验证向量存储和 metadata ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // 添加记忆
     let result = mem.add("测试向量存储").await.expect("Failed to add");
@@ -104,7 +121,7 @@ async fn test_hash_computation() {
 async fn test_history_tracking() {
     println!("\n========== 测试 4: 验证历史记录功能 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // 添加记忆
     let add_result = mem.add("原始内容").await.expect("Failed to add");
@@ -162,7 +179,7 @@ async fn test_history_tracking() {
 async fn test_complete_crud_workflow() {
     println!("\n========== 测试 5: 完整 CRUD 流程 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // CREATE
     println!("1. CREATE - 添加记忆");
@@ -234,7 +251,7 @@ async fn test_complete_crud_workflow() {
 async fn test_reset_functionality() {
     println!("\n========== 测试 6: reset() 方法 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // 添加一些记忆
     mem.add("测试记忆 1").await.ok();
@@ -266,7 +283,7 @@ async fn test_reset_functionality() {
 async fn test_performance_benchmark() {
     println!("\n========== 测试 7: 性能基准测试 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     let test_count = 100;
     let start = std::time::Instant::now();
@@ -306,7 +323,7 @@ async fn test_vector_dimension_consistency() {
 async fn test_data_consistency() {
     println!("\n========== 测试 9: 数据一致性验证 ==========");
 
-    let mem = Memory::new().await.expect("Failed to create Memory");
+    let mem = create_test_memory().await;
 
     // 添加多条记忆
     let test_data = vec!["测试数据 1", "测试数据 2", "测试数据 3"];

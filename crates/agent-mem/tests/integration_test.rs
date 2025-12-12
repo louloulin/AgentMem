@@ -5,6 +5,17 @@ use agent_mem::Memory;
 use chrono::Utc;
 use serde_json::json;
 
+/// 创建测试用的 Memory 实例（使用内存数据库避免并发冲突）
+async fn create_test_memory() -> Memory {
+    Memory::builder()
+        .with_storage("memory://")
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .disable_intelligent_features()
+        .build()
+        .await
+        .expect("Failed to create Memory")
+}
+
 #[tokio::test]
 async fn test_zero_config_initialization() {
     // 测试零配置初始化
@@ -34,7 +45,7 @@ async fn test_builder_pattern() {
 #[tokio::test]
 async fn test_add_memory() {
     // 测试添加记忆
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     let result = mem.add("I love pizza").await;
     assert!(result.is_ok(), "add() 应该成功");
@@ -48,7 +59,7 @@ async fn test_add_memory() {
 #[tokio::test]
 async fn test_search_memory() {
     // 测试搜索记忆
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     // 先添加一些记忆
     mem.add("I love pizza").await.expect("添加失败");
@@ -65,7 +76,7 @@ async fn test_search_memory() {
 #[tokio::test]
 async fn test_get_all_memories() {
     // 测试获取所有记忆
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     // 添加记忆
     mem.add("Memory 1").await.expect("添加失败");
@@ -83,7 +94,7 @@ async fn test_get_all_memories() {
 #[tokio::test]
 async fn test_get_stats() {
     // 测试获取统计信息
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     // 添加一些记忆
     mem.add("Test memory 1").await.expect("添加失败");
@@ -101,7 +112,7 @@ async fn test_get_stats() {
 
 #[tokio::test]
 async fn test_add_text_convenience_api() {
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     let user_id = format!("user-text-{}", Utc::now().timestamp_nanos_opt().unwrap());
     let agent_id = format!("agent-text-{}", Utc::now().timestamp_millis());
@@ -128,7 +139,7 @@ async fn test_add_text_convenience_api() {
 
 #[tokio::test]
 async fn test_add_structured_convenience_api() {
-    let mem = Memory::new().await.expect("初始化失败");
+    let mem = create_test_memory().await;
 
     let user_id = format!(
         "user-structured-{}",

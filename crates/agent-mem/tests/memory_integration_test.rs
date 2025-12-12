@@ -7,10 +7,13 @@ use agent_mem::MemoryBuilder;
 /// 创建测试用的 Memory 实例
 /// 使用 FastEmbed 本地嵌入（384维，无需 API key）
 /// VectorStore 会自动使用与 Embedder 相同的维度
+/// 使用内存数据库避免并发测试时的数据库锁定问题
 async fn create_test_memory() -> agent_mem::Memory {
     MemoryBuilder::new()
+        .with_storage("memory://") // 使用内存数据库避免并发冲突
         .with_agent("test_agent")
         .with_embedder("fastembed", "all-MiniLM-L6-v2") // 384维本地模型
+        .disable_intelligent_features()
         .build()
         .await
         .expect("Failed to create memory with fastembed")

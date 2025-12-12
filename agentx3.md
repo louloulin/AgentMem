@@ -107,6 +107,12 @@
   - 批量操作优化：`add_memory_batch_optimized` 已实现，支持批量嵌入生成和并行写入
   - LLM 调用优化：`extract_facts` 和 `extract_structured_facts` 已并行，`evaluate_importance` 和 `search_similar_memories` 已并行
   - 测试覆盖：10个测试文件，包括嵌入队列、性能对比、并发测试、批量操作等
+- 🐛 **测试修复**（2025-12-11）：
+  - 修复 `performance_analysis_test.rs`：移除对私有字段 `orchestrator` 的直接访问，改用公共 API（`add_for_user`）
+  - 修复 `end_to_end_verification_test.rs`：使用内存数据库（`memory://`）避免并发测试时的数据库锁定问题
+  - 修复 `integration_test.rs`：同样使用内存数据库，确保测试隔离
+  - 所有测试现在使用 `create_test_memory()` 辅助函数，确保测试隔离和可重复性
+  - **测试结果**：所有测试通过（7个库测试 + 5个批量操作测试 + 1个并发测试 + 5个性能对比测试 + 15个默认行为测试 + 3个嵌入队列测试 + 9个端到端测试 + 8个集成测试 = 53个测试通过）
 - ✅ 本地验证：`cargo build`、`cargo test` 全量通过（2025-12-11）。
 
 **本次实现（2025-12-10）**:
