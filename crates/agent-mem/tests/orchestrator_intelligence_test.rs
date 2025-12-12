@@ -5,6 +5,17 @@
 use agent_mem::{AddMemoryOptions, Memory};
 use agent_mem_traits::{Message, MessageRole};
 
+/// 创建测试用的 Memory 实例（使用内存数据库避免并发冲突）
+async fn create_test_memory() -> Memory {
+    Memory::builder()
+        .with_storage("memory://")
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .disable_intelligent_features()
+        .build()
+        .await
+        .expect("Failed to create Memory")
+}
+
 /// 测试类型转换方法
 #[cfg(test)]
 mod type_conversion_tests {
@@ -40,7 +51,7 @@ mod intelligent_add_tests {
     #[tokio::test]
     async fn test_add_memory_intelligent_basic() {
         // 测试基本的智能添加功能
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         let messages = vec![Message {
             role: MessageRole::User,
@@ -58,7 +69,7 @@ mod intelligent_add_tests {
     #[tokio::test]
     async fn test_add_memory_intelligent_with_entities() {
         // 测试包含实体提取的智能添加
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         let messages = vec![Message {
             role: MessageRole::User,
@@ -72,7 +83,7 @@ mod intelligent_add_tests {
     #[tokio::test]
     async fn test_add_memory_intelligent_with_conflict() {
         // 测试冲突检测和解决
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 第一次添加
         let messages1 = vec![Message {
@@ -94,7 +105,7 @@ mod intelligent_add_tests {
     #[tokio::test]
     async fn test_add_memory_intelligent_importance_evaluation() {
         // 测试重要性评估
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         let messages = vec![
             Message {
@@ -122,7 +133,7 @@ mod hybrid_search_tests {
     #[cfg(feature = "postgres")]
     async fn test_search_memories_hybrid_basic() {
         // 测试基本的混合搜索功能
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 先添加一些记忆
         let _ = mem.add("我喜欢吃披萨").await;
@@ -196,7 +207,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_full_pipeline_add_and_search() {
         // 测试完整的添加-搜索流程
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 1. 智能添加
         let messages = vec![Message {
@@ -220,7 +231,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_backward_compatibility() {
         // 测试向后兼容性
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 使用旧的 add() 方法
         let result = mem.add("测试向后兼容性").await;
@@ -240,7 +251,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_infer_parameter_false() {
         // 测试 infer=false 模式（简单模式）
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 使用 infer=false
         let options = AddMemoryOptions {
@@ -269,7 +280,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_infer_parameter_true() {
         // 测试 infer=true 模式（智能模式）
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 使用 infer=true
         let options = AddMemoryOptions {
@@ -310,7 +321,7 @@ mod performance_tests {
     #[ignore] // 默认忽略性能测试，使用 `cargo test -- --ignored` 运行
     async fn test_add_performance() {
         // 测试添加性能
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         let start = Instant::now();
         for i in 0..100 {
@@ -327,7 +338,7 @@ mod performance_tests {
     #[cfg(feature = "postgres")]
     async fn test_search_performance() {
         // 测试搜索性能
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         // 先添加 1000 条记忆
         for i in 0..1000 {
@@ -348,7 +359,7 @@ mod performance_tests {
     #[ignore]
     async fn test_performance_comparison() {
         // 性能对比测试：智能模式 vs 简单模式
-        let mem = Memory::new().await.expect("初始化失败");
+        let mem = create_test_memory().await;
 
         println!("\n========== 性能对比测试 ==========\n");
 

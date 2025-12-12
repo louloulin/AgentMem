@@ -9,13 +9,24 @@ mod mvp_tests {
     use agent_mem::Memory;
     use std::collections::HashMap;
 
+    /// 创建测试用的 Memory 实例（使用内存数据库避免并发冲突）
+    async fn create_test_memory() -> Memory {
+        Memory::builder()
+            .with_storage("memory://")
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .disable_intelligent_features()
+            .build()
+            .await
+            .expect("Failed to create Memory")
+    }
+
     /// 测试: execute_decisions现在调用真实的UPDATE方法
     #[tokio::test]
     async fn test_execute_decisions_update_integration() {
         println!("\n========== MVP改造测试: UPDATE决策执行 ==========");
 
         // 创建Memory实例
-        let mem = Memory::new().await.expect("Failed to create Memory");
+        let mem = create_test_memory().await;
 
         // 添加一个记忆
         let add_result = mem.add("原始内容").await.expect("Failed to add");
@@ -52,7 +63,7 @@ mod mvp_tests {
     async fn test_execute_decisions_delete_integration() {
         println!("\n========== MVP改造测试: DELETE决策执行 ==========");
 
-        let mem = Memory::new().await.expect("Failed to create Memory");
+        let mem = create_test_memory().await;
 
         // 添加一个记忆
         let add_result = mem.add("要删除的内容").await.expect("Failed to add");
@@ -115,7 +126,7 @@ mod mvp_tests {
     async fn test_mvp_crud_complete_flow() {
         println!("\n========== MVP改造综合测试: 完整CRUD流程 ==========");
 
-        let mem = Memory::new().await.expect("Failed to create Memory");
+        let mem = create_test_memory().await;
 
         // 1. ADD
         let add_result = mem.add("测试内容1").await.expect("Failed to add");
