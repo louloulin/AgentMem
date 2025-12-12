@@ -4,17 +4,21 @@
 
 use agent_mem::Memory;
 
+/// 创建测试用的 Memory 实例（使用内存数据库避免并发冲突）
+async fn create_test_memory() -> Memory {
+    Memory::builder()
+        .with_storage("memory://")
+        .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+        .disable_intelligent_features()
+        .build()
+        .await
+        .expect("Failed to create Memory")
+}
+
 /// 测试 1: 向量嵌入非零验证
 #[tokio::test]
 async fn test_vector_embedding_not_zero() {
-    let mem = Memory::new().await;
-
-    if mem.is_err() {
-        println!("⚠️ Memory 初始化失败（预期，可能缺少配置）");
-        return;
-    }
-
-    let mem = mem.unwrap();
+    let mem = create_test_memory().await;
 
     // 添加记忆
     match mem.add("测试向量嵌入功能").await {
@@ -117,14 +121,7 @@ async fn test_history_manager() {
 /// 测试 4: 双写策略验证（集成测试）
 #[tokio::test]
 async fn test_dual_write_strategy() {
-    let mem = Memory::new().await;
-
-    if mem.is_err() {
-        println!("⚠️ Memory 初始化失败，跳过集成测试");
-        return;
-    }
-
-    let mem = mem.unwrap();
+    let mem = create_test_memory().await;
 
     // 添加记忆（应该触发双写）
     match mem
@@ -150,14 +147,7 @@ async fn test_dual_write_strategy() {
 /// 测试 5: history() API 验证
 #[tokio::test]
 async fn test_history_api() {
-    let mem = Memory::new().await;
-
-    if mem.is_err() {
-        println!("⚠️ Memory 初始化失败，跳过 API 测试");
-        return;
-    }
-
-    let mem = mem.unwrap();
+    let mem = create_test_memory().await;
 
     // 添加记忆
     let result = mem.add("测试 history API").await;
@@ -197,16 +187,8 @@ async fn test_complete_workflow() {
     println!("\n========== Phase 6 完整流程测试 ==========\n");
 
     // 1. 初始化
-    let mem = match Memory::new().await {
-        Ok(m) => {
-            println!("✅ Step 1: Memory 初始化成功");
-            m
-        }
-        Err(e) => {
-            println!("❌ Step 1: Memory 初始化失败: {}", e);
-            return;
-        }
-    };
+    let mem = create_test_memory().await;
+    println!("✅ Step 1: Memory 初始化成功");
 
     // 2. 添加记忆（触发双写）
     let content = "完整流程测试：智能记忆管理平台";
@@ -254,14 +236,7 @@ async fn test_complete_workflow() {
 async fn test_metadata_standard_fields() {
     use agent_mem::types::AddMemoryOptions;
 
-    let mem = Memory::new().await;
-
-    if mem.is_err() {
-        println!("⚠️ Memory 初始化失败，跳过 metadata 测试");
-        return;
-    }
-
-    let mem = mem.unwrap();
+    let mem = create_test_memory().await;
 
     let mut options = AddMemoryOptions::default();
     options
