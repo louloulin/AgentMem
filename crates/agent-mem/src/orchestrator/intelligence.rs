@@ -778,11 +778,11 @@ impl IntelligenceModule {
             async {
                 info!("并行任务 1: 重要性评估");
                 Self::evaluate_importance(
-                    orchestrator,
-                    &structured_facts,
-                    &agent_id_for_importance,
-                    user_id_for_importance.clone(),
-                )
+            orchestrator,
+            &structured_facts,
+            &agent_id_for_importance,
+            user_id_for_importance.clone(),
+        )
                 .await
             },
             async {

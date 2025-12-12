@@ -169,9 +169,9 @@ impl StorageModule {
 
                     // 转换metadata为HashMap<String, String>，并添加 memory_id
                     let mut metadata_for_manager: std::collections::HashMap<String, String> =
-                        full_metadata_for_db
-                            .iter()
-                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            full_metadata_for_db
+                                .iter()
+                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                             .collect();
                     // 添加 memory_id 到 metadata，以便后续可以通过它查找
                     metadata_for_manager.insert("_memory_id".to_string(), memory_id_for_db.clone());

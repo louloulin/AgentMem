@@ -72,11 +72,11 @@ async fn test_search_memory() {
     match results {
         Ok(results) => {
             // 如果搜索成功，验证结果
-            assert!(!results.is_empty(), "Should find at least one result");
-            let has_pizza = results
-                .iter()
-                .any(|r| r.content.to_lowercase().contains("pizza"));
-            assert!(has_pizza, "Results should contain 'pizza'");
+    assert!(!results.is_empty(), "Should find at least one result");
+    let has_pizza = results
+        .iter()
+        .any(|r| r.content.to_lowercase().contains("pizza"));
+    assert!(has_pizza, "Results should contain 'pizza'");
         }
         Err(e) => {
             // 如果 embedder 未配置，这是预期的行为
@@ -195,10 +195,10 @@ async fn test_memory_workflow() {
     // 2. Search for "Rust" (如果 embedder 未配置，跳过搜索测试)
     match memory.search("Rust").await {
         Ok(rust_results) => {
-            assert!(
-                rust_results.len() >= 2,
-                "Should find at least 2 Rust-related memories"
-            );
+    assert!(
+        rust_results.len() >= 2,
+        "Should find at least 2 Rust-related memories"
+    );
         }
         Err(e) if e.to_string().contains("Embedder not configured") => {
             println!("⚠️ 搜索失败（预期行为）：Embedder 未配置，跳过搜索验证");
@@ -239,10 +239,10 @@ async fn test_memory_workflow() {
             println!("⚠️ 已删除的记忆仍在结果中（可能是 get_all 未过滤已删除的记忆）");
             // 不中断测试，这只是实现细节
         } else {
-            assert!(
-                !ids.contains(&id2.as_str()),
-                "Deleted memory should not be in results"
-            );
+    assert!(
+        !ids.contains(&id2.as_str()),
+        "Deleted memory should not be in results"
+    );
         }
     }
     

@@ -52,7 +52,7 @@ async fn test_embedding_performance_bottleneck() {
     
     // 计算性能提升
     if batch_embed_time.as_secs_f64() > 0.0 {
-        let speedup = single_embed_time.as_secs_f64() / batch_embed_time.as_secs_f64();
+    let speedup = single_embed_time.as_secs_f64() / batch_embed_time.as_secs_f64();
         println!("批量操作性能提升: {:.2}x", speedup);
     }
 }

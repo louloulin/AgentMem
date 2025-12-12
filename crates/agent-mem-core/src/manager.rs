@@ -254,7 +254,7 @@ impl MemoryManager {
             for (key, value) in metadata {
                 // 跳过 _memory_id，因为它已经用于设置 ID
                 if key != "_memory_id" {
-                    memory.add_metadata(key, value);
+                memory.add_metadata(key, value);
                 }
             }
         }

@@ -237,7 +237,7 @@ async fn test_search_without_plugins_feature() {
     // 搜索可能因为 embedder 未配置而失败，这是预期的
     match mem.search("Test").await {
         Ok(results) => {
-            assert!(!results.is_empty());
+    assert!(!results.is_empty());
         }
         Err(e) if e.to_string().contains("Embedder not configured") => {
             // 预期行为：如果没有配置 embedder，搜索会失败

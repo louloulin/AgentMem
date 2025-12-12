@@ -188,7 +188,7 @@ async fn test_complete_workflow() {
 
     // 1. 初始化
     let mem = create_test_memory().await;
-    println!("✅ Step 1: Memory 初始化成功");
+            println!("✅ Step 1: Memory 初始化成功");
 
     // 2. 添加记忆（触发双写）
     let content = "完整流程测试：智能记忆管理平台";
