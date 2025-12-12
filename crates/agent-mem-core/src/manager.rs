@@ -242,9 +242,20 @@ impl MemoryManager {
             importance.unwrap_or(0.5),
         );
 
+        // 如果 metadata 中包含 _memory_id，使用它作为 ID
+        if let Some(metadata) = &metadata {
+            if let Some(custom_id) = metadata.get("_memory_id") {
+                use agent_mem_traits::MemoryId;
+                memory.id = MemoryId::from_string(custom_id.clone());
+            }
+        }
+
         if let Some(metadata) = metadata {
             for (key, value) in metadata {
-                memory.add_metadata(key, value);
+                // 跳过 _memory_id，因为它已经用于设置 ID
+                if key != "_memory_id" {
+                    memory.add_metadata(key, value);
+                }
             }
         }
 

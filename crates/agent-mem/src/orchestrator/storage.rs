@@ -161,32 +161,44 @@ impl StorageModule {
                 }
             },
             // 并行任务 4: 存储到 MemoryManager (关键修复！)
+            // 注意：MemoryManager::add_memory 会生成自己的 ID，我们需要使用它返回的 ID
+            // 但为了保持一致性，我们使用预生成的 memory_id，并在 metadata 中传递它
             async move {
                 if let Some(manager) = memory_manager {
                     use agent_mem_core::types::MemoryType;
 
-                    // 转换metadata为HashMap<String, String>
-                    let metadata_for_manager: Option<std::collections::HashMap<String, String>> =
-                        Some(
-                            full_metadata_for_db
-                                .iter()
-                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                                .collect(),
-                        );
+                    // 转换metadata为HashMap<String, String>，并添加 memory_id
+                    let mut metadata_for_manager: std::collections::HashMap<String, String> =
+                        full_metadata_for_db
+                            .iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect();
+                    // 添加 memory_id 到 metadata，以便后续可以通过它查找
+                    metadata_for_manager.insert("_memory_id".to_string(), memory_id_for_db.clone());
 
                     // 写入数据库 - 使用MemoryManager的公开API
-                    manager
+                    // 注意：MemoryManager 会生成自己的 ID，但我们可以通过 metadata 中的 _memory_id 来关联
+                    let manager_id = manager
                         .add_memory(
                             agent_id_for_db.clone(),
                             Some(user_id_for_db.clone()),
                             content_for_db.clone(),
                             Some(memory_type_for_db.unwrap_or(MemoryType::Episodic)),
                             Some(1.0), // importance
-                            metadata_for_manager,
+                            Some(metadata_for_manager),
                         )
                         .await
-                        .map(|_| ())
-                        .map_err(|e| format!("MemoryManager write failed: {}", e))
+                        .map_err(|e| format!("MemoryManager write failed: {}", e))?;
+                    
+                    // 验证：如果 manager_id 与我们的 memory_id 不同，记录警告
+                    if manager_id != memory_id_for_db {
+                        warn!(
+                            "MemoryManager 生成的 ID ({}) 与预生成的 ID ({}) 不匹配，使用预生成的 ID",
+                            manager_id, memory_id_for_db
+                        );
+                    }
+                    
+                    Ok(())
                 } else {
                     // ⚠️ 关键：MemoryManager未初始化应该报错，不能静默失败
                     Err("MemoryManager not initialized - critical error!".to_string())
