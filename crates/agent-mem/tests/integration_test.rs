@@ -28,9 +28,9 @@ async fn test_zero_config_initialization() {
 
 #[tokio::test]
 async fn test_builder_pattern() {
-    // 测试 Builder 模式
+    // 测试 Builder 模式（使用内存数据库避免并发冲突）
     let result = Memory::builder()
-        .with_storage("libsql://test_builder.db")
+        .with_storage("memory://")
         .with_user("test_user")
         .with_agent("test_agent")
         .build()
@@ -38,7 +38,7 @@ async fn test_builder_pattern() {
 
     assert!(result.is_ok(), "Memory::builder().build() 应该成功");
 
-    let mem = result.unwrap();
+    let _mem = result.unwrap();
     println!("✅ Memory Builder 模式初始化成功");
 }
 

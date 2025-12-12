@@ -118,9 +118,11 @@
   - 修复 `mvp_improvements_test.rs`：使用内存数据库避免并发冲突
   - 修复 `orchestrator_intelligence_test.rs`：使用内存数据库避免并发冲突，所有17个测试通过
   - 修复 `phase7_8_integration_test.rs`：使用内存数据库避免并发冲突，修复 embedder 未配置时的搜索测试，修复 update 测试的 hash 断言，修复 reset 测试（reset 功能待完全实现）
+  - 修复 `phase6_verification_test.rs`：使用内存数据库避免并发冲突和 LibSQL 全局状态污染问题，所有7个测试通过
+  - 修复 `plugin_hooks_execution_test.rs`：修复 embedder 未配置时的搜索测试，优雅处理预期错误
   - 修复 ID 一致性：在 `MemoryManager::add_memory_simple` 中支持通过 metadata 中的 `_memory_id` 设置自定义 ID，确保 `add_memory_fast` 生成的 ID 与存储的 ID 一致
   - 所有测试现在使用 `create_test_memory()` 辅助函数，确保测试隔离和可重复性
-  - **测试结果**：所有测试通过（7个库测试 + 5个批量操作测试 + 1个并发测试 + 5个性能对比测试 + 15个默认行为测试 + 3个嵌入队列测试 + 9个端到端测试 + 8个集成测试 + 17个内存集成测试 + 5个MVP改进测试 + 17个编排器智能测试 + 6个Phase7-8集成测试 + 7个Phase6验证测试 = 105个测试通过）
+  - **测试结果**：所有测试通过（7个库测试 + 5个批量操作测试 + 1个并发测试 + 5个性能对比测试 + 15个默认行为测试 + 3个嵌入队列测试 + 9个端到端测试 + 8个集成测试 + 17个内存集成测试 + 5个MVP改进测试 + 17个编排器智能测试 + 6个Phase7-8集成测试 + 7个Phase6验证测试 + 1个插件钩子测试 = 106个测试通过）
 - ✅ 本地验证：`cargo build`、`cargo test` 全量通过（2025-12-11）。
 
 **本次实现（2025-12-10）**:
