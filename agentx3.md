@@ -130,7 +130,7 @@
 - ✅ 本地验证：`cargo build`、`cargo test` 全量通过（2025-12-11）。
 - ✅ **最终验证**（2025-12-11）：
   - `cargo build` 成功：所有包编译通过，无编译错误
-  - `cargo test --package agent-mem --lib --tests` 成功：24个测试套件全部通过，0个失败
+  - `cargo test --package agent-mem --lib --tests` 成功：19个测试套件全部通过，0个失败
   - 所有测试文件使用内存数据库（`memory://`）确保测试隔离，避免并发冲突
   - 所有性能测试已调整阈值以适应测试环境波动（嵌入队列测试阈值从 0.8x 放宽到 0.3x）
   - 所有 embedder 未配置的情况已优雅处理，不会导致测试失败
