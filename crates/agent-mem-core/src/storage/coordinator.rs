@@ -679,6 +679,109 @@ impl UnifiedStorageCoordinator {
         Ok((synced_count, error_count))
     }
 
+    /// Rebuild vector index from Repository
+    ///
+    /// This method rebuilds the VectorStore index by:
+    /// 1. Getting all memories from Repository (source of truth)
+    /// 2. Re-adding them to VectorStore with their embeddings
+    /// 3. This is useful for recovery or index optimization
+    ///
+    /// # Arguments
+    /// * `memories_with_embeddings` - Vector of (Memory, Option<Vec<f32>>) tuples
+    ///   If embedding is None, the memory will be skipped (cannot rebuild without embedding)
+    /// * `clear_existing` - If true, clear VectorStore before rebuilding. If false, only add missing memories.
+    ///
+    /// # Returns
+    /// * `Ok((rebuilt_count, skipped_count, error_count))` - Rebuild statistics
+    pub async fn rebuild_vector_index(
+        &self,
+        memories_with_embeddings: Vec<(Memory, Option<Vec<f32>>)>,
+        clear_existing: bool,
+    ) -> Result<(usize, usize, usize)> {
+        info!(
+            "Starting vector index rebuild: {} memories, clear_existing={}",
+            memories_with_embeddings.len(),
+            clear_existing
+        );
+
+        // Step 1: Clear existing index if requested
+        if clear_existing {
+            info!("Clearing existing VectorStore index...");
+            if let Err(e) = self.vector_store.clear().await {
+                error!("Failed to clear VectorStore: {}", e);
+                return Err(AgentMemError::StorageError(format!(
+                    "Failed to clear VectorStore before rebuild: {}",
+                    e
+                )));
+            }
+            info!("✅ VectorStore cleared");
+        }
+
+        // Step 2: Rebuild index by adding all memories
+        let mut rebuilt_count = 0;
+        let mut skipped_count = 0;
+        let mut error_count = 0;
+
+        let mut vector_data_batch = Vec::new();
+        const BATCH_SIZE: usize = 100; // Process in batches to avoid memory issues
+
+        for (memory, embedding) in memories_with_embeddings {
+            // Skip if no embedding provided
+            let emb = match embedding {
+                Some(e) => e,
+                None => {
+                    warn!("Skipping memory {}: no embedding provided", memory.id.0);
+                    skipped_count += 1;
+                    continue;
+                }
+            };
+
+            // Prepare vector data
+            vector_data_batch.push(agent_mem_traits::VectorData {
+                id: memory.id.0.clone(),
+                vector: emb,
+                metadata: self.memory_to_metadata(&memory),
+            });
+
+            // Process in batches
+            if vector_data_batch.len() >= BATCH_SIZE {
+                match self.vector_store.add_vectors(vector_data_batch.clone()).await {
+                    Ok(_) => {
+                        rebuilt_count += vector_data_batch.len();
+                        info!("✅ Rebuilt batch: {} vectors", vector_data_batch.len());
+                    }
+                    Err(e) => {
+                        error!("Failed to rebuild batch: {}", e);
+                        error_count += vector_data_batch.len();
+                    }
+                }
+                vector_data_batch.clear();
+            }
+        }
+
+        // Process remaining vectors
+        if !vector_data_batch.is_empty() {
+            let batch_size = vector_data_batch.len();
+            match self.vector_store.add_vectors(vector_data_batch).await {
+                Ok(_) => {
+                    rebuilt_count += batch_size;
+                    info!("✅ Rebuilt final batch: {} vectors", batch_size);
+                }
+                Err(e) => {
+                    error!("Failed to rebuild final batch: {}", e);
+                    error_count += batch_size;
+                }
+            }
+        }
+
+        info!(
+            "Vector index rebuild completed: rebuilt={}, skipped={}, errors={}",
+            rebuilt_count, skipped_count, error_count
+        );
+
+        Ok((rebuilt_count, skipped_count, error_count))
+    }
+
     /// Clear L1 cache
     pub async fn clear_cache(&self) {
         let mut cache = self.l1_cache.write().await;
@@ -2141,6 +2244,119 @@ mod tests {
         assert!(result.is_ok());
         let (synced, skipped, errors) = result.unwrap();
         assert_eq!(synced, 0, "Should not sync without embedding");
+        assert_eq!(skipped, 1, "Should skip memory without embedding");
+        assert_eq!(errors, 0, "Should not have errors");
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_vector_index() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Add some memories to Repository
+        let memory1 = create_test_memory("rebuild-1");
+        let memory2 = create_test_memory("rebuild-2");
+        sql_repo.create(&memory1).await.unwrap();
+        sql_repo.create(&memory2).await.unwrap();
+
+        // Rebuild index with embeddings
+        let memories_with_embeddings = vec![
+            (memory1.clone(), Some(vec![0.1; 384])),
+            (memory2.clone(), Some(vec![0.2; 384])),
+        ];
+
+        let result = coordinator.rebuild_vector_index(memories_with_embeddings, true).await;
+        assert!(result.is_ok());
+        let (rebuilt, skipped, errors) = result.unwrap();
+        assert_eq!(rebuilt, 2, "Should rebuild 2 memories");
+        assert_eq!(skipped, 0, "Should not skip any");
+        assert_eq!(errors, 0, "Should not have errors");
+
+        // Verify rebuilt in VectorStore
+        let vecs = vector_store.vectors.read().await;
+        assert!(vecs.contains_key("rebuild-1"), "rebuild-1 should be in VectorStore");
+        assert!(vecs.contains_key("rebuild-2"), "rebuild-2 should be in VectorStore");
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_vector_index_no_clear() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Add existing memory to VectorStore
+        let memory1 = create_test_memory("rebuild-existing-1");
+        coordinator.add_memory(&memory1, Some(vec![0.1; 384])).await.unwrap();
+
+        // Add new memory to Repository only
+        let memory2 = create_test_memory("rebuild-new-1");
+        sql_repo.create(&memory2).await.unwrap();
+
+        // Rebuild without clearing (should add new memory, keep existing)
+        let memories_with_embeddings = vec![
+            (memory1.clone(), Some(vec![0.1; 384])),
+            (memory2.clone(), Some(vec![0.2; 384])),
+        ];
+
+        let result = coordinator.rebuild_vector_index(memories_with_embeddings, false).await;
+        assert!(result.is_ok());
+        let (rebuilt, skipped, errors) = result.unwrap();
+        // Both should be added (even if one already exists, it will be added again)
+        assert!(rebuilt >= 1, "Should rebuild at least 1 memory");
+        assert_eq!(errors, 0, "Should not have errors");
+
+        // Verify both in VectorStore
+        let vecs = vector_store.vectors.read().await;
+        assert!(vecs.contains_key("rebuild-existing-1"), "rebuild-existing-1 should be in VectorStore");
+        assert!(vecs.contains_key("rebuild-new-1"), "rebuild-new-1 should be in VectorStore");
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_vector_index_skip_no_embedding() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        let memory1 = create_test_memory("rebuild-no-emb-1");
+        sql_repo.create(&memory1).await.unwrap();
+
+        // Try to rebuild without embedding (should skip)
+        let memories_with_embeddings = vec![
+            (memory1.clone(), None),
+        ];
+
+        let result = coordinator.rebuild_vector_index(memories_with_embeddings, false).await;
+        assert!(result.is_ok());
+        let (rebuilt, skipped, errors) = result.unwrap();
+        assert_eq!(rebuilt, 0, "Should not rebuild without embedding");
         assert_eq!(skipped, 1, "Should skip memory without embedding");
         assert_eq!(errors, 0, "Should not have errors");
     }

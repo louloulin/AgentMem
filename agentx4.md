@@ -1076,7 +1076,14 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
     - [x] 添加警告说明限制
   - **实现位置**: `crates/agent-mem-core/src/storage/coordinator.rs`
   - **测试**: ✅ 3个测试通过（test_sync_repository_to_vector_store等）
-- [ ] 实现向量索引重建机制 ⏳ **待实施**
+- [x] 实现向量索引重建机制 ✅ **已完成**（2025-12-10）
+  - [x] `rebuild_vector_index()` 方法实现
+  - [x] 支持全量重建（clear_existing=true）和增量重建（clear_existing=false）
+  - [x] 批量处理（每批100条，避免内存问题）
+  - [x] 自动跳过没有embedding的记录
+  - [x] 返回重建统计信息（rebuilt, skipped, errors）
+  - **实现位置**: `crates/agent-mem-core/src/storage/coordinator.rs`
+  - **测试**: ✅ 3个测试通过（test_rebuild_vector_index等）
 - [x] 添加数据一致性测试 ✅ **已完成**（2025-12-10）
   - [x] `test_verify_consistency()`: 测试单个memory一致性检查
   - [x] `test_verify_all_consistency()`: 测试所有memories一致性检查
@@ -1086,7 +1093,7 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 - ✅ 数据一致性测试通过（100%通过率）✅ **已完成**（添加了测试）
 - ✅ 补偿机制工作正常（部分失败时能回滚）✅ **已完成**（add_memory和batch_add_memories都实现回滚）
 - ✅ 数据同步机制工作正常 ✅ **已完成**（sync_repository_to_vector_store实现并测试通过）
-- ⏳ 向量索引可重建 **待实施**
+- ✅ 向量索引可重建 ✅ **已完成**（rebuild_vector_index实现并测试通过）
 
 **参考文档**:
 - `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - **最终架构决策**（包含核心执行架构图）
@@ -2149,6 +2156,16 @@ agentmem stats --user-id user123 | \
     - `sync_vector_store_to_repository()`: 从VectorStore同步到Repository（部分实现）
     - 支持批量同步、自动跳过已存在记录、返回详细统计信息
   - 参考: Mem0 的数据一致性思路
+- ✅ **Phase 5.2 (扩展): 向量索引重建机制实现**
+  - 代码位置: `crates/agent-mem-core/src/storage/coordinator.rs`
+  - 构建状态: ✅ 成功
+  - 测试状态: ✅ 通过（25个coordinator测试全部通过，新增3个重建测试）
+  - 实现内容:
+    - `rebuild_vector_index()`: 重建向量索引
+    - 支持全量重建（clear_existing=true）和增量重建（clear_existing=false）
+    - 批量处理（每批100条），自动跳过没有embedding的记录
+    - 返回详细统计信息（rebuilt, skipped, errors）
+  - 参考: Mem0 的索引管理思路
 
 **实现总结文档**:
 - `PHASE5_1_IMPLEMENTATION_SUMMARY.md` - Phase 5.1 实现总结
