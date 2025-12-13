@@ -1,0 +1,71 @@
+//! 查询结果缓存模块
+//!
+//! 提供搜索结果的 LRU 缓存功能，支持 TTL 和自动过期
+
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
+use lru::LruCache;
+
+/// 查询结果缓存条目
+#[derive(Debug, Clone)]
+pub struct CachedSearchResult {
+    /// 缓存的结果
+    pub results: Vec<serde_json::Value>,
+    /// 创建时间
+    pub created_at: Instant,
+    /// TTL（生存时间）
+    pub ttl: Duration,
+}
+
+impl CachedSearchResult {
+    pub fn new(results: Vec<serde_json::Value>, ttl: Duration) -> Self {
+        Self {
+            results,
+            created_at: Instant::now(),
+            ttl,
+        }
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.created_at.elapsed() > self.ttl
+    }
+}
+
+/// 查询结果缓存（全局单例，使用LRU策略）
+static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<LruCache<String, CachedSearchResult>>>> =
+    std::sync::OnceLock::new();
+
+/// 获取查询结果缓存
+pub fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
+    SEARCH_CACHE.get_or_init(|| {
+        // 默认缓存容量：1000个条目
+        let capacity = std::env::var("SEARCH_CACHE_CAPACITY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1000);
+        let cache_capacity = NonZeroUsize::new(capacity).unwrap_or_else(|| {
+            NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize")
+        });
+        Arc::new(RwLock::new(LruCache::new(cache_capacity)))
+    }).clone()
+}
+
+/// 生成查询缓存键
+pub fn generate_cache_key(
+    query: &str,
+    agent_id: &Option<String>,
+    user_id: &Option<String>,
+    limit: &Option<usize>,
+) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    let mut hasher = DefaultHasher::new();
+    query.hash(&mut hasher);
+    agent_id.hash(&mut hasher);
+    user_id.hash(&mut hasher);
+    limit.hash(&mut hasher);
+    format!("search_{}", hasher.finish())
+}
