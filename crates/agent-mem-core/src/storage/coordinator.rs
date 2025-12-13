@@ -161,6 +161,7 @@ impl UnifiedStorageCoordinator {
         info!("✅ Memory created in LibSQL: {}", memory.id.0);
 
         // Step 2: Write to VectorStore (if embedding provided)
+        // 如果 VectorStore 失败，需要回滚 Repository 以确保数据一致性
         if let Some(emb) = embedding {
             let vector_data = agent_mem_traits::VectorData {
                 id: memory.id.0.clone(),
@@ -169,12 +170,37 @@ impl UnifiedStorageCoordinator {
             };
 
             if let Err(e) = self.vector_store.add_vectors(vec![vector_data]).await {
-                // If vector store fails, we should rollback LibSQL
-                // For now, we log the error and continue (LibSQL is primary)
-                warn!(
-                    "Failed to add memory to vector store (non-critical): {}. Memory exists in LibSQL.",
+                // VectorStore失败，回滚Repository以确保数据一致性
+                // 参考 Mem0 的实现，确保要么都成功，要么都失败
+                error!(
+                    "Failed to add memory to vector store: {}. Rolling back Repository to ensure data consistency.",
                     e
                 );
+                
+                // 回滚Repository
+                if let Err(rollback_err) = self.sql_repository.delete(&memory.id.0).await {
+                    error!("Failed to rollback Repository after VectorStore failure: {}", rollback_err);
+                    {
+                        let mut stats = self.stats.write().await;
+                        stats.total_ops += 1;
+                        stats.failed_ops += 1;
+                    }
+                    return Err(AgentMemError::StorageError(format!(
+                        "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
+                        e, rollback_err
+                    )));
+                }
+                
+                {
+                    let mut stats = self.stats.write().await;
+                    stats.total_ops += 1;
+                    stats.failed_ops += 1;
+                }
+                
+                return Err(AgentMemError::StorageError(format!(
+                    "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {}",
+                    e
+                )));
             } else {
                 info!("✅ Memory added to vector store: {}", memory.id.0);
             }
@@ -419,6 +445,101 @@ impl UnifiedStorageCoordinator {
         self.cache_config.clone()
     }
 
+    /// Verify data consistency between Repository and VectorStore for a specific memory
+    ///
+    /// This method checks if a memory exists in both Repository and VectorStore,
+    /// and reports any inconsistencies.
+    ///
+    /// # Returns
+    /// - `Ok(true)`: Memory exists in both stores (consistent)
+    /// - `Ok(false)`: Memory exists in one store but not the other (inconsistent)
+    /// - `Err`: Error occurred during verification
+    pub async fn verify_consistency(&self, id: &str) -> Result<bool> {
+        debug!("Verifying data consistency for memory: {}", id);
+
+        // Check Repository
+        let in_repository = self.sql_repository.find_by_id(id).await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to check Repository: {}", e)))?
+            .is_some();
+
+        // Check VectorStore (if we can query by ID)
+        // Note: VectorStore may not have a direct get_by_id method, so we use search_with_filters as a workaround
+        let in_vector_store = {
+            // Try to search for the memory by ID in metadata
+            // This is a simplified check - in production, you might want a more robust method
+            let mut filters = HashMap::new();
+            filters.insert("id".to_string(), serde_json::Value::String(id.to_string()));
+            
+            let search_result = self.vector_store.search_with_filters(
+                vec![0.0; 384], // Dummy vector for search (dimension may vary, but this is just for filtering)
+                1,
+                &filters,
+                None, // No threshold
+            ).await;
+
+            match search_result {
+                Ok(results) => results.iter().any(|r| r.id == id),
+                Err(_) => {
+                    // If search fails, we can't verify VectorStore
+                    warn!("Could not verify VectorStore for memory: {}", id);
+                    false
+                }
+            }
+        };
+
+        let is_consistent = in_repository == in_vector_store;
+
+        if !is_consistent {
+            warn!(
+                "⚠️  Data inconsistency detected for memory {}: Repository={}, VectorStore={}",
+                id, in_repository, in_vector_store
+            );
+        } else {
+            debug!("✅ Data consistent for memory: {}", id);
+        }
+
+        Ok(is_consistent)
+    }
+
+    /// Verify data consistency for all memories
+    ///
+    /// This method checks consistency between Repository and VectorStore for all memories.
+    /// It returns a summary of inconsistencies found.
+    ///
+    /// # Returns
+    /// - `Ok((total, consistent, inconsistent))`: Summary of verification results
+    /// - `Err`: Error occurred during verification
+    pub async fn verify_all_consistency(&self) -> Result<(usize, usize, usize)> {
+        info!("Starting full data consistency verification...");
+
+        // Get all memory IDs from Repository (source of truth)
+        // Use list with a large limit to get all memories
+        let all_memories = self.sql_repository.list(i64::MAX, 0).await
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get all memories from Repository: {}", e)))?;
+
+        let total = all_memories.len();
+        let mut consistent = 0;
+        let mut inconsistent = 0;
+
+        for memory in &all_memories {
+            match self.verify_consistency(&memory.id.0).await {
+                Ok(true) => consistent += 1,
+                Ok(false) => inconsistent += 1,
+                Err(e) => {
+                    warn!("Error verifying consistency for memory {}: {}", memory.id.0, e);
+                    inconsistent += 1;
+                }
+            }
+        }
+
+        info!(
+            "✅ Data consistency verification completed: total={}, consistent={}, inconsistent={}",
+            total, consistent, inconsistent
+        );
+
+        Ok((total, consistent, inconsistent))
+    }
+
     /// Clear L1 cache
     pub async fn clear_cache(&self) {
         let mut cache = self.l1_cache.write().await;
@@ -481,13 +602,42 @@ impl UnifiedStorageCoordinator {
         }
 
         // Step 2: Batch add to VectorStore (if any embeddings)
+        // 如果 VectorStore 失败，需要回滚 Repository 以确保数据一致性
         let vector_batch_len = vector_data_batch.len();
         if !vector_data_batch.is_empty() {
             if let Err(e) = self.vector_store.add_vectors(vector_data_batch).await {
-                warn!(
-                    "Failed to add memories to vector store (non-critical): {}. Memories exist in LibSQL.",
-                    e
+                // VectorStore失败，回滚Repository以确保数据一致性
+                error!(
+                    "Failed to add {} memories to vector store: {}. Rolling back Repository to ensure data consistency.",
+                    vector_batch_len, e
                 );
+                
+                // 回滚Repository（删除已创建的记录）
+                let mut rollback_errors = Vec::new();
+                for id in &created_ids {
+                    if let Err(rollback_err) = self.sql_repository.delete(id).await {
+                        error!("Failed to rollback memory {} after VectorStore failure: {}", id, rollback_err);
+                        rollback_errors.push(format!("{}: {}", id, rollback_err));
+                    }
+                }
+                
+                {
+                    let mut stats = self.stats.write().await;
+                    stats.total_ops += memories.len() as u64;
+                    stats.failed_ops += memories.len() as u64;
+                }
+                
+                if !rollback_errors.is_empty() {
+                    return Err(AgentMemError::StorageError(format!(
+                        "Failed to store to VectorStore and some rollbacks failed: {} (rollback errors: {:?})",
+                        e, rollback_errors
+                    )));
+                }
+                
+                return Err(AgentMemError::StorageError(format!(
+                    "Failed to store {} memories to VectorStore, Repository rolled back to ensure data consistency: {}",
+                    vector_batch_len, e
+                )));
             } else {
                 info!("✅ Batch added {} memories to vector store", vector_batch_len);
             }
@@ -1011,10 +1161,42 @@ mod tests {
             &self,
             _query_vector: Vec<f32>,
             _limit: usize,
-            _filters: &HashMap<String, serde_json::Value>,
+            filters: &HashMap<String, serde_json::Value>,
             _threshold: Option<f32>,
         ) -> Result<Vec<agent_mem_traits::VectorSearchResult>> {
-            Ok(Vec::new())
+            // 支持通过 id filter 查找向量（用于一致性检查）
+            let vecs = self.vectors.read().await;
+            let mut results = Vec::new();
+            
+            if let Some(id_value) = filters.get("id") {
+                if let Some(id_str) = id_value.as_str() {
+                    if let Some(vector) = vecs.get(id_str) {
+                        results.push(agent_mem_traits::VectorSearchResult {
+                            id: id_str.to_string(),
+                            vector: vector.clone(),
+                            metadata: HashMap::new(),
+                            similarity: 1.0,
+                            distance: 0.0,
+                        });
+                    }
+                }
+            } else {
+                // 如果没有 id filter，返回所有向量（用于测试）
+                for (id, vector) in vecs.iter() {
+                    results.push(agent_mem_traits::VectorSearchResult {
+                        id: id.clone(),
+                        vector: vector.clone(),
+                        metadata: HashMap::new(),
+                        similarity: 1.0,
+                        distance: 0.0,
+                    });
+                    if results.len() >= _limit {
+                        break;
+                    }
+                }
+            }
+            
+            Ok(results)
         }
 
         async fn health_check(&self) -> Result<agent_mem_traits::HealthStatus> {
@@ -1609,6 +1791,70 @@ mod tests {
         assert_eq!(stats_after.failed_ops, 0);
         assert_eq!(stats_after.cache_hits, 0);
         assert_eq!(stats_after.cache_misses, 0);
+    }
+
+    #[tokio::test]
+    async fn test_verify_consistency() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Create a memory with embedding
+        let memory = create_test_memory("consistency-test");
+        let embedding = vec![0.1; 384];
+        
+        // Add memory (should be consistent)
+        coordinator.add_memory(&memory, Some(embedding.clone())).await.unwrap();
+        
+        // Verify consistency (should be true)
+        let is_consistent = coordinator.verify_consistency("consistency-test").await.unwrap();
+        assert!(is_consistent, "Memory should be consistent after adding");
+
+        // Delete from VectorStore only (create inconsistency)
+        vector_store.delete_vectors(vec!["consistency-test".to_string()]).await.unwrap();
+        
+        // Verify consistency (should be false)
+        let is_consistent = coordinator.verify_consistency("consistency-test").await.unwrap();
+        assert!(!is_consistent, "Memory should be inconsistent after deleting from VectorStore");
+    }
+
+    #[tokio::test]
+    async fn test_verify_all_consistency() {
+        let sql_repo = Arc::new(MockMemoryRepository {
+            memories: Arc::new(RwLock::new(HashMap::new())),
+        });
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(RwLock::new(HashMap::new())),
+        });
+
+        let coordinator = UnifiedStorageCoordinator::new(
+            sql_repo.clone(),
+            vector_store.clone(),
+            Some(CacheConfig::default()),
+        );
+
+        // Add multiple memories
+        let memory1 = create_test_memory("test-1");
+        let memory2 = create_test_memory("test-2");
+        let embedding = vec![0.1; 384];
+        
+        coordinator.add_memory(&memory1, Some(embedding.clone())).await.unwrap();
+        coordinator.add_memory(&memory2, Some(embedding.clone())).await.unwrap();
+        
+        // Verify all consistency (should all be consistent)
+        let (total, consistent, inconsistent) = coordinator.verify_all_consistency().await.unwrap();
+        assert_eq!(total, 2);
+        assert_eq!(consistent, 2);
+        assert_eq!(inconsistent, 0);
     }
 
     #[tokio::test]
