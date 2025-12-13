@@ -148,8 +148,12 @@ impl LibSqlMemoryRepository {
             {
                 Ok(_) => created_memories.push((*memory).clone()),
                 Err(e) => {
-                    // Rollback on error
-                    let _ = conn.execute("ROLLBACK", libsql::params![]).await;
+                    // Rollback on error - ensure rollback completes
+                    if let Err(rollback_err) = conn.execute("ROLLBACK", libsql::params![]).await {
+                        return Err(AgentMemError::StorageError(format!(
+                            "Failed to insert memory in batch: {e}, and rollback also failed: {rollback_err}"
+                        )));
+                    }
                     return Err(AgentMemError::StorageError(format!(
                         "Failed to insert memory in batch: {e}"
                     )));
