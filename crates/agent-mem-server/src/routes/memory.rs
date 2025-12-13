@@ -155,7 +155,10 @@ pub(crate) fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResu
             .and_then(|v| v.parse().ok())
             .unwrap_or(1000);
         let cache_capacity = NonZeroUsize::new(capacity)
-            .unwrap_or(NonZeroUsize::new(1000).unwrap());
+            .unwrap_or_else(|| {
+                // 1000 是一个有效的 NonZeroUsize 值，这里使用 expect 是安全的
+                NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize")
+            });
         Arc::new(RwLock::new(LruCache::new(cache_capacity)))
     }).clone()
 }
@@ -198,8 +201,9 @@ impl MemoryManager {
         info!("========================================");
 
         // 🔧 修复：使用builder模式显式指定LibSQL存储，而不是默认的内存存储
-        let db_path =
-            std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
+        // 支持 memory:// URL 格式（用于测试，避免数据库锁定）
+        let db_path = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "file:./data/agentmem.db".to_string());
 
         info!("📦 配置存储层");
         info!("  - 数据库类型: LibSQL (SQLite)");
@@ -1193,8 +1197,12 @@ pub(crate) fn calculate_quality_score(item: &MemoryItem) -> f64 {
     weight_sum += 0.2;
     
     // 3. 内容完整性评分（是否有hash）
-    let completeness_score = if item.hash.is_some() && !item.hash.as_ref().unwrap().is_empty() {
-        1.0 // 有hash，完整性好
+    let completeness_score = if let Some(hash) = &item.hash {
+        if hash.is_empty() {
+            0.5 // 有hash字段但为空
+        } else {
+            1.0 // 有hash，完整性好
+        }
     } else {
         0.5 // 无hash，完整性一般
     };
@@ -2439,7 +2447,8 @@ pub async fn warmup_cache(
             .await
             .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
         {
-            let id: String = row.get(0).unwrap();
+            let id: String = row.get(0)
+                .map_err(|e| ServerError::Internal(format!("Failed to get id from row: {}", e)))?;
             let access_count: i64 = row.get(1).unwrap_or(0);
             let last_accessed_ts: Option<i64> = row.get(2).ok();
             
@@ -3235,17 +3244,17 @@ pub async fn export_memories(
                      FROM memories WHERE is_deleted = 0".to_string();
     let mut query_params: Vec<String> = Vec::new();
     
-    if agent_id.is_some() {
+    if let Some(ref agent_id_val) = agent_id {
         query.push_str(" AND agent_id = ?");
-        query_params.push(agent_id.clone().unwrap());
+        query_params.push(agent_id_val.clone());
     }
-    if user_id.is_some() {
+    if let Some(ref user_id_val) = user_id {
         query.push_str(" AND user_id = ?");
-        query_params.push(user_id.clone().unwrap());
+        query_params.push(user_id_val.clone());
     }
-    if memory_type.is_some() {
+    if let Some(ref memory_type_val) = memory_type {
         query.push_str(" AND memory_type = ?");
-        query_params.push(memory_type.clone().unwrap());
+        query_params.push(memory_type_val.clone());
     }
     if min_importance.is_some() {
         query.push_str(" AND importance >= ?");
@@ -3529,14 +3538,14 @@ pub async fn performance_benchmark(
             .await;
         
         let search_duration = search_start.elapsed();
-        results.insert(
-            "search_latency_ms".to_string(),
-            serde_json::Value::Number(serde_json::Number::from_f64(search_duration.as_secs_f64() * 1000.0).unwrap()),
-        );
-        results.insert(
-            "search_operations_per_sec".to_string(),
-            serde_json::Value::Number(serde_json::Number::from_f64(1000.0 / (search_duration.as_secs_f64() * 1000.0)).unwrap()),
-        );
+        let latency_ms = search_duration.as_secs_f64() * 1000.0;
+        if let Some(latency_num) = serde_json::Number::from_f64(latency_ms) {
+            results.insert("search_latency_ms".to_string(), serde_json::Value::Number(latency_num));
+        }
+        let ops_per_sec = if latency_ms > 0.0 { 1000.0 / latency_ms } else { 0.0 };
+        if let Some(ops_num) = serde_json::Number::from_f64(ops_per_sec) {
+            results.insert("search_operations_per_sec".to_string(), serde_json::Value::Number(ops_num));
+        }
     }
 
     // 测试添加性能
@@ -3559,14 +3568,14 @@ pub async fn performance_benchmark(
             .await;
         
         let add_duration = add_start.elapsed();
-        results.insert(
-            "add_latency_ms".to_string(),
-            serde_json::Value::Number(serde_json::Number::from_f64(add_duration.as_secs_f64() * 1000.0).unwrap()),
-        );
-        results.insert(
-            "add_operations_per_sec".to_string(),
-            serde_json::Value::Number(serde_json::Number::from_f64(1000.0 / (add_duration.as_secs_f64() * 1000.0)).unwrap()),
-        );
+        let latency_ms = add_duration.as_secs_f64() * 1000.0;
+        if let Some(latency_num) = serde_json::Number::from_f64(latency_ms) {
+            results.insert("add_latency_ms".to_string(), serde_json::Value::Number(latency_num));
+        }
+        let ops_per_sec = if latency_ms > 0.0 { 1000.0 / latency_ms } else { 0.0 };
+        if let Some(ops_num) = serde_json::Number::from_f64(ops_per_sec) {
+            results.insert("add_operations_per_sec".to_string(), serde_json::Value::Number(ops_num));
+        }
     }
 
     // 测试删除性能（需要先有一个记忆ID）
@@ -3590,14 +3599,14 @@ pub async fn performance_benchmark(
         "total_searches".to_string(),
         serde_json::Value::Number(serde_json::Number::from(stats_read.total_searches)),
     );
-    results.insert(
-        "cache_hit_rate".to_string(),
-        serde_json::Value::Number(serde_json::Number::from_f64(stats_read.cache_hit_rate()).unwrap()),
-    );
-    results.insert(
-        "avg_latency_ms".to_string(),
-        serde_json::Value::Number(serde_json::Number::from_f64(stats_read.avg_latency_ms()).unwrap()),
-    );
+    let cache_hit_rate = stats_read.cache_hit_rate();
+    if let Some(hit_rate_num) = serde_json::Number::from_f64(cache_hit_rate) {
+        results.insert("cache_hit_rate".to_string(), serde_json::Value::Number(hit_rate_num));
+    }
+    let avg_latency = stats_read.avg_latency_ms();
+    if let Some(latency_num) = serde_json::Number::from_f64(avg_latency) {
+        results.insert("avg_latency_ms".to_string(), serde_json::Value::Number(latency_num));
+    }
 
     let response = serde_json::json!({
         "operations_tested": operations,

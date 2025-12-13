@@ -122,8 +122,6 @@
     - 包括删除所有记忆（通过 `delete_all_memories`）、清空历史记录（通过 `history_manager.reset()`）
     - 向量存储会在删除记忆时自动清理（`delete_memory` 会同时删除向量）
     - 所有测试通过，reset 功能已验证
-    - 向量存储会在删除记忆时自动清理（`delete_memory` 会同时删除向量）
-    - 所有测试通过，reset 功能已验证
   - 修复 `phase6_verification_test.rs`：使用内存数据库避免并发冲突和 LibSQL 全局状态污染问题，所有7个测试通过
   - 修复 `plugin_hooks_execution_test.rs`：修复 embedder 未配置时的搜索测试，优雅处理预期错误
   - 修复 `plugin_integration_test.rs`：修复 embedder 未配置时的搜索测试，优雅处理预期错误
