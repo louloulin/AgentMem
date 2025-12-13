@@ -680,9 +680,16 @@ impl MemoryManager {
 
 /// 默认实现（异步创建）
 impl MemoryManager {
-    pub fn new_sync() -> Self {
-        // 注意：这只用于类型系统，实际使用应该调用async new()
-        panic!("Use MemoryManager::new().await instead");
+    /// 同步创建方法（已废弃，仅用于类型系统）
+    /// 
+    /// # 注意
+    /// 这个方法会返回错误，实际使用应该调用 `MemoryManager::new().await`
+    /// 
+    /// # 错误处理
+    /// 使用 `Result` 返回错误，而不是 `panic!`，符合生产环境要求
+    pub fn new_sync() -> Result<Self, Box<dyn std::error::Error>> {
+        // 返回错误而不是 panic，符合生产环境要求
+        Err("Use MemoryManager::new().await instead. This method is only for type system compatibility.".into())
     }
 }
 
