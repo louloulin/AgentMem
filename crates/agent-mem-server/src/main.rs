@@ -120,25 +120,10 @@ async fn main() {
             info!("✅ 服务器实例创建成功");
             info!("🚀 启动 HTTP 服务器...");
 
-            // Setup graceful shutdown
-            let shutdown_signal = async {
-                tokio::signal::ctrl_c()
-                    .await
-                    .expect("Failed to install CTRL+C signal handler");
-                warn!("⚠️  收到关闭信号 (Ctrl+C)");
-            };
-
-            // Start server with graceful shutdown
-            tokio::select! {
-                result = server.start() => {
-                    if let Err(e) = result {
-                        error!("❌ 服务器运行错误: {}", e);
-                        process::exit(1);
-                    }
-                }
-                _ = shutdown_signal => {
-                    info!("🛑 正在优雅关闭服务器...");
-                }
+            // Start server with graceful shutdown (handled inside server.start())
+            if let Err(e) = server.start().await {
+                error!("❌ 服务器运行错误: {}", e);
+                process::exit(1);
             }
         }
         Err(e) => {
@@ -188,7 +173,12 @@ fn init_logging(log_level: &str) {
     let log_dir = Path::new("logs");
     if !log_dir.exists() {
         eprintln!("   创建日志目录: {}", log_dir.display());
-        fs::create_dir_all(log_dir).expect("Failed to create logs directory");
+        fs::create_dir_all(log_dir)
+            .map_err(|e| {
+                eprintln!("Failed to create logs directory: {}", e);
+                e
+            })
+            .expect("Logs directory creation should succeed");
     }
 
     // 获取当前日期，用于生成日志文件名
@@ -234,7 +224,12 @@ fn init_logging(log_level: &str) {
         .init();
 
     // 保存 guard 到全局变量，防止被丢弃
-    *FILE_APPENDER_GUARD.lock().unwrap() = Some(guard);
+    *FILE_APPENDER_GUARD.lock()
+        .map_err(|e| {
+            eprintln!("Failed to acquire file appender guard lock: {}", e);
+            e
+        })
+        .expect("File appender guard lock should be available") = Some(guard);
 
     // 创建软链接指向最新的日志文件
     create_log_symlink(&symlink_path, &dated_log_file);

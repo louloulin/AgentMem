@@ -234,6 +234,14 @@ impl Default for QuotaManager {
 }
 
 /// Quota checking middleware
+/// 
+/// This middleware enforces rate limiting and quota checks per organization.
+/// It checks:
+/// - Requests per minute
+/// - Requests per hour  
+/// - Requests per day
+/// 
+/// If quota is exceeded, returns a 429 Too Many Requests error.
 pub async fn quota_middleware(request: Request, next: Next) -> Result<Response, ServerError> {
     // Extract authenticated user
     let auth_user = request.extensions().get::<AuthUser>().cloned();
@@ -245,6 +253,7 @@ pub async fn quota_middleware(request: Request, next: Next) -> Result<Response, 
             quota_manager.check_request_quota(&user.org_id).await?;
         }
     }
+    // If no authenticated user, allow request (will be handled by auth middleware)
 
     Ok(next.run(request).await)
 }

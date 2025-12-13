@@ -158,7 +158,7 @@ mod tests {
     async fn test_liveness_check() {
         let result = liveness_check().await;
         assert!(result.is_ok());
-        let (status, response) = result.unwrap();
+        let (status, response) = result.expect("liveness_check should succeed in test");
         assert_eq!(status, StatusCode::OK);
         assert_eq!(response.0["status"], "alive");
     }

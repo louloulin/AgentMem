@@ -500,8 +500,12 @@ pub async fn get_memory_growth(
 
     // ✅ Calculate real growth rate
     let growth_rate = if data_points.len() > 1 {
-        let first = data_points.first().expect("data_points is not empty").total as f64;
-        let last = data_points.last().expect("data_points is not empty").total as f64;
+        let first = data_points.first()
+            .ok_or_else(|| ServerError::Internal("data_points is empty".to_string()))?
+            .total as f64;
+        let last = data_points.last()
+            .ok_or_else(|| ServerError::Internal("data_points is empty".to_string()))?
+            .total as f64;
         let days = data_points.len() as f64;
         if days > 0.0 {
             (last - first) / days

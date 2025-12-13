@@ -96,7 +96,7 @@ impl MemoryServer {
         })
     }
 
-    /// Start the server
+    /// Start the server with graceful shutdown support
     pub async fn start(self) -> ServerResult<()> {
         let addr = SocketAddr::from(([0, 0, 0, 0], self.config.port));
         let listener = TcpListener::bind(addr)
@@ -108,11 +108,55 @@ impl MemoryServer {
         info!("Health check endpoint: http://{}/health", addr);
         info!("Metrics endpoint: http://{}/metrics", addr);
 
-        // Start the server
-        axum::serve(listener, self.router)
+        // Setup graceful shutdown signal
+        let shutdown_signal = async {
+            #[cfg(unix)]
+            {
+                use tokio::signal::unix::{signal, SignalKind};
+                
+                let mut ctrl_c_stream = tokio::signal::ctrl_c();
+                let mut terminate_stream = match signal(SignalKind::terminate()) {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        tracing::error!("Failed to install SIGTERM signal handler: {}", e);
+                        return;
+                    }
+                };
+
+                tokio::select! {
+                    _ = ctrl_c_stream => {
+                        info!("🛑 Received CTRL+C signal, initiating graceful shutdown...");
+                    }
+                    _ = terminate_stream.recv() => {
+                        info!("🛑 Received SIGTERM signal, initiating graceful shutdown...");
+                    }
+                }
+            }
+
+            #[cfg(not(unix))]
+            {
+                tokio::signal::ctrl_c()
+                    .await
+                    .map_err(|e| {
+                        tracing::error!("Failed to install CTRL+C signal handler: {}", e);
+                        e
+                    })
+                    .ok();
+                info!("🛑 Received CTRL+C signal, initiating graceful shutdown...");
+            }
+        };
+
+        // Start the server with graceful shutdown
+        let server = axum::serve(listener, self.router)
+            .with_graceful_shutdown(shutdown_signal);
+
+        info!("✅ Server is ready to accept connections");
+        
+        server
             .await
             .map_err(|e| ServerError::ServerError(e.to_string()))?;
 
+        info!("✅ Server shutdown complete");
         Ok(())
     }
 
@@ -164,7 +208,10 @@ mod tests {
         if let Err(e) = &server {
             eprintln!("Server creation failed: {:?}", e);
         }
-        let server = server.expect("Server should be created successfully");
+        let server = server.map_err(|e| {
+            eprintln!("Server creation failed: {:?}", e);
+            e
+        }).expect("Server should be created successfully");
         assert_eq!(server.config().port, config.port);
     }
 }

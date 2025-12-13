@@ -27,6 +27,7 @@ use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
 use crate::middleware::{
     audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware,
+    QuotaManager,
 };
 use crate::rbac::RbacChecker;
 use tracing::info;
@@ -364,7 +365,8 @@ pub async fn create_router(
         .layer(Extension(mcp_server)) // 🆕 Add MCP server extension
         .layer(Extension(metrics_registry))
         .layer(Extension(memory_manager))
-        .layer(Extension(Arc::new(repositories)));
+        .layer(Extension(Arc::new(repositories)))
+        .layer(Extension(Arc::new(QuotaManager::new()))); // ✅ API限流管理器
 
     Ok(app)
 }
