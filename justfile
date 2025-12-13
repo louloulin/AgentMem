@@ -9,9 +9,15 @@ export DYLD_LIBRARY_PATH := justfile_directory() + "/lib:" + justfile_directory(
 export ORT_DYLIB_PATH := justfile_directory() + "/lib/libonnxruntime.1.22.0.dylib"
 
 # LLM 配置
+# 注意: API Key 应该通过环境变量设置，不要硬编码
+# 使用方式: export ZHIPU_API_KEY="your-key" && just <command>
+# 或者创建 .env 文件: echo "ZHIPU_API_KEY=your-key" > .env
+# 默认值仅用于开发环境，生产环境必须通过环境变量设置
 export LLM_PROVIDER := "zhipu"
 export LLM_MODEL := "glm-4.6"
-export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
+# ZHIPU_API_KEY 必须通过环境变量设置，不再硬编码
+# 如果未设置，相关功能将无法使用
+# 设置方式: export ZHIPU_API_KEY="your-key"
 
 # Embedder 配置
 export EMBEDDER_PROVIDER := "fastembed"
