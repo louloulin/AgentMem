@@ -269,7 +269,7 @@ pub async fn list_tools(
 
     // Validate pagination parameters
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0).max(0);
+    let _offset = query.offset.unwrap_or(0).max(0);
 
     let tools = if let Some(tags_str) = query.tags {
         let tags: Vec<String> = tags_str.split(',').map(|s| s.trim().to_string()).collect();

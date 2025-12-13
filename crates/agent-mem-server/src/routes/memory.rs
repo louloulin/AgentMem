@@ -8,6 +8,21 @@
 //! - 更好的类型处理
 //!
 //! 注意：本模块内部使用 MemoryItem 用于向后兼容，未来版本将迁移到 Memory V4
+//!
+//! 🆕 模块拆分（2025-12-10）：
+//! - memory/cache.rs: 查询结果缓存逻辑
+//! - memory/stats.rs: 搜索统计逻辑
+//! - 路由处理函数保留在此文件中（未来可进一步拆分到 handlers.rs）
+
+// 使用拆分的模块（作为子模块）
+#[path = "memory/cache.rs"]
+mod cache;
+#[path = "memory/stats.rs"]
+mod stats;
+
+// 重新导出以便向后兼容
+pub use cache::{get_search_cache, generate_cache_key, CachedSearchResult};
+pub use stats::{get_search_stats, SearchStatistics};
 
 use crate::{
     error::{ServerError, ServerResult},
@@ -23,161 +38,11 @@ use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, Searc
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 use futures::future::{self, join_all};
-use lru::LruCache;
-
-/// 查询结果缓存条目
-#[derive(Debug, Clone)]
-struct CachedSearchResult {
-    /// 缓存的结果
-    results: Vec<serde_json::Value>,
-    /// 创建时间
-    created_at: Instant,
-    /// TTL（生存时间）
-    ttl: Duration,
-}
-
-impl CachedSearchResult {
-    fn new(results: Vec<serde_json::Value>, ttl: Duration) -> Self {
-        Self {
-            results,
-            created_at: Instant::now(),
-            ttl,
-        }
-    }
-
-    fn is_expired(&self) -> bool {
-        self.created_at.elapsed() > self.ttl
-    }
-}
-
-/// 查询结果缓存（全局单例，使用LRU策略）
-static SEARCH_CACHE: std::sync::OnceLock<Arc<RwLock<LruCache<String, CachedSearchResult>>>> =
-    std::sync::OnceLock::new();
-
-/// 搜索统计信息（全局单例）
-#[derive(Debug, Clone)]
-pub(crate) struct SearchStatistics {
-    /// 总搜索次数
-    total_searches: u64,
-    /// 缓存命中次数
-    cache_hits: u64,
-    /// 缓存未命中次数
-    cache_misses: u64,
-    /// 精确查询次数（LibSQL）
-    exact_queries: u64,
-    /// 向量搜索次数
-    vector_searches: u64,
-    /// 总搜索延迟（微秒）
-    total_latency_us: u64,
-    /// 最后更新时间
-    last_updated: Instant,
-}
-
-impl SearchStatistics {
-    fn new() -> Self {
-        Self {
-            total_searches: 0,
-            cache_hits: 0,
-            cache_misses: 0,
-            exact_queries: 0,
-            vector_searches: 0,
-            total_latency_us: 0,
-            last_updated: Instant::now(),
-        }
-    }
-
-    fn default() -> Self {
-        Self::new()
-    }
-
-    /// 获取缓存命中率
-    pub(crate) fn cache_hit_rate(&self) -> f64 {
-        if self.total_searches == 0 {
-            return 0.0;
-        }
-        (self.cache_hits as f64) / (self.total_searches as f64)
-    }
-
-    /// 获取平均搜索延迟（毫秒）
-    pub(crate) fn avg_latency_ms(&self) -> f64 {
-        if self.total_searches == 0 {
-            return 0.0;
-        }
-        (self.total_latency_us as f64) / (self.total_searches as f64) / 1000.0
-    }
-
-    /// 🆕 Phase 4.2: 获取搜索统计的公共访问方法
-    pub(crate) fn get_total_searches(&self) -> u64 {
-        self.total_searches
-    }
-
-    pub(crate) fn get_cache_hits(&self) -> u64 {
-        self.cache_hits
-    }
-
-    pub(crate) fn get_cache_misses(&self) -> u64 {
-        self.cache_misses
-    }
-
-    pub(crate) fn get_exact_queries(&self) -> u64 {
-        self.exact_queries
-    }
-
-    pub(crate) fn get_vector_searches(&self) -> u64 {
-        self.vector_searches
-    }
-}
-
-/// 搜索统计（全局单例）
-static SEARCH_STATS: std::sync::OnceLock<Arc<RwLock<SearchStatistics>>> =
-    std::sync::OnceLock::new();
-
-/// 获取搜索统计
-pub(crate) fn get_search_stats() -> Arc<RwLock<SearchStatistics>> {
-    SEARCH_STATS.get_or_init(|| {
-        Arc::new(RwLock::new(SearchStatistics::new()))
-    }).clone()
-}
-
-/// 获取查询结果缓存
-pub(crate) fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
-    // OnceLock::get_or_init 返回 &T，可以直接 clone Arc
-    SEARCH_CACHE.get_or_init(|| {
-        // 默认缓存容量：1000个条目
-        let capacity = std::env::var("SEARCH_CACHE_CAPACITY")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1000);
-        let cache_capacity = NonZeroUsize::new(capacity)
-            .unwrap_or_else(|| {
-                // 1000 是一个有效的 NonZeroUsize 值，这里使用 expect 是安全的
-                NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize")
-            });
-        Arc::new(RwLock::new(LruCache::new(cache_capacity)))
-    }).clone()
-}
-
-/// 生成查询缓存键
-pub(crate) fn generate_cache_key(
-    query: &str,
-    agent_id: &Option<String>,
-    user_id: &Option<String>,
-    limit: &Option<usize>,
-) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    let mut hasher = DefaultHasher::new();
-    query.hash(&mut hasher);
-    agent_id.hash(&mut hasher);
-    user_id.hash(&mut hasher);
-    limit.hash(&mut hasher);
-    format!("search_{}", hasher.finish())
-}
 
 /// Server-side memory manager wrapper (基于Memory统一API)
 pub struct MemoryManager {

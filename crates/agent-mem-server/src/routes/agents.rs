@@ -421,7 +421,7 @@ pub async fn list_agents(
 
     // Validate pagination parameters
     let limit = query.limit.unwrap_or(50).min(100); // Max 100 items per page
-    let offset = query.offset.unwrap_or(0).max(0); // Ensure non-negative
+    let _offset = query.offset.unwrap_or(0).max(0); // Ensure non-negative
 
     let agents = repo
         .find_by_organization_id(&auth_user.org_id)
