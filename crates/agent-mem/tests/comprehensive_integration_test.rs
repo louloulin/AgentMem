@@ -502,3 +502,84 @@ async fn test_llm_parallelization() {
         println!("  错误: {:?}", add_result.err());
     }
 }
+
+/// 测试 12: 综合性能验证（新增 - 2025-12-11）
+#[tokio::test]
+async fn test_comprehensive_performance_verification() {
+    // 综合验证所有性能优化的效果
+    let mem = create_test_memory().await;
+    let user_id = "comprehensive_perf_user";
+    
+    println!("\n🔍 综合性能验证测试开始...");
+    
+    // 1. 测试批量操作性能（验证批量嵌入+并行写入）
+    let start = std::time::Instant::now();
+    let batch_contents: Vec<String> = (0..50)
+        .map(|i| format!("Comprehensive performance test memory {}", i))
+        .collect();
+    
+    use agent_mem::AddMemoryOptions;
+    let mut options = AddMemoryOptions::default();
+    options.user_id = Some(user_id.to_string());
+    
+    let batch_result = mem.add_batch_optimized(batch_contents, options).await;
+    assert!(batch_result.is_ok(), "批量添加应该成功");
+    
+    let batch_duration = start.elapsed();
+    let batch_ops_per_sec = 50.0 / batch_duration.as_secs_f64();
+    
+    println!("✅ 批量操作性能: {:.2} ops/s (50条记忆，耗时 {:.2}ms)", 
+        batch_ops_per_sec, batch_duration.as_millis());
+    
+    // 2. 测试并发操作性能（验证连接池）
+    let start = std::time::Instant::now();
+    let concurrency = 10;
+    let mut handles = Vec::new();
+    
+    for i in 0..concurrency {
+        let mem_clone = mem.clone();
+        let user_id_clone = format!("{}_{}", user_id, i);
+        let handle = tokio::spawn(async move {
+            mem_clone.add_for_user(
+                format!("Concurrent test memory {}", i),
+                &user_id_clone
+            ).await
+        });
+        handles.push(handle);
+    }
+    
+    let mut success_count = 0;
+    for handle in handles {
+        if handle.await.unwrap().is_ok() {
+            success_count += 1;
+        }
+    }
+    
+    let concurrent_duration = start.elapsed();
+    let concurrent_ops_per_sec = concurrency as f64 / concurrent_duration.as_secs_f64();
+    
+    println!("✅ 并发操作性能: {:.2} ops/s ({}并发，成功{}/{})", 
+        concurrent_ops_per_sec, concurrency, success_count, concurrency);
+    
+    // 3. 测试搜索性能
+    let start = std::time::Instant::now();
+    let search_result = mem.search_for_user("test", user_id).await;
+    assert!(search_result.is_ok(), "搜索应该成功");
+    
+    let search_duration = start.elapsed();
+    println!("✅ 搜索操作性能: {:.2}ms (单次搜索)", search_duration.as_millis());
+    
+    // 4. 综合性能评估
+    println!("\n📊 综合性能评估:");
+    println!("  批量操作: {:.2} ops/s", batch_ops_per_sec);
+    println!("  并发操作: {:.2} ops/s", concurrent_ops_per_sec);
+    println!("  搜索延迟: {:.2}ms", search_duration.as_millis());
+    
+    // 验证性能合理
+    assert!(batch_ops_per_sec > 50.0, "批量操作性能应该 > 50 ops/s");
+    assert!(concurrent_ops_per_sec > 10.0, "并发操作性能应该 > 10 ops/s");
+    assert!(search_duration.as_millis() < 1000, "搜索延迟应该 < 1000ms");
+    assert!(success_count >= concurrency * 8 / 10, "至少80%的并发操作应该成功");
+    
+    println!("✅ 综合性能验证通过");
+}
