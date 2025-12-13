@@ -2,7 +2,11 @@
 
 **日期**: 2025-12-10  
 **优先级**: 🔴 P0 - 致命问题  
-**状态**: 已修复部分，但仍存在潜在风险
+**状态**: 已修复部分，但仍存在潜在风险  
+**参考**: Mem0、MemOS、A-MEM、MemGPT、MemoriesDB、AlayaDB、**ENGRAM、MemVerse**等2025最新研究
+
+> 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - **最终推荐架构**  
+> 📚 **最佳架构设计**: 参见 `OPTIMAL_MEMORY_ARCHITECTURE.md` - 基于最新研究的完整架构方案
 
 ---
 
@@ -14,12 +18,14 @@
 ### 当前状态
 - ✅ **已修复**：`add_memory_fast()` 已添加MemoryManager写入（第4个并行任务）
 - ✅ **已修复**：MemoryManager使用LibSQL后端（LibSqlMemoryOperations）
-- ⚠️ **仍存在**：VectorStore和Repository之间没有事务保证
+- ✅ **已实现**：UnifiedStorageCoordinator（统一存储协调层）
+- ⚠️ **仍存在**：VectorStore失败时没有回滚Repository（coordinator.rs:171-177）
 - ⚠️ **仍存在**：数据一致性检查机制缺失
+- ⚠️ **仍存在**：数据同步机制缺失
 
 ### 影响评估
 - 🔴 **致命**：如果Repository写入失败，数据会丢失
-- 🔴 **致命**：如果VectorStore写入失败，向量搜索会失败
+- 🔴 **致命**：如果VectorStore写入失败，向量搜索会失败（当前只记录警告，未回滚）
 - 🟡 **中等**：没有数据一致性检查，无法发现不一致
 
 ---
@@ -432,15 +438,23 @@ def get_all(self, *, user_id=None, agent_id=None, run_id=None, filters=None, lim
 
 ---
 
-## 💡 解决方案
+## 💡 解决方案（基于最新研究）
 
-### 方案A：完善双写策略（推荐）⭐
+> 📚 **完整架构设计**: 参见 `OPTIMAL_MEMORY_ARCHITECTURE.md`
 
-**目标**：保持现有架构，完善数据一致性保证
+### 方案A：统一存储协调层（推荐）⭐⭐⭐
+
+**目标**：基于UnifiedStorageCoordinator，完善数据一致性保证
+
+**设计理念**：
+- **Repository优先**：LibSQL作为主存储，支持事务和复杂查询
+- **补偿机制**：VectorStore失败时回滚Repository
+- **混合检索**：时间 + 语义，兼顾性能和相关性
+- **数据一致性检查**：定期验证，自动修复
 
 **实施步骤**：
 
-#### 1. 实现补偿机制
+#### 1. 完善补偿机制（修复coordinator.rs）
 ```rust
 pub async fn add_memory_fast(...) -> Result<String> {
     // Step 1: 先写入Repository（主存储）
@@ -755,6 +769,65 @@ pub async fn get_all_memories_v2(...) -> Result<Vec<MemoryItem>> {
 
 ---
 
+## 📚 参考研究
+
+### 业界最佳实践
+
+1. **Mem0** (Python)
+   - 单一数据源架构
+   - VectorStore作为主存储
+   - 参考: `OPTIMAL_MEMORY_ARCHITECTURE.md`
+
+2. **MemOS** (2025)
+   - 三层架构（接口层、操作层、基础设施层）
+   - MemCube统一内存单元
+   - LOCOMO基准测试第一
+   - 参考: MemOS论文 (arXiv:2507.03724)
+
+3. **A-MEM** (NeurIPS 2025)
+   - Zettelkasten方法
+   - 动态知识网络
+   - 记忆演化机制
+   - 参考: A-MEM论文 (arXiv:2502.12110)
+
+4. **MemGPT** (2023)
+   - 分层内存管理
+   - Agent自主管理
+   - OS风格虚拟内存
+   - 参考: MemGPT论文 (arXiv:2310.08560)
+
+5. **MemoriesDB** (2025)
+   - 三维统一（时间+语义+关系）
+   - 几何模型
+   - 跨时间一致性
+   - 参考: MemoriesDB论文 (arXiv:2511.06179)
+
+6. **AlayaDB** (2025)
+   - KV缓存解耦
+   - 查询优化器
+   - 资源优化
+   - 参考: AlayaDB论文 (arXiv:2504.10326)
+
+### 生产系统分析
+
+1. **Mem0** (Universal Memory Layer)
+   - 三重存储：VectorStore + GraphStore + KVStore
+   - 并行写入
+   - 参考: Mnemoverse Production Systems Analysis
+
+2. **Zep** (Temporal Knowledge Graph)
+   - 双时间模型
+   - 三层层次图
+   - 参考: Mnemoverse Production Systems Analysis
+
+3. **Letta** (formerly MemGPT)
+   - 分层内存（In-Context + External）
+   - Agent驱动交换
+   - 参考: Mnemoverse Production Systems Analysis
+
+---
+
 **负责人**: AI Assistant  
 **审核**: 待用户确认  
-**预计完成**: 本周内
+**预计完成**: 本周内  
+**参考文档**: `OPTIMAL_MEMORY_ARCHITECTURE.md`
