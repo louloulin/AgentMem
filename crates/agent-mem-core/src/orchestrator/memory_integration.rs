@@ -143,12 +143,14 @@ pub struct MemoryIntegrator {
 impl MemoryIntegrator {
     /// 创建新的记忆集成器
     pub fn new(memory_engine: Arc<MemoryEngine>, config: MemoryIntegratorConfig) -> Self {
+        // Cache size is a compile-time constant (100), so this is safe
+        // Using expect with a clear message for better error handling
+        let cache_size = NonZeroUsize::new(100)
+            .expect("Cache size must be > 0 (this is a compile-time constant)");
         Self {
             memory_engine,
             config,
-            cache: Arc::new(RwLock::new(lru::LruCache::new(
-                NonZeroUsize::new(100).unwrap(),
-            ))),
+            cache: Arc::new(RwLock::new(lru::LruCache::new(cache_size))),
             cache_metrics: CacheMetrics::new(),
         }
     }
@@ -349,7 +351,9 @@ impl MemoryIntegrator {
         );
 
         // 🔧 修复: 改进商品ID检测 - 从查询中提取商品ID（即使包含其他文本）
-        let product_id_pattern = Regex::new(r"P\d{6}").unwrap(); // 不要求完全匹配，允许包含其他文本
+        // Regex pattern is a compile-time constant, so compilation failure is acceptable
+        let product_id_pattern = Regex::new(r"P\d{6}")
+            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
         let extracted_product_id = product_id_pattern.find(query).map(|m| m.as_str());
 
         if let Some(product_id) = extracted_product_id {
