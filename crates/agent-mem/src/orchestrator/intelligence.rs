@@ -11,7 +11,7 @@ use agent_mem_intelligence::{
     ConflictDetection, ExistingMemory, ExtractedFact, ImportanceEvaluation, MemoryAction,
     MemoryDecision, StructuredFact,
 };
-use agent_mem_traits::{MemoryItem, Result};
+use agent_mem_traits::{AgentMemError, MemoryItem, Result};
 
 use super::core::MemoryOrchestrator;
 use super::utils::UtilsModule;
@@ -265,9 +265,11 @@ impl IntelligenceModule {
         {
             if let Some(hybrid_engine) = &orchestrator.hybrid_search_engine {
                 // 生成查询向量
+                let embedder = orchestrator.embedder.as_ref()
+                    .ok_or_else(|| AgentMemError::ConfigError("Embedder not configured".to_string()))?;
                 let query_vector = UtilsModule::generate_query_embedding(
                     content,
-                    orchestrator.embedder.as_ref().unwrap().as_ref(),
+                    embedder.as_ref(),
                 )
                 .await?;
 
@@ -317,9 +319,11 @@ impl IntelligenceModule {
         {
             // 非 postgres 版本：使用 vector_store 搜索
             if let Some(vector_store) = &orchestrator.vector_store {
+                let embedder = orchestrator.embedder.as_ref()
+                    .ok_or_else(|| AgentMemError::ConfigError("Embedder not configured".to_string()))?;
                 let query_vector = UtilsModule::generate_query_embedding(
                     content,
-                    orchestrator.embedder.as_ref().unwrap().as_ref(),
+                    embedder.as_ref(),
                 )
                 .await?;
 

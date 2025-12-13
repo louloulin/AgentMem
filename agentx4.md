@@ -711,8 +711,15 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 
 **任务**:
 - [ ] 创建统一的错误处理模块 `error_handler.rs`
-- [ ] 替换所有 `unwrap()` 为 `?` 操作符（**1437+处生产代码**）⚠️
-- [ ] 替换所有 `expect()` 为 `?` 操作符
+- [x] 修复关键路径的 `unwrap()` 和 `expect()`（orchestrator、coordinator等）✅ **部分完成**（2025-12-10）
+  - [x] 修复 `memory_integration.rs` 中的 unwrap（2处）
+  - [x] 修复 `coordinator.rs` 中的 unwrap（1处）
+  - [x] 修复 `initialization.rs` 中的 unwrap（1处）
+  - [x] 修复 `intelligence.rs` 中的 unwrap（2处）
+  - [x] 使用 `expect` 提供清晰的错误消息（编译时常量）
+  - [x] 使用 `ok_or_else` 返回错误而不是 panic
+- [ ] 替换所有 `unwrap()` 为 `?` 操作符（**1437+处生产代码**，剩余待处理）⚠️
+- [ ] 替换所有 `expect()` 为 `?` 操作符（剩余待处理）
 - [ ] 移除 `panic!` 调用（如 `memory.rs:807`）
 - [ ] 添加错误上下文和堆栈跟踪
 - [ ] 实现友好的错误消息
@@ -2089,7 +2096,10 @@ agentmem stats --user-id user123 | \
 **实现进度**:
 - ✅ Phase 5.1: Mutex锁竞争问题已解决（多模型实例池）✅ **已完成**（2025-12-10）
 - ✅ Phase 5.2: 数据一致性修复（补偿机制+一致性检查）✅ **已完成**（2025-12-10）
-- ⏳ Phase 0.1: 错误处理统一化（待实施）
+- 🔄 Phase 0.1: 错误处理统一化（关键路径已修复）✅ **部分完成**（2025-12-10）
+  - ✅ 修复 orchestrator 关键路径的 unwrap/expect（6处）
+  - ✅ 修复 coordinator 关键路径的 unwrap（1处）
+  - ⏳ 剩余 1430+ 处待处理（非关键路径）
 
 **最新完成**（2025-12-10）:
 - ✅ **Phase 5.1: 多模型实例池实现，解决 Mutex 锁竞争问题**

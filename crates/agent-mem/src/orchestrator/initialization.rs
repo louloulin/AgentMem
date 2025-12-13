@@ -47,22 +47,23 @@ impl InitializationModule {
         // 创建 LLM Provider
         let llm_provider = Self::create_llm_provider(config).await?;
 
-        if llm_provider.is_none() {
-            warn!("LLM Provider 未配置，Intelligence 组件将不可用");
-            return Ok(IntelligenceComponents {
-                fact_extractor: None,
-                advanced_fact_extractor: None,
-                batch_entity_extractor: None,
-                batch_importance_evaluator: None,
-                decision_engine: None,
-                enhanced_decision_engine: None,
-                importance_evaluator: None,
-                conflict_resolver: None,
-                llm_provider: None,
-            });
-        }
-
-        let llm = llm_provider.clone().unwrap();
+        let llm = match llm_provider.clone() {
+            Some(llm) => llm,
+            None => {
+                warn!("LLM Provider 未配置，Intelligence 组件将不可用");
+                return Ok(IntelligenceComponents {
+                    fact_extractor: None,
+                    advanced_fact_extractor: None,
+                    batch_entity_extractor: None,
+                    batch_importance_evaluator: None,
+                    decision_engine: None,
+                    enhanced_decision_engine: None,
+                    importance_evaluator: None,
+                    conflict_resolver: None,
+                    llm_provider: None,
+                });
+            }
+        };
 
         // 创建各个 Intelligence 组件
         let fact_extractor = Some(Arc::new(FactExtractor::new(llm.clone())));

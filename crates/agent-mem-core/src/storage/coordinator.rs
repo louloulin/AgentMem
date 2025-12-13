@@ -101,7 +101,10 @@ impl UnifiedStorageCoordinator {
     ) -> Self {
         let config = cache_config.unwrap_or_default();
         let cache_capacity = NonZeroUsize::new(config.l1_capacity)
-            .unwrap_or(NonZeroUsize::new(1000).unwrap());
+            .unwrap_or_else(|| {
+                NonZeroUsize::new(1000)
+                    .expect("Default cache size must be > 0 (this is a compile-time constant)")
+            });
         
         // 🆕 Phase 1.2: L2 Redis缓存初始化（可选）
         #[cfg(feature = "redis-cache")]
