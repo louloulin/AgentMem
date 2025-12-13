@@ -1,17 +1,20 @@
-# AgentMem 企业级生产改造计划 v4.2
+# AgentMem 企业级生产改造计划 v4.3
 
 **分析日期**: 2025-12-10  
-**分析范围**: 全面代码分析 + 业界最佳实践研究 + Unix哲学评估 + 2025最新论文  
+**分析范围**: 全面代码分析 + 业界最佳实践研究 + Unix哲学评估 + 2025最新论文 + ContextFS论文分析  
 **目标**: 将 AgentMem 提升到企业级生产标准  
 **参考标准**: 企业级SaaS产品、云原生最佳实践、生产环境要求  
-**最新研究**: Mem0、MemOS、A-MEM、MemGPT、MemoriesDB、AlayaDB、**ENGRAM、MemVerse**等2025最新研究
+**最新研究**: Mem0、MemOS、A-MEM、MemGPT、MemoriesDB、AlayaDB、**ENGRAM、MemVerse、ContextFS、A-MemGuard、Intrinsic Memory**等2025最新研究
 
 > 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - **最终推荐架构**（基于2025最新研究）  
+> 🚀 **未来架构愿景**: 参见 `FUTURE_ARCHITECTURE_VISION.md` ⭐⭐⭐ - **完整未来架构**（ContextFS + Unix FS + 完整愿景）  
 > 📚 **关键文档**:
 > - `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - **最终架构决策**（必读）
+> - `FUTURE_ARCHITECTURE_VISION.md` ⭐⭐⭐ - **未来架构愿景**（必读）
 > - `OPTIMAL_MEMORY_ARCHITECTURE.md` - 11种架构完整对比
 > - `DATA_CONSISTENCY_DEEP_ANALYSIS.md` - 数据一致性深度分析
 > - `DATA_CONSISTENCY_FIX_PLAN.md` - 修复实施计划
+> - `CODE_ANALYSIS_DATA_FLOW.md` - 代码追踪分析
 > - `README_ARCHITECTURE.md` - 文档索引
 
 ---
@@ -982,14 +985,19 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 
 #### 5.2 数据一致性修复 ⚠️ **严重问题**
 
-> 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - 基于2025最新研究的最终推荐
+> 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - 基于2025最新研究的最终推荐  
+> 🔍 **代码分析**: 参见 `CODE_ANALYSIS_DATA_FLOW.md` - 数据流问题根源追踪
 
 **目标**: 修复存储和检索数据源不一致问题，确保数据一致性
 
 **最终推荐架构**: 统一存储协调层 + ENGRAM轻量级设计
 
+**核心执行架构**: 参见 `FINAL_ARCHITECTURE_DECISION.md` - 包含完整执行流程图
+
 **当前状态**:
 - ✅ **已完成**：在 `add_memory_fast()` 中添加MemoryRepository写入
+- ❌ **问题1**：`add_memory_fast()` 并行写入风险（4个任务并行，任一失败导致不一致）
+- ❌ **问题2**：`coordinator.add_memory()` 缺少回滚机制（VectorStore失败时只记录警告）
 - ⏳ **待实施**：实现补偿机制和数据一致性检查
 
 **任务**:
@@ -1014,10 +1022,11 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 - ✅ 向量索引可重建
 
 **参考文档**:
+- `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - **最终架构决策**（包含核心执行架构图）
+- `CODE_ANALYSIS_DATA_FLOW.md` ⭐ - **代码追踪分析**（数据流问题根源）
 - `DATA_CONSISTENCY_DEEP_ANALYSIS.md` - 详细分析和解决方案（包含Mem0、MemOS等对比）
 - `OPTIMAL_MEMORY_ARCHITECTURE.md` - **最佳架构设计**（基于最新研究）
 - `DATA_CONSISTENCY_FIX_PLAN.md` - 修复实施计划（具体代码修改）
-- `ARCHITECTURE_COMPARISON.md` - Mem0 vs AgentMem架构对比
 
 **最新研究参考**（已整合到OPTIMAL_MEMORY_ARCHITECTURE.md）:
 - **Mem0** (Universal Memory Layer) - 单一数据源架构，简洁高效

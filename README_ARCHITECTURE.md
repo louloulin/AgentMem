@@ -9,15 +9,33 @@
 
 ### 1. `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ **必读**
 
-**最终架构决策** - 基于2025最新研究（ENGRAM、MemVerse等）
+**最终架构决策** - 基于2025最新研究（ENGRAM、MemVerse、ContextFS等）
 
 **内容**:
 - 最终推荐架构：统一存储协调层 + ENGRAM轻量级设计
-- 2025最新研究总结（ENGRAM、MemVerse、MemoriesDB等）
+- **核心执行架构图**（完整流程图）
+- 2025最新研究总结（ENGRAM、MemVerse、MemoriesDB、MIRIX、Collaborative Memory、ContextFS、A-MemGuard、Intrinsic Memory等）
 - 架构对比（11种架构）
+- 基于现状的最佳选择理由
 - 实施计划（P0/P1/P2）
 
-**适合**: 快速了解最终推荐架构
+**适合**: 快速了解最终推荐架构和执行流程
+
+---
+
+### 1.5. `FUTURE_ARCHITECTURE_VISION.md` ⭐⭐⭐ **必读**
+
+**未来架构愿景** - ContextFS + Unix FS + 完整未来设计
+
+**内容**:
+- 完整未来架构设计（ContextFS + Unix FS + Repository优先）
+- ContextFS集成设计（Everything is Context）
+- Unix文件系统接口设计（Everything is File）
+- 完整数据流设计（写入、读取、搜索）
+- 实施路线图（Phase 0-5）
+- 架构对比（当前 vs 未来）
+
+**适合**: 了解完整未来架构愿景和实施路线
 
 ---
 
@@ -35,7 +53,22 @@
 
 ---
 
-### 3. `DATA_CONSISTENCY_FIX_PLAN.md` ⭐ **实施计划**
+### 3. `CODE_ANALYSIS_DATA_FLOW.md` ⭐ **代码追踪**
+
+**代码追踪分析** - 数据流问题根源
+
+**内容**:
+- 写入路径追踪（add_memory_fast、coordinator.add_memory）
+- 读取路径追踪（get_all_memories、get_agent_memories）
+- 根本原因分析（并行写入风险、缺少回滚机制）
+- 数据流对比（当前 vs 修复后）
+- 修复方案
+
+**适合**: 深入理解问题根源
+
+---
+
+### 4. `DATA_CONSISTENCY_FIX_PLAN.md` ⭐ **实施计划**
 
 **修复实施计划** - 具体代码修改
 
@@ -51,7 +84,7 @@
 
 ## 📋 支持文档
 
-### 4. `DATA_CONSISTENCY_DEEP_ANALYSIS.md`
+### 5. `DATA_CONSISTENCY_DEEP_ANALYSIS.md`
 
 **详细问题分析** - 深度技术分析
 
@@ -65,7 +98,7 @@
 
 ---
 
-### 5. `DATA_CONSISTENCY_COMPLETE_SOLUTION.md`
+### 6. `DATA_CONSISTENCY_COMPLETE_SOLUTION.md`
 
 **完整解决方案** - 架构设计和实施步骤
 
@@ -78,7 +111,7 @@
 
 ---
 
-### 6. `DATA_CONSISTENCY_FINAL_SUMMARY.md`
+### 7. `DATA_CONSISTENCY_FINAL_SUMMARY.md`
 
 **最终解决方案** - 快速参考
 
@@ -92,7 +125,7 @@
 
 ---
 
-### 7. `RESEARCH_SUMMARY.md`
+### 8. `RESEARCH_SUMMARY.md`
 
 **研究总结** - 业界最佳实践
 

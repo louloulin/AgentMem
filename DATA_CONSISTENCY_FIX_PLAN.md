@@ -4,7 +4,8 @@
 **优先级**: 🔴 P0 - 致命问题  
 **预计时间**: 4-6小时
 
-> 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - 基于2025最新研究的最终推荐
+> 🏆 **最终架构决策**: 参见 `FINAL_ARCHITECTURE_DECISION.md` ⭐⭐⭐ - 基于2025最新研究的最终推荐  
+> 🔍 **代码分析**: 参见 `CODE_ANALYSIS_DATA_FLOW.md` - 数据流问题根源
 
 ---
 
@@ -14,21 +15,24 @@
 - ✅ `add_memory_fast()` 已添加MemoryManager写入（第4个并行任务）
 - ✅ MemoryManager使用LibSQL后端（LibSqlMemoryOperations）
 - ✅ UnifiedStorageCoordinator已实现
-- ❌ **问题**：coordinator.rs中VectorStore失败时只记录警告，没有回滚Repository
-- ❌ **问题**：缺少数据一致性检查机制
-- ❌ **问题**：缺少数据同步机制
+- ❌ **问题1**：coordinator.rs中VectorStore失败时只记录警告，没有回滚Repository（171-177行）
+- ❌ **问题2**：add_memory_fast()并行写入风险，任一失败都会导致数据不一致
+- ❌ **问题3**：缺少数据一致性检查机制
+- ❌ **问题4**：缺少数据同步机制
 
 ### 代码位置
-- **文件**: `crates/agent-mem-core/src/storage/coordinator.rs`
-- **问题行**: 171-177（VectorStore失败时只记录警告）
+- **文件1**: `crates/agent-mem-core/src/storage/coordinator.rs` - 问题行：171-177
+- **文件2**: `crates/agent-mem/src/orchestrator/storage.rs` - 问题行：99-242（并行写入）
 
 ---
 
 ## 🎯 修复方案
 
-### 修复1: 实现补偿机制（回滚逻辑）
+### 修复1: 实现补偿机制（coordinator.rs）
 
-**文件**: `crates/agent-mem-core/src/storage/coordinator.rs`
+**文件**: `crates/agent-mem-core/src/storage/coordinator.rs:171-177`
+
+**问题**: VectorStore失败时只记录警告，没有回滚Repository
 
 **当前代码**（问题）:
 ```rust
@@ -69,6 +73,118 @@ if let Err(e) = self.vector_store.add_vectors(vec![vector_data]).await {
 - ✅ 确保数据一致性（要么都成功，要么都失败）
 - ✅ 避免数据丢失
 - ⚠️ 增加回滚开销（但这是必要的）
+
+---
+
+### 修复2: 修复add_memory_fast的并行写入风险
+
+**文件**: `crates/agent-mem/src/orchestrator/storage.rs:99-242`
+
+**问题**: 4个并行任务，任一失败都会导致数据不一致
+
+**当前代码**（问题）:
+```rust
+// 4个并行任务
+let (core_result, vector_result, history_result, db_result) = tokio::join!(
+    // 任务1: CoreMemoryManager
+    async move { /* ... */ },
+    // 任务2: VectorStore
+    async move { store.add_vectors(...).await },
+    // 任务3: HistoryManager
+    async move { /* ... */ },
+    // 任务4: MemoryManager (Repository)
+    async move { manager.add_memory(...).await }
+);
+
+// 问题：如果VectorStore失败，MemoryManager已写入，但没有回滚
+if let Err(e) = vector_result {
+    return Err(...);  // ❌ 没有回滚MemoryManager
+}
+```
+
+**修复后**（顺序写入+补偿）:
+```rust
+// Step 1: 先写MemoryManager（主存储）
+let db_result = if let Some(manager) = &memory_manager {
+    manager.add_memory(
+        agent_id.clone(),
+        user_id.clone(),
+        content.clone(),
+        memory_type,
+        Some(1.0),
+        Some(metadata_for_manager),
+    )
+    .await
+    .map_err(|e| format!("MemoryManager write failed: {}", e))
+} else {
+    Err("MemoryManager not initialized".to_string())
+};
+
+if let Err(e) = db_result {
+    error!("❌ 存储到MemoryManager失败: {}", e);
+    return Err(AgentMemError::storage_error(&format!(
+        "Failed to store to MemoryManager: {}",
+        e
+    )));
+}
+
+// Step 2: 再写VectorStore（向量索引）
+let vector_result = if let Some(store) = &vector_store {
+    let vector_data = VectorData {
+        id: memory_id.clone(),
+        vector: embedding.clone(),
+        metadata: string_metadata.clone(),
+    };
+    store
+        .add_vectors(vec![vector_data])
+        .await
+        .map_err(|e| format!("VectorStore write failed: {}", e))
+} else {
+    Ok(())
+};
+
+// Step 3: 如果VectorStore失败，回滚MemoryManager
+if let Err(e) = vector_result {
+    error!("❌ 存储到VectorStore失败，回滚MemoryManager: {}", e);
+    
+    if let Some(manager) = &memory_manager {
+        if let Err(rollback_err) = manager.delete_memory(&memory_id).await {
+            error!("❌ 回滚MemoryManager失败: {}", rollback_err);
+            return Err(AgentMemError::storage_error(&format!(
+                "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
+                e, rollback_err
+            )));
+        }
+    }
+    
+    return Err(AgentMemError::storage_error(&format!(
+        "Failed to store to VectorStore, MemoryManager rolled back: {}",
+        e
+    )));
+}
+
+// Step 4: 其他非关键任务（CoreMemoryManager、HistoryManager）可以并行执行
+let (core_result, history_result) = tokio::join!(
+    // 任务1: CoreMemoryManager（可选）
+    async move { /* ... */ },
+    // 任务2: HistoryManager（审计，非关键）
+    async move { /* ... */ }
+);
+
+// 这些失败不影响主流程，只记录警告
+if let Err(e) = core_result {
+    warn!("存储到CoreMemoryManager失败（非关键）: {}", e);
+}
+
+if let Err(e) = history_result {
+    warn!("记录历史失败（非关键）: {}", e);
+}
+```
+
+**影响**:
+- ✅ 确保数据一致性（Repository优先，VectorStore失败时回滚）
+- ✅ 避免并行写入导致的数据不一致
+- ⚠️ 略微增加写入延迟（但保证一致性）
 
 ---
 
