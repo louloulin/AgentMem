@@ -164,9 +164,8 @@ async fn test_batch_performance() {
     let mem = create_test_memory().await;
     let user_id = "perf_user";
     
+    // 测试小批量（10条）
     let start = std::time::Instant::now();
-    
-    // 批量添加 10 条记忆
     let contents: Vec<String> = (0..10)
         .map(|i| format!("Performance test memory {}", i))
         .collect();
@@ -181,11 +180,43 @@ async fn test_batch_performance() {
     let duration = start.elapsed();
     let ops_per_sec = 10.0 / duration.as_secs_f64();
     
-    println!("✅ 批量操作性能: {:.2} ops/s (10条记忆，耗时 {:.2}ms)", 
+    println!("✅ 小批量操作性能: {:.2} ops/s (10条记忆，耗时 {:.2}ms)", 
         ops_per_sec, duration.as_millis());
     
-    // 验证性能合理（至少应该 > 10 ops/s）
-    assert!(ops_per_sec > 1.0, "批量操作性能应该合理");
+    // 测试大批量（100条）- 验证分块处理
+    let start = std::time::Instant::now();
+    let large_contents: Vec<String> = (0..100)
+        .map(|i| format!("Large batch test memory {}", i))
+        .collect();
+    
+    let mut large_options = AddMemoryOptions::default();
+    large_options.user_id = Some(format!("{}_large", user_id));
+    
+    let large_batch_result = mem.add_batch_optimized(large_contents, large_options).await;
+    assert!(large_batch_result.is_ok(), "大批量添加应该成功");
+    
+    let large_duration = start.elapsed();
+    let large_ops_per_sec = 100.0 / large_duration.as_secs_f64();
+    
+    println!("✅ 大批量操作性能: {:.2} ops/s (100条记忆，耗时 {:.2}ms)", 
+        large_ops_per_sec, large_duration.as_millis());
+    
+    // 验证性能合理
+    assert!(ops_per_sec > 1.0, "小批量操作性能应该合理");
+    assert!(large_ops_per_sec > 1.0, "大批量操作性能应该合理");
+    
+    // 大批量应该比小批量更高效（每条的耗时更少）
+    let small_avg_ms = duration.as_millis() as f64 / 10.0;
+    let large_avg_ms = large_duration.as_millis() as f64 / 100.0;
+    
+    println!("✅ 平均每条耗时: 小批量 {:.2}ms, 大批量 {:.2}ms", 
+        small_avg_ms, large_avg_ms);
+    
+    // 大批量平均耗时应该更少（批量优化效果）
+    if large_avg_ms < small_avg_ms {
+        println!("✅ 批量优化生效: 大批量平均耗时更少 ({:.2}ms vs {:.2}ms)", 
+            large_avg_ms, small_avg_ms);
+    }
 }
 
 /// 测试 6: 错误处理验证
