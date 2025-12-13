@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Mutex;
 use tokio::sync::Semaphore;
 use std::time::{Duration, Instant};
+#[cfg(feature = "num_cpus")]
+use num_cpus;
 
 /// LibSQL connection pool configuration
 #[derive(Debug, Clone)]
@@ -28,9 +30,16 @@ pub struct LibSqlPoolConfig {
 
 impl Default for LibSqlPoolConfig {
     fn default() -> Self {
+        // Optimized defaults based on CPU cores and typical workload
+        // Reference: Mem0 uses connection pooling for better concurrency
+        #[cfg(feature = "num_cpus")]
+        let num_cpus = num_cpus::get().max(1);
+        #[cfg(not(feature = "num_cpus"))]
+        let num_cpus = 4; // Fallback to 4 if num_cpus not available
+        
         Self {
-            min_connections: 2,
-            max_connections: 10,
+            min_connections: num_cpus.max(2),  // At least 2, or CPU count
+            max_connections: (num_cpus * 4).max(10).min(50),  // 4x CPU cores, max 50, min 10
             connect_timeout: 30,
             idle_timeout: 600,  // 10 minutes
             max_lifetime: 1800, // 30 minutes
