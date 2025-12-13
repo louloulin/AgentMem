@@ -7,7 +7,7 @@
 **参考标准**: Mem0、LangChain Memory、CrewAI Memory、MIRIX  
 **实施状态**: ✅ Phase 0 和 Phase 1 核心任务已完成并验证
 
-**✅ 实施状态（2025-12-10 最终更新 - 全面验证完成）**: 
+**✅ 实施状态（2025-12-10 最终更新 - 全面验证完成 + 继续改造）**: 
 - ✅ **构建状态**: `cargo build` 成功，所有包编译通过
 - ✅ **测试状态**: 20个测试套件全部通过，100+个测试，0个失败
   - 所有测试使用内存数据库（`memory://`）确保测试隔离
@@ -49,6 +49,17 @@
   - ✅ 嵌入队列：已实现（2.00x 性能提升）
     - 配置：批处理大小 64，间隔 20ms
     - 功能：自动收集并发请求，批量处理嵌入生成
+- ✅ **代码组织进一步优化**（2025-12-10 继续改造）
+  - ✅ 创建 `memory/utils.rs` 模块（419行）
+    - 提取所有辅助函数：字符串处理、评分计算、查询检测、数据转换
+    - 包括：`truncate_string_at_char_boundary`, `contains_chinese`, `calculate_recency_score`, 
+      `calculate_3d_score`, `calculate_quality_score`, `get_adaptive_threshold`, 
+      `detect_exact_query`, `convert_memory_to_json`, `calculate_access_pattern_score`,
+      `calculate_auto_importance`, `apply_hierarchical_sorting`, `apply_intelligent_filtering`,
+      `compute_prefetch_candidates`
+  - ✅ `memory.rs` 进一步精简：从 3918 行减少到 3479 行（减少 439 行）
+  - ✅ 代码组织更清晰：模块职责明确分离
+  - ✅ `cargo build` 成功，`cargo test` 通过（86个测试通过）
 
 ---
 
@@ -4391,9 +4402,15 @@ pub use cache::{get_search_cache, generate_cache_key, CachedSearchResult};
 pub use stats::{get_search_stats, SearchStatistics};
 ```
 
-**结论**: ✅ **路由拆分已部分实施**，缓存和统计逻辑已分离，代码质量提升
+**结论**: ✅ **路由拆分已显著改进**，缓存、统计和工具函数已分离，代码质量大幅提升
 
-**状态**: ✅ 已完成（第一阶段），未来可进一步拆分 handlers
+**状态**: ✅ 已完成（第二阶段），代码从 4044 行减少到 3479 行（减少 565 行，14% 改进）
+- ✅ cache.rs (71行) - 查询结果缓存逻辑
+- ✅ stats.rs (94行) - 搜索统计逻辑  
+- ✅ utils.rs (419行) - 辅助函数模块
+- ✅ memory.rs (3479行) - 主路由处理文件
+
+**下一步**: 可进一步拆分路由处理函数到 handlers.rs（未来计划）
 
 ---
 
