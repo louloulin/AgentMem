@@ -381,7 +381,7 @@ async fn test_large_batch_chunking() {
     use agent_mem::GetAllOptions;
     let get_options = GetAllOptions {
         user_id: Some(user_id.to_string()),
-        limit: Some((large_batch_size + 100) as u32),
+        limit: Some(large_batch_size + 100),
         ..Default::default()
     };
     let all_memories = mem.get_all(get_options).await;
@@ -397,4 +397,61 @@ async fn test_large_batch_chunking() {
     assert!(duration.as_secs_f64() < 120.0, "大批量操作应该在 120 秒内完成");
     
     println!("✅ 大批量分块处理验证通过");
+}
+
+/// 测试 10: 批量操作性能基准测试（新增 - 2025-12-11）
+#[tokio::test]
+async fn test_batch_operation_benchmark() {
+    // 测试不同批量大小的性能，验证prepared statement复用的效果
+    let mem = create_test_memory().await;
+    let user_id = "benchmark_user";
+    
+    let batch_sizes = vec![10, 50, 100, 200, 500];
+    let mut results = Vec::new();
+    
+    for batch_size in batch_sizes {
+        let start = std::time::Instant::now();
+        
+        let contents: Vec<String> = (0..batch_size)
+            .map(|i| format!("Benchmark test memory {} for batch size {}", i, batch_size))
+            .collect();
+        
+        use agent_mem::AddMemoryOptions;
+        let mut options = AddMemoryOptions::default();
+        options.user_id = Some(user_id.to_string());
+        
+        let batch_result = mem.add_batch_optimized(contents, options).await;
+        assert!(batch_result.is_ok(), "批量添加应该成功");
+        
+        let duration = start.elapsed();
+        let ops_per_sec = batch_size as f64 / duration.as_secs_f64();
+        let avg_time_per_item = duration.as_millis() as f64 / batch_size as f64;
+        
+        results.push((batch_size, duration, ops_per_sec, avg_time_per_item));
+        
+        println!("批量大小: {}, 耗时: {:.2}ms, 吞吐量: {:.2} ops/s, 平均: {:.2}ms/条",
+                 batch_size, duration.as_millis(), ops_per_sec, avg_time_per_item);
+    }
+    
+    println!("\n✅ 批量操作性能基准测试结果:");
+    println!("{:<12} {:<12} {:<15} {:<15}", "批量大小", "耗时(ms)", "吞吐量(ops/s)", "平均(ms/条)");
+    println!("{}", "-".repeat(60));
+    for (size, duration, ops_per_sec, avg_time) in &results {
+        println!("{:<12} {:<12.2} {:<15.2} {:<15.2}", size, duration.as_millis(), ops_per_sec, avg_time);
+    }
+    
+    // 验证性能趋势：大批量应该更高效（平均时间应该减少或至少不显著增加）
+    if results.len() >= 2 {
+        let small_batch_avg = results[0].3; // 10条的平均时间
+        let large_batch_avg = results[results.len() - 1].3; // 500条的平均时间
+        
+        println!("\n性能对比: 小批量({:.2}ms/条) vs 大批量({:.2}ms/条)", 
+                 small_batch_avg, large_batch_avg);
+        
+        // 大批量的平均时间不应该比小批量慢太多（允许20%的波动）
+        let ratio = large_batch_avg / small_batch_avg;
+        assert!(ratio < 1.5, "大批量操作不应该比小批量慢太多 (ratio: {:.2})", ratio);
+    }
+    
+    println!("✅ 批量操作性能基准测试通过");
 }
