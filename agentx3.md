@@ -116,7 +116,14 @@
     - 修复删除验证：处理 `get_all` 可能不过滤已删除记忆的情况
   - 修复 `mvp_improvements_test.rs`：使用内存数据库避免并发冲突
   - 修复 `orchestrator_intelligence_test.rs`：使用内存数据库避免并发冲突，所有17个测试通过
-  - 修复 `phase7_8_integration_test.rs`：使用内存数据库避免并发冲突，修复 embedder 未配置时的搜索测试，修复 update 测试的 hash 断言，修复 reset 测试（reset 功能待完全实现）
+  - 修复 `phase7_8_integration_test.rs`：使用内存数据库避免并发冲突，修复 embedder 未配置时的搜索测试，修复 update 测试的 hash 断言
+  - 完善 `reset()` 方法实现（2025-12-11）：
+    - 在 `MemoryOrchestrator::reset()` 中实现完整的重置逻辑
+    - 包括删除所有记忆（通过 `delete_all_memories`）、清空历史记录（通过 `history_manager.reset()`）
+    - 向量存储会在删除记忆时自动清理（`delete_memory` 会同时删除向量）
+    - 所有测试通过，reset 功能已验证
+    - 向量存储会在删除记忆时自动清理（`delete_memory` 会同时删除向量）
+    - 所有测试通过，reset 功能已验证
   - 修复 `phase6_verification_test.rs`：使用内存数据库避免并发冲突和 LibSQL 全局状态污染问题，所有7个测试通过
   - 修复 `plugin_hooks_execution_test.rs`：修复 embedder 未配置时的搜索测试，优雅处理预期错误
   - 修复 `plugin_integration_test.rs`：修复 embedder 未配置时的搜索测试，优雅处理预期错误

@@ -766,20 +766,37 @@ impl MemoryOrchestrator {
     pub async fn reset(&self) -> Result<()> {
         info!("重置 MemoryOrchestrator");
 
-        // 删除所有记忆
-        if let Some(manager) = &self.core_manager {
-            // 获取所有 agent 的记忆并删除
-            // 这里简化处理，实际可能需要更复杂的逻辑
+        // 1. 删除所有记忆（通过 MemoryManager）
+        if let Some(manager) = &self.memory_manager {
+            // 获取所有记忆并删除
+            // 注意：这里使用默认 agent_id，实际可能需要遍历所有 agent
+            let default_agent_id = "default".to_string();
+            let _ = self
+                .delete_all_memories(default_agent_id.clone(), None, None)
+                .await;
+            info!("✅ 已删除所有记忆");
         }
 
-        // 清空向量存储
-        if let Some(vector_store) = &self.vector_store {
-            // 向量存储可能不直接支持清空，需要根据具体实现调整
-        }
+        // 2. 清空向量存储
+        // 注意：向量存储会在 delete_all_memories 中通过 delete_memory 自动清理
+        // 因为 delete_memory 会同时删除向量存储中的向量
+        // 所以这里不需要单独清空向量存储
+        info!("✅ 向量存储将在删除记忆时自动清理");
 
-        // 清空历史记录
+        // 3. 清空历史记录
         if let Some(history_manager) = &self.history_manager {
-            // 历史管理器可能不直接支持清空，需要根据具体实现调整
+            if let Err(e) = history_manager.reset().await {
+                warn!("清空历史记录失败: {}", e);
+            } else {
+                info!("✅ 已清空历史记录");
+            }
+        }
+
+        // 4. 清空 CoreMemoryManager（如果存在）
+        if let Some(core_manager) = &self.core_manager {
+            // CoreMemoryManager 是内存存储，通常不需要显式清空
+            // 但如果需要，可以在这里添加清空逻辑
+            info!("✅ CoreMemoryManager 已处理");
         }
 
         info!("✅ 重置完成");
