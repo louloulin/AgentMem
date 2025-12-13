@@ -52,10 +52,12 @@ fastembed = { version = "5.2.0", optional = true }
 dirs = "5.0"
 sha2 = "0.10"
 bytes = "1.0"
+num_cpus = "1.0"
 
 [dev-dependencies]
 tempfile.workspace = true
 tokio-test = "0.4"
+futures = "0.3"
 
 [features]
 default = ["openai"]  # FastEmbed 依赖 ONNX Runtime，可能导致编译问题，默认禁用
