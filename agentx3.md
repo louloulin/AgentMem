@@ -28,11 +28,14 @@
   - ✅ `test_get_all_for_user()`: 简化 API 验证
   - ✅ `test_mem0_style_workflow()`: 综合工作流验证
 - ✅ **路由模块拆分**: 完成 memory.rs 模块拆分（2025-12-10）
-  - ✅ `memory/cache.rs`: 查询结果缓存逻辑（72行）
-  - ✅ `memory/stats.rs`: 搜索统计逻辑（95行）
-  - ✅ `memory.rs`: 更新为使用子模块，减少代码重复（3918行 → 原4044行，减少126行）
+  - ✅ `memory/cache.rs`: 查询结果缓存逻辑（71行）
+  - ✅ `memory/stats.rs`: 搜索统计逻辑（94行）
+  - ✅ `memory/utils.rs`: 辅助函数模块（419行）
+    - 字符串处理、评分计算、查询检测、数据转换等工具函数
+  - ✅ `memory.rs`: 更新为使用子模块（3479行，从4044行减少565行）
   - ✅ `cargo build` 成功，所有编译通过
   - ✅ `cargo test` 通过，功能验证完成
+  - ✅ **代码改进**: 代码组织更清晰，模块职责分离，减少代码重复
 - ✅ **性能优化验证**: 所有关键性能优化已实现并验证（2025-12-10）
   - ✅ LibSQL 连接池：已实现（`LibSqlConnectionPool`，min: 2, max: 10）
     - 位置：`crates/agent-mem-core/src/storage/libsql/connection.rs`
@@ -60,7 +63,7 @@
 | **企业特性** | ⚠️ 基础（RBAC部分实现） | ✅ 完整（SOC2/HIPAA） | **中等** | P1 |
 | **生态集成** | ⚠️ 弱（5个示例） | ✅ 强（20+集成） | **4x** | P1 |
 | **文档质量** | ⚠️ 一般 | ✅ 优秀 | **中等** | P1 |
-| **代码质量** | ✅ 路由文件已拆分（4044行 → 3950行 + 72行cache + 95行stats） | ✅ 简洁（226行） | **改进中** | P0 |
+| **代码质量** | ✅ 路由文件已拆分（4044行 → 3479行 + 71行cache + 94行stats + 419行utils） | ✅ 简洁（226行） | **显著改进** | P0 |
 
 ### 总体评估
 
@@ -2919,9 +2922,10 @@ let rules = vec![
 ### Phase 0 检查清单
 
 - [x] 路由拆分完成（2025-12-10）✅
-  - [x] `routes/memory/cache.rs` 创建 ✅（72行）
-  - [x] `routes/memory/stats.rs` 创建 ✅（95行）
-  - [x] `memory.rs` 更新为使用子模块 ✅
+  - [x] `routes/memory/cache.rs` 创建 ✅（71行）
+  - [x] `routes/memory/stats.rs` 创建 ✅（94行）
+  - [x] `routes/memory/utils.rs` 创建 ✅（419行）
+  - [x] `memory.rs` 更新为使用子模块 ✅（3479行，减少565行）
   - [x] `cargo build` 成功 ✅
   - [x] `cargo test` 通过 ✅
   - [ ] `routes/memory/handlers.rs` 创建（未来计划，进一步拆分路由处理函数）
