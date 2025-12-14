@@ -42,31 +42,31 @@ impl RuleBasedExtractor {
     pub fn new() -> Self {
         Self {
             person_patterns: vec![
-                Regex::new(r"我叫(\p{Han}{2,4})").unwrap(),
-                Regex::new(r"我是(\p{Han}{2,4})").unwrap(),
-                Regex::new(r"名字是(\p{Han}{2,4})").unwrap(),
-                Regex::new(r"My name is ([A-Z][a-z]+ [A-Z][a-z]+)").unwrap(),
-                Regex::new(r"I am ([A-Z][a-z]+ [A-Z][a-z]+)").unwrap(),
+                Regex::new(r"我叫(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"我是(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"名字是(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"My name is ([A-Z][a-z]+ [A-Z][a-z]+)").expect("Person pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"I am ([A-Z][a-z]+ [A-Z][a-z]+)").expect("Person pattern regex must be valid (compile-time constant)"),
             ],
             org_patterns: vec![
-                Regex::new(r"(\p{Han}+(?:公司|企业|集团|机构|组织|学校|大学|医院))").unwrap(),
-                Regex::new(r"((?:Google|Microsoft|Apple|Amazon|Facebook|Tesla|Alibaba|Tencent|Baidu)\s*(?:Inc\.|Corp\.|Company)?)").unwrap(),
+                Regex::new(r"(\p{Han}+(?:公司|企业|集团|机构|组织|学校|大学|医院))").expect("Organization pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"((?:Google|Microsoft|Apple|Amazon|Facebook|Tesla|Alibaba|Tencent|Baidu)\s*(?:Inc\.|Corp\.|Company)?)").expect("Organization pattern regex must be valid (compile-time constant)"),
             ],
             location_patterns: vec![
-                Regex::new(r"(\p{Han}+(?:市|省|区|县|镇|村|路|街|道))").unwrap(),
-                Regex::new(r"(北京|上海|广州|深圳|杭州|成都|重庆|武汉|西安|南京)").unwrap(),
+                Regex::new(r"(\p{Han}+(?:市|省|区|县|镇|村|路|街|道))").expect("Location pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"(北京|上海|广州|深圳|杭州|成都|重庆|武汉|西安|南京)").expect("Location pattern regex must be valid (compile-time constant)"),
             ],
-            email_pattern: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap(),
-            phone_pattern: Regex::new(r"\b(?:\+?86)?1[3-9]\d{9}\b").unwrap(),
-            url_pattern: Regex::new(r"https?://[^\s]+").unwrap(),
+            email_pattern: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").expect("Email pattern regex must be valid (compile-time constant)"),
+            phone_pattern: Regex::new(r"\b(?:\+?86)?1[3-9]\d{9}\b").expect("Phone pattern regex must be valid (compile-time constant)"),
+            url_pattern: Regex::new(r"https?://[^\s]+").expect("URL pattern regex must be valid (compile-time constant)"),
             date_patterns: vec![
-                Regex::new(r"\d{4}年\d{1,2}月\d{1,2}日").unwrap(),
-                Regex::new(r"\d{4}-\d{1,2}-\d{1,2}").unwrap(),
-                Regex::new(r"\d{1,2}/\d{1,2}/\d{4}").unwrap(),
+                Regex::new(r"\d{4}年\d{1,2}月\d{1,2}日").expect("Date pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"\d{4}-\d{1,2}-\d{1,2}").expect("Date pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"\d{1,2}/\d{1,2}/\d{4}").expect("Date pattern regex must be valid (compile-time constant)"),
             ],
             money_patterns: vec![
-                Regex::new(r"(\d+(?:\.\d+)?)\s*(?:元|美元|欧元|英镑|日元)").unwrap(),
-                Regex::new(r"(?:¥|$|€|£|¥)\s*(\d+(?:,\d{3})*(?:\.\d+)?)").unwrap(),
+                Regex::new(r"(\d+(?:\.\d+)?)\s*(?:元|美元|欧元|英镑|日元)").expect("Money pattern regex must be valid (compile-time constant)"),
+                Regex::new(r"(?:¥|$|€|£|¥)\s*(\d+(?:,\d{3})*(?:\.\d+)?)").expect("Money pattern regex must be valid (compile-time constant)"),
             ],
         }
     }

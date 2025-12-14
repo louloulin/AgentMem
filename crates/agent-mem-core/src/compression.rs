@@ -224,13 +224,16 @@ impl SemanticAnalyzer {
                 let compressed_content = self
                     .compress_content_by_semantics(&memory.content, &compressed_embeddings[i])
                     .await?;
+                // Calculate compression ratio using the newly created compressed_content
+                let compression_ratio = self.calculate_compression_ratio(
+                    &memory.content,
+                    &compressed_content,
+                );
+                
                 compressed_memories.push(CompressedMemory {
                     original_id: memory.id.clone(),
                     compressed_content,
-                    compression_ratio: self.calculate_compression_ratio(
-                        &memory.content,
-                        &compressed_memories.last().unwrap().compressed_content,
-                    ),
+                    compression_ratio,
                     semantic_hash: self.calculate_semantic_hash(&memory.content),
                     importance_score: 0.5, // 将由重要性评估器更新
                 });
