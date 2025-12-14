@@ -96,7 +96,11 @@ impl Default for ThompsonSamplingArm {
 impl ThompsonSamplingArm {
     /// 采样当前臂的期望收益
     pub fn sample(&self) -> f64 {
-        let beta_dist = Beta::new(self.alpha, self.beta).unwrap();
+        let beta_dist = Beta::new(self.alpha, self.beta)
+            .unwrap_or_else(|_| {
+                // 如果参数无效，使用默认的Beta分布（alpha=1, beta=1，即均匀分布）
+                Beta::new(1.0, 1.0).expect("Default Beta(1,1) should always be valid")
+            });
         let mut rng = rand::thread_rng();
         beta_dist.sample(&mut rng)
     }
@@ -241,7 +245,8 @@ impl AdaptiveRouter {
         }
 
         // 选择采样值最大的臂
-        samples.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        samples.sort_by(|a, b| b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal));
         Ok(samples[0].0)
     }
 

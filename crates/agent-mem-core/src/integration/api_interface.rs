@@ -129,7 +129,7 @@ impl UnifiedApiInterface {
     }
 
     /// 处理API请求
-    pub async fn handle_request(&self, request: ApiRequest) -> ApiResponse<serde_json::Value> {
+    pub async fn handle_request(&self, request: ApiRequest) -> Result<ApiResponse<serde_json::Value>> {
         let start_time = std::time::Instant::now();
         let request_id = request.request_id;
 
@@ -138,7 +138,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.store_memory(memory).await {
                     Ok(memory_id) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(memory_id).unwrap()),
+                        Some(serde_json::to_value(memory_id)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize memory_id: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -149,7 +150,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.retrieve_memory(memory_id).await {
                     Ok(memory) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(memory).unwrap()),
+                        Some(serde_json::to_value(memory)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize memory: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -160,7 +162,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.search_memories(&query, limit).await {
                     Ok(memories) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(memories).unwrap()),
+                        Some(serde_json::to_value(memories)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize memories: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -171,7 +174,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.delete_memory(memory_id).await {
                     Ok(deleted) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(deleted).unwrap()),
+                        Some(serde_json::to_value(deleted)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize deleted: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -182,7 +186,8 @@ impl UnifiedApiInterface {
                 let status = self.system_manager.get_status().await;
                 (
                     ApiStatus::Success,
-                    Some(serde_json::to_value(status).unwrap()),
+                    Some(serde_json::to_value(status)
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize status: {e}")))?),
                     None,
                 )
             }
@@ -191,7 +196,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.perform_health_check().await {
                     Ok(health) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(health).unwrap()),
+                        Some(serde_json::to_value(health)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize health: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -202,7 +208,8 @@ impl UnifiedApiInterface {
                 match self.system_manager.get_system_statistics().await {
                     Ok(stats) => (
                         ApiStatus::Success,
-                        Some(serde_json::to_value(stats).unwrap()),
+                        Some(serde_json::to_value(stats)
+                            .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize stats: {e}")))?),
                         None,
                     ),
                     Err(e) => (ApiStatus::Error, None, Some(e.to_string())),
@@ -213,7 +220,8 @@ impl UnifiedApiInterface {
                 let config = self.system_manager.get_config();
                 (
                     ApiStatus::Success,
-                    Some(serde_json::to_value(config).unwrap()),
+                    Some(serde_json::to_value(config)
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize config: {e}")))?),
                     None,
                 )
             }
@@ -230,14 +238,14 @@ impl UnifiedApiInterface {
 
         let processing_time_ms = start_time.elapsed().as_millis() as u64;
 
-        ApiResponse {
+        Ok(ApiResponse {
             request_id,
             status,
             data,
             error,
             timestamp: chrono::Utc::now(),
             processing_time_ms,
-        }
+        })
     }
 
     /// 处理批量请求
@@ -248,22 +256,35 @@ impl UnifiedApiInterface {
         let mut error_count = 0;
 
         for operation in batch_request.operations {
+            let request_id = Uuid::new_v4();
             let request = ApiRequest {
-                request_id: Uuid::new_v4(),
+                request_id,
                 operation,
                 timestamp: chrono::Utc::now(),
                 client_info: batch_request.client_info.clone(),
             };
 
-            let response = self.handle_request(request).await;
-
-            if response.status == ApiStatus::Success {
-                success_count += 1;
-            } else {
-                error_count += 1;
+            match self.handle_request(request).await {
+                Ok(response) => {
+                    if response.status == ApiStatus::Success {
+                        success_count += 1;
+                    } else {
+                        error_count += 1;
+                    }
+                    responses.push(response);
+                }
+                Err(e) => {
+                    error_count += 1;
+                    responses.push(ApiResponse {
+                        request_id,
+                        status: ApiStatus::Error,
+                        data: None,
+                        error: Some(e.to_string()),
+                        timestamp: chrono::Utc::now(),
+                        processing_time_ms: 0,
+                    });
+                }
             }
-
-            responses.push(response);
 
             // 如果是事务性操作且有失败，则回滚
             if batch_request.transactional && error_count > 0 {
@@ -359,15 +380,16 @@ impl UnifiedApiInterface {
         request_id: Uuid,
         data: T,
         processing_time_ms: u64,
-    ) -> ApiResponse<serde_json::Value> {
-        ApiResponse {
+    ) -> Result<ApiResponse<serde_json::Value>> {
+        Ok(ApiResponse {
             request_id,
             status: ApiStatus::Success,
-            data: Some(serde_json::to_value(data).unwrap()),
+            data: Some(serde_json::to_value(data)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to serialize data: {e}")))?),
             error: None,
             timestamp: chrono::Utc::now(),
             processing_time_ms,
-        }
+        })
     }
 }
 

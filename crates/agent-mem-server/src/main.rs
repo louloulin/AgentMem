@@ -122,8 +122,8 @@ async fn main() {
 
             // Start server with graceful shutdown (handled inside server.start())
             if let Err(e) = server.start().await {
-                error!("❌ 服务器运行错误: {}", e);
-                process::exit(1);
+                        error!("❌ 服务器运行错误: {}", e);
+                        process::exit(1);
             }
         }
         Err(e) => {

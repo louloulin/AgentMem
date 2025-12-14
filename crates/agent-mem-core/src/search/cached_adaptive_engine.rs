@@ -242,8 +242,10 @@ impl ParallelSearchOptimizer {
             let permit = Arc::clone(&semaphore);
 
             let task = tokio::spawn(async move {
-                let _permit = permit.acquire().await.unwrap();
-                engine.search(vector, query).await
+                match permit.acquire().await {
+                    Ok(_permit) => engine.search(vector, query).await,
+                    Err(e) => Err(anyhow::anyhow!("Failed to acquire semaphore permit: {e}")),
+                }
             });
 
             tasks.push(task);

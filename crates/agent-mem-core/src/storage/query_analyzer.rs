@@ -163,7 +163,8 @@ impl QueryAnalyzer {
     pub async fn get_slowest_queries(&self, limit: usize) -> Vec<QueryStats> {
         let stats = self.stats.read().await;
         let mut queries: Vec<QueryStats> = stats.values().cloned().collect();
-        queries.sort_by(|a, b| b.avg_time_ms.partial_cmp(&a.avg_time_ms).unwrap());
+        queries.sort_by(|a, b| b.avg_time_ms.partial_cmp(&a.avg_time_ms)
+            .unwrap_or(std::cmp::Ordering::Equal));
         queries.truncate(limit);
         queries
     }

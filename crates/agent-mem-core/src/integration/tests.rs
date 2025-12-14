@@ -268,7 +268,8 @@ mod tests {
             }),
         };
 
-        let store_response = api_interface.handle_request(store_request).await;
+        let store_response = api_interface.handle_request(store_request).await
+            .expect("handle_request should succeed in test");
         assert_eq!(store_response.status, ApiStatus::Success);
         assert!(store_response.data.is_some());
 
