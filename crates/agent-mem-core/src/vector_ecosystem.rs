@@ -409,7 +409,14 @@ impl VectorEcosystemManager {
         }
 
         // 按分数排序
-        recommendations.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        recommendations.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or_else(|| {
+                    // Fallback: if scores are NaN or incomparable, maintain order
+                    std::cmp::Ordering::Equal
+                })
+        });
 
         Ok(recommendations)
     }

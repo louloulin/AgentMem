@@ -155,10 +155,16 @@ pub async fn get_prometheus_metrics(
                 .body(Body::from(format!("Internal error: {}", e)))
                 .unwrap_or_else(|_| {
                     // Last resort: return a simple error response
+                    // This should never fail, but handle it gracefully
                     Response::builder()
                         .status(500)
                         .body(Body::from("Internal server error"))
-                        .expect("Failed to build error response")
+                        .unwrap_or_else(|_| {
+                            tracing::error!("Critical: Failed to build even minimal error response");
+                            // This should never happen, but if it does, return a basic response
+                            // Using a simple string as body is always safe
+                            Response::new(Body::from("Internal server error"))
+                        })
                 })
         }
     }
