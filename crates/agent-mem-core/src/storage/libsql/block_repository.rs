@@ -78,8 +78,12 @@ impl LibSqlBlockRepository {
             AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
         })?;
 
-        let is_deleted_int: i64 = row.get(12).unwrap_or(0);
-        let is_template_int: i64 = row.get(5).unwrap_or(0);
+        let is_deleted_int: i64 = row.get(12).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+        })?;
+        let is_template_int: i64 = row.get(5).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get is_template: {e}"))
+        })?;
 
         Ok(Block {
             id: row

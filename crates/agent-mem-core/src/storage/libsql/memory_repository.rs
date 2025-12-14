@@ -200,7 +200,9 @@ impl LibSqlMemoryRepository {
             AgentMemError::StorageError("Invalid updated_at timestamp".to_string())
         })?;
 
-        let is_deleted_int: i64 = row.get(16).unwrap_or(0);
+        let is_deleted_int: i64 = row.get(16).map_err(|e| {
+            AgentMemError::StorageError(format!("Failed to get is_deleted: {e}"))
+        })?;
 
         let score_f64: Option<f64> = row.get(7).ok();
         let importance_f64: f64 = row
