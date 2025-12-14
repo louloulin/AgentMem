@@ -50,10 +50,10 @@ impl AgentRepository {
     pub async fn get_with_blocks(&self, agent_id: &str) -> CoreResult<Option<(Agent, Vec<Block>)>> {
         // Get agent
         let agent = self.read(agent_id).await?;
-        if agent.is_none() {
-            return Ok(None);
-        }
-        let agent = agent.unwrap();
+        let agent = match agent {
+            Some(agent) => agent,
+            None => return Ok(None),
+        };
 
         // Get associated blocks
         let blocks = sqlx::query_as::<_, Block>(
