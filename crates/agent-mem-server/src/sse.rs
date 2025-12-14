@@ -227,7 +227,8 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
 
-        let json = serde_json::to_string(&message).unwrap();
+        let json = serde_json::to_string(&message)
+            .expect("SSE message serialization should succeed in test");
         assert!(json.contains("message_id"));
         assert!(json.contains("msg1"));
     }
@@ -241,7 +242,8 @@ mod tests {
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
 
-        let json = serde_json::to_string(&message).unwrap();
+        let json = serde_json::to_string(&message)
+            .expect("SSE message serialization should succeed in test");
         assert!(json.contains("stream_chunk"));
         assert!(json.contains("req1"));
         assert!(json.contains("Hello"));
