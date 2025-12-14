@@ -304,7 +304,7 @@ impl MetricResult {
         }
 
         let mut sorted: Vec<_> = durations.iter().map(|d| d.as_micros() as f64).collect();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let avg = sorted.iter().sum::<f64>() / sorted.len() as f64;
         let min = sorted[0];

@@ -86,10 +86,14 @@ impl MultiLayerCache {
     /// Create a new multi-layer cache with default capacities
     pub fn new() -> Self {
         Self {
-            l1_memory: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(100).unwrap()))),
-            l2_llm: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(1000).unwrap()))),
+            l1_memory: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(100).expect("100 is a valid NonZeroUsize (compile-time constant)")
+            ))),
+            l2_llm: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize (compile-time constant)")
+            ))),
             l3_embedding: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(10000).unwrap(),
+                NonZeroUsize::new(10000).expect("10000 is a valid NonZeroUsize (compile-time constant)")
             ))),
             metrics: CacheMetrics::new(),
         }
@@ -247,9 +251,15 @@ impl MultiLayerCache {
     /// Get cache warming statistics
     pub fn get_warming_stats(&self) -> CacheWarmingStats {
         CacheWarmingStats {
-            l1_entries: self.l1_memory.read().unwrap().len(),
-            l2_entries: self.l2_llm.read().unwrap().len(),
-            l3_entries: self.l3_embedding.read().unwrap().len(),
+            l1_entries: self.l1_memory.read()
+                .expect("Failed to read L1 cache lock (poisoned)")
+                .len(),
+            l2_entries: self.l2_llm.read()
+                .expect("Failed to read L2 cache lock (poisoned)")
+                .len(),
+            l3_entries: self.l3_embedding.read()
+                .expect("Failed to read L3 cache lock (poisoned)")
+                .len(),
             last_warmed: std::time::SystemTime::now(),
         }
     }
