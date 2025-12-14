@@ -296,7 +296,11 @@ impl<C: Cache + 'static> CacheWarmer<C> {
         stats_guard.total_warming_time_ms += elapsed_ms;
         stats_guard.last_warming_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
     }
 

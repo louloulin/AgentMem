@@ -2119,7 +2119,7 @@ agentmem stats --user-id user123 | \
 
 **文档版本**: v4.16  
 **分析日期**: 2025-12-10  
-**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层10处+Server层10处+Storage层4处+Cache层22处+Types层3处+Managers层3处+Compression层1处+Extraction层15处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层1处+VectorEcosystem层1处+Integration层3处+Agents层3处，总计173处关键和非关键路径，约3.8%完成），Phase 0.2技术债务清理（修复未使用导入、改进错误处理、修复storage层unwrap_or为map_err、修复cache/search/types/managers/compression/extraction/deduplication/pipeline/v4_migration/temporal_graph/multi_layer/performance/collaboration/coordination/vector_ecosystem/agent_repository/monitor/performance_monitor模块unwrap/expect），本次批量修复：cache/mod.rs 3处、pipeline.rs 3处、cache/multi_layer.rs 4处、temporal_graph.rs 2处、v4_migration.rs 1处、episodic_agent.rs 3处，共16处非关键路径，累计修复22处）  
+**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层10处+Server层10处+Storage层4处+Cache层23处+Types层3处+Managers层3处+Compression层1处+Extraction层15处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层1处+VectorEcosystem层1处+Integration层3处+Agents层3处，总计174处关键和非关键路径，约3.8%完成），Phase 0.2技术债务清理（修复未使用导入、改进错误处理、修复storage层unwrap_or为map_err、修复cache/search/types/managers/compression/extraction/deduplication/pipeline/v4_migration/temporal_graph/multi_layer/performance/collaboration/coordination/vector_ecosystem/agent_repository/monitor/performance_monitor模块unwrap/expect），本次批量修复：cache/mod.rs 3处、pipeline.rs 3处、cache/multi_layer.rs 4处、temporal_graph.rs 2处、v4_migration.rs 1处、episodic_agent.rs 3处、cache/warming.rs 1处，共17处非关键路径，累计修复23处）  
 **分析轮次**: 多轮深度分析（包含Unix哲学分析 + 2025最新研究整合）  
 **分析范围**: 全面代码分析 + 架构评估 + Unix哲学评估 + 业界最佳实践研究 + 2025最新论文  
 **最新研究**: ENGRAM (2025-11, LoCoMo SOTA)、MemVerse (2025-12)、MemoriesDB (2025-10)等  
@@ -2194,10 +2194,11 @@ agentmem stats --user-id user123 | \
   - ✅ **修复 temporal_graph 模块非关键路径的 unwrap**（temporal_graph.rs 2处：first/last expect改为match pattern with early return）
   - ✅ **修复 v4_migration 模块非关键路径的 unwrap**（v4_migration.rs 1处：Number::from_f64 expect改为unwrap_or_else with nested fallback）
   - ✅ **修复 agents 模块非关键路径的 unwrap**（episodic_agent.rs 3处：start_time_str/end_time_str unwrap改为ok_or_else with error message）
-  - ⏳ 剩余 1283+ 处待处理（非关键路径，本次修复3处，累计修复22处）
+  - ✅ **修复 cache 模块非关键路径的 unwrap**（warming.rs 1处：SystemTime unwrap改为map_err with default）
+  - ⏳ 剩余 1282+ 处待处理（非关键路径，本次修复1处，累计修复23处）
 - ✅ Phase 5.4 (部分): 移除硬编码API Key ✅ **已完成**（2025-12-10）**100%**
 
-**总体完成进度**: **约38-43%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层10处+Server层10处+Storage层4处+Cache层22处+Types层3处+Managers层3处+Compression层1处+Extraction层15处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层1处+VectorEcosystem层1处+Integration层3处+Agents层3处，总计173处关键和非关键路径）已完成）
+**总体完成进度**: **约38-43%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层10处+Server层10处+Storage层4处+Cache层23处+Types层3处+Managers层3处+Compression层1处+Extraction层15处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层1处+VectorEcosystem层1处+Integration层3处+Agents层3处，总计174处关键和非关键路径）已完成）
 
 **最新完成**（2025-12-10）:
 - ✅ **Phase 5.1: 多模型实例池实现，解决 Mutex 锁竞争问题**
@@ -2234,6 +2235,7 @@ agentmem stats --user-id user123 | \
     - `temporal_graph.rs`: first/last expect改为match pattern with early return（2处）
     - `v4_migration.rs`: Number::from_f64 expect改为unwrap_or_else with nested fallback（1处）
     - `episodic_agent.rs`: start_time_str/end_time_str unwrap改为ok_or_else with error message（3处）
+    - `cache/warming.rs`: SystemTime unwrap改为map_err with default（1处）
   - 改进方式: 使用match pattern、map_err、unwrap_or_else、ok_or_else提供安全的错误处理，避免panic，添加日志记录便于调试
 - ✅ **Phase 5.4 (部分): 移除硬编码API Key**
   - 代码位置: `justfile`
