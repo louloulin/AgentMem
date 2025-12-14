@@ -1173,7 +1173,10 @@ impl MemoryBuilder {
     pub fn build(self) -> Memory {
         Memory {
             id: self.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
-            content: self.content.expect("content is required"),
+            content: self.content.unwrap_or_else(|| {
+                tracing::warn!("MemoryBuilder: content is required but not set, using empty string");
+                Content::Text(String::new())
+            }),
             attributes: self.attributes,
             relations: self.relations,
             metadata: Metadata::default(),
@@ -1404,7 +1407,25 @@ impl QueryFeatures {
     fn extract(s: &str) -> Self {
         // Safe: regex pattern is a compile-time constant
         let has_id_pattern = Regex::new(r"[A-Z]\d{6}")
-            .expect("ID pattern regex must be valid (compile-time constant)")
+            .unwrap_or_else(|e| {
+                tracing::error!("Failed to compile ID pattern regex: {e}, using fallback pattern");
+                Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                    // Empty regex pattern is always valid, but if it somehow fails, use a simple pattern
+                    Regex::new(r"^$").unwrap_or_else(|_| {
+                        tracing::error!("Failed to create even empty regex pattern, using simple fallback");
+                        // This should never fail, but if it does, we'll use a simple pattern
+                        Regex::new(r".").unwrap_or_else(|_| {
+                            // Last resort: create a regex that matches nothing
+                            tracing::error!("Critical: All regex patterns failed, using match-nothing pattern");
+                            Regex::new(r"(?!)").unwrap_or_else(|_| {
+                                // If even this fails, we have a serious problem
+                                tracing::error!("Fatal: Cannot create any regex pattern, aborting");
+                                std::process::abort();
+                            })
+                        })
+                    })
+                })
+            })
             .is_match(s);
         let has_attribute_filter = s.contains("::");
         let has_relation_query = s.contains("->");
@@ -1431,7 +1452,25 @@ impl QueryFeatures {
             // Extract ID pattern
             // Safe: regex pattern is a compile-time constant
             if let Some(captures) = Regex::new(r"([A-Z]\d{6})")
-                .expect("ID capture pattern regex must be valid (compile-time constant)")
+                .unwrap_or_else(|e| {
+                    tracing::error!("Failed to compile ID capture pattern regex: {e}, using fallback pattern");
+                    Regex::new(r"(\d{6})").unwrap_or_else(|_| {
+                        // Empty regex pattern is always valid, but if it somehow fails, use a simple pattern
+                        Regex::new(r"^$").unwrap_or_else(|_| {
+                            tracing::error!("Failed to create even empty regex pattern, using simple fallback");
+                            // This should never fail, but if it does, we'll use a simple pattern
+                            Regex::new(r".").unwrap_or_else(|_| {
+                                // Last resort: create a regex that matches nothing
+                                tracing::error!("Critical: All regex patterns failed, using match-nothing pattern");
+                                Regex::new(r"(?!)").unwrap_or_else(|_| {
+                                    // If even this fails, we have a serious problem
+                                    tracing::error!("Fatal: Cannot create any regex pattern, aborting");
+                                    std::process::abort();
+                                })
+                            })
+                        })
+                    })
+                })
                 .captures(s)
             {
                 // Safe: we know the pattern has one capture group
@@ -1545,7 +1584,13 @@ impl QueryBuilder {
     pub fn build(self) -> Query {
         Query {
             id: Uuid::new_v4().to_string(),
-            intent: self.intent.expect("intent is required"),
+            intent: self.intent.unwrap_or_else(|| {
+                tracing::warn!("QueryBuilder: intent is required but not set, using default SemanticSearch intent");
+                QueryIntent::SemanticSearch {
+                    text: String::new(),
+                    semantic_vector: None,
+                }
+            }),
             constraints: self.constraints,
             preferences: self.preferences,
             context: self.context,

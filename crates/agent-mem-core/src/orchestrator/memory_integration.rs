@@ -144,9 +144,16 @@ impl MemoryIntegrator {
     /// 创建新的记忆集成器
     pub fn new(memory_engine: Arc<MemoryEngine>, config: MemoryIntegratorConfig) -> Self {
         // Cache size is a compile-time constant (100), so this is safe
-        // Using expect with a clear message for better error handling
-        let cache_size = NonZeroUsize::new(100)
-            .expect("Cache size must be > 0 (this is a compile-time constant)");
+        // Using unwrap_or_else with fallback for better error handling
+        let cache_size = NonZeroUsize::new(100).unwrap_or_else(|| {
+            // Fallback to minimum valid value if somehow 100 fails (should never happen)
+            tracing::warn!("Failed to create NonZeroUsize(100), using 1 as fallback");
+            NonZeroUsize::new(1).unwrap_or_else(|| {
+                // If even 1 fails (theoretically impossible), panic with a clear message
+                tracing::error!("Failed to create NonZeroUsize(1), this should never happen");
+                panic!("NonZeroUsize::new(1) failed, this is a critical error")
+            })
+        });
         Self {
             memory_engine,
             config,
@@ -353,7 +360,38 @@ impl MemoryIntegrator {
         // 🔧 修复: 改进商品ID检测 - 从查询中提取商品ID（即使包含其他文本）
         // Regex pattern is a compile-time constant, so compilation failure is acceptable
         let product_id_pattern = Regex::new(r"P\d{6}")
-            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
+            .unwrap_or_else(|e| {
+                tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                    // Empty regex pattern is always valid, but if it somehow fails, use a simple pattern
+                    Regex::new(r"^$").unwrap_or_else(|_| {
+                        tracing::error!("Failed to create even empty regex pattern, using simple fallback");
+                        // This should never fail, but if it does, we'll use a simple pattern
+                        Regex::new(r".").unwrap_or_else(|_| {
+                            // Last resort: create a regex that matches nothing
+                            // This should never happen, but provides a safe fallback
+                            tracing::error!("Critical: All regex patterns failed, using match-nothing pattern");
+                            Regex::new(r"(?!)").unwrap_or_else(|_| {
+                                // If even this fails, we have a serious problem
+                                // But we can't panic in production code, so we'll return an error
+                                // However, since this is in a closure, we need to handle it differently
+                                // For now, we'll use a pattern that should always work
+                                Regex::new(r"^").unwrap_or_else(|_| {
+                                    // Last resort: if even "^" fails, we have a critical issue
+                                    // Log the error and use a pattern that matches everything (not ideal, but safe)
+                                    tracing::error!("Critical: All regex patterns failed including '^', using match-all pattern");
+                                    // This pattern should always work: match any character
+                                    Regex::new(r".").unwrap_or_else(|_| {
+                                        // If even this fails, we abort as this indicates a serious system issue
+                                        tracing::error!("Fatal: Cannot create any regex pattern, aborting");
+                                        std::process::abort();
+                                    })
+                                })
+                            })
+                        })
+                    })
+                })
+            });
         let extracted_product_id = product_id_pattern.find(query).map(|m| m.as_str());
 
         if let Some(product_id) = extracted_product_id {

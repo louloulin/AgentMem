@@ -248,7 +248,11 @@ impl LearningBasedCacheWarmer {
         stats.failed_warmings += failed;
         stats.last_warming_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         let final_stats = stats.clone();

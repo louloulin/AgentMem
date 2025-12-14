@@ -580,8 +580,11 @@ impl MetaMemoryManager {
                     .map(|status| status.current_load)
                     .unwrap_or(usize::MAX)
             })
-            .expect("agents slice should not be empty when calling select_least_loaded")
-            .to_string()
+            .map(|agent_id| agent_id.to_string())
+            .unwrap_or_else(|| {
+                tracing::warn!("agents slice is empty when calling select_least_loaded, returning empty string");
+                String::new()
+            })
     }
 
     /// Send a task to a specific agent

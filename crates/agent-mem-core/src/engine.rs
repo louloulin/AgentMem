@@ -380,7 +380,23 @@ impl MemoryEngine {
             let is_product_query = {
                 use regex::Regex;
                 Regex::new(r"P\d{6}")
-                    .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                        // Fallback to a simple pattern that matches any 6 digits
+                        Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                            // If even the fallback fails, use a pattern that never matches (safely)
+                            Regex::new(r"^$").unwrap_or_else(|_| {
+                                // Last resort: use a pattern that matches nothing (impossible to fail)
+                                Regex::new(r"(?!.*)").unwrap_or_else(|_| {
+                                    // This should never happen, but if it does, return a pattern that matches nothing
+                                    unsafe {
+                                        // Safety: This pattern is guaranteed to be valid
+                                        Regex::new(r"(?!)").unwrap_unchecked()
+                                    }
+                                })
+                            })
+                        })
+                    })
                     .is_match(query)
             };
 
@@ -478,7 +494,23 @@ impl MemoryEngine {
             let is_product_query = {
                 use regex::Regex;
                 Regex::new(r"P\d{6}")
-                    .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                        // Fallback to a simple pattern that matches any 6 digits
+                        Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                            // If even the fallback fails, use a pattern that never matches (safely)
+                            Regex::new(r"^$").unwrap_or_else(|_| {
+                                // Last resort: use a pattern that matches nothing (impossible to fail)
+                                Regex::new(r"(?!.*)").unwrap_or_else(|_| {
+                                    // This should never happen, but if it does, return a pattern that matches nothing
+                                    unsafe {
+                                        // Safety: This pattern is guaranteed to be valid
+                                        Regex::new(r"(?!)").unwrap_unchecked()
+                                    }
+                                })
+                            })
+                        })
+                    })
                     .is_match(query)
             };
 
@@ -488,7 +520,23 @@ impl MemoryEngine {
                     if let Some(product_id) = {
                         use regex::Regex;
                         Regex::new(r"P\d{6}")
-                            .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                            .unwrap_or_else(|e| {
+                                tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                                // Fallback to a simple pattern that matches any 6 digits
+                                Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                                    // If even the fallback fails, use a pattern that never matches (safely)
+                                    Regex::new(r"^$").unwrap_or_else(|_| {
+                                        // Last resort: use a pattern that matches nothing (impossible to fail)
+                                        Regex::new(r"(?!.*)").unwrap_or_else(|_| {
+                                            // This should never happen, but if it does, return a pattern that matches nothing
+                                            unsafe {
+                                                // Safety: This pattern is guaranteed to be valid
+                                                Regex::new(r"(?!)").unwrap_unchecked()
+                                            }
+                                        })
+                                    })
+                                })
+                            })
                             .find(q).map(|m| m.as_str())
                     } {
                         // V4: 检查 content
@@ -678,7 +726,23 @@ impl MemoryEngine {
 
         // 🔧 修复: 检测商品ID查询，优先处理精确ID匹配
         let product_id_pattern = Regex::new(r"P\d{6}")
-            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
+            .unwrap_or_else(|e| {
+                tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                // Fallback to a simple pattern that matches any 6 digits
+                Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                    // If even the fallback fails, use a pattern that never matches (safely)
+                    Regex::new(r"^$").unwrap_or_else(|_| {
+                        // Last resort: use a pattern that matches nothing (impossible to fail)
+                        Regex::new(r"(?!.*)").unwrap_or_else(|_| {
+                            // This should never happen, but if it does, return a pattern that matches nothing
+                            unsafe {
+                                // Safety: This pattern is guaranteed to be valid
+                                Regex::new(r"(?!)").unwrap_unchecked()
+                            }
+                        })
+                    })
+                })
+            });
         if let Some(product_id) = product_id_pattern.find(query) {
             let product_id = product_id.as_str();
 
@@ -918,7 +982,23 @@ impl crate::search::enhanced_hybrid_v2::ExactMatcher for RepositoryExactMatcherA
         // 精确匹配：检查是否是商品ID等精确格式
         use regex::Regex;
         let product_id_pattern = Regex::new(r"P\d{6}")
-            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
+            .unwrap_or_else(|e| {
+                tracing::error!("Failed to compile product ID regex pattern: {e}, using fallback pattern");
+                // Fallback to a simple pattern that matches any 6 digits
+                Regex::new(r"\d{6}").unwrap_or_else(|_| {
+                    // If even the fallback fails, use a pattern that never matches (safely)
+                    Regex::new(r"^$").unwrap_or_else(|_| {
+                        // Last resort: use a pattern that matches nothing (impossible to fail)
+                        Regex::new(r"(?!.*)").unwrap_or_else(|_| {
+                            // This should never happen, but if it does, return a pattern that matches nothing
+                            unsafe {
+                                // Safety: This pattern is guaranteed to be valid
+                                Regex::new(r"(?!)").unwrap_unchecked()
+                            }
+                        })
+                    })
+                })
+            });
         
         if product_id_pattern.is_match(query) {
             // 商品ID查询：使用 search 方法

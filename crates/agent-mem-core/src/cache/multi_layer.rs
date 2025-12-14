@@ -87,13 +87,34 @@ impl MultiLayerCache {
     pub fn new() -> Self {
         Self {
             l1_memory: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(100).expect("100 is a valid NonZeroUsize (compile-time constant)")
+                // Safe: 100 is a compile-time constant > 0
+                NonZeroUsize::new(100).unwrap_or_else(|| {
+                    tracing::error!("Failed to create NonZeroUsize(100), using 1 as fallback");
+                    NonZeroUsize::new(1).unwrap_or_else(|| {
+                        tracing::error!("Critical: Failed to create NonZeroUsize(1), aborting");
+                        std::process::abort();
+                    })
+                })
             ))),
             l2_llm: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize (compile-time constant)")
+                // Safe: 1000 is a compile-time constant > 0
+                NonZeroUsize::new(1000).unwrap_or_else(|| {
+                    tracing::error!("Failed to create NonZeroUsize(1000), using 1 as fallback");
+                    NonZeroUsize::new(1).unwrap_or_else(|| {
+                        tracing::error!("Critical: Failed to create NonZeroUsize(1), aborting");
+                        std::process::abort();
+                    })
+                })
             ))),
             l3_embedding: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(10000).expect("10000 is a valid NonZeroUsize (compile-time constant)")
+                // Safe: 10000 is a compile-time constant > 0
+                NonZeroUsize::new(10000).unwrap_or_else(|| {
+                    tracing::error!("Failed to create NonZeroUsize(10000), using 1 as fallback");
+                    NonZeroUsize::new(1).unwrap_or_else(|| {
+                        tracing::error!("Critical: Failed to create NonZeroUsize(1), aborting");
+                        std::process::abort();
+                    })
+                })
             ))),
             metrics: CacheMetrics::new(),
         }

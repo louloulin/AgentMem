@@ -40,33 +40,44 @@ pub struct RuleBasedExtractor {
 impl RuleBasedExtractor {
     /// 创建新的基于规则的提取器
     pub fn new() -> Self {
+        // Helper function to compile regex with fallback
+        let compile_regex = |pattern: &str, fallback: &str, name: &str| -> Regex {
+            Regex::new(pattern).unwrap_or_else(|e| {
+                tracing::error!("Failed to compile {} regex pattern '{}': {e}, using fallback", name, pattern);
+                Regex::new(fallback).unwrap_or_else(|_| {
+                    tracing::error!("Failed to compile fallback regex pattern '{}', using empty pattern", fallback);
+                    Regex::new(r"^$").expect("Empty regex pattern must be valid")
+                })
+            })
+        };
+
         Self {
             person_patterns: vec![
-                Regex::new(r"我叫(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"我是(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"名字是(\p{Han}{2,4})").expect("Person pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"My name is ([A-Z][a-z]+ [A-Z][a-z]+)").expect("Person pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"I am ([A-Z][a-z]+ [A-Z][a-z]+)").expect("Person pattern regex must be valid (compile-time constant)"),
+                compile_regex(r"我叫(\p{Han}{2,4})", r"我叫(.+)", "person pattern 1"),
+                compile_regex(r"我是(\p{Han}{2,4})", r"我是(.+)", "person pattern 2"),
+                compile_regex(r"名字是(\p{Han}{2,4})", r"名字是(.+)", "person pattern 3"),
+                compile_regex(r"My name is ([A-Z][a-z]+ [A-Z][a-z]+)", r"My name is (.+)", "person pattern 4"),
+                compile_regex(r"I am ([A-Z][a-z]+ [A-Z][a-z]+)", r"I am (.+)", "person pattern 5"),
             ],
             org_patterns: vec![
-                Regex::new(r"(\p{Han}+(?:公司|企业|集团|机构|组织|学校|大学|医院))").expect("Organization pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"((?:Google|Microsoft|Apple|Amazon|Facebook|Tesla|Alibaba|Tencent|Baidu)\s*(?:Inc\.|Corp\.|Company)?)").expect("Organization pattern regex must be valid (compile-time constant)"),
+                compile_regex(r"(\p{Han}+(?:公司|企业|集团|机构|组织|学校|大学|医院))", r"(.+公司)", "organization pattern 1"),
+                compile_regex(r"((?:Google|Microsoft|Apple|Amazon|Facebook|Tesla|Alibaba|Tencent|Baidu)\s*(?:Inc\.|Corp\.|Company)?)", r"(Google|Microsoft|Apple)", "organization pattern 2"),
             ],
             location_patterns: vec![
-                Regex::new(r"(\p{Han}+(?:市|省|区|县|镇|村|路|街|道))").expect("Location pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"(北京|上海|广州|深圳|杭州|成都|重庆|武汉|西安|南京)").expect("Location pattern regex must be valid (compile-time constant)"),
+                compile_regex(r"(\p{Han}+(?:市|省|区|县|镇|村|路|街|道))", r"(.+市)", "location pattern 1"),
+                compile_regex(r"(北京|上海|广州|深圳|杭州|成都|重庆|武汉|西安|南京)", r"(北京|上海)", "location pattern 2"),
             ],
-            email_pattern: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").expect("Email pattern regex must be valid (compile-time constant)"),
-            phone_pattern: Regex::new(r"\b(?:\+?86)?1[3-9]\d{9}\b").expect("Phone pattern regex must be valid (compile-time constant)"),
-            url_pattern: Regex::new(r"https?://[^\s]+").expect("URL pattern regex must be valid (compile-time constant)"),
+            email_pattern: compile_regex(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", r"@.+", "email pattern"),
+            phone_pattern: compile_regex(r"\b(?:\+?86)?1[3-9]\d{9}\b", r"\d{11}", "phone pattern"),
+            url_pattern: compile_regex(r"https?://[^\s]+", r"http://.+", "url pattern"),
             date_patterns: vec![
-                Regex::new(r"\d{4}年\d{1,2}月\d{1,2}日").expect("Date pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"\d{4}-\d{1,2}-\d{1,2}").expect("Date pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"\d{1,2}/\d{1,2}/\d{4}").expect("Date pattern regex must be valid (compile-time constant)"),
+                compile_regex(r"\d{4}年\d{1,2}月\d{1,2}日", r"\d{4}年\d{1,2}月", "date pattern 1"),
+                compile_regex(r"\d{4}-\d{1,2}-\d{1,2}", r"\d{4}-\d{2}", "date pattern 2"),
+                compile_regex(r"\d{1,2}/\d{1,2}/\d{4}", r"\d{2}/\d{4}", "date pattern 3"),
             ],
             money_patterns: vec![
-                Regex::new(r"(\d+(?:\.\d+)?)\s*(?:元|美元|欧元|英镑|日元)").expect("Money pattern regex must be valid (compile-time constant)"),
-                Regex::new(r"(?:¥|$|€|£|¥)\s*(\d+(?:,\d{3})*(?:\.\d+)?)").expect("Money pattern regex must be valid (compile-time constant)"),
+                compile_regex(r"(\d+(?:\.\d+)?)\s*(?:元|美元|欧元|英镑|日元)", r"(\d+)\s*元", "money pattern 1"),
+                compile_regex(r"(?:¥|$|€|£|¥)\s*(\d+(?:,\d{3})*(?:\.\d+)?)", r"¥\s*(\d+)", "money pattern 2"),
             ],
         }
     }

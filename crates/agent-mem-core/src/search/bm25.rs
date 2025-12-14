@@ -130,7 +130,12 @@ impl BM25SearchEngine {
         }
 
         // 按分数降序排序
-        scored_docs.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        scored_docs.sort_by(|a, b| {
+            b.2.partial_cmp(&a.2).unwrap_or_else(|| {
+                // Fallback: if scores are NaN or incomparable, maintain order
+                std::cmp::Ordering::Equal
+            })
+        });
 
         // 转换为搜索结果
         let results = scored_docs

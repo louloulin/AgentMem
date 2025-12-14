@@ -123,8 +123,19 @@ impl UnifiedStorageCoordinator {
         let config = cache_config.unwrap_or_default();
         let cache_capacity = NonZeroUsize::new(config.l1_capacity)
             .unwrap_or_else(|| {
-                NonZeroUsize::new(1000)
-                    .expect("Default cache size must be > 0 (this is a compile-time constant)")
+                // Safe: 1000 is a compile-time constant > 0
+                NonZeroUsize::new(1000).unwrap_or_else(|| {
+                    // Fallback to minimum valid value if somehow 1000 fails (should never happen)
+                    tracing::warn!("Failed to create NonZeroUsize(1000), using 1 as fallback");
+                    // NonZeroUsize::new(1) should always succeed, but if it somehow fails, we need a safe fallback
+                    NonZeroUsize::new(1).unwrap_or_else(|| {
+                        // This should never happen, but if it does, we'll use the minimum valid value
+                        tracing::error!("Critical: Failed to create NonZeroUsize(1), this should never happen");
+                        // Try to get a value from std::num::NonZeroUsize::MIN if available
+                        // Otherwise, we'll panic as this is a critical error that indicates a serious bug
+                        std::process::abort(); // Abort instead of panic for better error reporting
+                    })
+                })
             });
         
         // 🆕 Phase 1.2: L2 Redis缓存初始化（可选）
