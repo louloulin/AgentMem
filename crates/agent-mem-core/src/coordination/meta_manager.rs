@@ -580,7 +580,7 @@ impl MetaMemoryManager {
                     .map(|status| status.current_load)
                     .unwrap_or(usize::MAX)
             })
-            .unwrap()
+            .expect("agents slice should not be empty when calling select_least_loaded")
             .to_string()
     }
 

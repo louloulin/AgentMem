@@ -831,7 +831,7 @@ impl ConflictResolver {
         let most_important = conflict
             .conflicting_versions
             .iter()
-            .max_by(|a, b| a.importance_score.partial_cmp(&b.importance_score).unwrap())
+            .max_by(|a, b| a.importance_score.partial_cmp(&b.importance_score).unwrap_or(std::cmp::Ordering::Equal))
             .ok_or_else(|| AgentMemError::validation_error("No versions found"))?;
 
         Ok(ConflictResolution {
@@ -885,7 +885,7 @@ impl ConflictResolver {
 
         let winning_version = vote_scores
             .iter()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(version_id, _)| version_id)
             .ok_or_else(|| AgentMemError::validation_error("No winning version"))?;
 
