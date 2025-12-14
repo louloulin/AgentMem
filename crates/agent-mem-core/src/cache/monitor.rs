@@ -178,7 +178,7 @@ impl CacheMonitor {
         // 计算响应时间指标
         let times = self.response_times.read().await;
         let mut durations: Vec<f64> = times.iter().map(|r| r.duration_ms).collect();
-        durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        durations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let avg_response_time_ms = if !durations.is_empty() {
             durations.iter().sum::<f64>() / durations.len() as f64
@@ -279,8 +279,9 @@ impl CacheMonitor {
             return None;
         }
 
-        let latest = snapshots.back().unwrap();
-        let earliest = snapshots.front().unwrap();
+        // Safe unwrap: we already checked snapshots.is_empty() above
+        let latest = snapshots.back().expect("snapshots should not be empty after is_empty() check");
+        let earliest = snapshots.front().expect("snapshots should not be empty after is_empty() check");
 
         // 计算趋势
         let hit_rate_trend = latest.combined_stats.hit_rate() - earliest.combined_stats.hit_rate();
@@ -303,7 +304,7 @@ impl CacheMonitor {
             b.combined_stats
                 .hit_rate()
                 .partial_cmp(&a.combined_stats.hit_rate())
-                .unwrap()
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let best_hit_rate = sorted_by_hit_rate

@@ -168,7 +168,9 @@ impl QueryOptimizer {
 
     /// 优化查询，生成最优搜索计划
     pub fn optimize_query(&self, query: &SearchQuery) -> Result<OptimizedSearchPlan> {
-        let stats = self.stats.read().unwrap();
+        let stats = self.stats.read().map_err(|e| {
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {}", e))
+        })?;
 
         // 根据数据规模和查询要求选择策略
         let strategy = self.select_strategy(&stats, query);
@@ -280,14 +282,19 @@ impl QueryOptimizer {
     }
 
     /// 更新统计信息
-    pub fn update_statistics(&self, total_vectors: usize) {
-        let mut stats = self.stats.write().unwrap();
+    pub fn update_statistics(&self, total_vectors: usize) -> Result<()> {
+        let mut stats = self.stats.write().map_err(|e| {
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to write query optimizer stats: {}", e))
+        })?;
         stats.update(total_vectors);
+        Ok(())
     }
 
     /// 获取当前统计信息
-    pub fn get_statistics(&self) -> IndexStatistics {
-        self.stats.read().unwrap().clone()
+    pub fn get_statistics(&self) -> Result<IndexStatistics> {
+        Ok(self.stats.read().map_err(|e| {
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {}", e))
+        })?.clone())
     }
 }
 
@@ -326,7 +333,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = optimizer.optimize_query(&query).unwrap();
+        let plan = optimizer.optimize_query(&query).expect("optimize_query should succeed in test");
         assert!(matches!(plan.strategy, SearchStrategy::Exact));
         assert!(!plan.should_rerank); // 小数据集不需要重排序
         assert_eq!(plan.estimated_recall, 1.0); // 精确搜索100%召回
@@ -343,7 +350,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = optimizer.optimize_query(&query).unwrap();
+        let plan = optimizer.optimize_query(&query).expect("optimize_query should succeed in test");
         assert!(matches!(plan.strategy, SearchStrategy::HNSW { .. }));
         assert!(plan.should_rerank); // 大数据集需要重排序
         assert!(plan.estimated_recall >= 0.95); // 高召回率
@@ -360,7 +367,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = optimizer.optimize_query(&query).unwrap();
+        let plan = optimizer.optimize_query(&query).expect("optimize_query should succeed in test");
         assert!(plan.estimated_latency_ms < 50); // 应该很快
     }
 }

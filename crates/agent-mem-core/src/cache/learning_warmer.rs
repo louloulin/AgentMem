@@ -120,7 +120,7 @@ impl LearningBasedCacheWarmer {
         candidates.sort_by(|a, b| {
             let score_a = a.query_count as f32 * a.avg_effectiveness;
             let score_b = b.query_count as f32 * b.avg_effectiveness;
-            score_b.partial_cmp(&score_a).unwrap()
+            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // 取Top N
