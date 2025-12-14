@@ -2119,7 +2119,7 @@ agentmem stats --user-id user123 | \
 
 **文档版本**: v4.16  
 **分析日期**: 2025-12-10  
-**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层5处+Server层8处，总计90处关键路径，约2.5%完成），Phase 0.2技术债务清理（修复未使用导入、改进错误处理））  
+**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层5处+Server层8处+Storage层3处，总计93处关键路径，约2.6%完成），Phase 0.2技术债务清理（修复未使用导入、改进错误处理、修复storage层unwrap_or为map_err））  
 **分析轮次**: 多轮深度分析（包含Unix哲学分析 + 2025最新研究整合）  
 **分析范围**: 全面代码分析 + 架构评估 + Unix哲学评估 + 业界最佳实践研究 + 2025最新论文  
 **最新研究**: ENGRAM (2025-11, LoCoMo SOTA)、MemVerse (2025-12)、MemoriesDB (2025-10)等  
@@ -2156,7 +2156,7 @@ agentmem stats --user-id user123 | \
   - ✅ 限流策略（每分钟/每小时/每天）
   - ✅ 集成到路由中间件
   - ✅ 限流测试
-- 🔄 Phase 0.1: 错误处理统一化（关键路径批量修复）✅ **部分完成**（2025-12-10）**约2.5%**
+- 🔄 Phase 0.1: 错误处理统一化（关键路径批量修复）✅ **部分完成**（2025-12-10）**约2.6%**
   - ✅ 修复 orchestrator 关键路径的 unwrap/expect（6处）
   - ✅ 修复 coordinator 关键路径的 unwrap（1处）
   - ✅ 修复 server 关键路径的 unwrap/expect（8处：main.rs 1处未使用导入，metrics.rs 1处expect改进，cache.rs 1处expect改进）
@@ -2164,13 +2164,14 @@ agentmem stats --user-id user123 | \
   - ✅ 批量修复 routes 关键路径的 unwrap（predictor.rs 1处）
   - ✅ 批量修复 core 关键路径的 unwrap（background_tasks.rs 2处，已在测试代码中改进）
   - ✅ 批量修复 repository 关键路径的 unwrap（api_key_repository.rs 20处，tool_repository.rs 30处：find_by_id 15处 + list 15处）
+  - ✅ **修复 storage 层关键路径的 unwrap**（memory_repository.rs 1处：is_deleted字段从unwrap_or改为map_err，block_repository.rs 2处：is_deleted和is_template字段从unwrap_or改为map_err）
   - ✅ 批量修复 engine 关键路径的 unwrap（engine.rs 5处：Regex::new，cache/mod.rs 3处：SystemTime）
   - ✅ 批量修复 sse 关键路径的 unwrap（sse.rs 2处，已在测试代码中改进为expect）
   - ✅ 修复测试代码中的编译错误（server_integration_test.rs SearchRequest字段）
-  - ⏳ 剩余 1365+ 处待处理（非关键路径）
+  - ⏳ 剩余 1362+ 处待处理（非关键路径）
 - ✅ Phase 5.4 (部分): 移除硬编码API Key ✅ **已完成**（2025-12-10）**100%**
 
-**总体完成进度**: **约38-43%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层5处+Server层8处，总计90处关键路径）已完成）
+**总体完成进度**: **约38-43%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层50处+Engine层8处+SSE层2处+Search层5处+Server层8处+Storage层3处，总计93处关键路径）已完成）
 
 **最新完成**（2025-12-10）:
 - ✅ **Phase 5.1: 多模型实例池实现，解决 Mutex 锁竞争问题**
