@@ -37,10 +37,13 @@ pub async fn api_version_compatibility_middleware(
     // ✅ Task 1.5: 在响应头中添加弃用提示（可选，Phase 2启用）
     if is_legacy_route {
         let headers = response.headers_mut();
-        headers.insert("X-API-Deprecated", "true".parse().unwrap());
+        // Safe: "true" is a valid header value
+        headers.insert("X-API-Deprecated", "true".parse().expect("'true' is a valid header value"));
+        // Safe: formatted path is a valid header value
+        let recommended_path = format!("/api/v1{}", &path[4..]);
         headers.insert(
             "X-API-Recommended",
-            format!("/api/v1{}", &path[4..]).parse().unwrap(),
+            recommended_path.parse().expect("formatted API path is a valid header value"),
         );
     }
 

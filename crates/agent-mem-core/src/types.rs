@@ -1402,7 +1402,10 @@ enum QueryComplexity {
 
 impl QueryFeatures {
     fn extract(s: &str) -> Self {
-        let has_id_pattern = Regex::new(r"[A-Z]\d{6}").unwrap().is_match(s);
+        // Safe: regex pattern is a compile-time constant
+        let has_id_pattern = Regex::new(r"[A-Z]\d{6}")
+            .expect("ID pattern regex must be valid (compile-time constant)")
+            .is_match(s);
         let has_attribute_filter = s.contains("::");
         let has_relation_query = s.contains("->");
 
@@ -1426,10 +1429,17 @@ impl QueryFeatures {
     fn infer_intent(&self, s: &str) -> QueryIntent {
         if self.has_id_pattern {
             // Extract ID pattern
-            if let Some(captures) = Regex::new(r"([A-Z]\d{6})").unwrap().captures(s) {
-                return QueryIntent::Lookup {
-                    entity_id: captures.get(1).unwrap().as_str().to_string(),
-                };
+            // Safe: regex pattern is a compile-time constant
+            if let Some(captures) = Regex::new(r"([A-Z]\d{6})")
+                .expect("ID capture pattern regex must be valid (compile-time constant)")
+                .captures(s)
+            {
+                // Safe: we know the pattern has one capture group
+                if let Some(id_match) = captures.get(1) {
+                    return QueryIntent::Lookup {
+                        entity_id: id_match.as_str().to_string(),
+                    };
+                }
             }
         }
 
