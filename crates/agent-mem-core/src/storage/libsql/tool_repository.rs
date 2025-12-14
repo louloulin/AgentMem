@@ -135,27 +135,47 @@ impl ToolRepositoryTrait for LibSqlToolRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
         {
-            let created_at_ts: i64 = row.get(9).unwrap();
-            let updated_at_ts: i64 = row.get(10).unwrap();
-            let is_deleted_int: i64 = row.get(11).unwrap();
+            let created_at_ts: i64 = row.get(9)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
+            let updated_at_ts: i64 = row.get(10)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
+            let is_deleted_int: i64 = row.get(11)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?;
 
             let tool = Tool {
-                id: row.get(0).unwrap(),
-                organization_id: row.get(1).unwrap(),
-                name: row.get(2).unwrap(),
-                description: row.get(3).unwrap(),
-                json_schema: Self::deserialize_json(row.get(4).unwrap()),
-                source_type: row.get(5).unwrap(),
-                source_code: row.get(6).unwrap(),
-                tags: Self::deserialize_tags(row.get(7).unwrap()),
-                metadata_: Self::deserialize_json(row.get(8).unwrap()),
+                id: row.get(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                organization_id: row.get(1)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
+                name: row.get(2)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                description: row.get(3)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get description: {e}")))?,
+                json_schema: Self::deserialize_json(
+                    row.get(4)
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get json_schema: {e}")))?,
+                ),
+                source_type: row.get(5)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get source_type: {e}")))?,
+                source_code: row.get(6)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get source_code: {e}")))?,
+                tags: Self::deserialize_tags(
+                    row.get(7)
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get tags: {e}")))?,
+                ),
+                metadata_: Self::deserialize_json(
+                    row.get(8)
+                        .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?,
+                ),
                 created_at: chrono::DateTime::from_timestamp(created_at_ts, 0)
                     .unwrap_or_else(Utc::now),
                 updated_at: chrono::DateTime::from_timestamp(updated_at_ts, 0)
                     .unwrap_or_else(Utc::now),
                 is_deleted: is_deleted_int != 0,
-                created_by_id: row.get(12).unwrap(),
-                last_updated_by_id: row.get(13).unwrap(),
+                created_by_id: row.get(12)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_by_id: {e}")))?,
+                last_updated_by_id: row.get(13)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get last_updated_by_id: {e}")))?,
             };
 
             Ok(Some(tool))

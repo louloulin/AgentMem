@@ -204,7 +204,7 @@ mod tests {
         let tasks = manager.list_tasks().await;
         let status = tasks.iter().find(|t| t.id == task_id).cloned();
         assert!(status.is_some());
-        match status.unwrap().state {
+        match status.expect("Task status should exist in test").state {
             TaskState::Completed { .. } => {}
             _ => panic!("Task should be completed"),
         }
@@ -223,7 +223,7 @@ mod tests {
         let tasks = manager.list_tasks().await;
         let status = tasks.iter().find(|t| t.id == task_id).cloned();
         assert!(status.is_some());
-        match status.unwrap().state {
+        match status.expect("Task status should exist in test").state {
             TaskState::Failed { .. } => {}
             _ => panic!("Task should be failed"),
         }

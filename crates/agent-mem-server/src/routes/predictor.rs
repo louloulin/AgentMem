@@ -201,7 +201,8 @@ pub async fn predict_memories(
         .map_err(|e| {
             crate::error::ServerError::Internal(format!("Failed to fetch row: {}", e))
         })? {
-        let id: String = row.get(0).unwrap();
+        let id: String = row.get(0)
+            .map_err(|e| crate::error::ServerError::Internal(format!("Failed to get memory_id from row: {}", e)))?;
         let access_count: i64 = row.get(1).unwrap_or(0);
         let last_accessed_ts: Option<i64> = row.get(2).ok();
 
