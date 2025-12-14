@@ -1,4 +1,11 @@
 //! Error handling for the server
+//!
+//! This module provides comprehensive error handling with:
+//! - Unified error types
+//! - Error context and stack traces
+//! - Error conversion traits
+//! - Friendly error messages
+//! - Error monitoring support
 
 use crate::models::ErrorResponse;
 use axum::{
@@ -7,46 +14,133 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use std::backtrace::Backtrace;
+use std::fmt;
 use thiserror::Error;
 
-/// Server error types
+/// Error context for additional information
+#[derive(Debug, Clone)]
+pub struct ErrorContext {
+    /// Contextual information about where the error occurred
+    pub context: String,
+    /// Optional additional details
+    pub details: Option<String>,
+    /// Timestamp when the error occurred
+    pub timestamp: chrono::DateTime<Utc>,
+}
+
+impl ErrorContext {
+    /// Create a new error context
+    pub fn new(context: impl Into<String>) -> Self {
+        Self {
+            context: context.into(),
+            details: None,
+            timestamp: Utc::now(),
+        }
+    }
+
+    /// Add additional details to the context
+    pub fn with_details(mut self, details: impl Into<String>) -> Self {
+        self.details = Some(details.into());
+        self
+    }
+}
+
+impl Default for ErrorContext {
+    fn default() -> Self {
+        Self::new("Unknown error context")
+    }
+}
+
+/// Server error types with context support
 #[derive(Error, Debug)]
 pub enum ServerError {
-    #[error("Memory operation failed: {0}")]
-    MemoryError(String),
+    #[error("Memory operation failed: {message}")]
+    MemoryError {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+        backtrace: Option<Backtrace>,
+    },
 
-    #[error("Resource not found: {0}")]
-    NotFound(String),
+    #[error("Resource not found: {message}")]
+    NotFound {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Invalid request: {0}")]
-    BadRequest(String),
+    #[error("Invalid request: {message}")]
+    BadRequest {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Authentication failed: {0}")]
-    Unauthorized(String),
+    #[error("Authentication failed: {message}")]
+    Unauthorized {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Access forbidden: {0}")]
-    Forbidden(String),
+    #[error("Access forbidden: {message}")]
+    Forbidden {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Quota exceeded: {0}")]
-    QuotaExceeded(String),
+    #[error("Quota exceeded: {message}")]
+    QuotaExceeded {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Validation failed: {0}")]
-    ValidationError(String),
+    #[error("Validation failed: {message}")]
+    ValidationError {
+        message: String,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Server binding failed: {0}")]
-    BindError(String),
+    #[error("Server binding failed: {message}")]
+    BindError {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Server error: {0}")]
-    ServerError(String),
+    #[error("Server error: {message}")]
+    ServerError {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+        backtrace: Option<Backtrace>,
+    },
 
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
+    #[error("Configuration error: {message}")]
+    ConfigError {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Telemetry setup failed: {0}")]
-    TelemetryError(String),
+    #[error("Telemetry setup failed: {message}")]
+    TelemetryError {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+    },
 
-    #[error("Internal server error: {0}")]
-    Internal(String),
+    #[error("Internal server error: {message}")]
+    Internal {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+        context: Option<ErrorContext>,
+        backtrace: Option<Backtrace>,
+    },
 }
 
 /// Server result type
