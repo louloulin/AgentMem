@@ -178,7 +178,9 @@ fn init_logging(log_level: &str) {
                 eprintln!("Failed to create logs directory: {}", e);
                 e
             })
-            .expect("Logs directory creation should succeed");
+            .unwrap_or_else(|e| {
+                eprintln!("⚠️  Warning: Failed to create logs directory: {}. Logging will continue but may fail.", e);
+            });
     }
 
     // 获取当前日期，用于生成日志文件名
@@ -224,12 +226,11 @@ fn init_logging(log_level: &str) {
         .init();
 
     // 保存 guard 到全局变量，防止被丢弃
-    *FILE_APPENDER_GUARD.lock()
-        .map_err(|e| {
-            eprintln!("Failed to acquire file appender guard lock: {}", e);
-            e
-        })
-        .expect("File appender guard lock should be available") = Some(guard);
+    if let Ok(mut guard_lock) = FILE_APPENDER_GUARD.lock() {
+        *guard_lock = Some(guard);
+    } else {
+        eprintln!("⚠️  Warning: Failed to acquire file appender guard lock. Logging may not work correctly.");
+    }
 
     // 创建软链接指向最新的日志文件
     create_log_symlink(&symlink_path, &dated_log_file);
