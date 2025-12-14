@@ -2117,9 +2117,9 @@ agentmem stats --user-id user123 | \
 
 ---
 
-**文档版本**: v4.12  
+**文档版本**: v4.13  
 **分析日期**: 2025-12-10  
-**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层35处））  
+**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层35处+Engine层8处，总计60处））  
 **分析轮次**: 多轮深度分析（包含Unix哲学分析 + 2025最新研究整合）  
 **分析范围**: 全面代码分析 + 架构评估 + Unix哲学评估 + 业界最佳实践研究 + 2025最新论文  
 **最新研究**: ENGRAM (2025-11, LoCoMo SOTA)、MemVerse (2025-12)、MemoriesDB (2025-10)等  
@@ -2156,7 +2156,7 @@ agentmem stats --user-id user123 | \
   - ✅ 限流策略（每分钟/每小时/每天）
   - ✅ 集成到路由中间件
   - ✅ 限流测试
-- 🔄 Phase 0.1: 错误处理统一化（关键路径批量修复）✅ **部分完成**（2025-12-10）**约1.5%**
+- 🔄 Phase 0.1: 错误处理统一化（关键路径批量修复）✅ **部分完成**（2025-12-10）**约1.8%**
   - ✅ 修复 orchestrator 关键路径的 unwrap/expect（6处）
   - ✅ 修复 coordinator 关键路径的 unwrap（1处）
   - ✅ 修复 server 关键路径的 unwrap/expect（5处：main.rs 3处，server.rs 1处，health.rs 1处）
@@ -2164,10 +2164,11 @@ agentmem stats --user-id user123 | \
   - ✅ 批量修复 routes 关键路径的 unwrap（predictor.rs 1处）
   - ✅ 批量修复 core 关键路径的 unwrap（background_tasks.rs 2处，已在测试代码中改进）
   - ✅ 批量修复 repository 关键路径的 unwrap（api_key_repository.rs 20处，tool_repository.rs 15处）
-  - ⏳ 剩余 1400+ 处待处理（非关键路径）
+  - ✅ 批量修复 engine 关键路径的 unwrap（engine.rs 5处：Regex::new，cache/mod.rs 3处：SystemTime）
+  - ⏳ 剩余 1385+ 处待处理（非关键路径）
 - ✅ Phase 5.4 (部分): 移除硬编码API Key ✅ **已完成**（2025-12-10）**100%**
 
-**总体完成进度**: **约33-38%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层）已完成）
+**总体完成进度**: **约34-39%**（核心性能、数据一致性、高可用性基础、API限流和错误处理批量修复（Repository层+Engine层）已完成）
 
 **最新完成**（2025-12-10）:
 - ✅ **Phase 5.1: 多模型实例池实现，解决 Mutex 锁竞争问题**

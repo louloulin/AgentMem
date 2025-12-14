@@ -379,7 +379,9 @@ impl MemoryEngine {
             // 🔧 修复: 检测商品ID查询，用于过滤工作记忆
             let is_product_query = {
                 use regex::Regex;
-                Regex::new(r"P\d{6}").unwrap().is_match(query)
+                Regex::new(r"P\d{6}")
+                    .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                    .is_match(query)
             };
 
             // 🆕 V4: db_memories already are Vec<Memory> (V4)
@@ -475,7 +477,9 @@ impl MemoryEngine {
             // 🔧 修复: 改进排序逻辑 - 精确匹配优先，工作记忆降权
             let is_product_query = {
                 use regex::Regex;
-                Regex::new(r"P\d{6}").unwrap().is_match(query)
+                Regex::new(r"P\d{6}")
+                    .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                    .is_match(query)
             };
 
             scored_memories.sort_by(|(mem_a, score_a), (mem_b, score_b)| {
@@ -483,7 +487,9 @@ impl MemoryEngine {
                 let is_exact_product_match = |mem: &Memory, q: &str| -> bool {
                     if let Some(product_id) = {
                         use regex::Regex;
-                        Regex::new(r"P\d{6}").unwrap().find(q).map(|m| m.as_str())
+                        Regex::new(r"P\d{6}")
+                            .expect("Product ID regex pattern must be valid (this is a compile-time constant)")
+                            .find(q).map(|m| m.as_str())
                     } {
                         // V4: 检查 content
                         let content_text = match &mem.content {
@@ -671,7 +677,8 @@ impl MemoryEngine {
         use regex::Regex;
 
         // 🔧 修复: 检测商品ID查询，优先处理精确ID匹配
-        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();
+        let product_id_pattern = Regex::new(r"P\d{6}")
+            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
         if let Some(product_id) = product_id_pattern.find(query) {
             let product_id = product_id.as_str();
 
@@ -910,7 +917,8 @@ impl crate::search::enhanced_hybrid_v2::ExactMatcher for RepositoryExactMatcherA
     async fn match_exact(&self, query: &str, limit: usize) -> AgentMemResult<Vec<SearchResult>> {
         // 精确匹配：检查是否是商品ID等精确格式
         use regex::Regex;
-        let product_id_pattern = Regex::new(r"P\d{6}").unwrap();
+        let product_id_pattern = Regex::new(r"P\d{6}")
+            .expect("Product ID regex pattern must be valid (this is a compile-time constant)");
         
         if product_id_pattern.is_match(query) {
             // 商品ID查询：使用 search 方法
