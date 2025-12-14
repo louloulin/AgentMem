@@ -309,10 +309,14 @@ impl CacheMonitor {
 
         let best_hit_rate = sorted_by_hit_rate
             .first()
-            .unwrap()
+            .expect("sorted_by_hit_rate should not be empty after sorting")
             .combined_stats
             .hit_rate();
-        let worst_hit_rate = sorted_by_hit_rate.last().unwrap().combined_stats.hit_rate();
+        let worst_hit_rate = sorted_by_hit_rate
+            .last()
+            .expect("sorted_by_hit_rate should not be empty after sorting")
+            .combined_stats
+            .hit_rate();
 
         Some(PerformanceReport {
             report_period_secs: (latest.timestamp - earliest.timestamp),

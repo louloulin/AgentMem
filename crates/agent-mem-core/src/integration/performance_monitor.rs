@@ -404,7 +404,7 @@ impl PerformanceMonitor {
 
         let values: Vec<f64> = metric.data_points.iter().map(|dp| dp.value).collect();
         let mut sorted_values = values.clone();
-        sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let len = values.len() as f64;
         let sum: f64 = values.iter().sum();
