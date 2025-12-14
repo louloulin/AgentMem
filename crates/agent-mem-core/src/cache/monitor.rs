@@ -202,7 +202,11 @@ impl CacheMonitor {
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         PerformanceSnapshot {
@@ -280,8 +284,21 @@ impl CacheMonitor {
         }
 
         // Safe unwrap: we already checked snapshots.is_empty() above
-        let latest = snapshots.back().expect("snapshots should not be empty after is_empty() check");
-        let earliest = snapshots.front().expect("snapshots should not be empty after is_empty() check");
+        // 如果为空（理论上不应该发生），返回 None
+        let latest = match snapshots.back() {
+            Some(s) => s,
+            None => {
+                tracing::warn!("snapshots should not be empty after is_empty() check");
+                return None;
+            }
+        };
+        let earliest = match snapshots.front() {
+            Some(s) => s,
+            None => {
+                tracing::warn!("snapshots should not be empty after is_empty() check");
+                return None;
+            }
+        };
 
         // 计算趋势
         let hit_rate_trend = latest.combined_stats.hit_rate() - earliest.combined_stats.hit_rate();
@@ -307,16 +324,20 @@ impl CacheMonitor {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let best_hit_rate = sorted_by_hit_rate
-            .first()
-            .expect("sorted_by_hit_rate should not be empty after sorting")
-            .combined_stats
-            .hit_rate();
-        let worst_hit_rate = sorted_by_hit_rate
-            .last()
-            .expect("sorted_by_hit_rate should not be empty after sorting")
-            .combined_stats
-            .hit_rate();
+        let best_hit_rate = match sorted_by_hit_rate.first() {
+            Some(s) => s.combined_stats.hit_rate(),
+            None => {
+                tracing::warn!("sorted_by_hit_rate should not be empty after sorting");
+                return None;
+            }
+        };
+        let worst_hit_rate = match sorted_by_hit_rate.last() {
+            Some(s) => s.combined_stats.hit_rate(),
+            None => {
+                tracing::warn!("sorted_by_hit_rate should not be empty after sorting");
+                return None;
+            }
+        };
 
         Some(PerformanceReport {
             report_period_secs: (latest.timestamp - earliest.timestamp),

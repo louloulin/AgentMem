@@ -164,12 +164,20 @@ impl TemporalEdge {
             return 0.0;
         }
 
-        let first = self.strength_history.first()
-            .expect("strength_history is already checked to have at least 2 elements")
-            .1;
-        let last = self.strength_history.last()
-            .expect("strength_history is already checked to have at least 2 elements")
-            .1;
+        let first = match self.strength_history.first() {
+            Some(entry) => entry.1,
+            None => {
+                tracing::warn!("strength_history should have at least 2 elements, using 0.0 as fallback");
+                return 0.0;
+            }
+        };
+        let last = match self.strength_history.last() {
+            Some(entry) => entry.1,
+            None => {
+                tracing::warn!("strength_history should have at least 2 elements, using 0.0 as fallback");
+                return 0.0;
+            }
+        };
         last - first
     }
 }

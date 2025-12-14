@@ -243,14 +243,21 @@ impl EpisodicAgent {
         {
             // Use actual episodic memory manager if available
             if let Some(manager) = &self.episodic_store {
-                // Parse time strings
-                let start_time = chrono::DateTime::parse_from_rfc3339(start_time_str.unwrap())
+                // Parse time strings - both are required for time range query
+                let start_time_str = start_time_str.ok_or_else(|| {
+                    AgentError::InvalidParameters("start_time is required for time range query".to_string())
+                })?;
+                let end_time_str = end_time_str.ok_or_else(|| {
+                    AgentError::InvalidParameters("end_time is required for time range query".to_string())
+                })?;
+
+                let start_time = chrono::DateTime::parse_from_rfc3339(&start_time_str)
                     .map_err(|e| {
                         AgentError::InvalidParameters(format!("Invalid start_time format: {e}"))
                     })?
                     .with_timezone(&chrono::Utc);
 
-                let end_time = chrono::DateTime::parse_from_rfc3339(end_time_str.unwrap())
+                let end_time = chrono::DateTime::parse_from_rfc3339(&end_time_str)
                     .map_err(|e| {
                         AgentError::InvalidParameters(format!("Invalid end_time format: {e}"))
                     })?
@@ -289,8 +296,8 @@ impl EpisodicAgent {
                 log::info!(
                     "Episodic agent: Found {} events in time range {} to {}",
                     events.len(),
-                    start_time_str.unwrap(),
-                    end_time_str.unwrap()
+                    start_time_str,
+                    end_time_str
                 );
                 return Ok(response);
             }

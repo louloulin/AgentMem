@@ -1019,7 +1019,10 @@ impl MemoryCompressionStage {
                 memories
                     .iter()
                     .max_by_key(|m| m.metadata.created_at)
-                    .expect("memories is already checked to be non-empty")
+                    .unwrap_or_else(|| {
+                        // memories is already checked to be non-empty, but use safe fallback
+                        &memories[0]
+                    })
             }
             "highest_importance" => {
                 // Select the most important one
@@ -1030,16 +1033,22 @@ impl MemoryCompressionStage {
                             .partial_cmp(&b.importance())
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
-                    .expect("memories is already checked to be non-empty")
+                    .unwrap_or_else(|| {
+                        // memories is already checked to be non-empty, but use safe fallback
+                        &memories[0]
+                    })
             }
             "longest" => {
                 // Select the longest content
                 memories
                     .iter()
                     .max_by_key(|m| m.content.to_string().len())
-                    .expect("memories is already checked to be non-empty")
+                    .unwrap_or_else(|| {
+                        // memories is already checked to be non-empty, but use safe fallback
+                        &memories[0]
+                    })
             }
-            _ => memories[0], // Default to first
+            _ => &memories[0], // Default to first
         };
 
         let mut merged = (*base_memory).clone();

@@ -152,7 +152,11 @@ impl PerformanceMonitor {
     ) -> Result<()> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         let data_point = MetricDataPoint {
@@ -274,7 +278,11 @@ impl PerformanceMonitor {
     ) -> Result<()> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         // 收集系统级指标

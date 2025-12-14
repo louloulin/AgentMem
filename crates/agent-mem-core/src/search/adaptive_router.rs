@@ -5,7 +5,7 @@ use super::{QueryFeatures, SearchQuery, SearchWeights};
 use crate::config::AgentMemConfig;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use rand::distributions::Distribution;
+use rand::{distributions::Distribution, Rng};
 use rand_distr::Beta;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -96,11 +96,22 @@ impl Default for ThompsonSamplingArm {
 impl ThompsonSamplingArm {
     /// 采样当前臂的期望收益
     pub fn sample(&self) -> f64 {
-        let beta_dist = Beta::new(self.alpha, self.beta)
-            .unwrap_or_else(|_| {
+        // 尝试创建 Beta 分布
+        let beta_dist = match Beta::new(self.alpha, self.beta) {
+            Ok(dist) => dist,
+            Err(_) => {
                 // 如果参数无效，使用默认的Beta分布（alpha=1, beta=1，即均匀分布）
-                Beta::new(1.0, 1.0).expect("Default Beta(1,1) should always be valid")
-            });
+                // Beta(1,1) 总是有效的，因为 alpha > 0 且 beta > 0
+                // 如果仍然失败（理论上不应该），使用均匀分布的近似值
+                match Beta::new(1.0, 1.0) {
+                    Ok(dist) => dist,
+                    Err(_) => {
+                        // 如果 Beta(1,1) 也失败（理论上不应该），直接返回随机值
+                        return rand::thread_rng().gen_range(0.0..1.0);
+                    }
+                }
+            }
+        };
         let mut rng = rand::thread_rng();
         beta_dist.sample(&mut rng)
     }

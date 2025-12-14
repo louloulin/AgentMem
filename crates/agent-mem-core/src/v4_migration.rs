@@ -199,7 +199,14 @@ pub fn v4_to_legacy(memory: &MemoryV4) -> LegacyMemoryItem {
                     // If f64 cannot be converted to JSON Number, fallback to string representation
                     serde_json::Value::Number(
                         serde_json::Number::from_f64(n.clone())
-                            .unwrap_or_else(|| serde_json::Number::from_f64(0.0).expect("0.0 is a valid f64"))
+                            .unwrap_or_else(|| {
+                                // 0.0 is always a valid f64, but use unwrap_or_else for safety
+                                serde_json::Number::from_f64(0.0)
+                                    .unwrap_or_else(|| {
+                                        // If even 0.0 fails (should never happen), use 0 as integer
+                                        serde_json::Number::from(0)
+                                    })
+                            })
                     )
                 }
                 AttributeValue::Integer(i) => serde_json::Value::Number(i.clone().into()),

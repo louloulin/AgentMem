@@ -242,7 +242,11 @@ impl MultiLayerCache {
             total_warming_time_ms: elapsed.as_millis() as u64,
             last_warming_timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .map_err(|e| {
+                    tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                    std::time::Duration::ZERO
+                })
+                .unwrap_or_default()
                 .as_secs(),
             failed_warmings: failed,
         })
@@ -251,15 +255,27 @@ impl MultiLayerCache {
     /// Get cache warming statistics
     pub fn get_warming_stats(&self) -> CacheWarmingStats {
         CacheWarmingStats {
-            l1_entries: self.l1_memory.read()
-                .expect("Failed to read L1 cache lock (poisoned)")
-                .len(),
-            l2_entries: self.l2_llm.read()
-                .expect("Failed to read L2 cache lock (poisoned)")
-                .len(),
-            l3_entries: self.l3_embedding.read()
-                .expect("Failed to read L3 cache lock (poisoned)")
-                .len(),
+            l1_entries: match self.l1_memory.read() {
+                Ok(guard) => guard.len(),
+                Err(_) => {
+                    tracing::warn!("Failed to read L1 cache lock (poisoned), using 0 as default");
+                    0
+                }
+            },
+            l2_entries: match self.l2_llm.read() {
+                Ok(guard) => guard.len(),
+                Err(_) => {
+                    tracing::warn!("Failed to read L2 cache lock (poisoned), using 0 as default");
+                    0
+                }
+            },
+            l3_entries: match self.l3_embedding.read() {
+                Ok(guard) => guard.len(),
+                Err(_) => {
+                    tracing::warn!("Failed to read L3 cache lock (poisoned), using 0 as default");
+                    0
+                }
+            },
             last_warmed: std::time::SystemTime::now(),
         }
     }

@@ -59,7 +59,11 @@ impl CacheMetadata {
     pub fn new(ttl_seconds: u64, size_bytes: usize, level: CacheLevel) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("System time should be after UNIX_EPOCH (this should never fail)")
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         Self {
@@ -76,7 +80,11 @@ impl CacheMetadata {
     pub fn is_expired(&self) -> bool {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("System time should be after UNIX_EPOCH (this should never fail)")
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
 
         now - self.created_at > self.ttl_seconds
@@ -87,7 +95,11 @@ impl CacheMetadata {
         self.access_count += 1;
         self.last_accessed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("System time should be after UNIX_EPOCH (this should never fail)")
+            .map_err(|e| {
+                tracing::warn!("System time is before UNIX epoch: {e}, using 0 as timestamp");
+                std::time::Duration::ZERO
+            })
+            .unwrap_or_default()
             .as_secs();
     }
 }
