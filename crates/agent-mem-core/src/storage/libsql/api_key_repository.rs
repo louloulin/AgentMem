@@ -174,18 +174,28 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch API key row: {e}")))?
         {
-            let expires_at_ts: Option<i64> = row.get(5).unwrap();
-            let last_used_at_ts: Option<i64> = row.get(6).unwrap();
-            let created_at_ts: i64 = row.get(7).unwrap();
-            let updated_at_ts: i64 = row.get(8).unwrap();
-            let is_deleted: i64 = row.get(9).unwrap();
+            let expires_at_ts: Option<i64> = row.get(5)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get expires_at: {e}")))?;
+            let last_used_at_ts: Option<i64> = row.get(6)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get last_used_at: {e}")))?;
+            let created_at_ts: i64 = row.get(7)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
+            let updated_at_ts: i64 = row.get(8)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
+            let is_deleted: i64 = row.get(9)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?;
 
             api_keys.push(ApiKey {
-                id: row.get(0).unwrap(),
-                key_hash: row.get(1).unwrap(),
-                name: row.get(2).unwrap(),
-                user_id: row.get(3).unwrap(),
-                organization_id: row.get(4).unwrap(),
+                id: row.get(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                key_hash: row.get(1)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get key_hash: {e}")))?,
+                name: row.get(2)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                user_id: row.get(3)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
+                organization_id: row.get(4)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
                 expires_at: expires_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 last_used_at: last_used_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 created_at: DateTime::from_timestamp(created_at_ts, 0).ok_or_else(|| {
@@ -315,18 +325,28 @@ impl ApiKeyRepositoryTrait for LibSqlApiKeyRepository {
             .await
             .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch API key row: {e}")))?
         {
-            let expires_at_ts: Option<i64> = row.get(5).unwrap();
-            let last_used_at_ts: Option<i64> = row.get(6).unwrap();
-            let created_at_ts: i64 = row.get(7).unwrap();
-            let updated_at_ts: i64 = row.get(8).unwrap();
-            let is_deleted: i64 = row.get(9).unwrap();
+            let expires_at_ts: Option<i64> = row.get(5)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get expires_at: {e}")))?;
+            let last_used_at_ts: Option<i64> = row.get(6)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get last_used_at: {e}")))?;
+            let created_at_ts: i64 = row.get(7)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get created_at: {e}")))?;
+            let updated_at_ts: i64 = row.get(8)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get updated_at: {e}")))?;
+            let is_deleted: i64 = row.get(9)
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to get is_deleted: {e}")))?;
 
             api_keys.push(ApiKey {
-                id: row.get(0).unwrap(),
-                key_hash: row.get(1).unwrap(),
-                name: row.get(2).unwrap(),
-                user_id: row.get(3).unwrap(),
-                organization_id: row.get(4).unwrap(),
+                id: row.get(0)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get id: {e}")))?,
+                key_hash: row.get(1)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get key_hash: {e}")))?,
+                name: row.get(2)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get name: {e}")))?,
+                user_id: row.get(3)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get user_id: {e}")))?,
+                organization_id: row.get(4)
+                    .map_err(|e| AgentMemError::StorageError(format!("Failed to get organization_id: {e}")))?,
                 expires_at: expires_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 last_used_at: last_used_at_ts.and_then(|ts| DateTime::from_timestamp(ts, 0)),
                 created_at: DateTime::from_timestamp(created_at_ts, 0).ok_or_else(|| {
