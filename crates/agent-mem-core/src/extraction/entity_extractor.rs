@@ -46,7 +46,15 @@ impl RuleBasedExtractor {
                 tracing::error!("Failed to compile {} regex pattern '{}': {e}, using fallback", name, pattern);
                 Regex::new(fallback).unwrap_or_else(|_| {
                     tracing::error!("Failed to compile fallback regex pattern '{}', using empty pattern", fallback);
-                    Regex::new(r"^$").expect("Empty regex pattern must be valid")
+                    // Empty regex pattern "^$" is always valid, but handle error gracefully
+                    Regex::new(r"^$").unwrap_or_else(|_| {
+                        tracing::error!("Critical: Failed to compile empty regex pattern, this should never happen");
+                        // This should never happen, but if it does, return a pattern that matches nothing
+                        Regex::new(r"(?!)").unwrap_or_else(|_| {
+                            // Last resort: this should never fail, but handle it anyway
+                            panic!("Critical regex compilation failure: unable to create any regex pattern");
+                        })
+                    })
                 })
             })
         };
