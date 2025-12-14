@@ -103,6 +103,10 @@ async fn test_04_type_compatibility() {
         memory_type: Some(MemoryType::Semantic),
         limit: Some(10),
         threshold: Some(0.7),
+        max_age_days: None,
+        min_access_count: None,
+        min_importance: None,
+        offset: None,
     };
 
     println!("✅ SearchRequest类型兼容");
