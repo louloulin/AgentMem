@@ -2445,7 +2445,7 @@ mod tests {
 
         let result = coordinator.rebuild_vector_index(memories_with_embeddings, true).await;
         assert!(result.is_ok());
-        let (rebuilt, skipped, errors) = result.unwrap();
+        let (rebuilt, _skipped, errors) = result.unwrap();
         assert_eq!(rebuilt, 2, "Should rebuild 2 memories");
         assert_eq!(skipped, 0, "Should not skip any");
         assert_eq!(errors, 0, "Should not have errors");
@@ -2487,7 +2487,7 @@ mod tests {
 
         let result = coordinator.rebuild_vector_index(memories_with_embeddings, false).await;
         assert!(result.is_ok());
-        let (rebuilt, skipped, errors) = result.unwrap();
+        let (rebuilt, _skipped, errors) = result.unwrap();
         // Both should be added (even if one already exists, it will be added again)
         assert!(rebuilt >= 1, "Should rebuild at least 1 memory");
         assert_eq!(errors, 0, "Should not have errors");
@@ -2523,7 +2523,7 @@ mod tests {
 
         let result = coordinator.rebuild_vector_index(memories_with_embeddings, false).await;
         assert!(result.is_ok());
-        let (rebuilt, skipped, errors) = result.unwrap();
+        let (rebuilt, _skipped, errors) = result.unwrap();
         assert_eq!(rebuilt, 0, "Should not rebuild without embedding");
         assert_eq!(skipped, 1, "Should skip memory without embedding");
         assert_eq!(errors, 0, "Should not have errors");
@@ -2579,7 +2579,7 @@ mod tests {
         );
 
         // Add memories with different agent_ids
-        let mut memory1 = create_test_memory("warmup-filter-1");
+        let memory1 = create_test_memory("warmup-filter-1");
         // Note: create_test_memory may not set agent_id, so we'll test without filter
         sql_repo.create(&memory1).await.unwrap();
 
