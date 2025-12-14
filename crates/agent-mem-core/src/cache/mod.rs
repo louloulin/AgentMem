@@ -87,7 +87,7 @@ impl CacheMetadata {
         self.access_count += 1;
         self.last_accessed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time should be after UNIX_EPOCH (this should never fail)")
             .as_secs();
     }
 }

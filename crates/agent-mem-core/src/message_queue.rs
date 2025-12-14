@@ -242,7 +242,9 @@ mod tests {
 
         assert!(queue.send_message(message.clone()).await.is_ok());
 
-        let received = rx.recv().await.unwrap();
+        let received = rx.recv().await.ok_or_else(|| {
+            crate::CoreError::IoError("Message queue receiver closed".to_string())
+        })?;
         assert_eq!(received.content, "Hello");
     }
 

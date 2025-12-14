@@ -170,12 +170,13 @@ impl MetadataFilterSystem {
         if let Some(obj) = value.as_object() {
             // 格式: {"field": {"operator": "value"}}
             if obj.len() == 1 {
-                let (field, filter_obj) = obj.iter().next().unwrap();
-                if let Some(filter_map) = filter_obj.as_object() {
-                    return Self::parse_field_filter(
-                        field,
-                        &serde_json::Value::Object(filter_map.clone()),
-                    );
+                if let Some((field, filter_obj)) = obj.iter().next() {
+                    if let Some(filter_map) = filter_obj.as_object() {
+                        return Self::parse_field_filter(
+                            field,
+                            &serde_json::Value::Object(filter_map.clone()),
+                        );
+                    }
                 }
             }
         }

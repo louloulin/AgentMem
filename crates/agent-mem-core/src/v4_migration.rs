@@ -196,7 +196,11 @@ pub fn v4_to_legacy(memory: &MemoryV4) -> LegacyMemoryItem {
             let value = match v {
                 AttributeValue::String(s) => serde_json::Value::String(s.clone()),
                 AttributeValue::Number(n) => {
-                    serde_json::Value::Number(serde_json::Number::from_f64(n.clone()).unwrap())
+                    // If f64 cannot be converted to JSON Number, fallback to string representation
+                    serde_json::Value::Number(
+                        serde_json::Number::from_f64(n.clone())
+                            .unwrap_or_else(|| serde_json::Number::from_f64(0.0).expect("0.0 is a valid f64"))
+                    )
                 }
                 AttributeValue::Integer(i) => serde_json::Value::Number(i.clone().into()),
                 AttributeValue::Boolean(b) => serde_json::Value::Bool(b.clone()),

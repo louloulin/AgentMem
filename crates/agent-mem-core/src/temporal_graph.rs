@@ -60,8 +60,8 @@ impl TimeRange {
         // 如果一个范围的开始时间在另一个范围内
         self.contains(&other.start)
             || other.contains(&self.start)
-            || (self.end.is_some() && other.contains(&self.end.unwrap()))
-            || (other.end.is_some() && self.contains(&other.end.unwrap()))
+            || (self.end.is_some() && self.end.map(|end| other.contains(&end)).unwrap_or(false))
+            || (other.end.is_some() && other.end.map(|end| self.contains(&end)).unwrap_or(false))
     }
 
     /// 获取持续时间
@@ -71,7 +71,7 @@ impl TimeRange {
 
     /// 检查范围是否仍然有效（未结束）
     pub fn is_active(&self) -> bool {
-        self.end.is_none() || self.end.unwrap() > Utc::now()
+        self.end.map(|end| end > Utc::now()).unwrap_or(true)
     }
 }
 
@@ -164,8 +164,12 @@ impl TemporalEdge {
             return 0.0;
         }
 
-        let first = self.strength_history.first().unwrap().1;
-        let last = self.strength_history.last().unwrap().1;
+        let first = self.strength_history.first()
+            .expect("strength_history is already checked to have at least 2 elements")
+            .1;
+        let last = self.strength_history.last()
+            .expect("strength_history is already checked to have at least 2 elements")
+            .1;
         last - first
     }
 }

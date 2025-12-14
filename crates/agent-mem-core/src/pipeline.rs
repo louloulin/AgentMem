@@ -1019,7 +1019,7 @@ impl MemoryCompressionStage {
                 memories
                     .iter()
                     .max_by_key(|m| m.metadata.created_at)
-                    .unwrap()
+                    .expect("memories is already checked to be non-empty")
             }
             "highest_importance" => {
                 // Select the most important one
@@ -1030,14 +1030,14 @@ impl MemoryCompressionStage {
                             .partial_cmp(&b.importance())
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
-                    .unwrap()
+                    .expect("memories is already checked to be non-empty")
             }
             "longest" => {
                 // Select the longest content
                 memories
                     .iter()
                     .max_by_key(|m| m.content.to_string().len())
-                    .unwrap()
+                    .expect("memories is already checked to be non-empty")
             }
             _ => memories[0], // Default to first
         };

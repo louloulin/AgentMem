@@ -320,8 +320,8 @@ impl MemoryDeduplicator {
         // 选择最重要的作为基础
         let base = memories
             .iter()
-            .max_by(|a, b| a.importance.partial_cmp(&b.importance).unwrap())
-            .unwrap();
+            .max_by(|a, b| a.importance.partial_cmp(&b.importance).unwrap_or(std::cmp::Ordering::Equal))
+            .ok_or_else(|| AgentMemError::validation_error("Failed to find base memory for merge"))?;
 
         // 合并内容（选择最长的）
         let merged_content = memories
