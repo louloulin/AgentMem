@@ -6,7 +6,7 @@ use agent_mem_server::{MemoryServer, ServerConfig};
 use clap::Parser;
 use once_cell::sync::Lazy;
 use std::process;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[derive(Parser)]

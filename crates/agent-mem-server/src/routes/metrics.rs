@@ -140,11 +140,28 @@ pub async fn get_prometheus_metrics(
     // Use the gather() method which returns a String
     let metrics_text = metrics_registry.gather();
 
-    Response::builder()
+    // Build response with proper error handling
+    match Response::builder()
         .status(200)
         .header("Content-Type", "text/plain; version=0.0.4")
         .body(Body::from(metrics_text))
-        .expect("Failed to build metrics response - this should never fail with valid headers")
+    {
+        Ok(response) => response,
+        Err(e) => {
+            tracing::error!("Failed to build metrics response: {}", e);
+            // Return a minimal error response
+            Response::builder()
+                .status(500)
+                .body(Body::from(format!("Internal error: {}", e)))
+                .unwrap_or_else(|_| {
+                    // Last resort: return a simple error response
+                    Response::builder()
+                        .status(500)
+                        .body(Body::from("Internal server error"))
+                        .expect("Failed to build error response")
+                })
+        }
+    }
 }
 
 #[cfg(test)]

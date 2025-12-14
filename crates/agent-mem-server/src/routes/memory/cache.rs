@@ -47,7 +47,9 @@ pub fn get_search_cache() -> Arc<RwLock<LruCache<String, CachedSearchResult>>> {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(1000);
-        let cache_capacity = NonZeroUsize::new(capacity).unwrap_or_else(|| {
+        // 确保capacity至少为1，然后创建NonZeroUsize
+        let cache_capacity = NonZeroUsize::new(capacity.max(1)).unwrap_or_else(|| {
+            // 如果capacity为0，使用默认值1000（这是编译时保证有效的值）
             NonZeroUsize::new(1000).expect("1000 is a valid NonZeroUsize")
         });
         Arc::new(RwLock::new(LruCache::new(cache_capacity)))
