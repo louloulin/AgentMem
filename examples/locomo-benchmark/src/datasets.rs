@@ -1,7 +1,9 @@
 //! 数据集加载模块
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -56,32 +58,46 @@ impl DatasetLoader {
 
     /// 加载所有数据集
     pub async fn load_all(&self) -> Result<LocomoDatasets> {
-        let single_hop = self.load_category("single_hop").await?;
-        let multi_hop = self.load_category("multi_hop").await?;
-        let temporal = self.load_category("temporal").await?;
-        let open_domain = self.load_category("open_domain").await?;
-        let adversarial = self.load_category("adversarial").await?;
+        let categories = [
+            "single_hop",
+            "multi_hop",
+            "temporal",
+            "open_domain",
+            "adversarial",
+        ];
+        let has_all_dirs = categories
+            .iter()
+            .all(|c| Path::new(&self.base_path).join(c).exists());
 
-        Ok(LocomoDatasets {
-            single_hop,
-            multi_hop,
-            temporal,
-            open_domain,
-            adversarial,
-        })
+        if has_all_dirs {
+            let single_hop = self.load_category("single_hop").await?;
+            let multi_hop = self.load_category("multi_hop").await?;
+            let temporal = self.load_category("temporal").await?;
+            let open_domain = self.load_category("open_domain").await?;
+            let adversarial = self.load_category("adversarial").await?;
+
+            return Ok(LocomoDatasets {
+                single_hop,
+                multi_hop,
+                temporal,
+                open_domain,
+                adversarial,
+            });
+        }
+
+        tracing::info!("分类目录缺失，尝试直接解析原始 LoCoMo 数据集...");
+        self.load_from_raw().await
     }
 
-    /// 加载特定类别的数据集
+    /// 加载特定类别的数据集（要求目录和数据真实存在）
     async fn load_category(&self, category: &str) -> Result<Vec<ConversationSession>> {
         let category_path = Path::new(&self.base_path).join(category);
 
-        // 如果目录不存在，创建示例数据
         if !category_path.exists() {
-            tracing::warn!(
-                "数据集目录不存在: {:?}, 创建示例数据",
+            return Err(anyhow!(
+                "数据集目录不存在: {:?}。请先运行数据转换脚本生成分类数据。",
                 category_path
-            );
-            return Ok(self.create_sample_data(category));
+            ));
         }
 
         let mut sessions = Vec::new();
@@ -98,215 +114,170 @@ impl DatasetLoader {
             }
         }
 
-        // 如果没有找到数据，创建示例数据
         if sessions.is_empty() {
-            tracing::warn!(
-                "未找到数据集文件，使用示例数据: {:?}",
+            return Err(anyhow!(
+                "未找到数据集文件: {:?}。请确认已完成真实数据转换。",
                 category_path
-            );
-            return Ok(self.create_sample_data(category));
+            ));
         }
 
         Ok(sessions)
     }
 
-    /// 创建示例数据（用于测试）
-    fn create_sample_data(&self, category: &str) -> Vec<ConversationSession> {
-        match category {
-            "single_hop" => vec![
-                ConversationSession {
-                    session_id: "session_1".to_string(),
-                    timestamp: "2025-01-01T10:00:00Z".to_string(),
-                    messages: vec![
-                        Message {
-                            role: "user".to_string(),
-                            content: "I love pizza and Italian food.".to_string(),
-                        },
-                        Message {
-                            role: "assistant".to_string(),
-                            content: "That's great! Italian food is delicious.".to_string(),
-                        },
-                    ],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_001".to_string(),
-                        category: "single_hop".to_string(),
-                        question: "What do I love?".to_string(),
-                        expected_answer: "pizza and Italian food".to_string(),
-                        session_references: vec!["session_1".to_string()],
-                    }],
-                },
-                ConversationSession {
-                    session_id: "session_2".to_string(),
-                    timestamp: "2025-01-02T10:00:00Z".to_string(),
-                    messages: vec![
-                        Message {
-                            role: "user".to_string(),
-                            content: "My favorite programming language is Rust.".to_string(),
-                        },
-                        Message {
-                            role: "assistant".to_string(),
-                            content: "Rust is a great language for systems programming.".to_string(),
-                        },
-                    ],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_002".to_string(),
-                        category: "single_hop".to_string(),
-                        question: "What is my favorite programming language?".to_string(),
-                        expected_answer: "Rust".to_string(),
-                        session_references: vec!["session_2".to_string()],
-                    }],
-                },
-                ConversationSession {
-                    session_id: "session_3".to_string(),
-                    timestamp: "2025-01-03T10:00:00Z".to_string(),
-                    messages: vec![
-                        Message {
-                            role: "user".to_string(),
-                            content: "I live in San Francisco and work as a software engineer.".to_string(),
-                        },
-                    ],
-                    questions: vec![
-                        QuestionAnswer {
-                            question_id: "q_003".to_string(),
-                            category: "single_hop".to_string(),
-                            question: "Where do I live?".to_string(),
-                            expected_answer: "San Francisco".to_string(),
-                            session_references: vec!["session_3".to_string()],
-                        },
-                        QuestionAnswer {
-                            question_id: "q_004".to_string(),
-                            category: "single_hop".to_string(),
-                            question: "What is my profession?".to_string(),
-                            expected_answer: "software engineer".to_string(),
-                            session_references: vec!["session_3".to_string()],
-                        },
-                    ],
-                },
-            ],
-            "multi_hop" => vec![
-                ConversationSession {
-                    session_id: "session_1".to_string(),
-                    timestamp: "2025-01-01T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I work at Google.".to_string(),
-                    }],
-                    questions: vec![],
-                },
-                ConversationSession {
-                    session_id: "session_2".to_string(),
-                    timestamp: "2025-01-02T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I'm a software engineer.".to_string(),
-                    }],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_001".to_string(),
-                        category: "multi_hop".to_string(),
-                        question: "What is my job at Google?".to_string(),
-                        expected_answer: "software engineer".to_string(),
-                        session_references: vec!["session_1".to_string(), "session_2".to_string()],
-                    }],
-                },
-                ConversationSession {
-                    session_id: "session_3".to_string(),
-                    timestamp: "2025-01-03T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I'm learning machine learning.".to_string(),
-                    }],
-                    questions: vec![],
-                },
-                ConversationSession {
-                    session_id: "session_4".to_string(),
-                    timestamp: "2025-01-04T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "My team focuses on AI research.".to_string(),
-                    }],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_002".to_string(),
-                        category: "multi_hop".to_string(),
-                        question: "What does my team at Google focus on?".to_string(),
-                        expected_answer: "AI research".to_string(),
-                        session_references: vec!["session_1".to_string(), "session_4".to_string()],
-                    }],
-                },
-            ],
-            "temporal" => vec![
-                ConversationSession {
-                    session_id: "session_1".to_string(),
-                    timestamp: "2025-01-01T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I'm planning a trip to Japan.".to_string(),
-                    }],
-                    questions: vec![],
-                },
-                ConversationSession {
-                    session_id: "session_2".to_string(),
-                    timestamp: "2025-01-15T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I just returned from Japan.".to_string(),
-                    }],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_001".to_string(),
-                        category: "temporal".to_string(),
-                        question: "When did I return from Japan?".to_string(),
-                        expected_answer: "January 15, 2025".to_string(),
-                        session_references: vec!["session_2".to_string()],
-                    }],
-                },
-            ],
-            "open_domain" => vec![ConversationSession {
-                session_id: "session_1".to_string(),
-                timestamp: "2025-01-01T10:00:00Z".to_string(),
-                messages: vec![Message {
-                    role: "user".to_string(),
-                    content: "I'm reading a book about quantum physics.".to_string(),
-                }],
-                questions: vec![QuestionAnswer {
-                    question_id: "q_001".to_string(),
-                    category: "open_domain".to_string(),
-                    question: "What is quantum physics?".to_string(),
-                    expected_answer: "A branch of physics that studies matter and energy at the quantum level".to_string(),
-                    session_references: vec!["session_1".to_string()],
-                }],
-            }],
-            "adversarial" => vec![
-                ConversationSession {
-                    session_id: "session_1".to_string(),
-                    timestamp: "2025-01-01T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I love programming.".to_string(),
-                    }],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_001".to_string(),
-                        category: "adversarial".to_string(),
-                        question: "What is my favorite programming language that I never mentioned?".to_string(),
-                        expected_answer: "I cannot answer this question as it was never mentioned in our conversation.".to_string(),
-                        session_references: vec!["session_1".to_string()],
-                    }],
-                },
-                ConversationSession {
-                    session_id: "session_2".to_string(),
-                    timestamp: "2025-01-02T10:00:00Z".to_string(),
-                    messages: vec![Message {
-                        role: "user".to_string(),
-                        content: "I enjoy reading books about history.".to_string(),
-                    }],
-                    questions: vec![QuestionAnswer {
-                        question_id: "q_002".to_string(),
-                        category: "adversarial".to_string(),
-                        question: "What is my favorite historical period that I never mentioned?".to_string(),
-                        expected_answer: "I cannot answer this question as it was never mentioned in our conversation.".to_string(),
-                        session_references: vec!["session_2".to_string()],
-                    }],
-                },
-            ],
-            _ => vec![],
+    /// 从原始 LoCoMo JSON 中构建分类数据集
+    async fn load_from_raw(&self) -> Result<LocomoDatasets> {
+        let base = Path::new(&self.base_path);
+        let candidates = [
+            base.join("locomo10.json"),
+            base.join("msc_personas_all.json"),
+        ];
+
+        let raw_path = candidates
+            .iter()
+            .find(|p| p.exists())
+            .ok_or_else(|| anyhow!("未找到原始 LoCoMo 数据文件: {:?}", candidates))?;
+
+        let raw_content = fs::read_to_string(raw_path)
+            .with_context(|| format!("读取原始数据失败: {}", raw_path.display()))?;
+        let personas: Vec<Value> = serde_json::from_str(&raw_content)
+            .with_context(|| format!("解析原始数据失败: {}", raw_path.display()))?;
+
+        let mut buckets: HashMap<String, Vec<ConversationSession>> = HashMap::new();
+
+        for (p_idx, persona) in personas.iter().enumerate() {
+            let messages = self.extract_messages(persona)?;
+            let questions = self.extract_questions(persona)?;
+
+            for (q_idx, qa) in questions.into_iter().enumerate() {
+                // 每个问题生成一个会话，复用对话消息，便于测试覆盖
+                let session = ConversationSession {
+                    session_id: format!("persona{}_q{}", p_idx, q_idx),
+                    timestamp: "unknown".to_string(),
+                    messages: messages.clone(),
+                    questions: vec![qa.clone()],
+                };
+                buckets.entry(qa.category.clone()).or_default().push(session);
+            }
         }
+
+        Ok(LocomoDatasets {
+            single_hop: buckets.remove("single_hop").unwrap_or_default(),
+            multi_hop: buckets.remove("multi_hop").unwrap_or_default(),
+            temporal: buckets.remove("temporal").unwrap_or_default(),
+            open_domain: buckets.remove("open_domain").unwrap_or_default(),
+            adversarial: buckets.remove("adversarial").unwrap_or_default(),
+        })
+    }
+
+    /// 从原始 LoCoMo 结构中提取所有对话消息
+    fn extract_messages(&self, persona: &Value) -> Result<Vec<Message>> {
+        let mut messages = Vec::new();
+        if let Value::Object(map) = persona {
+            for (k, v) in map {
+                if let Some(stripped) = k.strip_prefix("session_") {
+                    // 跳过 summary/date_time 字段
+                    if stripped.ends_with("_summary") || stripped.ends_with("_date_time") {
+                        continue;
+                    }
+                    if let Value::Array(items) = v {
+                        for item in items {
+                            if let Value::Object(obj) = item {
+                                let speaker = obj
+                                    .get("speaker")
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("unknown")
+                                    .to_string();
+                                let content = obj
+                                    .get("text")
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                if !content.is_empty() {
+                                    messages.push(Message {
+                                        role: speaker,
+                                        content,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if messages.is_empty() {
+            return Err(anyhow!("原始数据缺少对话消息字段"));
+        }
+        Ok(messages)
+    }
+
+    /// 从原始 LoCoMo 结构中提取问题与答案，并映射到类别
+    fn extract_questions(&self, persona: &Value) -> Result<Vec<QuestionAnswer>> {
+        let mut questions = Vec::new();
+        if let Some(qa_list) = persona.get("qa").and_then(|v| v.as_array()) {
+            for (idx, qa) in qa_list.iter().enumerate() {
+                let question = qa
+                    .get("question")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let expected_answer = qa
+                    .get("answer")
+                    .or_else(|| qa.get("adversarial_answer"))
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let category_int = qa.get("category").and_then(|c| c.as_u64()).unwrap_or(0);
+                let category = Self::map_category(category_int);
+                let session_refs = Self::extract_session_refs(qa.get("evidence"));
+
+                questions.push(QuestionAnswer {
+                    question_id: format!("q_{}", idx),
+                    category,
+                    question,
+                    expected_answer,
+                    session_references: session_refs,
+                });
+            }
+        }
+
+        if questions.is_empty() {
+            return Err(anyhow!("原始数据缺少 qa 字段或内容为空"));
+        }
+        Ok(questions)
+    }
+
+    /// 将类别数字映射到内部类别名称
+    fn map_category(category: u64) -> String {
+        match category {
+            0 => "single_hop",
+            1 => "multi_hop",
+            2 => "temporal",
+            3 => "open_domain",
+            4 => "adversarial",
+            _ => "open_domain",
+        }
+        .to_string()
+    }
+
+    /// 从 evidence 中提取 session 引用，形如 "D3:12" -> "session_3"
+    fn extract_session_refs(evidence: Option<&Value>) -> Vec<String> {
+        let mut refs = Vec::new();
+        if let Some(Value::Array(items)) = evidence {
+            for item in items {
+                if let Some(ev_str) = item.as_str() {
+                    if let Some(stripped) = ev_str.strip_prefix('D') {
+                        let id_part: String = stripped.chars().take_while(|c| c.is_numeric()).collect();
+                        if !id_part.is_empty() {
+                            refs.push(format!("session_{}", id_part));
+                        }
+                    }
+                }
+            }
+        }
+        if refs.is_empty() {
+            refs.push("session_all".to_string());
+        }
+        refs
     }
 }
