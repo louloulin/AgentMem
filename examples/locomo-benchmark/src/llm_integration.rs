@@ -50,9 +50,9 @@ impl LlmClient {
     /// LLM-as-a-Judge评估
     pub async fn judge_answer(
         &self,
-        question: &str,
-        expected_answer: &str,
-        actual_answer: &str,
+        _question: &str,
+        _expected_answer: &str,
+        _actual_answer: &str,
     ) -> Result<f64> {
         // 简化实现：如果没有配置LLM，返回0.5（中等分数）
         if self.config.api_key.is_none() {

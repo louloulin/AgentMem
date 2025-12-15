@@ -1,7 +1,7 @@
 //! LOCOMO测试框架核心
 
 use crate::datasets::{DatasetLoader, ConversationSession};
-use crate::metrics::PerformanceMetrics;
+pub use crate::metrics::PerformanceMetrics;
 use crate::test_cases::{
     SingleHopTest, MultiHopTest, TemporalTest, OpenDomainTest, AdversarialTest,
 };
@@ -100,30 +100,19 @@ impl LocomoTestFramework {
     /// 创建新的测试框架
     pub fn new() -> Result<Self> {
         let config = TestConfig::default();
-        
-        // 创建Memory实例
-        let memory = tokio::runtime::Runtime::new()?
-            .block_on(async {
-                Memory::builder()
-                    .with_storage("memory://")
-                    .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
-                    .build()
-                    .await
-            })?;
-
         Self::with_config(config)
     }
 
     /// 使用自定义配置创建
     pub fn with_config(config: TestConfig) -> Result<Self> {
-        let memory = tokio::runtime::Runtime::new()?
-            .block_on(async {
-                Memory::builder()
-                    .with_storage("memory://")
-                    .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
-                    .build()
-                    .await
-            })?;
+        let rt = tokio::runtime::Runtime::new()?;
+        let memory = rt.block_on(async {
+            Memory::builder()
+                .with_storage("memory://")
+                .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+                .build()
+                .await
+        })?;
 
         Ok(Self {
             config,

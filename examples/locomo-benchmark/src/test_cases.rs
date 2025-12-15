@@ -4,7 +4,6 @@ use crate::datasets::{ConversationSession, QuestionAnswer};
 use crate::framework::{ErrorCase, PerformanceMetrics, TestResult};
 use crate::metrics::{AccuracyMetrics, MetricsCalculator};
 use agent_mem::Memory;
-use agent_mem::SearchOptions;
 use std::sync::Arc;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -26,7 +25,7 @@ impl SingleHopTest {
         Self { memory }
     }
 
-    async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
+    pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
         let mut passed = 0;
         let mut total = 0;
         let mut metrics_map = HashMap::new();
@@ -51,7 +50,7 @@ impl SingleHopTest {
                 let search_start = Instant::now();
                 let search_results = self
                     .memory
-                    .search(&qa.question, SearchOptions::default())
+                    .search(&qa.question)
                     .await?;
                 let search_latency = search_start.elapsed().as_millis() as f64;
 
@@ -159,7 +158,7 @@ impl MultiHopTest {
         Self { memory }
     }
 
-    async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
+    pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
         // 类似SingleHopTest，但需要跨会话检索
         let mut passed = 0;
         let mut total = 0;
@@ -188,7 +187,7 @@ impl MultiHopTest {
                     // 检索相关记忆（可能跨多个会话）
                     let search_results = self
                         .memory
-                        .search(&qa.question, SearchOptions::default())
+                        .search(&qa.question)
                         .await?;
 
                     // 综合多个记忆片段生成答案
@@ -270,7 +269,7 @@ impl TemporalTest {
         Self { memory }
     }
 
-    async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
+    pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
         // 类似实现，但需要处理时间信息
         // TODO: 实现时间推理逻辑
         SingleHopTest::new(self.memory.clone()).run(sessions).await
@@ -287,7 +286,7 @@ impl OpenDomainTest {
         Self { memory }
     }
 
-    async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
+    pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
         // 类似实现，但需要结合外部知识
         // TODO: 实现开放域知识融合
         SingleHopTest::new(self.memory.clone()).run(sessions).await
@@ -304,7 +303,7 @@ impl AdversarialTest {
         Self { memory }
     }
 
-    async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
+    pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
         // 测试对抗性问题识别
         let mut passed = 0;
         let mut total = 0;
@@ -321,7 +320,7 @@ impl AdversarialTest {
                 total += 1;
                 let search_results = self
                     .memory
-                    .search(&qa.question, SearchOptions::default())
+                    .search(&qa.question)
                     .await?;
 
                 // 对于对抗性问题，如果检索结果为空或相关性低，应该识别为无法回答
