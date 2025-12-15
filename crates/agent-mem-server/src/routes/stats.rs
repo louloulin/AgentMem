@@ -724,7 +724,7 @@ pub async fn get_memory_quality_stats(
 
     let high_quality_ratio = if total_memories > 0 {
         let mut rows2 = stmt2.query(params![total_memories]).await.map_err(|e| {
-            ServerError::Internal(format!("Failed to execute quality query: {}", e))
+            ServerError::internal_error(format!("Failed to execute quality query: {}", e))
         })?;
 
         if let Some(row) = rows2

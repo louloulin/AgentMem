@@ -27,7 +27,7 @@ pub fn setup_telemetry(config: &ServerConfig) -> ServerResult<()> {
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer().with_target(false))
         .try_init()
-        .map_err(|e| ServerError::TelemetryError(format!("Failed to setup tracing: {e}")))?;
+        .map_err(|e| ServerError::telemetry_error(format!("Failed to setup tracing: {e}")))?;
 
     tracing::info!("Telemetry initialized with log level: {}", config.log_level);
 

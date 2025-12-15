@@ -218,7 +218,7 @@ pub async fn register_plugin(
         .memory
         .register_plugin(plugin)
         .await
-        .map_err(|e| ServerError::ServerError(format!("Failed to register plugin: {}", e)))?;
+        .map_err(|e| ServerError::server_error(format!("Failed to register plugin: {}", e)))?;
 
     info!("Plugin {} registered successfully", request.id);
 
@@ -353,9 +353,7 @@ fn convert_capability_from_dto(dto: &CapabilityDto) -> Capability {
 pub async fn list_plugins(
     State(_memory_manager): State<Arc<MemoryManager>>,
 ) -> ServerResult<Json<Vec<PluginResponse>>> {
-    Err(ServerError::ServerError(
-        "Plugins feature is not enabled".to_string(),
-    ))
+    Err(ServerError::server_error("Plugins feature is not enabled"))
 }
 
 #[cfg(not(feature = "plugins"))]
@@ -363,9 +361,7 @@ pub async fn register_plugin(
     State(_memory_manager): State<Arc<MemoryManager>>,
     Json(_request): Json<RegisterPluginRequest>,
 ) -> ServerResult<(StatusCode, Json<PluginResponse>)> {
-    Err(ServerError::ServerError(
-        "Plugins feature is not enabled".to_string(),
-    ))
+    Err(ServerError::server_error("Plugins feature is not enabled"))
 }
 
 #[cfg(not(feature = "plugins"))]
@@ -373,7 +369,5 @@ pub async fn get_plugin(
     State(_memory_manager): State<Arc<MemoryManager>>,
     Path(_id): Path<String>,
 ) -> ServerResult<Json<PluginResponse>> {
-    Err(ServerError::ServerError(
-        "Plugins feature is not enabled".to_string(),
-    ))
+    Err(ServerError::server_error("Plugins feature is not enabled"))
 }

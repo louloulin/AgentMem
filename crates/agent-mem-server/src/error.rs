@@ -187,21 +187,13 @@ impl ServerError {
         }
     }
 
-    /// Create a quota exceeded error
-    pub fn quota_exceeded(msg: impl Into<String>) -> Self {
-        ServerError::QuotaExceeded {
-            message: msg.into(),
-            context: None,
-        }
-    }
-
     /// Create an internal error
     pub fn internal_error(msg: impl Into<String>) -> Self {
         ServerError::Internal {
             message: msg.into(),
             source: None,
             context: None,
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     }
 
@@ -211,7 +203,7 @@ impl ServerError {
             message: msg.into(),
             source: None,
             context: None,
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     }
 
@@ -221,7 +213,42 @@ impl ServerError {
             message: msg.into(),
             source: None,
             context: None,
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
+        }
+    }
+
+    /// Create a telemetry error
+    pub fn telemetry_error(msg: impl Into<String>) -> Self {
+        ServerError::TelemetryError {
+            message: msg.into(),
+            source: None,
+            context: None,
+        }
+    }
+
+    /// Create a config error
+    pub fn config_error(msg: impl Into<String>) -> Self {
+        ServerError::ConfigError {
+            message: msg.into(),
+            source: None,
+            context: None,
+        }
+    }
+
+    /// Create a bind error
+    pub fn bind_error(msg: impl Into<String>) -> Self {
+        ServerError::BindError {
+            message: msg.into(),
+            source: None,
+            context: None,
+        }
+    }
+
+    /// Create a validation error
+    pub fn validation_error(msg: impl Into<String>) -> Self {
+        ServerError::ValidationError {
+            message: msg.into(),
+            context: None,
         }
     }
 }
@@ -272,20 +299,20 @@ impl From<agent_mem_traits::AgentMemError> for ServerError {
             message: err.to_string(),
             source: Some(Box::new(err)),
             context: None,
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     }
 }
 
 impl From<serde_json::Error> for ServerError {
     fn from(err: serde_json::Error) -> Self {
-        ServerError::BadRequest(format!("JSON parsing error: {err}"))
+        ServerError::bad_request(format!("JSON parsing error: {err}"))
     }
 }
 
 impl From<validator::ValidationErrors> for ServerError {
     fn from(err: validator::ValidationErrors) -> Self {
-        ServerError::ValidationError(format!("Validation failed: {err}"))
+        ServerError::validation_error(format!("Validation failed: {err}"))
     }
 }
 

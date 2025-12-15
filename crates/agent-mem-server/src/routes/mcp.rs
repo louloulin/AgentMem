@@ -91,7 +91,7 @@ pub async fn list_tools(
     let response = mcp_server
         .list_tools()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to list tools: {}", e)))?;
 
     Ok(Json(ApiResponse::success(serde_json::json!({
         "tools": response.tools
@@ -191,7 +191,7 @@ pub async fn get_tool(
     let response = mcp_server
         .list_tools()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to list tools: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to list tools: {}", e)))?;
 
     let tool = response
         .tools

@@ -70,7 +70,7 @@ pub async fn get_metrics(
     let stats = memory_manager
         .get_stats()
         .await
-        .map_err(|e| crate::error::ServerError::MemoryError(e.to_string()))?;
+        .map_err(|e| crate::error::ServerError::memory_error(e.to_string()))?;
 
     let mut metrics = std::collections::HashMap::new();
 

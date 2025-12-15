@@ -174,7 +174,7 @@ pub async fn get_organization(
     let org = org_repo
         .find_by_id(&org_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
         .ok_or_else(|| ServerError::not_found("Organization not found"))?;
 
     let response = OrganizationResponse {
@@ -239,7 +239,7 @@ pub async fn update_organization(
     let mut org = org_repo
         .find_by_id(&org_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
         .ok_or_else(|| ServerError::not_found("Organization not found"))?;
 
     // Update fields
@@ -252,7 +252,7 @@ pub async fn update_organization(
     let updated_org = org_repo
         .update(&org)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to update organization: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to update organization: {e}")))?;
 
     let response = OrganizationResponse {
         id: updated_org.id,
@@ -361,7 +361,7 @@ pub async fn delete_organization(
     org_repo
         .delete(&org_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to delete organization: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to delete organization: {e}")))?;
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -119,7 +119,7 @@ pub async fn register_user(
         .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?;
 
     if exists {
-        return Err(ServerError::BadRequest(format!(
+        return Err(ServerError::bad_request(format!(
             "User with email {} already exists",
             request.email
         )));
@@ -434,7 +434,7 @@ pub async fn get_user_by_id(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user is admin
     if !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden("Admin role required".to_string()));
+        return Err(ServerError::forbidden("Admin role required"));
     }
 
     // Get user repository from repositories container
@@ -445,7 +445,7 @@ pub async fn get_user_by_id(
         .find_by_id(&user_id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound(format!("User with id {} not found", user_id)))?;
+        .ok_or_else(|| ServerError::not_found(format!("User with id {} not found", user_id)))?;
 
     let user = UserResponse {
         id: user_model.id,
@@ -484,7 +484,7 @@ pub async fn get_users_list(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user is admin
     if !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden("Admin role required".to_string()));
+        return Err(ServerError::forbidden("Admin role required"));
     }
 
     // Parse pagination parameters

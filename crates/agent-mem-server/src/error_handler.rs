@@ -30,7 +30,7 @@ impl<E: std::error::Error + Send + Sync + 'static> ErrorHandler for E {
             message: format!("{}: {}", context.into(), self),
             source: Some(Box::new(self)),
             context: Some(ErrorContext::new(context)),
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     }
 
@@ -43,7 +43,7 @@ impl<E: std::error::Error + Send + Sync + 'static> ErrorHandler for E {
             message: format!("{}: {}", context.into(), self),
             source: Some(Box::new(self)),
             context: Some(ErrorContext::new(context).with_details(details)),
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     }
 }
@@ -95,7 +95,7 @@ pub fn safe_expect<T>(
             message: msg,
             source: None,
             context: Some(ErrorContext::new(ctx)),
-            backtrace: Backtrace::capture(),
+            backtrace: Some(Backtrace::capture()),
         }
     })
 }

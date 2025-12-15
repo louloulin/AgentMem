@@ -56,7 +56,7 @@ impl MemoryServer {
         // Create repositories using factory
         let repositories = RepositoryFactory::create_repositories(&db_config)
             .await
-            .map_err(|e| ServerError::ServerError(format!("Failed to create repositories: {e}")))?;
+            .map_err(|e| ServerError::server_error(format!("Failed to create repositories: {e}")))?;
 
         info!("Database repositories initialized");
 
@@ -68,7 +68,7 @@ impl MemoryServer {
             )
             .await
             .map_err(|e| {
-                ServerError::ServerError(format!("Failed to create memory manager: {e}"))
+                ServerError::server_error(format!("Failed to create memory manager: {e}"))
             })?,
         );
         info!("Memory manager initialized (using agent-mem unified API)");
@@ -101,7 +101,7 @@ impl MemoryServer {
         let addr = SocketAddr::from(([0, 0, 0, 0], self.config.port));
         let listener = TcpListener::bind(addr)
             .await
-            .map_err(|e| ServerError::BindError(e.to_string()))?;
+            .map_err(|e| ServerError::bind_error(e.to_string()))?;
 
         info!("AgentMem server starting on {}", addr);
         info!("API documentation available at http://{}/swagger-ui/", addr);
@@ -154,7 +154,7 @@ impl MemoryServer {
         
         server
             .await
-            .map_err(|e| ServerError::ServerError(e.to_string()))?;
+            .map_err(|e| ServerError::server_error(e.to_string()))?;
 
         info!("✅ Server shutdown complete");
         Ok(())

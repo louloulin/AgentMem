@@ -236,7 +236,7 @@ pub async fn create_association(
             req.metadata.clone(),
         )
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
     let response = AssociationResponse {
         id: association_id,
@@ -282,7 +282,7 @@ pub async fn get_memory_associations(
     let associations = assoc_manager
         .get_associations(&memory_id, &auth_user.user_id)
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
     let response: Vec<AssociationResponse> = associations
         .into_iter()
@@ -326,7 +326,7 @@ pub async fn get_graph_stats(
     let stats = assoc_manager
         .get_stats(&auth_user.user_id)
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
     let response = serde_json::json!({
         "total_associations": stats.total_associations,

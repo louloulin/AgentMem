@@ -780,7 +780,7 @@ pub async fn get_memory(
 
     let memory = memory_manager.get_memory(&id).await.map_err(|e| {
         error!("Failed to get memory: {}", e);
-        ServerError::MemoryError(e.to_string())
+        ServerError::memory_error(e.to_string())
     })?;
 
     match memory {
@@ -853,7 +853,7 @@ pub async fn update_memory(
     // 执行更新
     repositories.memories.update(&updated).await.map_err(|e| {
         error!("Failed to update memory in repository: {}", e);
-        ServerError::MemoryError(e.to_string())
+        ServerError::memory_error(e.to_string())
     })?;
 
     info!("✅ Memory updated in LibSQL");
@@ -933,7 +933,7 @@ pub async fn delete_memory(
         }
         Err(e) => {
             error!("Failed to delete memory from LibSQL: {}", e);
-            Err(ServerError::MemoryError(format!(
+            Err(ServerError::memory_error(format!(
                 "Failed to delete memory: {}", e
             )))
         }
@@ -1353,11 +1353,11 @@ pub async fn search_memories(
         Ok(Ok(results)) => results,
         Ok(Err(e)) => {
             error!("Failed to search memories: {}", e);
-            return Err(ServerError::MemoryError(e.to_string()));
+            return Err(ServerError::memory_error(e.to_string()));
         }
         Err(_) => {
             error!("Search operation timed out after {} seconds", search_timeout_secs);
-            return Err(ServerError::Internal(format!(
+            return Err(ServerError::internal_error(format!(
                 "Search operation timed out after {} seconds",
                 search_timeout_secs
             )));
@@ -1960,7 +1960,7 @@ pub async fn get_memory_history(
         .get_memory(&id)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to get memory: {}", e)))?
-        .ok_or_else(|| ServerError::NotFound("Memory not found".to_string()))?;
+        .ok_or_else(|| ServerError::not_found("Memory not found"))?;
 
     // 构建历史记录（简化版，返回当前版本）
     let history = vec![serde_json::json!({
@@ -2263,12 +2263,12 @@ pub async fn batch_update_memories(
     let memory_ids = request
         .get("memory_ids")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| ServerError::BadRequest("Invalid request: missing 'memory_ids' array".to_string()))?;
+        .ok_or_else(|| ServerError::bad_request("Invalid request: missing 'memory_ids' array"))?;
     
     let updates = request
         .get("updates")
         .and_then(|v| v.as_object())
-        .ok_or_else(|| ServerError::BadRequest("Invalid request: missing 'updates' object".to_string()))?;
+        .ok_or_else(|| ServerError::bad_request("Invalid request: missing 'updates' object"))?;
     
     let importance = updates.get("importance").and_then(|v| v.as_f64()).map(|f| f as f32);
     let metadata = updates.get("metadata")
@@ -2292,7 +2292,7 @@ pub async fn batch_update_memories(
     for memory_id_value in memory_ids {
         let memory_id = memory_id_value
             .as_str()
-            .ok_or_else(|| ServerError::BadRequest("Invalid memory_id format".to_string()))?;
+            .ok_or_else(|| ServerError::bad_request("Invalid memory_id format"))?;
         
         // 获取现有记忆
         match repositories.memories.find_by_id(memory_id).await {
@@ -2530,7 +2530,7 @@ pub async fn import_memories(
     let memories_array = import_data
         .get("memories")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| ServerError::BadRequest("Invalid import data: missing 'memories' array".to_string()))?;
+        .ok_or_else(|| ServerError::bad_request("Invalid import data: missing 'memories' array"))?;
     
     let mut successful = 0;
     let mut failed = 0;
@@ -2544,14 +2544,14 @@ pub async fn import_memories(
         let agent_id = memory_json.get("agent_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .ok_or_else(|| ServerError::BadRequest(format!("Memory {}: missing agent_id", index)))?;
+            .ok_or_else(|| ServerError::bad_request(format!("Memory {}: missing agent_id", index)))?;
         let user_id = memory_json.get("user_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
         let content = memory_json.get("content")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .ok_or_else(|| ServerError::BadRequest(format!("Memory {}: missing content", index)))?;
+            .ok_or_else(|| ServerError::bad_request(format!("Memory {}: missing content", index)))?;
         let memory_type = memory_json.get("memory_type")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
@@ -2818,7 +2818,7 @@ pub async fn cleanup_memories_endpoint(
         }
         Err(e) => {
             warn!("⚠️ 记忆清理失败: {}", e);
-            Err(ServerError::Internal(format!("Memory cleanup failed: {}", e)))
+            Err(ServerError::internal_error(format!("Memory cleanup failed: {}", e)))
         }
     }
 }
