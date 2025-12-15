@@ -3,6 +3,8 @@ name = "locomo-benchmark"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+
 [dependencies]
 agent-mem = { path = "../../crates/agent-mem" }
 agent-mem-core = { path = "../../crates/agent-mem-core" }

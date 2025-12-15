@@ -111,7 +111,7 @@ impl LocomoTestFramework {
                     .await
             })?;
 
-        Ok(Self { config, memory })
+        Self::with_config(config)
     }
 
     /// 使用自定义配置创建
@@ -125,11 +125,15 @@ impl LocomoTestFramework {
                     .await
             })?;
 
-        Ok(Self { config, memory })
+        Ok(Self {
+            config,
+            memory: Arc::new(memory),
+        })
     }
 
     /// 运行所有测试
     pub async fn run_all_tests(&self) -> Result<OverallTestResults> {
+        use std::time::Instant;
         let start_time = Instant::now();
 
         println!("📋 加载测试数据集...");
