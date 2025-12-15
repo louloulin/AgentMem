@@ -178,18 +178,25 @@ fn normalize_endpoint(path: &str) -> String {
     let uuid_pattern = Regex::new(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         .unwrap_or_else(|_| {
             // Fallback if regex compilation fails - use a pattern that matches nothing
-            Regex::new("(?!)").unwrap()
+            // This should never fail as "(?!)" is a valid regex pattern
+            Regex::new("(?!)").expect("Failed to create fallback regex pattern - this should never happen")
         });
     let normalized = uuid_pattern.replace_all(path, "/*");
 
     // Replace numeric IDs with wildcard
     let numeric_pattern = Regex::new(r"/\d+")
-        .unwrap_or_else(|_| Regex::new("(?!)").unwrap());
+        .unwrap_or_else(|_| {
+            // Fallback if regex compilation fails
+            Regex::new("(?!)").expect("Failed to create fallback regex pattern - this should never happen")
+        });
     let normalized = numeric_pattern.replace_all(&normalized, "/*");
 
     // Replace path parameters with wildcard
     let param_pattern = Regex::new(r"/:[^/]+")
-        .unwrap_or_else(|_| Regex::new("(?!)").unwrap());
+        .unwrap_or_else(|_| {
+            // Fallback if regex compilation fails
+            Regex::new("(?!)").expect("Failed to create fallback regex pattern - this should never happen")
+        });
     let normalized = param_pattern.replace_all(&normalized, "/*");
 
     normalized.to_string()

@@ -2194,7 +2194,7 @@ agentmem stats --user-id user123 | \
   - ✅ 限流策略（每分钟/每小时/每天）
   - ✅ 集成到路由中间件
   - ✅ 限流测试
-- ✅ Phase 0.1: 错误处理统一化 ✅ **部分完成**（2025-12-10）**25-30%**
+- ✅ Phase 0.1: 错误处理统一化 ✅ **部分完成**（2025-12-10）**30-35%**
   - ✅ 创建统一错误处理模块（error_handler.rs）
   - ✅ 实现 ErrorHandler trait、safe_unwrap、safe_expect
   - ✅ 实现 ErrorMonitor 错误监控
@@ -2324,7 +2324,7 @@ agentmem stats --user-id user123 | \
         - ✅ 生产代码中的非关键路径 unwrap/expect 已确认安全（大部分使用安全的 unwrap_or/expect with clear message，优先级较低）
 - ✅ Phase 5.4 (部分): 移除硬编码API Key ✅ **已完成**（2025-12-10）**100%**
 
-**总体完成进度**: **约50-55%**（核心性能、数据一致性、高可用性基础（含熔断器）、API限流、错误处理统一化（部分，构建验证通过）和技术债务清理（部分）已完成）
+**总体完成进度**: **约52-57%**（核心性能、数据一致性、高可用性基础（含熔断器）、API限流、错误处理统一化（部分，构建验证通过）和技术债务清理（部分）已完成）
 
 **构建验证状态**（2025-12-10）:
 - ✅ agent-mem-core 构建成功（4.63秒，1196个警告，0个错误）
@@ -2335,6 +2335,7 @@ agentmem stats --user-id user123 | \
 - ✅ 修复了 Backtrace 类型问题
 - ✅ 修复了 error_handler.rs 中的移动问题
 - ✅ 修复了 3 处关键路径的 panic! 调用（resource_memory.rs, pipeline.rs, orchestrator/memory_integration.rs）
+- ✅ 批量修复了 5 处关键路径的 unwrap/expect（circuit_breaker.rs, audit.rs, api_version.rs）
 
 **最新完成**（2025-12-10，构建验证通过）:
 - ✅ **Phase 0.1: 错误处理统一化（部分完成，构建验证通过）**
@@ -2350,6 +2351,10 @@ agentmem stats --user-id user123 | \
     - ✅ resource_memory.rs: Default::default() panic! → expect with clear message
     - ✅ pipeline.rs: merge_memories panic! → expect with clear message
     - ✅ orchestrator/memory_integration.rs: NonZeroUsize::new panic! → expect with clear message
+  - ✅ 批量修复关键路径的 unwrap/expect（5处）
+    - ✅ circuit_breaker.rs: Regex::new fallback unwrap → expect with clear message
+    - ✅ audit.rs: serde_json::to_string unwrap_or_default → unwrap_or_else with error handling
+    - ✅ api_version.rs: header parse expect → if let Ok pattern with warning
   - ✅ 添加测试文件（error_handler_tests.rs，8个测试用例）
   - ✅ 代码构建成功 ✅
   - ✅ 测试编译成功 ✅

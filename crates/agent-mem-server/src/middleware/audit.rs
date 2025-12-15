@@ -80,7 +80,11 @@ impl AuditLogManager {
             .open(&log_file)
             .await?;
 
-        let json_line = serde_json::to_string(&log).unwrap_or_default();
+        let json_line = serde_json::to_string(&log)
+            .unwrap_or_else(|e| {
+                warn!("Failed to serialize audit log: {}", e);
+                format!(r#"{{"error":"serialization_failed","message":"{}"}}"#, e)
+            });
         file.write_all(format!("{}\n", json_line).as_bytes())
             .await?;
         file.flush().await?;
@@ -115,7 +119,11 @@ impl AuditLogManager {
             .open(&log_file)
             .await?;
 
-        let json_line = serde_json::to_string(&event).unwrap_or_default();
+        let json_line = serde_json::to_string(&event)
+            .unwrap_or_else(|e| {
+                warn!("Failed to serialize security event: {}", e);
+                format!(r#"{{"error":"serialization_failed","message":"{}"}}"#, e)
+            });
         file.write_all(format!("{}\n", json_line).as_bytes())
             .await?;
         file.flush().await?;
