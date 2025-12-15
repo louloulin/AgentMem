@@ -17,6 +17,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
+clap = { version = "4", features = ["derive"] }
 
 # 评估指标（简化实现，使用基础算法）
 regex = "1.0"

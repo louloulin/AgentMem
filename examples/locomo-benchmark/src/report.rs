@@ -19,7 +19,7 @@ impl ReportGenerator {
     pub async fn generate_report(&self, results: &OverallTestResults) -> Result<()> {
         // 生成Markdown报告
         let markdown_report = self.generate_markdown_report(results)?;
-        
+
         // 生成JSON报告
         let json_report = self.generate_json_report(results)?;
 
@@ -49,17 +49,17 @@ impl ReportGenerator {
 
         // 标题
         report.push_str("# AgentMem LOCOMO基准测试报告\n\n");
-        report.push_str(&format!("**测试日期**: {}\n", Utc::now().format("%Y-%m-%d %H:%M:%S")));
+        report.push_str(&format!(
+            "**测试日期**: {}\n",
+            Utc::now().format("%Y-%m-%d %H:%M:%S")
+        ));
         report.push_str(&format!("**测试版本**: AgentMem v0.x.x\n"));
         report.push_str(&format!("**总体得分**: {:.2}%\n\n", results.overall_score));
         report.push_str("---\n\n");
 
         // 执行摘要
         report.push_str("## 📊 执行摘要\n\n");
-        report.push_str(&format!(
-            "- **总体得分**: {:.2}%\n",
-            results.overall_score
-        ));
+        report.push_str(&format!("- **总体得分**: {:.2}%\n", results.overall_score));
         report.push_str(&format!(
             "- **测试耗时**: {:.2}秒\n",
             results.test_duration_secs
@@ -104,10 +104,22 @@ impl ReportGenerator {
         for (category, result) in &results.category_results {
             report.push_str(&format!("### {}\n\n", self.format_category_name(category)));
             report.push_str(&format!("- **得分**: {:.2}%\n", result.accuracy_score));
-            report.push_str(&format!("- **测试用例**: {}/{}\n", result.passed_tests, result.total_tests));
-            report.push_str(&format!("- **平均搜索延迟**: {:.2}ms\n", result.performance.avg_search_latency_ms));
-            report.push_str(&format!("- **平均生成延迟**: {:.2}ms\n", result.performance.avg_generation_latency_ms));
-            report.push_str(&format!("- **平均Token消耗**: {}\n\n", result.performance.avg_tokens));
+            report.push_str(&format!(
+                "- **测试用例**: {}/{}\n",
+                result.passed_tests, result.total_tests
+            ));
+            report.push_str(&format!(
+                "- **平均搜索延迟**: {:.2}ms\n",
+                result.performance.avg_search_latency_ms
+            ));
+            report.push_str(&format!(
+                "- **平均生成延迟**: {:.2}ms\n",
+                result.performance.avg_generation_latency_ms
+            ));
+            report.push_str(&format!(
+                "- **平均Token消耗**: {}\n\n",
+                result.performance.avg_tokens
+            ));
 
             // 错误案例
             if !result.error_cases.is_empty() {
@@ -158,17 +170,25 @@ impl ReportGenerator {
         report.push_str("| 平台 | Single-Hop | Multi-Hop | Open-Domain | Temporal | Overall |\n");
         report.push_str("|------|-----------|-----------|-------------|----------|---------|\n");
         report.push_str("| **AgentMem** | ");
-        
-        let single_hop = results.category_results.get("single_hop")
+
+        let single_hop = results
+            .category_results
+            .get("single_hop")
             .map(|r| r.accuracy_score)
             .unwrap_or(0.0);
-        let multi_hop = results.category_results.get("multi_hop")
+        let multi_hop = results
+            .category_results
+            .get("multi_hop")
             .map(|r| r.accuracy_score)
             .unwrap_or(0.0);
-        let open_domain = results.category_results.get("open_domain")
+        let open_domain = results
+            .category_results
+            .get("open_domain")
             .map(|r| r.accuracy_score)
             .unwrap_or(0.0);
-        let temporal = results.category_results.get("temporal")
+        let temporal = results
+            .category_results
+            .get("temporal")
             .map(|r| r.accuracy_score)
             .unwrap_or(0.0);
 

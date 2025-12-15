@@ -2,12 +2,18 @@
 
 use crate::datasets::{ConversationSession, QuestionAnswer};
 use crate::framework::{ErrorCase, PerformanceMetrics, TestResult};
+use crate::llm_integration::LlmClient;
 use crate::metrics::{AccuracyMetrics, MetricsCalculator};
 use agent_mem::Memory;
-use std::sync::Arc;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
+
+fn estimate_tokens_from_text(text: &str) -> usize {
+    // 粗略估计：4字符约等于1 token
+    (text.chars().count() / 4).max(1)
+}
 
 /// 测试用例trait
 #[async_trait::async_trait]
@@ -18,11 +24,12 @@ trait TestCase {
 /// Single-hop推理测试
 pub struct SingleHopTest {
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl SingleHopTest {
-    pub fn new(memory: Arc<Memory>) -> Self {
-        Self { memory }
+    pub fn new(memory: Arc<Memory>, llm_client: Option<Arc<LlmClient>>) -> Self {
+        Self { memory, llm_client }
     }
 
     pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
@@ -31,15 +38,16 @@ impl SingleHopTest {
         let mut metrics_map = HashMap::new();
         let mut error_cases = Vec::new();
         let mut latencies = Vec::new();
+        let mut search_latencies = Vec::new();
+        let mut generation_latencies = Vec::new();
         let mut total_tokens = 0;
 
         for session in sessions {
             // 存储对话记忆
             for message in &session.messages {
-                if message.role == "user" {
-                    if let Err(e) = self.memory.add(&message.content).await {
-                        tracing::warn!("添加记忆失败（继续测试）: {}", e);
-                    }
+                let formatted = format!("{}: {}", message.role, message.content);
+                if let Err(e) = self.memory.add(&formatted).await {
+                    tracing::warn!("添加记忆失败（继续测试）: {}", e);
                 }
             }
 
@@ -57,30 +65,67 @@ impl SingleHopTest {
                         Vec::new()
                     }
                 };
-                let _search_latency = search_start.elapsed().as_millis() as f64;
+                let search_latency = search_start.elapsed().as_millis() as f64;
+                search_latencies.push(search_latency);
 
-                // 生成答案（简化版：使用检索到的记忆）
-                let generation_start = Instant::now();
-                let actual_answer = if !search_results.is_empty() {
-                    // 使用第一个检索结果的摘要作为答案
+                // 生成答案：优先使用LLM，否则回退到检索结果拼接
+                let context_snippets: Vec<String> = if !search_results.is_empty() {
                     #[allow(deprecated)]
-                    search_results[0].content.clone()
+                    search_results
+                        .iter()
+                        .take(5)
+                        .map(|r| r.content.clone())
+                        .collect()
                 } else {
-                    // 如果没有检索结果，尝试从原始消息中提取答案
-                    if let Some(msg) = session.messages.iter().find(|m| m.role == "user") {
-                        msg.content.clone()
-                    } else {
-                        "I don't have enough information to answer this question.".to_string()
+                    session.messages.iter().map(|m| m.content.clone()).collect()
+                };
+
+                let generation_start = Instant::now();
+                let actual_answer = match &self.llm_client {
+                    Some(llm) => match llm.generate_answer(&qa.question, &context_snippets).await {
+                        Ok(ans) => ans,
+                        Err(e) => {
+                            tracing::warn!("LLM生成失败，使用回退答案: {}", e);
+                            if !context_snippets.is_empty() {
+                                context_snippets.join(" ")
+                            } else {
+                                "I don't have enough information to answer this question."
+                                    .to_string()
+                            }
+                        }
+                    },
+                    None => {
+                        if !context_snippets.is_empty() {
+                            context_snippets.join(" ")
+                        } else {
+                            "I don't have enough information to answer this question.".to_string()
+                        }
                     }
                 };
-                let _generation_latency = generation_start.elapsed().as_millis() as f64;
+                let generation_latency = generation_start.elapsed().as_millis() as f64;
+                generation_latencies.push(generation_latency);
 
                 let total_latency = start_time.elapsed().as_millis() as f64;
                 latencies.push(total_latency);
+                for snippet in &context_snippets {
+                    total_tokens += estimate_tokens_from_text(snippet);
+                }
+                total_tokens += estimate_tokens_from_text(&qa.question);
+                total_tokens += estimate_tokens_from_text(&actual_answer);
 
                 // 计算准确性指标
-                let accuracy_metrics =
-                    MetricsCalculator::calculate_accuracy_metrics(&qa.expected_answer, &actual_answer);
+                let mut accuracy_metrics = MetricsCalculator::calculate_accuracy_metrics(
+                    &qa.expected_answer,
+                    &actual_answer,
+                );
+                if let Some(llm) = &self.llm_client {
+                    if let Ok(score) = llm
+                        .judge_answer(&qa.question, &qa.expected_answer, &actual_answer)
+                        .await
+                    {
+                        accuracy_metrics.llm_judge_score = Some(score);
+                    }
+                }
                 let composite_score =
                     MetricsCalculator::calculate_composite_score(&accuracy_metrics);
 
@@ -98,15 +143,11 @@ impl SingleHopTest {
                 }
 
                 // 记录指标
-                metrics_map.insert(
-                    format!("f1_{}", qa.question_id),
-                    accuracy_metrics.f1_score,
-                );
+                metrics_map.insert(format!("f1_{}", qa.question_id), accuracy_metrics.f1_score);
                 metrics_map.insert(
                     format!("bleu1_{}", qa.question_id),
                     accuracy_metrics.bleu1_score,
                 );
-                total_tokens += 100; // 估算token消耗
             }
         }
 
@@ -130,7 +171,7 @@ impl SingleHopTest {
             accuracy_score,
             metrics: metrics_map,
             performance: {
-                let mut search_latencies: Vec<f64> = latencies.iter().map(|l| l * 0.3).collect();
+                let mut search_latencies: Vec<f64> = search_latencies.clone();
                 search_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let p95_search_idx = (search_latencies.len() as f64 * 0.95) as usize;
                 let p95_search = if !search_latencies.is_empty() {
@@ -147,8 +188,22 @@ impl SingleHopTest {
                 };
 
                 PerformanceMetrics {
-                    avg_search_latency_ms: avg_latency * 0.3,
-                    avg_generation_latency_ms: avg_latency * 0.7,
+                    avg_search_latency_ms: if !search_latencies.is_empty() {
+                        search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                    } else {
+                        0.0
+                    },
+                    avg_generation_latency_ms: if !generation_latencies.is_empty() {
+                        generation_latencies.iter().sum::<f64>() / generation_latencies.len() as f64
+                    } else {
+                        (avg_latency
+                            - if !search_latencies.is_empty() {
+                                search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                            } else {
+                                0.0
+                            })
+                        .max(0.0)
+                    },
                     p95_search_latency_ms: p95_search,
                     p95_total_latency_ms: p95_total,
                     avg_tokens: if total > 0 { total_tokens / total } else { 0 },
@@ -162,29 +217,30 @@ impl SingleHopTest {
 /// Multi-hop推理测试
 pub struct MultiHopTest {
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl MultiHopTest {
-    pub fn new(memory: Arc<Memory>) -> Self {
-        Self { memory }
+    pub fn new(memory: Arc<Memory>, llm_client: Option<Arc<LlmClient>>) -> Self {
+        Self { memory, llm_client }
     }
 
     pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
-        // 类似SingleHopTest，但需要跨会话检索
         let mut passed = 0;
         let mut total = 0;
         let mut metrics_map = HashMap::new();
         let mut error_cases = Vec::new();
         let mut latencies = Vec::new();
+        let mut search_latencies = Vec::new();
+        let mut generation_latencies = Vec::new();
         let mut total_tokens = 0;
 
-        // 存储所有会话的记忆
+        // 存储所有会话的记忆（多跳场景）
         for session in sessions {
             for message in &session.messages {
-                if message.role == "user" {
-                    if let Err(e) = self.memory.add(&message.content).await {
-                        tracing::warn!("添加记忆失败（继续测试）: {}", e);
-                    }
+                let formatted = format!("{}: {}", message.role, message.content);
+                if let Err(e) = self.memory.add(&formatted).await {
+                    tracing::warn!("添加记忆失败（继续测试）: {}", e);
                 }
             }
         }
@@ -192,68 +248,96 @@ impl MultiHopTest {
         // 测试需要跨会话的问题
         for session in sessions {
             for qa in &session.questions {
-                if qa.session_references.len() > 1 {
-                    // 多跳问题
-                    total += 1;
-                    let start_time = Instant::now();
+                // 多跳问题按类别划分，全部评估
+                total += 1;
+                let start_time = Instant::now();
 
-                    // 检索相关记忆（可能跨多个会话）
-                    let search_results = match self.memory.search(&qa.question).await {
-                        Ok(results) => results,
-                        Err(e) => {
-                            tracing::warn!("搜索失败: {}, 使用空结果", e);
-                            Vec::new()
-                        }
-                    };
-
-                    // 综合多个记忆片段生成答案
-                    let actual_answer = if !search_results.is_empty() {
-                        // 使用前3个检索结果的综合
-                        #[allow(deprecated)]
-                        search_results
-                            .iter()
-                            .take(3)
-                            .map(|r| r.content.as_str())
-                            .collect::<Vec<_>>()
-                            .join(". ")
-                    } else {
-                        // 回退到原始消息组合
-                        let combined: String = sessions
-                            .iter()
-                            .flat_map(|s| s.messages.iter())
-                            .filter(|m| m.role == "user")
-                            .map(|m| m.content.as_str())
-                            .collect::<Vec<_>>()
-                            .join(". ");
-                        if combined.is_empty() {
-                            "I don't have enough information to answer this question.".to_string()
-                        } else {
-                            combined
-                        }
-                    };
-
-                    let total_latency = start_time.elapsed().as_millis() as f64;
-                    latencies.push(total_latency);
-
-                    // 计算准确性
-                    let accuracy_metrics =
-                        MetricsCalculator::calculate_accuracy_metrics(&qa.expected_answer, &actual_answer);
-                    let composite_score =
-                        MetricsCalculator::calculate_composite_score(&accuracy_metrics);
-
-                    if composite_score >= 0.5 {
-                        passed += 1;
-                    } else {
-                        error_cases.push(ErrorCase {
-                            question_id: qa.question_id.clone(),
-                            question: qa.question.clone(),
-                            expected_answer: qa.expected_answer.clone(),
-                            actual_answer,
-                            error_reason: format!("Score too low: {:.2}", composite_score),
-                        });
+                let search_start = Instant::now();
+                let search_results = match self.memory.search(&qa.question).await {
+                    Ok(results) => results,
+                    Err(e) => {
+                        tracing::warn!("搜索失败: {}, 使用空结果", e);
+                        Vec::new()
                     }
+                };
+                let search_latency = search_start.elapsed().as_millis() as f64;
+                search_latencies.push(search_latency);
 
-                    total_tokens += 150; // 多跳问题需要更多token
+                let context_snippets: Vec<String> = if !search_results.is_empty() {
+                    #[allow(deprecated)]
+                    search_results
+                        .iter()
+                        .take(8)
+                        .map(|r| r.content.clone())
+                        .collect()
+                } else {
+                    sessions
+                        .iter()
+                        .flat_map(|s| s.messages.iter())
+                        .map(|m| m.content.clone())
+                        .collect()
+                };
+
+                // 综合多个记忆片段生成答案
+                let generation_start = Instant::now();
+                let actual_answer = match &self.llm_client {
+                    Some(llm) => match llm.generate_answer(&qa.question, &context_snippets).await {
+                        Ok(ans) => ans,
+                        Err(e) => {
+                            tracing::warn!("LLM生成失败（多跳），使用拼接答案: {}", e);
+                            if !context_snippets.is_empty() {
+                                context_snippets.join(". ")
+                            } else {
+                                "I don't have enough information to answer this question."
+                                    .to_string()
+                            }
+                        }
+                    },
+                    None => {
+                        if !context_snippets.is_empty() {
+                            context_snippets.join(". ")
+                        } else {
+                            "I don't have enough information to answer this question.".to_string()
+                        }
+                    }
+                };
+                let generation_latency = generation_start.elapsed().as_millis() as f64;
+                generation_latencies.push(generation_latency);
+
+                let total_latency = start_time.elapsed().as_millis() as f64;
+                latencies.push(total_latency);
+                for snippet in &context_snippets {
+                    total_tokens += estimate_tokens_from_text(snippet);
+                }
+                total_tokens += estimate_tokens_from_text(&qa.question);
+                total_tokens += estimate_tokens_from_text(&actual_answer);
+
+                // 计算准确性
+                let mut accuracy_metrics = MetricsCalculator::calculate_accuracy_metrics(
+                    &qa.expected_answer,
+                    &actual_answer,
+                );
+                if let Some(llm) = &self.llm_client {
+                    if let Ok(score) = llm
+                        .judge_answer(&qa.question, &qa.expected_answer, &actual_answer)
+                        .await
+                    {
+                        accuracy_metrics.llm_judge_score = Some(score);
+                    }
+                }
+                let composite_score =
+                    MetricsCalculator::calculate_composite_score(&accuracy_metrics);
+
+                if composite_score >= 0.5 {
+                    passed += 1;
+                } else {
+                    error_cases.push(ErrorCase {
+                        question_id: qa.question_id.clone(),
+                        question: qa.question.clone(),
+                        expected_answer: qa.expected_answer.clone(),
+                        actual_answer,
+                        error_reason: format!("Score too low: {:.2}", composite_score),
+                    });
                 }
             }
         }
@@ -277,10 +361,38 @@ impl MultiHopTest {
             accuracy_score,
             metrics: metrics_map,
             performance: PerformanceMetrics {
-                avg_search_latency_ms: avg_latency * 0.4,
-                avg_generation_latency_ms: avg_latency * 0.6,
-                p95_search_latency_ms: 0.0,
-                p95_total_latency_ms: 0.0,
+                avg_search_latency_ms: if !search_latencies.is_empty() {
+                    search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                } else {
+                    0.0
+                },
+                avg_generation_latency_ms: if !generation_latencies.is_empty() {
+                    generation_latencies.iter().sum::<f64>() / generation_latencies.len() as f64
+                } else {
+                    (avg_latency
+                        - if !search_latencies.is_empty() {
+                            search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                        } else {
+                            0.0
+                        })
+                    .max(0.0)
+                },
+                p95_search_latency_ms: if !search_latencies.is_empty() {
+                    let mut sorted = search_latencies.clone();
+                    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let idx = (sorted.len() as f64 * 0.95) as usize;
+                    sorted[idx.min(sorted.len() - 1)]
+                } else {
+                    0.0
+                },
+                p95_total_latency_ms: if !latencies.is_empty() {
+                    let mut sorted = latencies.clone();
+                    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let idx = (sorted.len() as f64 * 0.95) as usize;
+                    sorted[idx.min(sorted.len() - 1)]
+                } else {
+                    0.0
+                },
                 avg_tokens: if total > 0 { total_tokens / total } else { 0 },
             },
             error_cases,
@@ -291,64 +403,75 @@ impl MultiHopTest {
 /// Temporal推理测试
 pub struct TemporalTest {
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl TemporalTest {
-    pub fn new(memory: Arc<Memory>) -> Self {
-        Self { memory }
+    pub fn new(memory: Arc<Memory>, llm_client: Option<Arc<LlmClient>>) -> Self {
+        Self { memory, llm_client }
     }
 
     pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
-        // 类似实现，但需要处理时间信息
-        // TODO: 实现时间推理逻辑
-        SingleHopTest::new(self.memory.clone()).run(sessions).await
+        // 复用单跳逻辑，后续可加入时间衰减/时间戳排序
+        SingleHopTest::new(self.memory.clone(), self.llm_client.clone())
+            .run(sessions)
+            .await
     }
 }
 
 /// Open-domain知识测试
 pub struct OpenDomainTest {
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl OpenDomainTest {
-    pub fn new(memory: Arc<Memory>) -> Self {
-        Self { memory }
+    pub fn new(memory: Arc<Memory>, llm_client: Option<Arc<LlmClient>>) -> Self {
+        Self { memory, llm_client }
     }
 
     pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
-        // 类似实现，但需要结合外部知识
-        // TODO: 实现开放域知识融合
-        SingleHopTest::new(self.memory.clone()).run(sessions).await
+        // 复用单跳逻辑，后续可在此处融合外部知识库
+        SingleHopTest::new(self.memory.clone(), self.llm_client.clone())
+            .run(sessions)
+            .await
     }
 }
 
 /// Adversarial问题测试
 pub struct AdversarialTest {
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl AdversarialTest {
-    pub fn new(memory: Arc<Memory>) -> Self {
-        Self { memory }
+    pub fn new(memory: Arc<Memory>, llm_client: Option<Arc<LlmClient>>) -> Self {
+        Self { memory, llm_client }
     }
 
     pub async fn run(&self, sessions: &[ConversationSession]) -> Result<TestResult> {
-        // 测试对抗性问题识别
         let mut passed = 0;
         let mut total = 0;
+        let mut metrics_map = HashMap::new();
         let mut error_cases = Vec::new();
+        let mut latencies = Vec::new();
+        let mut search_latencies = Vec::new();
+        let mut generation_latencies = Vec::new();
+        let mut total_tokens = 0;
 
         for session in sessions {
             for message in &session.messages {
-                if message.role == "user" {
-                    if let Err(e) = self.memory.add(&message.content).await {
-                        tracing::warn!("添加记忆失败（继续测试）: {}", e);
-                    }
+                let formatted = format!("{}: {}", message.role, message.content);
+                if let Err(e) = self.memory.add(&formatted).await {
+                    tracing::warn!("添加记忆失败（继续测试）: {}", e);
                 }
             }
 
             for qa in &session.questions {
                 total += 1;
+                let start_time = Instant::now();
+
+                let search_start = Instant::now();
                 let search_results = match self.memory.search(&qa.question).await {
                     Ok(results) => results,
                     Err(e) => {
@@ -356,33 +479,80 @@ impl AdversarialTest {
                         Vec::new()
                     }
                 };
+                let search_latency = search_start.elapsed().as_millis() as f64;
+                search_latencies.push(search_latency);
 
-                // 对于对抗性问题，如果检索结果为空或相关性低，应该识别为无法回答
-                // 简化处理：如果检索结果为空，认为无法回答
-                let is_unanswerable = search_results.is_empty();
+                let context_snippets: Vec<String> = if !search_results.is_empty() {
+                    #[allow(deprecated)]
+                    search_results
+                        .iter()
+                        .take(5)
+                        .map(|r| r.content.clone())
+                        .collect()
+                } else {
+                    session.messages.iter().map(|m| m.content.clone()).collect()
+                };
 
-                // 检查期望答案是否表示无法回答
-                let expected_unanswerable = qa.expected_answer
-                    .to_lowercase()
-                    .contains("cannot")
-                    || qa.expected_answer.to_lowercase().contains("don't know")
-                    || qa.expected_answer.to_lowercase().contains("never mentioned");
+                let generation_start = Instant::now();
+                let actual_answer = match &self.llm_client {
+                    Some(llm) => match llm.generate_answer(&qa.question, &context_snippets).await {
+                        Ok(ans) => ans,
+                        Err(e) => {
+                            tracing::warn!("LLM生成失败（对抗），使用回退答案: {}", e);
+                            if !context_snippets.is_empty() {
+                                context_snippets.join(" ")
+                            } else {
+                                "No information available".to_string()
+                            }
+                        }
+                    },
+                    None => {
+                        if !context_snippets.is_empty() {
+                            context_snippets.join(" ")
+                        } else {
+                            "No information available".to_string()
+                        }
+                    }
+                };
+                let generation_latency = generation_start.elapsed().as_millis() as f64;
+                generation_latencies.push(generation_latency);
 
-                if is_unanswerable == expected_unanswerable {
+                let total_latency = start_time.elapsed().as_millis() as f64;
+                latencies.push(total_latency);
+                for snippet in &context_snippets {
+                    total_tokens += estimate_tokens_from_text(snippet);
+                }
+                total_tokens += estimate_tokens_from_text(&qa.question);
+                total_tokens += estimate_tokens_from_text(&actual_answer);
+
+                let mut accuracy_metrics = MetricsCalculator::calculate_accuracy_metrics(
+                    &qa.expected_answer,
+                    &actual_answer,
+                );
+                if let Some(llm) = &self.llm_client {
+                    if let Ok(score) = llm
+                        .judge_answer(&qa.question, &qa.expected_answer, &actual_answer)
+                        .await
+                    {
+                        accuracy_metrics.llm_judge_score = Some(score);
+                    }
+                }
+                let composite_score =
+                    MetricsCalculator::calculate_composite_score(&accuracy_metrics);
+
+                if composite_score >= 0.5 {
                     passed += 1;
                 } else {
                     error_cases.push(ErrorCase {
                         question_id: qa.question_id.clone(),
                         question: qa.question.clone(),
                         expected_answer: qa.expected_answer.clone(),
-                        actual_answer: if is_unanswerable {
-                            "Cannot answer".to_string()
-                        } else {
-                            "Can answer".to_string()
-                        },
-                        error_reason: "Failed to identify unanswerable question".to_string(),
+                        actual_answer: actual_answer.clone(),
+                        error_reason: format!("Score too low: {:.2}", composite_score),
                     });
                 }
+
+                metrics_map.insert(format!("f1_{}", qa.question_id), accuracy_metrics.f1_score);
             }
         }
 
@@ -397,8 +567,45 @@ impl AdversarialTest {
             total_tests: total,
             passed_tests: passed,
             accuracy_score,
-            metrics: HashMap::new(),
-            performance: PerformanceMetrics::default(),
+            metrics: metrics_map,
+            performance: PerformanceMetrics {
+                avg_search_latency_ms: if !search_latencies.is_empty() {
+                    search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                } else {
+                    0.0
+                },
+                avg_generation_latency_ms: if !generation_latencies.is_empty() {
+                    generation_latencies.iter().sum::<f64>() / generation_latencies.len() as f64
+                } else {
+                    (if !latencies.is_empty() {
+                        latencies.iter().sum::<f64>() / latencies.len() as f64
+                    } else {
+                        0.0
+                    } - if !search_latencies.is_empty() {
+                        search_latencies.iter().sum::<f64>() / search_latencies.len() as f64
+                    } else {
+                        0.0
+                    })
+                    .max(0.0)
+                },
+                p95_search_latency_ms: if !search_latencies.is_empty() {
+                    let mut sorted = search_latencies.clone();
+                    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let idx = (sorted.len() as f64 * 0.95) as usize;
+                    sorted[idx.min(sorted.len() - 1)]
+                } else {
+                    0.0
+                },
+                p95_total_latency_ms: if !latencies.is_empty() {
+                    let mut sorted = latencies.clone();
+                    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    let idx = (sorted.len() as f64 * 0.95) as usize;
+                    sorted[idx.min(sorted.len() - 1)]
+                } else {
+                    0.0
+                },
+                avg_tokens: if total > 0 { total_tokens / total } else { 0 },
+            },
             error_cases,
         })
     }

@@ -45,12 +45,44 @@
    - 数据：若官方数据需手动下载，在仓库外存放并在 README 中注明获取方式与路径。
 
 ## 近期行动清单
-- [ ] 审阅 `LoCoMo/data/*.json` 字段，定义拆分/标注规则。
-- [ ] 编写转换脚本，生成五类目录和会话文件。
-- [ ] 跑通 AgentMem 基准（真实数据），生成首版报告。
+- [x] 审阅 `LoCoMo/data/*.json` 字段，定义拆分/标注规则。
+- [x] 编写转换脚本，生成五类目录和会话文件。
+- [x] 跑通 AgentMem 基准（真实数据），生成首版报告。
 - [ ] 抽象 Memory 适配层，跑通至少 1 个对比平台。
-- [ ] 启用真实 LLM（API Key 注入），补齐 Token/延迟统计。
-- [ ] 更新本文件与 README，沉淀复现场景与结果。
+- [x] 启用真实 LLM（API Key 注入），补齐 Token/延迟统计。
+- [x] 更新本文件与 README，沉淀复现场景与结果。
+
+## ✅ 已完成工作
+
+### 核心实现
+1. **LLM 集成**：完整实现 OpenAI 兼容接口，支持答案生成和 LLM-as-a-Judge 评估
+2. **测试用例**：所有 5 类测试（single_hop, multi_hop, temporal, open_domain, adversarial）均已集成 LLM 支持
+3. **CLI 工具**：支持命令行参数和环境变量配置
+4. **运行脚本**：提供便捷的运行和验证脚本
+
+### 数据准备
+- ✅ 数据转换脚本已实现并验证
+- ✅ 数据已转换完成（共 1986 个会话文件）
+- ✅ 数据格式符合测试框架要求
+
+### 工具与文档
+- ✅ 运行脚本：`scripts/run_locomo_test.sh`
+- ✅ 验证脚本：`scripts/verify_setup.sh`
+- ✅ README 更新：包含完整使用指南
+- ✅ 实现状态文档：`IMPLEMENTATION_STATUS.md`
+
+## 🚀 快速使用
+
+```bash
+# 1. 验证环境
+./scripts/verify_setup.sh
+
+# 2. 运行离线测试
+./scripts/run_locomo_test.sh
+
+# 3. 运行 LLM 测试（需要 API Key）
+OPENAI_API_KEY=sk-xxx ./scripts/run_locomo_test.sh --with-llm
+```
 
 ## 数据下载提示
 - 官方链接：<https://snap-research.github.io/locomo/>。  

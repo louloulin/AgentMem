@@ -14,11 +14,41 @@ LOCOMO是评估AI系统长期对话记忆能力的标准基准测试，包括5�
 
 ## 🚀 快速开始
 
-### 运行测试
+### 方式一：使用运行脚本（推荐）
 
 ```bash
 cd examples/locomo-benchmark
-cargo run --release
+
+# 离线模式（无LLM，基于检索结果）
+./scripts/run_locomo_test.sh
+
+# 使用LLM模式（需要API Key）
+OPENAI_API_KEY=sk-xxxxx \
+LOCOMO_LLM_PROVIDER=openai \
+LOCOMO_LLM_MODEL=gpt-4o-mini \
+./scripts/run_locomo_test.sh --with-llm
+```
+
+### 方式二：直接运行
+
+```bash
+cd examples/locomo-benchmark
+
+# 离线模式
+cargo run --release -- --dataset-path data
+
+# 使用LLM（通过环境变量）
+OPENAI_API_KEY=sk-xxxxx \
+LOCOMO_LLM_PROVIDER=openai \
+LOCOMO_LLM_MODEL=gpt-4o-mini \
+cargo run --release -- --dataset-path data
+
+# 或通过CLI参数
+cargo run --release -- \
+  --dataset-path data \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini \
+  --llm-api-key sk-xxxxx
 ```
 
 ### 查看报告
@@ -49,9 +79,13 @@ let config = TestConfig {
         provider: "openai".to_string(),
         api_key: Some("your-api-key".to_string()),
         model: "gpt-4".to_string(),
+        base_url: None, // 可选：兼容自建OpenAI接口
     }),
 };
 ```
+
+- 如未提供 `api_key`，测试将自动退化为基于检索结果的本地答案拼接，便于离线验证。
+- 也可以使用 CLI/环境变量直接传入：`LOCOMO_LLM_PROVIDER`、`LOCOMO_LLM_MODEL`、`OPENAI_API_KEY`、`LOCOMO_LLM_BASE_URL`。
 
 ## 📝 数据集格式
 

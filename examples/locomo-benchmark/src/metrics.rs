@@ -50,10 +50,7 @@ pub struct MetricsCalculator;
 
 impl MetricsCalculator {
     /// 计算所有准确性指标
-    pub fn calculate_accuracy_metrics(
-        expected: &str,
-        actual: &str,
-    ) -> AccuracyMetrics {
+    pub fn calculate_accuracy_metrics(expected: &str, actual: &str) -> AccuracyMetrics {
         let f1_score = Self::calculate_f1_score(expected, actual);
         let bleu1_score = Self::calculate_bleu1(expected, actual);
         let rouge_l_score = Self::calculate_rouge_l(expected, actual);

@@ -1,11 +1,12 @@
 //! LOCOMO测试框架核心
 
-use crate::datasets::{DatasetLoader, ConversationSession};
+use crate::datasets::{ConversationSession, DatasetLoader};
+use crate::llm_integration::{LlmClient, LlmConfig};
 pub use crate::metrics::PerformanceMetrics;
 use crate::test_cases::{
-    SingleHopTest, MultiHopTest, TemporalTest, OpenDomainTest, AdversarialTest,
+    AdversarialTest, MultiHopTest, OpenDomainTest, SingleHopTest, TemporalTest,
 };
-use agent_mem::Memory;
+use agent_mem::{DeleteAllOptions, Memory};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,17 +21,6 @@ pub struct TestConfig {
     pub verbose: bool,
     /// LLM配置
     pub llm_config: Option<LlmConfig>,
-}
-
-/// LLM配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmConfig {
-    /// LLM provider (openai, anthropic, etc.)
-    pub provider: String,
-    /// API key
-    pub api_key: Option<String>,
-    /// Model name
-    pub model: String,
 }
 
 impl Default for TestConfig {
@@ -94,6 +84,7 @@ pub struct OverallTestResults {
 pub struct LocomoTestFramework {
     config: TestConfig,
     memory: Arc<Memory>,
+    llm_client: Option<Arc<LlmClient>>,
 }
 
 impl LocomoTestFramework {
@@ -110,10 +101,15 @@ impl LocomoTestFramework {
             .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
             .build()
             .await?;
+        let llm_client = config
+            .llm_config
+            .clone()
+            .map(|cfg| Arc::new(LlmClient::new(cfg)));
 
         Ok(Self {
             config,
             memory: Arc::new(memory),
+            llm_client,
         })
     }
 
@@ -127,10 +123,15 @@ impl LocomoTestFramework {
                 .build()
                 .await
         })?;
+        let llm_client = config
+            .llm_config
+            .clone()
+            .map(|cfg| Arc::new(LlmClient::new(cfg)));
 
         Ok(Self {
             config,
             memory: Arc::new(memory),
+            llm_client,
         })
     }
 
@@ -147,26 +148,31 @@ impl LocomoTestFramework {
 
         // 1. Single-hop推理测试
         println!("\n🔍 运行Single-hop推理测试...");
+        self.reset_memory().await;
         let single_hop_result = self.run_single_hop_test(&datasets.single_hop).await?;
         category_results.insert("single_hop".to_string(), single_hop_result);
 
         // 2. Multi-hop推理测试
         println!("\n🔗 运行Multi-hop推理测试...");
+        self.reset_memory().await;
         let multi_hop_result = self.run_multi_hop_test(&datasets.multi_hop).await?;
         category_results.insert("multi_hop".to_string(), multi_hop_result);
 
         // 3. Temporal推理测试
         println!("\n⏰ 运行Temporal推理测试...");
+        self.reset_memory().await;
         let temporal_result = self.run_temporal_test(&datasets.temporal).await?;
         category_results.insert("temporal".to_string(), temporal_result);
 
         // 4. Open-domain知识测试
         println!("\n🌐 运行Open-domain知识测试...");
+        self.reset_memory().await;
         let open_domain_result = self.run_open_domain_test(&datasets.open_domain).await?;
         category_results.insert("open_domain".to_string(), open_domain_result);
 
         // 5. Adversarial问题测试
         println!("\n🛡️ 运行Adversarial问题测试...");
+        self.reset_memory().await;
         let adversarial_result = self.run_adversarial_test(&datasets.adversarial).await?;
         category_results.insert("adversarial".to_string(), adversarial_result);
 
@@ -184,47 +190,32 @@ impl LocomoTestFramework {
     }
 
     /// 运行Single-hop测试
-    async fn run_single_hop_test(
-        &self,
-        test_data: &[ConversationSession],
-    ) -> Result<TestResult> {
-        let test = SingleHopTest::new(Arc::clone(&self.memory));
+    async fn run_single_hop_test(&self, test_data: &[ConversationSession]) -> Result<TestResult> {
+        let test = SingleHopTest::new(Arc::clone(&self.memory), self.llm_client.clone());
         test.run(test_data).await
     }
 
     /// 运行Multi-hop测试
-    async fn run_multi_hop_test(
-        &self,
-        test_data: &[ConversationSession],
-    ) -> Result<TestResult> {
-        let test = MultiHopTest::new(Arc::clone(&self.memory));
+    async fn run_multi_hop_test(&self, test_data: &[ConversationSession]) -> Result<TestResult> {
+        let test = MultiHopTest::new(Arc::clone(&self.memory), self.llm_client.clone());
         test.run(test_data).await
     }
 
     /// 运行Temporal测试
-    async fn run_temporal_test(
-        &self,
-        test_data: &[ConversationSession],
-    ) -> Result<TestResult> {
-        let test = TemporalTest::new(Arc::clone(&self.memory));
+    async fn run_temporal_test(&self, test_data: &[ConversationSession]) -> Result<TestResult> {
+        let test = TemporalTest::new(Arc::clone(&self.memory), self.llm_client.clone());
         test.run(test_data).await
     }
 
     /// 运行Open-domain测试
-    async fn run_open_domain_test(
-        &self,
-        test_data: &[ConversationSession],
-    ) -> Result<TestResult> {
-        let test = OpenDomainTest::new(Arc::clone(&self.memory));
+    async fn run_open_domain_test(&self, test_data: &[ConversationSession]) -> Result<TestResult> {
+        let test = OpenDomainTest::new(Arc::clone(&self.memory), self.llm_client.clone());
         test.run(test_data).await
     }
 
     /// 运行Adversarial测试
-    async fn run_adversarial_test(
-        &self,
-        test_data: &[ConversationSession],
-    ) -> Result<TestResult> {
-        let test = AdversarialTest::new(Arc::clone(&self.memory));
+    async fn run_adversarial_test(&self, test_data: &[ConversationSession]) -> Result<TestResult> {
+        let test = AdversarialTest::new(Arc::clone(&self.memory), self.llm_client.clone());
         test.run(test_data).await
     }
 
@@ -293,6 +284,13 @@ impl LocomoTestFramework {
             p95_search_latency_ms: p95_search,
             p95_total_latency_ms: p95_total,
             avg_tokens: if count > 0 { total_tokens / count } else { 0 },
+        }
+    }
+
+    /// 每个类别开始前清空记忆，避免跨类别污染
+    async fn reset_memory(&self) {
+        if let Err(e) = self.memory.delete_all(DeleteAllOptions::default()).await {
+            tracing::warn!("清空记忆失败（继续执行）: {}", e);
         }
     }
 }
