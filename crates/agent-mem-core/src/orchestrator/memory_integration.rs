@@ -148,11 +148,10 @@ impl MemoryIntegrator {
         let cache_size = NonZeroUsize::new(100).unwrap_or_else(|| {
             // Fallback to minimum valid value if somehow 100 fails (should never happen)
             tracing::warn!("Failed to create NonZeroUsize(100), using 1 as fallback");
-            NonZeroUsize::new(1).unwrap_or_else(|| {
-                // If even 1 fails (theoretically impossible), panic with a clear message
-                tracing::error!("Failed to create NonZeroUsize(1), this should never happen");
-                panic!("NonZeroUsize::new(1) failed, this is a critical error")
-            })
+            NonZeroUsize::new(1).expect(
+                "NonZeroUsize::new(1) failed, this is a critical error. \
+                This should never happen as 1 is always a valid NonZeroUsize value."
+            )
         });
         Self {
             memory_engine,

@@ -1009,7 +1009,10 @@ impl MemoryCompressionStage {
     /// Merge multiple memories into one
     fn merge_memories(&self, memories: &[&Memory]) -> Memory {
         if memories.is_empty() {
-            panic!("Cannot merge empty memory list");
+            panic!(
+                "Cannot merge empty memory list. At least one memory is required for merging. \
+                This is a programming error - callers should ensure the list is non-empty before calling merge_memories."
+            );
         }
 
         // Select base memory according to strategy

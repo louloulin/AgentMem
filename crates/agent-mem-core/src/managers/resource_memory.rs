@@ -659,9 +659,9 @@ impl Default for ResourceMemoryManager {
     fn default() -> Self {
         // Default implementation should not fail under normal circumstances
         // If it does, it indicates a configuration issue
-        Self::new().unwrap_or_else(|e| {
-            panic!("Failed to create default ResourceMemoryManager: {}. This indicates a configuration issue with the default storage path.", e)
-        })
+        Self::new().expect(
+            "Failed to create default ResourceMemoryManager. This indicates a configuration issue with the default storage path. Please check your storage configuration."
+        )
     }
 }
 
