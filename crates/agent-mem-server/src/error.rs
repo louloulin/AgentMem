@@ -149,56 +149,73 @@ pub type ServerResult<T> = Result<T, ServerError>;
 impl ServerError {
     /// Create a not found error
     pub fn not_found(msg: impl Into<String>) -> Self {
-        ServerError::NotFound(msg.into())
+        ServerError::NotFound {
+            message: msg.into(),
+            context: None,
+        }
     }
 
     /// Create a bad request error
     pub fn bad_request(msg: impl Into<String>) -> Self {
-        ServerError::BadRequest(msg.into())
+        ServerError::BadRequest {
+            message: msg.into(),
+            context: None,
+        }
     }
 
     /// Create an unauthorized error
     pub fn unauthorized(msg: impl Into<String>) -> Self {
-        ServerError::Unauthorized(msg.into())
+        ServerError::Unauthorized {
+            message: msg.into(),
+            context: None,
+        }
     }
 
     /// Create a forbidden error
     pub fn forbidden(msg: impl Into<String>) -> Self {
-        ServerError::Forbidden(msg.into())
+        ServerError::Forbidden {
+            message: msg.into(),
+            context: None,
+        }
     }
 
     /// Create an internal error
     pub fn internal_error(msg: impl Into<String>) -> Self {
-        ServerError::Internal(msg.into())
+        ServerError::Internal {
+            message: msg.into(),
+            source: None,
+            context: None,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
-            ServerError::MemoryError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "MEMORY_ERROR", msg)
+            ServerError::MemoryError { message, .. } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "MEMORY_ERROR", message)
             }
-            ServerError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg),
-            ServerError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg),
-            ServerError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg),
-            ServerError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg),
-            ServerError::QuotaExceeded(msg) => {
-                (StatusCode::TOO_MANY_REQUESTS, "QUOTA_EXCEEDED", msg)
+            ServerError::NotFound { message, .. } => (StatusCode::NOT_FOUND, "NOT_FOUND", message),
+            ServerError::BadRequest { message, .. } => (StatusCode::BAD_REQUEST, "BAD_REQUEST", message),
+            ServerError::Unauthorized { message, .. } => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", message),
+            ServerError::Forbidden { message, .. } => (StatusCode::FORBIDDEN, "FORBIDDEN", message),
+            ServerError::QuotaExceeded { message, .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "QUOTA_EXCEEDED", message)
             }
-            ServerError::ValidationError(msg) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg),
-            ServerError::BindError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "BIND_ERROR", msg),
-            ServerError::ServerError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "SERVER_ERROR", msg)
+            ServerError::ValidationError { message, .. } => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", message),
+            ServerError::BindError { message, .. } => (StatusCode::INTERNAL_SERVER_ERROR, "BIND_ERROR", message),
+            ServerError::ServerError { message, .. } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "SERVER_ERROR", message)
             }
-            ServerError::ConfigError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "CONFIG_ERROR", msg)
+            ServerError::ConfigError { message, .. } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "CONFIG_ERROR", message)
             }
-            ServerError::TelemetryError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "TELEMETRY_ERROR", msg)
+            ServerError::TelemetryError { message, .. } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "TELEMETRY_ERROR", message)
             }
-            ServerError::Internal(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", msg)
+            ServerError::Internal { message, .. } => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", message)
             }
         };
 
@@ -215,7 +232,12 @@ impl IntoResponse for ServerError {
 
 impl From<agent_mem_traits::AgentMemError> for ServerError {
     fn from(err: agent_mem_traits::AgentMemError) -> Self {
-        ServerError::MemoryError(err.to_string())
+        ServerError::MemoryError {
+            message: err.to_string(),
+            source: Some(Box::new(err)),
+            context: None,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 

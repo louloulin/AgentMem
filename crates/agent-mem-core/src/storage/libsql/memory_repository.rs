@@ -663,16 +663,36 @@ impl LibSqlMemoryRepository {
         let all_memories = self.search(search_query, limit * 10).await?;
         
         // 在内存中应用元数据过滤
-        // 注意：这里简化实现，实际应该使用MetadataFilterSystem评估过滤条件
+        // ✅ 使用 MetadataFilterSystem::matches 方法实现完整的元数据过滤评估逻辑
+        use std::collections::HashMap;
+        
         let filtered: Vec<Memory> = all_memories
             .into_iter()
             .filter(|memory| {
-                // 从memory的attributes中提取metadata并应用过滤
-                // 这里简化实现：检查memory是否符合过滤条件
-                // 实际应该使用MetadataFilterSystem::evaluate方法
-                // 但为了保持简单，暂时返回true（所有结果都通过）
-                // TODO: 实现完整的元数据过滤评估逻辑
-                true
+                // 从memory的metadata和attributes中提取过滤用的metadata
+                // MemoryV4 有 metadata (系统元数据) 和 attributes (用户属性)
+                let mut filter_metadata: HashMap<String, serde_json::Value> = HashMap::new();
+                
+                // 添加系统metadata
+                if let Ok(metadata_json) = serde_json::to_value(&memory.metadata) {
+                    if let Some(metadata_obj) = metadata_json.as_object() {
+                        for (k, v) in metadata_obj {
+                            filter_metadata.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+                
+                // 添加用户attributes（如果存在）
+                if let Ok(attrs_json) = serde_json::to_value(&memory.attributes) {
+                    if let Some(attrs_obj) = attrs_json.as_object() {
+                        for (k, v) in attrs_obj {
+                            filter_metadata.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+
+                // 使用 MetadataFilterSystem::matches 评估过滤条件
+                MetadataFilterSystem::matches(filters, &filter_metadata)
             })
             .take(limit as usize)
             .collect();

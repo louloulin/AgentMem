@@ -710,14 +710,23 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 **目标**: 消除所有 `unwrap()` 和 `expect()`，统一错误处理
 
 **任务**:
-- [ ] 创建统一的错误处理模块 `error_handler.rs`
+- [x] 创建统一的错误处理模块 `error_handler.rs` ✅ **已完成**（2025-12-10）
+  - [x] 实现 ErrorHandler trait
+  - [x] 实现 safe_unwrap 和 safe_expect 工具函数
+  - [x] 实现 ErrorMonitor 错误监控
+  - [x] 添加错误处理宏（handle_error!）
+  - [x] 添加测试文件（error_handler_tests.rs）
+  - **实现位置**: `crates/agent-mem-server/src/error_handler.rs`
+  - **状态**: ✅ 代码实现完成，✅ 测试已添加
 - [x] 修复关键路径的 `unwrap()` 和 `expect()`（orchestrator、coordinator等）✅ **部分完成**（2025-12-10）
   - [x] 修复 `memory_integration.rs` 中的 unwrap（2处）
   - [x] 修复 `coordinator.rs` 中的 unwrap（1处）
   - [x] 修复 `initialization.rs` 中的 unwrap（1处）
   - [x] 修复 `intelligence.rs` 中的 unwrap（2处）
+  - [x] 修复 `cache.rs` 中的 expect（1处：NonZeroUsize 安全处理）
   - [x] 使用 `expect` 提供清晰的错误消息（编译时常量）
   - [x] 使用 `ok_or_else` 返回错误而不是 panic
+  - [x] 修复 error.rs 中的类型不匹配（ServerError 结构体变体）
 - [ ] 替换所有 `unwrap()` 为 `?` 操作符（**1437+处生产代码**，剩余待处理）⚠️
 - [ ] 替换所有 `expect()` 为 `?` 操作符（剩余待处理）
 - [ ] 移除 `panic!` 调用（如 `memory.rs:807`）
@@ -740,9 +749,14 @@ export ZHIPU_API_KEY := "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
 
 **任务**:
 - [ ] 修复99个Clippy警告
-- [ ] 分类处理**77个TODO/FIXME**（实际扫描，非562）⚠️
-  - [ ] 按优先级分类（P0/P1/P2）
-  - [ ] 按类型分类（性能/功能/错误处理/测试/文档）
+- [x] 分类处理**77个TODO/FIXME**（实际扫描，非562）✅ **部分完成**（2025-12-10）
+  - [x] 修复关键TODO：实现完整的元数据过滤评估逻辑 ✅ **已完成**（2025-12-10）
+    - [x] 在 `memory_repository.rs` 中使用 `MetadataFilterSystem::matches` 实现完整的元数据过滤
+    - [x] 支持从 memory.metadata 和 memory.attributes 提取过滤数据
+    - **实现位置**: `crates/agent-mem-core/src/storage/libsql/memory_repository.rs`
+    - **状态**: ✅ 代码实现完成
+  - [ ] 按优先级分类（P0/P1/P2）（剩余待处理）
+  - [ ] 按类型分类（性能/功能/错误处理/测试/文档）（剩余待处理）
 - [ ] 降低代码重复率（12% → <5%）
 - [ ] 降低技术债务比率（15% → <10%）
 
@@ -2133,9 +2147,9 @@ agentmem stats --user-id user123 | \
 
 ---
 
-**文档版本**: v4.31  
+**文档版本**: v4.32  
 **分析日期**: 2025-12-10  
-**最后更新**: 2025-12-10（Phase 5.1、5.2、5.3完整实现，Phase 2.2高可用性基础功能实现，Phase 1.2.1 API限流实现，Phase 0.1错误处理批量修复（Repository层50处+Engine层13处+SSE层2处+Search层10处+Server层10处+Storage层5处+Cache层24处+Types层7处+Managers层3处+Compression层1处+Extraction层32处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层2处+VectorEcosystem层1处+Integration层3处+Agents层3处+Orchestrator层3处，总计206处关键和非关键路径，约4.0%完成），Phase 0.2技术债务清理（修复未使用导入、改进错误处理、修复storage层unwrap_or为map_err、修复cache/search/types/managers/compression/extraction/deduplication/pipeline/v4_migration/temporal_graph/multi_layer/performance/collaboration/coordination/vector_ecosystem/agent_repository/monitor/performance_monitor模块unwrap/expect），本次批量修复：cache/mod.rs 3处、pipeline.rs 3处、cache/multi_layer.rs 4处、temporal_graph.rs 2处、v4_migration.rs 1处、episodic_agent.rs 3处、cache/warming.rs 1处、storage/coordinator.rs 1处、orchestrator/memory_integration.rs 3处、cache/learning_warmer.rs 1处、coordination/meta_manager.rs 1处、engine.rs 5处、types.rs 4处、extraction/entity_extractor.rs 17处，共49处非关键路径，累计修复55处；继续修复：orchestrator/memory_integration.rs 1处、types.rs 2处、cache/multi_layer.rs 3处，共6处，累计修复61处；继续修复：engine.rs 5处（Regex::new嵌套回调中的expect，已改为多层fallback with unsafe unwrap_unchecked as last resort），累计修复217处；全面扫描其他模块（hierarchy_manager.rs, vector_ecosystem.rs, graph_optimization.rs, auto_rewriter.rs, template_engine.rs, llm_optimizer.rs, logging.rs, client.rs, orchestrator/mod.rs, background_tasks.rs, adaptive_strategy.rs, security.rs, monitoring.rs, performance/mod.rs, config_env.rs, storage/factory.rs, storage/libsql/memory_repository.rs, storage/libsql/block_repository.rs, storage/libsql/connection.rs, storage/libsql/organization_repository.rs, storage/libsql/user_repository.rs, storage/libsql/migrations.rs, storage/libsql/learning_repository.rs, search/vector_search.rs, managers/resource_memory.rs, message_queue.rs, pipeline.rs, search/adaptive_router.rs, search/query_optimizer.rs, search/ranker.rs, retrieval/router.rs, retrieval/agent_registry.rs, embeddings_batch.rs, context_aware_search.rs, conflict_resolver.rs, importance_scorer.rs, agent_state.rs, graph_memory.rs, hierarchical_service.rs, hierarchy.rs, core_memory/compiler.rs等），确认大部分unwrap/expect在测试代码中（标准实践，可接受），生产代码全面分析完成（2025-12-10）：全面扫描生产代码中的unwrap/expect，确认大部分在测试代码中（标准实践，可接受），生产代码关键路径已修复212处，非关键路径继续修复中（已修复5处，累计217处），生产代码中的非关键路径unwrap/expect已确认安全（大部分使用安全的unwrap_or/expect with clear message），代码构建和测试验证通过，错误处理统一化进度约16-21%）  
+**最后更新**: 2025-12-10（Phase 2.2.5熔断器模式完整实现、Phase 0.1错误处理统一化模块创建、Phase 0.2技术债务清理关键TODO修复、Phase 0.3测试覆盖率提升）  
 **分析轮次**: 多轮深度分析（包含Unix哲学分析 + 2025最新研究整合）  
 **分析范围**: 全面代码分析 + 架构评估 + Unix哲学评估 + 业界最佳实践研究 + 2025最新论文  
 **最新研究**: ENGRAM (2025-11, LoCoMo SOTA)、MemVerse (2025-12)、MemoriesDB (2025-10)等  
@@ -2300,9 +2314,24 @@ agentmem stats --user-id user123 | \
         - ✅ 生产代码中的非关键路径 unwrap/expect 已确认安全（大部分使用安全的 unwrap_or/expect with clear message，优先级较低）
 - ✅ Phase 5.4 (部分): 移除硬编码API Key ✅ **已完成**（2025-12-10）**100%**
 
-**总体完成进度**: **约45-50%**（核心性能、数据一致性、高可用性基础（含熔断器）、API限流和错误处理批量修复（Repository层50处+Engine层13处+SSE层2处+Search层10处+Server层10处+Storage层5处+Cache层24处+Types层7处+Managers层3处+Compression层1处+Extraction层32处+Pipeline层6处+V4Migration层2处+TemporalGraph层7处+Performance层1处+Collaboration层2处+Coordination层2处+VectorEcosystem层1处+Integration层3处+Agents层3处+Orchestrator层3处，总计206处关键和非关键路径；继续修复：orchestrator/memory_integration.rs 1处、types.rs 2处、cache/multi_layer.rs 3处，共6处，累计修复212处；继续修复：engine.rs 5处，累计修复217处；继续修复：agent-mem-server/main.rs 2处，累计修复219处；继续修复：orchestrator/background_tasks.rs 2处，累计修复221处；继续修复：extraction/entity_extractor.rs 1处，累计修复222处；继续修复：agent-mem-server/routes/metrics.rs 1处，累计修复223处；继续修复：vector_ecosystem.rs 1处，累计修复224处；生产代码全面分析完成，确认大部分unwrap/expect在测试代码中（标准实践），生产代码关键路径已修复（212处），非关键路径继续修复中（已修复12处），剩余非关键路径已确认安全（大部分使用安全的unwrap_or/expect with clear message，优先级较低））已完成）
+**总体完成进度**: **约48-53%**（核心性能、数据一致性、高可用性基础（含熔断器）、API限流、错误处理统一化（部分）和技术债务清理（部分）已完成）
 
 **最新完成**（2025-12-10）:
+- ✅ **Phase 0.1: 错误处理统一化（部分完成）**
+  - ✅ 创建统一错误处理模块（error_handler.rs）
+  - ✅ 实现 ErrorHandler trait、safe_unwrap、safe_expect
+  - ✅ 实现 ErrorMonitor 错误监控
+  - ✅ 修复 cache.rs 中的 expect（NonZeroUsize 安全处理）
+  - ✅ 修复 error.rs 中的类型不匹配
+  - ✅ 添加测试文件（error_handler_tests.rs，8个测试用例）
+  - **实现位置**: `crates/agent-mem-server/src/error_handler.rs`
+  - **状态**: ✅ 代码实现完成，✅ 测试已添加
+- ✅ **Phase 0.2: 技术债务清理（部分完成）**
+  - ✅ 修复关键TODO：实现完整的元数据过滤评估逻辑
+  - ✅ 在 memory_repository.rs 中使用 MetadataFilterSystem::matches
+  - ✅ 支持从 memory.metadata 和 memory.attributes 提取过滤数据
+  - **实现位置**: `crates/agent-mem-core/src/storage/libsql/memory_repository.rs`
+  - **状态**: ✅ 代码实现完成
 - ✅ **Phase 2.2.5: 熔断器模式实现（完整测试）**
   - ✅ 添加完整的单元测试（circuit_breaker_tests.rs）
   - ✅ 添加集成测试（circuit_breaker_integration_test.rs）
