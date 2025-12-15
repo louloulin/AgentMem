@@ -170,7 +170,8 @@ impl MetricsCalculator {
                 if a[i - 1] == b[j - 1] {
                     dp[i][j] = dp[i - 1][j - 1] + 1;
                 } else {
-                    dp[i][j] = dp[i - 1][j].max(dp[j - 1][i]);
+                    // 修正下标：应该比较左侧和上侧的子问题
+                    dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
                 }
             }
         }
