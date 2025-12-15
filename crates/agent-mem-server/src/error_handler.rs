@@ -26,10 +26,11 @@ pub trait ErrorHandler {
 
 impl<E: std::error::Error + Send + Sync + 'static> ErrorHandler for E {
     fn to_server_error(self, context: impl Into<String>) -> ServerError {
+        let context_str = context.into();
         ServerError::Internal {
-            message: format!("{}: {}", context.into(), self),
+            message: format!("{}: {}", context_str.clone(), self),
             source: Some(Box::new(self)),
-            context: Some(ErrorContext::new(context)),
+            context: Some(ErrorContext::new(context_str)),
             backtrace: Some(Backtrace::capture()),
         }
     }
@@ -39,10 +40,12 @@ impl<E: std::error::Error + Send + Sync + 'static> ErrorHandler for E {
         context: impl Into<String>,
         details: impl Into<String>,
     ) -> ServerError {
+        let context_str = context.into();
+        let details_str = details.into();
         ServerError::Internal {
-            message: format!("{}: {}", context.into(), self),
+            message: format!("{}: {}", context_str.clone(), self),
             source: Some(Box::new(self)),
-            context: Some(ErrorContext::new(context).with_details(details)),
+            context: Some(ErrorContext::new(context_str).with_details(details_str)),
             backtrace: Some(Backtrace::capture()),
         }
     }

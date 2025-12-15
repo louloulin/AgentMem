@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_error_conversion() {
-        let error = ServerError::NotFound("Test not found".to_string());
+        let error = ServerError::not_found("Test not found");
         let response = error.into_response();
 
         // We can't easily test the exact response content here,
@@ -336,6 +336,9 @@ mod tests {
         let memory_error = agent_mem_traits::AgentMemError::memory_error("test");
         let server_error: ServerError = memory_error.into();
 
-        assert!(matches!(server_error, ServerError::MemoryError(_)));
+        match server_error {
+            ServerError::MemoryError { .. } => {}
+            _ => panic!("Expected MemoryError"),
+        }
     }
 }

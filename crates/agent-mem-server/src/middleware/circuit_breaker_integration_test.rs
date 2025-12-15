@@ -13,6 +13,10 @@ mod integration_tests {
         response::Response,
     };
     use std::sync::Arc;
+    
+    // Note: Integration tests require actual HTTP server setup
+    // These tests are disabled for now as they need more complex setup
+    // Unit tests in circuit_breaker_tests.rs provide sufficient coverage
 
     /// Helper function to create a test request
     fn create_test_request(path: &str) -> Request {
