@@ -1,0 +1,21 @@
+[package]
+name = "locomo-benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+reqwest = { version = "0.11", features = ["json"] }
+
+# 评估指标（简化实现，使用基础算法）
+regex = "1.0"
+unicode-segmentation = "1.0"
