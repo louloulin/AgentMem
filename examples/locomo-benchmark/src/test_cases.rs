@@ -119,12 +119,30 @@ impl SingleHopTest {
             passed_tests: passed,
             accuracy_score,
             metrics: metrics_map,
-            performance: PerformanceMetrics {
-                avg_search_latency_ms: avg_latency * 0.3, // 估算搜索时间占比
-                avg_generation_latency_ms: avg_latency * 0.7, // 估算生成时间占比
-                p95_search_latency_ms: 0.0, // TODO
-                p95_total_latency_ms: 0.0, // TODO
-                avg_tokens: if total > 0 { total_tokens / total } else { 0 },
+            performance: {
+                let mut search_latencies: Vec<f64> = latencies.iter().map(|l| l * 0.3).collect();
+                search_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let p95_search_idx = (search_latencies.len() as f64 * 0.95) as usize;
+                let p95_search = if !search_latencies.is_empty() {
+                    search_latencies[p95_search_idx.min(search_latencies.len() - 1)]
+                } else {
+                    0.0
+                };
+
+                let p95_total_idx = (latencies.len() as f64 * 0.95) as usize;
+                let p95_total = if !latencies.is_empty() {
+                    latencies[p95_total_idx.min(latencies.len() - 1)]
+                } else {
+                    0.0
+                };
+
+                PerformanceMetrics {
+                    avg_search_latency_ms: avg_latency * 0.3,
+                    avg_generation_latency_ms: avg_latency * 0.7,
+                    p95_search_latency_ms: p95_search,
+                    p95_total_latency_ms: p95_total,
+                    avg_tokens: if total > 0 { total_tokens / total } else { 0 },
+                }
             },
             error_cases,
         })
@@ -307,9 +325,8 @@ impl AdversarialTest {
                     .await?;
 
                 // 对于对抗性问题，如果检索结果为空或相关性低，应该识别为无法回答
-                let is_unanswerable = search_results.is_empty()
-                    || (search_results.len() > 0
-                        && search_results[0].score.unwrap_or(0.0) < 0.5);
+                // 简化处理：如果检索结果为空，认为无法回答
+                let is_unanswerable = search_results.is_empty();
 
                 // 检查期望答案是否表示无法回答
                 let expected_unanswerable = qa.expected_answer

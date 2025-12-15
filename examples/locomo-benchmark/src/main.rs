@@ -7,6 +7,7 @@ mod datasets;
 mod metrics;
 mod test_cases;
 mod report;
+mod llm_integration;
 
 use anyhow::Result;
 use tracing_subscriber;

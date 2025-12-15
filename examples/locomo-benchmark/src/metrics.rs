@@ -70,14 +70,10 @@ impl MetricsCalculator {
 
     /// 计算F1 Score
     fn calculate_f1_score(expected: &str, actual: &str) -> f64 {
-        let expected_words: Vec<&str> = expected
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
-        let actual_words: Vec<&str> = actual
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
+        let expected_lower = expected.to_lowercase();
+        let actual_lower = actual.to_lowercase();
+        let expected_words: Vec<&str> = expected_lower.split_whitespace().collect();
+        let actual_words: Vec<&str> = actual_lower.split_whitespace().collect();
 
         if expected_words.is_empty() || actual_words.is_empty() {
             return 0.0;
@@ -111,14 +107,10 @@ impl MetricsCalculator {
 
     /// 计算BLEU-1 Score
     fn calculate_bleu1(expected: &str, actual: &str) -> f64 {
-        let expected_words: Vec<&str> = expected
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
-        let actual_words: Vec<&str> = actual
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
+        let expected_lower = expected.to_lowercase();
+        let actual_lower = actual.to_lowercase();
+        let expected_words: Vec<&str> = expected_lower.split_whitespace().collect();
+        let actual_words: Vec<&str> = actual_lower.split_whitespace().collect();
 
         if expected_words.is_empty() || actual_words.is_empty() {
             return 0.0;
@@ -145,14 +137,10 @@ impl MetricsCalculator {
 
     /// 计算ROUGE-L Score (简化版，基于最长公共子序列)
     fn calculate_rouge_l(expected: &str, actual: &str) -> f64 {
-        let expected_words: Vec<&str> = expected
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
-        let actual_words: Vec<&str> = actual
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
+        let expected_lower = expected.to_lowercase();
+        let actual_lower = actual.to_lowercase();
+        let expected_words: Vec<&str> = expected_lower.split_whitespace().collect();
+        let actual_words: Vec<&str> = actual_lower.split_whitespace().collect();
 
         if expected_words.is_empty() || actual_words.is_empty() {
             return 0.0;
@@ -192,14 +180,10 @@ impl MetricsCalculator {
 
     /// 计算Cosine Similarity (简化版，基于词频)
     fn calculate_cosine_similarity(expected: &str, actual: &str) -> f64 {
-        let expected_words: Vec<&str> = expected
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
-        let actual_words: Vec<&str> = actual
-            .to_lowercase()
-            .split_whitespace()
-            .collect();
+        let expected_lower = expected.to_lowercase();
+        let actual_lower = actual.to_lowercase();
+        let expected_words: Vec<&str> = expected_lower.split_whitespace().collect();
+        let actual_words: Vec<&str> = actual_lower.split_whitespace().collect();
 
         if expected_words.is_empty() || actual_words.is_empty() {
             return 0.0;

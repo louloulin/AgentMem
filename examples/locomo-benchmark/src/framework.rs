@@ -239,24 +239,42 @@ impl LocomoTestFramework {
         &self,
         results: &HashMap<String, TestResult>,
     ) -> PerformanceMetrics {
-        let mut total_latency = 0.0;
+        let mut all_search_latencies = Vec::new();
+        let mut all_total_latencies = Vec::new();
         let mut total_tokens = 0;
         let mut count = 0;
 
         for result in results.values() {
-            total_latency += result.performance.avg_search_latency_ms
-                + result.performance.avg_generation_latency_ms;
+            all_search_latencies.push(result.performance.avg_search_latency_ms);
+            all_total_latencies.push(
+                result.performance.avg_search_latency_ms
+                    + result.performance.avg_generation_latency_ms,
+            );
             total_tokens += result.performance.avg_tokens;
             count += 1;
         }
 
+        // 计算P95延迟
+        all_search_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        all_total_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let p95_search = if !all_search_latencies.is_empty() {
+            let index = (all_search_latencies.len() as f64 * 0.95) as usize;
+            all_search_latencies[index.min(all_search_latencies.len() - 1)]
+        } else {
+            0.0
+        };
+
+        let p95_total = if !all_total_latencies.is_empty() {
+            let index = (all_total_latencies.len() as f64 * 0.95) as usize;
+            all_total_latencies[index.min(all_total_latencies.len() - 1)]
+        } else {
+            0.0
+        };
+
         PerformanceMetrics {
             avg_search_latency_ms: if count > 0 {
-                results
-                    .values()
-                    .map(|r| r.performance.avg_search_latency_ms)
-                    .sum::<f64>()
-                    / count as f64
+                all_search_latencies.iter().sum::<f64>() / count as f64
             } else {
                 0.0
             },
@@ -269,8 +287,8 @@ impl LocomoTestFramework {
             } else {
                 0.0
             },
-            p95_search_latency_ms: 0.0, // TODO: 计算P95
-            p95_total_latency_ms: 0.0,  // TODO: 计算P95
+            p95_search_latency_ms: p95_search,
+            p95_total_latency_ms: p95_total,
             avg_tokens: if count > 0 { total_tokens / count } else { 0 },
         }
     }
