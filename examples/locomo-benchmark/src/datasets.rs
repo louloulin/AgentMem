@@ -113,27 +113,76 @@ impl DatasetLoader {
     /// 创建示例数据（用于测试）
     fn create_sample_data(&self, category: &str) -> Vec<ConversationSession> {
         match category {
-            "single_hop" => vec![ConversationSession {
-                session_id: "session_1".to_string(),
-                timestamp: "2025-01-01T10:00:00Z".to_string(),
-                messages: vec![
-                    Message {
-                        role: "user".to_string(),
-                        content: "I love pizza and Italian food.".to_string(),
-                    },
-                    Message {
-                        role: "assistant".to_string(),
-                        content: "That's great! Italian food is delicious.".to_string(),
-                    },
-                ],
-                questions: vec![QuestionAnswer {
-                    question_id: "q_001".to_string(),
-                    category: "single_hop".to_string(),
-                    question: "What do I love?".to_string(),
-                    expected_answer: "pizza and Italian food".to_string(),
-                    session_references: vec!["session_1".to_string()],
-                }],
-            }],
+            "single_hop" => vec![
+                ConversationSession {
+                    session_id: "session_1".to_string(),
+                    timestamp: "2025-01-01T10:00:00Z".to_string(),
+                    messages: vec![
+                        Message {
+                            role: "user".to_string(),
+                            content: "I love pizza and Italian food.".to_string(),
+                        },
+                        Message {
+                            role: "assistant".to_string(),
+                            content: "That's great! Italian food is delicious.".to_string(),
+                        },
+                    ],
+                    questions: vec![QuestionAnswer {
+                        question_id: "q_001".to_string(),
+                        category: "single_hop".to_string(),
+                        question: "What do I love?".to_string(),
+                        expected_answer: "pizza and Italian food".to_string(),
+                        session_references: vec!["session_1".to_string()],
+                    }],
+                },
+                ConversationSession {
+                    session_id: "session_2".to_string(),
+                    timestamp: "2025-01-02T10:00:00Z".to_string(),
+                    messages: vec![
+                        Message {
+                            role: "user".to_string(),
+                            content: "My favorite programming language is Rust.".to_string(),
+                        },
+                        Message {
+                            role: "assistant".to_string(),
+                            content: "Rust is a great language for systems programming.".to_string(),
+                        },
+                    ],
+                    questions: vec![QuestionAnswer {
+                        question_id: "q_002".to_string(),
+                        category: "single_hop".to_string(),
+                        question: "What is my favorite programming language?".to_string(),
+                        expected_answer: "Rust".to_string(),
+                        session_references: vec!["session_2".to_string()],
+                    }],
+                },
+                ConversationSession {
+                    session_id: "session_3".to_string(),
+                    timestamp: "2025-01-03T10:00:00Z".to_string(),
+                    messages: vec![
+                        Message {
+                            role: "user".to_string(),
+                            content: "I live in San Francisco and work as a software engineer.".to_string(),
+                        },
+                    ],
+                    questions: vec![
+                        QuestionAnswer {
+                            question_id: "q_003".to_string(),
+                            category: "single_hop".to_string(),
+                            question: "Where do I live?".to_string(),
+                            expected_answer: "San Francisco".to_string(),
+                            session_references: vec!["session_3".to_string()],
+                        },
+                        QuestionAnswer {
+                            question_id: "q_004".to_string(),
+                            category: "single_hop".to_string(),
+                            question: "What is my profession?".to_string(),
+                            expected_answer: "software engineer".to_string(),
+                            session_references: vec!["session_3".to_string()],
+                        },
+                    ],
+                },
+            ],
             "multi_hop" => vec![
                 ConversationSession {
                     session_id: "session_1".to_string(),
@@ -157,6 +206,30 @@ impl DatasetLoader {
                         question: "What is my job at Google?".to_string(),
                         expected_answer: "software engineer".to_string(),
                         session_references: vec!["session_1".to_string(), "session_2".to_string()],
+                    }],
+                },
+                ConversationSession {
+                    session_id: "session_3".to_string(),
+                    timestamp: "2025-01-03T10:00:00Z".to_string(),
+                    messages: vec![Message {
+                        role: "user".to_string(),
+                        content: "I'm learning machine learning.".to_string(),
+                    }],
+                    questions: vec![],
+                },
+                ConversationSession {
+                    session_id: "session_4".to_string(),
+                    timestamp: "2025-01-04T10:00:00Z".to_string(),
+                    messages: vec![Message {
+                        role: "user".to_string(),
+                        content: "My team focuses on AI research.".to_string(),
+                    }],
+                    questions: vec![QuestionAnswer {
+                        question_id: "q_002".to_string(),
+                        category: "multi_hop".to_string(),
+                        question: "What does my team at Google focus on?".to_string(),
+                        expected_answer: "AI research".to_string(),
+                        session_references: vec!["session_1".to_string(), "session_4".to_string()],
                     }],
                 },
             ],
@@ -201,21 +274,38 @@ impl DatasetLoader {
                     session_references: vec!["session_1".to_string()],
                 }],
             }],
-            "adversarial" => vec![ConversationSession {
-                session_id: "session_1".to_string(),
-                timestamp: "2025-01-01T10:00:00Z".to_string(),
-                messages: vec![Message {
-                    role: "user".to_string(),
-                    content: "I love programming.".to_string(),
-                }],
-                questions: vec![QuestionAnswer {
-                    question_id: "q_001".to_string(),
-                    category: "adversarial".to_string(),
-                    question: "What is my favorite programming language that I never mentioned?".to_string(),
-                    expected_answer: "I cannot answer this question as it was never mentioned in our conversation.".to_string(),
-                    session_references: vec!["session_1".to_string()],
-                }],
-            }],
+            "adversarial" => vec![
+                ConversationSession {
+                    session_id: "session_1".to_string(),
+                    timestamp: "2025-01-01T10:00:00Z".to_string(),
+                    messages: vec![Message {
+                        role: "user".to_string(),
+                        content: "I love programming.".to_string(),
+                    }],
+                    questions: vec![QuestionAnswer {
+                        question_id: "q_001".to_string(),
+                        category: "adversarial".to_string(),
+                        question: "What is my favorite programming language that I never mentioned?".to_string(),
+                        expected_answer: "I cannot answer this question as it was never mentioned in our conversation.".to_string(),
+                        session_references: vec!["session_1".to_string()],
+                    }],
+                },
+                ConversationSession {
+                    session_id: "session_2".to_string(),
+                    timestamp: "2025-01-02T10:00:00Z".to_string(),
+                    messages: vec![Message {
+                        role: "user".to_string(),
+                        content: "I enjoy reading books about history.".to_string(),
+                    }],
+                    questions: vec![QuestionAnswer {
+                        question_id: "q_002".to_string(),
+                        category: "adversarial".to_string(),
+                        question: "What is my favorite historical period that I never mentioned?".to_string(),
+                        expected_answer: "I cannot answer this question as it was never mentioned in our conversation.".to_string(),
+                        session_references: vec!["session_2".to_string()],
+                    }],
+                },
+            ],
             _ => vec![],
         }
     }

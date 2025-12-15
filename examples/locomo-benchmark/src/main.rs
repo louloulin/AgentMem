@@ -12,7 +12,7 @@ mod llm_integration;
 use anyhow::Result;
 use tracing_subscriber;
 
-use framework::LocomoTestFramework;
+use framework::{LocomoTestFramework, TestConfig};
 use report::ReportGenerator;
 
 #[tokio::main]
@@ -25,8 +25,8 @@ async fn main() -> Result<()> {
     println!("🚀 AgentMem LOCOMO基准测试");
     println!("================================");
 
-    // 创建测试框架
-    let framework = LocomoTestFramework::new()?;
+    // 创建测试框架（使用异步版本）
+    let framework = LocomoTestFramework::with_config_async(TestConfig::default()).await?;
 
     // 运行所有测试
     println!("\n📊 开始运行LOCOMO测试...\n");

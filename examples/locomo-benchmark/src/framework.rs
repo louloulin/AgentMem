@@ -97,13 +97,27 @@ pub struct LocomoTestFramework {
 }
 
 impl LocomoTestFramework {
-    /// 创建新的测试框架
-    pub fn new() -> Result<Self> {
+    /// 创建新的测试框架（异步版本）
+    pub async fn new() -> Result<Self> {
         let config = TestConfig::default();
-        Self::with_config(config)
+        Self::with_config_async(config).await
     }
 
-    /// 使用自定义配置创建
+    /// 使用自定义配置创建（异步版本）
+    pub async fn with_config_async(config: TestConfig) -> Result<Self> {
+        let memory = Memory::builder()
+            .with_storage("memory://")
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .build()
+            .await?;
+
+        Ok(Self {
+            config,
+            memory: Arc::new(memory),
+        })
+    }
+
+    /// 使用自定义配置创建（同步版本，用于非tokio环境）
     pub fn with_config(config: TestConfig) -> Result<Self> {
         let rt = tokio::runtime::Runtime::new()?;
         let memory = rt.block_on(async {
