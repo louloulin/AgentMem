@@ -3,6 +3,7 @@
 pub mod api_version; // ✅ Task 1.5: API版本兼容性中间件
 pub mod audit;
 pub mod auth;
+pub mod circuit_breaker; // ✅ Phase 2.2.5: 熔断器模式
 pub mod metrics;
 pub mod quota;
 pub mod rbac;
@@ -15,6 +16,7 @@ pub use auth::{
     jwt_auth_middleware, optional_auth_middleware, require_admin, require_role,
     tenant_isolation_middleware, AuthUser,
 };
+pub use circuit_breaker::{circuit_breaker_middleware, CircuitBreakerManager};
 pub use metrics::metrics_middleware;
 pub use quota::{quota_middleware, QuotaLimits, QuotaManager, UsageStats};
 pub use rbac::{

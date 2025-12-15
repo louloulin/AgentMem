@@ -26,8 +26,8 @@ pub mod predictor; // 🆕 Phase 2.3: 记忆预测功能
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
 use crate::middleware::{
-    audit_logging_middleware, default_auth_middleware, metrics_middleware, quota_middleware,
-    QuotaManager,
+    audit_logging_middleware, circuit_breaker_middleware, default_auth_middleware,
+    metrics_middleware, quota_middleware, CircuitBreakerManager, QuotaManager,
 };
 use crate::rbac::RbacChecker;
 use tracing::info;
@@ -347,11 +347,15 @@ pub async fn create_router(
         // Add state for plugin routes
         .with_state(memory_manager.clone());
 
+    // Create circuit breaker manager
+    let circuit_breaker_manager = Arc::new(CircuitBreakerManager::new());
+
     // Add middleware and shared state (order matters: last added = first executed)
     let app = app
         // Add middleware (these middleware layers execute BEFORE the Extension layers below)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
+        .layer(axum_middleware::from_fn(circuit_breaker_middleware)) // ✅ Phase 2.2.5: 熔断器模式
         .layer(axum_middleware::from_fn(quota_middleware))
         .layer(axum_middleware::from_fn(audit_logging_middleware))
         .layer(axum_middleware::from_fn(rbac_middleware)) // ✅ RBAC权限检查
@@ -359,6 +363,7 @@ pub async fn create_router(
         // Add default auth middleware (injects default AuthUser when auth is disabled)
         .layer(axum_middleware::from_fn(default_auth_middleware))
         // Add shared state via Extension (must be after middleware that uses them)
+        .layer(Extension(circuit_breaker_manager)) // ✅ Phase 2.2.5: 熔断器管理器
         .layer(Extension(rbac_checker)) // ✅ RBAC检查器
         .layer(Extension(sse_manager))
         .layer(Extension(ws_manager))

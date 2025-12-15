@@ -18,6 +18,7 @@ agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-tools = { path = "../agent-mem-tools" }
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-observability = { path = "../agent-mem-observability" }
+agent-mem-performance = { path = "../agent-mem-performance" }  # ✅ Phase 2.2.5: 熔断器模式
 agent-mem-storage = { path = "../agent-mem-storage", optional = true }
 agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成
 lumosai_core = { path = "../../lumosai/lumosai_core", optional = true }  # LumosAI集成
