@@ -1198,16 +1198,20 @@ impl UnifiedStorageCoordinator {
         let cache_key = format!("agentmem:memory:{}", id);
         
         // 获取TTL（根据memory_type）
-        let ttl = self.cache_config.ttl_by_type
-            .get(&memory.memory_type.to_string())
-            .copied()
-            .unwrap_or(3600); // 默认1小时
+        let ttl = if let Some(memory_type) = memory.memory_type() {
+            self.cache_config.ttl_by_type
+                .get(&memory_type.to_string())
+                .copied()
+                .unwrap_or(3600) // 默认1小时
+        } else {
+            3600 // 默认1小时
+        };
         
         match serde_json::to_string(memory) {
             Ok(data) => {
                 match client.get_async_connection().await {
                     Ok(mut conn) => {
-                        if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, data, ttl as usize).await {
+                        if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, data, ttl as u64).await {
                             warn!("Failed to set memory to L2 cache: {}", e);
                             // 不阻塞主流程，仅记录警告
                         }
