@@ -27,6 +27,837 @@
 
 ---
 
+## 🏗️ 整体架构设计
+
+### 架构全景图（ASCII Art）
+
+```
+graph TB
+    subgraph "接口层 (Interface Layer)"
+        API[REST API<br/>Axum Server]
+        MCP[MCP Tools<br/>CLI Interface]
+        UI[Web UI<br/>Next.js]
+        SDK[SDK & Examples]
+    end
+
+    subgraph "编排层 (Orchestration Layer)"
+        ORCH[MemoryOrchestrator<br/>统一编排器]
+        WM[Working Memory<br/>会话管理]
+        TOOL[Tool Executor<br/>工具调用]
+    end
+
+    subgraph "智能层 (Intelligence Layer)"
+        subgraph "记忆引擎"
+            ME[Memory Engine<br/>核心引擎]
+            MI[Memory Integration<br/>记忆整合]
+            HS[Hierarchical Service<br/>层次服务]
+        end
+        subgraph "智能推理"
+            IE[Intelligence Engine<br/>AI推理引擎]
+            EX[Extraction<br/>记忆提取]
+            IMP[Importance Scorer<br/>重要性评分]
+            CON[Conflict Resolver<br/>冲突处理]
+        end
+        subgraph "检索系统"
+            VS[Vector Search<br/>向量搜索]
+            HS2[Hybrid Search<br/>混合搜索]
+            RERANK[Reranker<br/>重排序]
+            CA[Context Aware<br/>上下文感知]
+        end
+        LLM[LLM Adapter<br/>20+ Providers]
+    end
+
+    subgraph "存储层 (Storage Layer)"
+        subgraph "结构化存储"
+            SQL[LibSQL Repository<br/>主存储]
+            PG[PostgreSQL<br/>可选]
+        end
+        subgraph "向量存储"
+            LANCE[LanceDB<br/>向量索引]
+            QDRANT[Qdrant<br/>可选]
+            PGVEC[pgvector<br/>可选]
+        end
+        subgraph "缓存系统"
+            L1[L1 Cache<br/>内存LRU]
+            L2[L2 Cache<br/>Redis]
+        end
+        HIST[History Manager<br/>审计日志]
+    end
+
+    subgraph "记忆类型 (Memory Types)"
+        EPI[Episodic<br/>情节记忆]
+        SEM[Semantic<br/>语义记忆]
+        PROC[Procedural<br/>程序记忆]
+        WORK[Working<br/>工作记忆]
+        CORE[Core<br/>核心记忆]
+        RES[Resource<br/>资源记忆]
+        KNOW[Knowledge<br/>知识记忆]
+        CTX[Contextual<br/>上下文记忆]
+    end
+
+    subgraph "记忆层次 (Memory Hierarchy)"
+        GLOBAL[Global Scope<br/>全局]
+        AGENT[Agent Scope<br/>代理级]
+        USER[User Scope<br/>用户级]
+        SESSION[Session Scope<br/>会话级]
+    end
+
+    API --> ORCH
+    MCP --> ORCH
+    UI --> ORCH
+    SDK --> ORCH
+
+    ORCH --> ME
+    ORCH --> WM
+    ORCH --> TOOL
+
+    ME --> IE
+    ME --> VS
+    ME --> SQL
+    MI --> HS
+    HS --> EPI
+    HS --> SEM
+    HS --> PROC
+    HS --> WORK
+
+    IE --> EX
+    IE --> IMP
+    IE --> CON
+    IE --> LLM
+
+    VS --> LANCE
+    VS --> HS2
+    HS2 --> RERANK
+    RERANK --> CA
+
+    SQL --> L1
+    L1 --> L2
+    SQL --> HIST
+
+    HS --> GLOBAL
+    HS --> AGENT
+    HS --> USER
+    HS --> SESSION
+
+    style API fill:#e1f5ff
+    style ORCH fill:#fff4e1
+    style ME fill:#e8f5e9
+    style IE fill:#f3e5f5
+    style SQL fill:#fff9c4
+    style LANCE fill:#fff9c4
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        接口层 (Interface Layer)                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  REST API (Axum)  │  MCP Tools  │  Web UI (Next.js)  │  SDK & Examples     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      编排层 (Orchestration Layer)                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  MemoryOrchestrator (统一编排器)  │  Working Memory  │  Tool Executor      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         智能层 (Intelligence Layer)                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐ │
+│  │   记忆引擎            │  │   智能推理            │  │   检索系统        │ │
+│  │  - Memory Engine     │  │  - Intelligence       │  │  - Vector Search │ │
+│  │  - Memory Integration│  │  - Extraction         │  │  - Hybrid Search │ │
+│  │  - Hierarchical Svc │  │  - Importance Scorer  │  │  - Reranker      │ │
+│  │                      │  │  - Conflict Resolver  │  │  - Context Aware │ │
+│  └──────────────────────┘  └──────────────────────┘  └──────────────────┘ │
+│                                                                               │
+│  LLM Adapter (20+ Providers: OpenAI, DeepSeek, Zhipu, Ollama...)            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         存储层 (Storage Layer)                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐ │
+│  │  结构化存储            │  │  向量存储             │  │  缓存系统         │ │
+│  │  - LibSQL (主存储)    │  │  - LanceDB           │  │  - L1 Cache (LRU)│ │
+│  │  - PostgreSQL (可选) │  │  - Qdrant (可选)    │  │  - L2 Cache (Redis)│ │
+│  └──────────────────────┘  └──────────────────────┘  └──────────────────┘ │
+│                                                                               │
+│  History Manager (审计日志)                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      记忆类型 (Memory Types)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Episodic  │  Semantic  │  Procedural  │  Working  │  Core  │  Resource   │
+│  Knowledge │  Contextual                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      记忆层次 (Memory Hierarchy)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Global Scope → Agent Scope → User Scope → Session Scope                    │
+│  (全局)        (代理级)      (用户级)      (会话级)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 数据流架构
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Orchestrator
+    participant Intelligence
+    participant Storage
+    participant Cache
+    participant VectorStore
+
+    User->>API: 添加记忆请求
+    API->>Orchestrator: add_memory()
+    
+    Orchestrator->>Intelligence: 提取和评分
+    Intelligence->>Intelligence: 重要性评估
+    Intelligence->>Intelligence: 冲突检测
+    
+    Orchestrator->>Cache: 检查缓存
+    alt 缓存命中
+        Cache-->>Orchestrator: 返回缓存结果
+    else 缓存未命中
+        Orchestrator->>Storage: 写入LibSQL
+        Orchestrator->>VectorStore: 写入向量
+        Storage-->>Orchestrator: 确认
+        VectorStore-->>Orchestrator: 确认
+        Orchestrator->>Cache: 更新缓存
+    end
+    
+    Orchestrator-->>API: 返回结果
+    API-->>User: 响应
+
+    User->>API: 搜索记忆请求
+    API->>Orchestrator: search_memories()
+    
+    Orchestrator->>Cache: 检查缓存
+    alt 缓存命中
+        Cache-->>Orchestrator: 返回缓存结果
+    else 缓存未命中
+        Orchestrator->>VectorStore: 向量搜索
+        VectorStore-->>Orchestrator: 候选结果
+        Orchestrator->>Intelligence: 重排序
+        Intelligence-->>Orchestrator: 排序结果
+        Orchestrator->>Storage: 获取完整数据
+        Storage-->>Orchestrator: 记忆数据
+        Orchestrator->>Cache: 更新缓存
+    end
+    
+    Orchestrator-->>API: 返回结果
+    API-->>User: 响应
+```
+
+### 记忆层次架构
+
+```mermaid
+graph TD
+    subgraph "记忆层次系统 (Memory Hierarchy)"
+        subgraph "Scope层次 (4层)"
+            G[Global<br/>全局知识<br/>永久存储]
+            A[Agent<br/>代理知识<br/>领域特定]
+            U[User<br/>用户记忆<br/>个人化]
+            S[Session<br/>会话记忆<br/>临时上下文]
+        end
+
+        subgraph "Level层次 (4层)"
+            ST[Strategic<br/>战略级<br/>长期规划]
+            TA[Tactical<br/>战术级<br/>中期计划]
+            OP[Operational<br/>操作级<br/>短期任务]
+            CT[Contextual<br/>上下文级<br/>即时响应]
+        end
+
+        subgraph "记忆类型 (8种)"
+            EP[Episodic<br/>情节记忆]
+            SE[Semantic<br/>语义记忆]
+            PR[Procedural<br/>程序记忆]
+            WO[Working<br/>工作记忆]
+            CO[Core<br/>核心记忆]
+            RE[Resource<br/>资源记忆]
+            KN[Knowledge<br/>知识记忆]
+            CX[Contextual<br/>上下文记忆]
+        end
+    end
+
+    G --> A
+    A --> U
+    U --> S
+
+    ST --> TA
+    TA --> OP
+    OP --> CT
+
+    G -.-> SE
+    A -.-> SE
+    U -.-> EP
+    S -.-> WO
+
+    style G fill:#ff6b6b
+    style A fill:#4ecdc4
+    style U fill:#45b7d1
+    style S fill:#f9ca24
+```
+
+---
+
+## 🧮 核心算法设计
+
+### 1. 多维度综合评分算法
+
+#### 1.1 算法公式
+
+```
+综合评分 = w₁ × 相关性 + w₂ × 重要性 + w₃ × 时效性 + w₄ × 质量
+
+其中：
+- w₁ = 0.5 (相关性权重)
+- w₂ = 0.3 (重要性权重)
+- w₃ = 0.15 (时效性权重)
+- w₄ = 0.05 (质量权重)
+```
+
+#### 1.2 各维度计算
+
+**相关性评分 (Relevance Score)**:
+```
+relevance = cosine_similarity(query_embedding, memory_embedding)
+```
+
+**重要性评分 (Importance Score)**:
+```
+importance = LLM_based_importance(memory_content)
+或
+importance = heuristic_importance(memory_metadata)
+```
+
+**时效性评分 (Recency Score)**:
+```
+recency = exp(-age_days / half_life)
+
+其中：
+- age_days = (now - memory.created_at).days
+- half_life = 30 (天)  # 30天半衰期
+```
+
+**质量评分 (Quality Score)**:
+```
+quality = f(content_length, completeness, coherence)
+
+其中：
+- content_length: 内容长度归一化
+- completeness: 完整性检查
+- coherence: 连贯性检查
+```
+
+#### 1.3 自适应权重调整
+
+```rust
+// 伪代码
+fn adaptive_weights(query_type: QueryType, user_preferences: &UserPrefs) -> Weights {
+    match query_type {
+        QueryType::Factual => Weights {
+            relevance: 0.6,
+            importance: 0.3,
+            recency: 0.05,
+            quality: 0.05,
+        },
+        QueryType::Recent => Weights {
+            relevance: 0.4,
+            importance: 0.2,
+            recency: 0.35,
+            quality: 0.05,
+        },
+        QueryType::Important => Weights {
+            relevance: 0.3,
+            importance: 0.5,
+            recency: 0.15,
+            quality: 0.05,
+        },
+        _ => default_weights(),
+    }
+}
+```
+
+### 2. 重排序算法 (Reranking)
+
+#### 2.1 Cross-Encoder重排序
+
+**算法流程**:
+```
+1. 初始检索: 使用向量搜索获取Top-K候选 (K=100)
+2. Cross-Encoder评分: 对每个候选计算精确相关性
+3. 综合评分: 结合初始分数和Cross-Encoder分数
+4. 最终排序: 按综合评分排序，返回Top-N (N=10)
+```
+
+**评分公式**:
+```
+final_score = α × vector_score + (1-α) × cross_encoder_score
+
+其中：
+- α = 0.3 (向量分数权重)
+- cross_encoder_score = CrossEncoder(query, memory_content)
+```
+
+#### 2.2 LLM-based重排序
+
+**算法流程**:
+```
+1. 初始检索: 获取Top-K候选
+2. LLM评分: 使用LLM对每个候选进行相关性评分
+3. 解释生成: 生成为什么相关的解释
+4. 最终排序: 按LLM评分排序
+```
+
+**Prompt模板**:
+```
+给定查询: {query}
+记忆内容: {memory_content}
+
+请评分该记忆与查询的相关性 (0-1分)，并解释原因。
+```
+
+### 3. 时间衰减算法
+
+#### 3.1 指数衰减模型
+
+```
+score(t) = score(0) × exp(-λ × t)
+
+其中：
+- score(0): 初始评分
+- λ: 衰减率 (默认: ln(2) / half_life)
+- t: 时间差 (天)
+- half_life: 半衰期 (默认: 30天)
+```
+
+#### 3.2 分段衰减模型
+
+```
+score(t) = {
+    score(0) × 1.0,           if t < 1天      # 不衰减
+    score(0) × exp(-λ₁ × t), if 1天 ≤ t < 7天  # 快速衰减
+    score(0) × exp(-λ₂ × t), if 7天 ≤ t < 30天 # 中速衰减
+    score(0) × exp(-λ₃ × t), if t ≥ 30天      # 慢速衰减
+}
+```
+
+### 4. 批量嵌入优化算法
+
+#### 4.1 批处理队列算法
+
+```rust
+// 伪代码
+struct EmbeddingBatchQueue {
+    queue: VecDeque<String>,
+    batch_size: usize,
+    max_wait_time: Duration,
+    last_batch_time: Instant,
+}
+
+impl EmbeddingBatchQueue {
+    async fn add(&mut self, content: String) -> Vec<f32> {
+        self.queue.push_back(content);
+        
+        if self.queue.len() >= self.batch_size 
+            || self.should_flush() {
+            return self.flush().await;
+        }
+        
+        // 等待更多内容或超时
+        self.wait_for_more().await
+    }
+    
+    fn should_flush(&self) -> bool {
+        self.last_batch_time.elapsed() >= self.max_wait_time
+    }
+    
+    async fn flush(&mut self) -> Vec<Vec<f32>> {
+        let batch: Vec<String> = self.queue.drain(..).collect();
+        let embeddings = embedder.embed_batch(&batch).await;
+        self.last_batch_time = Instant::now();
+        embeddings
+    }
+}
+```
+
+#### 4.2 自适应批大小算法
+
+```
+batch_size = min(
+    max_batch_size,
+    max(
+        min_batch_size,
+        queue_length / num_workers
+    )
+)
+
+其中：
+- min_batch_size = 10
+- max_batch_size = 100
+- num_workers = CPU核心数
+```
+
+### 5. 缓存策略算法
+
+#### 5.1 LRU缓存替换策略
+
+```rust
+// 伪代码
+struct LRUCache<K, V> {
+    cache: LinkedHashMap<K, V>,
+    capacity: usize,
+}
+
+impl LRUCache {
+    fn get(&mut self, key: &K) -> Option<&V> {
+        if let Some(value) = self.cache.remove(key) {
+            self.cache.insert(key.clone(), value);
+            self.cache.get(key)
+        } else {
+            None
+        }
+    }
+    
+    fn put(&mut self, key: K, value: V) {
+        if self.cache.len() >= self.capacity {
+            self.cache.pop_front(); // 移除最久未使用的
+        }
+        self.cache.insert(key, value);
+    }
+}
+```
+
+#### 5.2 缓存预热算法
+
+```
+预热策略：
+1. 统计热门查询 (Top 100)
+2. 预加载相关记忆到L1缓存
+3. 预计算嵌入向量
+4. 预构建索引结构
+```
+
+### 6. 混合搜索算法
+
+#### 6.1 向量+关键词混合搜索
+
+```
+1. 向量搜索: 获取Top-K向量结果
+2. 关键词搜索: 获取Top-K关键词结果
+3. 结果融合: 使用RRF (Reciprocal Rank Fusion)
+
+RRF公式:
+score = Σ(1 / (k + rank_i))
+
+其中：
+- k = 60 (默认参数)
+- rank_i: 在第i个结果集中的排名
+```
+
+#### 6.2 语义金字塔索引 (SPI)
+
+```
+1. 构建多分辨率向量索引
+2. 根据查询粒度选择最优分辨率
+3. 渐进式检索: 从粗到细
+4. 动态调整检索深度
+```
+
+### 7. 因果推理算法
+
+#### 7.1 因果知识图构建
+
+```
+1. 实体提取: 从记忆中提取实体
+2. 关系识别: 识别因果关系
+3. 图构建: 构建有向无环图 (DAG)
+4. 权重计算: 计算因果强度
+```
+
+#### 7.2 因果链检索
+
+```
+算法: 因果路径搜索
+1. 从查询实体开始
+2. 沿着因果边遍历
+3. 计算路径权重
+4. 返回Top-K因果链
+```
+
+### 8. Schema演化算法
+
+#### 8.1 Schema更新机制
+
+```
+1. 检测变化: 监控记忆模式变化
+2. 评估影响: 评估对现有记忆的影响
+3. 渐进更新: 逐步更新Schema
+4. 验证一致性: 确保更新后的一致性
+```
+
+#### 8.2 Schema演化策略
+
+```
+演化类型：
+- Schema更新: 修改现有Schema
+- Schema演化: 添加新字段/关系
+- Schema创建: 创建全新Schema
+```
+
+---
+
+## 📚 理论架构分析
+
+### 1. 认知心理学理论基础
+
+#### 1.1 Atkinson-Shiffrin记忆模型
+
+**三层记忆结构**:
+```
+感觉记忆 (Sensory Memory)
+    ↓
+短期记忆 (Short-term Memory / Working Memory)
+    ↓
+长期记忆 (Long-term Memory)
+    ├─ 情节记忆 (Episodic Memory)
+    ├─ 语义记忆 (Semantic Memory)
+    └─ 程序记忆 (Procedural Memory)
+```
+
+**AgentMem映射**:
+- **感觉记忆** → 实时输入处理
+- **工作记忆** → Session Scope (7±2项)
+- **情节记忆** → User Scope + Episodic Memory
+- **语义记忆** → Agent/Global Scope + Semantic Memory
+- **程序记忆** → Procedural Memory
+
+#### 1.2 PISA认知发展理论
+
+**Piaget认知发展阶段**:
+1. **感知运动阶段** (0-2岁) → 基础操作记忆
+2. **前运算阶段** (2-7岁) → 符号记忆
+3. **具体运算阶段** (7-12岁) → 逻辑记忆
+4. **形式运算阶段** (12+岁) → 抽象推理记忆
+
+**AgentMem应用**:
+- **Schema演化**: 对应认知发展阶段
+- **三模态适应**: Schema更新、演化、创建
+- **持续学习**: 支持认知发展
+
+#### 1.3 HCAM分层认知架构模型
+
+**四层认知架构**:
+```
+Level 4: 元认知层 (Metacognitive)
+    ↓
+Level 3: 认知层 (Cognitive)
+    ↓
+Level 2: 感知层 (Perceptual)
+    ↓
+Level 1: 反应层 (Reactive)
+```
+
+**AgentMem映射**:
+- **Level 4** → Strategic Level (战略规划)
+- **Level 3** → Tactical Level (战术决策)
+- **Level 2** → Operational Level (操作执行)
+- **Level 1** → Contextual Level (即时响应)
+
+### 2. 记忆系统理论模型
+
+#### 2.1 记忆编码理论
+
+**编码层次**:
+1. **浅层编码**: 表面特征 (关键词匹配)
+2. **深层编码**: 语义理解 (向量相似度)
+3. **情境编码**: 上下文关联 (多模态)
+
+**AgentMem实现**:
+- **浅层**: 关键词搜索
+- **深层**: 向量嵌入搜索
+- **情境**: 上下文感知搜索
+
+#### 2.2 记忆检索理论
+
+**检索机制**:
+1. **直接检索**: 精确匹配
+2. **关联检索**: 语义关联
+3. **重构检索**: 推理重构
+
+**AgentMem实现**:
+- **直接检索**: ID/元数据查询
+- **关联检索**: 向量相似度搜索
+- **重构检索**: 因果推理检索
+
+#### 2.3 记忆巩固理论
+
+**巩固过程**:
+1. **快速巩固**: 短期→中期 (分钟-小时)
+2. **慢速巩固**: 中期→长期 (天-周)
+3. **系统巩固**: 长期优化 (周-月)
+
+**AgentMem实现**:
+- **快速巩固**: Session → User (自动)
+- **慢速巩固**: User → Agent (重要性驱动)
+- **系统巩固**: Agent → Global (Schema演化)
+
+### 3. 信息检索理论
+
+#### 3.1 向量空间模型 (VSM)
+
+**核心思想**:
+- 文档和查询表示为向量
+- 相似度 = 余弦相似度
+- 权重 = TF-IDF
+
+**AgentMem应用**:
+- 记忆向量化
+- 相似度计算
+- 相关性排序
+
+#### 3.2 概率检索模型
+
+**BM25算法**:
+```
+score(D, Q) = Σ IDF(qi) × f(qi, D) × (k1 + 1) / (f(qi, D) + k1 × (1 - b + b × |D|/avgdl))
+
+其中：
+- IDF: 逆文档频率
+- f: 词频
+- k1, b: 调优参数
+```
+
+**AgentMem应用**:
+- 关键词搜索
+- 混合搜索
+- 相关性评分
+
+#### 3.3 学习排序 (Learning to Rank)
+
+**排序算法**:
+1. **Pointwise**: 独立评分
+2. **Pairwise**: 成对比较
+3. **Listwise**: 列表优化
+
+**AgentMem应用**:
+- 多维度评分 (Pointwise)
+- 重排序 (Pairwise)
+- 列表优化 (Listwise)
+
+### 4. 因果推理理论
+
+#### 4.1 因果图模型
+
+**有向无环图 (DAG)**:
+```
+节点: 实体/事件
+边: 因果关系
+权重: 因果强度
+```
+
+**AgentMem应用**:
+- 因果知识图
+- 因果链检索
+- 因果解释生成
+
+#### 4.2 结构因果模型 (SCM)
+
+**核心组件**:
+1. **结构方程**: Y = f(X, U)
+2. **因果图**: 可视化因果关系
+3. **干预**: do(X=x) 操作
+
+**AgentMem应用**:
+- 因果推理引擎
+- 干预分析
+- 反事实推理
+
+### 5. 分布式系统理论
+
+#### 5.1 CAP定理
+
+**一致性 (Consistency)**:
+- 所有节点同时看到相同数据
+
+**可用性 (Availability)**:
+- 每个请求都能得到响应
+
+**分区容错性 (Partition Tolerance)**:
+- 系统在分区时仍能工作
+
+**AgentMem选择**:
+- **CP模式**: 一致性优先 (主存储)
+- **AP模式**: 可用性优先 (缓存层)
+
+#### 5.2 最终一致性
+
+**一致性模型**:
+1. **强一致性**: 立即一致
+2. **弱一致性**: 最终一致
+3. **最终一致性**: 保证最终一致
+
+**AgentMem应用**:
+- 主存储: 强一致性
+- 向量存储: 最终一致性
+- 缓存: 弱一致性
+
+### 6. 性能优化理论
+
+#### 6.1 批量处理理论
+
+**批量大小优化**:
+```
+最优批量大小 = √(2 × 固定成本 / 单位成本)
+
+其中：
+- 固定成本: 批次处理开销
+- 单位成本: 单条处理成本
+```
+
+**AgentMem应用**:
+- 嵌入批量处理
+- 数据库批量写入
+- 向量批量索引
+
+#### 6.2 缓存理论
+
+**缓存替换策略**:
+1. **LRU**: 最近最少使用
+2. **LFU**: 最不经常使用
+3. **FIFO**: 先进先出
+4. **随机**: 随机替换
+
+**AgentMem选择**:
+- **L1缓存**: LRU (内存)
+- **L2缓存**: LRU + TTL (Redis)
+
+#### 6.3 并发控制理论
+
+**并发模型**:
+1. **锁机制**: Mutex, RwLock
+2. **无锁编程**: Atomic, Lock-free
+3. **Actor模型**: 消息传递
+
+**AgentMem应用**:
+- 存储层: RwLock
+- 缓存层: Atomic
+- 编排层: Actor模型
+
+---
+
 ## 🔬 第一部分：最新研究分析
 
 ### 1.1 记忆系统研究论文（2024-2025）
@@ -832,12 +1663,72 @@ Week 17-18: 测试、优化、发布
 
 ### 9.1 研究论文
 
+#### 核心记忆系统论文
+
 1. **PISA**: A Pragmatic Psych-Inspired Unified Memory System (2025)
+   - 作者: Shian Jia et al.
+   - 核心: 三模态适应机制、Schema演化、混合记忆访问
+   - URL: https://arxiv.org/abs/2510.15966
+
 2. **O-Mem**: Omni Memory System for Personalized, Long Horizon, Self-Evolving Agents (2025)
+   - 作者: 未指定
+   - 核心: 动态Persona提取、分层检索、个性化响应
+   - URL: https://arxiv.org/abs/2511.13593
+
 3. **SHIMI**: Decentralizing AI Memory: Semantic Hierarchical Memory Index (2025)
+   - 作者: Tooraj Helmi
+   - 核心: 语义层次结构、基于意义的检索、去中心化同步
+   - URL: https://arxiv.org/abs/2504.06135
+
 4. **KARMA**: Augmenting Embodied AI Agents with Long-and-Short Term Memory Systems (2024)
+   - 作者: 未指定
+   - 核心: 双记忆结构、3D场景图、经验检索
+   - URL: https://arxiv.org/abs/2409.14908
+
 5. **MemoryOS**: Memory OS of AI Agent (2025)
+   - 作者: Mingming Ji et al.
+   - 核心: 分层存储架构、KV-cache优化、操作系统级内存管理
+   - URL: https://aclanthology.org/2025.emnlp-main.1318
+
 6. **REMI**: Causal Reasoning Architecture (2025)
+   - 作者: 未指定
+   - 核心: 因果知识图、因果推理引擎、Schema-based规划
+   - URL: https://arxiv.org/abs/2509.06269
+
+#### 检索算法论文
+
+7. **SPI**: Semantic Pyramid Indexing (2025)
+   - 核心: 多分辨率向量索引、渐进式检索
+   - 性能: 搜索速度提升5.7x，内存效率提升1.8x
+   - URL: https://arxiv.org/abs/2511.16681
+
+8. **LevelRAG**: High-level Searcher with Sparse Search (2025)
+   - 核心: 查询分解、稀疏搜索、混合检索
+   - 性能: 超越GPT-4o
+   - URL: https://arxiv.org/abs/2502.18139
+
+9. **Cosmos**: CXL-based In-Memory ANNS (2025)
+   - 核心: 全内存系统、距离计算并行化
+   - 性能: 吞吐量提升6.72x
+   - URL: https://arxiv.org/abs/2505.16096
+
+#### 分布式和安全性论文
+
+10. **Merkle Automaton**: Immutable Memory Systems (2025)
+    - 作者: Craig Steven Wright
+    - 核心: 区块链索引、不可变内存、可验证推理
+    - URL: https://arxiv.org/abs/2506.13246
+
+11. **Emergent Collective Memory**: Decentralized Multi-Agent Systems (2025)
+    - 作者: Khushiyant
+    - 核心: 集体记忆涌现、去中心化、认知基础设施
+    - URL: https://arxiv.org/abs/2512.10166
+
+#### 认知架构论文
+
+12. **Agentic Episodic Control (AEC)**: Reinforcement Learning + LLM (2025)
+    - 核心: 情节记忆、语言接地嵌入、快速检索
+    - URL: https://arxiv.org/abs/2506.01442
 
 ### 9.2 产品参考
 
@@ -919,3 +1810,106 @@ Week 17-18: 测试、优化、发布
 ---
 
 **下一步**: 立即开始Phase 1实施，优先完成批量操作优化和Redis缓存集成。
+
+---
+
+## 🎓 附录：架构设计原则
+
+### 设计原则总结
+
+#### 1. 分层架构原则
+
+**接口层 → 编排层 → 智能层 → 存储层**
+
+- **关注点分离**: 每层职责清晰
+- **依赖方向**: 单向依赖，避免循环
+- **接口抽象**: 层间通过接口通信
+
+#### 2. 记忆层次原则
+
+**Scope层次 (4层) + Level层次 (4层) + 记忆类型 (8种)**
+
+- **继承机制**: 子层可访问父层
+- **衰减机制**: 继承时应用衰减因子
+- **容量限制**: 每层有容量上限
+
+#### 3. 性能优化原则
+
+**批量处理 + 缓存 + 并发 + 异步**
+
+- **批量优先**: 尽可能批量处理
+- **缓存分层**: L1内存 + L2Redis
+- **并发控制**: 合理使用锁和无锁
+- **异步处理**: 非阻塞I/O
+
+#### 4. 准确性提升原则
+
+**多维度评分 + 重排序 + 上下文理解 + 因果推理**
+
+- **综合评分**: 相关性+重要性+时效性+质量
+- **二次精排**: 初始检索+重排序
+- **上下文感知**: 理解对话上下文
+- **因果推理**: 理解因果关系
+
+#### 5. 易用性原则
+
+**零配置 + 简洁API + 完善文档 + 丰富示例**
+
+- **开箱即用**: 默认配置即可运行
+- **API简洁**: 最少代码完成功能
+- **文档完善**: 覆盖所有功能
+- **示例丰富**: 提供实际用例
+
+### 架构演进路径
+
+```
+当前架构 (v1.0)
+    ↓
+Phase 1: 性能优化 (v1.1)
+    - 批量操作优化
+    - Redis缓存集成
+    - KV-cache注入
+    - 数据一致性保证
+    ↓
+Phase 2: 准确性提升 (v1.2)
+    - 多维度评分
+    - 重排序机制
+    - 上下文理解
+    - Persona提取
+    ↓
+Phase 3: 易用性提升 (v2.0)
+    - API简化
+    - 文档完善
+    - CLI工具
+    - 文件系统集成
+    ↓
+Phase 4: 高级功能 (v2.1)
+    - 因果推理
+    - 图增强
+    - 语义层次索引
+    ↓
+Phase 5: 系统优化 (v3.0)
+    - 自适应学习
+    - 去中心化
+    - Schema演化
+    ↓
+目标架构 (v3.0)
+    - 顶级记忆平台
+    - 业界领先水平
+```
+
+---
+
+**文档完成时间**: 2025-12-10  
+**文档版本**: v6.0 (完整版)  
+**包含内容**: 
+- ✅ 整体架构设计图 (Mermaid)
+- ✅ 核心算法设计
+- ✅ 理论架构分析
+- ✅ 最新研究分析
+- ✅ 产品对标分析
+- ✅ 问题全面分析
+- ✅ 5个Phase改造计划
+- ✅ 实施路线图
+- ✅ 成功标准
+- ✅ 参考资源
