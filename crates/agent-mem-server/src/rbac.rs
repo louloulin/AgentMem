@@ -29,7 +29,7 @@ impl Role {
             "admin" => Ok(Role::Admin),
             "user" => Ok(Role::User),
             "readonly" | "read_only" | "read-only" => Ok(Role::ReadOnly),
-            _ => Err(ServerError::BadRequest(format!("Invalid role: {}", s))),
+            _ => Err(ServerError::bad_request(format!("Invalid role: {}", s))),
         }
     }
 
@@ -128,7 +128,7 @@ impl RbacChecker {
             .collect();
 
         if parsed_roles.is_empty() {
-            return Err(ServerError::Forbidden(
+            return Err(ServerError::forbidden(
                 "No valid roles assigned".to_string(),
             ));
         }
@@ -140,7 +140,7 @@ impl RbacChecker {
         {
             Ok(())
         } else {
-            Err(ServerError::Forbidden(format!(
+            Err(ServerError::forbidden(format!(
                 "Permission denied: {:?}",
                 permission
             )))
@@ -168,7 +168,7 @@ impl RbacChecker {
             (Resource::System, Action::Delete) => Permission::ManageSystem,
             (Resource::System, Action::Manage) => Permission::ManageSystem,
             _ => {
-                return Err(ServerError::BadRequest(format!(
+                return Err(ServerError::bad_request(format!(
                     "Invalid resource-action combination: {:?} {:?}",
                     resource, action
                 )))

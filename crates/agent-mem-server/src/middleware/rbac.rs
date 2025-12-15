@@ -58,9 +58,7 @@ pub async fn check_memory_permission(
         Ok(next.run(req).await)
     } else {
         // 没有用户上下文，拒绝访问
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        Err(ServerError::unauthorized("Authentication required"))
     }
 }
 
@@ -92,9 +90,7 @@ pub async fn check_agent_permission(
         result?;
         Ok(next.run(req).await)
     } else {
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        Err(ServerError::unauthorized("Authentication required"))
     }
 }
 
@@ -126,9 +122,7 @@ pub async fn check_user_permission(
         result?;
         Ok(next.run(req).await)
     } else {
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        Err(ServerError::unauthorized("Authentication required"))
     }
 }
 
@@ -168,12 +162,10 @@ pub async fn admin_only(
             );
             audit_log.log();
 
-            Err(ServerError::Forbidden("Admin access required".to_string()))
+            Err(ServerError::forbidden("Admin access required"))
         }
     } else {
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        Err(ServerError::unauthorized("Authentication required"))
     }
 }
 
@@ -198,16 +190,12 @@ pub async fn no_read_only(
             );
             audit_log.log();
 
-            Err(ServerError::Forbidden(
-                "Read-only users cannot perform this action".to_string(),
-            ))
+            Err(ServerError::forbidden("Read-only users cannot perform this action"))
         } else {
             Ok(next.run(req).await)
         }
     } else {
-        Err(ServerError::Unauthorized(
-            "Authentication required".to_string(),
-        ))
+        Err(ServerError::unauthorized("Authentication required"))
     }
 }
 
@@ -256,7 +244,7 @@ pub async fn rbac_middleware(req: Request, next: Next) -> ServerResult<Response>
             Ok(next.run(req).await)
         } else {
             // 没有任何用户上下文，需要认证
-            Err(ServerError::Unauthorized(
+            Err(ServerError::unauthorized(
                 "Authentication required".to_string(),
             ))
         }

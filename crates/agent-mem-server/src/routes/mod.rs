@@ -73,7 +73,7 @@ pub async fn create_router(
     mcp_server
         .initialize()
         .await
-        .map_err(|e| ServerError::ServerError(format!("Failed to initialize MCP server: {e}")))?;
+        .map_err(|e| ServerError::server_error(format!("Failed to initialize MCP server: {e}")))?;
 
     info!("MCP server initialized successfully");
 

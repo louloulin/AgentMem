@@ -98,7 +98,7 @@ pub async fn create_organization(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get organization repository from repositories container
     let org_repo = repositories.organizations.clone();
@@ -118,7 +118,7 @@ pub async fn create_organization(
     let created_org = org_repo
         .create(&org)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to create organization: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to create organization: {e}")))?;
 
     let response = OrganizationResponse {
         id: created_org.id,
@@ -162,7 +162,7 @@ pub async fn get_organization(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user belongs to the organization
     if auth_user.org_id != org_id && !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden(
+        return Err(ServerError::forbidden(
             "Access to this organization is forbidden".to_string(),
         ));
     }
@@ -175,7 +175,7 @@ pub async fn get_organization(
         .find_by_id(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound("Organization not found".to_string()))?;
+        .ok_or_else(|| ServerError::not_found("Organization not found"))?;
 
     let response = OrganizationResponse {
         id: org.id,
@@ -222,7 +222,7 @@ pub async fn update_organization(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user belongs to the organization and has admin role
     if auth_user.org_id != org_id || !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden(
+        return Err(ServerError::forbidden(
             "Admin role required for this organization".to_string(),
         ));
     }
@@ -230,7 +230,7 @@ pub async fn update_organization(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get organization repository from repositories container
     let org_repo = repositories.organizations.clone();
@@ -240,7 +240,7 @@ pub async fn update_organization(
         .find_by_id(&org_id)
         .await
         .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound("Organization not found".to_string()))?;
+        .ok_or_else(|| ServerError::not_found("Organization not found"))?;
 
     // Update fields
     if let Some(name) = request.name {
@@ -298,7 +298,7 @@ pub async fn list_organization_members(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user belongs to the organization
     if auth_user.org_id != org_id && !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden(
+        return Err(ServerError::forbidden(
             "Access to this organization is forbidden".to_string(),
         ));
     }
@@ -310,7 +310,7 @@ pub async fn list_organization_members(
     let users = user_repo
         .find_by_organization_id(&org_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?;
 
     let members: Vec<OrganizationMemberResponse> = users
         .into_iter()
@@ -351,7 +351,7 @@ pub async fn delete_organization(
 ) -> ServerResult<impl IntoResponse> {
     // Check if user is admin
     if !auth_user.roles.contains(&"admin".to_string()) {
-        return Err(ServerError::Forbidden("Admin role required".to_string()));
+        return Err(ServerError::forbidden("Admin role required".to_string()));
     }
 
     // Get organization repository from repositories container

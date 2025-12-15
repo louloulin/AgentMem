@@ -149,7 +149,7 @@ pub async fn get_graph_data(
         let entities = kg_manager
             .get_entities_by_type(&auth_user.user_id, entity_type)
             .await
-            .map_err(|e| ServerError::Internal(e.to_string()))?;
+            .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
         for entity in entities {
             if entity.confidence >= params.min_confidence {
@@ -170,7 +170,7 @@ pub async fn get_graph_data(
         let associations = assoc_manager
             .get_associations(&node.id, &auth_user.user_id)
             .await
-            .map_err(|e| ServerError::Internal(e.to_string()))?;
+            .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
         for assoc in associations {
             all_edges.push(GraphEdge {
@@ -221,7 +221,7 @@ pub async fn create_association(
     let assoc_manager = AssociationManager::with_default_config(Arc::new(pool));
 
     let assoc_type = AssociationType::from_str(&req.association_type)
-        .map_err(|e| ServerError::BadRequest(e.to_string()))?;
+        .map_err(|e| ServerError::bad_request(e.to_string()))?;
 
     let association_id = assoc_manager
         .create_association(

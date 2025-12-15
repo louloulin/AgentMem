@@ -27,7 +27,7 @@ pub async fn jwt_auth_middleware(
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| ServerError::Unauthorized("Missing authorization header".to_string()))?;
+        .ok_or_else(|| ServerError::unauthorized("Missing authorization header"))?;
 
     // Extract token from "Bearer <token>" format
     let token = AuthService::extract_token_from_header(auth_header)?;
@@ -36,7 +36,7 @@ pub async fn jwt_auth_middleware(
     let auth_service = request
         .extensions()
         .get::<Arc<AuthService>>()
-        .ok_or_else(|| ServerError::Internal("AuthService not found".to_string()))?;
+        .ok_or_else(|| ServerError::internal_error("AuthService not found"))?;
 
     // Validate token
     let claims = auth_service.validate_token(token)?;
@@ -63,20 +63,18 @@ pub async fn api_key_auth_middleware(
         .headers()
         .get("X-API-Key")
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| ServerError::Unauthorized("Missing API key".to_string()))?;
+        .ok_or_else(|| ServerError::unauthorized("Missing API key"))?;
 
     // Check format
     if !api_key.starts_with("agm_") {
-        return Err(ServerError::Unauthorized(
-            "Invalid API key format".to_string(),
-        ));
+        return Err(ServerError::unauthorized("Invalid API key format"));
     }
 
     // Get ApiKeyRepository from extensions (added by router)
     let api_key_repo = request
         .extensions()
         .get::<Arc<dyn ApiKeyRepositoryTrait>>()
-        .ok_or_else(|| ServerError::Internal("ApiKeyRepository not found".to_string()))?;
+        .ok_or_else(|| ServerError::internal_error("ApiKeyRepository not found"))?;
 
     // Hash the API key for lookup
     let key_hash = hash_api_key(api_key);
@@ -85,8 +83,8 @@ pub async fn api_key_auth_middleware(
     let api_key_model = api_key_repo
         .find_by_key(&key_hash)
         .await
-        .map_err(|e| ServerError::Internal(format!("API key validation failed: {e}")))?
-        .ok_or_else(|| ServerError::Unauthorized("Invalid or expired API key".to_string()))?;
+        .map_err(|e| ServerError::internal_error(format!("API key validation failed: {e}")))?
+        .ok_or_else(|| ServerError::unauthorized("Invalid or expired API key"))?;
 
     // Extract user info from API key
     let auth_user = AuthUser {
@@ -139,7 +137,7 @@ pub fn extract_auth_user(request: &Request) -> ServerResult<AuthUser> {
         .extensions()
         .get::<AuthUser>()
         .cloned()
-        .ok_or_else(|| ServerError::Unauthorized("Not authenticated".to_string()))
+        .ok_or_else(|| ServerError::unauthorized("Not authenticated"))
 }
 
 /// Check if user has a specific role
@@ -155,7 +153,7 @@ pub fn is_admin(auth_user: &AuthUser) -> bool {
 /// Require admin role
 pub fn require_admin(auth_user: &AuthUser) -> ServerResult<()> {
     if !is_admin(auth_user) {
-        return Err(ServerError::Forbidden("Admin role required".to_string()));
+        return Err(ServerError::forbidden("Admin role required"));
     }
     Ok(())
 }
@@ -163,7 +161,7 @@ pub fn require_admin(auth_user: &AuthUser) -> ServerResult<()> {
 /// Require specific role
 pub fn require_role(auth_user: &AuthUser, role: &str) -> ServerResult<()> {
     if !has_role(auth_user, role) {
-        return Err(ServerError::Forbidden(format!("Role '{role}' required")));
+        return Err(ServerError::forbidden(format!("Role '{role}' required")));
     }
     Ok(())
 }

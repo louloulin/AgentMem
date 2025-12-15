@@ -121,7 +121,7 @@ pub async fn call_tool(
     // 验证 API 密钥（如果需要）
     if let Some(api_key) = &request.api_key {
         if !mcp_server.verify_api_key(api_key) {
-            return Err(ServerError::Unauthorized("Invalid API key".to_string()));
+            return Err(ServerError::unauthorized("Invalid API key"));
         }
     }
 
@@ -136,7 +136,7 @@ pub async fn call_tool(
     let mcp_response = mcp_server
         .call_tool(mcp_request)
         .await
-        .map_err(|e| ServerError::Internal(format!("Tool execution failed: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Tool execution failed: {}", e)))?;
 
     // 转换响应
     let content: Vec<ContentItem> = mcp_response
@@ -197,7 +197,7 @@ pub async fn get_tool(
         .tools
         .into_iter()
         .find(|t| t.name == tool_name)
-        .ok_or_else(|| ServerError::NotFound(format!("Tool '{}' not found", tool_name)))?;
+        .ok_or_else(|| ServerError::not_found(format!("Tool '{}' not found", tool_name)))?;
 
     Ok(Json(ApiResponse::success(serde_json::json!(tool))))
 }

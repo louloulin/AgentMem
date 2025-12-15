@@ -131,19 +131,13 @@ impl QuotaManager {
 
         // Check quotas
         if usage.requests_this_minute >= limits.max_requests_per_minute {
-            return Err(ServerError::QuotaExceeded(
-                "Rate limit exceeded: too many requests per minute".to_string(),
-            ));
+            return Err(ServerError::quota_exceeded("Rate limit exceeded: too many requests per minute"));
         }
         if usage.requests_this_hour >= limits.max_requests_per_hour {
-            return Err(ServerError::QuotaExceeded(
-                "Rate limit exceeded: too many requests per hour".to_string(),
-            ));
+            return Err(ServerError::quota_exceeded("Rate limit exceeded: too many requests per hour"));
         }
         if usage.requests_this_day >= limits.max_requests_per_day {
-            return Err(ServerError::QuotaExceeded(
-                "Rate limit exceeded: too many requests per day".to_string(),
-            ));
+            return Err(ServerError::quota_exceeded("Rate limit exceeded: too many requests per day"));
         }
 
         // Increment counters
@@ -166,7 +160,7 @@ impl QuotaManager {
         match resource_type {
             "user" => {
                 if usage.total_users >= limits.max_users {
-                    return Err(ServerError::QuotaExceeded(format!(
+                    return Err(ServerError::quota_exceeded(format!(
                         "User quota exceeded: {} / {}",
                         usage.total_users, limits.max_users
                     )));
@@ -174,7 +168,7 @@ impl QuotaManager {
             }
             "agent" => {
                 if usage.total_agents >= limits.max_agents {
-                    return Err(ServerError::QuotaExceeded(format!(
+                    return Err(ServerError::quota_exceeded(format!(
                         "Agent quota exceeded: {} / {}",
                         usage.total_agents, limits.max_agents
                     )));
@@ -182,7 +176,7 @@ impl QuotaManager {
             }
             "memory" => {
                 if usage.total_memories >= limits.max_memories {
-                    return Err(ServerError::QuotaExceeded(format!(
+                    return Err(ServerError::quota_exceeded(format!(
                         "Memory quota exceeded: {} / {}",
                         usage.total_memories, limits.max_memories
                     )));
@@ -190,7 +184,7 @@ impl QuotaManager {
             }
             "api_key" => {
                 if usage.total_api_keys >= limits.max_api_keys {
-                    return Err(ServerError::QuotaExceeded(format!(
+                    return Err(ServerError::quota_exceeded(format!(
                         "API key quota exceeded: {} / {}",
                         usage.total_api_keys, limits.max_api_keys
                     )));

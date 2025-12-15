@@ -272,7 +272,7 @@ pub async fn get_plugin(
     let plugin = plugins
         .into_iter()
         .find(|p| p.name == id)
-        .ok_or_else(|| ServerError::NotFound(format!("Plugin not found: {}", id)))?;
+        .ok_or_else(|| ServerError::not_found(format!("Plugin not found: {}", id)))?;
 
     let response = PluginResponse {
         id: plugin.name.clone(),

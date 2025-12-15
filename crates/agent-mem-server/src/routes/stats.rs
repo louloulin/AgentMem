@@ -212,7 +212,7 @@ pub async fn get_dashboard_stats(
         .agents
         .list(10000, 0)
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
     let total_agents = all_agents.len() as i64;
     info!("  - Total agents: {}", total_agents);
 
@@ -221,7 +221,7 @@ pub async fn get_dashboard_stats(
         .users
         .find_by_organization_id("default")
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
     let total_users = all_users.len() as i64;
     info!("  - Total users: {}", total_users);
 
@@ -232,7 +232,7 @@ pub async fn get_dashboard_stats(
             .messages
             .find_by_agent_id(&agent.id, 10000)
             .await
-            .map_err(|e| ServerError::Internal(e.to_string()))?;
+            .map_err(|e| ServerError::internal_error(e.to_string()))?;
         total_messages += agent_messages.len() as i64;
     }
     info!(
@@ -299,7 +299,7 @@ pub async fn get_dashboard_stats(
             .messages
             .find_by_agent_id(&agent.id, 20)
             .await
-            .map_err(|e| ServerError::Internal(e.to_string()))?;
+            .map_err(|e| ServerError::internal_error(e.to_string()))?;
         recent_messages.extend(agent_messages);
     }
     recent_messages.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -422,10 +422,10 @@ pub async fn get_memory_growth(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     let mut data_points: Vec<MemoryGrowthPoint> = Vec::new();
     let mut total_memories = 0i64;
@@ -478,7 +478,7 @@ pub async fn get_memory_growth(
         let mut count_stmt = conn
             .prepare(count_query)
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
 
         if let Some(count_row) = count_stmt
             .query(params![])
@@ -501,10 +501,10 @@ pub async fn get_memory_growth(
     // ✅ Calculate real growth rate
     let growth_rate = if data_points.len() > 1 {
         let first = data_points.first()
-            .ok_or_else(|| ServerError::Internal("data_points is empty".to_string()))?
+            .ok_or_else(|| ServerError::internal_error("data_points is empty"))?
             .total as f64;
         let last = data_points.last()
-            .ok_or_else(|| ServerError::Internal("data_points is empty".to_string()))?
+            .ok_or_else(|| ServerError::internal_error("data_points is empty"))?
             .total as f64;
         let days = data_points.len() as f64;
         if days > 0.0 {
@@ -561,17 +561,17 @@ pub async fn get_agent_activity_stats(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     // Get all agents (using list with large limit)
     let all_agents = repositories
         .agents
         .list(1000, 0)
         .await
-        .map_err(|e| ServerError::Internal(e.to_string()))?;
+        .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
     let total_agents = all_agents.len() as i64;
 
@@ -588,17 +588,17 @@ pub async fn get_agent_activity_stats(
         let mut stmt = conn
             .prepare(memory_query)
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare memory query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare memory query: {}", e)))?;
 
         let mut rows = stmt
             .query(params![agent.id.as_str()])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute memory query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute memory query: {}", e)))?;
 
         let (total_memories, avg_importance) = if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch memory row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch memory row: {}", e)))?
         {
             let count: i64 = row.get(0).unwrap_or(0);
             let avg: Option<f64> = row.get(1).ok();
@@ -612,7 +612,7 @@ pub async fn get_agent_activity_stats(
             .messages
             .find_by_agent_id(&agent.id, 1000)
             .await
-            .map_err(|e| ServerError::Internal(e.to_string()))?;
+            .map_err(|e| ServerError::internal_error(e.to_string()))?;
 
         let total_interactions = messages.len() as i64;
 
@@ -680,10 +680,10 @@ pub async fn get_memory_quality_stats(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     // Query total memories and average importance
     let basic_query = "SELECT COUNT(*), AVG(importance) 
@@ -693,17 +693,17 @@ pub async fn get_memory_quality_stats(
     let mut stmt = conn
         .prepare(basic_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare basic query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare basic query: {}", e)))?;
 
     let mut rows = stmt
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute basic query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute basic query: {}", e)))?;
 
     let (total_memories, avg_importance) = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch basic row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch basic row: {}", e)))?
     {
         let count: i64 = row.get(0).unwrap_or(0);
         let avg: Option<f64> = row.get(1).ok();
@@ -720,7 +720,7 @@ pub async fn get_memory_quality_stats(
     let mut stmt2 = conn
         .prepare(high_quality_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare quality query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare quality query: {}", e)))?;
 
     let high_quality_ratio = if total_memories > 0 {
         let mut rows2 = stmt2.query(params![total_memories]).await.map_err(|e| {
@@ -730,7 +730,7 @@ pub async fn get_memory_quality_stats(
         if let Some(row) = rows2
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch quality row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch quality row: {}", e)))?
         {
             row.get::<f64>(0).unwrap_or(0.0)
         } else {
@@ -753,17 +753,17 @@ pub async fn get_memory_quality_stats(
         let mut stmt3 = conn
             .prepare(query)
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare dist query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare dist query: {}", e)))?;
 
         let mut rows3 = stmt3
             .query(params![])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute dist query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute dist query: {}", e)))?;
 
         if let Some(row) = rows3
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch dist row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch dist row: {}", e)))?
         {
             let count: i64 = row.get(0).unwrap_or(0);
             importance_distribution.insert(range.to_string(), count);
@@ -780,19 +780,19 @@ pub async fn get_memory_quality_stats(
     let mut stmt4 = conn
         .prepare(type_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare type query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare type query: {}", e)))?;
 
     let mut rows4 = stmt4
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute type query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute type query: {}", e)))?;
 
     let mut type_distribution = Vec::new();
 
     while let Some(row) = rows4
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch type row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch type row: {}", e)))?
     {
         let type_name: String = row.get(0).unwrap_or_else(|_| "Unknown".to_string());
         let count: i64 = row.get(1).unwrap_or(0);
@@ -1050,13 +1050,13 @@ pub async fn get_database_pool_stats() -> ServerResult<Json<DatabasePoolStats>> 
     // 创建连接管理器
     let manager = LibSqlConnectionManager::new(&db_path)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to create connection manager: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to create connection manager: {}", e)))?;
 
     // 获取数据库统计信息
     let db_stats = manager
         .get_stats()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to get database stats: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to get database stats: {}", e)))?;
 
     // 检查数据库健康状态
     let health_status = match manager.health_check().await {
@@ -1163,26 +1163,26 @@ pub async fn get_index_performance_stats(
         let db = Builder::new_local(&db_path)
             .build()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
         
         let conn = db
             .connect()
-            .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
         
         let mut stmt = conn
             .prepare("SELECT COUNT(*) FROM memories WHERE is_deleted = 0")
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
         
         let mut rows = stmt
             .query(params![])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
         
         if let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
         {
             row.get::<i64>(0).unwrap_or(0) as usize
         } else {
@@ -1384,11 +1384,11 @@ pub async fn get_memory_usage_stats(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
     
     // 查询总记忆数和平均访问次数
     let basic_query = "SELECT COUNT(*), AVG(COALESCE(access_count, 0)) 
@@ -1398,17 +1398,17 @@ pub async fn get_memory_usage_stats(
     let mut stmt = conn
         .prepare(basic_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare basic query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare basic query: {}", e)))?;
     
     let mut rows = stmt
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute basic query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute basic query: {}", e)))?;
     
     let (total_memories, avg_access_count) = if let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch basic row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch basic row: {}", e)))?
     {
         let count: i64 = row.get(0).unwrap_or(0);
         let avg: Option<f64> = row.get(1).ok();
@@ -1431,17 +1431,17 @@ pub async fn get_memory_usage_stats(
         let mut stmt2 = conn
             .prepare(query)
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare frequency query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare frequency query: {}", e)))?;
         
         let mut rows2 = stmt2
             .query(params![])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute frequency query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute frequency query: {}", e)))?;
         
         if let Some(row) = rows2
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch frequency row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch frequency row: {}", e)))?
         {
             let count: i64 = row.get(0).unwrap_or(0);
             access_frequency_distribution.insert(range.to_string(), count);
@@ -1467,17 +1467,17 @@ pub async fn get_memory_usage_stats(
         let mut stmt3 = conn
             .prepare(&query)
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare recency query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare recency query: {}", e)))?;
         
         let mut rows3 = stmt3
             .query(params![])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute recency query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute recency query: {}", e)))?;
         
         if let Some(row) = rows3
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch recency row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch recency row: {}", e)))?
         {
             let count: i64 = row.get(0).unwrap_or(0);
             recency_distribution.insert(range.to_string(), count);
@@ -1489,15 +1489,15 @@ pub async fn get_memory_usage_stats(
     let mut stmt4 = conn
         .prepare(&recently_accessed_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare recently accessed query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare recently accessed query: {}", e)))?;
     
     let recently_accessed = if let Some(row) = stmt4
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute recently accessed query: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute recently accessed query: {}", e)))?
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch recently accessed row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch recently accessed row: {}", e)))?
     {
         row.get::<i64>(0).unwrap_or(0)
     } else {
@@ -1509,15 +1509,15 @@ pub async fn get_memory_usage_stats(
     let mut stmt5 = conn
         .prepare(never_accessed_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare never accessed query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare never accessed query: {}", e)))?;
     
     let never_accessed = if let Some(row) = stmt5
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute never accessed query: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute never accessed query: {}", e)))?
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch never accessed row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch never accessed row: {}", e)))?
     {
         row.get::<i64>(0).unwrap_or(0)
     } else {
@@ -1529,15 +1529,15 @@ pub async fn get_memory_usage_stats(
     let mut stmt6 = conn
         .prepare(high_access_query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare high access query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare high access query: {}", e)))?;
     
     let high_access_memories = if let Some(row) = stmt6
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute high access query: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute high access query: {}", e)))?
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch high access row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch high access row: {}", e)))?
     {
         row.get::<i64>(0).unwrap_or(0)
     } else {

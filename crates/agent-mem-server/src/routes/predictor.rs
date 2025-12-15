@@ -123,7 +123,7 @@ pub async fn predict_memories(
 
     let limit = request.limit.unwrap_or(10);
     if limit == 0 {
-        return Err(crate::error::ServerError::BadRequest(
+        return Err(crate::error::ServerError::bad_request(
             "Limit cannot be zero".to_string(),
         ));
     }
@@ -138,13 +138,13 @@ pub async fn predict_memories(
         .build()
         .await
         .map_err(|e| {
-            crate::error::ServerError::Internal(format!("Failed to open database: {}", e))
+            crate::error::ServerError::internal_error(format!("Failed to open database: {}", e))
         })?;
     
     let conn = db
         .connect()
         .map_err(|e| {
-            crate::error::ServerError::Internal(format!("Failed to connect: {}", e))
+            crate::error::ServerError::internal_error(format!("Failed to connect: {}", e))
         })?;
 
     // 构建查询：获取访问频率和最近访问时间
@@ -155,13 +155,13 @@ pub async fn predict_memories(
             .prepare(query)
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to prepare query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
             })?;
         stmt
             .query(params![agent_id.clone(), (limit * 2) as i64])
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to execute query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to execute query: {}", e))
             })?
     } else if let Some(user_id) = &request.user_id {
         let query = "SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND user_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?";
@@ -169,13 +169,13 @@ pub async fn predict_memories(
             .prepare(query)
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to prepare query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
             })?;
         stmt
             .query(params![user_id.clone(), (limit * 2) as i64])
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to execute query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to execute query: {}", e))
             })?
     } else {
         let query = "SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?";
@@ -183,13 +183,13 @@ pub async fn predict_memories(
             .prepare(query)
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to prepare query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
             })?;
         stmt
             .query(params![(limit * 2) as i64])
             .await
             .map_err(|e| {
-                crate::error::ServerError::Internal(format!("Failed to execute query: {}", e))
+                crate::error::ServerError::internal_error(format!("Failed to execute query: {}", e))
             })?
     };
 
@@ -199,7 +199,7 @@ pub async fn predict_memories(
         .next()
         .await
         .map_err(|e| {
-            crate::error::ServerError::Internal(format!("Failed to fetch row: {}", e))
+            crate::error::ServerError::internal_error(format!("Failed to fetch row: {}", e))
         })? {
         let id: String = row.get(0)
             .map_err(|e| crate::error::ServerError::Internal(format!("Failed to get memory_id from row: {}", e)))?;

@@ -89,7 +89,7 @@ pub async fn get_log_stats(
     // 读取日志文件
     let content = fs::read_to_string(&log_file).await.map_err(|e| {
         warn!("Failed to read log file {}: {}", log_file, e);
-        ServerError::Internal(format!("Failed to read log file: {}", e))
+        ServerError::internal_error(format!("Failed to read log file: {}", e))
     })?;
 
     // 统计日志信息
@@ -186,7 +186,7 @@ pub async fn query_logs(
     // 读取日志文件
     let content = fs::read_to_string(&log_file).await.map_err(|e| {
         warn!("Failed to read log file {}: {}", log_file, e);
-        ServerError::Internal(format!("Failed to read log file: {}", e))
+        ServerError::internal_error(format!("Failed to read log file: {}", e))
     })?;
 
     // 过滤和限制日志行
@@ -332,7 +332,7 @@ pub async fn get_trace(
     all_requests.sort_by_key(|r| r.timestamp);
     
     if all_requests.is_empty() {
-        return Err(ServerError::NotFound(format!("Trace {} not found", trace_id)));
+        return Err(ServerError::not_found(format!("Trace {} not found", trace_id)));
     }
     
     // 计算总耗时和错误状态

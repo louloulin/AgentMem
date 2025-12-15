@@ -107,7 +107,7 @@ pub async fn register_user(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get user repository from repositories container
     let user_repo = repositories.users.clone();
@@ -116,7 +116,7 @@ pub async fn register_user(
     let exists = user_repo
         .email_exists(&request.email, &request.organization_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?;
 
     if exists {
         return Err(ServerError::BadRequest(format!(
@@ -144,7 +144,7 @@ pub async fn register_user(
     let user = user_repo
         .create(&new_user)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to create user: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to create user: {e}")))?;
 
     // Log security event
     log_security_event(SecurityEvent::LoginSuccess {
@@ -182,7 +182,7 @@ pub async fn login_user(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get user repository from repositories container
     let user_repo = repositories.users.clone();
@@ -191,14 +191,14 @@ pub async fn login_user(
     let user = user_repo
         .find_by_email(&request.email, &request.organization_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
         .ok_or_else(|| {
             log_security_event(SecurityEvent::LoginFailure {
                 email: request.email.clone(),
                 ip_address: None,
                 reason: "User not found".to_string(),
             });
-            ServerError::Unauthorized("Invalid email or password".to_string())
+            ServerError::unauthorized("Invalid email or password")
         })?;
 
     // Verify password
@@ -209,9 +209,7 @@ pub async fn login_user(
             ip_address: None,
             reason: "Invalid password".to_string(),
         });
-        return Err(ServerError::Unauthorized(
-            "Invalid email or password".to_string(),
-        ));
+        return Err(ServerError::unauthorized("Invalid email or password"));
     }
 
     // Generate JWT token
@@ -270,8 +268,8 @@ pub async fn get_current_user(
     let user = user_repo
         .find_by_id(&auth_user.user_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound("User not found".to_string()))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerError::not_found("User not found"))?;
 
     let response = UserResponse {
         id: user.id,
@@ -308,7 +306,7 @@ pub async fn update_current_user(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get user repository from repositories container
     let user_repo = repositories.users.clone();
@@ -317,8 +315,8 @@ pub async fn update_current_user(
     let mut user = user_repo
         .find_by_id(&auth_user.user_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound("User not found".to_string()))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerError::not_found("User not found"))?;
 
     // Update fields if provided
     if let Some(name) = request.name {
@@ -334,7 +332,7 @@ pub async fn update_current_user(
     let user = user_repo
         .update(&user)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to update user: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to update user: {e}")))?;
 
     let response = UserResponse {
         id: user.id,
@@ -371,7 +369,7 @@ pub async fn change_password(
     // Validate request
     request
         .validate()
-        .map_err(|e| ServerError::BadRequest(format!("Validation error: {e}")))?;
+        .map_err(|e| ServerError::bad_request(format!("Validation error: {e}")))?;
 
     // Get user repository from repositories container
     let user_repo = repositories.users.clone();
@@ -380,15 +378,13 @@ pub async fn change_password(
     let user = user_repo
         .find_by_id(&auth_user.user_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
-        .ok_or_else(|| ServerError::NotFound("User not found".to_string()))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerError::not_found("User not found"))?;
 
     // Verify current password
     let valid = PasswordService::verify_password(&request.current_password, &user.password_hash)?;
     if !valid {
-        return Err(ServerError::Unauthorized(
-            "Current password is incorrect".to_string(),
-        ));
+        return Err(ServerError::unauthorized("Current password is incorrect"));
     }
 
     // Hash new password
@@ -398,7 +394,7 @@ pub async fn change_password(
     user_repo
         .update_password(&auth_user.user_id, &new_password_hash)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to update password: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to update password: {e}")))?;
 
     // Log security event
     log_security_event(SecurityEvent::PasswordChanged {
@@ -448,7 +444,7 @@ pub async fn get_user_by_id(
     let user_model = user_repo
         .find_by_id(&user_id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?
         .ok_or_else(|| ServerError::NotFound(format!("User with id {} not found", user_id)))?;
 
     let user = UserResponse {
@@ -515,7 +511,7 @@ pub async fn get_users_list(
     let users_models = user_repo
         .list(page_size as i64, offset as i64)
         .await
-        .map_err(|e| ServerError::Internal(format!("Database error: {e}")))?;
+        .map_err(|e| ServerError::internal_error(format!("Database error: {e}")))?;
 
     // Convert to response models
     let users: Vec<UserResponse> = users_models

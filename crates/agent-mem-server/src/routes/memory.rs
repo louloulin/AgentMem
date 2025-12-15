@@ -115,7 +115,7 @@ impl MemoryManager {
         warn!("⚠️  下载进度不会显示，但程序正在运行中");
 
         let memory = builder.build().await.map_err(|e| {
-            ServerError::Internal(format!("Failed to create Memory with LibSQL: {}", e))
+            ServerError::internal_error(format!("Failed to create Memory with LibSQL: {}", e))
         })?;
 
         info!("✅ Memory 实例构建成功");
@@ -744,7 +744,7 @@ pub async fn add_memory(
         .await
         .map_err(|e| {
             error!("Failed to add memory: {}", e);
-            ServerError::MemoryError(e.to_string())
+            ServerError::memory_error(e.to_string())
         })?;
 
     let response = crate::models::MemoryResponse {
@@ -785,7 +785,7 @@ pub async fn get_memory(
 
     match memory {
         Some(mem) => Ok(Json(crate::models::ApiResponse::success(mem))),
-        None => Err(ServerError::NotFound("Memory not found".to_string())),
+        None => Err(ServerError::not_found("Memory not found")),
     }
 }
 
@@ -820,9 +820,9 @@ pub async fn update_memory(
         .await
         .map_err(|e| {
             error!("Failed to find memory for update: {}", e);
-            ServerError::MemoryError(format!("Memory not found: {}", e))
+            ServerError::memory_error(format!("Memory not found: {}", e))
         })?
-        .ok_or_else(|| ServerError::MemoryError("Memory not found".to_string()))?;
+        .ok_or_else(|| ServerError::memory_error("Memory not found"))?;
 
     // 构建更新后的Memory，保留其他字段
     let updated_content = if let Some(content) = request.content {
@@ -896,7 +896,7 @@ pub async fn delete_memory(
     
     if !memory_exists {
         warn!("记忆不存在于LibSQL: {}", id);
-        return Err(ServerError::NotFound(format!("Memory not found: {}", id)));
+        return Err(ServerError::not_found(format!("Memory not found: {}", id)));
     }
     
     // 🔧 修复: 先删除LibSQL（主存储），然后尝试删除向量存储
@@ -1074,37 +1074,37 @@ async fn prefetch_for_query(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
 
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     // 根据过滤条件构建查询
     let mut rows = if let Some(agent_id) = &request.agent_id {
         let mut stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
         stmt.query(libsql::params![agent_id.clone(), fetch_limit as i64])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?
     } else if let Some(user_id) = &request.user_id {
         let mut stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND user_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
         stmt.query(libsql::params![user_id.clone(), fetch_limit as i64])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?
     } else {
         let mut stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
         stmt.query(libsql::params![fetch_limit as i64])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?
     };
 
     // 收集行数据
@@ -1112,11 +1112,11 @@ async fn prefetch_for_query(
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         let id: String = row
             .get(0)
-            .map_err(|e| ServerError::Internal(format!("Failed to get id: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to get id: {}", e)))?;
         let access_count: i64 = row.get(1).unwrap_or(0);
         let last_accessed_ts: Option<i64> = row.get(2).ok();
         collected.push((id, access_count, last_accessed_ts));
@@ -1851,11 +1851,11 @@ pub async fn warmup_cache(
         let db = Builder::new_local(&db_path)
             .build()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
         
         let conn = db
             .connect()
-            .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
         
         // 🆕 Phase 2.3: 增强查询 - 获取访问模式和评分信息
         let mut stmt = conn
@@ -1866,22 +1866,22 @@ pub async fn warmup_cache(
                  LIMIT ?"
             )
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
         
         let mut rows = stmt
             .query(params![limit as i64])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+            .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
         
         // 🆕 Phase 2.3: 使用访问模式评分排序
         let mut memory_scores: Vec<(String, f64, i64)> = Vec::new();
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
         {
             let id: String = row.get(0)
-                .map_err(|e| ServerError::Internal(format!("Failed to get id from row: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to get id from row: {}", e)))?;
             let access_count: i64 = row.get(1).unwrap_or(0);
             let last_accessed_ts: Option<i64> = row.get(2).ok();
             
@@ -1959,7 +1959,7 @@ pub async fn get_memory_history(
     let memory = memory_manager
         .get_memory(&id)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to get memory: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to get memory: {}", e)))?
         .ok_or_else(|| ServerError::NotFound("Memory not found".to_string()))?;
 
     // 构建历史记录（简化版，返回当前版本）
@@ -2394,11 +2394,11 @@ pub async fn deduplicate_memories(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
     
     // 查询所有记忆，按hash分组
     let query = "SELECT id, hash, content, importance, agent_id, user_id 
@@ -2410,12 +2410,12 @@ pub async fn deduplicate_memories(
     let mut stmt = conn
         .prepare(query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
     
     let mut rows = stmt
         .query(params![])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
     
     // 按hash分组记忆
     use std::collections::HashMap;
@@ -2424,7 +2424,7 @@ pub async fn deduplicate_memories(
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         let id: String = row.get(0).unwrap_or_default();
         let hash: String = row.get(1).unwrap_or_default();
@@ -2665,11 +2665,11 @@ pub async fn export_memories(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
     
     // 构建查询
     let mut query = "SELECT id, agent_id, user_id, content, memory_type, importance, 
@@ -2698,13 +2698,13 @@ pub async fn export_memories(
     let mut stmt = conn
         .prepare(&query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
     
     // 简化参数处理：只使用limit
     let mut rows = stmt
         .query(params![limit as i64])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
     
     let mut memories = Vec::new();
     use chrono::{DateTime, Utc};
@@ -2712,7 +2712,7 @@ pub async fn export_memories(
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         let created_at_ts: Option<i64> = row.get(6).ok();
         let created_at_str = created_at_ts
@@ -2858,22 +2858,22 @@ pub async fn batch_update_importance(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
     
     let query = "SELECT id, importance, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND (access_count > 0 OR last_accessed IS NOT NULL) LIMIT ?";
     let mut stmt = conn
         .prepare(query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
     
     let mut rows = stmt
         .query(params![limit as i64])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to execute query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
     
     let mut update_count = 0;
     let now = chrono::Utc::now().timestamp();
@@ -2881,7 +2881,7 @@ pub async fn batch_update_importance(
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         let id: String = row.get(0).unwrap_or_default();
         let current_importance: f64 = row.get(1).unwrap_or(0.5);
@@ -3082,11 +3082,11 @@ pub async fn get_agent_memories(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
 
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     let query = "SELECT id, agent_id, user_id, content, memory_type, importance, \
                  created_at, last_accessed, access_count, metadata, hash \
@@ -3095,19 +3095,19 @@ pub async fn get_agent_memories(
     let mut stmt = conn
         .prepare(query)
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to prepare query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
 
     let mut rows = stmt
         .query(params![agent_id.clone()])
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to query: {}", e)))?;
 
     let mut memories_json: Vec<serde_json::Value> = vec![];
 
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
         use chrono::{DateTime, Utc};
@@ -3201,10 +3201,10 @@ pub async fn list_all_memories(
     let db = Builder::new_local(&db_path)
         .build()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to open database: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to open database: {}", e)))?;
     let conn = db
         .connect()
-        .map_err(|e| ServerError::Internal(format!("Failed to connect: {}", e)))?;
+        .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     // 构建查询并执行
     use libsql::params;
@@ -3219,10 +3219,10 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(&query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
             stmt.query(params![limit as i64, offset as i64])
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+                .map_err(|e| ServerError::internal_error(format!("Failed to query: {}", e)))?
         }
         (Some(aid), None) => {
             let query = format!(
@@ -3234,10 +3234,10 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(&query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
             stmt.query(params![aid.clone(), limit as i64, offset as i64])
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+                .map_err(|e| ServerError::internal_error(format!("Failed to query: {}", e)))?
         }
         (None, Some(mt)) => {
             let query = format!(
@@ -3249,10 +3249,10 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(&query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
             stmt.query(params![mt.clone(), limit as i64, offset as i64])
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+                .map_err(|e| ServerError::internal_error(format!("Failed to query: {}", e)))?
         }
         (Some(aid), Some(mt)) => {
             let query = format!(
@@ -3264,7 +3264,7 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(&query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
             stmt.query(params![
                 aid.clone(),
                 mt.clone(),
@@ -3272,7 +3272,7 @@ pub async fn list_all_memories(
                 offset as i64
             ])
             .await
-            .map_err(|e| ServerError::Internal(format!("Failed to query: {}", e)))?
+            .map_err(|e| ServerError::internal_error(format!("Failed to query: {}", e)))?
         }
     };
 
@@ -3280,7 +3280,7 @@ pub async fn list_all_memories(
     while let Some(row) = rows
         .next()
         .await
-        .map_err(|e| ServerError::Internal(format!("Failed to fetch row: {}", e)))?
+        .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         let created_at_ts: Option<i64> = row.get(6).ok();
         let created_at_str = created_at_ts
@@ -3320,7 +3320,7 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
             if let Some(count_row) = stmt
                 .query(params![])
                 .await
@@ -3337,7 +3337,7 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
             if let Some(count_row) = stmt
                 .query(params![aid.clone()])
                 .await
@@ -3354,7 +3354,7 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
             if let Some(count_row) = stmt
                 .query(params![mt.clone()])
                 .await
@@ -3371,7 +3371,7 @@ pub async fn list_all_memories(
             let mut stmt = conn
                 .prepare(query)
                 .await
-                .map_err(|e| ServerError::Internal(format!("Failed to prepare count: {}", e)))?;
+                .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
             if let Some(count_row) = stmt
                 .query(params![aid.clone(), mt.clone()])
                 .await

@@ -179,9 +179,45 @@ impl ServerError {
         }
     }
 
+    /// Create a quota exceeded error
+    pub fn quota_exceeded(msg: impl Into<String>) -> Self {
+        ServerError::QuotaExceeded {
+            message: msg.into(),
+            context: None,
+        }
+    }
+
+    /// Create a quota exceeded error
+    pub fn quota_exceeded(msg: impl Into<String>) -> Self {
+        ServerError::QuotaExceeded {
+            message: msg.into(),
+            context: None,
+        }
+    }
+
     /// Create an internal error
     pub fn internal_error(msg: impl Into<String>) -> Self {
         ServerError::Internal {
+            message: msg.into(),
+            source: None,
+            context: None,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    /// Create a memory error
+    pub fn memory_error(msg: impl Into<String>) -> Self {
+        ServerError::MemoryError {
+            message: msg.into(),
+            source: None,
+            context: None,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    /// Create a server error
+    pub fn server_error(msg: impl Into<String>) -> Self {
+        ServerError::ServerError {
             message: msg.into(),
             source: None,
             context: None,
