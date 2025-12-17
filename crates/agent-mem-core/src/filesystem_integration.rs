@@ -119,10 +119,9 @@ impl FilesystemIntegrationManager {
         info!("加载CLAUDE.md文件: {:?}", path);
 
         let content = fs::read_to_string(path).await.map_err(|e| {
-            agent_mem_traits::AgentMemError::IoError(format!(
-                "Failed to read CLAUDE.md file: {}",
-                e
-            ))
+            agent_mem_traits::AgentMemError::IoError(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to read CLAUDE.md file: {}", e))
+            )
         })?;
 
         let claude_file = self.parse_claude_md(&content, path)?;
@@ -208,25 +207,18 @@ impl FilesystemIntegrationManager {
         let mut memories = Vec::new();
 
         for claude_mem in &claude_file.memories {
+            let memory_type = claude_mem.memory_type.clone().unwrap_or_else(|| "untyped".to_string());
+            let importance = claude_mem.importance.unwrap_or(0.5) as f32;
+            
             let mut memory = Memory::new(
-                agent_mem_traits::Content::Text(claude_mem.content.clone()),
+                "default".to_string(), // agent_id
+                None, // user_id
+                memory_type.clone(),
+                claude_mem.content.clone(),
+                importance,
             );
 
-            // 设置记忆类型
-            if let Some(ref mem_type) = claude_mem.memory_type {
-                memory.attributes.insert(
-                    agent_mem_traits::AttributeKey::core("memory_type"),
-                    agent_mem_traits::AttributeValue::String(mem_type.clone()),
-                );
-            }
-
-            // 设置重要性
-            if let Some(importance) = claude_mem.importance {
-                memory.attributes.insert(
-                    agent_mem_traits::AttributeKey::system("importance"),
-                    agent_mem_traits::AttributeValue::Number(importance),
-                );
-            }
+            // 记忆类型和重要性已在Memory::new中设置，这里只需要更新其他属性
 
             // 设置标签
             if !claude_mem.tags.is_empty() {
@@ -243,7 +235,7 @@ impl FilesystemIntegrationManager {
             // 设置元数据
             for (key, value) in &claude_mem.metadata {
                 memory.attributes.insert(
-                    agent_mem_traits::AttributeKey::custom(key),
+                    agent_mem_traits::AttributeKey::new("metadata", key),
                     agent_mem_traits::AttributeValue::String(value.clone()),
                 );
             }
@@ -268,9 +260,8 @@ impl FilesystemIntegrationManager {
     pub async fn process_imports(&self, content: &str) -> Result<String> {
         let mut result = content.to_string();
 
-        for prefix in &self.config.import_prefixes {
+        for _prefix in &self.config.import_prefixes {
             // 查找所有导入语句
-            let pattern = format!("{}{{}}", prefix);
             // 简化的导入处理（实际应使用更完善的解析）
             // TODO: 实现完整的导入解析和替换
         }
@@ -318,10 +309,9 @@ impl FilesystemIntegrationManager {
         }
 
         fs::write(path, content).await.map_err(|e| {
-            agent_mem_traits::AgentMemError::IoError(format!(
-                "Failed to write CLAUDE.md file: {}",
-                e
-            ))
+            agent_mem_traits::AgentMemError::IoError(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to write CLAUDE.md file: {}", e))
+            )
         })?;
 
         info!("✅ 记忆已保存到CLAUDE.md");
