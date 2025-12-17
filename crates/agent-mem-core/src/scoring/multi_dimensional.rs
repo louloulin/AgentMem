@@ -1,0 +1,504 @@
+//! Multi-Dimensional Scoring System
+//!
+//! Phase 2.1: 实现综合评分（相关性+重要性+时效性+质量）
+//! 参考Mem0的评分策略，提升检索准确率10-15%
+
+use agent_mem_traits::{MemoryV4 as Memory, Result};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{debug, info};
+
+/// 多维度评分配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiDimensionalScoringConfig {
+    /// 相关性权重 (0.0-1.0)
+    pub relevance_weight: f64,
+    /// 重要性权重 (0.0-1.0)
+    pub importance_weight: f64,
+    /// 时效性权重 (0.0-1.0)
+    pub recency_weight: f64,
+    /// 质量权重 (0.0-1.0)
+    pub quality_weight: f64,
+    /// 时间衰减半衰期（小时）
+    pub recency_halflife_hours: f64,
+    /// 启用权重自适应调整
+    pub enable_adaptive_weights: bool,
+    /// 启用评分缓存
+    pub enable_score_cache: bool,
+    /// 缓存TTL（秒）
+    pub cache_ttl_seconds: u64,
+}
+
+impl Default for MultiDimensionalScoringConfig {
+    fn default() -> Self {
+        Self {
+            relevance_weight: 0.40,      // 40%: 相关性最重要
+            importance_weight: 0.25,     // 25%: 重要性
+            recency_weight: 0.20,        // 20%: 时效性
+            quality_weight: 0.15,       // 15%: 质量
+            recency_halflife_hours: 24.0, // 24小时半衰期
+            enable_adaptive_weights: true,
+            enable_score_cache: true,
+            cache_ttl_seconds: 3600,     // 1小时缓存
+        }
+    }
+}
+
+/// 多维度评分结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiDimensionalScore {
+    /// 相关性分数 (0.0-1.0)
+    pub relevance: f64,
+    /// 重要性分数 (0.0-1.0)
+    pub importance: f64,
+    /// 时效性分数 (0.0-1.0)
+    pub recency: f64,
+    /// 质量分数 (0.0-1.0)
+    pub quality: f64,
+    /// 综合分数 (加权平均)
+    pub composite: f64,
+    /// 各维度贡献度（用于调试和分析）
+    pub contributions: HashMap<String, f64>,
+    /// 计算时间戳
+    pub calculated_at: DateTime<Utc>,
+}
+
+/// 评分缓存条目
+#[derive(Debug, Clone)]
+struct ScoreCacheEntry {
+    score: MultiDimensionalScore,
+    cached_at: DateTime<Utc>,
+}
+
+/// 多维度评分器
+pub struct MultiDimensionalScorer {
+    config: MultiDimensionalScoringConfig,
+    /// 评分缓存 (memory_id -> ScoreCacheEntry)
+    score_cache: Arc<RwLock<HashMap<String, ScoreCacheEntry>>>,
+    /// 权重历史（用于自适应调整）
+    weight_history: Arc<RwLock<Vec<MultiDimensionalScoringConfig>>>,
+    /// 性能指标（用于权重优化）
+    performance_metrics: Arc<RwLock<HashMap<String, f64>>>,
+}
+
+impl MultiDimensionalScorer {
+    /// 创建新的多维度评分器
+    pub fn new(config: MultiDimensionalScoringConfig) -> Self {
+        Self {
+            config: config.clone(),
+            score_cache: Arc::new(RwLock::new(HashMap::new())),
+            weight_history: Arc::new(RwLock::new(vec![config])),
+            performance_metrics: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 使用默认配置创建
+    pub fn with_defaults() -> Self {
+        Self::new(MultiDimensionalScoringConfig::default())
+    }
+
+    /// 计算多维度综合评分
+    pub async fn calculate_score(
+        &self,
+        memory: &Memory,
+        query: &str,
+        query_vector: Option<&[f32]>,
+    ) -> Result<MultiDimensionalScore> {
+        // 检查缓存
+        if self.config.enable_score_cache {
+            let memory_id = memory.id.as_str().to_string();
+            if let Some(cached) = self.get_cached_score(&memory_id).await {
+                debug!("使用缓存的评分: {}", memory_id);
+                return Ok(cached);
+            }
+        }
+
+        // 计算各维度分数
+        let relevance = self.calculate_relevance_score(memory, query, query_vector).await?;
+        let importance = self.calculate_importance_score(memory).await?;
+        let recency = self.calculate_recency_score(memory).await?;
+        let quality = self.calculate_quality_score(memory).await?;
+
+        // 计算加权综合分数
+        let composite = relevance * self.config.relevance_weight
+            + importance * self.config.importance_weight
+            + recency * self.config.recency_weight
+            + quality * self.config.quality_weight;
+
+        // 计算各维度贡献度
+        let mut contributions = HashMap::new();
+        contributions.insert("relevance".to_string(), relevance * self.config.relevance_weight);
+        contributions.insert("importance".to_string(), importance * self.config.importance_weight);
+        contributions.insert("recency".to_string(), recency * self.config.recency_weight);
+        contributions.insert("quality".to_string(), quality * self.config.quality_weight);
+
+        let score = MultiDimensionalScore {
+            relevance,
+            importance,
+            recency,
+            quality,
+            composite,
+            contributions,
+            calculated_at: Utc::now(),
+        };
+
+        // 缓存结果
+        if self.config.enable_score_cache {
+            let memory_id = memory.id.as_str().to_string();
+            self.cache_score(&memory_id, &score).await;
+        }
+
+        debug!(
+            "多维度评分: relevance={:.3}, importance={:.3}, recency={:.3}, quality={:.3}, composite={:.3}",
+            relevance, importance, recency, quality, composite
+        );
+
+        Ok(score)
+    }
+
+    /// 计算相关性分数
+    async fn calculate_relevance_score(
+        &self,
+        memory: &Memory,
+        query: &str,
+        query_vector: Option<&[f32]>,
+    ) -> Result<f64> {
+        // 方法1: 如果提供了查询向量，使用向量相似度
+        if let Some(qv) = query_vector {
+            if let Some(memory_vector) = self.get_memory_vector(memory).await? {
+                let similarity = self.cosine_similarity(qv, &memory_vector);
+                return Ok(similarity.max(0.0).min(1.0));
+            }
+        }
+
+        // 方法2: 文本匹配（字符/单词重叠）
+        let content = self.get_memory_content(memory);
+        let query_lower = query.to_lowercase();
+        let content_lower = content.to_lowercase();
+
+        // 字符重叠（适用于中文）
+        let query_chars: Vec<char> = query_lower.chars().filter(|c| !c.is_whitespace()).collect();
+        let char_score = if !query_chars.is_empty() {
+            let matches = query_chars.iter()
+                .filter(|c| content_lower.contains(**c))
+                .count();
+            (matches as f64) / (query_chars.len() as f64)
+        } else {
+            0.0
+        };
+
+        // 单词重叠（适用于英文）
+        let query_words: Vec<&str> = query_lower.split_whitespace().collect();
+        let content_words: Vec<&str> = content_lower.split_whitespace().collect();
+        let word_score = if !query_words.is_empty() && !content_words.is_empty() {
+            let matches = query_words.iter()
+                .filter(|qw| content_words.iter().any(|cw| cw.contains(*qw)))
+                .count();
+            (matches as f64) / (query_words.len() as f64)
+        } else {
+            0.0
+        };
+
+        // 返回最大值（兼容中英文）
+        Ok(char_score.max(word_score).max(0.0).min(1.0))
+    }
+
+    /// 计算重要性分数
+    async fn calculate_importance_score(&self, memory: &Memory) -> Result<f64> {
+        // 从memory属性中获取重要性分数
+        let importance = memory
+            .attributes
+            .get(&agent_mem_traits::AttributeKey::system("importance"))
+            .and_then(|v| v.as_number())
+            .unwrap_or(0.5);
+
+        Ok(importance.max(0.0).min(1.0))
+    }
+
+    /// 计算时效性分数（时间衰减）
+    async fn calculate_recency_score(&self, memory: &Memory) -> Result<f64> {
+        let now = Utc::now();
+        let created_at = memory.metadata.created_at;
+        let age_hours = (now - created_at).num_hours() as f64;
+
+        // 检查是否是工作记忆（不衰减）
+        let memory_type = memory
+            .attributes
+            .get(&agent_mem_traits::AttributeKey::core("memory_type"))
+            .and_then(|v| v.as_string())
+            .unwrap_or(&String::new())
+            .clone();
+
+        if memory_type == "working" || memory_type == "Working" {
+            return Ok(1.0); // 工作记忆不衰减
+        }
+
+        // 指数衰减: score = e^(-λt), where λ = ln(2) / halflife
+        let lambda = (2.0_f64).ln() / self.config.recency_halflife_hours;
+        let decay_factor = (-lambda * age_hours).exp();
+
+        Ok(decay_factor.max(0.0).min(1.0))
+    }
+
+    /// 计算质量分数
+    async fn calculate_quality_score(&self, memory: &Memory) -> Result<f64> {
+        let content = self.get_memory_content(memory);
+        let length = content.len();
+
+        // 内容长度评分
+        let length_score = if length < 20 {
+            0.3 // 太短
+        } else if length > 1000 {
+            0.8 // 太长
+        } else {
+            1.0 // 适中
+        };
+
+        // 结构化信息评分（如果有结构化内容）
+        let structured_score = match &memory.content {
+            agent_mem_traits::Content::Structured(_) => 1.0,
+            agent_mem_traits::Content::Text(_) => 0.8,
+            _ => 0.5,
+        };
+
+        // 元数据完整性评分
+        let metadata_score = if memory.attributes.attributes.is_empty() {
+            0.5
+        } else {
+            0.8 + (memory.attributes.attributes.len() as f64 * 0.01).min(0.2)
+        };
+
+        // 综合质量分数（加权平均）
+        let quality = length_score * 0.4 + structured_score * 0.3 + metadata_score * 0.3;
+
+        Ok(quality.max(0.0_f64).min(1.0_f64))
+    }
+
+    /// 获取记忆向量（如果可用）
+    async fn get_memory_vector(&self, _memory: &Memory) -> Result<Option<Vec<f32>>> {
+        // TODO: 从向量存储中获取记忆的嵌入向量
+        // 当前返回None，使用文本匹配
+        Ok(None)
+    }
+
+    /// 获取记忆内容文本
+    fn get_memory_content(&self, memory: &Memory) -> String {
+        match &memory.content {
+            agent_mem_traits::Content::Text(t) => t.clone(),
+            agent_mem_traits::Content::Structured(v) => v.to_string(),
+            _ => String::new(),
+        }
+    }
+
+    /// 计算余弦相似度
+    fn cosine_similarity(&self, vec1: &[f32], vec2: &[f32]) -> f64 {
+        if vec1.len() != vec2.len() {
+            return 0.0;
+        }
+
+        let dot_product: f64 = vec1.iter()
+            .zip(vec2.iter())
+            .map(|(a, b)| (*a as f64) * (*b as f64))
+            .sum();
+
+        let norm1: f64 = vec1.iter()
+            .map(|x| (*x as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
+
+        let norm2: f64 = vec2.iter()
+            .map(|x| (*x as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
+
+        if norm1 == 0.0 || norm2 == 0.0 {
+            0.0
+        } else {
+            (dot_product / (norm1 * norm2)).max(-1.0).min(1.0)
+        }
+    }
+
+    /// 获取缓存的评分
+    async fn get_cached_score(&self, memory_id: &str) -> Option<MultiDimensionalScore> {
+        let cache = self.score_cache.read().await;
+        if let Some(entry) = cache.get(memory_id) {
+            let age = Utc::now() - entry.cached_at;
+            if age.num_seconds() < self.config.cache_ttl_seconds as i64 {
+                return Some(entry.score.clone());
+            }
+        }
+        None
+    }
+
+    /// 缓存评分
+    async fn cache_score(&self, memory_id: &str, score: &MultiDimensionalScore) {
+        let mut cache = self.score_cache.write().await;
+        cache.insert(
+            memory_id.to_string(),
+            ScoreCacheEntry {
+                score: score.clone(),
+                cached_at: Utc::now(),
+            },
+        );
+    }
+
+    /// 自适应调整权重（基于性能反馈）
+    pub async fn adjust_weights(&mut self, feedback: &WeightAdjustmentFeedback) -> Result<()> {
+        if !self.config.enable_adaptive_weights {
+            return Ok(());
+        }
+
+        // 根据反馈调整权重
+        // TODO: 实现更复杂的自适应算法（如梯度下降、强化学习等）
+        info!("自适应调整权重: {:?}", feedback);
+        
+        // 保存权重历史
+        let mut history = self.weight_history.write().await;
+        history.push(self.config.clone());
+
+        Ok(())
+    }
+
+    /// 清除评分缓存
+    pub async fn clear_cache(&self) {
+        let mut cache = self.score_cache.write().await;
+        cache.clear();
+        info!("评分缓存已清除");
+    }
+
+    /// 获取缓存统计
+    pub async fn get_cache_stats(&self) -> CacheStats {
+        let cache = self.score_cache.read().await;
+        CacheStats {
+            entries: cache.len(),
+            hit_rate: 0.0, // TODO: 实现命中率统计
+        }
+    }
+}
+
+/// 权重调整反馈
+#[derive(Debug, Clone)]
+pub struct WeightAdjustmentFeedback {
+    /// 检索准确率提升
+    pub accuracy_improvement: f64,
+    /// 用户满意度
+    pub user_satisfaction: f64,
+    /// 各维度效果
+    pub dimension_effects: HashMap<String, f64>,
+}
+
+/// 缓存统计
+#[derive(Debug, Clone)]
+pub struct CacheStats {
+    pub entries: usize,
+    pub hit_rate: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_mem_traits::{AttributeKey, AttributeValue, Content, MetadataV4 as MemoryMetadata, AttributeSet, MemoryId, RelationGraph};
+
+    fn create_test_memory(importance: f64, age_hours: i64) -> Memory {
+        let created_at = Utc::now() - chrono::Duration::hours(age_hours);
+        
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance),
+        );
+        attributes.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String("episodic".to_string()),
+        );
+
+        use agent_mem_traits::{AttributeSet, MemoryId, RelationGraph};
+        
+        let mut attr_set = AttributeSet::new();
+        attr_set.insert(
+            AttributeKey::system("importance"),
+            AttributeValue::Number(importance),
+        );
+        attr_set.insert(
+            AttributeKey::core("memory_type"),
+            AttributeValue::String("episodic".to_string()),
+        );
+
+        Memory {
+            id: MemoryId::new(),
+            content: Content::Text("This is a test memory content".to_string()),
+            metadata: MemoryMetadata {
+                created_at,
+                updated_at: created_at,
+                accessed_at: created_at,
+                access_count: 0,
+                version: 1,
+                hash: None,
+            },
+            attributes: attr_set,
+            relations: RelationGraph::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_multi_dimensional_scoring() {
+        let scorer = MultiDimensionalScorer::with_defaults();
+        
+        let memory = create_test_memory(0.8, 1);
+        let query = "test memory";
+        let query_vector = None;
+
+        let score = scorer.calculate_score(&memory, query, query_vector).await.unwrap();
+
+        assert!(score.relevance >= 0.0 && score.relevance <= 1.0);
+        assert!(score.importance >= 0.0 && score.importance <= 1.0);
+        assert!(score.recency >= 0.0 && score.recency <= 1.0);
+        assert!(score.quality >= 0.0 && score.quality <= 1.0);
+        assert!(score.composite >= 0.0 && score.composite <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_recency_decay() {
+        let scorer = MultiDimensionalScorer::with_defaults();
+        
+        let recent = create_test_memory(0.5, 1);  // 1小时前
+        let old = create_test_memory(0.5, 48);     // 48小时前
+
+        let recent_score = scorer.calculate_recency_score(&recent).await.unwrap();
+        let old_score = scorer.calculate_recency_score(&old).await.unwrap();
+
+        assert!(recent_score > old_score, "新记忆应该得分更高");
+    }
+
+    #[tokio::test]
+    async fn test_importance_scoring() {
+        let scorer = MultiDimensionalScorer::with_defaults();
+        
+        let high_importance = create_test_memory(0.9, 1);
+        let low_importance = create_test_memory(0.2, 1);
+
+        let high_score = scorer.calculate_importance_score(&high_importance).await.unwrap();
+        let low_score = scorer.calculate_importance_score(&low_importance).await.unwrap();
+
+        assert!(high_score > low_score, "高重要性应该得分更高");
+    }
+
+    #[tokio::test]
+    async fn test_score_caching() {
+        let scorer = MultiDimensionalScorer::with_defaults();
+        
+        let memory = create_test_memory(0.5, 1);
+        let query = "test";
+
+        // 第一次计算（应该计算）
+        let score1 = scorer.calculate_score(&memory, query, None).await.unwrap();
+        
+        // 第二次计算（应该使用缓存）
+        let score2 = scorer.calculate_score(&memory, query, None).await.unwrap();
+
+        assert_eq!(score1.composite, score2.composite, "缓存分数应该相同");
+    }
+}

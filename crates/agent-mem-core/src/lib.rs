@@ -46,6 +46,8 @@ pub mod hierarchy_manager;
 pub mod history;
 pub mod importance_scorer;
 pub mod integration;
+/// Multi-dimensional scoring system for memory evaluation
+pub mod scoring;
 pub mod intelligence;
 pub mod lifecycle;
 /// LLM optimization modules (KV-cache, prompt optimization)
