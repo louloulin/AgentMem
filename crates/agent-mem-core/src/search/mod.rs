@@ -50,7 +50,10 @@ pub use enhanced_hybrid_v2::{
     EnhancedHybridConfig, EnhancedHybridSearchEngine as EnhancedHybridSearchEngineV2,
     EnhancedSearchResult, EnhancedSearchStats,
 };
-pub use external_reranker::{InternalReranker, Reranker, RerankerFactory};
+pub use external_reranker::{
+    InternalReranker, LLMReranker, LLMRerankerConfig, Reranker, RerankerFactory,
+    RerankCacheStats, CachedReranker,
+};
 #[cfg(feature = "postgres")]
 pub use fulltext_search::FullTextSearchEngine;
 pub use fuzzy::{FuzzyMatchEngine, FuzzyMatchParams};
