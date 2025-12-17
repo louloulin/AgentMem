@@ -21,6 +21,8 @@ pub struct TestConfig {
     pub verbose: bool,
     /// LLM配置
     pub llm_config: Option<LlmConfig>,
+    /// 每个类别最多使用多少个会话（None 表示使用全部）
+    pub max_sessions_per_category: Option<usize>,
 }
 
 impl Default for TestConfig {
@@ -29,6 +31,7 @@ impl Default for TestConfig {
             dataset_path: "data".to_string(),
             verbose: true,
             llm_config: None,
+            max_sessions_per_category: None,
         }
     }
 }
@@ -96,11 +99,9 @@ impl LocomoTestFramework {
 
     /// 使用自定义配置创建（异步版本）
     pub async fn with_config_async(config: TestConfig) -> Result<Self> {
-        let memory = Memory::builder()
-            .with_storage("memory://")
-            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
-            .build()
-            .await?;
+        // 使用 mem0_mode 确保所有组件正确初始化
+        // 这会自动配置 FastEmbed、LibSQL 和 LanceDB
+        let memory = Memory::mem0_mode().await?;
         let llm_client = config
             .llm_config
             .clone()
@@ -117,11 +118,8 @@ impl LocomoTestFramework {
     pub fn with_config(config: TestConfig) -> Result<Self> {
         let rt = tokio::runtime::Runtime::new()?;
         let memory = rt.block_on(async {
-            Memory::builder()
-                .with_storage("memory://")
-                .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
-                .build()
-                .await
+            // 使用 mem0_mode 确保所有组件正确初始化
+            Memory::mem0_mode().await
         })?;
         let llm_client = config
             .llm_config
@@ -144,36 +142,52 @@ impl LocomoTestFramework {
         let dataset_loader = DatasetLoader::new(&self.config.dataset_path);
         let datasets = dataset_loader.load_all().await?;
 
+        // 如果设置了每类最大会话数，则在内存中做一次裁剪，避免一次性加载过多样本导致 OOM
+        let limit = self.config.max_sessions_per_category;
+        let limit_sessions = |sessions: &Vec<ConversationSession>| -> Vec<ConversationSession> {
+            if let Some(max) = limit {
+                sessions.iter().cloned().take(max).collect()
+            } else {
+                sessions.clone()
+            }
+        };
+
+        let single_hop_data = limit_sessions(&datasets.single_hop);
+        let multi_hop_data = limit_sessions(&datasets.multi_hop);
+        let temporal_data = limit_sessions(&datasets.temporal);
+        let open_domain_data = limit_sessions(&datasets.open_domain);
+        let adversarial_data = limit_sessions(&datasets.adversarial);
+
         let mut category_results = HashMap::new();
 
         // 1. Single-hop推理测试
         println!("\n🔍 运行Single-hop推理测试...");
         self.reset_memory().await;
-        let single_hop_result = self.run_single_hop_test(&datasets.single_hop).await?;
+        let single_hop_result = self.run_single_hop_test(&single_hop_data).await?;
         category_results.insert("single_hop".to_string(), single_hop_result);
 
         // 2. Multi-hop推理测试
         println!("\n🔗 运行Multi-hop推理测试...");
         self.reset_memory().await;
-        let multi_hop_result = self.run_multi_hop_test(&datasets.multi_hop).await?;
+        let multi_hop_result = self.run_multi_hop_test(&multi_hop_data).await?;
         category_results.insert("multi_hop".to_string(), multi_hop_result);
 
         // 3. Temporal推理测试
         println!("\n⏰ 运行Temporal推理测试...");
         self.reset_memory().await;
-        let temporal_result = self.run_temporal_test(&datasets.temporal).await?;
+        let temporal_result = self.run_temporal_test(&temporal_data).await?;
         category_results.insert("temporal".to_string(), temporal_result);
 
         // 4. Open-domain知识测试
         println!("\n🌐 运行Open-domain知识测试...");
         self.reset_memory().await;
-        let open_domain_result = self.run_open_domain_test(&datasets.open_domain).await?;
+        let open_domain_result = self.run_open_domain_test(&open_domain_data).await?;
         category_results.insert("open_domain".to_string(), open_domain_result);
 
         // 5. Adversarial问题测试
         println!("\n🛡️ 运行Adversarial问题测试...");
         self.reset_memory().await;
-        let adversarial_result = self.run_adversarial_test(&datasets.adversarial).await?;
+        let adversarial_result = self.run_adversarial_test(&adversarial_data).await?;
         category_results.insert("adversarial".to_string(), adversarial_result);
 
         // 计算总体得分

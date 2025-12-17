@@ -3,7 +3,7 @@
 //! 负责所有批量操作，包括批量添加、批量处理等
 
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use agent_mem_core::types::MemoryType;
 use agent_mem_traits::Result;
@@ -49,9 +49,11 @@ impl BatchModule {
             ));
         };
 
-        // Step 2: 为每个记忆准备数据并创建并行任务
+        // Step 2: 准备批量数据
         let mut memory_ids = Vec::new();
-        let mut tasks = Vec::new();
+        let mut vector_data_batch = Vec::new();
+        let mut memory_manager_batch = Vec::new();
+        let mut history_entries = Vec::new();
 
         for (i, (content, agent_id, user_id, memory_type, metadata)) in
             items.into_iter().enumerate()
@@ -63,7 +65,7 @@ impl BatchModule {
 
             // 准备元数据
             let mut full_metadata = HashMap::new();
-            full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id));
+            full_metadata.insert("agent_id".to_string(), serde_json::json!(agent_id.clone()));
             if let Some(uid) = &user_id {
                 full_metadata.insert("user_id".to_string(), serde_json::json!(uid));
             }
@@ -77,109 +79,156 @@ impl BatchModule {
                 full_metadata.extend(meta);
             }
 
-            // 创建并行任务
-            let core_manager = orchestrator.core_manager.clone();
-            let vector_store = orchestrator.vector_store.clone();
-            let history_manager = orchestrator.history_manager.clone();
+            // 准备向量数据（批量写入VectorStore）
+            let string_metadata: HashMap<String, String> = full_metadata
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect();
+            vector_data_batch.push(agent_mem_traits::VectorData {
+                id: memory_id.clone(),
+                vector: embedding,
+                metadata: string_metadata.clone(),
+            });
 
-            // 为每个async块准备独立的clone
-            let content_for_core = content.clone();
-            let content_for_history = content.clone();
-            let memory_id_for_vector = memory_id.clone();
-            let memory_id_for_history = memory_id.clone();
-            let embedding_for_vector = embedding.clone();
-            let metadata_for_vector = full_metadata.clone();
+            // 准备MemoryManager批量数据
+            let mut metadata_for_manager: std::collections::HashMap<String, String> = string_metadata;
+            metadata_for_manager.insert("_memory_id".to_string(), memory_id.clone());
+            memory_manager_batch.push((
+                memory_id.clone(),
+                content.clone(),
+                agent_id.clone(),
+                user_id.clone(),
+                memory_type.clone(),
+                metadata_for_manager,
+            ));
 
-            let task = async move {
-                let (core_result, vector_result, history_result) = tokio::join!(
-                    async move {
-                        if let Some(manager) = core_manager {
-                            manager
-                                .create_persona_block(content_for_core, None)
-                                .await
-                                .map(|_| ())
-                                .map_err(|e| e.to_string())
-                        } else {
-                            Ok::<(), String>(())
-                        }
-                    },
-                    async move {
-                        if let Some(store) = vector_store {
-                            let string_metadata: HashMap<String, String> = metadata_for_vector
-                                .iter()
-                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                                .collect();
-                            let vector_data = agent_mem_traits::VectorData {
-                                id: memory_id_for_vector,
-                                vector: embedding_for_vector,
-                                metadata: string_metadata,
-                            };
-                            store
-                                .add_vectors(vec![vector_data])
-                                .await
-                                .map(|_| ())
-                                .map_err(|e| e.to_string())
-                        } else {
-                            Ok::<(), String>(())
-                        }
-                    },
-                    async move {
-                        if let Some(history) = history_manager {
-                            let entry = crate::history::HistoryEntry {
-                                id: uuid::Uuid::new_v4().to_string(),
-                                memory_id: memory_id_for_history,
-                                old_memory: None,
-                                new_memory: Some(content_for_history),
-                                event: "ADD".to_string(),
-                                created_at: chrono::Utc::now(),
-                                updated_at: None,
-                                is_deleted: false,
-                                actor_id: None,
-                                role: Some("user".to_string()),
-                            };
-                            history
-                                .add_history(entry)
-                                .await
-                                .map(|_| ())
-                                .map_err(|e| e.to_string())
-                        } else {
-                            Ok::<(), String>(())
+            // 准备历史记录
+            history_entries.push(crate::history::HistoryEntry {
+                id: uuid::Uuid::new_v4().to_string(),
+                memory_id: memory_id.clone(),
+                old_memory: None,
+                new_memory: Some(content),
+                event: "ADD".to_string(),
+                created_at: chrono::Utc::now(),
+                updated_at: None,
+                is_deleted: false,
+                actor_id: None,
+                role: Some("user".to_string()),
+            });
+        }
+
+        // Step 3: 批量写入（Phase 1.1 优化：使用批量操作）
+        let core_manager = orchestrator.core_manager.clone();
+        let vector_store = orchestrator.vector_store.clone();
+        let history_manager = orchestrator.history_manager.clone();
+        let memory_manager = orchestrator.memory_manager.clone();
+
+        // 并行执行批量写入
+        // 准备数据副本用于并行任务
+        let memory_manager_batch_clone = memory_manager_batch.clone();
+        let (core_result, vector_result, history_result, db_result) = tokio::join!(
+            // CoreMemoryManager（可选，非关键）
+            async move {
+                if let Some(manager) = core_manager {
+                    // 批量写入CoreMemoryManager（如果支持）
+                    for (_, content, _, _, _, _) in &memory_manager_batch_clone {
+                        if let Err(e) = manager.create_persona_block(content.clone(), None).await {
+                            warn!("CoreMemoryManager批量写入失败: {}", e);
                         }
                     }
-                );
-
-                // 检查结果
-                if let Err(e) = core_result {
-                    return Err(format!("CoreMemoryManager 失败: {}", e));
                 }
-                if let Err(e) = vector_result {
-                    return Err(format!("VectorStore 失败: {}", e));
-                }
-                if let Err(e) = history_result {
-                    warn!("历史记录失败: {}", e);
-                }
-
                 Ok::<(), String>(())
-            };
-
-            tasks.push(task);
-        }
-
-        // Step 3: 并行执行所有写入任务
-        let results = futures::future::join_all(tasks).await;
-
-        // 检查是否有失败
-        for (i, result) in results.iter().enumerate() {
-            if let Err(e) = result {
-                error!("批量添加第 {} 个记忆失败: {}", i, e);
-                return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "批量添加失败: {}",
-                    e
-                )));
+            },
+            // VectorStore批量写入
+            async move {
+                if let Some(store) = vector_store {
+                    store
+                        .add_vectors(vector_data_batch)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("VectorStore批量写入失败: {}", e))
+                } else {
+                    Ok::<(), String>(())
+                }
+            },
+            // HistoryManager批量写入
+            async move {
+                if let Some(history) = history_manager {
+                    for entry in history_entries {
+                        if let Err(e) = history.add_history(entry).await {
+                            warn!("历史记录批量写入失败: {}", e);
+                        }
+                    }
+                }
+                Ok::<(), String>(())
+            },
+            // MemoryManager批量写入（关键：主存储）
+            async move {
+                if let Some(manager) = memory_manager {
+                    use agent_mem_core::types::MemoryType;
+                    for (memory_id, content, agent_id, user_id, memory_type, metadata) in memory_manager_batch {
+                        match manager
+                            .add_memory(
+                                agent_id.clone(),
+                                user_id.clone(),
+                                content,
+                                Some(memory_type.unwrap_or(MemoryType::Episodic)),
+                                Some(1.0), // importance
+                                Some(metadata),
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                debug!("MemoryManager批量写入成功: {}", memory_id);
+                            }
+                            Err(e) => {
+                                error!("MemoryManager批量写入失败: {} - {}", memory_id, e);
+                                return Err(format!("MemoryManager批量写入失败: {}", e));
+                            }
+                        }
+                    }
+                    Ok(())
+                } else {
+                    Err("MemoryManager未初始化 - 致命错误!".to_string())
+                }
             }
+        );
+
+        // Step 4: 检查结果并处理错误
+        if let Err(e) = core_result {
+            warn!("CoreMemoryManager批量写入警告: {}", e);
         }
 
-        info!("批量快速添加完成: {} 个记忆", memory_ids.len());
+        if let Err(e) = vector_result {
+            error!("VectorStore批量写入失败: {}", e);
+            // 如果VectorStore失败，需要回滚MemoryManager（数据一致性保证）
+            if let Some(manager) = &orchestrator.memory_manager {
+                warn!("开始回滚MemoryManager以确保数据一致性...");
+                for memory_id in &memory_ids {
+                    if let Err(rollback_err) = manager.delete_memory(memory_id).await {
+                        error!("回滚MemoryManager失败: {} - {}", memory_id, rollback_err);
+                    }
+                }
+            }
+            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
+                "VectorStore批量写入失败，已回滚MemoryManager: {}",
+                e
+            )));
+        }
+
+        if let Err(e) = history_result {
+            warn!("历史记录批量写入警告: {}", e);
+        }
+
+        if let Err(e) = db_result {
+            error!("MemoryManager批量写入失败: {}", e);
+            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
+                "MemoryManager批量写入失败: {}",
+                e
+            )));
+        }
+
+        info!("✅ 批量快速添加完成: {} 个记忆（批量嵌入+批量写入）", memory_ids.len());
         Ok(memory_ids)
     }
 

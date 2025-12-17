@@ -29,6 +29,10 @@ struct Cli {
     #[arg(long, default_value_t = true)]
     verbose: bool,
 
+    /// 每个类别最多使用多少个会话（默认使用全部）
+    #[arg(long)]
+    max_sessions_per_category: Option<usize>,
+
     /// LLM提供商（openai/openai_compatible 等），可用环境变量 LOCOMO_LLM_PROVIDER
     #[arg(long)]
     llm_provider: Option<String>,
@@ -50,7 +54,7 @@ struct Cli {
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::fmt()
-        .with_env_filter("locomo_benchmark=debug,agent_mem=info")
+        .with_env_filter("locomo_benchmark=debug,agent_mem=warn")
         .init();
 
     println!("🚀 AgentMem LOCOMO基准测试");
@@ -89,6 +93,7 @@ async fn main() -> Result<()> {
         dataset_path: args.dataset_path,
         verbose: args.verbose,
         llm_config,
+        max_sessions_per_category: args.max_sessions_per_category,
         ..Default::default()
     })
     .await?;

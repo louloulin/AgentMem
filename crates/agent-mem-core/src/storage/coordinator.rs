@@ -956,14 +956,33 @@ impl UnifiedStorageCoordinator {
             };
 
             if should_load {
-                // Load into cache
+                // Load into L1 cache
                 let memory_id = memory.id.0.clone();
-                self.update_l1_cache(&memory_id, memory).await;
+                let memory_clone = memory.clone();
+                self.update_l1_cache(&memory_id, memory_clone.clone()).await;
+                
+                // 🆕 Phase 1.2: Load into L2 Redis cache (if enabled)
+                #[cfg(feature = "redis-cache")]
+                if let Some(ref l2_client) = self.l2_cache {
+                    if self.cache_config.l2_enabled {
+                        let _ = self.set_to_l2_cache(&memory_id, &memory_clone, l2_client).await;
+                    }
+                }
+                
                 loaded_count += 1;
             }
         }
 
-        info!("✅ Cache warmup completed: {} memories loaded", loaded_count);
+        #[cfg(feature = "redis-cache")]
+        let l2_status = if self.cache_config.l2_enabled { "+L2" } else { "" };
+        #[cfg(not(feature = "redis-cache"))]
+        let l2_status = "";
+        
+        info!("✅ Cache warmup completed: {} memories loaded (L1{}{})", 
+            loaded_count,
+            if self.cache_config.l1_enabled { "+" } else { "" },
+            l2_status
+        );
         Ok(loaded_count)
     }
 
@@ -1012,7 +1031,7 @@ impl UnifiedStorageCoordinator {
         }
 
         // Step 2: Batch add to VectorStore (if any embeddings)
-        // 如果 VectorStore 失败，需要回滚 Repository 以确保数据一致性
+        // 🆕 Phase 1.4: 如果 VectorStore 失败，需要回滚 Repository 以确保数据一致性
         let vector_batch_len = vector_data_batch.len();
         if !vector_data_batch.is_empty() {
             if let Err(e) = self.vector_store.add_vectors(vector_data_batch).await {
@@ -2449,7 +2468,7 @@ mod tests {
 
         let result = coordinator.rebuild_vector_index(memories_with_embeddings, true).await;
         assert!(result.is_ok());
-        let (rebuilt, _skipped, errors) = result.unwrap();
+        let (rebuilt, skipped, errors) = result.unwrap();
         assert_eq!(rebuilt, 2, "Should rebuild 2 memories");
         assert_eq!(skipped, 0, "Should not skip any");
         assert_eq!(errors, 0, "Should not have errors");
@@ -2527,7 +2546,7 @@ mod tests {
 
         let result = coordinator.rebuild_vector_index(memories_with_embeddings, false).await;
         assert!(result.is_ok());
-        let (rebuilt, _skipped, errors) = result.unwrap();
+        let (rebuilt, skipped, errors) = result.unwrap();
         assert_eq!(rebuilt, 0, "Should not rebuild without embedding");
         assert_eq!(skipped, 1, "Should skip memory without embedding");
         assert_eq!(errors, 0, "Should not have errors");

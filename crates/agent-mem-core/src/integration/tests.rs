@@ -284,6 +284,8 @@ mod tests {
         };
 
         let retrieve_response = api_interface.handle_request(retrieve_request).await;
+        assert!(retrieve_response.is_ok());
+        let retrieve_response = retrieve_response.unwrap();
         assert_eq!(retrieve_response.status, ApiStatus::Success);
         assert!(retrieve_response.data.is_some());
 
@@ -299,6 +301,8 @@ mod tests {
         };
 
         let search_response = api_interface.handle_request(search_request).await;
+        assert!(search_response.is_ok());
+        let search_response = search_response.unwrap();
         assert_eq!(search_response.status, ApiStatus::Success);
         assert!(search_response.data.is_some());
 
@@ -311,6 +315,8 @@ mod tests {
         };
 
         let status_response = api_interface.handle_request(status_request).await;
+        assert!(status_response.is_ok());
+        let status_response = status_response.unwrap();
         assert_eq!(status_response.status, ApiStatus::Success);
         assert!(status_response.data.is_some());
 

@@ -48,6 +48,8 @@ pub mod importance_scorer;
 pub mod integration;
 pub mod intelligence;
 pub mod lifecycle;
+/// LLM optimization modules (KV-cache, prompt optimization)
+pub mod llm;
 pub mod manager;
 /// Specialized memory managers for different memory types
 pub mod managers;
