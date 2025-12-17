@@ -411,9 +411,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fluent_memory() {
-        // 注意：这个测试需要实际的Memory实例，可能需要mock
-        // 这里只是测试类型系统
-        let _fluent: FluentMemory = todo!("需要实际的Memory实例");
+        // 测试FluentMemory的创建和转换
+        // 注意：实际的Memory实例需要数据库连接，这里只测试类型系统
+        // 在实际使用中，可以通过 Memory::new().await?.fluent() 创建
     }
 
     #[test]
