@@ -26,6 +26,8 @@ pub mod config;
 pub mod config_env;
 pub mod conflict;
 pub mod context;
+/// Phase 2.3: Context understanding enhancement (window expansion, multi-turn, compression)
+pub mod context_enhancement;
 /// Multi-agent coordination and orchestration
 pub mod coordination;
 /// Core Memory system with Block management, template engine, and auto-rewriter
@@ -62,6 +64,8 @@ pub mod operations;
 pub mod orchestrator;
 /// Performance optimization system with caching, batching, and benchmarking
 pub mod performance;
+/// Phase 2.4: Persona dynamic extraction (extraction engine, dynamic update, retrieval optimization)
+pub mod persona_extraction;
 /// Pipeline framework for memory operations
 pub mod pipeline;
 /// Prompt processing and optimization

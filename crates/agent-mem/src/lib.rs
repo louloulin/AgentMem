@@ -93,6 +93,7 @@
 //!
 //! 详细迁移指南请参见：`docs/migration/v3_to_v4.md`
 
+pub mod api_simplification;
 pub mod auto_config;
 pub mod builder;
 pub mod chat;
@@ -103,6 +104,7 @@ pub mod types;
 pub mod visualization;
 
 // 重新导出核心类型
+pub use api_simplification::{EnhancedError, ErrorEnhancer, FluentMemory, SmartDefaults};
 pub use builder::MemoryBuilder;
 pub use memory::Memory;
 pub use types::{
