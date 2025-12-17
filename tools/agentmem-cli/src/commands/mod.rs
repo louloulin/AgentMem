@@ -19,6 +19,8 @@ pub mod metrics;
 pub mod generate;
 pub mod import;
 pub mod export;
+/// Phase 3.3: Debug commands
+pub mod debug;
 
 pub use init::InitCommand;
 pub use memory::MemoryCommand;
@@ -32,6 +34,7 @@ pub use metrics::MetricsCommand;
 pub use generate::GenerateCommand;
 pub use import::ImportCommand;
 pub use export::ExportCommand;
+pub use debug::{DebugCommand, DebugSubcommand};
 
 /// Trait for command execution
 pub trait CommandExecutor {

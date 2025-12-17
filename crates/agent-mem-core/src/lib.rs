@@ -66,6 +66,8 @@ pub mod orchestrator;
 pub mod performance;
 /// Phase 2.4: Persona dynamic extraction (extraction engine, dynamic update, retrieval optimization)
 pub mod persona_extraction;
+/// Phase 3.4: File system integration (CLAUDE.md compatibility, auto-loading, import system)
+pub mod filesystem_integration;
 /// Pipeline framework for memory operations
 pub mod pipeline;
 /// Prompt processing and optimization

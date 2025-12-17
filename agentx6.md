@@ -3740,13 +3740,21 @@ if let Err(e) = self.vector_store.add_vectors(vec![vector_data]).await {
 
 **工作量**: 7-10天
 
-#### 3.3 CLI工具完善
+#### 3.3 CLI工具完善 ✅ **已完成实现**
 
 **任务**:
-- [ ] 记忆管理命令
-- [ ] 性能测试工具
-- [ ] 调试工具
-- [ ] 可视化工具
+- [x] ✅ 记忆管理命令（已实现）
+- [x] ✅ 性能测试工具（已实现）
+- [x] ✅ 调试工具（已实现）
+- [ ] 可视化工具（待实现）
+
+**实现位置**: `tools/agentmem-cli/src/commands/`
+
+**实现细节**:
+- ✅ 记忆管理命令：实现了`MemoryCommand`，支持add/get/update/delete/list/stats
+- ✅ 性能测试工具：实现了`BenchmarkCommand`，支持性能基准测试
+- ✅ 调试工具：实现了`DebugCommand`，支持memory/query/status/cache调试
+- ✅ 其他命令：实现了search/deploy/migrate/config/status/metrics/generate/import/export
 
 **预期效果**:
 - 开发效率提升 40%
