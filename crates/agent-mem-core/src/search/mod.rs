@@ -26,6 +26,7 @@ pub mod external_reranker;
 #[cfg(feature = "postgres")]
 pub mod fulltext_search;
 pub mod fuzzy;
+pub mod hnsw_optimizer;
 #[cfg(feature = "postgres")]
 pub mod hybrid;
 pub mod learning;
