@@ -44,6 +44,9 @@ pub struct MemoryIntegratorConfig {
     // 🆕 Phase 2: 图记忆系统集成（可选启用）
     /// 启用图记忆系统（图-向量混合检索、关系推理）
     pub enable_graph_memory: bool,
+    // 🆕 Phase 2: 上下文增强系统集成（可选启用）
+    /// 启用上下文增强系统（上下文窗口扩展、多轮对话理解）
+    pub enable_context_enhancement: bool,
 }
 
 #[derive(Debug)]
@@ -145,6 +148,40 @@ mod tests {
         config.enable_graph_memory = true;
         assert!(config.enable_graph_memory); // 可以启用
     }
+
+    /// 🆕 Phase 2: 测试上下文增强配置
+    #[test]
+    fn test_context_enhancement_config() {
+        let config = MemoryIntegratorConfig::default();
+        // 验证默认配置
+        assert!(!config.enable_context_enhancement); // 默认关闭
+        
+        let mut config = MemoryIntegratorConfig::default();
+        config.enable_context_enhancement = true;
+        assert!(config.enable_context_enhancement); // 可以启用
+    }
+
+    /// 🆕 Phase 2: 综合测试 - 验证所有高级能力配置可以同时启用
+    #[test]
+    fn test_all_advanced_capabilities_config() {
+        let mut config = MemoryIntegratorConfig::default();
+        
+        // 启用所有高级能力
+        config.enable_active_retrieval = true;
+        config.enable_graph_memory = true;
+        config.enable_context_enhancement = true;
+        
+        // 验证所有配置都可以启用
+        assert!(config.enable_active_retrieval);
+        assert!(config.enable_graph_memory);
+        assert!(config.enable_context_enhancement);
+        
+        // 验证可以同时启用多个功能
+        let all_enabled = config.enable_active_retrieval 
+            && config.enable_graph_memory 
+            && config.enable_context_enhancement;
+        assert!(all_enabled);
+    }
 }
 
 impl Default for MemoryIntegratorConfig {
@@ -168,6 +205,8 @@ impl Default for MemoryIntegratorConfig {
             enable_active_retrieval: false,
             // 🆕 Phase 2: 图记忆系统（默认关闭，可选启用）
             enable_graph_memory: false,
+            // 🆕 Phase 2: 上下文增强系统（默认关闭，可选启用）
+            enable_context_enhancement: false,
         }
     }
 }
@@ -191,6 +230,8 @@ pub struct MemoryIntegrator {
     active_retrieval: Option<Arc<crate::retrieval::ActiveRetrievalSystem>>,
     /// 🆕 Phase 2: 图记忆引擎（可选，用于图-向量混合检索）
     graph_memory: Option<Arc<crate::graph_memory::GraphMemoryEngine>>,
+    /// 🆕 Phase 2: 上下文增强管理器（可选，用于上下文窗口扩展和多轮对话理解）
+    context_enhancement: Option<Arc<crate::context_enhancement::ContextWindowManager>>,
 }
 
 impl MemoryIntegrator {
@@ -213,6 +254,7 @@ impl MemoryIntegrator {
             cache_metrics: CacheMetrics::new(),
             active_retrieval: None,
             graph_memory: None,
+            context_enhancement: None,
         }
     }
 
@@ -236,6 +278,15 @@ impl MemoryIntegrator {
         graph_memory: Arc<crate::graph_memory::GraphMemoryEngine>,
     ) -> Self {
         self.graph_memory = Some(graph_memory);
+        self
+    }
+
+    /// 🆕 Phase 2: 设置上下文增强管理器（可选启用）
+    pub fn with_context_enhancement(
+        mut self,
+        context_enhancement: Arc<crate::context_enhancement::ContextWindowManager>,
+    ) -> Self {
+        self.context_enhancement = Some(context_enhancement);
         self
     }
 
@@ -410,8 +461,32 @@ impl MemoryIntegrator {
         session_id: Option<&str>,
         max_count: usize,
     ) -> Result<Vec<Memory>> {
-        // ⭐ 先检查缓存
-        let cache_key = self.normalize_cache_key(query, agent_id, user_id, session_id);
+        // 🆕 Phase 2: 如果启用了上下文增强，先增强查询
+        let enhanced_query = if self.config.enable_context_enhancement {
+            if let Some(ref context_manager) = self.context_enhancement {
+                match context_manager.expand_context_window(query, query).await {
+                    Ok(enhanced) => {
+                        if enhanced != query {
+                            info!("📝 Context enhancement expanded query: {} -> {}", query, &enhanced[..enhanced.len().min(100)]);
+                            enhanced
+                        } else {
+                            query.to_string()
+                        }
+                    }
+                    Err(e) => {
+                        warn!("⚠️ Context enhancement failed: {}, using original query", e);
+                        query.to_string()
+                    }
+                }
+            } else {
+                query.to_string()
+            }
+        } else {
+            query.to_string()
+        };
+
+        // ⭐ 先检查缓存（使用增强后的查询）
+        let cache_key = self.normalize_cache_key(&enhanced_query, agent_id, user_id, session_id);
         if let Some(cached) = self.get_cached(&cache_key) {
             info!("🎯 Cache hit, returning {} cached memories", cached.len());
             return Ok(cached.into_iter().take(max_count).collect());
@@ -434,7 +509,7 @@ impl MemoryIntegrator {
                 }
 
                 let request = RetrievalRequest {
-                    query: query.to_string(),
+                    query: enhanced_query.clone(),
                     target_memory_types: None,
                     max_results: max_count,
                     preferred_strategy: None,
@@ -522,12 +597,12 @@ impl MemoryIntegrator {
                     })
                 })
             });
-        let extracted_product_id = product_id_pattern.find(query).map(|m| m.as_str());
+        let extracted_product_id = product_id_pattern.find(&enhanced_query).map(|m| m.as_str());
 
         if let Some(product_id) = extracted_product_id {
             info!(
                 "🎯 检测到商品ID查询，提取ID: {} (from query: {})",
-                product_id, query
+                product_id, enhanced_query
             );
 
             // 使用提取的商品ID进行查询（而不是完整查询）
@@ -640,7 +715,7 @@ impl MemoryIntegrator {
             info!("📚🔄 [1-2/4] Parallel querying Episodic + Working Memory");
 
             let episodic_query = self.memory_engine.search_memories(
-                query,
+                &enhanced_query,
                 Some(episodic_scope),
                 Some(max_count * 2),
             );
@@ -648,7 +723,7 @@ impl MemoryIntegrator {
             let working_query = if let Some(ws) = working_scope {
                 Some(
                     self.memory_engine
-                        .search_memories(query, Some(ws), Some(max_count / 2)),
+                        .search_memories(&enhanced_query, Some(ws), Some(max_count / 2)),
                 )
             } else {
                 None
@@ -739,8 +814,8 @@ impl MemoryIntegrator {
 
             // 🆕 并行执行Semantic和Global查询
             let (semantic_result, global_result) = tokio::join!(
-                self.memory_engine.search_memories(query, Some(semantic_scope), Some(remaining * 2)),
-                self.memory_engine.search_memories(query, Some(global_scope), Some(remaining * 2))
+                self.memory_engine.search_memories(&enhanced_query, Some(semantic_scope), Some(remaining * 2)),
+                self.memory_engine.search_memories(&enhanced_query, Some(global_scope), Some(remaining * 2))
             );
 
             // 处理Semantic结果

@@ -66,6 +66,8 @@ mod tests {
         
         // 验证默认配置
         assert!(!config.enable_active_retrieval); // 默认关闭
+        assert!(!config.enable_graph_memory); // 默认关闭
+        assert!(!config.enable_context_enhancement); // 默认关闭
         assert_eq!(config.max_memories, 3);
         assert_eq!(config.episodic_weight, 1.2);
     }
@@ -81,5 +83,27 @@ mod tests {
         assert!(!config.enable_auto_compression); // 默认关闭
         assert_eq!(config.auto_compression_threshold, 1000);
         assert_eq!(config.auto_compression_age_days, 30);
+    }
+
+    /// 🆕 Phase 2: 综合测试 - 验证所有高级能力配置可以同时启用
+    #[test]
+    fn test_all_advanced_capabilities_config() {
+        let mut config = MemoryIntegratorConfig::default();
+        
+        // 启用所有高级能力
+        config.enable_active_retrieval = true;
+        config.enable_graph_memory = true;
+        config.enable_context_enhancement = true;
+        
+        // 验证所有配置都可以启用
+        assert!(config.enable_active_retrieval);
+        assert!(config.enable_graph_memory);
+        assert!(config.enable_context_enhancement);
+        
+        // 验证可以同时启用多个功能
+        let all_enabled = config.enable_active_retrieval 
+            && config.enable_graph_memory 
+            && config.enable_context_enhancement;
+        assert!(all_enabled);
     }
 }
