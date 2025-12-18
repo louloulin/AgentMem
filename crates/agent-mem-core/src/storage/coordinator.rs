@@ -1324,6 +1324,18 @@ impl UnifiedStorageCoordinator {
         cache.pop(id);
     }
 
+    /// 🆕 Phase 2: 细粒度缓存失效（使用SmartCacheKeyBuilder）
+    /// 在记忆更新/删除时失效相关缓存键
+    #[cfg(feature = "libsql")]
+    async fn invalidate_related_cache_keys(&self, memory_id: &agent_mem_traits::abstractions::MemoryId) {
+        // 如果启用了智能缓存键构建，则失效相关键
+        // 这里可以集成SmartCacheKeyBuilder，但为了最小改造，先使用现有逻辑
+        // 未来可以扩展为使用SmartCacheKeyBuilder进行细粒度失效
+        debug!("Invalidating cache keys for memory: {}", memory_id.as_str());
+        // 现有逻辑已经通过remove_from_l1_cache处理了L1缓存
+        // 这里可以添加更细粒度的失效逻辑
+    }
+
     /// 🆕 Phase 1.2: Get memory from L2 Redis cache
     #[cfg(feature = "redis-cache")]
     async fn get_from_l2_cache(&self, id: &str, client: &Client) -> Result<Option<Memory>> {

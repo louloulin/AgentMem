@@ -11,6 +11,7 @@ pub mod memory_cache;
 pub mod monitor;
 pub mod multi_layer;
 pub mod multi_level;
+pub mod smart_key;
 pub mod warming;
 
 pub use learning_warmer::{LearningBasedCacheWarmer, LearningWarmingConfig};
@@ -18,6 +19,7 @@ pub use memory_cache::{MemoryCache, MemoryCacheConfig, MemoryCacheStats};
 pub use monitor::{CacheMonitor, MonitorConfig, PerformanceReport, PerformanceSnapshot};
 pub use multi_layer::MultiLayerCache;
 pub use multi_level::{CacheLevel, MultiLevelCache, MultiLevelCacheConfig};
+pub use smart_key::{SmartCacheKeyBuilder, SmartKeyStats};
 pub use warming::{CacheWarmer, CacheWarmingConfig, DataLoader, WarmingStats, WarmingStrategy};
 
 use agent_mem_traits::Result;
