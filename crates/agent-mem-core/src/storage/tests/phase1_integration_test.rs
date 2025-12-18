@@ -3,11 +3,12 @@
 //! 测试所有P0任务的集成效果
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::super::coordinator::{CacheConfig, UnifiedStorageCoordinator};
     use super::super::libsql::memory_repository::LibSqlMemoryRepository;
     use agent_mem_traits::{MemoryV4 as Memory, VectorStore, VectorData};
     use std::sync::Arc;
+    use std::collections::HashMap;
     use tokio::time::Instant;
 
     // Mock implementations for testing
@@ -115,15 +116,82 @@ mod tests {
             self.vectors.write().await.clear();
             Ok(())
         }
+
+        async fn search_with_filters(
+            &self,
+            _query_vector: Vec<f32>,
+            _limit: usize,
+            _filters: &std::collections::HashMap<String, serde_json::Value>,
+            _threshold: Option<f32>,
+        ) -> agent_mem_traits::Result<Vec<agent_mem_traits::VectorSearchResult>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_vector(&self, id: &str) -> agent_mem_traits::Result<Option<VectorData>> {
+            let vecs = self.vectors.read().await;
+            Ok(vecs.get(id).cloned())
+        }
+
+        async fn count_vectors(&self) -> agent_mem_traits::Result<usize> {
+            Ok(self.vectors.read().await.len())
+        }
+
+        async fn health_check(&self) -> agent_mem_traits::Result<agent_mem_traits::HealthStatus> {
+            Ok(agent_mem_traits::HealthStatus {
+                status: "healthy".to_string(),
+                message: "OK".to_string(),
+                timestamp: chrono::Utc::now(),
+                details: std::collections::HashMap::new(),
+            })
+        }
+
+        async fn get_stats(&self) -> agent_mem_traits::Result<agent_mem_traits::VectorStoreStats> {
+            Ok(agent_mem_traits::VectorStoreStats {
+                total_vectors: self.vectors.read().await.len(),
+                dimension: 384,
+                index_size: 0,
+            })
+        }
+
+        async fn add_vectors_batch(
+            &self,
+            batches: Vec<Vec<VectorData>>,
+        ) -> agent_mem_traits::Result<Vec<Vec<String>>> {
+            let mut results = Vec::new();
+            for batch in batches {
+                let result = self.add_vectors(batch).await?;
+                results.push(result);
+            }
+            Ok(results)
+        }
+
+        async fn delete_vectors_batch(
+            &self,
+            batches: Vec<Vec<String>>,
+        ) -> agent_mem_traits::Result<Vec<bool>> {
+            let mut results = Vec::new();
+            for batch in batches {
+                let result = self.delete_vectors(batch).await;
+                results.push(result.is_ok());
+            }
+            Ok(results)
+        }
     }
 
     fn create_test_memory(id: &str) -> Memory {
-        use agent_mem_traits::abstractions::{Content, Metadata};
-        Memory::new(
-            agent_mem_traits::abstractions::MemoryId::from(id),
-            Content::Text(format!("Test memory {}", id)),
-            Metadata::default(),
-        )
+        // 复用coordinator.rs中的create_test_memory实现
+        let mut memory = Memory::new(
+            "agent-1",
+            Some("user-1".to_string()),
+            "episodic",
+            format!("Test memory content: {}", id),
+            0.5,
+        );
+        
+        // Override ID
+        use agent_mem_traits::abstractions::MemoryId;
+        memory.id = MemoryId::from_string(id.to_string());
+        memory
     }
 
     /// 测试1.1: 并行存储优化
@@ -195,5 +263,50 @@ mod tests {
         // 批量查询应该比循环查询快（100次 * 5ms = 500ms vs 10ms）
         assert!(batch_elapsed.as_millis() < 100, "Batch query should be much faster");
         println!("✅ Batch query completed in {}ms", batch_elapsed.as_millis());
+    }
+
+    /// 测试1.2: 批量向量存储队列
+    /// 验证批量队列能够批量处理向量存储
+    #[tokio::test]
+    async fn test_batch_vector_queue() {
+        let vector_store = Arc::new(MockVectorStore {
+            vectors: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+            add_delay_ms: 10, // 10ms delay per vector
+        });
+
+        // 创建批量队列
+        use super::super::batch_vector_queue::{BatchVectorStorageQueue, BatchVectorQueueConfig};
+        let mut config = BatchVectorQueueConfig::default();
+        config.batch_size = 10; // 小批量用于测试
+        config.batch_interval_ms = 50; // 50ms间隔
+        let queue = BatchVectorStorageQueue::new(vector_store, config);
+
+        // 添加多个向量
+        let start = Instant::now();
+        for i in 0..30 {
+            let vector_data = VectorData {
+                id: format!("vec_{}", i),
+                vector: vec![0.5; 384],
+                metadata: std::collections::HashMap::new(),
+            };
+            queue.add_vector(vector_data).await.unwrap();
+        }
+
+        // 等待队列处理完成
+        queue.flush().await.unwrap();
+        let elapsed = start.elapsed();
+
+        // 验证: 批量处理应该比单个处理快
+        // 30个向量，每个10ms = 300ms串行
+        // 批量处理（batch_size=10）应该接近30-50ms（3批，每批10ms）
+        assert!(elapsed.as_millis() < 200, "Batch processing should be faster than sequential");
+        println!("✅ Batch vector queue completed in {}ms", elapsed.as_millis());
+        
+        // 检查统计
+        let stats = queue.stats().await;
+        assert_eq!(stats.total_tasks, 30);
+        assert_eq!(stats.processed_tasks, 30);
+        assert!(stats.total_batches >= 3); // 至少3批
+        println!("✅ Queue stats: {} tasks, {} batches", stats.total_tasks, stats.total_batches);
     }
 }

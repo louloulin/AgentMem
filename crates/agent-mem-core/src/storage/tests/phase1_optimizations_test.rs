@@ -39,7 +39,7 @@ mod tests {
             Ok(Vec::new())
         }
 
-        async fn delete_vectors(&self, ids: Vec<String>) -> agent_mem_traits::Result<()> {
+        async fn delete_vectors(&self, _ids: Vec<String>) -> agent_mem_traits::Result<()> {
             Ok(())
         }
 
@@ -50,6 +50,60 @@ mod tests {
         async fn clear(&self) -> agent_mem_traits::Result<()> {
             Ok(())
         }
+
+        async fn search_with_filters(
+            &self,
+            _query_vector: Vec<f32>,
+            _limit: usize,
+            _filters: &std::collections::HashMap<String, serde_json::Value>,
+            _threshold: Option<f32>,
+        ) -> agent_mem_traits::Result<Vec<agent_mem_traits::VectorSearchResult>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_vector(&self, _id: &str) -> agent_mem_traits::Result<Option<VectorData>> {
+            Ok(None)
+        }
+
+        async fn count_vectors(&self) -> agent_mem_traits::Result<usize> {
+            Ok(0)
+        }
+
+        async fn health_check(&self) -> agent_mem_traits::Result<agent_mem_traits::HealthStatus> {
+            Ok(agent_mem_traits::HealthStatus {
+                status: "healthy".to_string(),
+                message: "OK".to_string(),
+                timestamp: chrono::Utc::now(),
+                details: std::collections::HashMap::new(),
+            })
+        }
+
+        async fn get_stats(&self) -> agent_mem_traits::Result<agent_mem_traits::VectorStoreStats> {
+            Ok(agent_mem_traits::VectorStoreStats {
+                total_vectors: 0,
+                dimension: 384,
+                index_size: 0,
+            })
+        }
+
+        async fn add_vectors_batch(
+            &self,
+            batches: Vec<Vec<VectorData>>,
+        ) -> agent_mem_traits::Result<Vec<Vec<String>>> {
+            let mut results = Vec::new();
+            for batch in batches {
+                let result = self.add_vectors(batch).await?;
+                results.push(result);
+            }
+            Ok(results)
+        }
+
+        async fn delete_vectors_batch(
+            &self,
+            id_batches: Vec<Vec<String>>,
+        ) -> agent_mem_traits::Result<Vec<bool>> {
+            Ok(vec![true; id_batches.len()])
+        }
     }
 
     /// 测试1.1: 并行存储优化
@@ -57,7 +111,7 @@ mod tests {
     #[tokio::test]
     async fn test_parallel_storage_optimization() {
         // 创建mock vector store（模拟50ms延迟）
-        let vector_store = Arc::new(MockVectorStore { add_delay_ms: 50 });
+        let _vector_store = Arc::new(MockVectorStore { add_delay_ms: 50 });
         
         // 创建coordinator（需要实际的repository，这里简化）
         // 注意: 这需要实际的数据库连接，在集成测试中完成
@@ -111,7 +165,7 @@ mod tests {
     #[tokio::test]
     async fn test_connection_pool_optimization() {
         // 创建连接池
-        let pool_config = super::super::libsql::connection::LibSqlPoolConfig::default();
+        let _pool_config = super::super::libsql::connection::LibSqlPoolConfig::default();
         // 注意: 需要实际的数据库路径，在集成测试中完成
         
         // 验证点：
