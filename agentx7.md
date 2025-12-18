@@ -2116,16 +2116,509 @@ pub struct PerformanceConfig {
 
 ---
 
-**文档版本**: v7.0  
+**文档版本**: v7.1  
 **最后更新**: 2025-12-10  
-**分析状态**: ✅ 全面分析完成  
-**计划状态**: 📋 改造计划制定完成  
+**分析状态**: ✅ 全面分析完成（包含隐藏能力发掘）  
+**计划状态**: ✅ 改造计划制定完成（包含高级能力集成）  
 **实施状态**: 🎯 准备开始Phase 1实施  
-**预计完成时间**: 6-8周（分阶段实施）
+**预计完成时间**: 6-8周（分阶段实施）  
+**新增内容**: 
+- ✅ 发掘7个隐藏的高级能力（图记忆、压缩、主动检索、语义层次、时序推理、因果推理、上下文增强）
+- ✅ 新增2个高级改造方案（统一智能检索系统、自动压缩管理）
+- ✅ 更新实施路线图和关键指标目标
 
 ---
 
-## 📊 第十三部分：完整分析总结
+## 🔬 第十三部分：AgentMem隐藏能力深度发掘
+
+### 13.1 已实现但未充分利用的高级能力
+
+#### 能力1: 图记忆系统（GraphMemoryEngine）⭐⭐⭐
+
+**位置**: `crates/agent-mem-core/src/graph_memory.rs` (1000+行)
+
+**核心能力**:
+- ✅ **图节点管理**: Entity, Concept, Event, Relation, Context 5种节点类型
+- ✅ **关系类型**: IsA, PartOf, RelatedTo, CausedBy, Leads, SimilarTo等11种关系
+- ✅ **推理能力**: 演绎、归纳、溯因、类比、因果推理
+- ✅ **图遍历**: BFS, DFS, 最短路径查找
+- ✅ **社区检测**: 基于模块度的社区发现
+- ✅ **中心性分析**: Degree, Betweenness, Closeness, PageRank
+
+**当前使用情况**:
+- ⚠️ **未集成到主检索流程**: 图记忆系统独立存在，未与向量搜索深度融合
+- ⚠️ **性能未优化**: 大规模图遍历可能较慢
+- ⚠️ **无持久化**: 图结构仅存在内存中
+
+**改造方案**:
+```rust
+// 1. 图-向量混合检索
+pub async fn hybrid_graph_vector_search(
+    &self,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<SearchResult>> {
+    // 并行执行图搜索和向量搜索
+    let (graph_results, vector_results) = tokio::join!(
+        self.graph_memory.find_related_nodes(query, 3),
+        self.vector_search.search(query, limit)
+    );
+    
+    // 融合结果
+    self.fuse_graph_vector_results(graph_results?, vector_results?)
+}
+
+// 2. 图持久化
+pub async fn persist_graph(&self) -> Result<()> {
+    // 将图结构持久化到Neo4j或图数据库
+    self.graph_store.save_graph(self.graph_memory).await
+}
+
+// 3. 图索引优化
+pub async fn build_graph_index(&self) -> Result<()> {
+    // 构建图索引，加速遍历
+    self.graph_indexer.build_spatial_index().await
+}
+```
+
+**预期效果**: 
+- 检索准确率提升15-25%（通过关系推理）
+- 支持复杂查询（多跳推理、因果关系查询）
+
+---
+
+#### 能力2: 智能压缩系统（CompressionEngine）⭐⭐
+
+**位置**: `crates/agent-mem-core/src/compression.rs` (1000+行)
+
+**核心能力**:
+- ✅ **重要性驱动压缩**: 基于重要性评分压缩低重要性记忆
+- ✅ **语义保持压缩**: 保持语义相似度 > 0.85
+- ✅ **时间感知压缩**: 基于时间衰减因子压缩旧记忆
+- ✅ **自适应压缩**: 根据数据特征自动调整压缩策略
+
+**当前使用情况**:
+- ⚠️ **未自动触发**: 需要手动调用压缩
+- ⚠️ **未集成到存储流程**: 存储时未自动压缩旧记忆
+
+**改造方案**:
+```rust
+// 1. 自动压缩后台任务
+pub async fn start_auto_compression(&self) -> Result<()> {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(3600)).await;
+            
+            // 压缩30天前的低重要性记忆
+            let old_memories = self.get_memories_before(
+                Utc::now() - Duration::days(30)
+            ).await?;
+            
+            let low_importance = old_memories
+                .iter()
+                .filter(|m| m.importance() < 0.3)
+                .collect::<Vec<_>>();
+            
+            self.compression_engine
+                .compress_batch(low_importance, CompressionStrategy::Semantic)
+                .await?;
+        }
+    });
+    Ok(())
+}
+
+// 2. 存储时自动压缩
+pub async fn add_memory_with_compression(
+    &self,
+    memory: Memory,
+) -> Result<String> {
+    // 检查是否需要压缩旧记忆
+    if self.should_compress() {
+        self.auto_compress_old_memories().await?;
+    }
+    
+    // 存储新记忆
+    self.add_memory(memory).await
+}
+```
+
+**预期效果**:
+- 存储空间减少60%
+- 查询性能提升20%（数据量减少）
+- 成本降低50%
+
+---
+
+#### 能力3: 主动检索系统（ActiveRetrievalSystem）⭐⭐⭐
+
+**位置**: `crates/agent-mem-core/src/retrieval/` (4个模块)
+
+**核心能力**:
+- ✅ **主题提取**: 基于LLM的主题提取和分类
+- ✅ **智能路由**: 8种检索策略（Embedding, BM25, StringMatch, FuzzyMatch, Hybrid, SemanticGraph, Temporal, ContextAware）
+- ✅ **上下文合成**: 多源记忆融合和冲突解决
+- ✅ **Agent注册表**: 支持真实Agent调用
+
+**当前使用情况**:
+- ⚠️ **未集成到主检索**: 主动检索系统独立，未替代现有检索流程
+- ⚠️ **默认使用Mock**: `use_real_agents = false`
+
+**改造方案**:
+```rust
+// 1. 集成到主检索流程
+pub async fn retrieve_memories_enhanced(
+    &self,
+    query: &str,
+    max_count: usize,
+) -> Result<Vec<Memory>> {
+    // 使用主动检索系统
+    let request = RetrievalRequest {
+        query: query.to_string(),
+        max_results: max_count,
+        enable_topic_extraction: true,
+        enable_context_synthesis: true,
+        ..Default::default()
+    };
+    
+    let response = self.active_retrieval.retrieve(request).await?;
+    
+    // 转换为Memory格式
+    response.memories
+        .into_iter()
+        .map(|rm| self.convert_to_memory(rm))
+        .collect()
+}
+
+// 2. 启用真实Agent
+pub fn enable_real_agents(&mut self) {
+    self.active_retrieval.enable_real_agents();
+}
+```
+
+**预期效果**:
+- 检索准确率提升20-30%（通过主题提取和智能路由）
+- 支持复杂查询（多策略融合）
+
+---
+
+#### 能力4: 语义层次索引（SemanticHierarchyIndex）⭐⭐
+
+**位置**: `crates/agent-mem-core/src/semantic_hierarchy.rs` (500+行)
+
+**核心能力**:
+- ✅ **语义层次结构**: 基于抽象程度的层次组织
+- ✅ **基于意义的检索**: 语义相似度检索
+- ✅ **层次遍历优化**: 高效的层次遍历算法
+
+**当前使用情况**:
+- ⚠️ **未集成**: 语义层次索引独立，未与主检索集成
+- ⚠️ **未持久化**: 仅存在内存中
+
+**改造方案**:
+```rust
+// 1. 集成到检索流程
+pub async fn search_with_semantic_hierarchy(
+    &self,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<Memory>> {
+    // 使用语义层次索引
+    let semantic_results = self.semantic_hierarchy
+        .search_by_meaning(query, limit)
+        .await?;
+    
+    // 转换为Memory格式
+    semantic_results
+        .into_iter()
+        .map(|sr| self.convert_semantic_to_memory(sr))
+        .collect()
+}
+```
+
+**预期效果**:
+- 检索准确率提升10-15%（通过语义层次匹配）
+- 支持抽象概念查询
+
+---
+
+#### 能力5: 时序推理引擎（TemporalReasoningEngine）⭐⭐
+
+**位置**: `crates/agent-mem-core/src/temporal_reasoning.rs` (900+行)
+
+**核心能力**:
+- ✅ **时序逻辑推理**: 基于时间顺序的推理
+- ✅ **因果推理**: 原因->结果的推理
+- ✅ **多跳推理**: 多步推理链
+- ✅ **反事实推理**: 假设性推理
+- ✅ **预测性推理**: 未来预测
+
+**当前使用情况**:
+- ⚠️ **未集成**: 时序推理引擎独立，未与主检索集成
+- ⚠️ **性能未优化**: 大规模时序推理可能较慢
+
+**改造方案**:
+```rust
+// 1. 集成时序推理到检索
+pub async fn retrieve_with_temporal_reasoning(
+    &self,
+    query: &str,
+    time_range: Option<TimeRange>,
+) -> Result<Vec<Memory>> {
+    // 使用时序推理引擎
+    let reasoning_paths = self.temporal_reasoning
+        .reason_causal_chain(query, time_range)
+        .await?;
+    
+    // 提取相关记忆
+    let memory_ids: Vec<String> = reasoning_paths
+        .iter()
+        .flat_map(|p| p.nodes.clone())
+        .collect();
+    
+    self.batch_get_memories(memory_ids).await
+}
+```
+
+**预期效果**:
+- 支持时序查询（"昨天发生了什么导致今天的问题"）
+- 支持因果推理查询（"为什么会出现这个结果"）
+
+---
+
+#### 能力6: 因果推理引擎（CausalReasoningEngine）⭐⭐
+
+**位置**: `crates/agent-mem-core/src/causal_reasoning.rs` (500+行)
+
+**核心能力**:
+- ✅ **因果知识图**: 构建个人因果知识图
+- ✅ **因果链检索**: 查找因果关系链
+- ✅ **因果解释生成**: 生成因果解释
+
+**当前使用情况**:
+- ⚠️ **未集成**: 因果推理引擎独立，未与主检索集成
+
+**改造方案**:
+```rust
+// 1. 集成因果推理到检索
+pub async fn retrieve_with_causal_reasoning(
+    &self,
+    query: &str,
+) -> Result<Vec<Memory>> {
+    // 使用因果推理引擎
+    let causal_chains = self.causal_reasoning
+        .find_causal_chains(query, 5)
+        .await?;
+    
+    // 提取相关记忆
+    let memory_ids: Vec<String> = causal_chains
+        .iter()
+        .flat_map(|c| c.nodes.clone())
+        .collect();
+    
+    self.batch_get_memories(memory_ids).await
+}
+```
+
+**预期效果**:
+- 支持因果查询（"什么导致了这个问题"）
+- 支持解释生成（"为什么会出现这个结果"）
+
+---
+
+#### 能力7: 上下文增强系统（ContextEnhancement）⭐⭐
+
+**位置**: `crates/agent-mem-core/src/context_enhancement.rs` (500+行)
+
+**核心能力**:
+- ✅ **上下文窗口扩展**: 动态扩展上下文窗口
+- ✅ **多轮对话理解**: 理解多轮对话的上下文关系
+- ✅ **上下文压缩**: 智能压缩上下文
+
+**当前使用情况**:
+- ⚠️ **未集成**: 上下文增强系统独立，未与主检索集成
+
+**改造方案**:
+```rust
+// 1. 集成上下文增强到检索
+pub async fn retrieve_with_context_enhancement(
+    &self,
+    query: &str,
+    conversation_history: &[ConversationTurn],
+) -> Result<Vec<Memory>> {
+    // 使用上下文增强
+    let enhanced_query = self.context_enhancement
+        .expand_context_window(query, conversation_history)
+        .await?;
+    
+    // 执行检索
+    self.retrieve_memories(&enhanced_query, 10).await
+}
+```
+
+**预期效果**:
+- 检索准确率提升5-10%（通过上下文理解）
+- 支持多轮对话查询
+
+---
+
+### 13.2 能力整合改造方案
+
+#### 方案13.1: 统一智能检索系统 ⭐⭐⭐
+
+**目标**: 整合所有高级能力到统一检索接口
+
+**实现**:
+```rust
+pub struct UnifiedIntelligentRetrieval {
+    // 基础检索
+    vector_search: Arc<VectorSearch>,
+    hybrid_search: Arc<EnhancedHybridSearchEngine>,
+    
+    // 高级能力
+    graph_memory: Arc<GraphMemoryEngine>,
+    active_retrieval: Arc<ActiveRetrievalSystem>,
+    semantic_hierarchy: Arc<SemanticHierarchyIndex>,
+    temporal_reasoning: Arc<TemporalReasoningEngine>,
+    causal_reasoning: Arc<CausalReasoningEngine>,
+    context_enhancement: Arc<ContextWindowManager>,
+    
+    // 配置
+    config: UnifiedRetrievalConfig,
+}
+
+impl UnifiedIntelligentRetrieval {
+    pub async fn retrieve(
+        &self,
+        query: &str,
+        context: &RetrievalContext,
+    ) -> Result<RetrievalResult> {
+        // 1. 上下文增强
+        let enhanced_query = if self.config.enable_context_enhancement {
+            self.context_enhancement
+                .expand_context_window(query, &context.conversation_history)
+                .await?
+        } else {
+            query.to_string()
+        };
+        
+        // 2. 主题提取和智能路由
+        let routing_result = if self.config.enable_active_retrieval {
+            let topics = self.active_retrieval
+                .topic_extractor
+                .extract_topics(&enhanced_query)
+                .await?;
+            
+            self.active_retrieval
+                .router
+                .route_retrieval(&enhanced_query, &topics)
+                .await?
+        } else {
+            // 默认路由
+            Default::default()
+        };
+        
+        // 3. 并行执行多种检索策略
+        let (vector_results, graph_results, semantic_results, temporal_results, causal_results) = 
+            tokio::join!(
+                self.vector_search.search(&enhanced_query, 10),
+                self.graph_memory.find_related_nodes(&enhanced_query, 3),
+                self.semantic_hierarchy.search_by_meaning(&enhanced_query, 10),
+                self.temporal_reasoning.reason_causal_chain(&enhanced_query, None),
+                self.causal_reasoning.find_causal_chains(&enhanced_query, 5),
+            );
+        
+        // 4. 融合所有结果
+        let fused_results = self.fuse_all_results(
+            vector_results?,
+            graph_results?,
+            semantic_results?,
+            temporal_results?,
+            causal_results?,
+        ).await?;
+        
+        // 5. 上下文合成
+        let synthesized = if self.config.enable_context_synthesis {
+            self.active_retrieval
+                .synthesizer
+                .synthesize_context(&fused_results, &context)
+                .await?
+        } else {
+            fused_results
+        };
+        
+        Ok(RetrievalResult {
+            memories: synthesized,
+            confidence: self.calculate_confidence(&synthesized),
+            reasoning: self.generate_reasoning(&routing_result),
+        })
+    }
+}
+```
+
+**预期效果**:
+- 检索准确率提升30-50%（多能力融合）
+- 支持复杂查询（时序、因果、图关系）
+- 检索延迟: < 100ms（并行执行）
+
+---
+
+#### 方案13.2: 自动压缩和生命周期管理 ⭐⭐
+
+**目标**: 自动压缩旧记忆，优化存储和性能
+
+**实现**:
+```rust
+pub struct AutoCompressionManager {
+    compression_engine: Arc<CompressionEngine>,
+    importance_scorer: Arc<ImportanceScorer>,
+    config: AutoCompressionConfig,
+}
+
+impl AutoCompressionManager {
+    // 后台自动压缩任务
+    pub async fn start_auto_compression(&self) -> Result<()> {
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+                
+                // 1. 获取旧记忆
+                let old_memories = self.get_memories_before(
+                    Utc::now() - Duration::days(30)
+                ).await?;
+                
+                // 2. 评估重要性
+                let mut to_compress = Vec::new();
+                for memory in old_memories {
+                    let importance = self.importance_scorer
+                        .calculate_importance(&memory)
+                        .await?;
+                    
+                    if importance < self.config.compression_threshold {
+                        to_compress.push(memory);
+                    }
+                }
+                
+                // 3. 批量压缩
+                if !to_compress.is_empty() {
+                    self.compression_engine
+                        .compress_batch(to_compress, CompressionStrategy::Semantic)
+                        .await?;
+                }
+            }
+        });
+        Ok(())
+    }
+}
+```
+
+**预期效果**:
+- 存储空间减少60%
+- 查询性能提升20%
+- 成本降低50%
+
+---
+
+## 📊 第十四部分：完整分析总结
 
 ### 13.1 核心发现汇总
 
@@ -2176,7 +2669,74 @@ pub struct PerformanceConfig {
 
 ---
 
-### 13.3 实施路线图
+### 14.1 核心发现汇总（更新）
+
+#### 架构优势（新增发现）
+
+1. **分层记忆架构**: ✅ 已有完整的分层记忆系统（Strategic, Tactical, Operational, Contextual）
+2. **Episodic-first检索**: ✅ 基于认知理论的检索策略
+3. **混合搜索**: ✅ 向量搜索 + BM25 + 精确匹配
+4. **批量优化**: ✅ 批量嵌入生成和批量存储
+5. **多层缓存**: ✅ L1内存缓存 + L2 Redis缓存
+6. **图记忆系统**: ✅ 完整的图结构存储和推理能力（**新发现**）
+7. **智能压缩系统**: ✅ 重要性驱动、语义保持、时间感知压缩（**新发现**）
+8. **主动检索系统**: ✅ 主题提取、智能路由、上下文合成（**新发现**）
+9. **语义层次索引**: ✅ SHIMI风格的语义层次结构（**新发现**）
+10. **时序推理引擎**: ✅ 时序逻辑、因果、多跳、反事实推理（**新发现**）
+11. **因果推理引擎**: ✅ 因果知识图、因果链检索（**新发现**）
+12. **上下文增强**: ✅ 上下文窗口扩展、多轮对话理解（**新发现**）
+
+#### 性能瓶颈（更新）
+
+1. **存储延迟**: 30-150ms（串行执行）
+2. **检索延迟**: 130-450ms（串行多优先级查询）
+3. **向量搜索延迟**: 30-150ms（索引未优化）
+4. **数据库查询延迟**: 10-100ms（索引未优化）
+5. **连接池**: 配置保守，可能耗尽
+6. **N+1查询**: 批量操作存在N+1问题
+7. **高级能力未集成**: 图记忆、主动检索、时序推理等未集成到主流程（**新发现**）
+8. **自动压缩未启用**: 压缩系统存在但未自动触发（**新发现**）
+
+#### 竞品对比（更新）
+
+| 竞品 | 延迟 | AgentMem当前 | 差距 | 优化方向 |
+|------|------|-------------|------|---------|
+| **Mem0** | p95减少91% | 基准 | 需优化检索 | 智能检索优化 + **高级能力集成** |
+| **Pinecone** | < 10ms | 30-150ms | 3-15x | 索引优化 + **图-向量融合** |
+| **Weaviate** | 15-100ms | 30-150ms | 相当 | HNSW参数调优 + **语义层次索引** |
+| **Qdrant** | < 10ms | 30-150ms | 3-15x | 索引和参数优化 + **时序推理** |
+
+**AgentMem独特优势**:
+- ✅ **图记忆系统**: 竞品大多只有向量搜索，AgentMem有完整的图推理能力
+- ✅ **多推理引擎**: 时序推理、因果推理、反事实推理
+- ✅ **主动检索**: 主题提取、智能路由、上下文合成
+- ✅ **语义层次**: SHIMI风格的语义层次索引
+
+---
+
+### 14.2 改造方案优先级（更新）
+
+#### P0 - 立即实施（预期效果）
+
+1. **并行存储优化**: 存储延迟 30-150ms → 15-75ms（减少50%）
+2. **批量向量存储队列**: 吞吐量提升5-10x
+3. **连接池优化**: 连接获取延迟 < 1ms
+4. **完全并行检索**: 检索延迟 130-450ms → 50-180ms（减少60%）
+5. **向量搜索优化**: 延迟 30-150ms → < 50ms（减少33-67%）
+6. **消除N+1查询**: 批量查询性能提升10x
+7. **统一智能检索系统**: 整合所有高级能力（**新增**）
+8. **自动压缩和生命周期管理**: 存储空间减少60%（**新增**）
+
+**预期总体效果**: 
+- 存储延迟: 减少50-87%
+- 检索延迟: 减少60-78%
+- 向量搜索延迟: 减少33-67%
+- 检索准确率: 提升30-50%（通过高级能力集成）
+- 整体性能: 提升3-10x
+
+---
+
+### 14.3 实施路线图（更新）
 
 ```
 Week 1-2: Phase 1 核心性能优化
@@ -2187,25 +2747,31 @@ Week 1-2: Phase 1 核心性能优化
   ├─ 向量搜索优化
   └─ 消除N+1查询
 
-Week 3-4: Phase 2 缓存系统优化
+Week 3-4: Phase 2 缓存系统优化 + 高级能力集成
   ├─ 智能多层缓存
-  └─ 缓存预热机制
+  ├─ 缓存预热机制
+  ├─ 统一智能检索系统（整合图记忆、主动检索、时序推理等）
+  └─ 自动压缩和生命周期管理
 
 Week 5-6: Phase 3 索引和查询优化
   ├─ HNSW索引优化
   ├─ SQL索引优化
-  └─ 查询分类和路由优化
+  ├─ 查询分类和路由优化
+  └─ 图-向量融合检索
 
 Week 7-8: Phase 4-5 批量操作和高级优化
   ├─ 自动批量处理队列
   ├─ 批量向量搜索
+  ├─ 语义层次索引集成
+  ├─ 时序推理集成
+  ├─ 因果推理集成
   ├─ 向量量化优化（可选）
   └─ 分布式架构支持（可选）
 ```
 
 ---
 
-### 13.4 关键指标目标
+### 14.4 关键指标目标（更新）
 
 | 指标类别 | 当前 | Phase 1目标 | Phase 2-3目标 | 最终目标 |
 |---------|------|------------|--------------|---------|
@@ -2216,6 +2782,9 @@ Week 7-8: Phase 4-5 批量操作和高级优化
 | **缓存命中率** | 30-50% | > 60% | > 80% | > 90% |
 | **并发支持** | 100 | 500 | 1000+ | 5000+ |
 | **批量吞吐量** | 基准 | 5x | 10x | 20x |
+| **检索准确率** | 基准 | +10% | +30% | +50% |
+| **存储空间** | 基准 | -20% | -40% | -60% |
+| **复杂查询支持** | 基础 | 图查询 | 时序+因果 | 全能力融合 |
 
 ---
 
