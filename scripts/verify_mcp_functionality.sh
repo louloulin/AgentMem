@@ -38,15 +38,18 @@ echo ""
 
 # 检查MCP服务器二进制文件（修复：使用正确的二进制名称）
 log_info "检查MCP服务器二进制文件..."
-MCP_BINARY="./target/release/agentmem-mcp-client"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+MCP_BINARY="$PROJECT_ROOT/target/release/agentmem-mcp-client"
 if [ -f "$MCP_BINARY" ]; then
     log_success "MCP服务器二进制文件存在: $MCP_BINARY"
     ls -lh "$MCP_BINARY"
 else
     log_error "MCP服务器二进制文件不存在: $MCP_BINARY"
     log_info "尝试构建..."
-    cd "$(dirname "$0")/../.."
-    just build-mcp || cargo build --release --example mcp-stdio-server
+    cargo build --package mcp-stdio-server --release 2>&1 | tail -5
     if [ -f "$MCP_BINARY" ]; then
         log_success "构建成功"
     else

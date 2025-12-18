@@ -83,7 +83,7 @@ if [ "$SKIP_BUILD" = false ]; then
     if [ "$BUILD_SERVER" = true ] || [ ! -f "./target/release/agent-mem-server" ]; then
         echo ""
         echo "🔨 构建 agent-mem-server..."
-        cargo build --release --bin agent-mem-server --exclude agent-mem-python
+        cargo build --release --bin agent-mem-server
         echo "✅ agent-mem-server 构建完成"
     else
         echo "✅ agent-mem-server 已存在"
