@@ -192,6 +192,56 @@ impl LibSqlConnectionPool {
         idle.push((conn, Instant::now()));
     }
 
+    /// 🆕 Phase 1.3: 连接池健康检查
+    /// 预期效果: 确保连接池中的连接都是健康的
+    pub async fn health_check(&self) -> Result<()> {
+        let mut idle = self.idle_connections.lock().await;
+        let now = Instant::now();
+        let mut healthy_count = 0;
+        let mut removed_count = 0;
+
+        // 检查并移除不健康的连接
+        idle.retain(|(conn, created_at)| {
+            let age = now.duration_since(*created_at);
+            let is_idle_ok = age.as_secs() < self.config.idle_timeout;
+            let is_lifetime_ok = age.as_secs() < self.config.max_lifetime;
+
+            if is_idle_ok && is_lifetime_ok {
+                healthy_count += 1;
+                true
+            } else {
+                removed_count += 1;
+                false
+            }
+        });
+
+        // 如果健康连接数少于min_connections，补充连接
+        if healthy_count < self.config.min_connections {
+            let needed = self.config.min_connections - healthy_count;
+            for _ in 0..needed {
+                match self.create_connection().await {
+                    Ok(conn) => {
+                        idle.push((conn, Instant::now()));
+                        self.current_connections.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to create connection during health check: {}", e);
+                    }
+                }
+            }
+        }
+
+        if removed_count > 0 {
+            tracing::info!(
+                "Connection pool health check: removed {} stale connections, {} healthy connections",
+                removed_count,
+                healthy_count
+            );
+        }
+
+        Ok(())
+    }
+
     /// Get pool statistics
     pub async fn stats(&self) -> LibSqlPoolStats {
         let idle = self.idle_connections.lock().await;

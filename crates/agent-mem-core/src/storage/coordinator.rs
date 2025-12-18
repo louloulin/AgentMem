@@ -17,6 +17,8 @@ use redis::{AsyncCommands, Client};
 use serde_json;
 
 use super::traits::MemoryRepositoryTrait;
+#[cfg(feature = "libsql")]
+use super::batch_vector_queue::{BatchVectorStorageQueue, BatchVectorQueueConfig};
 
 /// Unified storage coordinator that manages LibSQL and VectorStore
 pub struct UnifiedStorageCoordinator {
@@ -33,6 +35,9 @@ pub struct UnifiedStorageCoordinator {
     cache_config: CacheConfig,
     /// Statistics
     stats: Arc<RwLock<CoordinatorStats>>,
+    /// 🆕 Phase 1.2: 批量向量存储队列（可选）
+    #[cfg(feature = "libsql")]
+    batch_vector_queue: Option<Arc<BatchVectorStorageQueue>>,
 }
 
 // Note: update_cache_config requires &mut self, but coordinator is typically used as Arc
@@ -53,6 +58,9 @@ pub struct CacheConfig {
     /// Redis URL (optional, for L2 cache)
     #[cfg(feature = "redis-cache")]
     pub redis_url: Option<String>,
+    /// 🆕 Phase 1.2: 启用批量向量存储队列
+    #[cfg(feature = "libsql")]
+    pub enable_batch_vector_queue: bool,
 }
 
 impl Default for CacheConfig {
@@ -71,6 +79,8 @@ impl Default for CacheConfig {
             ttl_by_type,
             #[cfg(feature = "redis-cache")]
             redis_url: None,
+            #[cfg(feature = "libsql")]
+            enable_batch_vector_queue: true, // 默认启用批量队列
         }
     }
 }
@@ -160,6 +170,20 @@ impl UnifiedStorageCoordinator {
             None
         };
         
+        // 🆕 Phase 1.2: 创建批量向量存储队列（如果启用）
+        #[cfg(feature = "libsql")]
+        let batch_vector_queue = if config.enable_batch_vector_queue {
+            let queue_config = BatchVectorQueueConfig::default();
+            Some(Arc::new(BatchVectorStorageQueue::new(
+                Arc::clone(&vector_store),
+                queue_config,
+            )))
+        } else {
+            None
+        };
+        #[cfg(not(feature = "libsql"))]
+        let batch_vector_queue = None;
+
         Self {
             sql_repository,
             vector_store,
@@ -168,6 +192,8 @@ impl UnifiedStorageCoordinator {
             l2_cache,
             cache_config: config,
             stats: Arc::new(RwLock::new(CoordinatorStats::default())),
+            #[cfg(feature = "libsql")]
+            batch_vector_queue,
         }
     }
 
@@ -180,6 +206,9 @@ impl UnifiedStorageCoordinator {
     }
 
     /// Add memory with atomic write to both stores
+    /// 
+    /// 🆕 Phase 1.1: 并行存储优化 - LibSQL和VectorStore并行执行
+    /// 预期效果: 存储延迟减少50% (30-150ms → 15-75ms)
     pub async fn add_memory(
         &self,
         memory: &Memory,
@@ -187,16 +216,8 @@ impl UnifiedStorageCoordinator {
     ) -> Result<String> {
         info!("Adding memory: id={}", memory.id.0);
 
-        // Step 1: Write to LibSQL first (primary source of truth)
-        let _created_memory = self.sql_repository.create(memory).await.map_err(|e| {
-            error!("Failed to create memory in LibSQL: {}", e);
-            AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
-        })?;
-
-        info!("✅ Memory created in LibSQL: {}", memory.id.0);
-
-        // Step 2: Write to VectorStore (if embedding provided)
-        // 如果 VectorStore 失败，需要回滚 Repository 以确保数据一致性
+        // 🆕 Phase 1.1: 并行执行LibSQL和VectorStore存储
+        // 如果VectorStore失败，需要回滚LibSQL以确保数据一致性
         if let Some(emb) = embedding {
             let vector_data = agent_mem_traits::VectorData {
                 id: memory.id.0.clone(),
@@ -204,41 +225,164 @@ impl UnifiedStorageCoordinator {
                 metadata: self.memory_to_metadata(memory),
             };
 
-            if let Err(e) = self.vector_store.add_vectors(vec![vector_data]).await {
-                // VectorStore失败，回滚Repository以确保数据一致性
-                // 参考 Mem0 的实现，确保要么都成功，要么都失败
-                error!(
-                    "Failed to add memory to vector store: {}. Rolling back Repository to ensure data consistency.",
-                    e
-                );
+            // 🆕 Phase 1.2: 如果启用批量队列，使用队列；否则并行执行
+            #[cfg(feature = "libsql")]
+            let use_queue = self.cache_config.enable_batch_vector_queue
+                && self.batch_vector_queue.is_some();
+
+            #[cfg(feature = "libsql")]
+            if use_queue {
+                // 使用批量队列（非阻塞）
+                let sql_result = self.sql_repository.create(memory).await;
                 
-                // 回滚Repository
-                if let Err(rollback_err) = self.sql_repository.delete(&memory.id.0).await {
-                    error!("Failed to rollback Repository after VectorStore failure: {}", rollback_err);
+                // 检查LibSQL结果
+                let _created_memory = sql_result.map_err(|e| {
+                    error!("Failed to create memory in LibSQL: {}", e);
+                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                })?;
+
+                info!("✅ Memory created in LibSQL: {}", memory.id.0);
+
+                // 添加到批量队列（非阻塞，立即返回）
+                if let Some(ref queue) = self.batch_vector_queue {
+                    if let Err(e) = queue.add_vector(vector_data).await {
+                        // 队列失败，回滚LibSQL
+                        error!("Failed to add memory to vector queue: {}. Rolling back Repository.", e);
+                        if let Err(rollback_err) = self.sql_repository.delete(&memory.id.0).await {
+                            error!("Failed to rollback Repository after queue failure: {}", rollback_err);
+                            {
+                                let mut stats = self.stats.write().await;
+                                stats.total_ops += 1;
+                                stats.failed_ops += 1;
+                            }
+                            return Err(AgentMemError::StorageError(format!(
+                                "Failed to store to vector queue and rollback failed: {} (rollback error: {})",
+                                e, rollback_err
+                            )));
+                        }
+                        {
+                            let mut stats = self.stats.write().await;
+                            stats.total_ops += 1;
+                            stats.failed_ops += 1;
+                        }
+                        return Err(AgentMemError::StorageError(format!(
+                            "Failed to store to vector queue, Repository rolled back: {}",
+                            e
+                        )));
+                    } else {
+                        info!("✅ Memory queued for vector storage: {}", memory.id.0);
+                    }
+                }
+            } else {
+                // 未启用队列，使用并行存储
+                // 并行执行LibSQL和VectorStore存储
+                let (sql_result, vector_result) = tokio::join!(
+                    self.sql_repository.create(memory),
+                    self.vector_store.add_vectors(vec![vector_data])
+                );
+
+                // 检查LibSQL结果
+                let _created_memory = sql_result.map_err(|e| {
+                    error!("Failed to create memory in LibSQL: {}", e);
+                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                })?;
+
+                info!("✅ Memory created in LibSQL: {}", memory.id.0);
+
+                // 检查VectorStore结果，如果失败则回滚LibSQL
+                if let Err(e) = vector_result {
+                    error!(
+                        "Failed to add memory to vector store: {}. Rolling back Repository to ensure data consistency.",
+                        e
+                    );
+                    
+                    // 回滚Repository
+                    if let Err(rollback_err) = self.sql_repository.delete(&memory.id.0).await {
+                        error!("Failed to rollback Repository after VectorStore failure: {}", rollback_err);
+                        {
+                            let mut stats = self.stats.write().await;
+                            stats.total_ops += 1;
+                            stats.failed_ops += 1;
+                        }
+                        return Err(AgentMemError::StorageError(format!(
+                            "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
+                            e, rollback_err
+                        )));
+                    }
+                    
                     {
                         let mut stats = self.stats.write().await;
                         stats.total_ops += 1;
                         stats.failed_ops += 1;
                     }
+                    
                     return Err(AgentMemError::StorageError(format!(
-                        "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
-                        e, rollback_err
+                        "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {}",
+                        e
                     )));
+                } else {
+                    info!("✅ Memory added to vector store: {}", memory.id.0);
                 }
-                
-                {
-                    let mut stats = self.stats.write().await;
-                    stats.total_ops += 1;
-                    stats.failed_ops += 1;
-                }
-                
-                return Err(AgentMemError::StorageError(format!(
-                    "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {}",
-                    e
-                )));
-            } else {
-                info!("✅ Memory added to vector store: {}", memory.id.0);
             }
+
+            #[cfg(not(feature = "libsql"))]
+            {
+                // 未启用libsql feature，使用并行存储
+                let (sql_result, vector_result) = tokio::join!(
+                    self.sql_repository.create(memory),
+                    self.vector_store.add_vectors(vec![vector_data])
+                );
+
+                // 检查LibSQL结果
+                let _created_memory = sql_result.map_err(|e| {
+                    error!("Failed to create memory in LibSQL: {}", e);
+                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                })?;
+
+                info!("✅ Memory created in LibSQL: {}", memory.id.0);
+
+                // 检查VectorStore结果，如果失败则回滚LibSQL
+                if let Err(e) = vector_result {
+                    error!(
+                        "Failed to add memory to vector store: {}. Rolling back Repository to ensure data consistency.",
+                        e
+                    );
+                    
+                    // 回滚Repository
+                    if let Err(rollback_err) = self.sql_repository.delete(&memory.id.0).await {
+                        error!("Failed to rollback Repository after VectorStore failure: {}", rollback_err);
+                        {
+                            let mut stats = self.stats.write().await;
+                            stats.total_ops += 1;
+                            stats.failed_ops += 1;
+                        }
+                        return Err(AgentMemError::StorageError(format!(
+                            "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
+                            e, rollback_err
+                        )));
+                    }
+                    
+                    {
+                        let mut stats = self.stats.write().await;
+                        stats.total_ops += 1;
+                        stats.failed_ops += 1;
+                    }
+                    
+                    return Err(AgentMemError::StorageError(format!(
+                        "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {}",
+                        e
+                    )));
+                } else {
+                    info!("✅ Memory queued for vector storage: {}", memory.id.0);
+                }
+            }
+        } else {
+            // 没有embedding，只存储到LibSQL
+            let _created_memory = self.sql_repository.create(memory).await.map_err(|e| {
+                error!("Failed to create memory in LibSQL: {}", e);
+                AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+            })?;
+            info!("✅ Memory created in LibSQL: {}", memory.id.0);
         }
 
         // Step 3: Update L1 cache
@@ -1295,23 +1439,18 @@ impl UnifiedStorageCoordinator {
         }
 
         // Step 2: Fetch missing memories from LibSQL
+        // 🆕 Phase 1.6: 消除N+1查询 - 使用批量查询优化
+        // 预期效果: 批量查询性能提升10x (N次查询 → 1次查询)
         if !missing_ids.is_empty() {
-            for id in &missing_ids {
-                match self.sql_repository.find_by_id(id).await {
-                    Ok(Some(memory)) => {
-                        // Update cache
-                        if self.cache_config.l1_enabled {
-                            self.update_l1_cache(id, memory.clone()).await;
-                        }
-                        results.push(memory);
-                    }
-                    Ok(None) => {
-                        debug!("Memory not found: {}", id);
-                    }
-                    Err(e) => {
-                        warn!("Failed to fetch memory {}: {}", id, e);
-                    }
+            // 使用批量查询方法（trait已提供默认实现，具体实现可以覆盖）
+            let batch_memories = self.sql_repository.batch_find_by_ids(&missing_ids).await?;
+            for memory in batch_memories {
+                let id = memory.id.as_str();
+                // Update cache
+                if self.cache_config.l1_enabled {
+                    self.update_l1_cache(id, memory.clone()).await;
                 }
+                results.push(memory);
             }
         }
 
@@ -1329,6 +1468,7 @@ impl UnifiedStorageCoordinator {
         
         Ok(results)
     }
+
 
     /// Check if memory exists
     ///

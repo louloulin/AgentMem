@@ -15,6 +15,8 @@ pub mod factory;
 
 // Unified storage coordinator (always available)
 pub mod coordinator;
+#[cfg(feature = "libsql")]
+pub mod batch_vector_queue;
 
 // LibSQL backend (default, embedded mode)
 #[cfg(feature = "libsql")]

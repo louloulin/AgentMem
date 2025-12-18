@@ -165,6 +165,20 @@ pub trait MemoryRepositoryTrait: Send + Sync {
     /// Find memory by ID
     async fn find_by_id(&self, id: &str) -> Result<Option<Memory>>;
 
+    /// 🆕 Phase 1.6: 批量查询优化 - 批量查找多个ID的记忆
+    /// 预期效果: 批量查询性能提升10x (N次查询 → 1次查询)
+    /// 默认实现使用循环调用find_by_id（fallback），具体实现可以覆盖此方法
+    async fn batch_find_by_ids(&self, ids: &[String]) -> Result<Vec<Memory>> {
+        // 默认实现：循环调用find_by_id（N+1问题，但作为fallback）
+        let mut results = Vec::new();
+        for id in ids {
+            if let Ok(Some(memory)) = self.find_by_id(id).await {
+                results.push(memory);
+            }
+        }
+        Ok(results)
+    }
+
     /// Find memories by agent ID
     async fn find_by_agent_id(&self, agent_id: &str, limit: i64) -> Result<Vec<Memory>>;
 

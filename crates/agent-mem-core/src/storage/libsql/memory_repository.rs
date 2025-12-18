@@ -253,6 +253,61 @@ impl LibSqlMemoryRepository {
 
 #[async_trait]
 impl MemoryRepositoryTrait for LibSqlMemoryRepository {
+    /// 🆕 Phase 1.6: 覆盖批量查询方法，使用IN子句优化
+    async fn batch_find_by_ids(&self, ids: &[String]) -> Result<Vec<Memory>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.get_conn().await?;
+        let conn = conn.lock().await;
+
+        // LibSQL的params!宏不支持动态参数，我们使用字符串拼接（已转义防止SQL注入）
+        // 对于大量ID，分批处理以避免SQL语句过长
+        const MAX_BATCH_SIZE: usize = 100;
+        let mut all_results = Vec::new();
+
+        for chunk in ids.chunks(MAX_BATCH_SIZE) {
+            // 转义ID并构建IN子句
+            let ids_str: Vec<String> = chunk.iter()
+                .map(|id| {
+                    // 转义单引号防止SQL注入
+                    format!("'{}'", id.replace("'", "''"))
+                })
+                .collect();
+            let ids_str_joined = ids_str.join(",");
+            
+            let sql = format!(
+                "SELECT id, organization_id, user_id, agent_id, content, hash, metadata,
+                        score, memory_type, scope, level, importance, access_count, last_accessed,
+                        created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
+                 FROM memories WHERE id IN ({}) AND is_deleted = 0",
+                ids_str_joined
+            );
+
+            // 使用query方法执行SQL（不使用参数绑定，因为LibSQL限制）
+            // 注意: query方法需要两个参数，对于没有参数的查询使用()
+            let mut rows = conn
+                .query(&sql, ())
+                .await
+                .map_err(|e| {
+                    AgentMemError::StorageError(format!("Failed to execute batch query: {e}"))
+                })?;
+
+            while let Some(row) = rows
+                .next()
+                .await
+                .map_err(|e| AgentMemError::StorageError(format!("Failed to fetch row: {e}")))?
+            {
+                let db_memory = Self::row_to_memory(&row)?;
+                let memory = db_to_memory(&db_memory)?;
+                all_results.push(memory);
+            }
+        }
+
+        Ok(all_results)
+    }
+
     async fn create(&self, memory: &Memory) -> Result<Memory> {
         let conn = self.get_conn().await?;
         let conn = conn.lock().await;
@@ -331,6 +386,8 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
             Ok(None)
         }
     }
+
+
 
     async fn find_by_agent_id(&self, agent_id: &str, limit: i64) -> Result<Vec<Memory>> {
         let conn = self.get_conn().await?;
@@ -610,8 +667,8 @@ impl LibSqlMemoryRepository {
         // 但LibSQL的execute不支持SELECT，所以我们使用query方法
         // 对于简单情况，使用params!宏；对于复杂情况，使用动态构建
         
-        // 计算参数数量
-        let param_count = 1 + // agent_id
+        // 计算参数数量（用于未来优化）
+        let _param_count = 1 + // agent_id
             if query.is_empty() { 0 } else { 1 } + // search_pattern
             filter_params.len() + // filter params
             1; // limit

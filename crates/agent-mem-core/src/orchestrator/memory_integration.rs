@@ -594,22 +594,26 @@ impl MemoryIntegrator {
             return Ok(result);
         }
 
-        // ========== Priority 3: Semantic Memory (Agent Scope) ==========
-        // ✅ 优化3: 仅在需要时查询
+        // ========== 🆕 Phase 1.4: 完全并行检索 - Priority 3 & 4 并行执行 ==========
+        // 预期效果: 检索延迟减少60% (130-450ms → 50-180ms)
         if all_memories.len() < max_count {
             let semantic_scope = MemoryScope::Agent(agent_id.to_string());
-
+            let global_scope = MemoryScope::Global;
             let remaining = max_count.saturating_sub(all_memories.len());
+
             info!(
-                "📖 [3/4] Querying Semantic Memory - need {} more",
+                "📖🌍 [3-4/4] Parallel querying Semantic + Global Memory - need {} more",
                 remaining
             );
 
-            match self
-                .memory_engine
-                .search_memories(query, Some(semantic_scope), Some(remaining * 2))
-                .await
-            {
+            // 🆕 并行执行Semantic和Global查询
+            let (semantic_result, global_result) = tokio::join!(
+                self.memory_engine.search_memories(query, Some(semantic_scope), Some(remaining * 2)),
+                self.memory_engine.search_memories(query, Some(global_scope), Some(remaining * 2))
+            );
+
+            // 处理Semantic结果
+            match semantic_result {
                 Ok(memories) => {
                     let mut added = 0;
                     query_count += 1;
@@ -632,51 +636,11 @@ impl MemoryIntegrator {
                 }
             }
 
-            // ✅ 优化4: 早停检查2 - 加上Semantic已足够
-            if all_memories.len() >= max_count {
-                let saved_queries = 1; // 节省了Global查询
-                info!(
-                    "✅ Early stop after Priority 3: {} >= target {}, saved {} queries",
-                    all_memories.len(),
-                    max_count,
-                    saved_queries
-                );
-
-                self.record_query_stats(query_count, saved_queries);
-
-                all_memories.sort_by(|a, b| {
-                    b.score()
-                        .unwrap_or(0.0)
-                        .partial_cmp(&a.score().unwrap_or(0.0))
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
-
-                let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
-                self.update_cache(cache_key.clone(), result.clone());
-
-                return Ok(result);
-            }
-        }
-
-        // ========== Priority 4: Global Memory (Global Scope) ==========
-        // 理论依据: 全局知识库，包含通用知识、产品信息等
-        // 修复: 支持global scope的商品记忆等全局知识
-        if all_memories.len() < max_count {
-            let global_scope = MemoryScope::Global;
-
-            let remaining = max_count.saturating_sub(all_memories.len());
-            info!(
-                "🌍 Priority 4: Querying Global Memory (Global scope) - 需要 {} 更多",
-                remaining
-            );
-
-            match self
-                .memory_engine
-                .search_memories(query, Some(global_scope), Some(remaining * 2))
-                .await
-            {
+            // 处理Global结果
+            match global_result {
                 Ok(memories) => {
                     let mut added = 0;
+                    query_count += 1;
                     for mut memory in memories {
                         if seen_ids.insert(memory.id.clone()) {
                             // 🎯 Global Memory 权重 (可配置，降低因为范围最广)
@@ -695,6 +659,15 @@ impl MemoryIntegrator {
                 Err(e) => {
                     warn!("⚠️  Global Memory query failed: {}", e);
                 }
+            }
+
+            // ✅ 早停检查 - 所有优先级查询完成
+            if all_memories.len() >= max_count {
+                info!(
+                    "✅ All priority queries completed: {} >= target {}",
+                    all_memories.len(),
+                    max_count
+                );
             }
         }
 
