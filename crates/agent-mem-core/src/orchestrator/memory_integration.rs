@@ -41,6 +41,9 @@ pub struct MemoryIntegratorConfig {
     // 🆕 Phase 2: 主动检索系统集成（可选启用）
     /// 启用主动检索系统（主题提取、智能路由、上下文合成）
     pub enable_active_retrieval: bool,
+    // 🆕 Phase 2: 图记忆系统集成（可选启用）
+    /// 启用图记忆系统（图-向量混合检索、关系推理）
+    pub enable_graph_memory: bool,
 }
 
 #[derive(Debug)]
@@ -130,6 +133,18 @@ mod tests {
         assert_eq!(config.auto_compression_threshold, 1000);
         assert_eq!(config.auto_compression_age_days, 30);
     }
+
+    /// 🆕 Phase 2: 测试图记忆系统配置
+    #[test]
+    fn test_graph_memory_config() {
+        let config = MemoryIntegratorConfig::default();
+        // 验证默认配置
+        assert!(!config.enable_graph_memory); // 默认关闭
+        
+        let mut config = MemoryIntegratorConfig::default();
+        config.enable_graph_memory = true;
+        assert!(config.enable_graph_memory); // 可以启用
+    }
 }
 
 impl Default for MemoryIntegratorConfig {
@@ -151,9 +166,12 @@ impl Default for MemoryIntegratorConfig {
 
             // 🆕 Phase 2: 主动检索系统（默认关闭，可选启用）
             enable_active_retrieval: false,
+            // 🆕 Phase 2: 图记忆系统（默认关闭，可选启用）
+            enable_graph_memory: false,
         }
     }
 }
+
 
 /// ⭐ 简单缓存项
 #[derive(Clone)]
@@ -171,6 +189,8 @@ pub struct MemoryIntegrator {
     cache_metrics: CacheMetrics,
     /// 🆕 Phase 2: 主动检索系统（可选，用于主题提取、智能路由、上下文合成）
     active_retrieval: Option<Arc<crate::retrieval::ActiveRetrievalSystem>>,
+    /// 🆕 Phase 2: 图记忆引擎（可选，用于图-向量混合检索）
+    graph_memory: Option<Arc<crate::graph_memory::GraphMemoryEngine>>,
 }
 
 impl MemoryIntegrator {
@@ -192,6 +212,7 @@ impl MemoryIntegrator {
             cache: Arc::new(RwLock::new(lru::LruCache::new(cache_size))),
             cache_metrics: CacheMetrics::new(),
             active_retrieval: None,
+            graph_memory: None,
         }
     }
 
@@ -206,6 +227,15 @@ impl MemoryIntegrator {
         active_retrieval: Arc<crate::retrieval::ActiveRetrievalSystem>,
     ) -> Self {
         self.active_retrieval = Some(active_retrieval);
+        self
+    }
+
+    /// 🆕 Phase 2: 设置图记忆引擎（可选启用）
+    pub fn with_graph_memory(
+        mut self,
+        graph_memory: Arc<crate::graph_memory::GraphMemoryEngine>,
+    ) -> Self {
+        self.graph_memory = Some(graph_memory);
         self
     }
 
@@ -800,7 +830,67 @@ impl MemoryIntegrator {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // 返回 top N（基于HCAM的两阶段检索结果）
+        // 🆕 Phase 2: 如果启用了图记忆系统，使用图记忆查找相关节点并融合结果
+        if self.config.enable_graph_memory {
+            if let Some(ref graph_memory) = self.graph_memory {
+                info!("🕸️ Using GraphMemoryEngine for enhanced retrieval");
+                
+                // 从已检索的记忆中提取节点ID，使用图记忆查找相关节点
+                let mut graph_enhanced_memories = Vec::new();
+                // seen_ids 是 HashSet<MemoryId>，需要转换为字符串集合
+                let mut graph_seen_ids: HashSet<String> = seen_ids.iter()
+                    .map(|id| id.as_str().to_string())
+                    .collect();
+                
+                // 对前几个记忆使用图记忆查找相关节点
+                for memory in all_memories.iter().take(3) {
+                    // MemoryId 是 String 的类型别名，直接使用字符串
+                    let graph_node_id = memory.id.as_str().to_string();
+                    
+                    // 查找相关节点（深度2，查找相关关系）
+                    if let Ok(related_nodes) = graph_memory
+                        .find_related_nodes(&graph_node_id, 2, None)
+                        .await
+                    {
+                        for graph_node in related_nodes {
+                            let node_id_str = graph_node.id.clone(); // MemoryId 是 String
+                            
+                            // 如果节点ID不在已见过的ID中，尝试从memory_engine获取
+                            if !graph_seen_ids.contains(&node_id_str) {
+                                if let Ok(Some(related_memory)) = self.memory_engine
+                                    .get_memory(&node_id_str)
+                                    .await
+                                {
+                                    // 提升图记忆相关节点的分数（因为通过关系推理找到）
+                                    let mut enhanced_memory = related_memory;
+                                    if let Some(score) = enhanced_memory.score() {
+                                        enhanced_memory.set_score(score * 1.1); // 提升10%
+                                    }
+                                    graph_enhanced_memories.push(enhanced_memory);
+                                    graph_seen_ids.insert(node_id_str);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 融合图记忆结果
+                if !graph_enhanced_memories.is_empty() {
+                    info!("✅ GraphMemoryEngine found {} related memories", graph_enhanced_memories.len());
+                    all_memories.extend(graph_enhanced_memories);
+                    
+                    // 重新排序（图记忆增强后的结果）
+                    all_memories.sort_by(|a, b| {
+                        b.score()
+                            .unwrap_or(0.0)
+                            .partial_cmp(&a.score().unwrap_or(0.0))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                }
+            }
+        }
+
+        // 返回 top N（基于HCAM的两阶段检索结果 + 图记忆增强）
         let result: Vec<Memory> = all_memories.into_iter().take(max_count).collect();
 
         // ⭐ 更新缓存
