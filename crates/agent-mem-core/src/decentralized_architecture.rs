@@ -502,6 +502,71 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_decentralized_manager_empty_nodes() {
+        let manager = DecentralizedManager::with_defaults();
+
+        // 测试没有节点时的同步
+        let operation = SyncOperation {
+            operation_id: "op1".to_string(),
+            operation_type: SyncOperationType::Create,
+            key: "key1".to_string(),
+            value: b"value1".to_vec(),
+            version: 1,
+            timestamp: Utc::now(),
+            node_id: manager.config.node_id.clone(),
+        };
+
+        // 应该成功，即使没有其他节点
+        manager.sync_to_nodes(operation).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_conflict_detection() {
+        let manager = DecentralizedManager::with_defaults();
+
+        let existing_versions = vec![
+            ConflictVersion {
+                version: 2, // 版本号大于或等于新版本
+                node_id: "node1".to_string(),
+                value: b"value1".to_vec(), // 值不同
+                timestamp: Utc::now() - chrono::Duration::hours(1),
+            },
+        ];
+
+        // 测试冲突检测：版本2 >= 新版本2，且值不同
+        let conflict = manager
+            .detect_conflict("key1", 2, b"value2", existing_versions)
+            .await
+            .unwrap();
+
+        // 应该检测到冲突
+        assert!(conflict.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_conflict_detection_no_conflict() {
+        let manager = DecentralizedManager::with_defaults();
+
+        let existing_versions = vec![
+            ConflictVersion {
+                version: 1, // 版本号小于新版本
+                node_id: "node1".to_string(),
+                value: b"value1".to_vec(),
+                timestamp: Utc::now() - chrono::Duration::hours(1),
+            },
+        ];
+
+        // 测试无冲突：版本1 < 新版本2
+        let conflict = manager
+            .detect_conflict("key1", 2, b"value2", existing_versions)
+            .await
+            .unwrap();
+
+        // 不应该检测到冲突
+        assert!(conflict.is_none());
+    }
+
+    #[tokio::test]
     async fn test_conflict_resolution() {
         let manager = DecentralizedManager::with_defaults();
 

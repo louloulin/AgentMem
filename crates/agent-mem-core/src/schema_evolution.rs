@@ -615,5 +615,69 @@ mod tests {
         assert!(updated.is_some());
         assert_eq!(updated.unwrap().memory_ids.len(), 3);
     }
+
+    #[tokio::test]
+    async fn test_schema_evolution_nonexistent() {
+        let engine = SchemaEvolutionEngine::with_defaults();
+
+        // 测试更新不存在的Schema
+        let result = engine
+            .update_schema_from_memories("nonexistent", vec!["mem1".to_string()])
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_schema_evolution_max_count() {
+        let engine = SchemaEvolutionEngine::with_defaults();
+
+        // 创建最大数量的Schema
+        for i in 0..engine.config.max_schema_count {
+            let schema = Schema {
+                id: format!("schema{}", i),
+                name: format!("Schema {}", i),
+                description: "Test".to_string(),
+                pattern: SchemaPattern {
+                    core_concept: format!("concept{}", i),
+                    key_attributes: vec![],
+                    relation_patterns: Vec::new(),
+                    typical_examples: Vec::new(),
+                    semantic_vector: None,
+                },
+                memory_ids: vec![],
+                version: 1,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                usage_count: 0,
+                confidence: 0.8,
+            };
+
+            engine.create_schema(schema).await.unwrap();
+        }
+
+        // 尝试创建超出限制的Schema
+        let schema = Schema {
+            id: "schema_overflow".to_string(),
+            name: "Overflow Schema".to_string(),
+            description: "Test".to_string(),
+            pattern: SchemaPattern {
+                core_concept: "concept".to_string(),
+                key_attributes: vec![],
+                relation_patterns: Vec::new(),
+                typical_examples: Vec::new(),
+                semantic_vector: None,
+            },
+            memory_ids: vec![],
+            version: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            usage_count: 0,
+            confidence: 0.8,
+        };
+
+        let result = engine.create_schema(schema).await;
+        assert!(result.is_err());
+    }
 }
 
