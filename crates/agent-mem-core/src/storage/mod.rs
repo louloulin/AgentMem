@@ -27,6 +27,10 @@ mod phase1_integration_test;
 #[path = "tests/phase1_optimizations_test.rs"]
 mod phase1_optimizations_test;
 
+#[cfg(test)]
+#[path = "tests/phase4_batch_test.rs"]
+mod phase4_batch_test;
+
 // LibSQL backend (default, embedded mode)
 #[cfg(feature = "libsql")]
 pub mod libsql;
