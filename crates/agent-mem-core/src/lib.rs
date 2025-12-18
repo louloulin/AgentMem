@@ -68,6 +68,16 @@ pub mod performance;
 pub mod persona_extraction;
 /// Phase 3.4: File system integration (CLAUDE.md compatibility, auto-loading, import system)
 pub mod filesystem_integration;
+/// Phase 4.1: Causal reasoning engine (causal knowledge graph, reasoning engine, chain retrieval, explanation generation)
+pub mod causal_reasoning;
+/// Phase 4.3: Semantic hierarchy index (SHIMI-style) - semantic hierarchy structure, meaning-based retrieval, hierarchy traversal optimization
+pub mod semantic_hierarchy;
+/// Phase 5.1: Adaptive learning mechanism - learning strategy optimization, adaptive parameter adjustment, online learning support
+pub mod adaptive_learning;
+/// Phase 5.2: Decentralized architecture - distributed sync mechanism, conflict resolution strategy, network optimization
+pub mod decentralized_architecture;
+/// Phase 5.3: Schema evolution system - schema update mechanism, schema evolution algorithm, schema creation support
+pub mod schema_evolution;
 /// Pipeline framework for memory operations
 pub mod pipeline;
 /// Prompt processing and optimization
