@@ -28,6 +28,16 @@ impl AgentMemBackend {
             user_id,
         }
     }
+
+    /// 获取agent_id
+    pub fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
+
+    /// 获取user_id
+    pub fn user_id(&self) -> &str {
+        &self.user_id
+    }
 }
 
 #[async_trait]
