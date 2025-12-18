@@ -38,6 +38,8 @@ pub struct UnifiedStorageCoordinator {
     /// 🆕 Phase 1.2: 批量向量存储队列（可选）
     #[cfg(feature = "libsql")]
     batch_vector_queue: Option<Arc<BatchVectorStorageQueue>>,
+    /// 🆕 Phase 2: 自动压缩引擎（可选，用于压缩旧的低重要性记忆）
+    compression_engine: Option<Arc<crate::compression::IntelligentCompressionEngine>>,
 }
 
 // Note: update_cache_config requires &mut self, but coordinator is typically used as Arc
@@ -61,6 +63,12 @@ pub struct CacheConfig {
     /// 🆕 Phase 1.2: 启用批量向量存储队列
     #[cfg(feature = "libsql")]
     pub enable_batch_vector_queue: bool,
+    /// 🆕 Phase 2: 启用自动压缩（可选，用于压缩旧的低重要性记忆）
+    pub enable_auto_compression: bool,
+    /// 自动压缩阈值（超过此数量的旧记忆触发压缩）
+    pub auto_compression_threshold: usize,
+    /// 自动压缩时间阈值（天数，超过此天数的记忆才考虑压缩）
+    pub auto_compression_age_days: u64,
 }
 
 impl Default for CacheConfig {
@@ -81,6 +89,10 @@ impl Default for CacheConfig {
             redis_url: None,
             #[cfg(feature = "libsql")]
             enable_batch_vector_queue: true, // 默认启用批量队列
+            // 🆕 Phase 2: 自动压缩（默认关闭，可选启用）
+            enable_auto_compression: false,
+            auto_compression_threshold: 1000, // 超过1000条旧记忆触发压缩
+            auto_compression_age_days: 30, // 30天前的记忆才考虑压缩
         }
     }
 }
@@ -184,6 +196,14 @@ impl UnifiedStorageCoordinator {
         #[cfg(not(feature = "libsql"))]
         let batch_vector_queue = None;
 
+        // 🆕 Phase 2: 创建压缩引擎（如果启用）
+        let compression_engine = if config.enable_auto_compression {
+            let compression_config = crate::compression::CompressionConfig::default();
+            Some(Arc::new(crate::compression::IntelligentCompressionEngine::new(compression_config)))
+        } else {
+            None
+        };
+
         Self {
             sql_repository,
             vector_store,
@@ -194,7 +214,17 @@ impl UnifiedStorageCoordinator {
             stats: Arc::new(RwLock::new(CoordinatorStats::default())),
             #[cfg(feature = "libsql")]
             batch_vector_queue,
+            compression_engine,
         }
+    }
+
+    /// 🆕 Phase 2: 设置压缩引擎（可选启用）
+    pub fn with_compression_engine(
+        mut self,
+        compression_engine: Arc<crate::compression::IntelligentCompressionEngine>,
+    ) -> Self {
+        self.compression_engine = Some(compression_engine);
+        self
     }
 
     /// Create a new unified storage coordinator with default configuration
@@ -401,6 +431,18 @@ impl UnifiedStorageCoordinator {
             let mut stats = self.stats.write().await;
             stats.total_ops += 1;
             stats.successful_ops += 1;
+        }
+
+        // 🆕 Phase 2: 自动压缩检查（如果启用）
+        // 注意：完整的自动压缩需要后台任务，这里只做检查标记
+        // 实际压缩可以在后台任务中异步执行
+        if self.cache_config.enable_auto_compression {
+            if let Some(_compression_engine) = &self.compression_engine {
+                // 检查是否需要触发压缩（基于统计信息）
+                // 这里只记录日志，实际压缩逻辑可以在后台任务中实现
+                debug!("Auto-compression enabled, checking if compression is needed...");
+                // TODO: 实现完整的自动压缩逻辑（需要后台任务和查询旧记忆）
+            }
         }
 
         Ok(memory.id.0.clone())

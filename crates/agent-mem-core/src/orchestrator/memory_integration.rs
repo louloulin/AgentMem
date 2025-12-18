@@ -10,7 +10,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, RwLock,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// 记忆集成器配置
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -37,6 +37,10 @@ pub struct MemoryIntegratorConfig {
     pub enable_compression: bool,
     /// 压缩阈值（超过此数量启动压缩）
     pub compression_threshold: usize,
+
+    // 🆕 Phase 2: 主动检索系统集成（可选启用）
+    /// 启用主动检索系统（主题提取、智能路由、上下文合成）
+    pub enable_active_retrieval: bool,
 }
 
 #[derive(Debug)]
@@ -102,6 +106,30 @@ mod tests {
 
         assert_eq!(key, "agent-1::user-1::session-1::hello world".to_string());
     }
+
+    /// 🆕 Phase 2: 测试主动检索系统配置
+    #[test]
+    fn test_active_retrieval_config() {
+        let config = MemoryIntegratorConfig::default();
+        // 验证默认配置
+        assert!(!config.enable_active_retrieval); // 默认关闭
+        
+        let mut config = MemoryIntegratorConfig::default();
+        config.enable_active_retrieval = true;
+        assert!(config.enable_active_retrieval); // 可以启用
+    }
+
+    /// 🆕 Phase 2: 测试自动压缩配置
+    #[test]
+    fn test_auto_compression_config() {
+        use crate::storage::coordinator::CacheConfig;
+        
+        let config = CacheConfig::default();
+        // 验证默认配置
+        assert!(!config.enable_auto_compression); // 默认关闭
+        assert_eq!(config.auto_compression_threshold, 1000);
+        assert_eq!(config.auto_compression_age_days, 30);
+    }
 }
 
 impl Default for MemoryIntegratorConfig {
@@ -120,6 +148,9 @@ impl Default for MemoryIntegratorConfig {
             // Phase 5: 记忆压缩
             enable_compression: true,
             compression_threshold: 10, // 超过10条启动压缩
+
+            // 🆕 Phase 2: 主动检索系统（默认关闭，可选启用）
+            enable_active_retrieval: false,
         }
     }
 }
@@ -138,6 +169,8 @@ pub struct MemoryIntegrator {
     /// ⭐ 简单LRU缓存 (query -> memories)
     cache: Arc<RwLock<lru::LruCache<String, CacheEntry>>>,
     cache_metrics: CacheMetrics,
+    /// 🆕 Phase 2: 主动检索系统（可选，用于主题提取、智能路由、上下文合成）
+    active_retrieval: Option<Arc<crate::retrieval::ActiveRetrievalSystem>>,
 }
 
 impl MemoryIntegrator {
@@ -158,12 +191,22 @@ impl MemoryIntegrator {
             config,
             cache: Arc::new(RwLock::new(lru::LruCache::new(cache_size))),
             cache_metrics: CacheMetrics::new(),
+            active_retrieval: None,
         }
     }
 
     /// 使用默认配置创建
     pub fn with_default_config(memory_engine: Arc<MemoryEngine>) -> Self {
         Self::new(memory_engine, MemoryIntegratorConfig::default())
+    }
+
+    /// 🆕 Phase 2: 设置主动检索系统（可选启用）
+    pub fn with_active_retrieval(
+        mut self,
+        active_retrieval: Arc<crate::retrieval::ActiveRetrievalSystem>,
+    ) -> Self {
+        self.active_retrieval = Some(active_retrieval);
+        self
     }
 
     /// ⭐ 检查缓存
@@ -342,6 +385,64 @@ impl MemoryIntegrator {
         if let Some(cached) = self.get_cached(&cache_key) {
             info!("🎯 Cache hit, returning {} cached memories", cached.len());
             return Ok(cached.into_iter().take(max_count).collect());
+        }
+
+        // 🆕 Phase 2: 如果启用了主动检索系统，使用它进行增强检索
+        if self.config.enable_active_retrieval {
+            if let Some(ref active_retrieval) = self.active_retrieval {
+                info!("🚀 Using ActiveRetrievalSystem for enhanced retrieval");
+                use crate::retrieval::{RetrievalRequest, RetrievalResponse};
+                use std::collections::HashMap;
+
+                let mut context = HashMap::new();
+                context.insert("agent_id".to_string(), serde_json::Value::String(agent_id.to_string()));
+                if let Some(uid) = user_id {
+                    context.insert("user_id".to_string(), serde_json::Value::String(uid.to_string()));
+                }
+                if let Some(sid) = session_id {
+                    context.insert("session_id".to_string(), serde_json::Value::String(sid.to_string()));
+                }
+
+                let request = RetrievalRequest {
+                    query: query.to_string(),
+                    target_memory_types: None,
+                    max_results: max_count,
+                    preferred_strategy: None,
+                    context: Some(context),
+                    enable_topic_extraction: true,
+                    enable_context_synthesis: true,
+                };
+
+                match active_retrieval.retrieve(request).await {
+                    Ok(response) => {
+                        if !response.memories.is_empty() {
+                            // 从 memory_engine 中获取完整的 Memory 对象
+                            let mut memories = Vec::new();
+                            for rm in response.memories {
+                                if let Ok(Some(memory)) = self.memory_engine
+                                    .get_memory(&rm.id)
+                                    .await
+                                {
+                                    memories.push(memory);
+                                }
+                            }
+
+                            if !memories.is_empty() {
+                                info!("✅ ActiveRetrievalSystem returned {} memories", memories.len());
+                                // 更新缓存
+                                self.update_cache(cache_key, memories.clone());
+                                return Ok(memories.into_iter().take(max_count).collect());
+                            }
+                        }
+                        // 如果主动检索没有返回结果，继续使用默认检索流程
+                        info!("⚠️ ActiveRetrievalSystem returned no results, falling back to default retrieval");
+                    }
+                    Err(e) => {
+                        warn!("⚠️ ActiveRetrievalSystem failed: {}, falling back to default retrieval", e);
+                        // 继续使用默认检索流程
+                    }
+                }
+            }
         }
 
         use crate::hierarchy::MemoryScope;
