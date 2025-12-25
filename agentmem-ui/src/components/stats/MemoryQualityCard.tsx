@@ -241,7 +241,7 @@ export function MemoryQualityCard({
                         border: '1px solid #475569',
                         borderRadius: '8px',
                       }}
-                      formatter={(value: number, name: string, props: any) => [
+                      formatter={(value: any, name: any, props: any) => [
                         `${value} (${props.payload.percentage.toFixed(1)}%)`,
                         name
                       ]}

@@ -152,7 +152,7 @@ export function MemoryGrowthChart({
                     padding: '8px 12px',
                   }}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: any, name: any) => {
                     if (name === 'total') return [value, 'Total Memories'];
                     if (name === 'new') return [value, 'New Memories'];
                     return [value, name];
