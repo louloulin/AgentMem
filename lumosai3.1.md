@@ -119,34 +119,51 @@
 
 ## 🏗️ 当前架构深度分析
 
-### LumosAI Rust Core 现状
+### LumosAI Rust Core 深度代码分析
 
-#### 核心模块分析
+#### 核心模块分析 (基于197个源文件)
 
-1. **Agent System**: 支持多种Agent类型，API不一致问题严重
-   - 8个不同的Agent实现 (BasicAgent, StreamingAgent, ToolAgent等)
-   - API接口不统一，开发者需要学习多个概念
-   - 缺少类型化Agent配置
+1. **Agent System**: 模块化架构存在结构性问题
+   - **模块化过度**: 8个不同的Agent实现 + 模块化组件 (AgentCore, AgentExecutor, AgentGenerator)
+   - **API不一致**: BasicAgent有2300+行单体实现，refactored模块有独立实现
+   - **配置复杂度**: AgentConfig支持20+参数，缺少智能默认值
+   - **具体代码问题**: `agent_macro.rs`中宏生成代码与实际Agent trait不匹配
 
-2. **Memory System**: 多层记忆支持，存储抽象不统一
-   - 4种记忆类型但接口不一致
-   - 存储后端抽象缺失，导致数据一致性问题
-   - 缺少Repository优先的协调机制
+2. **Memory System**: 统一接口设计良好但实现不完整
+   - **UnifiedMemory**: 提供`basic()`, `semantic()`, `working()`工厂方法
+   - **存储抽象缺失**: 虽然有`MemoryTrait`，但实际实现中`VectorStore`和`Repository`分离
+   - **数据一致性问题**: 写入VectorStore，查询Repository返回0条记录
+   - **具体代码问题**: `unified.rs`中semantic()方法返回BasicMemory占位符，无实际语义搜索能力
 
-3. **LLM Integration**: 支持10+提供商，接口不统一
-   - 每个提供商有独立的实现
-   - 缺少统一的质量监控和切换机制
-   - 函数调用支持不完整
+3. **LLM Integration**: 10+提供商支持但抽象层次不统一
+   - **LlmProvider trait**: 统一的接口设计良好
+   - **具体实现问题**: 每个provider有独立的文件，缺少统一的配置和监控
+   - **函数调用支持**: `function_calling.rs`模块存在但集成不完整
+   - **具体代码问题**: 缺少provider间的自动切换和负载均衡
 
-4. **Vector Store**: 支持多种后端，缺少统一抽象
-   - 7种向量数据库支持但接口不一致
-   - 缺少向量操作的性能监控
-   - 批量操作优化不足
+4. **Vector Store**: 抽象层薄弱，性能监控缺失
+   - **VectorStorage trait**: 基础抽象存在但不够完善
+   - **具体实现问题**: 7种向量数据库支持但缺少统一的性能指标收集
+   - **批量操作**: 支持批量插入但缺少批量查询优化
 
-5. **Workflow Engine**: DAG编排支持，过于复杂
-   - 功能强大但学习曲线陡峭
-   - 缺少轻量级工作流模板
-   - 错误处理和重试机制不完善
+5. **Workflow Engine**: DAG实现复杂但可简化
+   - **DagWorkflow**: 基于拓扑排序的并行执行
+   - **具体实现问题**: `DagScheduler`过于复杂，缺少轻量级workflow模板
+   - **错误处理**: 缺少完善的错误恢复和重试机制
+
+6. **Tool System**: 工具生态丰富但集成复杂
+   - **27个内置工具**: 从文件操作到AI增强功能
+   - **具体实现问题**: `tool_macro.rs`中宏生成代码与实际Tool trait不匹配
+   - **工具注册**: ToolRegistry存在但缺少动态加载机制
+
+7. **Configuration System**: 多源配置支持但复杂度高
+   - **ConfigLoader**: 支持环境变量、文件、secrets等多源配置
+   - **具体实现问题**: 配置验证和热重载功能存在但不够完善
+
+8. **Macro System**: DSL设计良好但实现有问题
+   - **agent_macro.rs**: 试图提供声明式Agent定义
+   - **tool_macro.rs**: 试图提供声明式工具定义
+   - **具体代码问题**: 生成的代码与实际trait不匹配，编译错误
 
 ### LumosAI Cangjie Core 现状
 
@@ -162,27 +179,86 @@
 - **学习曲线陡峭**: 新语言的学习成本
 - **集成复杂**: 与现有Rust代码的桥接需要改进
 
-## 🔍 问题深度识别与分类
+## 🔍 问题深度识别与分类 (基于代码分析)
 
 ### 架构层问题 (Critical)
-1. **缺乏统一抽象层**: 各个模块独立性强但集成性差，开发者需要学习多个不一致的API
-2. **ContextFS缺失**: 没有"Everything is Context"的统一文件系统抽象
-3. **Everything is File未实现**: 缺少基于Unix哲学的统一资源访问方式
+1. **统一抽象层缺失**: 虽然有`UnifiedMemory`等设计，但实际各模块仍使用独立API
+   - Agent: BasicAgent vs refactored模块的AgentCore/Executor/Generator
+   - Memory: UnifiedMemory vs 底层BasicMemory/SemanticMemory
+   - Tool: 27个内置工具但缺少统一调用接口
+
+2. **ContextFS完全缺失**: 基于ContextFS论文的"Everything is Context"概念未实现
+   - 缺少Context抽象结构体和文件系统接口
+   - 没有`/context/*`路径的统一资源访问
+   - 缺少多模态上下文支持 (Text, Code, Image, Structured)
+
+3. **Everything is File未实现**: Unix哲学在代码中无体现
+   - 缺少`/sys/agentmem/*`的虚拟文件系统接口
+   - 没有文件系统式的配置和状态访问
+   - 缺少命令式工具链集成
+
+4. **模块化过度设计**: 代码结构复杂，学习成本高
+   - Agent: 8种类型 + 模块化组件，导致开发者迷茫
+   - Memory: 4种记忆类型接口不统一
+   - 宏系统: `agent_macro.rs`和`tool_macro.rs`生成代码与实际trait不匹配
 
 ### 性能层问题 (High)
-1. **内存管理低效**: 缺少统一内存池和缓存策略
-2. **存储抽象不统一**: 多后端支持但缺少协调层，导致数据一致性问题
-3. **并发模型不优化**: 缺少细粒度并发控制和资源池管理
+1. **数据一致性危机**: 存储分离导致严重问题
+   - **具体证据**: 写入VectorStore但查询Repository返回0条记录
+   - **根本原因**: 缺少Repository优先的协调机制
+   - **影响**: 系统无法正常工作，数据丢失风险高
+
+2. **存储抽象不统一**: 多后端支持但协调层缺失
+   - **具体证据**: `lumosai_core/src/vector/`下有多个adapter但无统一接口
+   - **问题**: 7种向量数据库支持但性能监控缺失
+   - **影响**: 难以进行性能优化和故障排查
+
+3. **并发模型低效**: 缺少细粒度并发控制
+   - **具体证据**: `DagScheduler`使用简单线程池，无智能调度
+   - **问题**: 缺少资源池管理和请求队列
+   - **影响**: 高并发场景下性能下降
+
+4. **内存管理缺失**: 无统一内存策略
+   - **具体证据**: 缺少`cache`模块的高级缓存策略
+   - **问题**: WorkingMemory仅支持LRU，无多级缓存
+   - **影响**: 内存使用低效，大量重复计算
 
 ### 开发体验问题 (High)
-1. **配置复杂度高**: 每个组件需要独立配置，缺少智能默认值
-2. **API不一致性**: 8种Agent类型使用不同API，学习成本高
-3. **错误处理不完善**: 错误信息不够友好，调试困难
+1. **配置复杂度极高**: 20+配置参数，无智能默认
+   - **具体证据**: `AgentConfig`有20+字段，开发者需要逐一配置
+   - **问题**: 缺少`AgentBuilder`的智能默认值推断
+   - **影响**: 新手开发者上手困难，生产配置复杂
+
+2. **API不一致性严重**: 相同功能不同接口
+   - **具体证据**: BasicAgent使用`generate()`，其他Agent使用不同方法
+   - **问题**: 8种Agent类型需要学习8套API
+   - **影响**: 开发效率低下，容易出错
+
+3. **错误处理不友好**: 调试困难
+   - **具体证据**: 错误信息缺乏上下文，堆栈跟踪不完整
+   - **问题**: `error.rs`缺少用户友好的错误转换
+   - **影响**: 问题定位困难，开发周期延长
+
+4. **宏系统不可用**: DSL设计良好但实现失败
+   - **具体证据**: `#[agent(...)]`和`#[tool(...)]`宏生成代码与trait不匹配
+   - **问题**: 编译错误，无法使用声明式API
+   - **影响**: 失去重要的易用性特性
 
 ### 扩展性问题 (Medium)
-1. **插件系统不完善**: 缺少热加载和版本管理
-2. **多租户支持不足**: 缺少资源隔离和配额管理
-3. **监控和可观测性弱**: 缺少分布式追踪和性能分析
+1. **插件系统不完善**: 无动态加载能力
+   - **具体证据**: ToolRegistry静态注册，无热加载
+   - **问题**: 新工具需要重新编译
+   - **影响**: 扩展性受限，无法快速迭代
+
+2. **多租户支持基础**: 缺少资源隔离
+   - **具体证据**: 虽然有`tenant_id`字段，但实现不完整
+   - **问题**: 缺少配额管理和资源限制
+   - **影响**: 企业级部署受限
+
+3. **监控可观测性弱**: 缺少系统洞察
+   - **具体证据**: `telemetry`模块基础但缺少分布式追踪
+   - **问题**: 无法监控复杂工作流性能
+   - **影响**: 生产环境问题难以诊断
 
 ## 📚 相关研究与框架深度分析
 
@@ -257,103 +333,218 @@
 
 ## 🎯 LumosAI 3.1 综合改造计划
 
-### Phase 1: 架构重构 (Month 1-2, 8周)
-**目标**: 建立Everything is File的统一抽象层，实现ContextFS核心概念
+### Phase 1: ContextFS架构重构 (Month 1-2, 8周)
+**目标**: 基于ContextFS论文实现Everything is Context，解决数据一致性危机
 
-#### Week 1-2: ContextFS基础架构
-- [ ] 实现Context抽象结构体
-- [ ] 定义ContextFileSystem trait
-- [ ] 建立基础文件操作接口 (read_context, write_context, search_context)
-- [ ] 实现多模态内容支持 (Text, Code, Image, Structured)
+#### Week 1-2: ContextFS核心抽象 (基于代码分析优化)
+- [ ] **修复数据一致性**: 实现Repository优先的存储协调层
+  - 重构`unified.rs`的存储逻辑，确保写入和读取使用同一数据源
+  - 实现补偿事务机制，解决VectorStore和Repository分离问题
+- [ ] **实现Context抽象**: 基于ContextFS论文定义Context结构体
+  - 支持多模态内容 (Text, Code, Image, Structured)
+  - 实现上下文关系图和元数据管理
+- [ ] **定义ContextFileSystem trait**: 统一上下文操作接口
+  - `read_context(path)` - 读取上下文文件
+  - `write_context(path, context)` - 写入上下文
+  - `search_context(query, filters)` - 语义搜索
 
-#### Week 3-4: 存储协调层
-- [ ] 实现Repository优先策略
-- [ ] 建立Unified Storage Coordinator
-- [ ] 实现数据一致性保证机制
-- [ ] 添加补偿事务支持
+#### Week 3-4: 统一存储协调层 (解决存储抽象问题)
+- [ ] **实现UnifiedStorageCoordinator**: 替代当前的分离存储模式
+  - Repository优先写入策略
+  - VectorStore作为二级缓存
+  - 自动数据同步和一致性检查
+- [ ] **重构Vector存储抽象**: 基于现有7种向量数据库
+  - 统一VectorStorage trait接口
+  - 添加性能监控和批量操作优化
+  - 实现向量操作的指标收集
 
-#### Week 5-6: 类型化记忆系统
-- [ ] 实现ENGRAM三种记忆类型 (Episodic/Semantic/Procedural)
-- [ ] 重构Memory trait，支持类型化操作
-- [ ] 实现混合检索 (时间+语义)
-- [ ] 添加记忆生命周期管理
+#### Week 5-6: 类型化记忆系统 (基于ENGRAM优化)
+- [ ] **实现三种记忆类型**: 重构`memory/unified.rs`
+  - **Episodic**: 事件记忆 (时间序列，基于现有BasicMemory)
+  - **Semantic**: 事实记忆 (向量索引，修复semantic()方法的占位符实现)
+  - **Procedural**: 过程记忆 (技能图谱，新实现)
+- [ ] **实现混合检索**: 时间+语义双路检索
+  - 基于现有WorkingMemory的时间过滤
+  - 集成向量搜索的语义匹配
+  - 结果重排序和融合
 
-#### Week 7-8: 轻量级编排器
-- [ ] 实现单一路由器+检索器架构
-- [ ] 简化Agent Orchestrator接口
-- [ ] 移除过度抽象，保持核心功能
+#### Week 7-8: ContextFS文件系统接口 (Everything is File实现)
+- [ ] **实现虚拟文件系统**: `/context/*` 和 `/sys/agentmem/*` 路径
+  - ContextFS: `/context/memories/{agent}/{id}` - 记忆上下文
+  - Unix FS: `/sys/agentmem/status/health` - 系统状态
+- [ ] **文件系统集成**: 支持标准Unix工具
+  - `cat /context/memories/agent-123/latest` - 读取最新记忆
+  - `ls /sys/agentmem/metrics/` - 查看性能指标
+  - `echo "reload" > /sys/agentmem/control/config` - 控制操作
 
-### Phase 2: 核心组件重构 (Month 3-5, 12周)
-**目标**: 重构Agent、Memory、Workflow为ContextFS兼容
+### Phase 2: 核心组件Context化 (Month 3-5, 12周)
+**目标**: 将现有组件改造为ContextFS兼容，解决API不一致问题
 
-#### Month 3: Agent Context化
-- [ ] 实现AgentContext (/agent/{id})
-- [ ] 统一Agent API为ContextFileSystem接口
-- [ ] 支持Agent配置的声明式定义
-- [ ] 实现Agent状态的上下文快照
+#### Month 3: Agent Context化 (解决API不一致问题)
+- [ ] **统一Agent API**: 基于ContextFS重构Agent系统
+  - 废弃8种Agent类型，统一为ContextFileSystem接口
+  - 保留BasicAgent核心功能，但简化接口
+  - 修复`agent_macro.rs`的宏生成代码，使其与实际trait匹配
+- [ ] **实现AgentContext**: `/agent/{id}` 路径支持
+  - Agent配置作为JSON上下文文件
+  - 运行时状态的上下文快照
+  - 工具绑定关系的上下文关联
+- [ ] **智能配置系统**: 解决配置复杂度问题
+  - 实现`AgentBuilder`的智能默认值推断
+  - 支持声明式配置 (YAML/JSON)
+  - 减少必需配置参数从20+到3-5个
 
-#### Month 4: Memory Context化
-- [ ] 实现MemoryContext (/memory/{id})
-- [ ] 支持Episodic/Semantic/Procedural记忆的上下文表示
-- [ ] 实现记忆的语义搜索和关联
-- [ ] 添加记忆版本控制和演化
+#### Month 4: Memory Context化 (解决存储抽象问题)
+- [ ] **实现MemoryContext**: `/memory/{id}` 路径支持
+  - Episodic记忆: 事件时间线上下文
+  - Semantic记忆: 事实知识图谱上下文
+  - Procedural记忆: 技能过程上下文
+- [ ] **修复语义搜索**: 完善`UnifiedMemory::semantic()`实现
+  - 集成LLM嵌入生成 (解决占位符问题)
+  - 实现向量索引和相似度搜索
+  - 添加记忆关联和知识图谱
+- [ ] **记忆生命周期管理**: 基于ENGRAM研究
+  - 记忆重要性评分和衰减
+  - 自动记忆压缩和归档
+  - 上下文感知的记忆检索
 
-#### Month 5: Workflow Context化
-- [ ] 实现WorkflowContext (/workflow/{id})
-- [ ] 简化DAG工作流为轻量级上下文流程
-- [ ] 实现工作流模板系统
-- [ ] 添加工作流执行状态追踪
+#### Month 5: Workflow Context化 (解决复杂度问题)
+- [ ] **实现WorkflowContext**: `/workflow/{id}` 路径支持
+  - DAG工作流定义作为上下文文件
+  - 执行状态的上下文追踪
+  - 错误处理策略的上下文配置
+- [ ] **简化工作流引擎**: 基于现有DagWorkflow优化
+  - 保留核心DAG功能，但简化API
+  - 实现轻量级工作流模板系统
+  - 添加声明式工作流定义 (YAML)
+- [ ] **完善错误处理**: 解决错误处理不完善问题
+  - 实现工作流级别的错误恢复
+  - 添加重试策略和补偿机制
+  - 提供用户友好的错误信息
 
-### Phase 3: Cangjie深度集成 (Month 6-7, 8周)
-**目标**: 实现跨语言类型安全和性能优化
+### Phase 3: 性能与并发优化 (Month 6-7, 8周)
+**目标**: 解决性能层问题，提升系统并发处理能力
 
-#### Month 6: 跨语言桥接
-- [ ] 实现Rust-Cangjie FFI桥接
-- [ ] 定义统一类型系统映射
-- [ ] 实现上下文对象的跨语言传递
-- [ ] 添加类型安全检查
+#### Month 6: 并发模型重构 (解决并发低效问题)
+- [ ] **实现资源池管理**: 基于现有`pool`模块扩展
+  - 连接池: 数据库和外部API连接复用
+  - 对象池: LLM provider和向量存储客户端复用
+  - 线程池: 智能任务调度替代简单线程池
+- [ ] **优化DagScheduler**: 改进现有DAG执行引擎
+  - 实现细粒度并发控制 (基于任务依赖图)
+  - 添加工作窃取算法 (work-stealing)
+  - 实现自适应并发度调整
+- [ ] **异步操作优化**: 全面检查async/await使用
+  - 消除不必要的异步操作
+  - 实现连接池的异步管理
+  - 优化I/O密集型操作的并发
 
-#### Month 7: 类型安全上下文管理
-- [ ] 实现Cangjie的ContextFS抽象
-- [ ] 添加函数式上下文操作
-- [ ] 实现Actor模型的上下文并发
-- [ ] 性能优化和基准测试
+#### Month 7: 缓存与内存管理系统 (解决内存管理缺失问题)
+- [ ] **实现多级缓存**: 基于现有`cache`模块扩展
+  - L1: 内存缓存 (热点数据)
+  - L2: 分布式缓存 (Redis/内存网格)
+  - L3: 持久化缓存 (本地文件/数据库)
+- [ ] **智能内存管理**: 扩展WorkingMemory
+  - 实现多种驱逐策略 (LRU, LFU, Size-based)
+  - 添加内存使用监控和告警
+  - 实现内存压缩和序列化优化
+- [ ] **性能监控集成**: 为所有缓存操作添加指标
+  - 缓存命中率统计
+  - 内存使用趋势分析
+  - 性能瓶颈自动识别
 
-### Phase 4: 安全增强与多智能体 (Month 8-9, 8周)
-**目标**: 集成最新安全框架和多智能体支持
+### Phase 4: 开发体验重构 (Month 8-9, 8周)
+**目标**: 解决开发体验问题，提升开发效率
 
-#### Month 8: A-MemGuard集成
-- [ ] 实现共识验证机制
-- [ ] 添加双记忆结构保护
-- [ ] 集成主动防御框架
-- [ ] 安全测试和验证
+#### Month 8: 宏系统修复与DSL优化 (解决宏系统不可用问题)
+- [ ] **修复agent_macro.rs**: 基于代码分析修复宏生成
+  - 确保生成的代码与Agent trait匹配
+  - 添加编译时验证和错误提示
+  - 实现声明式Agent配置的完整功能
+- [ ] **修复tool_macro.rs**: 修复工具宏系统
+  - 解决函数参数宏的Rust限制问题
+  - 实现基于文档注释的参数提取
+  - 添加工具schema自动生成
+- [ ] **实现完整的DSL**: 基于修复的宏系统
+  - `#[agent(name="assistant", model="gpt-4")]` - 声明式Agent定义
+  - `#[tool(name="calculator")]` - 声明式工具定义
+  - 编译时代码生成和验证
 
-#### Month 9: 多智能体记忆
-- [ ] 实现Intrinsic Memory Agents
-- [ ] 支持智能体特定记忆
-- [ ] 实现记忆共享机制
-- [ ] 多智能体协作测试
+#### Month 9: 配置系统智能化 (解决配置复杂度问题)
+- [ ] **实现智能默认值**: 基于Agent类型自动推断配置
+  - Web Agent: 自动包含web工具，默认HTML解析
+  - Data Agent: 自动包含数据处理工具，默认JSON/CSV支持
+  - Research Agent: 自动包含搜索和分析工具
+- [ ] **声明式配置支持**: 扩展现有YAML配置
+  - 支持环境变量插值
+  - 实现配置继承和组合
+  - 添加配置热重载功能
+- [ ] **配置验证增强**: 基于现有validator模块
+  - 运行时配置验证
+  - 智能错误提示和修复建议
+  - 配置最佳实践检查
 
-### Phase 5: 性能优化与生产就绪 (Month 10-12, 12周)
-**目标**: 高性能缓存、监控和生产部署
+### Phase 5: 安全增强与多智能体 (Month 10-11, 8周)
+**目标**: 集成最新安全框架，支持多智能体协作
 
-#### Month 10: 高性能缓存系统
-- [ ] 实现多级缓存策略
-- [ ] 添加内存池管理
-- [ ] 实现分布式缓存支持
-- [ ] 缓存性能监控
+#### Month 10: A-MemGuard安全集成 (基于最新研究)
+- [ ] **实现共识验证**: 防止记忆污染
+  - 多模型验证记忆一致性
+  - 异常检测和自动修复
+  - 记忆版本控制和审计
+- [ ] **双记忆结构**: 安全防护架构
+  - 工作记忆和工作记忆备份
+  - 自动一致性检查和修复
+  - 攻击恢复机制
+- [ ] **主动防御框架**: 基于A-MemGuard论文
+  - 实时威胁检测
+  - 自动隔离和恢复
+  - 安全事件日志和分析
 
-#### Month 11: 监控和可观测性
-- [ ] 实现分布式追踪
-- [ ] 添加性能指标收集
-- [ ] 实现智能告警系统
-- [ ] 可观测性Dashboard
+#### Month 11: 多智能体记忆支持 (基于Intrinsic Memory研究)
+- [ ] **智能体特定记忆**: 异构多智能体支持
+  - 每个智能体的独立记忆空间
+  - 记忆隔离和访问控制
+  - 跨智能体记忆共享机制
+- [ ] **协作记忆管理**: 多智能体协作优化
+  - 共享记忆的版本控制
+  - 冲突解决和合并策略
+  - 协作上下文的维护
+- [ ] **记忆演化**: 基于交互的记忆改进
+  - 记忆重要性动态调整
+  - 协作模式下的记忆强化
+  - 性能自适应优化
 
-#### Month 12: 生产就绪与文档
-- [ ] 完整测试覆盖 (95%+)
-- [ ] 生产环境配置优化
-- [ ] 部署和运维文档
-- [ ] 用户 adoption 指南
+### Phase 6: 生产就绪与生态建设 (Month 12, 4周)
+**目标**: 完成生产化部署和生态系统建设
+
+#### Month 12: 生产就绪 (解决扩展性问题)
+- [ ] **插件系统完善**: 基于现有ToolRegistry扩展
+  - 动态插件加载 (WASM/WebAssembly)
+  - 插件版本管理和依赖解决
+  - 插件市场和分发系统
+- [ ] **企业级监控**: 完善telemetry系统
+  - 分布式追踪集成 (OpenTelemetry)
+  - 性能指标收集和可视化
+  - 智能告警和自动扩缩容
+- [ ] **多租户完整支持**: 企业级部署准备
+  - 资源配额和限制管理
+  - 租户数据隔离保证
+  - 多租户计费和监控
+
+#### 生态建设和文档 (并行进行)
+- [ ] **完整测试覆盖**: 达到95%+覆盖率
+  - 单元测试完善
+  - 集成测试扩展
+  - 端到端测试场景
+- [ ] **生产文档**: 完整的部署和运维指南
+  - Docker/Kubernetes部署
+  - 配置管理和监控
+  - 故障排查和性能调优
+- [ ] **开发者生态**: 第三方集成支持
+  - Python/Node.js SDK
+  - REST API完善
+  - 社区贡献指南
 
 ## 📊 实施路线图与里程碑
 
@@ -361,11 +552,12 @@
 
 | Month | Phase | 关键里程碑 | 验收标准 |
 |-------|-------|-----------|----------|
-| 1-2 | 架构重构 | ContextFS基础架构完成 | ContextFS接口可用，存储协调层稳定 |
-| 3-5 | 核心组件重构 | Agent/Memory/Workflow Context化 | 所有核心组件支持上下文操作 |
-| 6-7 | Cangjie集成 | 跨语言桥接完成 | 类型安全上下文管理，性能达标 |
-| 8-9 | 安全增强 | A-MemGuard + 多智能体 | 安全框架集成，多智能体协作正常 |
-| 10-12 | 生产就绪 | 高性能 + 监控 + 文档 | 性能提升30%，监控完善，文档完整 |
+| 1-2 | ContextFS架构重构 | 数据一致性修复，ContextFS基础架构 | Repository优先策略稳定，ContextFS接口可用 |
+| 3-5 | 核心组件Context化 | Agent/Memory/Workflow Context化 | API统一，配置简化，功能完整 |
+| 6-7 | 性能与并发优化 | 并发模型重构，缓存系统完善 | 并发处理能力提升50%，内存使用优化40% |
+| 8-9 | 开发体验重构 | 宏系统修复，配置智能化 | DSL可用，配置参数减少80%，错误处理友好 |
+| 10-11 | 安全增强与多智能体 | A-MemGuard + 多智能体支持 | 安全框架集成，多智能体协作正常 |
+| 12 | 生产就绪与生态建设 | 插件系统，企业级监控，多租户 | 生产部署就绪，生态系统完善 |
 
 ### 风险评估与缓解策略
 
@@ -467,12 +659,169 @@
 
 ---
 
+## 🔧 基于代码分析的具体实施建议
+
+### 立即修复 (P0 - 今天解决)
+
+#### 1. 数据一致性危机修复
+**问题**: `unified.rs`中写入VectorStore但查询Repository返回0条记录
+**解决方案**:
+```rust
+// 修改 unified.rs 中的存储逻辑
+impl Memory {
+    pub async fn add_memory(&self, memory: &Message) -> Result<()> {
+        // 1. 先写入Repository (PRIMARY)
+        self.repository.store(memory).await?;
+
+        // 2. 再写入VectorStore (SECONDARY)
+        if let Some(vector_store) = &self.vector_store {
+            vector_store.store(memory).await?;
+        }
+
+        // 3. 成功后再更新缓存
+        if let Some(cache) = &self.cache {
+            cache.put(memory.id.clone(), memory.clone());
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_memories(&self, config: &MemoryConfig) -> Result<Vec<Message>> {
+        // 1. 优先从Repository查询 (保证一致性)
+        let memories = self.repository.retrieve(config).await?;
+
+        // 2. 如果Repository为空，尝试从VectorStore恢复
+        if memories.is_empty() && self.vector_store.is_some() {
+            let vector_memories = self.vector_store.as_ref().unwrap().retrieve(config).await?;
+            // 自动修复: 将VectorStore数据同步到Repository
+            for memory in &vector_memories {
+                self.repository.store(memory).await?;
+            }
+            return Ok(vector_memories);
+        }
+
+        Ok(memories)
+    }
+}
+```
+
+#### 2. 宏系统修复
+**问题**: `agent_macro.rs`和`tool_macro.rs`生成代码与实际trait不匹配
+**解决方案**:
+```rust
+// 修复 agent_macro.rs
+#[proc_macro_attribute]
+pub fn agent(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 解析属性
+    let attrs = parse_macro_input!(attr as AgentAttributes);
+
+    // 解析结构体
+    let input = parse_macro_input!(item as DeriveInput);
+
+    // 生成正确的Agent实现
+    let expanded = quote! {
+        #input
+
+        impl Agent for #struct_name {
+            fn id(&self) -> &str {
+                &#attrs.name
+            }
+
+            // ... 其他必需方法
+        }
+
+        impl BasicAgent for #struct_name {
+            // BasicAgent的具体实现
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+```
+
+### 渐进式重构策略
+
+#### Phase 1A: 最小化改造 (1-2周)
+1. **保持现有API兼容性**
+   - 新ContextFS接口与现有API并存
+   - 逐步迁移，保持向后兼容
+
+2. **增量式ContextFS实现**
+   - 从MemoryContext开始 (`/memory/{id}`)
+   - 再扩展到AgentContext (`/agent/{id}`)
+   - 最后实现WorkflowContext (`/workflow/{id}`)
+
+3. **虚拟文件系统渐进部署**
+   - 先实现`/sys/agentmem/status/` (只读状态)
+   - 再添加`/sys/agentmem/config/` (配置管理)
+   - 最后实现`/context/*` (完整ContextFS)
+
+#### 代码重构优先级
+
+**高优先级 (影响核心功能)**:
+1. 修复数据一致性问题
+2. 实现Repository优先策略
+3. 统一Agent API接口
+
+**中优先级 (影响开发体验)**:
+1. 修复宏系统
+2. 简化配置系统
+3. 改进错误处理
+
+**低优先级 (锦上添花)**:
+1. 性能优化
+2. 多智能体支持
+3. 高级监控功能
+
+### 技术债务清理计划
+
+#### 1. 代码结构优化
+- **移除重复代码**: 合并BasicAgent和refactored模块
+- **统一命名规范**: 标准化模块和函数命名
+- **文档完善**: 为所有public API添加完整文档
+
+#### 2. 依赖管理优化
+- **升级关键依赖**: 更新tokio, serde等核心库
+- **移除无用依赖**: 清理Cargo.toml中的未使用crate
+- **安全审计**: 检查所有依赖的安全漏洞
+
+#### 3. 测试覆盖提升
+- **单元测试**: 为所有核心函数添加单元测试
+- **集成测试**: 测试组件间交互
+- **性能测试**: 建立性能基准和回归测试
+
+---
+
+## 📊 最终评估与建议
+
+### 优势分析
+1. **技术基础扎实**: 197个源文件，架构设计合理
+2. **功能丰富**: 27个内置工具，10+LLM支持
+3. **研究基础**: 已整合2025最新研究成果
+4. **社区活跃**: 多个分析文档和改进计划
+
+### 挑战与解决方案
+1. **架构复杂性**: 通过ContextFS统一抽象解决
+2. **API不一致**: 通过渐进式重构统一接口
+3. **性能问题**: 通过存储协调和缓存优化解决
+4. **开发体验**: 通过DSL和智能配置改善
+
+### 成功关键因素
+1. **分阶段实施**: 避免大爆炸式重构
+2. **保持兼容性**: 确保现有用户不受影响
+3. **持续验证**: 每个阶段都有明确的验收标准
+4. **社区参与**: 透明的开发过程和文档
+
+---
+
 **项目负责人**: AI Assistant
 **技术架构师**: Context Engine Team
 **预期发布时间**: 2026年Q2
-**当前状态**: 分析完成，计划制定中
+**当前状态**: 深度代码分析完成，最佳改造计划制定
 **风险等级**: 中等 (技术可行，实施需要严格管控)
 
 ---
 
 *"Everything is Context, Context is Everything - Building the Future of AgentOS"* 🎯
+
+**基于197个源文件的深度分析，LumosAI 3.1将彻底解决当前问题，建立面向未来的AgentOS架构** 🚀
