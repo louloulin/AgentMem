@@ -7,13 +7,13 @@
 //!
 //! 参考Mem0和自适应学习理论，实现持续学习和优化
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// 自适应学习配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -479,7 +479,7 @@ mod tests {
             timestamp: Utc::now(),
         };
 
-        engine.record_performance(metrics).await.unwrap();
+        engine.record_performance(metrics).await?;
 
         // 获取统计
         let stats = engine.get_statistics().await;
@@ -491,7 +491,7 @@ mod tests {
         let engine = AdaptiveLearningEngine::with_defaults();
 
         // 设置参数
-        engine.set_parameter("vector_weight", 0.8).await.unwrap();
+        engine.set_parameter("vector_weight", 0.8).await?;
 
         // 获取参数
         let value = engine.get_parameter("vector_weight").await;

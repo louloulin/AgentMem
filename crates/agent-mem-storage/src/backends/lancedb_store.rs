@@ -477,7 +477,7 @@ impl VectorStore for LanceDBStore {
         // 🔧 动态调整检索数量：商品ID查询需要大量候选
         let is_product_query = query_hint
             .as_ref()
-            .map_or(false, |h| h.starts_with("p") && h.len() < 10);
+            .is_some_and(|h| h.starts_with("p") && h.len() < 10);
         let fetch_multiplier = if is_product_query {
             200 // 商品ID查询：取大量候选，因为向量相似度不可靠
         } else if filters.is_empty() {
@@ -953,7 +953,7 @@ mod tests {
             .unwrap();
 
         // Test health check
-        let health = store.health_check().await.unwrap();
+        let health = store.health_check().await?;
         assert_eq!(health.status, "healthy");
     }
 
@@ -966,7 +966,7 @@ mod tests {
             .await
             .unwrap();
 
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 0);
     }
 
@@ -1002,13 +1002,13 @@ mod tests {
         ];
 
         // Add vectors
-        let ids = store.add_vectors(vectors).await.unwrap();
+        let ids = store.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 2);
         assert_eq!(ids[0], "vec1");
         assert_eq!(ids[1], "vec2");
 
         // Verify stats
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 2);
     }
 
@@ -1027,7 +1027,7 @@ mod tests {
             vector: vec![1.0, 2.0, 3.0],
             metadata: std::collections::HashMap::new(),
         }];
-        let ids1 = store.add_vectors(vectors1).await.unwrap();
+        let ids1 = store.add_vectors(vectors1).await?;
         assert_eq!(ids1.len(), 1);
 
         // Second batch
@@ -1043,11 +1043,11 @@ mod tests {
                 metadata: std::collections::HashMap::new(),
             },
         ];
-        let ids2 = store.add_vectors(vectors2).await.unwrap();
+        let ids2 = store.add_vectors(vectors2).await?;
         assert_eq!(ids2.len(), 2);
 
         // Verify total count
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 3);
     }
 
@@ -1082,12 +1082,12 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Search for similar vectors
         // Query vector is close to vec1 [1.0, 0.0, 0.0, 0.0]
         let query = vec![0.9, 0.1, 0.0, 0.0];
-        let results = store.search_vectors(query, 2, None).await.unwrap();
+        let results = store.search_vectors(query, 2, None).await?;
 
         // Should return 2 results (vec1 and vec2)
         assert_eq!(results.len(), 2);
@@ -1129,7 +1129,7 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Search with high threshold - should filter out distant vectors
         let query = vec![1.0, 0.0, 0.0];
@@ -1172,10 +1172,10 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Verify all vectors are added
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 3);
 
         // Delete vec2
@@ -1185,7 +1185,7 @@ mod tests {
             .unwrap();
 
         // Verify vec2 is deleted
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 2);
 
         // Search should not return vec2
@@ -1224,7 +1224,7 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Delete vec1 and vec3
         store
@@ -1233,7 +1233,7 @@ mod tests {
             .unwrap();
 
         // Verify only vec2 remains
-        let stats = store.get_stats().await.unwrap();
+        let stats = store.get_stats().await?;
         assert_eq!(stats.total_vectors, 1);
 
         // Search should only return vec2
@@ -1255,7 +1255,7 @@ mod tests {
             .unwrap();
 
         // Delete empty list should not error
-        store.delete_vectors(vec![]).await.unwrap();
+        store.delete_vectors(vec![]).await?;
     }
 
     #[tokio::test]
@@ -1287,7 +1287,7 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Update vectors with new data
         let mut updated_metadata1 = HashMap::new();
@@ -1300,7 +1300,7 @@ mod tests {
             metadata: updated_metadata1,
         }];
 
-        store.update_vectors(updated_vectors).await.unwrap();
+        store.update_vectors(updated_vectors).await?;
 
         // Verify update by searching
         let results = store
@@ -1345,10 +1345,10 @@ mod tests {
             },
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Get existing vector
-        let result = store.get_vector("vec1").await.unwrap();
+        let result = store.get_vector("vec1").await?;
         assert!(result.is_some());
 
         let vec1 = result.unwrap();
@@ -1358,7 +1358,7 @@ mod tests {
         assert_eq!(vec1.metadata.get("key2").unwrap(), "value2");
 
         // Get non-existent vector
-        let result = store.get_vector("vec999").await.unwrap();
+        let result = store.get_vector("vec999").await?;
         assert!(result.is_none());
     }
 
@@ -1378,10 +1378,10 @@ mod tests {
             metadata: HashMap::new(),
         }];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // Get vector
-        let result = store.get_vector("vec1").await.unwrap();
+        let result = store.get_vector("vec1").await?;
         assert!(result.is_some());
 
         let vec1 = result.unwrap();
@@ -1400,7 +1400,7 @@ mod tests {
             .unwrap();
 
         // Update empty list should not error
-        store.update_vectors(vec![]).await.unwrap();
+        store.update_vectors(vec![]).await?;
     }
 
     /// 性能基准测试：向量插入性能
@@ -1429,7 +1429,7 @@ mod tests {
 
         // 测试插入性能
         let start = std::time::Instant::now();
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
         let duration = start.elapsed();
 
         let ops_per_sec = num_vectors as f64 / duration.as_secs_f64();
@@ -1468,12 +1468,12 @@ mod tests {
             });
         }
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 测试搜索性能
         let query = vec![0.5; dimension];
         let start = std::time::Instant::now();
-        let results = store.search_vectors(query, 10, None).await.unwrap();
+        let results = store.search_vectors(query, 10, None).await?;
         let duration = start.elapsed();
 
         println!("搜索性能 (1K 向量): {duration:?} (目标: < 50ms)");
@@ -1514,13 +1514,13 @@ mod tests {
                     metadata: std::collections::HashMap::new(),
                 });
             }
-            store.add_vectors(vectors).await.unwrap();
+            store.add_vectors(vectors).await?;
         }
 
         // 测试搜索性能
         let query = vec![0.5; dimension];
         let start = std::time::Instant::now();
-        let results = store.search_vectors(query, 10, None).await.unwrap();
+        let results = store.search_vectors(query, 10, None).await?;
         let duration = start.elapsed();
 
         println!("搜索性能 (10K 向量): {duration:?} (目标: < 50ms)");

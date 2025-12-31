@@ -106,6 +106,7 @@ pub enum Preference {
 
 /// 查询上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct QueryContext {
     pub user_id: Option<String>,
     pub agent_id: Option<String>,
@@ -113,16 +114,6 @@ pub struct QueryContext {
     pub metadata: HashMap<String, String>,
 }
 
-impl Default for QueryContext {
-    fn default() -> Self {
-        Self {
-            user_id: None,
-            agent_id: None,
-            session_id: None,
-            metadata: HashMap::new(),
-        }
-    }
-}
 
 /// 查询特征（用于意图推断）
 #[derive(Debug, Clone)]

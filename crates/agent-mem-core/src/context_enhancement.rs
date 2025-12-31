@@ -13,7 +13,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
-use tracing::{debug, info};
+use tracing::info;
 
 /// 上下文理解增强配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,7 +295,7 @@ impl ContextWindowManager {
     /// 提取关键信息
     async fn extract_key_information(&self, text: &str) -> Result<Vec<String>> {
         // 简化的关键信息提取（实际应使用LLM或NLP工具）
-        let mut key_info = Vec::new();
+        let key_info = Vec::new();
 
         // 提取数字、日期、名称等
         // TODO: 使用更高级的提取方法
@@ -414,6 +414,7 @@ impl ContextWindowManager {
 
 /// 多轮对话上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct MultiTurnContext {
     /// 对话轮次
     pub turns: Vec<ConversationTurn>,
@@ -429,21 +430,10 @@ pub struct MultiTurnContext {
     pub summary: String,
 }
 
-impl Default for MultiTurnContext {
-    fn default() -> Self {
-        Self {
-            turns: Vec::new(),
-            key_information: Vec::new(),
-            topics: Vec::new(),
-            entities: HashMap::new(),
-            conversation_flow: ConversationFlow::default(),
-            summary: String::new(),
-        }
-    }
-}
 
 /// 对话流程
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ConversationFlow {
     /// 总轮次数
     pub total_turns: usize,
@@ -453,15 +443,6 @@ pub struct ConversationFlow {
     pub question_answer_pairs: Vec<(String, String)>,
 }
 
-impl Default for ConversationFlow {
-    fn default() -> Self {
-        Self {
-            total_turns: 0,
-            topics_evolution: Vec::new(),
-            question_answer_pairs: Vec::new(),
-        }
-    }
-}
 
 /// 压缩的上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,7 +467,7 @@ mod tests {
         let query = "test query";
         let context = "current context";
 
-        let expanded = manager.expand_context_window(query, context).await.unwrap();
+        let expanded = manager.expand_context_window(query, context).await?;
         assert!(!expanded.is_empty());
     }
 
@@ -495,7 +476,7 @@ mod tests {
         let manager = ContextWindowManager::with_defaults();
         let context = "This is a long context that needs to be compressed. ".repeat(100);
 
-        let compressed = manager.compress_context(&context).await.unwrap();
+        let compressed = manager.compress_context(&context).await?;
         assert!(compressed.len() < context.len());
     }
 

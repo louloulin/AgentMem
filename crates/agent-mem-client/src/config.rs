@@ -95,7 +95,7 @@ impl ClientConfig {
     pub fn validate(&self) -> Result<(), String> {
         // Validate base URL
         if let Err(e) = Url::parse(&self.base_url) {
-            return Err(format!("Invalid base URL: {}", e));
+            return Err(format!("Invalid base URL: {e}"));
         }
 
         // Validate timeouts

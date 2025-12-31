@@ -22,7 +22,7 @@ members = [
     "crates/agent-mem-storage",
     "crates/agent-mem-embeddings",
     "crates/agent-mem-intelligence",
-    "crates/agent-mem-server",
+    # "crates/agent-mem-server",  # Temporarily disabled - has dependency issues
     "crates/agent-mem-client",
     "crates/agent-mem-performance",
     "crates/agent-mem-distributed",
@@ -30,6 +30,7 @@ members = [
     "crates/agent-mem-deployment",
     "crates/agent-mem-plugin-sdk",  # Plugin SDK
     "crates/agent-mem-plugins",     # Plugin Manager
+    # "crates/agent-mem-lumosai",  # Temporarily disabled - missing lumosai_core dependency
     # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
     # "crates/agent-mem-intelligence",
@@ -96,10 +97,10 @@ members = [
     "examples/phase4-demo",  # ✅ FIXED: Updated LLM factory API
     "examples/phase5-production-demo",
     "examples/phase6-optimization-demo",
-    "examples/server-demo",
+    # "examples/server-demo",  # Temporarily disabled - depends on agent-mem-server
     "examples/client-demo",
     "examples/mem0-compat-demo",
-    "examples/client-server-integration-test",
+    # "examples/client-server-integration-test",  # Temporarily disabled - depends on agent-mem-server
     "examples/comprehensive-verification",  # 综合功能验证
     "examples/intelligent-reasoning-demo",
     "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
@@ -138,7 +139,7 @@ members = [
     "examples/production-telemetry-demo",
     "examples/real-implementation-demo",
     "examples/llm-provider-demo",
-    "examples/api-server-demo",
+    # "examples/api-server-demo",  # Temporarily disabled - depends on agent-mem-server
     "examples/multi-tenant-demo",
     "examples/cloud-native-demo",
     "examples/performance-benchmark",
@@ -161,7 +162,7 @@ members = [
     "examples/demo-performance-comparison", # 性能对比测试（对标MIRIX）
     "examples/enhanced-hybrid-search-demo", # 增强混合搜索演示
     "examples/product-search-demo",        # 商品搜索演示
-    "examples/hybrid-search-server-demo",  # 混合检索Server演示(REST API + MCP)
+    # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 
 [workspace.package]

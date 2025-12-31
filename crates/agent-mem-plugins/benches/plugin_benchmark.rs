@@ -17,7 +17,7 @@ fn get_wasm_plugin_path(plugin_name: &str) -> PathBuf {
         .unwrap()
         .to_path_buf();
 
-    workspace_root.join(format!("target/wasm32-wasip1/release/{}.wasm", plugin_name))
+    workspace_root.join(format!("target/wasm32-wasip1/release/{plugin_name}.wasm"))
 }
 
 /// Create a test memory object
@@ -115,9 +115,9 @@ async fn benchmark_plugin_loading() {
     let _ = manager.get_plugin("bench-hello").await.unwrap();
     let cached_load_time = start.elapsed();
 
-    println!("  Registration time:     {:?}", register_time);
-    println!("  First load time:       {:?}", first_load_time);
-    println!("  Cached load time:      {:?}", cached_load_time);
+    println!("  Registration time:     {register_time:?}");
+    println!("  First load time:       {first_load_time:?}");
+    println!("  Cached load time:      {cached_load_time:?}");
     println!(
         "  Cache speedup:         {:.2}x",
         first_load_time.as_micros() as f64 / cached_load_time.as_micros() as f64
@@ -170,10 +170,10 @@ async fn benchmark_plugin_execution() {
     let avg_time = total_time / iterations;
     let throughput = iterations as f64 / total_time.as_secs_f64();
 
-    println!("  Iterations:            {}", iterations);
-    println!("  Total time:            {:?}", total_time);
-    println!("  Average time:          {:?}", avg_time);
-    println!("  Throughput:            {:.2} calls/sec", throughput);
+    println!("  Iterations:            {iterations}");
+    println!("  Total time:            {total_time:?}");
+    println!("  Average time:          {avg_time:?}");
+    println!("  Throughput:            {throughput:.2} calls/sec");
 }
 
 async fn benchmark_cache_performance() {
@@ -186,9 +186,9 @@ async fn benchmark_cache_performance() {
         // Register multiple plugins
         for i in 0..10 {
             let plugin = RegisteredPlugin {
-                id: format!("cache-test-{}", i),
+                id: format!("cache-test-{i}"),
                 metadata: PluginMetadata {
-                    name: format!("Cache Test {}", i),
+                    name: format!("Cache Test {i}"),
                     version: "0.1.0".to_string(),
                     description: "Test".to_string(),
                     author: "Test".to_string(),
@@ -220,7 +220,7 @@ async fn benchmark_cache_performance() {
         let total_time = start.elapsed();
         let avg_time = total_time / iterations;
 
-        println!("  Cache size {:<2}:  {:?}/call", cache_size, avg_time);
+        println!("  Cache size {cache_size:<2}:  {avg_time:?}/call");
     }
 }
 
@@ -272,8 +272,7 @@ async fn benchmark_concurrent_execution() {
         let avg_time = total_time / concurrency;
 
         println!(
-            "  Concurrency {:<3}:  {:?} total, {:?} avg",
-            concurrency, total_time, avg_time
+            "  Concurrency {concurrency:<3}:  {total_time:?} total, {avg_time:?} avg"
         );
     }
 }

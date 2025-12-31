@@ -674,8 +674,8 @@ mod tests {
 
     async fn create_test_file(dir: &Path, filename: &str, content: &[u8]) -> PathBuf {
         let file_path = dir.join(filename);
-        let mut file = File::create(&file_path).await.unwrap();
-        file.write_all(content).await.unwrap();
+        let mut file = File::create(&file_path).await?;
+        file.write_all(content).await?;
         file_path
     }
 
@@ -688,7 +688,7 @@ mod tests {
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
 
         assert_eq!(stats.total_resources, 0);
         assert_eq!(stats.total_storage_size, 0);
@@ -744,7 +744,7 @@ mod tests {
         assert!(storage_path.exists());
 
         // 验证文件内容
-        let stored_content = tokio::fs::read(&storage_path).await.unwrap();
+        let stored_content = tokio::fs::read(&storage_path).await?;
         assert_eq!(stored_content, test_content);
     }
 
@@ -779,7 +779,7 @@ mod tests {
         assert_eq!(resource_id1, resource_id2);
 
         // 验证统计信息
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.total_resources, 1);
         assert_eq!(stats.deduplication_savings, test_content.len() as u64);
     }
@@ -800,8 +800,8 @@ mod tests {
         let audio_file = create_test_file(temp_dir.path(), "audio.mp3", b"MP3 content").await;
 
         // 存储资源
-        manager.store_resource(&doc_file, None, None).await.unwrap();
-        manager.store_resource(&img_file, None, None).await.unwrap();
+        manager.store_resource(&doc_file, None, None).await?;
+        manager.store_resource(&img_file, None, None).await?;
         manager
             .store_resource(&audio_file, None, None)
             .await
@@ -812,8 +812,8 @@ mod tests {
             .search_by_type(ResourceType::Document)
             .await
             .unwrap();
-        let images = manager.search_by_type(ResourceType::Image).await.unwrap();
-        let audio = manager.search_by_type(ResourceType::Audio).await.unwrap();
+        let images = manager.search_by_type(ResourceType::Image).await?;
+        let audio = manager.search_by_type(ResourceType::Audio).await?;
 
         assert_eq!(documents.len(), 1);
         assert_eq!(images.len(), 1);
@@ -880,15 +880,15 @@ mod tests {
         let file3 = create_test_file(temp_dir.path(), "important_image.png", b"Content 3").await;
 
         // 存储资源
-        manager.store_resource(&file1, None, None).await.unwrap();
-        manager.store_resource(&file2, None, None).await.unwrap();
-        manager.store_resource(&file3, None, None).await.unwrap();
+        manager.store_resource(&file1, None, None).await?;
+        manager.store_resource(&file2, None, None).await?;
+        manager.store_resource(&file3, None, None).await?;
 
         // 按文件名搜索
-        let results = manager.search_by_filename("important").await.unwrap();
+        let results = manager.search_by_filename("important").await?;
         assert_eq!(results.len(), 2);
 
-        let pdf_results = manager.search_by_filename("document").await.unwrap();
+        let pdf_results = manager.search_by_filename("document").await?;
         assert_eq!(pdf_results.len(), 1);
         assert_eq!(pdf_results[0].original_filename, "important_document.pdf");
     }
@@ -961,7 +961,7 @@ mod tests {
         assert!(storage_path.exists());
 
         // 删除资源
-        manager.delete_resource(&resource_id).await.unwrap();
+        manager.delete_resource(&resource_id).await?;
 
         // 验证资源已删除
         assert!(manager
@@ -1019,11 +1019,11 @@ mod tests {
         let img_file = create_test_file(temp_dir.path(), "img.png", img_content).await;
 
         // 存储资源
-        manager.store_resource(&doc_file, None, None).await.unwrap();
-        manager.store_resource(&img_file, None, None).await.unwrap();
+        manager.store_resource(&doc_file, None, None).await?;
+        manager.store_resource(&img_file, None, None).await?;
 
         // 检查统计信息
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.total_resources, 2);
         assert_eq!(
             stats.total_storage_size,
@@ -1060,7 +1060,7 @@ mod tests {
             .unwrap();
 
         // 健康检查应该没有问题
-        let issues = manager.check_storage_health().await.unwrap();
+        let issues = manager.check_storage_health().await?;
         assert_eq!(issues.len(), 0);
 
         // 删除物理文件但保留元数据
@@ -1069,10 +1069,10 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        tokio::fs::remove_file(&storage_path).await.unwrap();
+        tokio::fs::remove_file(&storage_path).await?;
 
         // 健康检查应该发现问题
-        let issues = manager.check_storage_health().await.unwrap();
+        let issues = manager.check_storage_health().await?;
         assert_eq!(issues.len(), 1);
         assert!(issues[0].contains("Missing file"));
     }
@@ -1097,18 +1097,18 @@ mod tests {
             .unwrap();
 
         // 验证资源存在
-        let stats_before = manager.get_stats().await.unwrap();
+        let stats_before = manager.get_stats().await?;
         assert_eq!(stats_before.total_resources, 1);
 
         // 清空所有资源
-        manager.clear_all().await.unwrap();
+        manager.clear_all().await?;
 
         // 验证所有资源已清空
-        let stats_after = manager.get_stats().await.unwrap();
+        let stats_after = manager.get_stats().await?;
         assert_eq!(stats_after.total_resources, 0);
         assert_eq!(stats_after.total_storage_size, 0);
 
-        let all_resources = manager.list_all_resources().await.unwrap();
+        let all_resources = manager.list_all_resources().await?;
         assert_eq!(all_resources.len(), 0);
     }
 
@@ -1167,7 +1167,7 @@ mod tests {
             .store_resource(&test_file, None, None)
             .await
             .unwrap();
-        let metadata = manager.get_resource_metadata(&resource_id).await.unwrap();
+        let metadata = manager.get_resource_metadata(&resource_id).await?;
 
         assert!(metadata.is_some());
         let meta = metadata.unwrap();
@@ -1191,15 +1191,15 @@ mod tests {
         let file2 = create_test_file(temp_dir.path(), "doc2.pdf", b"content2").await;
         let file3 = create_test_file(temp_dir.path(), "doc3.pdf", b"content3").await;
 
-        let id1 = manager.store_resource(&file1, None, None).await.unwrap();
-        let id2 = manager.store_resource(&file2, None, None).await.unwrap();
-        let id3 = manager.store_resource(&file3, None, None).await.unwrap();
+        let id1 = manager.store_resource(&file1, None, None).await?;
+        let id2 = manager.store_resource(&file2, None, None).await?;
+        let id3 = manager.store_resource(&file3, None, None).await?;
 
         assert_ne!(id1, id2);
         assert_ne!(id2, id3);
         assert_ne!(id1, id3);
 
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.total_resources, 3);
     }
 

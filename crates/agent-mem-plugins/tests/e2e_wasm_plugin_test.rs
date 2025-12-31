@@ -17,14 +17,13 @@ async fn test_load_hello_plugin_wasm() -> Result<(), Box<dyn std::error::Error>>
 
     if !plugin_path.exists() {
         println!(
-            "⚠️  Skipping test: WASM plugin not found at {:?}",
-            plugin_path
+            "⚠️  Skipping test: WASM plugin not found at {plugin_path:?}"
         );
         println!("   Run ./build_plugins.sh to build WASM plugins");
         return Ok(());
     }
 
-    println!("✅ Found plugin: {:?}", plugin_path);
+    println!("✅ Found plugin: {plugin_path:?}");
 
     // Create plugin info
     let plugin = RegisteredPlugin {
@@ -59,7 +58,7 @@ async fn test_load_hello_plugin_wasm() -> Result<(), Box<dyn std::error::Error>>
         &serde_json::to_string(&input)?,
     )?;
 
-    println!("✅ Plugin execution result: {}", result);
+    println!("✅ Plugin execution result: {result}");
 
     // Verify result contains greeting
     assert!(result.contains("Hello"), "Expected greeting in result");
@@ -77,13 +76,12 @@ async fn test_memory_processor_plugin_wasm() -> Result<(), Box<dyn std::error::E
 
     if !plugin_path.exists() {
         println!(
-            "⚠️  Skipping test: WASM plugin not found at {:?}",
-            plugin_path
+            "⚠️  Skipping test: WASM plugin not found at {plugin_path:?}"
         );
         return Ok(());
     }
 
-    println!("✅ Found plugin: {:?}", plugin_path);
+    println!("✅ Found plugin: {plugin_path:?}");
 
     // Create plugin info
     let plugin = RegisteredPlugin {
@@ -128,7 +126,7 @@ async fn test_memory_processor_plugin_wasm() -> Result<(), Box<dyn std::error::E
         &serde_json::to_string(&memory)?,
     )?;
 
-    println!("✅ Plugin execution result: {}", result);
+    println!("✅ Plugin execution result: {result}");
 
     // Parse result
     let processed: serde_json::Value = serde_json::from_str(&result)?;
@@ -147,13 +145,12 @@ async fn test_code_analyzer_plugin_wasm() -> Result<(), Box<dyn std::error::Erro
 
     if !plugin_path.exists() {
         println!(
-            "⚠️  Skipping test: WASM plugin not found at {:?}",
-            plugin_path
+            "⚠️  Skipping test: WASM plugin not found at {plugin_path:?}"
         );
         return Ok(());
     }
 
-    println!("✅ Found plugin: {:?}", plugin_path);
+    println!("✅ Found plugin: {plugin_path:?}");
 
     // Create plugin info
     let plugin = RegisteredPlugin {
@@ -192,7 +189,7 @@ async fn test_code_analyzer_plugin_wasm() -> Result<(), Box<dyn std::error::Erro
         &serde_json::to_string(&code_input)?,
     )?;
 
-    println!("✅ Plugin execution result: {}", result);
+    println!("✅ Plugin execution result: {result}");
 
     // Parse result
     let analysis: serde_json::Value = serde_json::from_str(&result)?;
@@ -244,7 +241,7 @@ async fn test_plugin_manager_with_wasm() -> Result<(), Box<dyn std::error::Error
         .call_plugin("hello-wasm", "hello", &serde_json::to_string(&input)?)
         .await?;
 
-    println!("✅ Plugin manager call result: {}", result);
+    println!("✅ Plugin manager call result: {result}");
     assert!(result.contains("Hello"));
 
     Ok(())
@@ -279,7 +276,7 @@ async fn test_multiple_wasm_plugins_concurrent() -> Result<(), Box<dyn std::erro
         let mut plugin_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         plugin_path.pop(); // Go up to crates/
         plugin_path.pop(); // Go up to agentmen/
-        plugin_path.push(format!("target/wasm32-wasip1/release/{}", filename));
+        plugin_path.push(format!("target/wasm32-wasip1/release/{filename}"));
 
         if !plugin_path.exists() {
             continue;
@@ -290,7 +287,7 @@ async fn test_multiple_wasm_plugins_concurrent() -> Result<(), Box<dyn std::erro
             metadata: PluginMetadata {
                 name: id.to_string(),
                 version: "0.1.0".to_string(),
-                description: format!("{} Plugin", id),
+                description: format!("{id} Plugin"),
                 author: "AgentMem Team".to_string(),
                 plugin_type,
                 required_capabilities: vec![],

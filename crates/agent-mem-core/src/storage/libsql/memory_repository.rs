@@ -281,8 +281,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
                 "SELECT id, organization_id, user_id, agent_id, content, hash, metadata,
                         score, memory_type, scope, level, importance, access_count, last_accessed,
                         created_at, updated_at, is_deleted, created_by_id, last_updated_by_id
-                 FROM memories WHERE id IN ({}) AND is_deleted = 0",
-                ids_str_joined
+                 FROM memories WHERE id IN ({ids_str_joined}) AND is_deleted = 0"
             );
 
             // 使用query方法执行SQL（不使用参数绑定，因为LibSQL限制）
@@ -421,7 +420,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         }
 
         // Convert DbMemory to Memory V4
-        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(db_to_memory).collect();
         memories
     }
 
@@ -457,7 +456,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         }
 
         // Convert DbMemory to Memory V4
-        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(db_to_memory).collect();
         memories
     }
 
@@ -495,7 +494,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         }
 
         // Convert DbMemory to Memory V4
-        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(db_to_memory).collect();
         memories
     }
 
@@ -602,7 +601,7 @@ impl MemoryRepositoryTrait for LibSqlMemoryRepository {
         }
 
         // Convert DbMemory to Memory V4
-        let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+        let memories: Result<Vec<Memory>> = db_memories.iter().map(db_to_memory).collect();
         memories
     }
 }
@@ -634,7 +633,7 @@ impl LibSqlMemoryRepository {
         let search_pattern = if query.is_empty() {
             String::new()
         } else {
-            format!("%{}%", query)
+            format!("%{query}%")
         };
 
         // 构建完整的SQL查询
@@ -696,7 +695,7 @@ impl LibSqlMemoryRepository {
             }
 
             // Convert DbMemory to Memory V4
-            let memories: Result<Vec<Memory>> = db_memories.iter().map(|db| db_to_memory(db)).collect();
+            let memories: Result<Vec<Memory>> = db_memories.iter().map(db_to_memory).collect();
             memories
         } else {
             // 复杂情况：有元数据过滤
@@ -887,7 +886,7 @@ mod tests {
         let repo = LibSqlMemoryRepository::new(conn);
 
         let memory = create_test_memory("mem2");
-        repo.create(&memory).await.unwrap();
+        repo.create(&memory).await?;
 
         let result = repo.find_by_id("mem2").await;
         assert!(result.is_ok());
@@ -903,8 +902,8 @@ mod tests {
 
         let memory1 = create_test_memory("mem3");
         let memory2 = create_test_memory("mem4");
-        repo.create(&memory1).await.unwrap();
-        repo.create(&memory2).await.unwrap();
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
 
         let result = repo.find_by_agent_id("agent1", 10).await;
         assert!(result.is_ok());
@@ -918,7 +917,7 @@ mod tests {
         let repo = LibSqlMemoryRepository::new(conn);
 
         let memory = create_test_memory("mem5");
-        repo.create(&memory).await.unwrap();
+        repo.create(&memory).await?;
 
         let result = repo.find_by_user_id("user1", 10).await;
         assert!(result.is_ok());
@@ -933,7 +932,7 @@ mod tests {
         let repo = LibSqlMemoryRepository::new(conn);
 
         let memory = create_test_memory("mem6");
-        repo.create(&memory).await.unwrap();
+        repo.create(&memory).await?;
 
         let result = repo.search("Test memory", 10).await;
         assert!(result.is_ok());
@@ -947,14 +946,14 @@ mod tests {
         let repo = LibSqlMemoryRepository::new(conn);
 
         let mut memory = create_test_memory("mem7");
-        repo.create(&memory).await.unwrap();
+        repo.create(&memory).await?;
 
         memory.content = agent_mem_traits::Content::Text("Updated content".to_string());
         memory.set_importance(0.9);
         let result = repo.update(&memory).await;
 
         assert!(result.is_ok());
-        let updated = repo.find_by_id("mem7").await.unwrap().unwrap();
+        let updated = repo.find_by_id("mem7").await?.unwrap();
         if let agent_mem_traits::Content::Text(text) = &updated.content {
             assert_eq!(text, "Updated content");
         } else {
@@ -969,12 +968,12 @@ mod tests {
         let repo = LibSqlMemoryRepository::new(conn);
 
         let memory = create_test_memory("mem8");
-        repo.create(&memory).await.unwrap();
+        repo.create(&memory).await?;
 
         let result = repo.delete("mem8").await;
         assert!(result.is_ok());
 
-        let found = repo.find_by_id("mem8").await.unwrap();
+        let found = repo.find_by_id("mem8").await?;
         assert!(found.is_none());
     }
 
@@ -985,14 +984,14 @@ mod tests {
 
         let memory1 = create_test_memory("mem9");
         let memory2 = create_test_memory("mem10");
-        repo.create(&memory1).await.unwrap();
-        repo.create(&memory2).await.unwrap();
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
 
         let result = repo.delete_by_agent_id("agent1").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 2);
 
-        let memories = repo.find_by_agent_id("agent1", 10).await.unwrap();
+        let memories = repo.find_by_agent_id("agent1", 10).await?;
         assert_eq!(memories.len(), 0);
     }
 
@@ -1003,8 +1002,8 @@ mod tests {
 
         let memory1 = create_test_memory("mem11");
         let memory2 = create_test_memory("mem12");
-        repo.create(&memory1).await.unwrap();
-        repo.create(&memory2).await.unwrap();
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
 
         let result = repo.list(10, 0).await;
         assert!(result.is_ok());

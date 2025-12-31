@@ -2,7 +2,6 @@
 //!
 //! 提供各种辅助方法，包括查询预处理、阈值计算、类型转换等
 
-use agent_mem_core::search::SearchResult;
 use agent_mem_core::types::Memory as CoreMemory;
 use agent_mem_core::types::MemoryType;
 use agent_mem_intelligence::{ExistingMemory, StructuredFact};
@@ -137,8 +136,7 @@ impl UtilsModule {
             Err(e) => {
                 error!("生成查询嵌入向量失败: {}", e);
                 Err(agent_mem_traits::AgentMemError::EmbeddingError(format!(
-                    "Failed to generate query embedding: {}",
-                    e
+                    "Failed to generate query embedding: {e}"
                 )))
             }
         }
@@ -203,7 +201,7 @@ impl UtilsModule {
         agent_id: String,
         user_id: Option<String>,
     ) -> MemoryItem {
-        use agent_mem_traits::{Entity, Relation, Session};
+        use agent_mem_traits::Session;
         use chrono::Utc;
 
         let now = Utc::now();
@@ -494,8 +492,7 @@ impl UtilsModule {
     /// 构建重排序提示词
     pub fn build_rerank_prompt(query: &str, memory_items: &[MemoryItem], user_id: &str) -> String {
         let mut prompt = format!(
-            "用户查询: {}\n用户ID: {}\n\n请根据查询意图和相关性对以下记忆进行重新排序。\n\n记忆列表:\n",
-            query, user_id
+            "用户查询: {query}\n用户ID: {user_id}\n\n请根据查询意图和相关性对以下记忆进行重新排序。\n\n记忆列表:\n"
         );
 
         for (idx, item) in memory_items.iter().enumerate() {

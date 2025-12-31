@@ -12,17 +12,17 @@ use std::sync::Arc;
 
 /// 检查后端健康状态
 async fn check_backend_health(api_url: &str) -> Result<(), String> {
-    let url = format!("{}/health", api_url);
+    let url = format!("{api_url}/health");
     let timeout = std::time::Duration::from_secs(5);
 
     let result = tokio::task::spawn_blocking(move || ureq::get(&url).timeout(timeout).call())
         .await
-        .map_err(|e| format!("Join error: {}", e))?;
+        .map_err(|e| format!("Join error: {e}"))?;
 
     match result {
         Ok(resp) if resp.status() == 200 => Ok(()),
         Ok(resp) => Err(format!("Backend unhealthy: status {}", resp.status())),
-        Err(e) => Err(format!("Health check failed: {}", e)),
+        Err(e) => Err(format!("Health check failed: {e}")),
     }
 }
 
@@ -178,10 +178,10 @@ impl Tool for AddMemoryTool {
         let agent_id = if actual_scope_type == "agent" || agent_id_arg.is_some() {
             agent_id_arg.map(|s| s.to_string()).unwrap_or_else(|| {
                 std::env::var("AGENTMEM_DEFAULT_AGENT_ID")
-                    .unwrap_or_else(|_| format!("agent-{}", user_id))
+                    .unwrap_or_else(|_| format!("agent-{user_id}"))
             })
         } else {
-            format!("default-agent-{}", user_id)
+            format!("default-agent-{user_id}")
         };
 
         let memory_type = args["memory_type"].as_str().unwrap_or("Episodic");
@@ -202,7 +202,7 @@ impl Tool for AddMemoryTool {
 
         // 调用 AgentMem Backend API (使用同步 HTTP 客户端避免 stdio 冲突)
         let api_url = get_api_url();
-        let url = format!("{}/api/v1/memories", api_url);
+        let url = format!("{api_url}/api/v1/memories");
 
         let request_body = json!({
             "content": content,
@@ -228,19 +228,19 @@ impl Tool for AddMemoryTool {
             match response {
                 Ok(resp) => resp
                     .into_json::<Value>()
-                    .map_err(|e| format!("Failed to parse response: {}", e)),
+                    .map_err(|e| format!("Failed to parse response: {e}")),
                 Err(ureq::Error::Status(code, resp)) => {
                     let text = resp
                         .into_string()
                         .unwrap_or_else(|_| "Unknown error".to_string());
-                    Err(format!("API returned error {}: {}", code, text))
+                    Err(format!("API returned error {code}: {text}"))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e)),
+                Err(e) => Err(format!("HTTP request failed: {e}")),
             }
         })
         .await
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {e}")))?
+        .map_err(crate::error::ToolError::ExecutionFailed)?;
 
         // 提取 memory_id 从响应中
         let memory_id = api_response["data"]["id"]
@@ -321,7 +321,7 @@ impl Tool for SearchMemoriesTool {
             user_id,
             limit
         );
-        let url = format!("{}/api/v1/memories/search", api_url);
+        let url = format!("{api_url}/api/v1/memories/search");
 
         let request_body = json!({
             "query": query,
@@ -340,19 +340,19 @@ impl Tool for SearchMemoriesTool {
             match response {
                 Ok(resp) => resp
                     .into_json::<Value>()
-                    .map_err(|e| format!("Failed to parse response: {}", e)),
+                    .map_err(|e| format!("Failed to parse response: {e}")),
                 Err(ureq::Error::Status(code, resp)) => {
                     let text = resp
                         .into_string()
                         .unwrap_or_else(|_| "Unknown error".to_string());
-                    Err(format!("API returned error {}: {}", code, text))
+                    Err(format!("API returned error {code}: {text}"))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e)),
+                Err(e) => Err(format!("HTTP request failed: {e}")),
             }
         })
         .await
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {e}")))?
+        .map_err(crate::error::ToolError::ExecutionFailed)?;
 
         // 提取搜索结果
         // 注意：API返回的是 {"data": [...]}，不是 {"data": {"memories": [...]}}
@@ -444,7 +444,7 @@ impl Tool for ChatTool {
 
         // 调用 AgentMem Backend API (使用同步 HTTP 客户端)
         let api_url = get_api_url();
-        let url = format!("{}/api/v1/agents/{}/chat", api_url, agent_id);
+        let url = format!("{api_url}/api/v1/agents/{agent_id}/chat");
 
         let request_body = json!({
             "message": message,
@@ -463,19 +463,19 @@ impl Tool for ChatTool {
             match response {
                 Ok(resp) => resp
                     .into_json::<Value>()
-                    .map_err(|e| format!("Failed to parse response: {}", e)),
+                    .map_err(|e| format!("Failed to parse response: {e}")),
                 Err(ureq::Error::Status(code, resp)) => {
                     let text = resp
                         .into_string()
                         .unwrap_or_else(|_| "Unknown error".to_string());
-                    Err(format!("API returned error {}: {}", code, text))
+                    Err(format!("API returned error {code}: {text}"))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e)),
+                Err(e) => Err(format!("HTTP request failed: {e}")),
             }
         })
         .await
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {e}")))?
+        .map_err(crate::error::ToolError::ExecutionFailed)?;
 
         // 提取响应内容
         let response_content = api_response["data"]["content"]
@@ -538,10 +538,10 @@ impl Tool for GetSystemPromptTool {
         })?;
 
         let context = args["context"].as_str().unwrap_or("");
-        let url = format!("{}/api/v1/memories/search", api_url);
+        let url = format!("{api_url}/api/v1/memories/search");
 
         let search_query = if !context.is_empty() {
-            format!("用户偏好和背景信息 {}", context)
+            format!("用户偏好和背景信息 {context}")
         } else {
             "用户偏好和背景信息".to_string()
         };
@@ -562,19 +562,19 @@ impl Tool for GetSystemPromptTool {
             match response {
                 Ok(resp) => resp
                     .into_json::<Value>()
-                    .map_err(|e| format!("Failed to parse response: {}", e)),
+                    .map_err(|e| format!("Failed to parse response: {e}")),
                 Err(ureq::Error::Status(code, resp)) => {
                     let text = resp
                         .into_string()
                         .unwrap_or_else(|_| "Unknown error".to_string());
-                    Err(format!("API returned error {}: {}", code, text))
+                    Err(format!("API returned error {code}: {text}"))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e)),
+                Err(e) => Err(format!("HTTP request failed: {e}")),
             }
         })
         .await
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
-        .map_err(|e| crate::error::ToolError::ExecutionFailed(e))?;
+        .map_err(|e| crate::error::ToolError::ExecutionFailed(format!("Task join error: {e}")))?
+        .map_err(crate::error::ToolError::ExecutionFailed)?;
 
         // 提取记忆内容
         let memories = api_response["data"]["memories"]
@@ -585,7 +585,7 @@ impl Tool for GetSystemPromptTool {
         let memory_count = memories.len();
 
         // 构建系统提示
-        let mut system_prompt = format!("你是一个智能助手，正在为用户 {} 提供服务。\n", user_id);
+        let mut system_prompt = format!("你是一个智能助手，正在为用户 {user_id} 提供服务。\n");
 
         if memory_count > 0 {
             system_prompt.push_str("\n基于用户的历史记忆，你了解到：\n");
@@ -630,7 +630,7 @@ pub async fn register_agentmem_tools(executor: &crate::executor::ToolExecutor) -
 
 /// 🆕 确保Agent存在，如果不存在则自动创建
 async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> ToolResult<()> {
-    let check_url = format!("{}/api/v1/agents/{}", api_url, agent_id);
+    let check_url = format!("{api_url}/api/v1/agents/{agent_id}");
 
     // 1. 检查Agent是否存在
     let exists = tokio::task::spawn_blocking({
@@ -655,7 +655,7 @@ async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> To
     // 2. Agent不存在，自动创建
     tracing::info!("🤖 Agent {} 不存在，自动创建", agent_id);
 
-    let create_url = format!("{}/api/v1/agents", api_url);
+    let create_url = format!("{api_url}/api/v1/agents");
     let create_body = json!({
         "id": agent_id,
         "name": format!("Auto Agent for {}", user_id),
@@ -683,8 +683,7 @@ async fn ensure_agent_exists(api_url: &str, agent_id: &str, user_id: &str) -> To
         Err(e) => {
             tracing::error!("❌ Agent {} 创建失败: {}", agent_id, e);
             Err(ToolError::ExecutionFailed(format!(
-                "Failed to create agent: {}",
-                e
+                "Failed to create agent: {e}"
             )))
         }
     }

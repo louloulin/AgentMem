@@ -79,7 +79,7 @@ async fn demo_memory_sharing() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let result = system.execute_operation(share_operation).await?;
-    println!("  📤 记忆共享结果: {:?}", result);
+    println!("  📤 记忆共享结果: {result:?}");
 
     // 智能体 B 请求访问
     let access_operation = CollaborationOperation::RequestAccess {
@@ -89,7 +89,7 @@ async fn demo_memory_sharing() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let access_result = system.execute_operation(access_operation).await?;
-    println!("  🔍 访问请求结果: {:?}", access_result);
+    println!("  🔍 访问请求结果: {access_result:?}");
 
     println!("  ✅ 记忆共享演示完成\n");
     Ok(())
@@ -129,7 +129,7 @@ async fn demo_permission_management() -> Result<(), Box<dyn std::error::Error>> 
         };
 
         let result = system.execute_operation(operation).await?;
-        println!("  🔐 权限测试 - {}: {:?} ({})", agent, result, expected);
+        println!("  🔐 权限测试 - {agent}: {result:?} ({expected})");
     }
 
     println!("  ✅ 权限管理演示完成\n");
@@ -177,7 +177,7 @@ async fn demo_knowledge_propagation() -> Result<(), Box<dyn std::error::Error>> 
     };
 
     let result = system.execute_operation(propagation_operation).await?;
-    println!("  🌐 知识传播结果: {:?}", result);
+    println!("  🌐 知识传播结果: {result:?}");
 
     // 获取传播统计
     let stats = system
@@ -230,7 +230,7 @@ async fn demo_conflict_resolution() -> Result<(), Box<dyn std::error::Error>> {
         .detect_conflict("project_deadline".to_string(), conflicting_versions)
         .await?;
 
-    println!("  ⚠️ 检测到冲突: {}", conflict_id);
+    println!("  ⚠️ 检测到冲突: {conflict_id}");
 
     // 解决冲突
     let resolution_operation = CollaborationOperation::ResolveConflict {
@@ -246,7 +246,7 @@ async fn demo_conflict_resolution() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let result = system.execute_operation(resolution_operation).await?;
-    println!("  ⚖️ 冲突解决结果: {:?}", result);
+    println!("  ⚖️ 冲突解决结果: {result:?}");
 
     // 获取冲突统计
     let stats = system.conflict_resolver().get_conflict_statistics().await?;

@@ -15,6 +15,7 @@ use crate::search::EnhancedHybridConfig as HybridSearchConfig;
 
 /// 主配置 - 整合所有子模块配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AgentMemConfig {
     /// 混合搜索配置
     #[serde(default)]
@@ -41,18 +42,6 @@ pub struct AgentMemConfig {
     pub adaptive_threshold: AdaptiveThresholdConfig,
 }
 
-impl Default for AgentMemConfig {
-    fn default() -> Self {
-        Self {
-            hybrid_search: HybridSearchConfig::default(),
-            importance_scorer: ImportanceScorerConfig::default(),
-            memory_integration: MemoryIntegratorConfig::default(),
-            intelligence: IntelligenceConfig::default(),
-            compression: CompressionConfig::default(),
-            adaptive_threshold: AdaptiveThresholdConfig::default(),
-        }
-    }
-}
 
 impl AgentMemConfig {
     /// 从TOML文件加载配置
@@ -120,8 +109,7 @@ impl AgentMemConfig {
 
         if (importance_total - 1.0).abs() > 0.01 {
             anyhow::bail!(
-                "Importance weights must sum to 1.0, got {}",
-                importance_total
+                "Importance weights must sum to 1.0, got {importance_total}"
             );
         }
 

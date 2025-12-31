@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
     let duration = start.elapsed();
 
     println!("📝 输入文本:");
-    println!("   {}", text1);
+    println!("   {text1}");
     println!();
     println!(
         "✅ 提取到 {} 个实体（耗时: {:?}）:",
@@ -95,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
                  公司网站：https://www.alibaba.com";
 
     println!("📝 输入文本:");
-    println!("   {}", text2);
+    println!("   {text2}");
     println!();
 
     let start = Instant::now();
@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let duration = start.elapsed();
 
-    println!("✅ 提取结果（耗时: {:?}）:", duration);
+    println!("✅ 提取结果（耗时: {duration:?}）:");
     println!();
     println!("📊 实体统计:");
 
@@ -118,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     for (entity_type, count) in entity_counts.iter() {
-        println!("   - {}: {} 个", entity_type, count);
+        println!("   - {entity_type}: {count} 个");
     }
     println!();
 

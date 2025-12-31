@@ -353,10 +353,10 @@ mod tests {
         };
 
         let warmer = CacheWarmer::new(cache.clone(), loader, config);
-        warmer.start().await.unwrap();
+        warmer.start().await?;
 
         // Check that keys were warmed
-        let value = cache.get(&"key_0".to_string()).await.unwrap();
+        let value = cache.get(&"key_0".to_string()).await?;
         assert!(value.is_some());
 
         let stats = warmer.stats().await;

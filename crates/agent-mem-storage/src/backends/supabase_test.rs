@@ -19,7 +19,7 @@ mod tests {
             similarity_function: SimilarityFunction::Cosine,
             ..Default::default()
         };
-        SupabaseStore::new(config).await.unwrap()
+        SupabaseStore::new(config).await?
     }
 
     fn create_test_vector(id: &str, vector: Vec<f32>) -> VectorData {
@@ -40,7 +40,7 @@ mod tests {
     #[ignore] // Requires Supabase credentials
     async fn test_supabase_store_creation() {
         let store = create_test_store().await;
-        let count = store.count_vectors().await.unwrap();
+        let count = store.count_vectors().await?;
         assert_eq!(count, 0);
     }
 
@@ -50,12 +50,12 @@ mod tests {
         let store = create_test_store().await;
 
         let vector_data = create_test_vector("test1", vec![1.0, 2.0, 3.0, 4.0]);
-        let ids = store.add_vectors(vec![vector_data.clone()]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data.clone()]).await?;
 
         assert_eq!(ids.len(), 1);
         assert_eq!(ids[0], "test1");
 
-        let retrieved = store.get_vector("test1").await.unwrap();
+        let retrieved = store.get_vector("test1").await?;
         assert!(retrieved.is_some());
 
         let retrieved_data = retrieved.unwrap();
@@ -84,11 +84,11 @@ mod tests {
             create_test_vector("vec3", vec![0.0, 0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 搜索与第一个向量相似的向量
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
-        let results = store.search_vectors(query_vector, 2, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 2, None).await?;
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].id, "vec1"); // 最相似的应该是自己
@@ -106,7 +106,7 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]), // 与查询向量垂直，相似度为0
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 使用高阈值搜索
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
@@ -127,14 +127,14 @@ mod tests {
 
         // 添加初始向量
         let vector_data = create_test_vector("test1", vec![1.0, 2.0, 3.0, 4.0]);
-        store.add_vectors(vec![vector_data]).await.unwrap();
+        store.add_vectors(vec![vector_data]).await?;
 
         // 更新向量
         let updated_vector = create_test_vector("test1", vec![5.0, 6.0, 7.0, 8.0]);
-        store.update_vectors(vec![updated_vector]).await.unwrap();
+        store.update_vectors(vec![updated_vector]).await?;
 
         // 验证更新
-        let retrieved = store.get_vector("test1").await.unwrap().unwrap();
+        let retrieved = store.get_vector("test1").await?.unwrap();
         assert_eq!(retrieved.vector, vec![5.0, 6.0, 7.0, 8.0]);
     }
 
@@ -149,21 +149,21 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
         // 删除一个向量
         store
             .delete_vectors(vec!["vec1".to_string()])
             .await
             .unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
+        assert_eq!(store.count_vectors().await?, 1);
 
         // 验证删除
-        let retrieved = store.get_vector("vec1").await.unwrap();
+        let retrieved = store.get_vector("vec1").await?;
         assert!(retrieved.is_none());
 
-        let retrieved = store.get_vector("vec2").await.unwrap();
+        let retrieved = store.get_vector("vec2").await?;
         assert!(retrieved.is_some());
     }
 
@@ -178,12 +178,12 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
         // 清空存储
-        store.clear().await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 0);
+        store.clear().await?;
+        assert_eq!(store.count_vectors().await?, 0);
     }
 
     #[tokio::test]
@@ -217,7 +217,7 @@ mod tests {
             metadata,
         };
 
-        let ids = store.add_vectors(vec![vector_data]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data]).await?;
 
         assert_eq!(ids.len(), 1);
         assert!(!ids[0].is_empty()); // 应该生成一个非空ID
@@ -236,19 +236,19 @@ mod tests {
             create_test_vector("batch3", vec![0.0, 0.0, 1.0, 0.0]),
         ];
 
-        let ids = store.add_vectors(vectors).await.unwrap();
+        let ids = store.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 3);
-        assert_eq!(store.count_vectors().await.unwrap(), 3);
+        assert_eq!(store.count_vectors().await?, 3);
 
         // 批量删除向量
         store
             .delete_vectors(vec!["batch1".to_string(), "batch3".to_string()])
             .await
             .unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
+        assert_eq!(store.count_vectors().await?, 1);
 
         // 验证剩余向量
-        let remaining = store.get_vector("batch2").await.unwrap();
+        let remaining = store.get_vector("batch2").await?;
         assert!(remaining.is_some());
     }
 
@@ -264,11 +264,11 @@ mod tests {
             create_test_vector("orthogonal", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 搜索
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
-        let results = store.search_vectors(query_vector, 3, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 3, None).await?;
 
         assert_eq!(results.len(), 3);
 
@@ -303,11 +303,11 @@ mod tests {
             metadata,
         };
 
-        let ids = store.add_vectors(vec![vector_data]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data]).await?;
         assert_eq!(ids[0], "pg_doc_1");
 
         // 验证 JSONB 元数据保持完整
-        let retrieved = store.get_vector("pg_doc_1").await.unwrap().unwrap();
+        let retrieved = store.get_vector("pg_doc_1").await?.unwrap();
         assert_eq!(
             retrieved.metadata.get("title").unwrap(),
             "PostgreSQL Document"
@@ -332,14 +332,14 @@ mod tests {
 
         // 添加初始数据
         let vector_data = create_test_vector("realtime_test", vec![0.5, 0.5, 0.5, 0.5]);
-        store.add_vectors(vec![vector_data]).await.unwrap();
+        store.add_vectors(vec![vector_data]).await?;
 
         // 测试实时更新
         let updated_vector = create_test_vector("realtime_test", vec![0.8, 0.6, 0.4, 0.2]);
-        store.update_vectors(vec![updated_vector]).await.unwrap();
+        store.update_vectors(vec![updated_vector]).await?;
 
         // 验证更新
-        let retrieved = store.get_vector("realtime_test").await.unwrap().unwrap();
+        let retrieved = store.get_vector("realtime_test").await?.unwrap();
         assert_eq!(retrieved.vector, vec![0.8, 0.6, 0.4, 0.2]);
 
         // 测试实时删除
@@ -349,7 +349,7 @@ mod tests {
             .unwrap();
 
         // 验证删除
-        let retrieved = store.get_vector("realtime_test").await.unwrap();
+        let retrieved = store.get_vector("realtime_test").await?;
         assert!(retrieved.is_none());
     }
 
@@ -368,11 +368,11 @@ mod tests {
             create_test_vector("edge3", vec![0.9, 0.8, 0.7, 0.6]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 执行搜索
         let query_vector = vec![0.5, 0.5, 0.5, 0.5];
-        let results = store.search_vectors(query_vector, 3, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 3, None).await?;
 
         let elapsed = start_time.elapsed();
 
@@ -396,22 +396,22 @@ mod tests {
         let vector_data = create_test_vector("opensource_test", vec![1.0, 1.0, 1.0, 1.0]);
 
         // 添加向量
-        let ids = store.add_vectors(vec![vector_data]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data]).await?;
         assert_eq!(ids.len(), 1);
 
         // 验证标准操作
-        let count = store.count_vectors().await.unwrap();
+        let count = store.count_vectors().await?;
         assert_eq!(count, 1);
 
         // 验证搜索功能
         let query_vector = vec![1.0, 1.0, 1.0, 1.0];
-        let results = store.search_vectors(query_vector, 1, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 1, None).await?;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "opensource_test");
 
         // 验证清理功能
-        store.clear().await.unwrap();
-        let final_count = store.count_vectors().await.unwrap();
+        store.clear().await?;
+        let final_count = store.count_vectors().await?;
         assert_eq!(final_count, 0);
     }
 }

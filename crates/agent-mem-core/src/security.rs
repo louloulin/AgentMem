@@ -668,7 +668,7 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        security.create_user(user).await.unwrap();
+        security.create_user(user).await?;
 
         // Test authentication failure
         let result = security
@@ -699,7 +699,7 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        security.create_user(user).await.unwrap();
+        security.create_user(user).await?;
 
         // Check admin permissions
         let has_admin_access = security

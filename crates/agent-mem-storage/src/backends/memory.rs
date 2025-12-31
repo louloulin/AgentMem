@@ -223,7 +223,7 @@ mod tests {
             dimension: Some(3),
             ..Default::default()
         };
-        MemoryVectorStore::new(config).await.unwrap()
+        MemoryVectorStore::new(config).await?
     }
 
     fn create_test_vector(id: &str, vector: Vec<f32>) -> VectorData {
@@ -243,10 +243,10 @@ mod tests {
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        let ids = store.add_vectors(vectors).await.unwrap();
+        let ids = store.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 2);
 
-        let vector = store.get_vector("1").await.unwrap();
+        let vector = store.get_vector("1").await?;
         assert!(vector.is_some());
         assert_eq!(vector.unwrap().vector, vec![1.0, 0.0, 0.0]);
     }
@@ -261,7 +261,7 @@ mod tests {
             create_test_vector("3", vec![0.0, 0.0, 1.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 搜索与第一个向量相似的向量
         let results = store
@@ -282,13 +282,13 @@ mod tests {
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
-        store.delete_vectors(vec!["1".to_string()]).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
+        store.delete_vectors(vec!["1".to_string()]).await?;
+        assert_eq!(store.count_vectors().await?, 1);
 
-        let vector = store.get_vector("1").await.unwrap();
+        let vector = store.get_vector("1").await?;
         assert!(vector.is_none());
     }
 
@@ -297,12 +297,12 @@ mod tests {
         let store = create_test_store().await;
 
         let vectors = vec![create_test_vector("1", vec![1.0, 0.0, 0.0])];
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         let updated_vectors = vec![create_test_vector("1", vec![0.0, 1.0, 0.0])];
-        store.update_vectors(updated_vectors).await.unwrap();
+        store.update_vectors(updated_vectors).await?;
 
-        let vector = store.get_vector("1").await.unwrap().unwrap();
+        let vector = store.get_vector("1").await?.unwrap();
         assert_eq!(vector.vector, vec![0.0, 1.0, 0.0]);
     }
 
@@ -315,11 +315,11 @@ mod tests {
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
-        store.clear().await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 0);
+        store.clear().await?;
+        assert_eq!(store.count_vectors().await?, 0);
     }
 
     #[tokio::test]

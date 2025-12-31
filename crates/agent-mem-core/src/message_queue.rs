@@ -242,7 +242,7 @@ mod tests {
 
         assert!(queue.send_message(message.clone()).await.is_ok());
 
-        let received = rx.recv().await.unwrap();
+        let received = rx.recv().await?;
         assert_eq!(received.content, "Hello");
     }
 

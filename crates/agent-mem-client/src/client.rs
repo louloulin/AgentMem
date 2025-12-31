@@ -64,7 +64,7 @@ impl AsyncAgentMemClient {
 
     /// Get a memory by ID
     pub async fn get_memory(&self, memory_id: &str) -> ClientResult<Memory> {
-        let url = self.build_url(&format!("/api/v1/memories/{}", memory_id))?;
+        let url = self.build_url(&format!("/api/v1/memories/{memory_id}"))?;
 
         self.retry_executor
             .execute(|| async {
@@ -138,7 +138,7 @@ impl AsyncAgentMemClient {
 
             serde_json::from_str(&body).map_err(|e| {
                 error!("Failed to deserialize response: {}", e);
-                ClientError::InvalidResponse(format!("JSON deserialization failed: {}", e))
+                ClientError::InvalidResponse(format!("JSON deserialization failed: {e}"))
             })
         } else {
             let body = response.text().await.unwrap_or_default();
@@ -175,7 +175,7 @@ impl AgentMemClient {
     pub fn new(config: ClientConfig) -> ClientResult<Self> {
         let async_client = AsyncAgentMemClient::new(config)?;
         let runtime = tokio::runtime::Runtime::new()
-            .map_err(|e| ClientError::InternalError(format!("Failed to create runtime: {}", e)))?;
+            .map_err(|e| ClientError::InternalError(format!("Failed to create runtime: {e}")))?;
 
         Ok(Self {
             async_client,

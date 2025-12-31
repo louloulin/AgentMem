@@ -13,8 +13,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use console::{style, Emoji};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use std::time::Duration;
+use indicatif::MultiProgress;
 use tracing::{info, warn};
 
 mod config;
@@ -25,7 +24,6 @@ mod scenarios;
 mod stats;
 
 use config::StressTestConfig;
-use monitor::SystemMonitor;
 use real_config::{RealStressTestConfig, RealStressTestEnv};
 use report::ReportGenerator;
 use scenarios::*;
@@ -270,7 +268,7 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     let mut all_stats = Vec::new();
 
     // 场景 1: 记忆构建
-    println!("{} 场景 1: 记忆构建压测", CHART);
+    println!("{CHART} 场景 1: 记忆构建压测");
     let stats = memory_creation::run_test(
         config.memory_creation.concurrency,
         config.memory_creation.total_memories,
@@ -280,7 +278,7 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     all_stats.push(("memory_creation", stats));
 
     // 场景 2: 记忆检索
-    println!("{} 场景 2: 记忆检索压测", CHART);
+    println!("{CHART} 场景 2: 记忆检索压测");
     let stats = memory_retrieval::run_test(
         config.memory_retrieval.dataset_size,
         config.memory_retrieval.concurrency,
@@ -290,7 +288,7 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     all_stats.push(("memory_retrieval", stats));
 
     // 场景 3: 并发操作
-    println!("{} 场景 3: 并发操作压测", CHART);
+    println!("{CHART} 场景 3: 并发操作压测");
     let stats = concurrent_ops::run_test(
         config.concurrent_ops.concurrent_users,
         config.concurrent_ops.duration_seconds,
@@ -300,7 +298,7 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     all_stats.push(("concurrent_ops", stats));
 
     // 场景 4: 图推理
-    println!("{} 场景 4: 图推理压测", CHART);
+    println!("{CHART} 场景 4: 图推理压测");
     let stats = graph_reasoning::run_test(
         config.graph_reasoning.nodes,
         config.graph_reasoning.edges,
@@ -310,7 +308,7 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     all_stats.push(("graph_reasoning", stats));
 
     // 场景 5: 智能处理
-    println!("{} 场景 5: 智能处理压测", CHART);
+    println!("{CHART} 场景 5: 智能处理压测");
     let stats = intelligence_processing::run_test(
         config.intelligence_processing.concurrency,
         &multi_progress,
@@ -319,14 +317,14 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     all_stats.push(("intelligence_processing", stats));
 
     // 场景 6: 缓存性能
-    println!("{} 场景 6: 缓存性能压测", CHART);
+    println!("{CHART} 场景 6: 缓存性能压测");
     let stats =
         cache_performance::run_test(config.cache_performance.cache_size_mb, &multi_progress)
             .await?;
     all_stats.push(("cache_performance", stats));
 
     // 场景 7: 批量操作
-    println!("{} 场景 7: 批量操作压测", CHART);
+    println!("{CHART} 场景 7: 批量操作压测");
     let stats =
         batch_operations::run_test(config.batch_operations.batch_size, &multi_progress).await?;
     all_stats.push(("batch_operations", stats));
@@ -336,8 +334,8 @@ async fn run_all_scenarios(config: &StressTestConfig, output_dir: &str) -> Resul
     report_gen.generate_comprehensive_report(&all_stats).await?;
 
     println!();
-    println!("{} 所有场景压测完成", CHECK);
-    println!("报告已生成: {}/comprehensive-report.html", output_dir);
+    println!("{CHECK} 所有场景压测完成");
+    println!("报告已生成: {output_dir}/comprehensive-report.html");
 
     Ok(())
 }
@@ -349,8 +347,8 @@ async fn run_memory_creation_test(
     output_dir: &str,
 ) -> Result<()> {
     println!("{} {}", FIRE, style("记忆构建压测 (Mock)").bold().yellow());
-    println!("  并发数: {}", concurrency);
-    println!("  总记忆数: {}", total);
+    println!("  并发数: {concurrency}");
+    println!("  总记忆数: {total}");
     println!();
 
     let multi_progress = MultiProgress::new();
@@ -380,8 +378,8 @@ async fn run_memory_creation_test_real(
         FIRE,
         style("记忆构建压测 (真实 SDK)").bold().green()
     );
-    println!("  并发数: {}", concurrency);
-    println!("  总记忆数: {}", total);
+    println!("  并发数: {concurrency}");
+    println!("  总记忆数: {total}");
     println!("  数据库: PostgreSQL");
     println!();
 
@@ -529,7 +527,7 @@ async fn run_batch_operations_test_real(
 
 async fn run_stability_test(hours: u64, output_dir: &str) -> Result<()> {
     println!("{} {}", FIRE, style("长时间稳定性测试").bold().yellow());
-    println!("  运行时间: {} 小时", hours);
+    println!("  运行时间: {hours} 小时");
     println!();
 
     warn!("稳定性测试需要长时间运行，请确保系统资源充足");
@@ -548,7 +546,7 @@ async fn generate_report(results_dir: &str, output_dir: &str) -> Result<()> {
     let report_gen = ReportGenerator::new(output_dir);
     report_gen.generate_from_directory(results_dir).await?;
 
-    println!("{} 报告已生成: {}/report.html", CHECK, output_dir);
+    println!("{CHECK} 报告已生成: {output_dir}/report.html");
     Ok(())
 }
 

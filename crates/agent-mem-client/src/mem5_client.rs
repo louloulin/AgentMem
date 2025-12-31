@@ -18,8 +18,7 @@ use agent_mem_config::MemoryConfig;
 use agent_mem_core::MemoryType;
 use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_traits::{
-    BatchMemoryOperations, BatchResult, EnhancedAddRequest, EnhancedSearchRequest, FilterBuilder,
-    HealthStatus, MemorySearchResult, Messages, MetadataBuilder, PerformanceReport,
+    BatchResult, EnhancedAddRequest, EnhancedSearchRequest, MemorySearchResult, Messages,
     ProcessingOptions, SystemMetrics,
 };
 
@@ -34,7 +33,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{RwLock, Semaphore};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, info, instrument};
 
 /// Mem5 Enhanced AgentMem Client
 ///
@@ -93,6 +92,12 @@ impl Default for ClientState {
 pub struct TelemetrySystem {
     operation_counter: AtomicU64,
     start_time: Instant,
+}
+
+impl Default for TelemetrySystem {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TelemetrySystem {
@@ -241,7 +246,7 @@ impl Mem5Client {
 
         // Acquire semaphore permit for concurrency control
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            ClientError::InternalError(format!("Failed to acquire semaphore: {}", e))
+            ClientError::InternalError(format!("Failed to acquire semaphore: {e}"))
         })?;
 
         // Create enhanced request
@@ -258,7 +263,7 @@ impl Mem5Client {
 
         // Validate request
         request.validate().map_err(|e| {
-            ClientError::ValidationError(format!("Request validation failed: {}", e))
+            ClientError::ValidationError(format!("Request validation failed: {e}"))
         })?;
 
         // Execute with error recovery
@@ -333,7 +338,7 @@ impl Mem5Client {
                     let v4_memory = agent_mem_core::storage::conversion::legacy_to_v4(&memory_item);
 
                     engine.add_memory(v4_memory).await.map_err(|e| {
-                        ClientError::InternalError(format!("Memory engine error: {}", e))
+                        ClientError::InternalError(format!("Memory engine error: {e}"))
                     })
                 })
             })
@@ -380,7 +385,7 @@ impl Mem5Client {
             .await;
 
         let _permit = self.semaphore.acquire().await.map_err(|e| {
-            ClientError::InternalError(format!("Failed to acquire semaphore: {}", e))
+            ClientError::InternalError(format!("Failed to acquire semaphore: {e}"))
         })?;
 
         // Create enhanced search request
@@ -396,7 +401,7 @@ impl Mem5Client {
 
         // Validate request
         request.validate().map_err(|e| {
-            ClientError::ValidationError(format!("Search request validation failed: {}", e))
+            ClientError::ValidationError(format!("Search request validation failed: {e}"))
         })?;
 
         // Execute with error recovery
@@ -414,7 +419,7 @@ impl Mem5Client {
                         )
                         .await
                         .map_err(|e| {
-                            ClientError::InternalError(format!("Memory engine search error: {}", e))
+                            ClientError::InternalError(format!("Memory engine search error: {e}"))
                         })
                 })
             })
@@ -454,7 +459,7 @@ impl Mem5Client {
                     MemorySearchResult {
                         id: memory.id.to_string(),
                         content: content_str,
-                        importance: Some(importance as f64),
+                        importance: Some(importance),
                         score: importance as f32,
                         metadata: HashMap::new(), // TODO: Convert metadata properly
                         created_at: memory.metadata.created_at,

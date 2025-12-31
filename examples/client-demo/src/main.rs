@@ -7,7 +7,6 @@ use agent_mem_client::{
 };
 use agent_mem_core::MemoryType;
 use anyhow::Result;
-use std::collections::HashMap;
 use tracing::{error, info};
 
 #[tokio::main]

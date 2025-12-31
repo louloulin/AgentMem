@@ -451,7 +451,7 @@ mod tests {
         let query = "test memory";
         let query_vector = None;
 
-        let score = scorer.calculate_score(&memory, query, query_vector).await.unwrap();
+        let score = scorer.calculate_score(&memory, query, query_vector).await?;
 
         assert!(score.relevance >= 0.0 && score.relevance <= 1.0);
         assert!(score.importance >= 0.0 && score.importance <= 1.0);
@@ -467,8 +467,8 @@ mod tests {
         let recent = create_test_memory(0.5, 1);  // 1小时前
         let old = create_test_memory(0.5, 48);     // 48小时前
 
-        let recent_score = scorer.calculate_recency_score(&recent).await.unwrap();
-        let old_score = scorer.calculate_recency_score(&old).await.unwrap();
+        let recent_score = scorer.calculate_recency_score(&recent).await?;
+        let old_score = scorer.calculate_recency_score(&old).await?;
 
         assert!(recent_score > old_score, "新记忆应该得分更高");
     }
@@ -480,8 +480,8 @@ mod tests {
         let high_importance = create_test_memory(0.9, 1);
         let low_importance = create_test_memory(0.2, 1);
 
-        let high_score = scorer.calculate_importance_score(&high_importance).await.unwrap();
-        let low_score = scorer.calculate_importance_score(&low_importance).await.unwrap();
+        let high_score = scorer.calculate_importance_score(&high_importance).await?;
+        let low_score = scorer.calculate_importance_score(&low_importance).await?;
 
         assert!(high_score > low_score, "高重要性应该得分更高");
     }
@@ -494,10 +494,10 @@ mod tests {
         let query = "test";
 
         // 第一次计算（应该计算）
-        let score1 = scorer.calculate_score(&memory, query, None).await.unwrap();
+        let score1 = scorer.calculate_score(&memory, query, None).await?;
         
         // 第二次计算（应该使用缓存）
-        let score2 = scorer.calculate_score(&memory, query, None).await.unwrap();
+        let score2 = scorer.calculate_score(&memory, query, None).await?;
 
         assert_eq!(score1.composite, score2.composite, "缓存分数应该相同");
     }

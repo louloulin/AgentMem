@@ -169,7 +169,7 @@ impl QueryOptimizer {
     /// 优化查询，生成最优搜索计划
     pub fn optimize_query(&self, query: &SearchQuery) -> Result<OptimizedSearchPlan> {
         let stats = self.stats.read().map_err(|e| {
-            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {}", e))
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {e}"))
         })?;
 
         // 根据数据规模和查询要求选择策略
@@ -284,7 +284,7 @@ impl QueryOptimizer {
     /// 更新统计信息
     pub fn update_statistics(&self, total_vectors: usize) -> Result<()> {
         let mut stats = self.stats.write().map_err(|e| {
-            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to write query optimizer stats: {}", e))
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to write query optimizer stats: {e}"))
         })?;
         stats.update(total_vectors);
         Ok(())
@@ -293,7 +293,7 @@ impl QueryOptimizer {
     /// 获取当前统计信息
     pub fn get_statistics(&self) -> Result<IndexStatistics> {
         Ok(self.stats.read().map_err(|e| {
-            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {}", e))
+            agent_mem_traits::AgentMemError::MemoryError(format!("Failed to read query optimizer stats: {e}"))
         })?.clone())
     }
 }

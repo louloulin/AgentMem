@@ -484,7 +484,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
 
-        let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
         let conn = manager.get_connection().await;
         assert!(conn.is_ok());
     }
@@ -495,7 +495,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
 
-        let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
         let result = manager.health_check().await;
         if let Err(e) = &result {
             eprintln!("Health check failed: {e:?}");
@@ -509,7 +509,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
 
-        let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
         let stats = manager.get_stats().await;
         assert!(stats.is_ok());
 
@@ -545,7 +545,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
 
-        let manager = LibSqlConnectionManager::new(db_path_str).await.unwrap();
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
 
         // Get multiple connections
         let conn1 = manager.get_connection().await;

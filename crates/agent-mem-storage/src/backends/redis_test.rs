@@ -15,7 +15,7 @@ mod tests {
             enable_distributed_lock: true,
             ..Default::default()
         };
-        RedisStore::new(config).await.unwrap()
+        RedisStore::new(config).await?
     }
 
     fn create_test_vector(id: &str, vector: Vec<f32>) -> VectorData {
@@ -35,7 +35,7 @@ mod tests {
     #[tokio::test]
     async fn test_redis_store_creation() {
         let store = create_test_store().await;
-        let count = store.count_vectors().await.unwrap();
+        let count = store.count_vectors().await?;
         assert_eq!(count, 0);
     }
 
@@ -44,12 +44,12 @@ mod tests {
         let store = create_test_store().await;
 
         let vector_data = create_test_vector("cache1", vec![1.0, 2.0, 3.0, 4.0]);
-        let ids = store.add_vectors(vec![vector_data.clone()]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data.clone()]).await?;
 
         assert_eq!(ids.len(), 1);
         assert_eq!(ids[0], "cache1");
 
-        let retrieved = store.get_vector("cache1").await.unwrap();
+        let retrieved = store.get_vector("cache1").await?;
         assert!(retrieved.is_some());
 
         let retrieved_data = retrieved.unwrap();
@@ -77,11 +77,11 @@ mod tests {
             create_test_vector("vec3", vec![0.0, 0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 搜索与第一个向量相似的向量
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
-        let results = store.search_vectors(query_vector, 2, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 2, None).await?;
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].id, "vec1"); // 最相似的应该是自己
@@ -98,7 +98,7 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]), // 与查询向量垂直，相似度为0
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 使用高阈值搜索
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
@@ -118,14 +118,14 @@ mod tests {
 
         // 添加初始向量
         let vector_data = create_test_vector("cache1", vec![1.0, 2.0, 3.0, 4.0]);
-        store.add_vectors(vec![vector_data]).await.unwrap();
+        store.add_vectors(vec![vector_data]).await?;
 
         // 更新向量
         let updated_vector = create_test_vector("cache1", vec![5.0, 6.0, 7.0, 8.0]);
-        store.update_vectors(vec![updated_vector]).await.unwrap();
+        store.update_vectors(vec![updated_vector]).await?;
 
         // 验证更新
-        let retrieved = store.get_vector("cache1").await.unwrap().unwrap();
+        let retrieved = store.get_vector("cache1").await?.unwrap();
         assert_eq!(retrieved.vector, vec![5.0, 6.0, 7.0, 8.0]);
     }
 
@@ -139,21 +139,21 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
         // 删除一个向量
         store
             .delete_vectors(vec!["vec1".to_string()])
             .await
             .unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
+        assert_eq!(store.count_vectors().await?, 1);
 
         // 验证删除
-        let retrieved = store.get_vector("vec1").await.unwrap();
+        let retrieved = store.get_vector("vec1").await?;
         assert!(retrieved.is_none());
 
-        let retrieved = store.get_vector("vec2").await.unwrap();
+        let retrieved = store.get_vector("vec2").await?;
         assert!(retrieved.is_some());
     }
 
@@ -167,12 +167,12 @@ mod tests {
             create_test_vector("vec2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
 
         // 清空存储
-        store.clear().await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 0);
+        store.clear().await?;
+        assert_eq!(store.count_vectors().await?, 0);
     }
 
     #[tokio::test]
@@ -204,7 +204,7 @@ mod tests {
             metadata,
         };
 
-        let ids = store.add_vectors(vec![vector_data]).await.unwrap();
+        let ids = store.add_vectors(vec![vector_data]).await?;
 
         assert_eq!(ids.len(), 1);
         assert!(!ids[0].is_empty()); // 应该生成一个非空ID
@@ -222,19 +222,19 @@ mod tests {
             create_test_vector("batch3", vec![0.0, 0.0, 1.0, 0.0]),
         ];
 
-        let ids = store.add_vectors(vectors).await.unwrap();
+        let ids = store.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 3);
-        assert_eq!(store.count_vectors().await.unwrap(), 3);
+        assert_eq!(store.count_vectors().await?, 3);
 
         // 批量删除向量
         store
             .delete_vectors(vec!["batch1".to_string(), "batch3".to_string()])
             .await
             .unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
+        assert_eq!(store.count_vectors().await?, 1);
 
         // 验证剩余向量
-        let remaining = store.get_vector("batch2").await.unwrap();
+        let remaining = store.get_vector("batch2").await?;
         assert!(remaining.is_some());
     }
 
@@ -249,11 +249,11 @@ mod tests {
             create_test_vector("orthogonal", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 搜索
         let query_vector = vec![1.0, 0.0, 0.0, 0.0];
-        let results = store.search_vectors(query_vector, 3, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 3, None).await?;
 
         assert_eq!(results.len(), 3);
 
@@ -278,12 +278,12 @@ mod tests {
             create_test_vector("stats2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 访问向量以生成统计数据
-        let _ = store.get_vector("stats1").await.unwrap();
-        let _ = store.get_vector("stats1").await.unwrap(); // 再次访问
-        let _ = store.get_vector("nonexistent").await.unwrap(); // 缓存未命中
+        let _ = store.get_vector("stats1").await?;
+        let _ = store.get_vector("stats1").await?; // 再次访问
+        let _ = store.get_vector("nonexistent").await?; // 缓存未命中
 
         // 获取缓存统计
         let stats = store.get_cache_stats();
@@ -298,7 +298,7 @@ mod tests {
         let store = create_test_store().await;
 
         // 获取分布式锁
-        let lock = store.acquire_lock("test_resource", 60).await.unwrap();
+        let lock = store.acquire_lock("test_resource", 60).await?;
         assert!(lock.is_some());
 
         let lock = lock.unwrap();
@@ -307,7 +307,7 @@ mod tests {
         assert!(!lock.value.is_empty());
 
         // 释放锁
-        let released = store.release_lock(&lock).await.unwrap();
+        let released = store.release_lock(&lock).await?;
         assert!(released);
     }
 
@@ -321,7 +321,7 @@ mod tests {
             create_test_vector("warm2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 缓存预热
         let warmed = store
@@ -335,7 +335,7 @@ mod tests {
         assert_eq!(warmed, 2); // 只有2个存在的向量被预热
 
         // 缓存清理
-        let cleaned = store.cleanup_cache().await.unwrap();
+        let cleaned = store.cleanup_cache().await?;
         assert_eq!(cleaned, 0); // 在测试环境中没有过期项目
     }
 
@@ -349,7 +349,7 @@ mod tests {
             create_test_vector("ttl2", vec![0.0, 1.0, 0.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
 
         // 批量设置 TTL
         let result = store
@@ -377,17 +377,17 @@ mod tests {
             vectors.push(create_test_vector(&format!("perf_test_{i}"), vector));
         }
 
-        store.add_vectors(vectors).await.unwrap();
+        store.add_vectors(vectors).await?;
         let add_duration = start_time.elapsed();
 
         // 验证添加性能（缓存应该很快）
         assert!(add_duration.as_millis() < 500); // 应该在500ms内完成
-        assert_eq!(store.count_vectors().await.unwrap(), 50);
+        assert_eq!(store.count_vectors().await?, 50);
 
         // 测试搜索性能
         let query_vector = vec![0.5, 0.5, 0.5, 0.5];
         let start = std::time::Instant::now();
-        let results = store.search_vectors(query_vector, 10, None).await.unwrap();
+        let results = store.search_vectors(query_vector, 10, None).await?;
         let search_duration = start.elapsed();
 
         // 验证搜索性能和结果
@@ -407,7 +407,7 @@ mod tests {
             create_test_vector("session_user_3", vec![0.1, 0.1, 0.8, 0.2]),
         ];
 
-        store.add_vectors(session_vectors).await.unwrap();
+        store.add_vectors(session_vectors).await?;
 
         // 测试会话查询
         let user_query = vec![0.7, 0.3, 0.1, 0.1];
@@ -438,11 +438,11 @@ mod tests {
         let start = std::time::Instant::now();
 
         // 快速添加
-        store.add_vectors(real_time_data).await.unwrap();
+        store.add_vectors(real_time_data).await?;
 
         // 立即搜索
         let query = vec![0.8, 0.2, 0.1, 0.1];
-        let results = store.search_vectors(query, 2, None).await.unwrap();
+        let results = store.search_vectors(query, 2, None).await?;
 
         let total_time = start.elapsed();
 
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(results[0].id, "realtime_1"); // 最相关的结果
 
         // 验证数据一致性
-        let count = store.count_vectors().await.unwrap();
+        let count = store.count_vectors().await?;
         assert_eq!(count, 2);
     }
 }

@@ -427,7 +427,7 @@ impl TemporalGraphEngine {
             }
         }
 
-        Err(anyhow!("Edge not found: {}", edge_id))
+        Err(anyhow!("Edge not found: {edge_id}"))
     }
 
     /// 结束边的有效期
@@ -453,7 +453,7 @@ impl TemporalGraphEngine {
             }
         }
 
-        Err(anyhow!("Edge not found: {}", edge_id))
+        Err(anyhow!("Edge not found: {edge_id}"))
     }
 
     /// 恢复已结束的边
@@ -496,7 +496,7 @@ impl TemporalGraphEngine {
             }
         }
 
-        Err(anyhow!("Edge not found: {}", edge_id))
+        Err(anyhow!("Edge not found: {edge_id}"))
     }
 
     /// 获取关系演化历史

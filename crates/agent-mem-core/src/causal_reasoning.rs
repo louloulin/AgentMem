@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 /// 因果知识图节点
@@ -357,7 +357,7 @@ impl CausalReasoningEngine {
                 for edge_id in edge_ids {
                     if let Some(edge) = edges_map.get(edge_id) {
                         let next = edge.effect_id.clone();
-                        let visit_key = format!("{}:{}", current, next);
+                        let visit_key = format!("{current}:{next}");
 
                         if !visited.contains(&visit_key) {
                             visited.insert(visit_key);
@@ -384,7 +384,7 @@ impl CausalReasoningEngine {
         effect_id: &str,
     ) -> String {
         if chains.is_empty() {
-            return format!("未找到从 {} 到 {} 的因果链", cause_id, effect_id);
+            return format!("未找到从 {cause_id} 到 {effect_id} 的因果链");
         }
 
         if let Some(best) = chains.first() {
@@ -537,9 +537,9 @@ mod tests {
             properties: HashMap::new(),
         };
 
-        engine.add_node(node1).await.unwrap();
-        engine.add_node(node2).await.unwrap();
-        engine.add_node(node3).await.unwrap();
+        engine.add_node(node1).await?;
+        engine.add_node(node2).await?;
+        engine.add_node(node3).await?;
 
         // 添加因果关系
         let edge1 = CausalEdge {
@@ -566,11 +566,11 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        engine.add_causal_relation(edge1).await.unwrap();
-        engine.add_causal_relation(edge2).await.unwrap();
+        engine.add_causal_relation(edge1).await?;
+        engine.add_causal_relation(edge2).await?;
 
         // 查找因果链
-        let result = engine.find_causal_chains("node1", "node3").await.unwrap();
+        let result = engine.find_causal_chains("node1", "node3").await?;
         assert!(!result.chains.is_empty());
         assert!(result.overall_confidence > 0.0);
     }

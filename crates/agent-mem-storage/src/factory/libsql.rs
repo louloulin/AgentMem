@@ -138,7 +138,7 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_str().unwrap();
 
-        let factory = LibSqlStorageFactory::new(path).await.unwrap();
+        let factory = LibSqlStorageFactory::new(path).await?;
 
         let stores = factory.create_all_stores().await;
         assert!(stores.is_ok());

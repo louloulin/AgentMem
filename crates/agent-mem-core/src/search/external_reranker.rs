@@ -324,7 +324,7 @@ impl Reranker for LLMReranker {
             
             // 结合原始向量分数和LLM评分
             let vector_score = query_vector
-                .and_then(|_| doc.vector_score)
+                .and(doc.vector_score)
                 .unwrap_or(doc.score);
             
             doc.score = vector_score * self.config.vector_weight

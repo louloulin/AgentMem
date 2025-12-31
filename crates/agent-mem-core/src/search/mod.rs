@@ -76,7 +76,7 @@ pub use vector_search::{
 };
 
 use agent_mem_traits::{
-    AttributeKey, AttributeValue, ComparisonOperator, Constraint, Query, QueryIntent,
+    AttributeValue, ComparisonOperator, Constraint, Query, QueryIntent,
 };
 pub use metadata_filter::{
     FilterOperator, FilterValue, LogicalOperator, MetadataFilter, MetadataFilterSystem,

@@ -256,7 +256,7 @@ impl MemoryConsolidator {
 
         // Update the base memory
         memories[base_idx].content = agent_mem_traits::Content::Text(merged_content);
-        memories[base_idx].set_score(merged_importance as f64);
+        memories[base_idx].set_score(merged_importance);
         memories[base_idx].metadata.access_count = merged_access_count;
         memories[base_idx].metadata.updated_at = chrono::Utc::now();
 

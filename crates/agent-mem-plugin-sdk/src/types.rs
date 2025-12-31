@@ -54,17 +54,11 @@ pub enum Capability {
 
 /// Plugin configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PluginConfig {
     pub settings: HashMap<String, serde_json::Value>,
 }
 
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self {
-            settings: HashMap::new(),
-        }
-    }
-}
 
 /// Generic plugin request
 #[derive(Debug, Serialize, Deserialize)]

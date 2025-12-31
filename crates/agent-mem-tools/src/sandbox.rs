@@ -151,7 +151,7 @@ impl SandboxManager {
             // On macOS, we can use task_info
             // For now, return 0 as a placeholder
             // In production, use proper system calls
-            return 0;
+            0
         }
 
         #[cfg(target_os = "windows")]

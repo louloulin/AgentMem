@@ -31,7 +31,7 @@ impl MockSearchBackend {
         // 初始化测试数据
         for i in 0..50 {
             let memory = MemoryBuilder::new()
-                .content(Content::Text(format!("测试记忆内容 {}", i)))
+                .content(Content::Text(format!("测试记忆内容 {i}")))
                 .attribute(
                     AttributeKey::system("index"),
                     AttributeValue::Number(i as f64),
@@ -118,7 +118,7 @@ async fn test_adaptive_router_strategy_selection() {
     ));
     assert!((weights.vector_weight + weights.fulltext_weight - 1.0).abs() < 0.01);
 
-    println!("✅ Adaptive router selected strategy: {:?}", strategy);
+    println!("✅ Adaptive router selected strategy: {strategy:?}");
     println!("   - Vector weight: {:.2}", weights.vector_weight);
     println!("   - Fulltext weight: {:.2}", weights.fulltext_weight);
 }
@@ -160,7 +160,7 @@ async fn test_adaptive_learning_feedback() {
 
     println!("✅ Adaptive learning feedback loop completed");
     println!("   - Iterations: 10");
-    println!("   - Total strategy updates: {}", total_tries);
+    println!("   - Total strategy updates: {total_tries}");
     println!("   - Accuracy range: 0.70 → 0.88");
 }
 
@@ -214,8 +214,8 @@ async fn test_cache_hit_and_miss() {
     assert!(latency2.as_millis() < 20); // 缓存应该很快
 
     println!("✅ Cache hit/miss test passed");
-    println!("   - 1st search (miss): {:?}", latency1);
-    println!("   - 2nd search (hit): {:?}", latency2);
+    println!("   - 1st search (miss): {latency1:?}");
+    println!("   - 2nd search (hit): {latency2:?}");
     println!(
         "   - Speedup: {:.1}x",
         latency1.as_millis() as f64 / latency2.as_millis() as f64
@@ -248,7 +248,7 @@ async fn test_cache_statistics() {
     // 执行20次搜索（10个不同查询，每个查询2次）
     for i in 0..10 {
         let query = SearchQuery {
-            query: format!("测试记忆内容 {}", i),
+            query: format!("测试记忆内容 {i}"),
             limit: 10,
             threshold: Some(0.7),
             vector_weight: 0.0,
@@ -268,7 +268,7 @@ async fn test_cache_statistics() {
     // 获取缓存统计
     let stats = engine.get_cache_stats().await.unwrap();
     println!("✅ Cache statistics:");
-    println!("{}", stats);
+    println!("{stats}");
 
     // 验证：20次请求，10次未命中，10次命中，命中率50%
     assert!(stats.contains("Total Requests: 20"));
@@ -296,7 +296,7 @@ async fn test_parallel_search_performance() {
     let queries: Vec<(Vec<f32>, SearchQuery)> = (0..50)
         .map(|i| {
             let query = SearchQuery {
-                query: format!("测试记忆内容 {}", i),
+                query: format!("测试记忆内容 {i}"),
                 limit: 10,
                 threshold: Some(0.7),
                 vector_weight: 0.0,
@@ -321,8 +321,8 @@ async fn test_parallel_search_performance() {
     let qps = 50.0 / elapsed.as_secs_f64();
     println!("✅ Parallel search completed");
     println!("   - Queries: 50");
-    println!("   - Elapsed: {:?}", elapsed);
-    println!("   - QPS: {:.0}", qps);
+    println!("   - Elapsed: {elapsed:?}");
+    println!("   - QPS: {qps:.0}");
 
     // 串行最少需要 50 * 50ms = 2.5s，并发应该显著减少
     assert!(elapsed.as_secs() < 3);
@@ -341,7 +341,7 @@ async fn test_cache_warmup() {
     let hot_queries: Vec<(Vec<f32>, SearchQuery)> = (0..10)
         .map(|i| {
             let query = SearchQuery {
-                query: format!("测试记忆内容 {}", i),
+                query: format!("测试记忆内容 {i}"),
                 limit: 10,
                 threshold: Some(0.7),
                 vector_weight: 0.0,
@@ -357,7 +357,7 @@ async fn test_cache_warmup() {
     let warmed = engine.warmup_cache(hot_queries).await.unwrap();
 
     assert_eq!(warmed, 10);
-    println!("✅ Cache warmup completed: {} queries", warmed);
+    println!("✅ Cache warmup completed: {warmed} queries");
 
     // 验证缓存已填充
     let stats = engine.get_cache_stats().await.unwrap();

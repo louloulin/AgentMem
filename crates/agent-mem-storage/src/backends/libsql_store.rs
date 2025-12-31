@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_libsql_create_and_get() {
-        let store = LibSQLStore::new(":memory:").await.unwrap();
+        let store = LibSQLStore::new(":memory:").await?;
 
         let record = MemoryRecord {
             id: "test-1".to_string(),
@@ -410,16 +410,16 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        store.insert(&record).await.unwrap();
+        store.insert(&record).await?;
 
-        let retrieved = store.get("test-1").await.unwrap();
+        let retrieved = store.get("test-1").await?;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().content, "Test memory");
     }
 
     #[tokio::test]
     async fn test_libsql_search() {
-        let store = LibSQLStore::new(":memory:").await.unwrap();
+        let store = LibSQLStore::new(":memory:").await?;
 
         // Insert test records
         for i in 0..5 {
@@ -434,10 +434,10 @@ mod tests {
                 updated_at: Utc::now(),
                 metadata: HashMap::new(),
             };
-            store.insert(&record).await.unwrap();
+            store.insert(&record).await?;
         }
 
-        let results = store.search(Some("agent-1"), None, None, 10).await.unwrap();
+        let results = store.search(Some("agent-1"), None, None, 10).await?;
         assert_eq!(results.len(), 5);
     }
 }

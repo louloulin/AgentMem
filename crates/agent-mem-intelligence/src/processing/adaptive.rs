@@ -525,7 +525,7 @@ mod tests {
         let manager = AdaptiveMemoryManager::new(100, 30 * 24 * 60 * 60);
         let mut memory = create_test_memory("test", 0.5, 5, 10);
 
-        manager.archive_memory(&mut memory).await.unwrap();
+        manager.archive_memory(&mut memory).await?;
 
         // 检查 archived 属性
         let archived = memory.attributes.get(&AttributeKey::system("archived"));
@@ -543,7 +543,7 @@ mod tests {
         memory.content = agent_mem_traits::Content::Text("A".repeat(15000)); // Large content
 
         let original_size = memory.content.as_text().unwrap_or("").len();
-        manager.compress_memory(&mut memory).await.unwrap();
+        manager.compress_memory(&mut memory).await?;
 
         assert!(memory.content.as_text().unwrap_or("").len() < original_size);
         // 检查 compressed 属性
@@ -566,7 +566,7 @@ mod tests {
             create_test_memory("5", 0.8, 8, 2),  // High importance
         ];
 
-        let (archived, deleted) = manager.manage_memories(&mut memories).await.unwrap();
+        let (archived, deleted) = manager.manage_memories(&mut memories).await?;
 
         // Should have deleted some memories due to capacity constraints
         assert!(deleted > 0);

@@ -9,10 +9,10 @@
 //! 参考Mem0的API设计，提升易用性
 
 use crate::memory::Memory;
-use crate::types::{AddMemoryOptions, AddResult, SearchOptions};
+use crate::types::{AddMemoryOptions, AddResult};
 use agent_mem_traits::{AgentMemError, Result};
 use std::fmt;
-use tracing::{debug, info};
+use tracing::info;
 
 /// 链式调用的Memory包装器
 ///
@@ -115,7 +115,7 @@ impl fmt::Display for EnhancedError {
             }
         }
         if let Some(context) = &self.context {
-            write!(f, "\n\n上下文: {}", context)?;
+            write!(f, "\n\n上下文: {context}")?;
         }
         Ok(())
     }
@@ -150,7 +150,7 @@ impl ErrorEnhancer {
     fn analyze_error(error: &AgentMemError) -> (String, Vec<String>) {
         match error {
             AgentMemError::StorageError(msg) => {
-                let user_msg = format!("存储错误: {}", msg);
+                let user_msg = format!("存储错误: {msg}");
                 let suggestions = vec![
                     "检查数据库连接是否正常".to_string(),
                     "确认存储路径有写入权限".to_string(),
@@ -159,7 +159,7 @@ impl ErrorEnhancer {
                 (user_msg, suggestions)
             }
             AgentMemError::NotFound(msg) => {
-                let user_msg = format!("未找到: {}", msg);
+                let user_msg = format!("未找到: {msg}");
                 let suggestions = vec![
                     "检查ID是否正确".to_string(),
                     "确认记忆是否已创建".to_string(),
@@ -168,7 +168,7 @@ impl ErrorEnhancer {
                 (user_msg, suggestions)
             }
             AgentMemError::InvalidInput(msg) => {
-                let user_msg = format!("输入无效: {}", msg);
+                let user_msg = format!("输入无效: {msg}");
                 let suggestions = vec![
                     "检查输入参数格式是否正确".to_string(),
                     "确认必需参数是否已提供".to_string(),
@@ -177,7 +177,7 @@ impl ErrorEnhancer {
                 (user_msg, suggestions)
             }
             AgentMemError::LLMError(msg) => {
-                let user_msg = format!("LLM错误: {}", msg);
+                let user_msg = format!("LLM错误: {msg}");
                 let suggestions = vec![
                     "检查API Key是否正确配置".to_string(),
                     "确认网络连接是否正常".to_string(),
@@ -186,7 +186,7 @@ impl ErrorEnhancer {
                 (user_msg, suggestions)
             }
             _ => {
-                let user_msg = format!("错误: {}", error);
+                let user_msg = format!("错误: {error}");
                 let suggestions = vec!["查看详细错误日志".to_string()];
                 (user_msg, suggestions)
             }

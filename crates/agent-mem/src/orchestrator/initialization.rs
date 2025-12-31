@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use agent_mem_core::operations::MemoryOperations;
 use agent_mem_core::storage::libsql::{
-    LibSqlConnectionManager, LibSqlMemoryOperations, LibSqlMemoryRepository,
+    LibSqlMemoryOperations, LibSqlMemoryRepository,
 };
 use agent_mem_embeddings::EmbeddingFactory;
 use agent_mem_intelligence::clustering::{dbscan::DBSCANClusterer, kmeans::KMeansClusterer};
@@ -863,7 +863,7 @@ impl InitializationModule {
 
     /// 创建重排序器
     pub fn create_reranker() -> Option<Arc<dyn agent_mem_core::search::Reranker>> {
-        use agent_mem_core::search::{InternalReranker, RerankerFactory};
+        use agent_mem_core::search::InternalReranker;
         use std::sync::Arc;
 
         info!("创建重排序器...");
@@ -940,8 +940,7 @@ impl InitializationModule {
                 .await
                 .map_err(|e| {
                     AgentMemError::StorageError(format!(
-                        "Failed to create LibSQL connection pool: {}",
-                        e
+                        "Failed to create LibSQL connection pool: {e}"
                     ))
                 })?;
 
@@ -949,11 +948,11 @@ impl InitializationModule {
 
             // Step 2: 运行迁移创建表（使用池中的连接）
             let conn = pool.get().await.map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to get connection from pool: {}", e))
+                AgentMemError::StorageError(format!("Failed to get connection from pool: {e}"))
             })?;
             // run_migrations 需要 Arc<Mutex<Connection>>，pool.get() 已经返回这个类型
             run_migrations(conn).await.map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to run migrations: {}", e))
+                AgentMemError::StorageError(format!("Failed to run migrations: {e}"))
             })?;
             info!("✅ 数据库迁移完成");
 
@@ -968,7 +967,7 @@ impl InitializationModule {
                 "✅ Phase 0: LibSQL Memory Operations 创建成功（连接池模式） - 数据将持久化到 {}",
                 actual_db_path
             );
-            return Ok(Box::new(operations));
+            Ok(Box::new(operations))
         } else {
             // 内存模式：使用单连接（避免连接池在内存模式下的问题）
             info!("🔧 内存模式：使用单连接（避免连接池复杂性）");
@@ -976,8 +975,7 @@ impl InitializationModule {
         // Step 1: 创建连接管理器
             let conn_mgr = LibSqlConnectionManager::new(actual_db_path).await.map_err(|e| {
             AgentMemError::StorageError(format!(
-                "Failed to create LibSQL connection manager: {}",
-                e
+                "Failed to create LibSQL connection manager: {e}"
             ))
         })?;
 
@@ -985,7 +983,7 @@ impl InitializationModule {
 
         // Step 2: 获取连接
         let conn = conn_mgr.get_connection().await.map_err(|e| {
-            AgentMemError::StorageError(format!("Failed to get LibSQL connection: {}", e))
+            AgentMemError::StorageError(format!("Failed to get LibSQL connection: {e}"))
         })?;
 
         info!("✅ 获取LibSQL连接成功");
@@ -993,7 +991,7 @@ impl InitializationModule {
             // Step 2.5: 运行迁移创建表
             use agent_mem_core::storage::libsql::run_migrations;
             run_migrations(conn.clone()).await.map_err(|e| {
-                AgentMemError::StorageError(format!("Failed to run migrations: {}", e))
+                AgentMemError::StorageError(format!("Failed to run migrations: {e}"))
             })?;
             info!("✅ 数据库迁移完成");
 
@@ -1008,7 +1006,7 @@ impl InitializationModule {
                 "✅ Phase 0: LibSQL Memory Operations 创建成功（单连接模式） - 数据将持久化到 {}",
                 actual_db_path
         );
-            return Ok(Box::new(operations));
+            Ok(Box::new(operations))
         }
     }
 }

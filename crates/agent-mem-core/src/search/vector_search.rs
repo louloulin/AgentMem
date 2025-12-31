@@ -527,7 +527,7 @@ impl SearchEngine for VectorSearchEngine {
         // 1. 提取查询向量
         let query_vector = match &query.intent {
             QueryIntent::Vector { embedding } => embedding.clone(),
-            QueryIntent::NaturalLanguage { text, .. } => {
+            QueryIntent::NaturalLanguage {  .. } => {
                 // 对于自然语言查询，需要先生成 embedding
                 // 这里返回错误，因为 VectorSearchEngine 不负责生成 embedding
                 return Err(AgentMemError::validation_error(
@@ -614,7 +614,7 @@ mod tests {
             index_name: None,
             collection_name: None,
         };
-        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await?);
         let engine = VectorSearchEngine::new(vector_store.clone(), 128);
 
         // 添加测试向量
@@ -627,7 +627,7 @@ mod tests {
             metadata,
         }];
 
-        let ids = engine.add_vectors(vectors).await.unwrap();
+        let ids = engine.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 1);
 
         // 执行搜索
@@ -639,7 +639,7 @@ mod tests {
         };
 
         let query_vector = vec![0.1; 128];
-        let (results, elapsed) = engine.search(query_vector, &query).await.unwrap();
+        let (results, elapsed) = engine.search(query_vector, &query).await?;
 
         assert!(!results.is_empty());
         assert!(elapsed >= 0); // 允许 0，因为内存操作可能非常快
@@ -648,7 +648,7 @@ mod tests {
     #[tokio::test]
     async fn test_vector_dimension_validation() {
         let config = VectorStoreConfig::default();
-        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await?);
         let engine = VectorSearchEngine::new(vector_store, 128);
 
         let query = SearchQuery::default();
@@ -664,7 +664,7 @@ mod tests {
             dimension: Some(128),
             ..Default::default()
         };
-        let vector_store = Arc::new(MemoryVectorStore::new(config).await.unwrap());
+        let vector_store = Arc::new(MemoryVectorStore::new(config).await?);
         let engine = VectorSearchEngine::new(vector_store, 128);
 
         // 添加向量
@@ -677,7 +677,7 @@ mod tests {
             metadata,
         }];
 
-        let ids = engine.add_vectors(vectors).await.unwrap();
+        let ids = engine.add_vectors(vectors).await?;
 
         // 删除向量
         let result = engine.delete_vectors(ids).await;
@@ -899,7 +899,7 @@ pub fn build_hybrid_vector_search_sql(
     let mut similarity_parts = Vec::new();
     let mut param_index = 1;
 
-    for (_i, (column, weight)) in columns.iter().zip(weights.iter()).enumerate() {
+    for (column, weight) in columns.iter().zip(weights.iter()) {
         // 将距离转换为相似度，然后乘以权重
         let similarity_expr = match operator {
             VectorDistanceOperator::Cosine => {

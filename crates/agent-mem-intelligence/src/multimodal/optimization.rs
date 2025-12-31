@@ -601,7 +601,7 @@ mod tests {
             (vec![1.0, 1.0], ContentType::Text, ContentType::Image),
         ];
 
-        let results = processor.batch_align(embeddings).await.unwrap();
+        let results = processor.batch_align(embeddings).await?;
         assert_eq!(results.len(), 3);
     }
 }

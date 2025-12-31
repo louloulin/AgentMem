@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::info;
 
 /// Schema演化配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,7 +207,7 @@ impl SchemaEvolutionEngine {
         let mut schemas = self.schemas.write().await;
         let schema = schemas
             .get_mut(schema_id)
-            .ok_or_else(|| AgentMemError::not_found(format!("Schema不存在: {}", schema_id)))?;
+            .ok_or_else(|| AgentMemError::not_found(format!("Schema不存在: {schema_id}")))?;
 
         // 添加新记忆
         for memory_id in &new_memory_ids {
@@ -358,7 +358,7 @@ impl SchemaEvolutionEngine {
     /// 检查并创建新Schema
     async fn check_and_create_schemas(&self) -> Result<Vec<SchemaEvolutionOperation>> {
         // 简化实现：检查未关联的记忆，如果数量足够，创建新Schema
-        let mut operations = Vec::new();
+        let operations = Vec::new();
 
         // 这里应该检查未关联的记忆
         // 简化实现：返回空操作列表
@@ -602,7 +602,7 @@ mod tests {
             confidence: 0.8,
         };
 
-        engine.create_schema(schema).await.unwrap();
+        engine.create_schema(schema).await?;
 
         // 更新Schema
         engine
@@ -611,7 +611,7 @@ mod tests {
             .unwrap();
 
         // 获取Schema
-        let updated = engine.get_schema("schema1").await.unwrap();
+        let updated = engine.get_schema("schema1").await?;
         assert!(updated.is_some());
         assert_eq!(updated.unwrap().memory_ids.len(), 3);
     }
@@ -653,7 +653,7 @@ mod tests {
                 confidence: 0.8,
             };
 
-            engine.create_schema(schema).await.unwrap();
+            engine.create_schema(schema).await?;
         }
 
         // 尝试创建超出限制的Schema

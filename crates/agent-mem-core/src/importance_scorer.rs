@@ -4,12 +4,11 @@
 //! and context-aware evaluation for memory prioritization.
 
 use crate::hierarchical_service::HierarchicalMemoryRecord;
-use crate::types::{ImportanceLevel, MemoryType};
-use agent_mem_traits::{AgentMemError, Result};
-use chrono::{DateTime, Duration, Timelike, Utc};
+use crate::types::ImportanceLevel;
+use agent_mem_traits::Result;
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Configuration for importance scoring
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,7 +342,7 @@ impl AdvancedImportanceScorer {
 
         // Time-based context (e.g., work hours, weekends)
         let hour = context.current_time.hour();
-        let is_work_hours = hour >= 9 && hour <= 17;
+        let is_work_hours = (9..=17).contains(&hour);
 
         if let Some(memory_context) = memory.metadata.get("context_type") {
             match memory_context.as_str() {
@@ -488,7 +487,7 @@ impl AdvancedImportanceScorer {
     fn get_or_create_stats(&mut self, memory_id: &str) -> &mut MemoryUsageStats {
         self.usage_stats
             .entry(memory_id.to_string())
-            .or_insert_with(MemoryUsageStats::default)
+            .or_default()
     }
 
     /// Update usage statistics for a memory

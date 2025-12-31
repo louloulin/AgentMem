@@ -14,8 +14,8 @@ use agent_mem_traits::{AgentMemError, MemoryItem, Result};
 use crate::builder::MemoryBuilder;
 use crate::orchestrator::MemoryOrchestrator;
 use crate::types::{
-    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryEvent, MemoryScope,
-    MemoryStats, RelationEvent, SearchOptions,
+    AddMemoryOptions, AddResult, DeleteAllOptions, GetAllOptions, MemoryScope,
+    MemoryStats, SearchOptions,
 };
 
 /// 统一的记忆管理接口
@@ -613,7 +613,7 @@ impl Memory {
         query: impl Into<String>,
         options: SearchOptions,
     ) -> Result<Vec<MemoryItem>> {
-        let mut query = query.into();
+        let query = query.into();
         debug!("搜索记忆: {}", query);
 
         // ===== Phase 3: 插件钩子 - before_search =====
@@ -629,7 +629,7 @@ impl Memory {
 
         // 核心搜索操作
         let orchestrator = self.orchestrator.read().await;
-        let mut results = orchestrator
+        let results = orchestrator
             .search_memories(
                 query,
                 self.default_agent_id.clone(),

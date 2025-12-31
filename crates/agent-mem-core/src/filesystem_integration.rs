@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// 文件系统集成配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,7 +120,7 @@ impl FilesystemIntegrationManager {
 
         let content = fs::read_to_string(path).await.map_err(|e| {
             agent_mem_traits::AgentMemError::IoError(
-                std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to read CLAUDE.md file: {}", e))
+                std::io::Error::other(format!("Failed to read CLAUDE.md file: {e}"))
             )
         })?;
 
@@ -140,7 +140,7 @@ impl FilesystemIntegrationManager {
     /// 解析CLAUDE.md文件内容
     fn parse_claude_md(&self, content: &str, path: &Path) -> Result<ClaudeMdFile> {
         let mut memories = Vec::new();
-        let mut metadata = HashMap::new();
+        let metadata = HashMap::new();
 
         // 解析CLAUDE.md格式
         // 支持多种格式：
@@ -258,7 +258,7 @@ impl FilesystemIntegrationManager {
     ///
     /// 支持 `@path/to/file` 和 `import:path/to/file` 格式
     pub async fn process_imports(&self, content: &str) -> Result<String> {
-        let mut result = content.to_string();
+        let result = content.to_string();
 
         for _prefix in &self.config.import_prefixes {
             // 查找所有导入语句
@@ -294,14 +294,14 @@ impl FilesystemIntegrationManager {
             // 提取记忆类型
             if let Some(mem_type) = memory.attributes.get(&agent_mem_traits::AttributeKey::core("memory_type")) {
                 if let Some(typ) = mem_type.as_string() {
-                    content.push_str(&format!("### Type: {}\n\n", typ));
+                    content.push_str(&format!("### Type: {typ}\n\n"));
                 }
             }
 
             // 提取重要性
             if let Some(importance) = memory.attributes.get(&agent_mem_traits::AttributeKey::system("importance")) {
                 if let Some(imp) = importance.as_number() {
-                    content.push_str(&format!("### Importance: {}\n\n", imp));
+                    content.push_str(&format!("### Importance: {imp}\n\n"));
                 }
             }
 
@@ -310,7 +310,7 @@ impl FilesystemIntegrationManager {
 
         fs::write(path, content).await.map_err(|e| {
             agent_mem_traits::AgentMemError::IoError(
-                std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to write CLAUDE.md file: {}", e))
+                std::io::Error::other(format!("Failed to write CLAUDE.md file: {e}"))
             )
         })?;
 
@@ -387,7 +387,7 @@ Python is also a great language.
             metadata: HashMap::new(),
         };
 
-        let memories = manager.convert_to_memories(&claude_file).await.unwrap();
+        let memories = manager.convert_to_memories(&claude_file).await?;
         assert_eq!(memories.len(), 1);
     }
 }

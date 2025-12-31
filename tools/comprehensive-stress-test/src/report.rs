@@ -1,9 +1,7 @@
 //! 压测报告生成模块
 
 use anyhow::Result;
-use serde_json;
 use std::fs;
-use std::path::Path;
 use tracing::info;
 
 use crate::stats::StressTestStats;
@@ -96,7 +94,7 @@ impl ReportGenerator {
     fn generate_scenario_section(&self, name: &str, stats: &StressTestStats) -> String {
         let mut section = String::new();
 
-        section.push_str(&format!("## 场景: {}\n\n", name));
+        section.push_str(&format!("## 场景: {name}\n\n"));
 
         section.push_str("### 基本统计\n\n");
         section.push_str(&format!("- **总操作数**: {}\n", stats.total_operations));
@@ -149,7 +147,7 @@ impl ReportGenerator {
                 ));
             }
         }
-        analysis.push_str("\n");
+        analysis.push('\n');
 
         // 延迟瓶颈分析
         analysis.push_str("### 延迟瓶颈\n\n");
@@ -161,7 +159,7 @@ impl ReportGenerator {
                 ));
             }
         }
-        analysis.push_str("\n");
+        analysis.push('\n');
 
         // 吞吐量瓶颈分析
         analysis.push_str("### 吞吐量瓶颈\n\n");
@@ -173,7 +171,7 @@ impl ReportGenerator {
                 ));
             }
         }
-        analysis.push_str("\n");
+        analysis.push('\n');
 
         analysis.push_str("---\n\n");
 
@@ -186,7 +184,7 @@ impl ReportGenerator {
         recommendations.push_str("## 💡 优化建议\n\n");
 
         for (name, stats) in all_stats {
-            recommendations.push_str(&format!("### {}\n\n", name));
+            recommendations.push_str(&format!("### {name}\n\n"));
 
             if stats.peak_cpu_usage > 80.0 {
                 recommendations.push_str("- 🔧 **CPU 优化**: 考虑使用更高效的算法或并行处理\n");
@@ -209,7 +207,7 @@ impl ReportGenerator {
                 ));
             }
 
-            recommendations.push_str("\n");
+            recommendations.push('\n');
         }
 
         recommendations.push_str("---\n\n");

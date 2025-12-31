@@ -34,7 +34,7 @@ impl Tool for ListAgentsTool {
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> ToolResult<Value> {
         let api_url = get_api_url();
-        let url = format!("{}/api/v1/agents", api_url);
+        let url = format!("{api_url}/api/v1/agents");
 
         // 在spawn_blocking之前提取所有需要的值
         let user_id = args["user_id"].as_str().map(|s| s.to_string());
@@ -56,19 +56,19 @@ impl Tool for ListAgentsTool {
             match req.call() {
                 Ok(resp) => resp
                     .into_json::<Value>()
-                    .map_err(|e| format!("Failed to parse response: {}", e)),
+                    .map_err(|e| format!("Failed to parse response: {e}")),
                 Err(ureq::Error::Status(code, resp)) => {
                     let text = resp
                         .into_string()
                         .unwrap_or_else(|_| "Unknown error".to_string());
-                    Err(format!("API returned error {}: {}", code, text))
+                    Err(format!("API returned error {code}: {text}"))
                 }
-                Err(e) => Err(format!("HTTP request failed: {}", e)),
+                Err(e) => Err(format!("HTTP request failed: {e}")),
             }
         })
         .await
-        .map_err(|e| ToolError::ExecutionFailed(format!("Task join error: {}", e)))?
-        .map_err(|e| ToolError::ExecutionFailed(e))?;
+        .map_err(|e| ToolError::ExecutionFailed(format!("Task join error: {e}")))?
+        .map_err(ToolError::ExecutionFailed)?;
 
         // 提取Agent列表
         let agents = response["data"].as_array().cloned().unwrap_or_default();

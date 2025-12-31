@@ -13,7 +13,7 @@ use agent_mem::{Memory, MemoryBuilder};
 use anyhow::Result;
 use colored::*;
 use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use tracing::warn;
 use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*};
 
 mod test_tracker;
@@ -191,14 +191,12 @@ async fn test_add_performance(
     let medium_text = "A".repeat(100);
     let large_text = "B".repeat(1000);
 
-    let test_sizes = vec![
-        ("Small (10 bytes)", "Small text"),
+    let test_sizes = [("Small (10 bytes)", "Small text"),
         ("Medium (100 bytes)", medium_text.as_str()),
-        ("Large (1000 bytes)", large_text.as_str()),
-    ];
+        ("Large (1000 bytes)", large_text.as_str())];
 
     for (size_name, content) in test_sizes.iter() {
-        tracker.start_subtest(&format!("Add {}", size_name));
+        tracker.start_subtest(format!("Add {size_name}"));
 
         let start = Instant::now();
         let mut count = 0;
@@ -272,7 +270,7 @@ async fn test_search_performance(
 
     // 测试不同复杂度的查询
     for (query_type, query) in &config.test_queries {
-        tracker.start_subtest(&format!("{} query: '{}'", query_type, query));
+        tracker.start_subtest(format!("{query_type} query: '{query}'"));
 
         let start = Instant::now();
         match memory.search(query.to_string()).await {
@@ -291,7 +289,7 @@ async fn test_search_performance(
                 );
             }
             Err(e) => {
-                tracker.fail_subtest(&format!("Search failed: {}", e), None);
+                tracker.fail_subtest(&format!("Search failed: {e}"), None);
             }
         }
     }
@@ -312,10 +310,10 @@ async fn test_batch_performance(
     );
 
     // 批量添加测试
-    tracker.start_subtest(&format!("Batch add {} memories", config.memory_count));
+    tracker.start_subtest(format!("Batch add {} memories", config.memory_count));
 
     let contents: Vec<String> = (0..config.memory_count)
-        .map(|i| format!("Test memory item number {}", i))
+        .map(|i| format!("Test memory item number {i}"))
         .collect();
 
     let start = Instant::now();
@@ -353,10 +351,10 @@ async fn test_concurrent_performance(
 ) -> Result<()> {
     tracker.start_test(
         "Concurrent Operation Performance",
-        &format!("测试{}个并发操作的性能", config.concurrent_count),
+        format!("测试{}个并发操作的性能", config.concurrent_count),
     );
 
-    tracker.start_subtest(&format!(
+    tracker.start_subtest(format!(
         "Concurrent {} add operations",
         config.concurrent_count
     ));
@@ -368,7 +366,7 @@ async fn test_concurrent_performance(
         let memory_clone = memory.clone();
         let handle = tokio::spawn(async move {
             memory_clone
-                .add(&format!("Concurrent test memory {}", i))
+                .add(&format!("Concurrent test memory {i}"))
                 .await
         });
         handles.push(handle);
@@ -406,7 +404,7 @@ async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig)
     let scales = vec![100, 500, 1000];
 
     for scale in scales {
-        tracker.start_subtest(&format!("Scale: {} memories", scale));
+        tracker.start_subtest(format!("Scale: {scale} memories"));
 
         let memory = create_test_memory().await?;
         let start = Instant::now();
@@ -414,7 +412,7 @@ async fn test_scale_performance(tracker: &mut TestTracker, _config: &TestConfig)
 
         for i in 0..scale {
             if memory
-                .add(&format!("Scale test memory {}", i))
+                .add(&format!("Scale test memory {i}"))
                 .await
                 .is_ok()
             {

@@ -19,7 +19,7 @@ async fn create_test_memory() -> Memory {
 /// 测试类型转换方法
 #[cfg(test)]
 mod type_conversion_tests {
-    use super::*;
+    
 
     #[test]
     fn test_structured_fact_to_memory_item() {
@@ -53,7 +53,7 @@ mod intelligent_add_tests {
         // 测试基本的智能添加功能
         let mem = create_test_memory().await;
 
-        let messages = vec![Message {
+        let messages = [Message {
             role: MessageRole::User,
             content: "我喜欢吃披萨，尤其是意大利香肠披萨".to_string(),
             timestamp: None,
@@ -71,7 +71,7 @@ mod intelligent_add_tests {
         // 测试包含实体提取的智能添加
         let mem = create_test_memory().await;
 
-        let messages = vec![Message {
+        let messages = [Message {
             role: MessageRole::User,
             content: "我在北京工作，公司是字节跳动".to_string(),
             timestamp: None,
@@ -86,14 +86,14 @@ mod intelligent_add_tests {
         let mem = create_test_memory().await;
 
         // 第一次添加
-        let messages1 = vec![Message {
+        let messages1 = [Message {
             role: MessageRole::User,
             content: "我的生日是 1990 年 1 月 1 日".to_string(),
             timestamp: None,
         }];
 
         // 第二次添加（冲突）
-        let messages2 = vec![Message {
+        let messages2 = [Message {
             role: MessageRole::User,
             content: "我的生日是 1991 年 2 月 2 日".to_string(),
             timestamp: None,
@@ -127,7 +127,7 @@ mod intelligent_add_tests {
 /// 测试混合搜索流水线
 #[cfg(test)]
 mod hybrid_search_tests {
-    use super::*;
+    
 
     #[tokio::test]
     #[cfg(feature = "postgres")]
@@ -172,7 +172,7 @@ mod hybrid_search_tests {
 /// 测试智能决策
 #[cfg(test)]
 mod intelligent_decision_tests {
-    use super::*;
+    
 
     #[tokio::test]
     async fn test_decision_add() {
@@ -210,7 +210,7 @@ mod integration_tests {
         let mem = create_test_memory().await;
 
         // 1. 智能添加
-        let messages = vec![Message {
+        let messages = [Message {
             role: MessageRole::User,
             content: "我在北京工作，公司是字节跳动，职位是软件工程师".to_string(),
             timestamp: None,
@@ -242,8 +242,8 @@ mod integration_tests {
                 println!("   添加了 {} 条记忆", add_result.results.len());
             }
             Err(e) => {
-                println!("❌ 向后兼容性测试失败: {:?}", e);
-                panic!("旧的 add() 方法应该仍然可用，但返回错误: {:?}", e);
+                println!("❌ 向后兼容性测试失败: {e:?}");
+                panic!("旧的 add() 方法应该仍然可用，但返回错误: {e:?}");
             }
         }
     }
@@ -271,8 +271,8 @@ mod integration_tests {
                 assert_eq!(add_result.results[0].event, "ADD");
             }
             Err(e) => {
-                println!("❌ infer=false 测试失败: {:?}", e);
-                panic!("infer=false 应该使用简单模式，但返回错误: {:?}", e);
+                println!("❌ infer=false 测试失败: {e:?}");
+                panic!("infer=false 应该使用简单模式，但返回错误: {e:?}");
             }
         }
     }
@@ -297,12 +297,11 @@ mod integration_tests {
                     add_result.results.len()
                 );
                 // 智能模式可能会提取多个事实，所以结果数量可能 >= 1
-                assert!(add_result.results.len() >= 1);
+                assert!(!add_result.results.is_empty());
             }
             Err(e) => {
                 println!(
-                    "⚠️ infer=true 测试失败（可能是因为 Intelligence 组件未初始化）: {:?}",
-                    e
+                    "⚠️ infer=true 测试失败（可能是因为 Intelligence 组件未初始化）: {e:?}"
                 );
                 // 如果 Intelligence 组件未初始化，应该降级到简单模式
                 // 这不是错误，只是一个警告
@@ -325,11 +324,11 @@ mod performance_tests {
 
         let start = Instant::now();
         for i in 0..100 {
-            let _ = mem.add(&format!("测试记忆 {}", i)).await;
+            let _ = mem.add(&format!("测试记忆 {i}")).await;
         }
         let duration = start.elapsed();
 
-        println!("✅ 添加 100 条记忆耗时: {:?}", duration);
+        println!("✅ 添加 100 条记忆耗时: {duration:?}");
         println!("   平均每条: {:?}", duration / 100);
     }
 
@@ -373,14 +372,14 @@ mod performance_tests {
         let start = Instant::now();
         for i in 0..50 {
             let _ = mem
-                .add_with_options(&format!("简单模式测试记忆 {}", i), simple_options.clone())
+                .add_with_options(&format!("简单模式测试记忆 {i}"), simple_options.clone())
                 .await;
         }
         let simple_add_duration = start.elapsed();
         let simple_add_avg = simple_add_duration / 50;
 
-        println!("   总耗时: {:?}", simple_add_duration);
-        println!("   平均每条: {:?}", simple_add_avg);
+        println!("   总耗时: {simple_add_duration:?}");
+        println!("   平均每条: {simple_add_avg:?}");
         println!(
             "   吞吐量: {:.2} 条/秒\n",
             50.0 / simple_add_duration.as_secs_f64()
@@ -397,7 +396,7 @@ mod performance_tests {
         for i in 0..50 {
             let _ = mem
                 .add_with_options(
-                    &format!("智能模式测试记忆 {}", i),
+                    &format!("智能模式测试记忆 {i}"),
                     intelligent_options.clone(),
                 )
                 .await;
@@ -405,8 +404,8 @@ mod performance_tests {
         let intelligent_add_duration = start.elapsed();
         let intelligent_add_avg = intelligent_add_duration / 50;
 
-        println!("   总耗时: {:?}", intelligent_add_duration);
-        println!("   平均每条: {:?}", intelligent_add_avg);
+        println!("   总耗时: {intelligent_add_duration:?}");
+        println!("   平均每条: {intelligent_add_avg:?}");
         println!(
             "   吞吐量: {:.2} 条/秒\n",
             50.0 / intelligent_add_duration.as_secs_f64()
@@ -421,15 +420,15 @@ mod performance_tests {
                 - 100.0;
 
         println!("📈 添加性能对比:");
-        println!("   简单模式: {:?} (基准)", simple_add_avg);
-        println!("   智能模式: {:?}", intelligent_add_avg);
+        println!("   简单模式: {simple_add_avg:?} (基准)");
+        println!("   智能模式: {intelligent_add_avg:?}");
 
         if add_time_diff > 0.0 {
-            println!("   性能差异: +{:.1}% (智能模式更慢)", add_time_diff);
+            println!("   性能差异: +{add_time_diff:.1}% (智能模式更慢)");
             println!("   ⚠️  注意: 智能模式因为包含事实提取、冲突检测等步骤，预期会比简单模式慢");
             println!("   ✅ 但提供了更高质量的记忆管理（去重、冲突解决、重要性评估）");
         } else {
-            println!("   性能差异: {:.1}% (智能模式更快)", add_time_diff);
+            println!("   性能差异: {add_time_diff:.1}% (智能模式更快)");
             println!("   ✅ 智能模式性能优于预期！");
         }
 

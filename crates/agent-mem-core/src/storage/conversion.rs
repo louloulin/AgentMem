@@ -5,7 +5,7 @@
 
 use crate::storage::models::DbMemory;
 use agent_mem_traits::{
-    AgentMemError, AttributeKey, AttributeSet, AttributeValue, Content, MemoryId,
+    AttributeKey, AttributeSet, AttributeValue, Content, MemoryId,
     MemoryV4 as Memory, MetadataV4 as Metadata, RelationGraph, Result,
 };
 use chrono::Utc;

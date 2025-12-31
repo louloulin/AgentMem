@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// 语义层次节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,8 +168,7 @@ impl SemanticHierarchyIndex {
             let nodes = self.nodes.read().await;
             if !nodes.contains_key(parent_id) {
                 return Err(AgentMemError::not_found(format!(
-                    "父节点不存在: {}",
-                    parent_id
+                    "父节点不存在: {parent_id}"
                 )));
             }
         }
@@ -319,7 +318,7 @@ impl SemanticHierarchyIndex {
         let nodes = self.nodes.read().await;
         let start_node = nodes
             .get(start_node_id)
-            .ok_or_else(|| AgentMemError::not_found(format!("节点不存在: {}", start_node_id)))?;
+            .ok_or_else(|| AgentMemError::not_found(format!("节点不存在: {start_node_id}")))?;
 
         let max_depth = max_depth.unwrap_or(self.config.max_depth);
         let mut result = Vec::new();
@@ -514,7 +513,7 @@ mod tests {
             properties: HashMap::new(),
         };
 
-        index.add_node(root).await.unwrap();
+        index.add_node(root).await?;
 
         // 添加子节点
         let child = SemanticNode {
@@ -535,10 +534,10 @@ mod tests {
             properties: HashMap::new(),
         };
 
-        index.add_node(child).await.unwrap();
+        index.add_node(child).await?;
 
         // 测试层次遍历
-        let traversed = index.traverse_hierarchy("root", Some(2)).await.unwrap();
+        let traversed = index.traverse_hierarchy("root", Some(2)).await?;
         assert_eq!(traversed.len(), 1);
         assert_eq!(traversed[0].id, "child1");
 
@@ -551,7 +550,7 @@ mod tests {
             semantic_vector: None,
         };
 
-        let results = index.search_by_meaning(&query, 10).await.unwrap();
+        let results = index.search_by_meaning(&query, 10).await?;
         assert!(!results.is_empty());
     }
 }

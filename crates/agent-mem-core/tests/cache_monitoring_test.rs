@@ -2,7 +2,7 @@
 
 use agent_mem_core::cache::{
     Cache, CacheLevel, CacheMonitor, CacheStats, MonitorConfig, MultiLevelCache,
-    MultiLevelCacheConfig, PerformanceReport,
+    MultiLevelCacheConfig,
 };
 use std::time::Duration;
 use tokio::time::sleep;

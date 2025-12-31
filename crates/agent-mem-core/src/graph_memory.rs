@@ -646,7 +646,7 @@ impl GraphMemoryEngine {
         filters: &HashMap<String, String>,
     ) -> Result<GraphAddResult> {
         use crate::types::MemoryType;
-        use uuid::Uuid;
+        
 
         // 1. 创建Memory对象（复用现有类型）
         let memory = Memory::new(
@@ -708,7 +708,7 @@ impl GraphMemoryEngine {
                     // 应用filters
                     if let Some(user_id) = filters.get("user_id") {
                         let node_user_id = node.memory.user_id();
-                        if node_user_id.as_ref().map(|s| s.as_str()) != Some(user_id.as_str()) {
+                        if node_user_id.as_deref() != Some(user_id.as_str()) {
                             return false;
                         }
                     }
@@ -784,7 +784,7 @@ impl GraphMemoryEngine {
                 // 应用filters
                 if let Some(user_id) = filters.get("user_id") {
                     let node_user_id = node.memory.user_id();
-                    if node_user_id.as_ref().map(|s| s.as_str()) != Some(user_id.as_str()) {
+                    if node_user_id.as_deref() != Some(user_id.as_str()) {
                         should_delete = false;
                     }
                 }
@@ -848,9 +848,9 @@ impl GraphMemoryEngine {
                 (nodes.get(&edge.from_node), nodes.get(&edge.to_node))
             {
                 if let Some(user_id) = filters.get("user_id") {
-                    let from_match = from_node.memory.user_id().as_ref().map(|id| id.as_str())
+                    let from_match = from_node.memory.user_id().as_deref()
                         == Some(user_id.as_str());
-                    let to_match = to_node.memory.user_id().as_ref().map(|id| id.as_str())
+                    let to_match = to_node.memory.user_id().as_deref()
                         == Some(user_id.as_str());
                     if !from_match && !to_match {
                         should_include = false;
@@ -949,8 +949,8 @@ mod tests {
         );
 
         // 添加节点
-        let node1_id = engine.add_node(memory1, NodeType::Entity).await.unwrap();
-        let node2_id = engine.add_node(memory2, NodeType::Concept).await.unwrap();
+        let node1_id = engine.add_node(memory1, NodeType::Entity).await?;
+        let node2_id = engine.add_node(memory2, NodeType::Concept).await?;
 
         // 添加边
         let _edge_id = engine
@@ -959,11 +959,11 @@ mod tests {
             .unwrap();
 
         // 查找相关节点
-        let related = engine.find_related_nodes(&node1_id, 2, None).await.unwrap();
+        let related = engine.find_related_nodes(&node1_id, 2, None).await?;
         assert_eq!(related.len(), 1);
 
         // 获取统计信息
-        let stats = engine.get_graph_stats().await.unwrap();
+        let stats = engine.get_graph_stats().await?;
         assert_eq!(stats.total_nodes, 2);
         assert_eq!(stats.total_edges, 1);
     }
@@ -979,21 +979,21 @@ mod tests {
         filters.insert("agent_id".to_string(), "test_agent".to_string());
         filters.insert("user_id".to_string(), "user1".to_string());
 
-        let result = engine.add("Apple is a fruit", &filters).await.unwrap();
+        let result = engine.add("Apple is a fruit", &filters).await?;
         assert!(!result.added_entities.is_empty());
 
         // 测试search方法
-        let relations = engine.search("fruit", &filters, 10).await.unwrap();
+        let relations = engine.search("fruit", &filters, 10).await?;
         // 可能为空，因为需要先建立关系
         assert!(relations.len() <= 10);
 
         // 测试get_all方法
-        let all_relations = engine.get_all(&filters, 10).await.unwrap();
+        let all_relations = engine.get_all(&filters, 10).await?;
         assert!(all_relations.len() <= 10);
 
         // 测试delete_all方法
-        engine.delete_all(&filters).await.unwrap();
-        let after_delete = engine.get_all(&filters, 10).await.unwrap();
+        engine.delete_all(&filters).await?;
+        let after_delete = engine.get_all(&filters, 10).await?;
         assert_eq!(after_delete.len(), 0);
     }
 }

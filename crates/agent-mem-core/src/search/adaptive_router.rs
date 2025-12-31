@@ -410,7 +410,7 @@ mod tests {
         };
 
         // 决策
-        let (strategy_id, weights) = router.decide_strategy(&query).await.unwrap();
+        let (strategy_id, weights) = router.decide_strategy(&query).await?;
         assert!(weights.vector_weight + weights.fulltext_weight > 0.0);
 
         // 记录反馈

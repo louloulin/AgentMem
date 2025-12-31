@@ -131,7 +131,7 @@ impl BM25SearchEngine {
 
         // 按分数降序排序
         scored_docs.sort_by(|a, b| {
-            b.2.partial_cmp(&a.2).unwrap_or_else(|| {
+            b.2.partial_cmp(&a.2).unwrap_or({
                 // Fallback: if scores are NaN or incomparable, maintain order
                 std::cmp::Ordering::Equal
             })
@@ -376,7 +376,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = engine.search(&query).await.unwrap();
+        let results = engine.search(&query).await?;
 
         assert!(!results.is_empty());
         assert_eq!(results[0].id, "doc3"); // doc3 应该得分最高
@@ -392,7 +392,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = engine.search(&query).await.unwrap();
+        let results = engine.search(&query).await?;
         assert!(results.is_empty());
     }
 }

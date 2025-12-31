@@ -6,8 +6,7 @@ use agent_mem_traits::{AgentMemError, Embedder, Result};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 /// 嵌入请求
 struct EmbedRequest {
@@ -156,7 +155,7 @@ impl EmbeddingQueue {
                 warn!("批量嵌入生成失败: {}", e);
                 
                 // 发送错误（移动 batch，为每个请求创建新的错误）
-                let error_msg = format!("批量嵌入失败: {}", e);
+                let error_msg = format!("批量嵌入失败: {e}");
                 for req in batch.into_iter() {
                     let _ = req.responder.send(Err(AgentMemError::embedding_error(error_msg.clone())));
                 }

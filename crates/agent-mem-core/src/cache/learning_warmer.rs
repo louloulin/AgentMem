@@ -2,7 +2,7 @@
 //!
 //! 利用学习引擎的统计数据来智能预热缓存，提升冷启动性能
 
-use super::{CacheWarmer, WarmingStats};
+use super::WarmingStats;
 use crate::search::learning::{LearningEngine, QueryPattern};
 use crate::search::QueryFeatures;
 use agent_mem_traits::Result;

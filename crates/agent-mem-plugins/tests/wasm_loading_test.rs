@@ -15,7 +15,7 @@ fn get_wasm_plugin_path(plugin_name: &str) -> PathBuf {
         .unwrap()
         .to_path_buf();
 
-    workspace_root.join(format!("target/wasm32-wasip1/release/{}.wasm", plugin_name))
+    workspace_root.join(format!("target/wasm32-wasip1/release/{plugin_name}.wasm"))
 }
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn test_load_hello_plugin_wasm() {
     let wasm_path = get_wasm_plugin_path("hello_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         eprintln!(
             "   Run: cd examples/hello_plugin && cargo build --target wasm32-wasip1 --release"
         );
@@ -66,12 +66,12 @@ async fn test_load_hello_plugin_wasm() {
             let metadata_result = PluginLoader::call_plugin(&mut plugin.plugin, "metadata", "");
 
             if let Ok(metadata_json) = metadata_result {
-                println!("✅ Plugin metadata: {}", metadata_json);
+                println!("✅ Plugin metadata: {metadata_json}");
                 assert!(metadata_json.contains("hello-plugin"));
             }
         }
         Err(e) => {
-            eprintln!("❌ Failed to load plugin: {}", e);
+            eprintln!("❌ Failed to load plugin: {e}");
             panic!("Plugin loading failed");
         }
     }
@@ -83,7 +83,7 @@ async fn test_execute_hello_plugin() {
     let wasm_path = get_wasm_plugin_path("hello_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -117,14 +117,14 @@ async fn test_execute_hello_plugin() {
 
     match result {
         Ok(output) => {
-            println!("✅ Plugin output: {}", output);
+            println!("✅ Plugin output: {output}");
             assert!(output.contains("Hello"));
 
             let response: serde_json::Value = serde_json::from_str(&output).unwrap();
             assert_eq!(response["greeting"], "Hello, World!");
         }
         Err(e) => {
-            eprintln!("❌ Plugin execution failed: {}", e);
+            eprintln!("❌ Plugin execution failed: {e}");
             panic!("Plugin execution failed");
         }
     }
@@ -136,7 +136,7 @@ async fn test_load_memory_processor_plugin() {
     let wasm_path = get_wasm_plugin_path("memory_processor_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -174,7 +174,7 @@ async fn test_load_code_analyzer_plugin() {
     let wasm_path = get_wasm_plugin_path("code_analyzer_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 

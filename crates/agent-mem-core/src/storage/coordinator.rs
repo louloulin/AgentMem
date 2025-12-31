@@ -268,7 +268,7 @@ impl UnifiedStorageCoordinator {
                 // 检查LibSQL结果
                 let _created_memory = sql_result.map_err(|e| {
                     error!("Failed to create memory in LibSQL: {}", e);
-                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {e}"))
                 })?;
 
                 info!("✅ Memory created in LibSQL: {}", memory.id.0);
@@ -286,8 +286,7 @@ impl UnifiedStorageCoordinator {
                                 stats.failed_ops += 1;
                             }
                             return Err(AgentMemError::StorageError(format!(
-                                "Failed to store to vector queue and rollback failed: {} (rollback error: {})",
-                                e, rollback_err
+                                "Failed to store to vector queue and rollback failed: {e} (rollback error: {rollback_err})"
                             )));
                         }
                         {
@@ -296,8 +295,7 @@ impl UnifiedStorageCoordinator {
                             stats.failed_ops += 1;
                         }
                         return Err(AgentMemError::StorageError(format!(
-                            "Failed to store to vector queue, Repository rolled back: {}",
-                            e
+                            "Failed to store to vector queue, Repository rolled back: {e}"
                         )));
                     } else {
                         info!("✅ Memory queued for vector storage: {}", memory.id.0);
@@ -314,7 +312,7 @@ impl UnifiedStorageCoordinator {
                 // 检查LibSQL结果
                 let _created_memory = sql_result.map_err(|e| {
                     error!("Failed to create memory in LibSQL: {}", e);
-                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                    AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {e}"))
                 })?;
 
                 info!("✅ Memory created in LibSQL: {}", memory.id.0);
@@ -335,8 +333,7 @@ impl UnifiedStorageCoordinator {
                             stats.failed_ops += 1;
                         }
                         return Err(AgentMemError::StorageError(format!(
-                            "Failed to store to VectorStore and rollback failed: {} (rollback error: {})",
-                            e, rollback_err
+                            "Failed to store to VectorStore and rollback failed: {e} (rollback error: {rollback_err})"
                         )));
                     }
                     
@@ -347,8 +344,7 @@ impl UnifiedStorageCoordinator {
                     }
                     
                     return Err(AgentMemError::StorageError(format!(
-                        "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {}",
-                        e
+                        "Failed to store to VectorStore, Repository rolled back to ensure data consistency: {e}"
                     )));
                 } else {
                     info!("✅ Memory added to vector store: {}", memory.id.0);
@@ -410,7 +406,7 @@ impl UnifiedStorageCoordinator {
             // 没有embedding，只存储到LibSQL
             let _created_memory = self.sql_repository.create(memory).await.map_err(|e| {
                 error!("Failed to create memory in LibSQL: {}", e);
-                AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {e}"))
             })?;
             info!("✅ Memory created in LibSQL: {}", memory.id.0);
         }
@@ -483,8 +479,7 @@ impl UnifiedStorageCoordinator {
                 // LibSQL delete failed, but vector store succeeded
                 error!("Failed to delete from LibSQL after vector store deleted: {}", e);
                 Err(AgentMemError::StorageError(format!(
-                    "Memory deleted from vector store but failed to delete from LibSQL: {}",
-                    e
+                    "Memory deleted from vector store but failed to delete from LibSQL: {e}"
                 )))
             }
             (Err(e), Ok(_)) => {
@@ -520,8 +515,7 @@ impl UnifiedStorageCoordinator {
                     stats.failed_ops += 1;
                 }
                 Err(AgentMemError::StorageError(format!(
-                    "Failed to delete memory: {}",
-                    e2
+                    "Failed to delete memory: {e2}"
                 )))
             }
         }
@@ -565,7 +559,7 @@ impl UnifiedStorageCoordinator {
         // Step 3: Query LibSQL (primary source)
         let memory = self.sql_repository.find_by_id(id).await.map_err(|e| {
             error!("Failed to get memory from LibSQL: {}", e);
-            AgentMemError::StorageError(format!("Failed to get memory: {}", e))
+            AgentMemError::StorageError(format!("Failed to get memory: {e}"))
         })?;
 
         // Step 4: Update caches if found
@@ -603,7 +597,7 @@ impl UnifiedStorageCoordinator {
         // Step 1: Update LibSQL
         let updated_memory = self.sql_repository.update(memory).await.map_err(|e| {
             error!("Failed to update memory in LibSQL: {}", e);
-            AgentMemError::StorageError(format!("Failed to update memory: {}", e))
+            AgentMemError::StorageError(format!("Failed to update memory: {e}"))
         })?;
 
         // Step 2: Update VectorStore if embedding provided
@@ -680,7 +674,7 @@ impl UnifiedStorageCoordinator {
 
         // Check Repository
         let in_repository = self.sql_repository.find_by_id(id).await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to check Repository: {}", e)))?
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to check Repository: {e}")))?
             .is_some();
 
         // Check VectorStore (if we can query by ID)
@@ -736,7 +730,7 @@ impl UnifiedStorageCoordinator {
         // Get all memory IDs from Repository (source of truth)
         // Use list with a large limit to get all memories
         let all_memories = self.sql_repository.list(i64::MAX, 0).await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to get all memories from Repository: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to get all memories from Repository: {e}")))?;
 
         let total = all_memories.len();
         let mut consistent = 0;
@@ -855,7 +849,7 @@ impl UnifiedStorageCoordinator {
 
         // Get all memories from Repository (source of truth for IDs)
         let repository_memories = self.sql_repository.list(i64::MAX, 0).await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list Repository memories: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list Repository memories: {e}")))?;
         
         let repository_ids: std::collections::HashSet<String> = repository_memories
             .iter()
@@ -870,8 +864,8 @@ impl UnifiedStorageCoordinator {
 
         // For now, we can only sync memories that we know about from Repository
         // In a real implementation, VectorStore should provide a list method
-        let mut synced_count = 0;
-        let mut error_count = 0;
+        let synced_count = 0;
+        let error_count = 0;
 
         // Check each Repository memory to see if it exists in VectorStore
         // If not, we can't recover it (VectorStore doesn't store full Memory data)
@@ -928,8 +922,7 @@ impl UnifiedStorageCoordinator {
             if let Err(e) = self.vector_store.clear().await {
                 error!("Failed to clear VectorStore: {}", e);
                 return Err(AgentMemError::StorageError(format!(
-                    "Failed to clear VectorStore before rebuild: {}",
-                    e
+                    "Failed to clear VectorStore before rebuild: {e}"
                 )));
             }
             info!("✅ VectorStore cleared");
@@ -1030,7 +1023,7 @@ impl UnifiedStorageCoordinator {
         }
 
         info!("Evicting expired cache entries...");
-        let mut evicted_count = 0;
+        let evicted_count = 0;
 
         // Note: LRU cache doesn't track insertion time or TTL
         // For a production implementation, we'd need to extend LRU cache with TTL support
@@ -1107,7 +1100,7 @@ impl UnifiedStorageCoordinator {
 
         // Get recent memories from Repository
         let memories = self.sql_repository.list(limit as i64, 0).await
-            .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories for warmup: {}", e)))?;
+            .map_err(|e| AgentMemError::StorageError(format!("Failed to list memories for warmup: {e}")))?;
 
         let mut loaded_count = 0;
 
@@ -1196,7 +1189,7 @@ impl UnifiedStorageCoordinator {
             // Add to LibSQL
             let _created = self.sql_repository.create(memory).await.map_err(|e| {
                 error!("Failed to create memory in LibSQL: {}", e);
-                AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {}", e))
+                AgentMemError::StorageError(format!("Failed to create memory in LibSQL: {e}"))
             })?;
 
             created_ids.push(memory.id.0.clone());
@@ -1232,7 +1225,7 @@ impl UnifiedStorageCoordinator {
                 for id in &created_ids {
                     if let Err(rollback_err) = self.sql_repository.delete(id).await {
                         error!("Failed to rollback memory {} after VectorStore failure: {}", id, rollback_err);
-                        rollback_errors.push(format!("{}: {}", id, rollback_err));
+                        rollback_errors.push(format!("{id}: {rollback_err}"));
                     }
                 }
                 
@@ -1244,14 +1237,12 @@ impl UnifiedStorageCoordinator {
                 
                 if !rollback_errors.is_empty() {
                     return Err(AgentMemError::StorageError(format!(
-                        "Failed to store to VectorStore and some rollbacks failed: {} (rollback errors: {:?})",
-                        e, rollback_errors
+                        "Failed to store to VectorStore and some rollbacks failed: {e} (rollback errors: {rollback_errors:?})"
                     )));
                 }
                 
                 return Err(AgentMemError::StorageError(format!(
-                    "Failed to store {} memories to VectorStore, Repository rolled back to ensure data consistency: {}",
-                    vector_batch_len, e
+                    "Failed to store {vector_batch_len} memories to VectorStore, Repository rolled back to ensure data consistency: {e}"
                 )));
             } else {
                 info!("✅ Batch added {} memories to vector store", vector_batch_len);
@@ -1297,7 +1288,7 @@ impl UnifiedStorageCoordinator {
                 }
                 Err(e) => {
                     error!("Failed to delete memory {} from LibSQL: {}", id, e);
-                    errors.push(format!("{}: {}", id, e));
+                    errors.push(format!("{id}: {e}"));
                 }
             }
         }
@@ -1575,7 +1566,7 @@ impl UnifiedStorageCoordinator {
             Err(e) => {
                 components.insert("libsql".to_string(), ComponentHealth {
                     status: "unhealthy".to_string(),
-                    message: Some(format!("LibSQL repository error: {}", e)),
+                    message: Some(format!("LibSQL repository error: {e}")),
                 });
                 overall_healthy = false;
                 false
@@ -1598,7 +1589,7 @@ impl UnifiedStorageCoordinator {
             Err(e) => {
                 components.insert("vector_store".to_string(), ComponentHealth {
                     status: "unhealthy".to_string(),
-                    message: Some(format!("VectorStore error: {}", e)),
+                    message: Some(format!("VectorStore error: {e}")),
                 });
                 overall_healthy = false;
                 false
@@ -1614,8 +1605,7 @@ impl UnifiedStorageCoordinator {
             
             components.insert("l1_cache".to_string(), ComponentHealth {
                 status: "healthy".to_string(),
-                message: Some(format!("L1 cache: {}/{} entries ({:.1}% used)", 
-                    cache_size, cache_capacity, cache_usage)),
+                message: Some(format!("L1 cache: {cache_size}/{cache_capacity} entries ({cache_usage:.1}% used)")),
             });
             true
         } else {
@@ -1903,7 +1893,7 @@ mod tests {
         assert_eq!(result.unwrap(), "test-1");
 
         // Verify in LibSQL
-        let retrieved = sql_repo.find_by_id("test-1").await.unwrap();
+        let retrieved = sql_repo.find_by_id("test-1").await?;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().id.0, "test-1");
 
@@ -1912,7 +1902,7 @@ mod tests {
         assert!(vecs.contains_key("test-1"));
 
         // Verify in cache
-        let cached = coordinator.get_memory("test-1").await.unwrap();
+        let cached = coordinator.get_memory("test-1").await?;
         assert!(cached.is_some());
     }
 
@@ -1935,14 +1925,14 @@ mod tests {
         let embedding = Some(vec![0.1; 1536]);
 
         // Add memory first
-        coordinator.add_memory(&memory, embedding.clone()).await.unwrap();
+        coordinator.add_memory(&memory, embedding.clone()).await?;
 
         // Delete memory
         let result = coordinator.delete_memory("test-2").await;
         assert!(result.is_ok());
 
         // Verify deleted from LibSQL
-        let retrieved = sql_repo.find_by_id("test-2").await.unwrap();
+        let retrieved = sql_repo.find_by_id("test-2").await?;
         assert!(retrieved.is_none());
 
         // Verify deleted from VectorStore
@@ -1950,7 +1940,7 @@ mod tests {
         assert!(!vecs.contains_key("test-2"));
 
         // Verify deleted from cache
-        let cached = coordinator.get_memory("test-2").await.unwrap();
+        let cached = coordinator.get_memory("test-2").await?;
         assert!(cached.is_none());
     }
 
@@ -1973,17 +1963,17 @@ mod tests {
         let embedding = Some(vec![0.1; 1536]);
 
         // Add memory (this already puts it in cache)
-        coordinator.add_memory(&memory, embedding).await.unwrap();
+        coordinator.add_memory(&memory, embedding).await?;
 
         // First get (should hit cache, since add_memory already cached it)
         let stats_before = coordinator.get_stats().await;
-        let _ = coordinator.get_memory("test-3").await.unwrap();
+        let _ = coordinator.get_memory("test-3").await?;
         let stats_after = coordinator.get_stats().await;
         assert_eq!(stats_after.cache_hits, stats_before.cache_hits + 1, "First get after add_memory should be a cache hit");
 
         // Second get (should also hit cache)
         let stats_before = coordinator.get_stats().await;
-        let _ = coordinator.get_memory("test-3").await.unwrap();
+        let _ = coordinator.get_memory("test-3").await?;
         let stats_after = coordinator.get_stats().await;
         assert_eq!(stats_after.cache_hits, stats_before.cache_hits + 1, "Second get should also be a cache hit");
     }
@@ -2007,7 +1997,7 @@ mod tests {
         let embedding = Some(vec![0.1; 1536]);
 
         // Add memory
-        coordinator.add_memory(&memory, embedding.clone()).await.unwrap();
+        coordinator.add_memory(&memory, embedding.clone()).await?;
 
         // Update memory
         let updated_memory = create_test_memory("test-4");
@@ -2016,7 +2006,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify updated in LibSQL
-        let retrieved = sql_repo.find_by_id("test-4").await.unwrap();
+        let retrieved = sql_repo.find_by_id("test-4").await?;
         assert!(retrieved.is_some());
 
         // Verify updated in VectorStore
@@ -2058,7 +2048,7 @@ mod tests {
 
         // Verify in LibSQL
         for (memory, _) in &memories {
-            let retrieved = sql_repo.find_by_id(&memory.id.0).await.unwrap();
+            let retrieved = sql_repo.find_by_id(&memory.id.0).await?;
             assert!(retrieved.is_some());
         }
 
@@ -2070,7 +2060,7 @@ mod tests {
 
         // Verify in cache
         for (memory, _) in &memories {
-            let cached = coordinator.get_memory(&memory.id.0).await.unwrap();
+            let cached = coordinator.get_memory(&memory.id.0).await?;
             assert!(cached.is_some());
         }
     }
@@ -2096,7 +2086,7 @@ mod tests {
             (create_test_memory("batch-del-2"), Some(vec![0.2; 1536])),
             (create_test_memory("batch-del-3"), Some(vec![0.3; 1536])),
         ];
-        coordinator.batch_add_memories(memories).await.unwrap();
+        coordinator.batch_add_memories(memories).await?;
 
         // Batch delete
         let ids = vec![
@@ -2110,7 +2100,7 @@ mod tests {
 
         // Verify deleted from LibSQL
         for id in &ids {
-            let retrieved = sql_repo.find_by_id(id).await.unwrap();
+            let retrieved = sql_repo.find_by_id(id).await?;
             assert!(retrieved.is_none());
         }
 
@@ -2122,7 +2112,7 @@ mod tests {
 
         // Verify deleted from cache
         for id in &ids {
-            let cached = coordinator.get_memory(id).await.unwrap();
+            let cached = coordinator.get_memory(id).await?;
             assert!(cached.is_none());
         }
     }
@@ -2192,32 +2182,32 @@ mod tests {
         let memory2 = create_test_memory("lru-2");
         let memory3 = create_test_memory("lru-3");
 
-        coordinator.add_memory(&memory1, None).await.unwrap();
-        coordinator.add_memory(&memory2, None).await.unwrap();
-        coordinator.add_memory(&memory3, None).await.unwrap();
+        coordinator.add_memory(&memory1, None).await?;
+        coordinator.add_memory(&memory2, None).await?;
+        coordinator.add_memory(&memory3, None).await?;
 
         // After adding 3 memories to a cache of size 2:
         // Cache should contain: [memory3, memory2] (memory1 was evicted)
         
         // Access memory2 to make it recently used
-        let _ = coordinator.get_memory("lru-2").await.unwrap();
+        let _ = coordinator.get_memory("lru-2").await?;
         // Cache now: [memory2, memory3]
 
         // memory1 should be evicted (least recently used, not in cache)
         // When we try to get it, it will be fetched from LibSQL and added to cache
         // This will evict memory3 (least recently used of the two in cache)
-        let cached = coordinator.get_memory("lru-1").await.unwrap();
+        let cached = coordinator.get_memory("lru-1").await?;
         // memory1 is now in cache (fetched from LibSQL), so it should be Some
         assert!(cached.is_some(), "LRU-1 should be fetched from LibSQL and added to cache");
 
         // memory2 should still be in cache (was recently accessed)
-        let cached2 = coordinator.get_memory("lru-2").await.unwrap();
+        let cached2 = coordinator.get_memory("lru-2").await?;
         assert!(cached2.is_some(), "LRU-2 should be in cache");
 
         // memory3 might have been evicted when memory1 was fetched
         // This is expected LRU behavior: when cache is full and we add a new item,
         // the least recently used item is evicted
-        let cached3 = coordinator.get_memory("lru-3").await.unwrap();
+        let cached3 = coordinator.get_memory("lru-3").await?;
         // memory3 might be in cache or might have been evicted, both are valid
         // The important thing is that LRU eviction is working
         assert!(cached3.is_some() || cached3.is_none(), "LRU-3 may or may not be in cache depending on eviction order");
@@ -2239,16 +2229,16 @@ mod tests {
         );
 
         let memory = create_test_memory("hit-rate-test");
-        coordinator.add_memory(&memory, None).await.unwrap();
+        coordinator.add_memory(&memory, None).await?;
 
         // First access: add_memory already puts it in cache, so this is a hit
-        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+        let _ = coordinator.get_memory("hit-rate-test").await?;
         
         // Second access: cache hit
-        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+        let _ = coordinator.get_memory("hit-rate-test").await?;
         
         // Third access: cache hit
-        let _ = coordinator.get_memory("hit-rate-test").await.unwrap();
+        let _ = coordinator.get_memory("hit-rate-test").await?;
 
         let hit_rate = coordinator.get_cache_hit_rate().await;
         // Should be 3 hits / 3 total = 1.0 (since add_memory puts it in cache)
@@ -2281,9 +2271,9 @@ mod tests {
         let memory2 = create_test_memory("batch-get-2");
         let memory3 = create_test_memory("batch-get-3");
 
-        coordinator.add_memory(&memory1, None).await.unwrap();
-        coordinator.add_memory(&memory2, None).await.unwrap();
-        coordinator.add_memory(&memory3, None).await.unwrap();
+        coordinator.add_memory(&memory1, None).await?;
+        coordinator.add_memory(&memory2, None).await?;
+        coordinator.add_memory(&memory3, None).await?;
 
         // Batch get
         let ids = vec![
@@ -2291,7 +2281,7 @@ mod tests {
             "batch-get-2".to_string(),
             "batch-get-3".to_string(),
         ];
-        let results = coordinator.batch_get_memories(&ids).await.unwrap();
+        let results = coordinator.batch_get_memories(&ids).await?;
 
         assert_eq!(results.len(), 3);
         assert!(results.iter().any(|m| m.id.0 == "batch-get-1"));
@@ -2315,11 +2305,11 @@ mod tests {
         );
 
         let memory = create_test_memory("exists-test");
-        coordinator.add_memory(&memory, None).await.unwrap();
+        coordinator.add_memory(&memory, None).await?;
 
         // Check existence
-        assert!(coordinator.memory_exists("exists-test").await.unwrap());
-        assert!(!coordinator.memory_exists("non-existent").await.unwrap());
+        assert!(coordinator.memory_exists("exists-test").await?);
+        assert!(!coordinator.memory_exists("non-existent").await?);
     }
 
     #[tokio::test]
@@ -2338,16 +2328,16 @@ mod tests {
         );
 
         // Initially should be 0
-        let count = coordinator.count_memories().await.unwrap();
+        let count = coordinator.count_memories().await?;
         assert_eq!(count, 0);
 
         // Add memories
-        coordinator.add_memory(&create_test_memory("count-1"), None).await.unwrap();
-        coordinator.add_memory(&create_test_memory("count-2"), None).await.unwrap();
-        coordinator.add_memory(&create_test_memory("count-3"), None).await.unwrap();
+        coordinator.add_memory(&create_test_memory("count-1"), None).await?;
+        coordinator.add_memory(&create_test_memory("count-2"), None).await?;
+        coordinator.add_memory(&create_test_memory("count-3"), None).await?;
 
         // Should be 3
-        let count = coordinator.count_memories().await.unwrap();
+        let count = coordinator.count_memories().await?;
         assert_eq!(count, 3);
     }
 
@@ -2367,7 +2357,7 @@ mod tests {
         );
 
         // Perform health check
-        let health = coordinator.health_check().await.unwrap();
+        let health = coordinator.health_check().await?;
 
         // Verify overall status
         assert_eq!(health.overall_status, "healthy");
@@ -2400,8 +2390,8 @@ mod tests {
 
         // Perform some operations to generate stats
         let memory = create_test_memory("stats-test");
-        coordinator.add_memory(&memory, None).await.unwrap();
-        let _ = coordinator.get_memory("stats-test").await.unwrap();
+        coordinator.add_memory(&memory, None).await?;
+        let _ = coordinator.get_memory("stats-test").await?;
 
         // Check stats are non-zero
         let stats_before = coordinator.get_stats().await;
@@ -2440,17 +2430,17 @@ mod tests {
         let embedding = vec![0.1; 384];
         
         // Add memory (should be consistent)
-        coordinator.add_memory(&memory, Some(embedding.clone())).await.unwrap();
+        coordinator.add_memory(&memory, Some(embedding.clone())).await?;
         
         // Verify consistency (should be true)
-        let is_consistent = coordinator.verify_consistency("consistency-test").await.unwrap();
+        let is_consistent = coordinator.verify_consistency("consistency-test").await?;
         assert!(is_consistent, "Memory should be consistent after adding");
 
         // Delete from VectorStore only (create inconsistency)
-        vector_store.delete_vectors(vec!["consistency-test".to_string()]).await.unwrap();
+        vector_store.delete_vectors(vec!["consistency-test".to_string()]).await?;
         
         // Verify consistency (should be false)
-        let is_consistent = coordinator.verify_consistency("consistency-test").await.unwrap();
+        let is_consistent = coordinator.verify_consistency("consistency-test").await?;
         assert!(!is_consistent, "Memory should be inconsistent after deleting from VectorStore");
     }
 
@@ -2474,11 +2464,11 @@ mod tests {
         let memory2 = create_test_memory("test-2");
         let embedding = vec![0.1; 384];
         
-        coordinator.add_memory(&memory1, Some(embedding.clone())).await.unwrap();
-        coordinator.add_memory(&memory2, Some(embedding.clone())).await.unwrap();
+        coordinator.add_memory(&memory1, Some(embedding.clone())).await?;
+        coordinator.add_memory(&memory2, Some(embedding.clone())).await?;
         
         // Verify all consistency (should all be consistent)
-        let (total, consistent, inconsistent) = coordinator.verify_all_consistency().await.unwrap();
+        let (total, consistent, inconsistent) = coordinator.verify_all_consistency().await?;
         assert_eq!(total, 2);
         assert_eq!(consistent, 2);
         assert_eq!(inconsistent, 0);
@@ -2548,8 +2538,8 @@ mod tests {
         // Add memories to Repository only (not to VectorStore)
         let memory1 = create_test_memory("sync-1");
         let memory2 = create_test_memory("sync-2");
-        sql_repo.create(&memory1).await.unwrap();
-        sql_repo.create(&memory2).await.unwrap();
+        sql_repo.create(&memory1).await?;
+        sql_repo.create(&memory2).await?;
 
         // Sync to VectorStore with embeddings
         let memories_with_embeddings = vec![
@@ -2587,7 +2577,7 @@ mod tests {
 
         // Add memory to both Repository and VectorStore
         let memory1 = create_test_memory("sync-existing-1");
-        coordinator.add_memory(&memory1, Some(vec![0.1; 384])).await.unwrap();
+        coordinator.add_memory(&memory1, Some(vec![0.1; 384])).await?;
 
         // Try to sync again (should skip)
         let memories_with_embeddings = vec![
@@ -2618,7 +2608,7 @@ mod tests {
         );
 
         let memory1 = create_test_memory("sync-no-emb-1");
-        sql_repo.create(&memory1).await.unwrap();
+        sql_repo.create(&memory1).await?;
 
         // Try to sync without embedding (should skip)
         let memories_with_embeddings = vec![
@@ -2651,8 +2641,8 @@ mod tests {
         // Add some memories to Repository
         let memory1 = create_test_memory("rebuild-1");
         let memory2 = create_test_memory("rebuild-2");
-        sql_repo.create(&memory1).await.unwrap();
-        sql_repo.create(&memory2).await.unwrap();
+        sql_repo.create(&memory1).await?;
+        sql_repo.create(&memory2).await?;
 
         // Rebuild index with embeddings
         let memories_with_embeddings = vec![
@@ -2690,11 +2680,11 @@ mod tests {
 
         // Add existing memory to VectorStore
         let memory1 = create_test_memory("rebuild-existing-1");
-        coordinator.add_memory(&memory1, Some(vec![0.1; 384])).await.unwrap();
+        coordinator.add_memory(&memory1, Some(vec![0.1; 384])).await?;
 
         // Add new memory to Repository only
         let memory2 = create_test_memory("rebuild-new-1");
-        sql_repo.create(&memory2).await.unwrap();
+        sql_repo.create(&memory2).await?;
 
         // Rebuild without clearing (should add new memory, keep existing)
         let memories_with_embeddings = vec![
@@ -2731,7 +2721,7 @@ mod tests {
         );
 
         let memory1 = create_test_memory("rebuild-no-emb-1");
-        sql_repo.create(&memory1).await.unwrap();
+        sql_repo.create(&memory1).await?;
 
         // Try to rebuild without embedding (should skip)
         let memories_with_embeddings = vec![
@@ -2764,8 +2754,8 @@ mod tests {
         // Add some memories to Repository
         let memory1 = create_test_memory("warmup-1");
         let memory2 = create_test_memory("warmup-2");
-        sql_repo.create(&memory1).await.unwrap();
-        sql_repo.create(&memory2).await.unwrap();
+        sql_repo.create(&memory1).await?;
+        sql_repo.create(&memory2).await?;
 
         // Warmup cache
         let result = coordinator.warmup_cache(Some(10), None, None).await;
@@ -2774,9 +2764,9 @@ mod tests {
         assert_eq!(loaded_count, 2, "Should load 2 memories into cache");
 
         // Verify memories are in cache
-        let cached1 = coordinator.get_memory("warmup-1").await.unwrap();
+        let cached1 = coordinator.get_memory("warmup-1").await?;
         assert!(cached1.is_some(), "warmup-1 should be in cache");
-        let cached2 = coordinator.get_memory("warmup-2").await.unwrap();
+        let cached2 = coordinator.get_memory("warmup-2").await?;
         assert!(cached2.is_some(), "warmup-2 should be in cache");
     }
 
@@ -2798,7 +2788,7 @@ mod tests {
         // Add memories with different agent_ids
         let memory1 = create_test_memory("warmup-filter-1");
         // Note: create_test_memory may not set agent_id, so we'll test without filter
-        sql_repo.create(&memory1).await.unwrap();
+        sql_repo.create(&memory1).await?;
 
         // Warmup cache without filters (should load all)
         let result = coordinator.warmup_cache(Some(10), None, None).await;
@@ -2872,7 +2862,7 @@ mod tests {
 
         // Add a memory to trigger cache operations
         let memory = create_test_memory("cache-stats-1");
-        coordinator.add_memory(&memory, None).await.unwrap();
+        coordinator.add_memory(&memory, None).await?;
 
         // Get cache stats
         let result = coordinator.get_cache_stats().await;

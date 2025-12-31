@@ -96,7 +96,7 @@ mod tests {
             .with_bm25_searcher(Arc::new(MockBM25Searcher))
             .with_exact_matcher(Arc::new(MockExactMatcher));
         
-        let result = engine.search("P000001", 10).await.unwrap();
+        let result = engine.search("P000001", 10).await?;
         
         // 应该分类为ExactId
         assert_eq!(result.query_type, QueryType::ExactId);
@@ -116,7 +116,7 @@ mod tests {
             .with_vector_searcher(Arc::new(MockVectorSearcher))
             .with_bm25_searcher(Arc::new(MockBM25Searcher));
         
-        let result = engine.search("推荐一款手机", 10).await.unwrap();
+        let result = engine.search("推荐一款手机", 10).await?;
         
         // 应该分类为NaturalLanguage
         assert_eq!(result.query_type, QueryType::NaturalLanguage);
@@ -137,7 +137,7 @@ mod tests {
         let result = engine.search(
             "What is the meaning of life, the universe, and everything?",
             10
-        ).await.unwrap();
+        ).await?;
         
         // 应该分类为Semantic
         assert_eq!(result.query_type, QueryType::Semantic);
@@ -155,11 +155,11 @@ mod tests {
         let engine = EnhancedHybridSearchEngineV2::new(config)
             .with_vector_searcher(Arc::new(MockVectorSearcher));
         
-        let short_query = engine.search("AI", 10).await.unwrap();
+        let short_query = engine.search("AI", 10).await?;
         let long_query = engine.search(
             "What is artificial intelligence and how does it work?",
             10
-        ).await.unwrap();
+        ).await?;
         
         // 短查询应该有更低的阈值
         assert!(short_query.stats.threshold_used < long_query.stats.threshold_used);
@@ -175,9 +175,9 @@ mod tests {
             .with_vector_searcher(Arc::new(MockVectorSearcher));
         
         // 执行几次查询
-        engine.search("test1", 10).await.unwrap();
-        engine.search("test2", 10).await.unwrap();
-        engine.search("test3", 10).await.unwrap();
+        engine.search("test1", 10).await?;
+        engine.search("test2", 10).await?;
+        engine.search("test3", 10).await?;
         
         let metrics = engine.get_metrics().await;
         assert_eq!(metrics.total_queries, 3);
@@ -194,7 +194,7 @@ mod tests {
             .with_vector_searcher(Arc::new(MockVectorSearcher))
             .with_bm25_searcher(Arc::new(MockBM25Searcher));
         
-        let result = engine.search("test query", 10).await.unwrap();
+        let result = engine.search("test query", 10).await?;
         
         // 并行搜索应该比顺序搜索快
         assert!(result.stats.vector_search_time_ms > 0);

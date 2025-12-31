@@ -191,7 +191,7 @@ impl RetrievalModule {
         threshold: Option<f32>,
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<MemoryItem>> {
-        use agent_mem_traits::{Entity, Relation, Session};
+        use agent_mem_traits::Session;
         use chrono::Utc;
 
         info!(
@@ -357,7 +357,7 @@ impl RetrievalModule {
                 };
 
                 // 5. 用户相关性权重 - 如果记忆属于当前用户，得分更高
-                let user_score = if mem.user_id.as_ref().map(|s| s.as_str()) == Some(user_id) {
+                let user_score = if mem.user_id.as_deref() == Some(user_id) {
                     0.1
                 } else {
                     0.0

@@ -1,7 +1,7 @@
 //! Batch optimization integration tests
 
 use agent_mem_core::embeddings_batch::{
-    BatchPerformanceComparison, EmbeddingBatchConfig, EmbeddingBatchProcessor, EmbeddingBatchStats,
+    BatchPerformanceComparison, EmbeddingBatchConfig, EmbeddingBatchProcessor,
 };
 
 #[tokio::test]
@@ -16,7 +16,7 @@ async fn test_embedding_batch_processor_basic() {
     let processor = EmbeddingBatchProcessor::new(config);
 
     // Test with 25 texts
-    let texts: Vec<String> = (0..25).map(|i| format!("Test text number {}", i)).collect();
+    let texts: Vec<String> = (0..25).map(|i| format!("Test text number {i}")).collect();
 
     // Mock embedding function that simulates API call
     let embed_fn = |batch: Vec<String>| async move {
@@ -87,7 +87,7 @@ async fn test_embedding_batch_large_batch() {
     let processor = EmbeddingBatchProcessor::new(config);
 
     // Test with 200 texts
-    let texts: Vec<String> = (0..200).map(|i| format!("Text {}", i)).collect();
+    let texts: Vec<String> = (0..200).map(|i| format!("Text {i}")).collect();
 
     let embed_fn = |batch: Vec<String>| async move {
         let embeddings: Vec<Vec<f32>> = batch.iter().map(|_| vec![0.5, 0.6, 0.7]).collect();
@@ -107,7 +107,7 @@ async fn test_embedding_batch_stats() {
     let config = EmbeddingBatchConfig::default();
     let processor = EmbeddingBatchProcessor::new(config);
 
-    let texts: Vec<String> = (0..30).map(|i| format!("Text {}", i)).collect();
+    let texts: Vec<String> = (0..30).map(|i| format!("Text {i}")).collect();
 
     let embed_fn = |batch: Vec<String>| async move {
         tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
@@ -142,7 +142,7 @@ async fn test_embedding_batch_stats_reset() {
 
     // First batch
     let _ = processor
-        .batch_embed(texts.clone(), |b| embed_fn(b))
+        .batch_embed(texts.clone(), embed_fn)
         .await
         .unwrap();
 
@@ -169,7 +169,7 @@ async fn test_embedding_batch_different_sizes() {
     for size in [1, 5, 10, 15, 20, 50, 100] {
         processor.reset_stats().await;
 
-        let texts: Vec<String> = (0..size).map(|i| format!("Text {}", i)).collect();
+        let texts: Vec<String> = (0..size).map(|i| format!("Text {i}")).collect();
 
         let embed_fn = |batch: Vec<String>| async move { Ok(vec![vec![1.0, 2.0]; batch.len()]) };
 
@@ -226,7 +226,7 @@ async fn test_concurrent_batch_processing() {
         let processor_clone = processor.clone();
         let handle = tokio::spawn(async move {
             let texts: Vec<String> = (0..10)
-                .map(|i| format!("Batch {} Text {}", batch_id, i))
+                .map(|i| format!("Batch {batch_id} Text {i}"))
                 .collect();
 
             let embed_fn = |batch: Vec<String>| async move {

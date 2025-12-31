@@ -78,7 +78,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_system_lifecycle() {
-        let system_manager = create_test_system_manager().await.unwrap();
+        let system_manager = create_test_system_manager().await?;
 
         // 测试系统启动
         assert!(system_manager.start().await.is_ok());
@@ -107,18 +107,18 @@ mod tests {
     #[tokio::test]
     #[ignore] // TODO: 需要实现完整的存储和检索逻辑
     async fn test_unified_memory_operations() {
-        let system_manager = create_test_system_manager().await.unwrap();
-        system_manager.start().await.unwrap();
+        let system_manager = create_test_system_manager().await?;
+        system_manager.start().await?;
 
         // 测试存储不同类型的记忆
         let core_memory = create_test_memory(MemoryType::Core, "这是核心记忆内容");
-        let core_id = system_manager.store_memory(core_memory).await.unwrap();
+        let core_id = system_manager.store_memory(core_memory).await?;
 
         let resource_memory = create_test_memory(MemoryType::Resource, "这是资源记忆内容");
-        let resource_id = system_manager.store_memory(resource_memory).await.unwrap();
+        let resource_id = system_manager.store_memory(resource_memory).await?;
 
         let knowledge_memory = create_test_memory(MemoryType::Knowledge, "这是知识库内容");
-        let _knowledge_id = system_manager.store_memory(knowledge_memory).await.unwrap();
+        let _knowledge_id = system_manager.store_memory(knowledge_memory).await?;
 
         let contextual_memory = create_test_memory(MemoryType::Contextual, "这是上下文记忆内容");
         let _contextual_id = system_manager
@@ -127,11 +127,11 @@ mod tests {
             .unwrap();
 
         // 测试记忆检索
-        let retrieved_core = system_manager.retrieve_memory(core_id).await.unwrap();
+        let retrieved_core = system_manager.retrieve_memory(core_id).await?;
         assert!(retrieved_core.is_some());
         assert_eq!(retrieved_core.unwrap().content, "这是核心记忆内容");
 
-        let retrieved_resource = system_manager.retrieve_memory(resource_id).await.unwrap();
+        let retrieved_resource = system_manager.retrieve_memory(resource_id).await?;
         assert!(retrieved_resource.is_some());
         assert_eq!(retrieved_resource.unwrap().content, "这是资源记忆内容");
 
@@ -143,23 +143,23 @@ mod tests {
         assert!(!search_results.is_empty());
 
         // 测试记忆删除
-        let deleted = system_manager.delete_memory(core_id).await.unwrap();
+        let deleted = system_manager.delete_memory(core_id).await?;
         assert!(deleted);
 
         // 验证删除后无法检索
-        let retrieved_after_delete = system_manager.retrieve_memory(core_id).await.unwrap();
+        let retrieved_after_delete = system_manager.retrieve_memory(core_id).await?;
         assert!(retrieved_after_delete.is_none());
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
     async fn test_health_monitoring() {
-        let system_manager = create_test_system_manager().await.unwrap();
-        system_manager.start().await.unwrap();
+        let system_manager = create_test_system_manager().await?;
+        system_manager.start().await?;
 
         // 执行健康检查
-        let health_results = system_manager.perform_health_check().await.unwrap();
+        let health_results = system_manager.perform_health_check().await?;
 
         // 验证所有组件都有健康检查结果
         assert!(health_results.contains_key("core_memory"));
@@ -175,29 +175,29 @@ mod tests {
             assert_ne!(health.status, HealthStatus::Unknown);
         }
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
     async fn test_system_statistics() {
-        let system_manager = create_test_system_manager().await.unwrap();
-        system_manager.start().await.unwrap();
+        let system_manager = create_test_system_manager().await?;
+        system_manager.start().await?;
 
         // 存储一些测试数据
         for i in 0..5 {
             let memory = create_test_memory(MemoryType::Core, &format!("测试记忆 {i}"));
-            system_manager.store_memory(memory).await.unwrap();
+            system_manager.store_memory(memory).await?;
         }
 
         // 获取系统统计信息
-        let stats = system_manager.get_system_statistics().await.unwrap();
+        let stats = system_manager.get_system_statistics().await?;
 
         // 验证统计信息包含必要的字段
         assert!(stats.contains_key("system_status"));
         assert!(stats.contains_key("component_health"));
         assert!(stats.contains_key("core_memory_stats"));
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
@@ -249,8 +249,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_api_interface() {
-        let system_manager = Arc::new(create_test_system_manager().await.unwrap());
-        system_manager.start().await.unwrap();
+        let system_manager = Arc::new(create_test_system_manager().await?);
+        system_manager.start().await?;
 
         let api_interface = UnifiedApiInterface::new(Arc::clone(&system_manager));
 
@@ -320,13 +320,13 @@ mod tests {
         assert_eq!(status_response.status, ApiStatus::Success);
         assert!(status_response.data.is_some());
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
     async fn test_batch_operations() {
-        let system_manager = Arc::new(create_test_system_manager().await.unwrap());
-        system_manager.start().await.unwrap();
+        let system_manager = Arc::new(create_test_system_manager().await?);
+        system_manager.start().await?;
 
         let api_interface = UnifiedApiInterface::new(Arc::clone(&system_manager));
 
@@ -355,13 +355,13 @@ mod tests {
         assert_eq!(batch_response.success_count, 3);
         assert_eq!(batch_response.error_count, 0);
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
     async fn test_concurrent_operations() {
-        let system_manager = Arc::new(create_test_system_manager().await.unwrap());
-        system_manager.start().await.unwrap();
+        let system_manager = Arc::new(create_test_system_manager().await?);
+        system_manager.start().await?;
 
         // 并发存储记忆
         let mut handles = Vec::new();
@@ -377,7 +377,7 @@ mod tests {
         // 等待所有操作完成
         let mut results = Vec::new();
         for handle in handles {
-            let result = handle.await.unwrap();
+            let result = handle.await?;
             results.push(result);
         }
 
@@ -387,12 +387,12 @@ mod tests {
             assert!(result.is_ok());
         }
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 
     #[tokio::test]
     async fn test_error_handling() {
-        let system_manager = create_test_system_manager().await.unwrap();
+        let system_manager = create_test_system_manager().await?;
         // 不启动系统，测试错误处理
 
         // 测试在系统未运行时的操作
@@ -401,12 +401,12 @@ mod tests {
         assert!(result.is_err());
 
         // 测试检索不存在的记忆
-        system_manager.start().await.unwrap();
+        system_manager.start().await?;
         let non_existent_id = Uuid::new_v4();
         let result = system_manager.retrieve_memory(non_existent_id).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
 
-        system_manager.stop().await.unwrap();
+        system_manager.stop().await?;
     }
 }

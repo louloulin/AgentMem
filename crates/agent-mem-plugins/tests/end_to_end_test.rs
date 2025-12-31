@@ -16,7 +16,7 @@ fn get_wasm_plugin_path(plugin_name: &str) -> PathBuf {
         .unwrap()
         .to_path_buf();
 
-    workspace_root.join(format!("target/wasm32-wasip1/release/{}.wasm", plugin_name))
+    workspace_root.join(format!("target/wasm32-wasip1/release/{plugin_name}.wasm"))
 }
 
 /// Create a test memory object
@@ -39,7 +39,7 @@ fn create_test_memory(id: &str, content: &str, memory_type: &str, user_id: &str)
 async fn test_e2e_hello_plugin_workflow() {
     let wasm_path = get_wasm_plugin_path("hello_plugin");
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -77,7 +77,7 @@ async fn test_e2e_hello_plugin_workflow() {
 
     assert!(result.is_ok());
     let output = result.unwrap();
-    println!("  ✅ Plugin executed: {}", output);
+    println!("  ✅ Plugin executed: {output}");
 
     let response: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(response["greeting"], "Hello, World!");
@@ -94,7 +94,7 @@ async fn test_e2e_hello_plugin_workflow() {
 async fn test_e2e_memory_processor_workflow() {
     let wasm_path = get_wasm_plugin_path("memory_processor_plugin");
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -182,7 +182,7 @@ async fn test_e2e_memory_processor_workflow() {
 async fn test_e2e_code_analyzer_workflow() {
     let wasm_path = get_wasm_plugin_path("code_analyzer_plugin");
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -299,7 +299,7 @@ async fn test_e2e_multiple_plugins_concurrent() {
     for (id, name) in &plugins {
         let wasm_path = get_wasm_plugin_path(name);
         if !wasm_path.exists() {
-            eprintln!("⚠️  Skipping {}: WASM file not found", id);
+            eprintln!("⚠️  Skipping {id}: WASM file not found");
             continue;
         }
 
@@ -315,7 +315,7 @@ async fn test_e2e_multiple_plugins_concurrent() {
             metadata: PluginMetadata {
                 name: id.to_string(),
                 version: "0.1.0".to_string(),
-                description: format!("{} plugin", id),
+                description: format!("{id} plugin"),
                 author: "Test".to_string(),
                 plugin_type,
                 required_capabilities: vec![Capability::LoggingAccess],
@@ -329,7 +329,7 @@ async fn test_e2e_multiple_plugins_concurrent() {
         };
 
         manager.register(plugin).await.unwrap();
-        println!("  ✅ Registered plugin: {}", id);
+        println!("  ✅ Registered plugin: {id}");
     }
 
     // Call plugins concurrently

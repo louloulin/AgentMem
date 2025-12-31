@@ -256,7 +256,7 @@ mod tests {
             "user-1".to_string(),
             "Hello".to_string(),
         );
-        manager.send_message(message).await.unwrap();
+        manager.send_message(message).await?;
 
         // Wait for message to be processed
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(received.unwrap(), "Hello");
 
         // Stop agent
-        manager.stop_agent("agent-1").await.unwrap();
+        manager.stop_agent("agent-1").await?;
     }
 
     #[tokio::test]
@@ -297,7 +297,7 @@ mod tests {
             "user-1".to_string(),
             "Hello".to_string(),
         );
-        manager.send_message(message).await.unwrap();
+        manager.send_message(message).await?;
 
         // Wait for processing
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
@@ -307,6 +307,6 @@ mod tests {
         assert_eq!(state, Some(AgentState::Idle));
 
         // Stop agent
-        manager.stop_agent("agent-1").await.unwrap();
+        manager.stop_agent("agent-1").await?;
     }
 }

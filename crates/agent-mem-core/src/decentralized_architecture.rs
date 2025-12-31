@@ -10,7 +10,7 @@
 use agent_mem_traits::{Result, AgentMemError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -333,7 +333,7 @@ impl DecentralizedManager {
         if let Some(value) = resolved_value {
             // 更新冲突记录
             let mut conflicts = self.conflicts.write().await;
-            if let Some(mut conflict_record) = conflicts.get_mut(&conflict.conflict_id) {
+            if let Some(conflict_record) = conflicts.get_mut(&conflict.conflict_id) {
                 conflict_record.resolved_value = Some(value.clone());
                 conflict_record.resolved_time = Some(Utc::now());
             }
@@ -485,7 +485,7 @@ mod tests {
             capabilities: vec!["memory".to_string(), "search".to_string()],
         };
 
-        manager.register_node(node).await.unwrap();
+        manager.register_node(node).await?;
 
         // 测试同步
         let operation = SyncOperation {
@@ -498,7 +498,7 @@ mod tests {
             node_id: manager.config.node_id.clone(),
         };
 
-        manager.sync_to_nodes(operation).await.unwrap();
+        manager.sync_to_nodes(operation).await?;
     }
 
     #[tokio::test]
@@ -517,7 +517,7 @@ mod tests {
         };
 
         // 应该成功，即使没有其他节点
-        manager.sync_to_nodes(operation).await.unwrap();
+        manager.sync_to_nodes(operation).await?;
     }
 
     #[tokio::test]
@@ -593,7 +593,7 @@ mod tests {
             resolved_time: None,
         };
 
-        let resolved = manager.resolve_conflict(conflict).await.unwrap();
+        let resolved = manager.resolve_conflict(conflict).await?;
         assert_eq!(resolved, b"value2");
     }
 }

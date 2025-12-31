@@ -452,8 +452,8 @@ impl ConflictResolver {
         let prompt = format!(
             r#"请分析以下两段记忆内容是否存在语义冲突，并评估冲突严重程度（0.0-1.0）：
 
-记忆1: {}
-记忆2: {}
+记忆1: {content1_str}
+记忆2: {content2_str}
 
 请返回JSON格式：
 {{
@@ -462,8 +462,7 @@ impl ConflictResolver {
   "explanation": "冲突分析说明"
 }}
 
-只返回JSON，不要其他解释："#,
-            content1_str, content2_str
+只返回JSON，不要其他解释："#
         );
 
         // P0 优化: 添加超时控制

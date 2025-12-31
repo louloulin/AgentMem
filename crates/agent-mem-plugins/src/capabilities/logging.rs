@@ -14,11 +14,11 @@ impl LoggingCapability {
     pub fn log(&self, level: &str, message: &str) -> Result<()> {
         // Use standard logging
         match level {
-            "error" => eprintln!("[PLUGIN ERROR] {}", message),
-            "warn" => eprintln!("[PLUGIN WARN] {}", message),
-            "info" => println!("[PLUGIN INFO] {}", message),
-            "debug" => println!("[PLUGIN DEBUG] {}", message),
-            _ => println!("[PLUGIN] {}", message),
+            "error" => eprintln!("[PLUGIN ERROR] {message}"),
+            "warn" => eprintln!("[PLUGIN WARN] {message}"),
+            "info" => println!("[PLUGIN INFO] {message}"),
+            "debug" => println!("[PLUGIN DEBUG] {message}"),
+            _ => println!("[PLUGIN] {message}"),
         }
         Ok(())
     }

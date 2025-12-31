@@ -361,7 +361,7 @@ impl AgentOrchestrator {
 
             // 格式化对话对
             let conversation_pair =
-                format!("User: {}\nAssistant: {}", user_message, assistant_response);
+                format!("User: {user_message}\nAssistant: {assistant_response}");
 
             // 创建工作记忆项
             let item = WorkingMemoryItem {
@@ -413,7 +413,7 @@ impl AgentOrchestrator {
         request: ChatRequest,
     ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send + 'static>>> {
         use futures::stream;
-        use futures::stream::{Stream, StreamExt};
+        use futures::stream::StreamExt;
 
         info!(
             "🌊 Starting REAL streaming conversation for agent_id={}, user_id={}",
@@ -1038,7 +1038,7 @@ impl AgentOrchestrator {
             "You are a helpful assistant.".to_string()
         } else {
             // 有记忆时：约600-800字符
-            format!("Context:\n{}\n\nUse context when relevant.", memory_text)
+            format!("Context:\n{memory_text}\n\nUse context when relevant.")
         };
 
         // 构建消息列表

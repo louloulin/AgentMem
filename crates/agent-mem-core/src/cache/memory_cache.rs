@@ -311,7 +311,7 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        let value = cache.get(&"key1".to_string()).await.unwrap();
+        let value = cache.get(&"key1".to_string()).await?;
 
         assert_eq!(value, Some(b"value1".to_vec()));
     }
@@ -320,7 +320,7 @@ mod tests {
     async fn test_memory_cache_miss() {
         let cache = MemoryCache::new(MemoryCacheConfig::default());
 
-        let value = cache.get(&"nonexistent".to_string()).await.unwrap();
+        let value = cache.get(&"nonexistent".to_string()).await?;
         assert_eq!(value, None);
     }
 
@@ -332,10 +332,10 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        let removed = cache.delete(&"key1".to_string()).await.unwrap();
+        let removed = cache.delete(&"key1".to_string()).await?;
         assert!(removed);
 
-        let value = cache.get(&"key1".to_string()).await.unwrap();
+        let value = cache.get(&"key1".to_string()).await?;
         assert_eq!(value, None);
     }
 
@@ -347,10 +347,10 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        cache.get(&"key1".to_string()).await.unwrap(); // hit
-        cache.get(&"key2".to_string()).await.unwrap(); // miss
+        cache.get(&"key1".to_string()).await?; // hit
+        cache.get(&"key2".to_string()).await?; // miss
 
-        let stats = cache.stats().await.unwrap();
+        let stats = cache.stats().await?;
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.total_sets, 1);

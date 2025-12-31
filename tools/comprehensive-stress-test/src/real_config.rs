@@ -5,7 +5,7 @@
 use agent_mem::Memory;
 use agent_mem_embeddings::{config::EmbeddingConfig, providers::LocalEmbedder};
 use agent_mem_storage::backends::lancedb_store::LanceDBStore;
-use agent_mem_traits::{Embedder, Result, VectorStore};
+use agent_mem_traits::{Result, VectorStore};
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -54,9 +54,8 @@ impl RealStressTestEnv {
         let vector_store = LanceDBStore::new(&config.lancedb_path, "stress_test_embeddings")
             .await
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "Failed to initialize LanceDB: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "Failed to initialize LanceDB: {e}"
                 ))
             })?;
 
@@ -83,9 +82,8 @@ impl RealStressTestEnv {
         // 3. 初始化 AgentMem SDK (使用 LibSQL)
         info!("🎯 初始化 AgentMem SDK (LibSQL)...");
         let memory = Memory::new().await.map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!(
-                "Failed to initialize AgentMem: {}",
-                e
+            agent_mem_traits::AgentMemError::storage_error(format!(
+                "Failed to initialize AgentMem: {e}"
             ))
         })?;
 

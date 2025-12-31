@@ -127,7 +127,7 @@ impl MetadataFilterSystem {
             if let Some(and_array) = and_value.as_array() {
                 let conditions: Result<Vec<MetadataFilter>, String> = and_array
                     .iter()
-                    .map(|v| Self::parse_filter_condition(v))
+                    .map(Self::parse_filter_condition)
                     .collect();
                 return Ok(LogicalOperator::And(conditions?));
             }
@@ -137,7 +137,7 @@ impl MetadataFilterSystem {
             if let Some(or_array) = or_value.as_array() {
                 let conditions: Result<Vec<MetadataFilter>, String> = or_array
                     .iter()
-                    .map(|v| Self::parse_filter_condition(v))
+                    .map(Self::parse_filter_condition)
                     .collect();
                 return Ok(LogicalOperator::Or(conditions?));
             }
@@ -191,7 +191,7 @@ impl MetadataFilterSystem {
         // 如果值是对象，包含操作符
         if let Some(obj) = value.as_object() {
             // 查找操作符
-            for (op_str, val) in obj {
+            if let Some((op_str, val)) = obj.into_iter().next() {
                 let operator = match op_str.as_str() {
                     "eq" => FilterOperator::Eq,
                     "ne" => FilterOperator::Ne,
@@ -203,7 +203,7 @@ impl MetadataFilterSystem {
                     "nin" => FilterOperator::Nin,
                     "contains" => FilterOperator::Contains,
                     "icontains" => FilterOperator::IContains,
-                    _ => return Err(format!("Unknown operator: {}", op_str)),
+                    _ => return Err(format!("Unknown operator: {op_str}")),
                 };
 
                 let filter_value = Self::parse_filter_value(val)?;
@@ -240,7 +240,7 @@ impl MetadataFilterSystem {
             serde_json::Value::Bool(b) => Ok(FilterValue::Boolean(*b)),
             serde_json::Value::Array(arr) => {
                 let list: Result<Vec<FilterValue>, String> =
-                    arr.iter().map(|v| Self::parse_filter_value(v)).collect();
+                    arr.iter().map(Self::parse_filter_value).collect();
                 Ok(FilterValue::List(list?))
             }
             serde_json::Value::Null => Ok(FilterValue::Null),
@@ -356,16 +356,12 @@ impl MetadataFilterSystem {
             serde_json::Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     Some(FilterValue::Integer(i))
-                } else if let Some(f) = n.as_f64() {
-                    Some(FilterValue::Number(f))
-                } else {
-                    None
-                }
+                } else { n.as_f64().map(FilterValue::Number) }
             }
             serde_json::Value::Bool(b) => Some(FilterValue::Boolean(*b)),
             serde_json::Value::Array(arr) => {
                 let list: Result<Vec<FilterValue>, String> =
-                    arr.iter().map(|v| Self::parse_filter_value(v)).collect();
+                    arr.iter().map(Self::parse_filter_value).collect();
                 list.ok().map(FilterValue::List)
             }
             serde_json::Value::Null => Some(FilterValue::Null),
@@ -473,7 +469,7 @@ impl MetadataFilterSystem {
             LogicalOperator::Not(condition) => {
                 let clause =
                     Self::build_condition_clause(condition, params, param_offset + params.len())?;
-                Ok(format!("NOT ({})", clause))
+                Ok(format!("NOT ({clause})"))
             }
             LogicalOperator::Single(condition) => {
                 Self::build_condition_clause(condition, params, param_offset)
@@ -524,7 +520,7 @@ impl MetadataFilterSystem {
                     .collect();
                 return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
             }
-            FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
+            FilterValue::Null => return Ok(format!("{field_path} IS NULL")),
         };
 
         params.push(value);
@@ -532,9 +528,9 @@ impl MetadataFilterSystem {
         match filter.operator {
             FilterOperator::Contains | FilterOperator::IContains => {
                 // 对于LIKE/ILIKE，需要添加通配符
-                Ok(format!("{} {} {}", field_path, sql_op, param_placeholder))
+                Ok(format!("{field_path} {sql_op} {param_placeholder}"))
             }
-            _ => Ok(format!("{} {} {}", field_path, sql_op, param_placeholder)),
+            _ => Ok(format!("{field_path} {sql_op} {param_placeholder}")),
         }
     }
 
@@ -571,7 +567,7 @@ impl MetadataFilterSystem {
             }
             LogicalOperator::Not(condition) => {
                 let clause = Self::build_libsql_condition_clause(condition, params)?;
-                Ok(format!("NOT ({})", clause))
+                Ok(format!("NOT ({clause})"))
             }
             LogicalOperator::Single(condition) => {
                 Self::build_libsql_condition_clause(condition, params)
@@ -605,7 +601,7 @@ impl MetadataFilterSystem {
                 match filter.operator {
                     FilterOperator::Contains | FilterOperator::IContains => {
                         // 添加通配符
-                        return Ok(format!("{} {} ?", field_path, sql_op));
+                        return Ok(format!("{field_path} {sql_op} ?"));
                     }
                     _ => serde_json::Value::String(s.clone()),
                 }
@@ -629,11 +625,11 @@ impl MetadataFilterSystem {
                     .collect();
                 return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
             }
-            FilterValue::Null => return Ok(format!("{} IS NULL", field_path)),
+            FilterValue::Null => return Ok(format!("{field_path} IS NULL")),
         };
 
         params.push(value);
-        Ok(format!("{} {} ?", field_path, sql_op))
+        Ok(format!("{field_path} {sql_op} ?"))
     }
 }
 

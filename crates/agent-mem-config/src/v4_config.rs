@@ -9,6 +9,7 @@ use std::path::Path;
 
 /// Master configuration for AgentMem V4.0
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AgentMemConfig {
     /// Search configuration
     pub search: SearchConfig,
@@ -32,19 +33,6 @@ pub struct AgentMemConfig {
     pub storage: StorageConfig,
 }
 
-impl Default for AgentMemConfig {
-    fn default() -> Self {
-        Self {
-            search: SearchConfig::default(),
-            importance: ImportanceConfig::default(),
-            intelligence: IntelligenceConfig::default(),
-            memory_integration: MemoryIntegrationConfig::default(),
-            adaptive_threshold: AdaptiveThresholdConfig::default(),
-            performance: PerformanceConfig::default(),
-            storage: StorageConfig::default(),
-        }
-    }
-}
 
 impl AgentMemConfig {
     /// Load configuration from TOML file

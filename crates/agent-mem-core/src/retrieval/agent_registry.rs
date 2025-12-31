@@ -234,7 +234,7 @@ mod tests {
         let agent_arc = Arc::new(RwLock::new(agent));
 
         // 注册 agent
-        // registry.register_core_agent(agent_arc).await.unwrap();
+        // registry.register_core_agent(agent_arc).await?;
 
         // 验证注册
         // assert!(registry.has_agent(&MemoryType::Core).await);

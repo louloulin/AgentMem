@@ -59,13 +59,13 @@ fn row_to_item(row: &Row) -> Result<WorkingMemoryItem> {
     // expires_at is INTEGER (timestamp)
     let expires_at_ts: Option<i64> = row.get(15).ok();
     let expires_at =
-        expires_at_ts.map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(|| Utc::now()));
+        expires_at_ts.map(|ts| DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now));
 
     // created_at is INTEGER (timestamp)
     let created_at_ts: i64 = row
         .get(17)
         .map_err(|e| AgentMemError::storage_error(format!("Failed to get created_at: {e}")))?;
-    let created_at = DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(|| Utc::now());
+    let created_at = DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(Utc::now);
 
     // session_id (new column, index 22)
     let session_id: String = row

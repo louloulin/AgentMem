@@ -6,7 +6,6 @@ use super::adaptive_search_engine::SearchEngineBackend;
 use super::{SearchQuery, SearchResult};
 use crate::config::AgentMemConfig;
 use crate::performance::cache::{CacheKey, QueryCache, QueryCacheConfig};
-use agent_mem_traits::AgentMemError;
 use anyhow::Result;
 use std::sync::Arc;
 use std::time::Instant;
@@ -190,7 +189,7 @@ impl<S: SearchEngineBackend> CachedAdaptiveEngine<S> {
         self.cache
             .clear()
             .await
-            .map_err(|e| anyhow::anyhow!("Cache clear error: {}", e))
+            .map_err(|e| anyhow::anyhow!("Cache clear error: {e}"))
     }
 
     /// 预热缓存（批量加载热点查询）
@@ -374,7 +373,7 @@ where
         let results = self
             .search(query_vector, search_query)
             .await
-            .map_err(|e| agent_mem_traits::AgentMemError::Other(e))?;
+            .map_err(agent_mem_traits::AgentMemError::Other)?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
         let v4_results = results

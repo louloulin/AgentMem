@@ -77,7 +77,7 @@ async fn test_chat_basic_functionality() -> Result<()> {
     if result.is_ok() {
         let response = result.unwrap();
         assert!(!response.is_empty());
-        println!("Chat response: {}", response);
+        println!("Chat response: {response}");
     } else {
         println!(
             "Skipping chat test - Ollama not available: {:?}",
@@ -227,7 +227,7 @@ async fn test_chat_with_memory_context() -> Result<()> {
     if result.is_ok() {
         let response = result.unwrap();
         assert!(!response.is_empty());
-        println!("Context-aware response: {}", response);
+        println!("Context-aware response: {response}");
 
         // 理想情况下，响应应该包含一些背景信息
         // 但这取决于 LLM 的质量，所以我们只检查响应不为空
@@ -246,7 +246,7 @@ async fn test_chat_multiple_rounds() -> Result<()> {
     let user = client.create_user("test_multi_user".to_string()).await?;
 
     // 进行多轮对话
-    let messages = vec!["My name is Alice", "I am learning Rust", "What is my name?"];
+    let messages = ["My name is Alice", "I am learning Rust", "What is my name?"];
 
     for (i, msg) in messages.iter().enumerate() {
         let result = client

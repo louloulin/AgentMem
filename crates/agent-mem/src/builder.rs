@@ -3,8 +3,6 @@
 use crate::memory::Memory;
 use crate::orchestrator::{MemoryOrchestrator, OrchestratorConfig};
 use agent_mem_traits::Result;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::info;
 
 /// Memory 构建器
@@ -311,7 +309,7 @@ impl MemoryBuilder {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn enable_reranking(mut self) -> Self {
+    pub fn enable_reranking(self) -> Self {
         // 重排序器在orchestrator初始化时自动创建
         // 这里只是标记启用，实际创建在build()时完成
         self

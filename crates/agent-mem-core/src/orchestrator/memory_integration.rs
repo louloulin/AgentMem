@@ -379,8 +379,7 @@ impl MemoryIntegrator {
         let user_part = user_id.unwrap_or("_global");
         let session_part = session_id.unwrap_or("_session");
         format!(
-            "{}::{}::{}::{}",
-            agent_id, user_part, session_part, normalized_query
+            "{agent_id}::{user_part}::{session_part}::{normalized_query}"
         )
     }
 
@@ -407,8 +406,8 @@ impl MemoryIntegrator {
     pub fn invalidate_cache(&self, agent_id: &str, user_id: Option<&str>) {
         if let Ok(mut cache) = self.cache.write() {
             let prefix = match user_id {
-                Some(uid) => format!("{}::{}::", agent_id, uid),
-                None => format!("{}::", agent_id),
+                Some(uid) => format!("{agent_id}::{uid}::"),
+                None => format!("{agent_id}::"),
             };
 
             let keys: Vec<String> = cache
@@ -476,7 +475,7 @@ impl MemoryIntegrator {
         };
 
         // 调用 MemoryEngine 进行搜索
-        let scope_str = format!("{:?}", scope); // Clone scope info for logging
+        let scope_str = format!("{scope:?}"); // Clone scope info for logging
         let memories = self
             .memory_engine
             .search_memories(query, scope, Some(max_count))
@@ -556,7 +555,7 @@ impl MemoryIntegrator {
         if self.config.enable_active_retrieval {
             if let Some(ref active_retrieval) = self.active_retrieval {
                 info!("🚀 Using ActiveRetrievalSystem for enhanced retrieval");
-                use crate::retrieval::{RetrievalRequest, RetrievalResponse};
+                use crate::retrieval::RetrievalRequest;
                 use std::collections::HashMap;
 
                 let mut context = HashMap::new();
@@ -691,7 +690,7 @@ impl MemoryIntegrator {
                                 _ => "",
                             };
                             let is_exact_product = {
-                                content_str.contains(&format!("商品ID: {}", product_id))
+                                content_str.contains(&format!("商品ID: {product_id}"))
                                     || memory
                                         .attributes
                                         .get(&agent_mem_traits::AttributeKey::core("product_id"))
@@ -780,14 +779,8 @@ impl MemoryIntegrator {
                 Some(max_count * 2),
             );
 
-            let working_query = if let Some(ws) = working_scope {
-                Some(
-                    self.memory_engine
-                        .search_memories(&enhanced_query, Some(ws), Some(max_count / 2)),
-                )
-            } else {
-                None
-            };
+            let working_query = working_scope.map(|ws| self.memory_engine
+                        .search_memories(&enhanced_query, Some(ws), Some(max_count / 2)));
 
             // ✅ 并行执行
             let (episodic_result, working_result) = if let Some(wq) = working_query {
@@ -1200,7 +1193,7 @@ impl MemoryIntegrator {
 
         // 简单策略：只保留最重要的前N条
         let keep_count = self.config.compression_threshold / 2;
-        let mut result: Vec<Memory> = memories.into_iter().take(keep_count).collect();
+        let result: Vec<Memory> = memories.into_iter().take(keep_count).collect();
 
         info!(
             "📦 Compressed: kept {} most important memories",

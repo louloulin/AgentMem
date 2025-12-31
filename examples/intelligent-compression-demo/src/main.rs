@@ -86,7 +86,7 @@ async fn demo_importance_driven_compression(
     println!("  📝 原始记忆数量: {}", memories.len());
     println!("  📊 访问统计:");
     for (id, count) in &context.access_stats {
-        println!("    - {}: {} 次访问", id, count);
+        println!("    - {id}: {count} 次访问");
     }
 
     // 执行重要性驱动压缩
@@ -207,7 +207,7 @@ async fn demo_adaptive_compression(
     ];
 
     for (scenario_name, context) in scenarios {
-        println!("  📊 场景: {}", scenario_name);
+        println!("  📊 场景: {scenario_name}");
 
         let compressed = engine.compress_memories(&memories, &context).await?;
 
@@ -221,7 +221,7 @@ async fn demo_adaptive_compression(
             memories.len(),
             compressed.len()
         );
-        println!("    - 总体压缩比: {:.3}", compression_ratio);
+        println!("    - 总体压缩比: {compression_ratio:.3}");
         println!(
             "    - 平均重要性: {:.3}",
             compressed.iter().map(|m| m.importance_score).sum::<f32>() / compressed.len() as f32
@@ -251,7 +251,7 @@ async fn demo_compression_stats(
 
     println!("  🎯 策略权重:");
     for (strategy, weight) in &stats.strategy_weights {
-        println!("    - {}: {:.3}", strategy, weight);
+        println!("    - {strategy}: {weight:.3}");
     }
 
     Ok(())
@@ -392,7 +392,7 @@ fn create_high_query_context() -> CompressionContext {
     let mut context = CompressionContext::new();
     // 模拟高频查询场景
     for i in 0..15 {
-        context.query_patterns.push(format!("query_{}", i));
+        context.query_patterns.push(format!("query_{i}"));
     }
     context
 }
@@ -401,7 +401,7 @@ fn create_large_memory_context() -> CompressionContext {
     let mut context = CompressionContext::new();
     // 模拟大量记忆场景
     for i in 0..1500 {
-        context.update_access_stats(format!("memory_{}", i), 1);
+        context.update_access_stats(format!("memory_{i}"), 1);
     }
     context
 }
@@ -410,10 +410,10 @@ fn create_balanced_context() -> CompressionContext {
     let mut context = CompressionContext::new();
     // 模拟平衡场景
     for i in 0..5 {
-        context.query_patterns.push(format!("query_{}", i));
+        context.query_patterns.push(format!("query_{i}"));
     }
     for i in 0..100 {
-        context.update_access_stats(format!("memory_{}", i), i % 10 + 1);
+        context.update_access_stats(format!("memory_{i}"), i % 10 + 1);
     }
     context
 }

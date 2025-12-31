@@ -118,10 +118,10 @@ impl Content {
 impl std::fmt::Display for Content {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Content::Text(s) => write!(f, "{}", s),
+            Content::Text(s) => write!(f, "{s}"),
             Content::Structured(v) => {
-                let json_str = serde_json::to_string(v).unwrap_or_else(|_| format!("{:?}", v));
-                write!(f, "{}", json_str)
+                let json_str = serde_json::to_string(v).unwrap_or_else(|_| format!("{v:?}"));
+                write!(f, "{json_str}")
             }
             Content::Vector(v) => write!(f, "[vector:{}dims]", v.len()),
             Content::Multimodal(contents) => {
@@ -1001,7 +1001,7 @@ impl Memory {
     /// 添加metadata到attributes
     pub fn add_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.attributes.insert(
-            AttributeKey::new("metadata", &key.into()),
+            AttributeKey::new("metadata", key.into()),
             AttributeValue::String(value.into()),
         );
     }

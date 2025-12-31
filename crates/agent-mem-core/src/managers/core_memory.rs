@@ -588,7 +588,7 @@ mod tests {
     #[tokio::test]
     async fn test_core_memory_manager_creation() {
         let manager = CoreMemoryManager::new();
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
 
         assert_eq!(stats.persona_blocks_count, 0);
         assert_eq!(stats.human_blocks_count, 0);
@@ -606,7 +606,7 @@ mod tests {
             .await
             .unwrap();
 
-        let retrieved_block = manager.get_persona_block(&block_id).await.unwrap().unwrap();
+        let retrieved_block = manager.get_persona_block(&block_id).await?.unwrap();
         assert_eq!(retrieved_block.content, content);
         assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Persona);
         assert_eq!(retrieved_block.access_count, 1);
@@ -622,7 +622,7 @@ mod tests {
             .await
             .unwrap();
 
-        let retrieved_block = manager.get_human_block(&block_id).await.unwrap().unwrap();
+        let retrieved_block = manager.get_human_block(&block_id).await?.unwrap();
         assert_eq!(retrieved_block.content, content);
         assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Human);
         assert_eq!(retrieved_block.access_count, 1);
@@ -644,7 +644,7 @@ mod tests {
             .await
             .unwrap();
 
-        let updated_block = manager.get_persona_block(&block_id).await.unwrap().unwrap();
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
         assert_eq!(updated_block.content, new_content);
         assert!(updated_block.updated_at > updated_block.created_at);
     }
@@ -665,7 +665,7 @@ mod tests {
             .await
             .unwrap();
 
-        let updated_block = manager.get_persona_block(&block_id).await.unwrap().unwrap();
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
         assert!(updated_block.content.contains(&initial_content));
         assert!(updated_block.content.contains(additional_content));
     }
@@ -682,7 +682,7 @@ mod tests {
             .await
             .unwrap();
 
-        let block = manager.get_persona_block(&block_id).await.unwrap().unwrap();
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
         assert_eq!(block.max_capacity, small_capacity);
         assert!(block.capacity_usage() < 1.0);
 
@@ -714,7 +714,7 @@ mod tests {
             .await
             .unwrap();
 
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert!(stats.auto_rewrites > 0);
     }
 
@@ -723,7 +723,7 @@ mod tests {
         let manager = CoreMemoryManager::new();
 
         let content = "Content to be deleted".to_string();
-        let block_id = manager.create_persona_block(content, None).await.unwrap();
+        let block_id = manager.create_persona_block(content, None).await?;
 
         // 确认块存在
         assert!(manager
@@ -733,7 +733,7 @@ mod tests {
             .is_some());
 
         // 删除块
-        manager.delete_persona_block(&block_id).await.unwrap();
+        manager.delete_persona_block(&block_id).await?;
 
         // 确认块已删除
         assert!(manager
@@ -742,7 +742,7 @@ mod tests {
             .unwrap()
             .is_none());
 
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.persona_blocks_count, 0);
     }
 
@@ -764,8 +764,8 @@ mod tests {
             .await
             .unwrap();
 
-        let persona_blocks = manager.list_persona_blocks().await.unwrap();
-        let human_blocks = manager.list_human_blocks().await.unwrap();
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
 
         assert_eq!(persona_blocks.len(), 2);
         assert_eq!(human_blocks.len(), 1);
@@ -780,7 +780,7 @@ mod tests {
             .await
             .unwrap();
 
-        let status = manager.check_capacity_status().await.unwrap();
+        let status = manager.check_capacity_status().await?;
         assert_eq!(status.len(), 1);
 
         let (id, block_type, usage) = &status[0];
@@ -794,14 +794,14 @@ mod tests {
         let manager = CoreMemoryManager::new();
 
         let content = "Content that will be rewritten manually".to_string();
-        let block_id = manager.create_persona_block(content, None).await.unwrap();
+        let block_id = manager.create_persona_block(content, None).await?;
 
-        manager.manual_rewrite_block(&block_id).await.unwrap();
+        manager.manual_rewrite_block(&block_id).await?;
 
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.auto_rewrites, 1);
 
-        let block = manager.get_persona_block(&block_id).await.unwrap().unwrap();
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
         assert!(block
             .content
             .contains("[Auto-rewritten to manage capacity]"));

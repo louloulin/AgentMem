@@ -1782,7 +1782,7 @@ mod tests {
             },
         ];
 
-        let add_results = client.add_batch(add_requests).await.unwrap();
+        let add_results = client.add_batch(add_requests).await?;
         let mem1_id = add_results[0].id.clone();
         let mem2_id = add_results[1].id.clone();
 
@@ -1847,7 +1847,7 @@ mod tests {
             },
         ];
 
-        let add_results = client.add_batch(add_requests).await.unwrap();
+        let add_results = client.add_batch(add_requests).await?;
         let memory_ids = vec![
             add_results[0].id.clone(),
             add_results[1].id.clone(),

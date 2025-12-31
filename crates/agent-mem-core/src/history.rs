@@ -160,8 +160,7 @@ impl MemoryHistory {
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ImportanceChanged,
             change_description: Some(format!(
-                "Importance changed from {:.2} to {:.2}",
-                old_importance, new_importance
+                "Importance changed from {old_importance:.2} to {new_importance:.2}"
             )),
         };
 

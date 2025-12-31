@@ -5,11 +5,10 @@
 
 use crate::hierarchical_service::{HierarchicalMemoryRecord, HierarchicalMemoryService};
 use crate::hierarchy::{MemoryLevel, MemoryScope};
-use crate::types::ImportanceLevel;
-use agent_mem_traits::{AgentMemError, Result};
-use chrono::{DateTime, Duration, Utc};
+use agent_mem_traits::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;

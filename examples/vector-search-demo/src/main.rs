@@ -129,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (results, search_time) = search_engine.search(query_vector.clone(), &query).await?;
     println!("✅ 搜索完成:");
-    println!("   - 搜索时间: {} ms", search_time);
+    println!("   - 搜索时间: {search_time} ms");
     println!("   - 结果数量: {}", results.len());
     for (i, result) in results.iter().enumerate() {
         println!(
@@ -150,11 +150,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 第二次搜索（应该命中缓存）
     let (results2, search_time2) = search_engine.search(query_vector.clone(), &query).await?;
     println!("✅ 第二次搜索（缓存）:");
-    println!("   - 搜索时间: {} ms", search_time2);
+    println!("   - 搜索时间: {search_time2} ms");
     println!("   - 结果数量: {}", results2.len());
     println!(
-        "   - 时间对比: 第一次 {} ms vs 第二次 {} ms",
-        search_time, search_time2
+        "   - 时间对比: 第一次 {search_time} ms vs 第二次 {search_time2} ms"
     );
 
     if search_time2 < search_time {

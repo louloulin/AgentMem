@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
                 None,
             )
             .await?;
-        println!("  ✓ 添加记忆: {}", fact);
+        println!("  ✓ 添加记忆: {fact}");
     }
     println!("✅ 背景信息添加完成\n");
 
@@ -93,13 +93,11 @@ async fn main() -> Result<()> {
     println!("📝 Step 4: 进行多轮对话\n");
     println!("{}", "=".repeat(60));
 
-    let conversations = vec![
-        ("What is my profession?", true),
+    let conversations = [("What is my profession?", true),
         ("Where do I live?", true),
         ("What are my hobbies?", true),
         ("What programming language do I prefer?", true),
-        ("Tell me about my pet", true),
-    ];
+        ("Tell me about my pet", true)];
 
     for (i, (question, save_to_memory)) in conversations.iter().enumerate() {
         println!("\n🗣️  Round {}: {}", i + 1, question);
@@ -110,10 +108,10 @@ async fn main() -> Result<()> {
             .await
         {
             Ok(response) => {
-                println!("🤖 Assistant: {}", response);
+                println!("🤖 Assistant: {response}");
             }
             Err(e) => {
-                println!("❌ Error: {}", e);
+                println!("❌ Error: {e}");
                 println!("\n⚠️  提示：请检查 LLM 配置");
                 println!("   1. 确保设置了 DEEPSEEK_API_KEY 环境变量");
                 println!("   2. 检查 API key 是否有效");
@@ -153,7 +151,7 @@ async fn main() -> Result<()> {
     // 7. 测试清空对话历史
     println!("\n📝 Step 7: 清空对话历史");
     let deleted_count = client.clear_conversation_history(user.id.clone()).await?;
-    println!("✅ 删除了 {} 条对话记录", deleted_count);
+    println!("✅ 删除了 {deleted_count} 条对话记录");
 
     let remaining_memories = client
         .get_all(Some(user.id.clone()), None, None, None)
@@ -178,11 +176,11 @@ async fn main() -> Result<()> {
         .await
     {
         Ok(response) => {
-            println!("🤖 Assistant: {}", response);
+            println!("🤖 Assistant: {response}");
             println!("\n✅ 语义记忆仍然有效！");
         }
         Err(e) => {
-            println!("❌ Error: {}", e);
+            println!("❌ Error: {e}");
         }
     }
 

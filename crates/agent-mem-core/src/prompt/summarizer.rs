@@ -114,7 +114,7 @@ impl MemorySummarizer {
 
         // Calculate omission marker size
         let omitted_chars = content.len().saturating_sub(head_len + tail_len);
-        let marker = format!("...[省略{}字符]...", omitted_chars);
+        let marker = format!("...[省略{omitted_chars}字符]...");
 
         // Adjust head and tail to accommodate marker
         let marker_len = marker.len();
@@ -139,7 +139,7 @@ impl MemorySummarizer {
             .map(|(idx, _)| &content[idx..])
             .unwrap_or("");
 
-        format!("{}{}{}", head, marker, tail)
+        format!("{head}{marker}{tail}")
     }
 
     /// Key sentences extraction strategy

@@ -141,11 +141,11 @@ mod tests {
                 vector: vec![0.0; 384],
                 metadata: std::collections::HashMap::new(),
             };
-            queue.add_vector(vector_data).await.unwrap();
+            queue.add_vector(vector_data).await?;
         }
 
         // 等待队列处理完成
-        queue.flush().await.unwrap();
+        queue.flush().await?;
         let elapsed = start.elapsed();
 
         // 验证: 批量处理应该比单个处理快

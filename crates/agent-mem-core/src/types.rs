@@ -135,9 +135,8 @@ impl std::str::FromStr for MemoryType {
             "resource" => Ok(MemoryType::Resource),
             "knowledge" => Ok(MemoryType::Knowledge),
             "contextual" => Ok(MemoryType::Contextual),
-            _ => Err(AgentMemError::validation_error(&format!(
-                "Unknown memory type: {}",
-                s
+            _ => Err(AgentMemError::validation_error(format!(
+                "Unknown memory type: {s}"
             ))),
         }
     }
@@ -267,7 +266,7 @@ impl Content {
                     url,
                     caption
                         .as_ref()
-                        .map(|c| format!(" - {}", c))
+                        .map(|c| format!(" - {c}"))
                         .unwrap_or_default()
                 )
             }
@@ -277,7 +276,7 @@ impl Content {
                     url,
                     transcript
                         .as_ref()
-                        .map(|t| format!(" - {}", t))
+                        .map(|t| format!(" - {t}"))
                         .unwrap_or_default()
                 )
             }
@@ -287,7 +286,7 @@ impl Content {
                     url,
                     summary
                         .as_ref()
-                        .map(|s| format!(" - {}", s))
+                        .map(|s| format!(" - {s}"))
                         .unwrap_or_default()
                 )
             }
@@ -383,16 +382,16 @@ pub enum AttributeValue {
 impl std::fmt::Display for AttributeValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeValue::String(s) => write!(f, "{}", s),
-            AttributeValue::Number(n) => write!(f, "{}", n),
-            AttributeValue::Boolean(b) => write!(f, "{}", b),
+            AttributeValue::String(s) => write!(f, "{s}"),
+            AttributeValue::Number(n) => write!(f, "{n}"),
+            AttributeValue::Boolean(b) => write!(f, "{b}"),
             AttributeValue::Timestamp(t) => write!(f, "{}", t.to_rfc3339()),
             AttributeValue::Array(arr) => {
                 let items: Vec<String> = arr.iter().map(|v| v.to_string()).collect();
                 write!(f, "[{}]", items.join(", "))
             }
             AttributeValue::Object(obj) => {
-                let items: Vec<String> = obj.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
+                let items: Vec<String> = obj.iter().map(|(k, v)| format!("{k}: {v}")).collect();
                 write!(f, "{{{}}}", items.join(", "))
             }
         }
@@ -1813,7 +1812,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 let node = self
                     .nodes
                     .get(&node_id)
-                    .ok_or_else(|| anyhow::anyhow!("Node '{}' not found", node_id))?;
+                    .ok_or_else(|| anyhow::anyhow!("Node '{node_id}' not found"))?;
 
                 // 检查边条件
                 let should_execute = self
@@ -1835,7 +1834,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 let handle = tokio::spawn(async move {
                     let mut ctx = context_clone.lock().await;
 
-                    match stage_clone.execute(input_clone, &mut *ctx).await {
+                    match stage_clone.execute(input_clone, &mut ctx).await {
                         Ok(StageResult::Continue(output)) => {
                             results_clone.lock().await.insert(node_id.clone(), output);
                             Ok(())
@@ -1848,7 +1847,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                             if let Some(ref handler) = error_handler {
                                 handler(&node_name, &reason);
                             }
-                            Err(anyhow::anyhow!("Node '{}' aborted: {}", node_id, reason))
+                            Err(anyhow::anyhow!("Node '{node_id}' aborted: {reason}"))
                         }
                         Err(e) => {
                             if is_optional {
@@ -1857,7 +1856,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                                 }
                                 Ok(())
                             } else {
-                                Err(anyhow::anyhow!("Node '{}' failed: {}", node_id, e))
+                                Err(anyhow::anyhow!("Node '{node_id}' failed: {e}"))
                             }
                         }
                     }
@@ -1906,7 +1905,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
             }
             adjacency
                 .entry(edge.from.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(edge.to.clone());
         }
 
@@ -1918,7 +1917,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
                 }
                 adjacency
                     .entry(dep.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(node_id.clone());
             }
         }
@@ -1995,7 +1994,7 @@ impl<I: Send + Clone + 'static, O: Send + Clone + 'static> DagPipeline<I, O> {
         for edge in incoming_edges {
             if let Some(ref condition_name) = edge.condition {
                 if let Some(condition_fn) = self.conditions.get(condition_name) {
-                    if !condition_fn(&*ctx) {
+                    if !condition_fn(&ctx) {
                         return Ok(false); // 条件不满足
                     }
                 }
@@ -2057,9 +2056,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
                         handler(stage_name, &reason);
                     }
                     return Err(anyhow::anyhow!(
-                        "Pipeline aborted at stage '{}': {}",
-                        stage_name,
-                        reason
+                        "Pipeline aborted at stage '{stage_name}': {reason}"
                     ));
                 }
                 Err(e) => {
@@ -2070,9 +2067,7 @@ impl<I: Send + 'static, O: Send + 'static> Pipeline<I, O> {
                         continue;
                     } else {
                         return Err(anyhow::anyhow!(
-                            "Pipeline failed at stage '{}': {}",
-                            stage_name,
-                            e
+                            "Pipeline failed at stage '{stage_name}': {e}"
                         ));
                     }
                 }
@@ -3151,7 +3146,7 @@ mod tests {
             .add_node("C", TestStage::new("C", 10), vec!["B".to_string()]);
 
         let mut ctx = PipelineContext::new();
-        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let results = dag.execute(0, &mut ctx).await?;
 
         assert_eq!(results.len(), 3);
         assert_eq!(results.get("A"), Some(&1));
@@ -3169,7 +3164,7 @@ mod tests {
 
         let start = std::time::Instant::now();
         let mut ctx = PipelineContext::new();
-        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let results = dag.execute(0, &mut ctx).await?;
         let elapsed = start.elapsed().as_millis();
 
         assert_eq!(results.len(), 3);
@@ -3195,7 +3190,7 @@ mod tests {
             );
 
         let mut ctx = PipelineContext::new();
-        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let results = dag.execute(0, &mut ctx).await?;
 
         assert_eq!(results.len(), 4);
         assert!(ctx.get::<bool>("A_executed").unwrap_or(false));
@@ -3243,13 +3238,13 @@ mod tests {
 
         // Test with high value (should execute B)
         let mut ctx1 = PipelineContext::new();
-        let results1 = dag.execute(10, &mut ctx1).await.unwrap();
+        let results1 = dag.execute(10, &mut ctx1).await?;
         assert!(results1.contains_key("B"));
         assert!(!results1.contains_key("C"));
 
         // Test with low value (should execute C)
         let mut ctx2 = PipelineContext::new();
-        let results2 = dag.execute(3, &mut ctx2).await.unwrap();
+        let results2 = dag.execute(3, &mut ctx2).await?;
         assert!(!results2.contains_key("B"));
         assert!(results2.contains_key("C"));
     }
@@ -3281,7 +3276,7 @@ mod tests {
 
         let start = std::time::Instant::now();
         let mut ctx = PipelineContext::new();
-        let results = dag.execute(0, &mut ctx).await.unwrap();
+        let results = dag.execute(0, &mut ctx).await?;
         let elapsed = start.elapsed().as_millis();
 
         assert_eq!(results.len(), 4);

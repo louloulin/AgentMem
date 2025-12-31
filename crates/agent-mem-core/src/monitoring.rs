@@ -594,7 +594,7 @@ mod tests {
             labels: HashMap::new(),
         };
 
-        monitoring.add_alert_rule(rule).await.unwrap();
+        monitoring.add_alert_rule(rule).await?;
 
         // Record high CPU usage
         monitoring
@@ -602,7 +602,7 @@ mod tests {
             .await
             .unwrap();
 
-        let alerts = monitoring.evaluate_alerts().await.unwrap();
+        let alerts = monitoring.evaluate_alerts().await?;
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::Warning);
     }

@@ -476,8 +476,8 @@ mod tests {
     async fn test_user_repository_crud() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
-        run_migrations(conn.clone()).await.unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
+        run_migrations(conn.clone()).await?;
 
         // Create organization first (required for foreign key)
         let org_id = generate_id("org");
@@ -486,7 +486,7 @@ mod tests {
             conn_guard.execute(
                 "INSERT INTO organizations (id, name, created_at, updated_at, is_deleted) VALUES (?, ?, ?, ?, ?)",
                 libsql::params![org_id.clone(), "Test Org", chrono::Utc::now().timestamp(), chrono::Utc::now().timestamp(), 0],
-            ).await.unwrap();
+            ).await?;
         }
 
         let repo = LibSqlUserRepository::new(conn);
@@ -499,24 +499,24 @@ mod tests {
             "hashed_password".to_string(),
             "UTC".to_string(),
         );
-        let created = repo.create(&user).await.unwrap();
+        let created = repo.create(&user).await?;
         assert_eq!(created.name, "Test User");
 
         // Find by ID
-        let found = repo.find_by_id(&user.id).await.unwrap();
+        let found = repo.find_by_id(&user.id).await?;
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "Test User");
 
         // Update
         let mut updated_user = user.clone();
         updated_user.name = "Updated User".to_string();
-        repo.update(&updated_user).await.unwrap();
-        let found = repo.find_by_id(&user.id).await.unwrap().unwrap();
+        repo.update(&updated_user).await?;
+        let found = repo.find_by_id(&user.id).await?.unwrap();
         assert_eq!(found.name, "Updated User");
 
         // Delete
-        repo.delete(&user.id).await.unwrap();
-        let found = repo.find_by_id(&user.id).await.unwrap();
+        repo.delete(&user.id).await?;
+        let found = repo.find_by_id(&user.id).await?;
         assert!(found.is_none());
     }
 }

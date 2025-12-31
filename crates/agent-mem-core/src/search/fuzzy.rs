@@ -129,7 +129,7 @@ impl FuzzyMatchEngine {
 
         // 按分数降序排序
         scored_docs.sort_by(|a, b| {
-            b.2.partial_cmp(&a.2).unwrap_or_else(|| {
+            b.2.partial_cmp(&a.2).unwrap_or({
                 // Fallback: if scores are NaN or incomparable, maintain order
                 std::cmp::Ordering::Equal
             })
@@ -372,7 +372,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = engine.search(&query).await.unwrap();
+        let results = engine.search(&query).await?;
 
         assert!(!results.is_empty());
         // doc1 和 doc2 都应该被找到
@@ -404,7 +404,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = engine.search(&query).await.unwrap();
+        let results = engine.search(&query).await?;
 
         assert_eq!(results.len(), 1);
         assert!(results[0].score > 0.9); // 应该是高分匹配

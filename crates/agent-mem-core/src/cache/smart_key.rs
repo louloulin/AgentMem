@@ -46,8 +46,7 @@ impl SmartCacheKeyBuilder {
         let type_part = memory_type.unwrap_or("_any");
 
         let key = format!(
-            "memory:{}:{}:{}:{}:{}",
-            agent_id, user_part, scope_part, type_part, query_hash
+            "memory:{agent_id}:{user_part}:{scope_part}:{type_part}:{query_hash}"
         );
 
         // 记录键前缀用于失效

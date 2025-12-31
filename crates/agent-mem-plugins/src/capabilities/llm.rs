@@ -149,7 +149,7 @@ mod tests {
             parameters: std::collections::HashMap::new(),
         };
 
-        let response = llm.call_llm(request).await.unwrap();
+        let response = llm.call_llm(request).await?;
 
         assert!(response.text.contains("summary"));
         assert_eq!(response.model, "gpt-4");
@@ -178,8 +178,8 @@ mod tests {
             parameters: std::collections::HashMap::new(),
         };
 
-        llm.call_llm(request1).await.unwrap();
-        llm.call_llm(request2).await.unwrap();
+        llm.call_llm(request1).await?;
+        llm.call_llm(request2).await?;
 
         let history = llm.get_history().await;
         assert_eq!(history.len(), 2);
@@ -200,7 +200,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        let response = llm.call_llm(request).await.unwrap();
+        let response = llm.call_llm(request).await?;
         assert!(response.text.contains("summary"));
 
         // Test translate
@@ -212,7 +212,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        let response = llm.call_llm(request).await.unwrap();
+        let response = llm.call_llm(request).await?;
         assert!(response.text.contains("翻译"));
 
         // Test analyze
@@ -224,7 +224,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        let response = llm.call_llm(request).await.unwrap();
+        let response = llm.call_llm(request).await?;
         assert!(response.text.contains("Analysis"));
     }
 
@@ -241,10 +241,10 @@ mod tests {
             parameters: std::collections::HashMap::new(),
         };
 
-        llm.call_llm(request).await.unwrap();
+        llm.call_llm(request).await?;
         assert_eq!(llm.get_history().await.len(), 1);
 
-        llm.clear_history().await.unwrap();
+        llm.clear_history().await?;
         assert_eq!(llm.get_history().await.len(), 0);
     }
 }

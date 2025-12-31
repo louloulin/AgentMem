@@ -77,7 +77,7 @@ impl ResultReranker {
         candidates.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
-                .unwrap_or_else(|| {
+                .unwrap_or({
                     // Fallback: if scores are NaN or incomparable, maintain order
                     std::cmp::Ordering::Equal
                 })
@@ -109,13 +109,13 @@ impl ResultReranker {
         let quality_score = self.calculate_quality_score(result);
 
         // 加权综合
-        let final_score = similarity_score * self.config.similarity_weight
+        
+
+        similarity_score * self.config.similarity_weight
             + metadata_score * self.config.metadata_weight
             + time_score * self.config.time_weight
             + importance_score * self.config.importance_weight
-            + quality_score * self.config.quality_weight;
-
-        final_score
+            + quality_score * self.config.quality_weight
     }
 
     /// 计算精确余弦相似度
@@ -182,7 +182,14 @@ impl ResultReranker {
         let length = result.content.len();
 
         // 内容长度评分
-        let length_score = if length < self.config.min_content_length {
+        
+
+        // 可以添加更多质量指标：
+        // - 是否包含特殊字符
+        // - 是否是完整句子
+        // - 是否有结构化信息
+
+        if length < self.config.min_content_length {
             // 太短，降低分数
             0.3
         } else if length > self.config.max_content_length {
@@ -191,14 +198,7 @@ impl ResultReranker {
         } else {
             // 适中长度
             1.0
-        };
-
-        // 可以添加更多质量指标：
-        // - 是否包含特殊字符
-        // - 是否是完整句子
-        // - 是否有结构化信息
-
-        length_score
+        }
     }
 
     /// 批量重排序

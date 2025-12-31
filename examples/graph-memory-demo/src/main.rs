@@ -10,8 +10,7 @@ use agent_mem_core::graph_memory::{GraphMemoryEngine, NodeType, ReasoningType, R
 use agent_mem_core::types::Memory;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::collections::HashMap;
-use tracing::{error, info};
+use tracing::error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -195,7 +194,7 @@ async fn demo_relationship_reasoning(
                 println!("    路径 {}: 置信度 {:.2}", i + 1, path.confidence);
             }
         }
-        Err(e) => println!("    ❌ 推理失败: {}", e),
+        Err(e) => println!("    ❌ 推理失败: {e}"),
     }
 
     // 归纳推理
@@ -210,7 +209,7 @@ async fn demo_relationship_reasoning(
         Ok(paths) => {
             println!("    ✅ 归纳推理完成，找到 {} 个模式", paths.len());
         }
-        Err(e) => println!("    ❌ 推理失败: {}", e),
+        Err(e) => println!("    ❌ 推理失败: {e}"),
     }
 
     // 溯因推理
@@ -225,7 +224,7 @@ async fn demo_relationship_reasoning(
         Ok(paths) => {
             println!("    ✅ 溯因推理完成，找到 {} 个可能原因", paths.len());
         }
-        Err(e) => println!("    ❌ 推理失败: {}", e),
+        Err(e) => println!("    ❌ 推理失败: {e}"),
     }
 
     // 类比推理
@@ -240,7 +239,7 @@ async fn demo_relationship_reasoning(
         Ok(paths) => {
             println!("    ✅ 类比推理完成，找到 {} 个类比关系", paths.len());
         }
-        Err(e) => println!("    ❌ 推理失败: {}", e),
+        Err(e) => println!("    ❌ 推理失败: {e}"),
     }
 
     // 因果推理
@@ -255,7 +254,7 @@ async fn demo_relationship_reasoning(
         Ok(paths) => {
             println!("    ✅ 因果推理完成，找到 {} 条因果链", paths.len());
         }
-        Err(e) => println!("    ❌ 推理失败: {}", e),
+        Err(e) => println!("    ❌ 推理失败: {e}"),
     }
 
     println!("\n🎯 推理结果：");
@@ -291,7 +290,7 @@ async fn demo_graph_traversal(
                 );
             }
         }
-        Err(e) => println!("    ❌ 遍历失败: {}", e),
+        Err(e) => println!("    ❌ 遍历失败: {e}"),
     }
 
     // 查找相关节点（深度2）
@@ -307,7 +306,7 @@ async fn demo_graph_traversal(
                 );
             }
         }
-        Err(e) => println!("    ❌ 遍历失败: {}", e),
+        Err(e) => println!("    ❌ 遍历失败: {e}"),
     }
 
     // 按关系类型过滤
@@ -326,7 +325,7 @@ async fn demo_graph_traversal(
                 );
             }
         }
-        Err(e) => println!("    ❌ 遍历失败: {}", e),
+        Err(e) => println!("    ❌ 遍历失败: {e}"),
     }
 
     println!("\n🎯 遍历结果：");
@@ -406,7 +405,7 @@ async fn demo_graph_statistics(
 
 /// 创建测试记忆
 fn create_memory(id: &str, agent_id: &str, content: &str, user_id: &str) -> Memory {
-    use agent_mem_core::types::{AttributeKey, AttributeValue};
+    
     let mut memory = Memory::new(
         agent_id.to_string(),
         Some(user_id.to_string()),

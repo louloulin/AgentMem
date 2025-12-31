@@ -292,7 +292,7 @@ async fn test_performance_baseline() {
     let candidates: Vec<_> = (0..100)
         .map(|i| {
             create_test_result(
-                &format!("id_{}", i),
+                &format!("id_{i}"),
                 0.5 + (i as f32 / 200.0),
                 "test content",
             )
@@ -314,5 +314,5 @@ async fn test_performance_baseline() {
     let duration = start.elapsed();
 
     // 重排序100个结果应该很快（<10ms）
-    assert!(duration.as_millis() < 10, "重排序耗时: {:?}", duration);
+    assert!(duration.as_millis() < 10, "重排序耗时: {duration:?}");
 }

@@ -83,7 +83,7 @@ mod tests {
             .await
             .unwrap();
 
-        let value = storage.get("key1").await.unwrap();
+        let value = storage.get("key1").await?;
         assert_eq!(value, Some("value1".to_string()));
     }
 
@@ -95,11 +95,11 @@ mod tests {
             .set("key1".to_string(), "value1".to_string())
             .await
             .unwrap();
-        assert!(storage.exists("key1").await.unwrap());
+        assert!(storage.exists("key1").await?);
 
-        let deleted = storage.delete("key1").await.unwrap();
+        let deleted = storage.delete("key1").await?;
         assert!(deleted);
-        assert!(!storage.exists("key1").await.unwrap());
+        assert!(!storage.exists("key1").await?);
     }
 
     #[tokio::test]
@@ -119,7 +119,7 @@ mod tests {
             .await
             .unwrap();
 
-        let keys = storage.list_keys().await.unwrap();
+        let keys = storage.list_keys().await?;
         assert_eq!(keys.len(), 3);
         assert!(keys.contains(&"key1".to_string()));
         assert!(keys.contains(&"key2".to_string()));
@@ -139,9 +139,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(storage.count().await.unwrap(), 2);
+        assert_eq!(storage.count().await?, 2);
 
-        storage.clear().await.unwrap();
-        assert_eq!(storage.count().await.unwrap(), 0);
+        storage.clear().await?;
+        assert_eq!(storage.count().await?, 0);
     }
 }

@@ -3,7 +3,7 @@
 //! Implements ContextEngine's layered memory architecture with scoped access control.
 
 use crate::Memory;
-use agent_mem_traits::{AgentMemError, MemoryType, Result};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1060,11 +1060,11 @@ mod tests {
         let memory = Memory::from_legacy_item(&memory_item);
 
         // 测试添加记忆
-        let hierarchical_memory = manager.add_memory(memory.clone()).await.unwrap();
+        let hierarchical_memory = manager.add_memory(memory.clone()).await?;
         assert_eq!(hierarchical_memory.memory.id.as_str(), memory.id.as_str());
 
         // 测试获取记忆
-        let retrieved = manager.get_memory(memory.id.as_str()).await.unwrap();
+        let retrieved = manager.get_memory(memory.id.as_str()).await?;
         assert!(retrieved.is_some());
 
         // 测试搜索记忆
@@ -1075,7 +1075,7 @@ mod tests {
         assert!(!search_results.is_empty());
 
         // 测试删除记忆
-        let removed = manager.remove_memory(memory.id.as_str()).await.unwrap();
+        let removed = manager.remove_memory(memory.id.as_str()).await?;
         assert!(removed);
     }
 

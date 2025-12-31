@@ -79,7 +79,7 @@ pub async fn run_test_real(
 
             pb_clone.inc(1);
             if i % 100 == 0 {
-                pb_clone.set_message(format!("已完成 {}/{}", i, total_memories));
+                pb_clone.set_message(format!("已完成 {i}/{total_memories}"));
             }
         });
 

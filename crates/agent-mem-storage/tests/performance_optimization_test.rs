@@ -28,7 +28,7 @@ async fn test_batch_insertion_performance() {
     let start = Instant::now();
     for i in 0..num_vectors {
         let vector = vec![VectorData {
-            id: format!("seq_{}", i),
+            id: format!("seq_{i}"),
             vector: vec![i as f32 / num_vectors as f32; dimension],
             metadata: HashMap::new(),
         }];
@@ -37,8 +37,7 @@ async fn test_batch_insertion_performance() {
     let sequential_duration = start.elapsed();
 
     println!(
-        "Sequential insertion: {:?} for {} vectors",
-        sequential_duration, num_vectors
+        "Sequential insertion: {sequential_duration:?} for {num_vectors} vectors"
     );
 
     // Test 2: Batch insertion (optimized)
@@ -50,7 +49,7 @@ async fn test_batch_insertion_performance() {
     let mut batch_vectors = Vec::new();
     for i in 0..num_vectors {
         batch_vectors.push(VectorData {
-            id: format!("batch_{}", i),
+            id: format!("batch_{i}"),
             vector: vec![i as f32 / num_vectors as f32; dimension],
             metadata: HashMap::new(),
         });
@@ -61,19 +60,17 @@ async fn test_batch_insertion_performance() {
     let batch_duration = start.elapsed();
 
     println!(
-        "Batch insertion: {:?} for {} vectors",
-        batch_duration, num_vectors
+        "Batch insertion: {batch_duration:?} for {num_vectors} vectors"
     );
 
     // Calculate speedup
     let speedup = sequential_duration.as_secs_f64() / batch_duration.as_secs_f64();
-    println!("Batch insertion speedup: {:.2}x", speedup);
+    println!("Batch insertion speedup: {speedup:.2}x");
 
     // Batch should be at least 1.5x faster (conservative estimate)
     assert!(
         speedup >= 1.5,
-        "Batch insertion should be at least 1.5x faster, got {:.2}x",
-        speedup
+        "Batch insertion should be at least 1.5x faster, got {speedup:.2}x"
     );
 }
 
@@ -95,10 +92,10 @@ async fn test_search_performance_scaling() {
 
     for &num_vectors in &scales {
         // Use unique table per scale to avoid conflicts
-        let scale_path = dir.path().join(format!("scale_{}.lance", num_vectors));
+        let scale_path = dir.path().join(format!("scale_{num_vectors}.lance"));
         let scale_store = LanceDBStore::new(
             scale_path.to_str().unwrap(),
-            &format!("vectors_{}", num_vectors),
+            &format!("vectors_{num_vectors}"),
         )
         .await
         .unwrap();
@@ -110,7 +107,7 @@ async fn test_search_performance_scaling() {
             let mut batch_vectors = Vec::new();
             for i in batch_start..batch_end {
                 batch_vectors.push(VectorData {
-                    id: format!("vec_{}", i),
+                    id: format!("vec_{i}"),
                     vector: vec![i as f32 / num_vectors as f32; dimension],
                     metadata: HashMap::new(),
                 });
@@ -140,13 +137,12 @@ async fn test_search_performance_scaling() {
     let time_1k = search_times.iter().find(|(n, _)| *n == 1000).unwrap().1;
 
     let growth_ratio = time_1k.as_secs_f64() / time_100.as_secs_f64();
-    println!("Search time growth (100→1K): {:.2}x", growth_ratio);
+    println!("Search time growth (100→1K): {growth_ratio:.2}x");
 
     // Growth should be sub-linear (< 10x for 10x data)
     assert!(
         growth_ratio < 10.0,
-        "Search should scale sub-linearly, got {:.2}x growth for 10x data",
-        growth_ratio
+        "Search should scale sub-linearly, got {growth_ratio:.2}x growth for 10x data"
     );
 }
 
@@ -167,7 +163,7 @@ async fn test_threshold_filtering_performance() {
 
     for i in 0..num_vectors {
         vectors.push(VectorData {
-            id: format!("vec_{}", i),
+            id: format!("vec_{i}"),
             vector: {
                 let mut v = vec![0.0; dimension];
                 // Create diverse vectors with varying similarity
@@ -263,7 +259,7 @@ async fn test_concurrent_operations() {
             let mut vectors = Vec::new();
             for i in 0..100 {
                 vectors.push(VectorData {
-                    id: format!("batch{}_{}", batch_id, i),
+                    id: format!("batch{batch_id}_{i}"),
                     vector: vec![i as f32 / 100.0; 128],
                     metadata: HashMap::new(),
                 });
@@ -319,7 +315,7 @@ async fn test_real_world_workflow() {
     println!("Phase 1: Initial data load");
     let initial_vectors: Vec<VectorData> = (0..100)
         .map(|i| VectorData {
-            id: format!("init_{}", i),
+            id: format!("init_{i}"),
             vector: vec![i as f32 / 100.0; 64],
             metadata: {
                 let mut m = HashMap::new();
@@ -342,7 +338,7 @@ async fn test_real_world_workflow() {
     for batch in 0..5 {
         let updates: Vec<VectorData> = (0..10)
             .map(|i| VectorData {
-                id: format!("update_{}_{}", batch, i),
+                id: format!("update_{batch}_{i}"),
                 vector: vec![(batch * 10 + i) as f32 / 50.0; 64],
                 metadata: {
                     let mut m = HashMap::new();
@@ -358,7 +354,7 @@ async fn test_real_world_workflow() {
 
     // Phase 4: Search workload
     println!("Phase 4: Search workload");
-    let search_queries = vec![vec![0.1; 64], vec![0.5; 64], vec![0.9; 64]];
+    let search_queries = [vec![0.1; 64], vec![0.5; 64], vec![0.9; 64]];
 
     for (i, query) in search_queries.iter().enumerate() {
         let start = Instant::now();
@@ -376,11 +372,11 @@ async fn test_real_world_workflow() {
 
     // Phase 5: Cleanup old data
     println!("Phase 5: Cleanup");
-    let delete_ids: Vec<String> = (0..10).map(|i| format!("init_{}", i)).collect();
+    let delete_ids: Vec<String> = (0..10).map(|i| format!("init_{i}")).collect();
     store.delete_vectors(delete_ids).await.unwrap();
 
     // Verify final state
     let final_count = store.count_vectors().await.unwrap();
-    println!("Final vector count: {}", final_count);
+    println!("Final vector count: {final_count}");
     assert_eq!(final_count, 140, "Should have 90 initial + 50 updates");
 }

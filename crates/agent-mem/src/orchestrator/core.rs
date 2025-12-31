@@ -659,10 +659,10 @@ impl MemoryOrchestrator {
 
     /// 获取统计信息
     pub async fn get_stats(&self, user_id: Option<String>) -> Result<MemoryStats> {
-        let mut total_memories = 0;
-        let mut memories_by_type: HashMap<String, usize> = HashMap::new();
-        let mut total_importance = 0.0;
-        let mut count = 0;
+        let total_memories = 0;
+        let memories_by_type: HashMap<String, usize> = HashMap::new();
+        let total_importance = 0.0;
+        let count = 0;
 
         // 从 CoreMemoryManager 获取统计
         // Note: CoreMemoryManager 不提供 get_memory_stats 方法
@@ -696,7 +696,7 @@ impl MemoryOrchestrator {
         agent_id: String,
         user_id: Option<String>,
     ) -> Result<Vec<MemoryItem>> {
-        use super::utils::UtilsModule;
+        
         let mut all_memories = Vec::new();
 
         // 使用 MemoryManager 获取所有记忆
@@ -705,9 +705,8 @@ impl MemoryOrchestrator {
                 .get_agent_memories(&agent_id, None)
                 .await
                 .map_err(|e| {
-                    agent_mem_traits::AgentMemError::storage_error(&format!(
-                        "Failed to get memories from MemoryManager: {}",
-                        e
+                    agent_mem_traits::AgentMemError::storage_error(format!(
+                        "Failed to get memories from MemoryManager: {e}"
                     ))
                 })?;
 
@@ -820,7 +819,7 @@ impl MemoryOrchestrator {
     /// 获取性能统计
     pub async fn get_performance_stats(&self) -> Result<crate::memory::PerformanceStats> {
         // 实现性能统计逻辑
-        let total_memories;
+        
         let cache_hit_rate = 0.0;
         let avg_add_latency_ms = 0.0;
         let avg_search_latency_ms = 0.0;
@@ -828,7 +827,7 @@ impl MemoryOrchestrator {
         let memory_usage_mb = 0.0;
 
         // 从 MemoryManager 获取统计
-        total_memories = if let Some(manager) = &self.memory_manager {
+        let total_memories = if let Some(manager) = &self.memory_manager {
             manager
                 .get_memory_stats(None)
                 .await

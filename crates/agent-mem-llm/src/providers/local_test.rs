@@ -336,7 +336,7 @@ mod tests {
             timestamp: None,
         }];
 
-        let response = provider.generate(&messages).await.unwrap();
+        let response = provider.generate(&messages).await?;
         assert!(!response.is_empty());
         assert!(response.contains("您好"));
     }
@@ -352,7 +352,7 @@ mod tests {
             timestamp: None,
         }];
 
-        let (response, metadata) = provider.generate_with_metadata(&messages).await.unwrap();
+        let (response, metadata) = provider.generate_with_metadata(&messages).await?;
         assert!(!response.is_empty());
         assert!(metadata.contains_key("model"));
         assert!(metadata.contains_key("usage"));
@@ -363,7 +363,7 @@ mod tests {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
-        let is_healthy = provider.health_check().await.unwrap();
+        let is_healthy = provider.health_check().await?;
         assert!(is_healthy);
     }
 

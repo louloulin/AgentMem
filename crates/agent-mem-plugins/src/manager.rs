@@ -49,7 +49,7 @@ impl PluginManager {
             registry
                 .get(plugin_id)
                 .cloned()
-                .ok_or_else(|| anyhow!("Plugin not found: {}", plugin_id))?
+                .ok_or_else(|| anyhow!("Plugin not found: {plugin_id}"))?
         };
 
         let loaded_plugin = self.loader.load_plugin(&plugin_info)?;

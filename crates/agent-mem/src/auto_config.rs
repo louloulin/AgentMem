@@ -49,7 +49,7 @@ impl AutoConfig {
             // 默认使用 LibSQL
             let default_path = "agentmem.db";
             info!("使用默认存储: libsql://{}", default_path);
-            config.storage_url = Some(format!("libsql://{}", default_path));
+            config.storage_url = Some(format!("libsql://{default_path}"));
         }
 
         // 检测向量存储
@@ -134,7 +134,7 @@ impl AutoConfig {
 
         // 检测 LibSQL
         if let Ok(path) = env::var("AGENTMEM_DB_PATH") {
-            return Some(format!("libsql://{}", path));
+            return Some(format!("libsql://{path}"));
         }
 
         None
@@ -144,7 +144,7 @@ impl AutoConfig {
     fn detect_vector_store() -> Option<String> {
         // 检测 LanceDB
         if let Ok(path) = env::var("LANCEDB_PATH") {
-            return Some(format!("lancedb://{}", path));
+            return Some(format!("lancedb://{path}"));
         }
 
         // 检测 Qdrant
@@ -154,7 +154,7 @@ impl AutoConfig {
 
         // 检测 Pinecone
         if let Ok(api_key) = env::var("PINECONE_API_KEY") {
-            return Some(format!("pinecone://{}", api_key));
+            return Some(format!("pinecone://{api_key}"));
         }
 
         None

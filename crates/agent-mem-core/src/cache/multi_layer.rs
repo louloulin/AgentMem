@@ -82,6 +82,12 @@ pub struct MultiLayerCache {
     metrics: CacheMetrics,
 }
 
+impl Default for MultiLayerCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiLayerCache {
     /// Create a new multi-layer cache with default capacities
     pub fn new() -> Self {

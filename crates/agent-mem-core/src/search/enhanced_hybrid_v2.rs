@@ -10,14 +10,14 @@
 
 use super::adaptive_threshold::AdaptiveThresholdCalculator;
 use super::query_classifier::{QueryClassifier, QueryType, SearchStrategy};
-use super::{SearchResult, SearchStats};
+use super::SearchResult;
 use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// 增强的混合搜索配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

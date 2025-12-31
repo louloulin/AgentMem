@@ -169,8 +169,7 @@ fn test_fuzzy_search_similarity() {
 
 #[test]
 fn test_search_result_ranking() {
-    let mut results = vec![
-        SearchResult {
+    let mut results = [SearchResult {
             memory_id: "1".to_string(),
             score: 5.0,
             matched_terms: vec!["rust".to_string()],
@@ -184,8 +183,7 @@ fn test_search_result_ranking() {
             memory_id: "3".to_string(),
             score: 3.0,
             matched_terms: vec!["programming".to_string()],
-        },
-    ];
+        }];
 
     // Sort by score (descending)
     results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
@@ -201,7 +199,7 @@ fn test_search_with_limit() {
     let memories: Vec<Memory> = (0..20)
         .map(|i| Memory {
             id: i.to_string(),
-            content: format!("Memory content {}", i),
+            content: format!("Memory content {i}"),
             memory_type: "Semantic".to_string(),
             metadata: HashMap::new(),
         })
@@ -303,7 +301,7 @@ fn test_semantic_search_simulation() {
 
 #[test]
 fn test_empty_query_handling() {
-    let memories = vec![Memory {
+    let memories = [Memory {
         id: "1".to_string(),
         content: "Test content".to_string(),
         memory_type: "Semantic".to_string(),

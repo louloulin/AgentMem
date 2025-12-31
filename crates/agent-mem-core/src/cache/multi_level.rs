@@ -107,7 +107,7 @@ impl MultiLevelCache {
             let monitor_config = config
                 .monitor_config
                 .clone()
-                .unwrap_or_else(MonitorConfig::default);
+                .unwrap_or_default();
             Some(Arc::new(CacheMonitor::new(monitor_config)))
         } else {
             None
@@ -383,7 +383,7 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        let value = cache.get(&"key1".to_string()).await.unwrap();
+        let value = cache.get(&"key1".to_string()).await?;
 
         assert_eq!(value, Some(b"value1".to_vec()));
     }
@@ -397,9 +397,9 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        cache.get(&"key1".to_string()).await.unwrap();
+        cache.get(&"key1".to_string()).await?;
 
-        let stats = cache.stats().await.unwrap();
+        let stats = cache.stats().await?;
         assert!(stats.total_sets > 0);
         assert!(stats.hits > 0);
     }
@@ -413,10 +413,10 @@ mod tests {
             .set("key1".to_string(), b"value1".to_vec(), None)
             .await
             .unwrap();
-        let deleted = cache.delete(&"key1".to_string()).await.unwrap();
+        let deleted = cache.delete(&"key1".to_string()).await?;
         assert!(deleted);
 
-        let value = cache.get(&"key1".to_string()).await.unwrap();
+        let value = cache.get(&"key1".to_string()).await?;
         assert_eq!(value, None);
     }
 }

@@ -18,9 +18,8 @@ use crate::storage::traits::*;
 
 #[cfg(feature = "libsql")]
 use crate::storage::libsql::{
-    create_libsql_pool, create_libsql_pool_with_config, run_migrations, LibSqlAgentRepository,
-    LibSqlApiKeyRepository, LibSqlAssociationRepository, LibSqlBlockRepository,
-    LibSqlConnectionPool, LibSqlMemoryRepository, LibSqlMessageRepository,
+    create_libsql_pool_with_config, run_migrations, LibSqlAgentRepository,
+    LibSqlApiKeyRepository, LibSqlAssociationRepository, LibSqlBlockRepository, LibSqlMemoryRepository, LibSqlMessageRepository,
     LibSqlOrganizationRepository, LibSqlPoolConfig, LibSqlToolRepository, LibSqlUserRepository,
 };
 
@@ -650,11 +649,11 @@ mod storage_factory_tests {
 
         let temp_dir = TempDir::new().unwrap();
         let mode = DeploymentMode::embedded(temp_dir.path());
-        let repos = StorageFactory::create(mode).await.unwrap();
+        let repos = StorageFactory::create(mode).await?;
 
         // First create an organization (required for foreign key)
         let org = Organization::new("Test Org".to_string());
-        repos.organizations.create(&org).await.unwrap();
+        repos.organizations.create(&org).await?;
 
         // Then create a user
         let user = User::new(
@@ -741,7 +740,7 @@ mod storage_factory_tests {
 
         let temp_dir = TempDir::new().unwrap();
         let mode = DeploymentMode::embedded(temp_dir.path());
-        let repos = StorageFactory::create(mode).await.unwrap();
+        let repos = StorageFactory::create(mode).await?;
 
         // Verify key repositories with list() method are available
         assert!(repos.users.list(1, 0).await.is_ok(), "users.list failed");

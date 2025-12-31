@@ -266,7 +266,7 @@ where
         let results = self
             .search(query_vector, search_query)
             .await
-            .map_err(|e| agent_mem_traits::AgentMemError::Other(e))?;
+            .map_err(agent_mem_traits::AgentMemError::Other)?;
 
         // 4. 转换 SearchResult 到 SearchResultV4
         let v4_results = results

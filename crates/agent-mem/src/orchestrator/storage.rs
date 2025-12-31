@@ -3,7 +3,6 @@
 //! 负责所有存储相关操作，包括添加、更新、删除记忆
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use agent_mem_core::types::MemoryType;
@@ -97,7 +96,7 @@ impl StorageModule {
         let embedding_for_vector = embedding.clone();
         let full_metadata_for_vector = full_metadata.clone();
         let full_metadata_for_db = full_metadata.clone();
-        let memory_type_for_db = memory_type.clone();
+        let memory_type_for_db = memory_type;
 
         let (core_result, vector_result, history_result, db_result) = tokio::join!(
             // 并行任务 1: 存储到 CoreMemoryManager
@@ -188,7 +187,7 @@ impl StorageModule {
                             Some(metadata_for_manager),
                         )
                         .await
-                        .map_err(|e| format!("MemoryManager write failed: {}", e))?;
+                        .map_err(|e| format!("MemoryManager write failed: {e}"))?;
                     
                     // 验证：如果 manager_id 与我们的 memory_id 不同，记录警告
                     if manager_id != memory_id_for_db {
@@ -209,17 +208,15 @@ impl StorageModule {
         // 检查结果
         if let Err(e) = core_result {
             error!("存储到 CoreMemoryManager 失败: {:?}", e);
-            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                "Failed to store to CoreMemoryManager: {:?}",
-                e
+            return Err(agent_mem_traits::AgentMemError::storage_error(format!(
+                "Failed to store to CoreMemoryManager: {e:?}"
             )));
         }
 
         if let Err(e) = vector_result {
             error!("存储到 VectorStore 失败: {}", e);
-            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                "Failed to store to VectorStore: {}",
-                e
+            return Err(agent_mem_traits::AgentMemError::storage_error(format!(
+                "Failed to store to VectorStore: {e}"
             )));
         }
 
@@ -231,9 +228,8 @@ impl StorageModule {
         // 🔑 关键：检查MemoryManager写入结果
         if let Err(e) = db_result {
             error!("❌ 存储到 MemoryManager 失败: {}", e);
-            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                "Failed to store to MemoryManager (memories table): {}",
-                e
+            return Err(agent_mem_traits::AgentMemError::storage_error(format!(
+                "Failed to store to MemoryManager (memories table): {e}"
             )));
         }
 
@@ -297,9 +293,8 @@ impl StorageModule {
                 )
                 .await
                 .map_err(|e| {
-                    agent_mem_traits::AgentMemError::storage_error(&format!(
-                        "Failed to update memory in MemoryManager: {}",
-                        e
+                    agent_mem_traits::AgentMemError::storage_error(format!(
+                        "Failed to update memory in MemoryManager: {e}"
                     ))
                 })?;
         }
@@ -310,8 +305,7 @@ impl StorageModule {
                 if let Some(vector_store) = &orchestrator.vector_store {
                     let embedding = embedder.embed(new_content).await.map_err(|e| {
                         agent_mem_traits::AgentMemError::EmbeddingError(format!(
-                            "Failed to generate embedding: {}",
-                            e
+                            "Failed to generate embedding: {e}"
                         ))
                     })?;
 
@@ -333,9 +327,8 @@ impl StorageModule {
                         .update_vectors(vec![vector_data])
                         .await
                         .map_err(|e| {
-                            agent_mem_traits::AgentMemError::storage_error(&format!(
-                                "Failed to update vector: {}",
-                                e
+                            agent_mem_traits::AgentMemError::storage_error(format!(
+                                "Failed to update vector: {e}"
                             ))
                         })?;
                 }
@@ -374,9 +367,8 @@ impl StorageModule {
         // 2. 使用 MemoryManager 删除记忆
         if let Some(manager) = &orchestrator.memory_manager {
             manager.delete_memory(memory_id).await.map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "Failed to delete memory from MemoryManager: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "Failed to delete memory from MemoryManager: {e}"
                 ))
             })?;
         }
@@ -387,9 +379,8 @@ impl StorageModule {
                 .delete_vectors(vec![memory_id.to_string()])
                 .await
                 .map_err(|e| {
-                    agent_mem_traits::AgentMemError::storage_error(&format!(
-                        "Failed to delete vector: {}",
-                        e
+                    agent_mem_traits::AgentMemError::storage_error(format!(
+                        "Failed to delete vector: {e}"
                     ))
                 })?;
         }
@@ -432,9 +423,8 @@ impl StorageModule {
         // 优先从 MemoryManager 获取
         if let Some(manager) = &orchestrator.memory_manager {
             if let Some(memory) = manager.get_memory(memory_id).await.map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "Failed to get memory from MemoryManager: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "Failed to get memory from MemoryManager: {e}"
                 ))
             })? {
                 // 转换为 MemoryItem
@@ -452,8 +442,7 @@ impl StorageModule {
         }
 
         Err(agent_mem_traits::AgentMemError::NotFound(format!(
-            "Memory not found: {}",
-            memory_id
+            "Memory not found: {memory_id}"
         )))
     }
 

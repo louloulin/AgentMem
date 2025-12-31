@@ -10,7 +10,7 @@ use crate::{
     search::{
         EnhancedHybridConfig, EnhancedHybridSearchEngineV2, SearchResult,
     },
-    storage::conversion::{db_to_memory, legacy_to_v4, memory_to_db, v4_to_legacy},
+    storage::conversion::v4_to_legacy,
 };
 use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory, Result as AgentMemResult};
 use serde::{Deserialize, Serialize};
@@ -254,7 +254,7 @@ impl MemoryEngine {
             let search_result = search_engine
                 .search(query, search_limit)
                 .await
-                .map_err(|e| crate::CoreError::Storage(format!("Enhanced search failed: {}", e)))?;
+                .map_err(|e| crate::CoreError::Storage(format!("Enhanced search failed: {e}")))?;
 
             // 将 SearchResult 转换为 Memory
             let mut memories = Vec::new();
@@ -441,7 +441,7 @@ impl MemoryEngine {
                         .get(&agent_mem_traits::AttributeKey::core("user_id"))
                         .and_then(|v| v.as_string());
                     
-                    let user_match_boost = if let Some(ref mem_user_id) = mem_user_id {
+                    let user_match_boost = if let Some(mem_user_id) = mem_user_id {
                         if let Some(target_uid) = target_user_id {
                             if mem_user_id.as_str() == target_uid {
                                 2.0  // 同一用户：加倍权重
@@ -546,7 +546,7 @@ impl MemoryEngine {
                             _ => String::new(),
                         };
 
-                        content_text.contains(&format!("商品ID: {}", product_id))
+                        content_text.contains(&format!("商品ID: {product_id}"))
                             || mem
                                 .attributes
                                 .get(&agent_mem_traits::AttributeKey::user("product_id"))
@@ -747,7 +747,7 @@ impl MemoryEngine {
             let product_id = product_id.as_str();
 
             // 1. 精确ID匹配（最高分）
-            if memory.content.contains(&format!("商品ID: {}", product_id))
+            if memory.content.contains(&format!("商品ID: {product_id}"))
                 || memory
                     .metadata
                     .get("product_id")
@@ -1018,7 +1018,7 @@ impl crate::search::enhanced_hybrid_v2::ExactMatcher for RepositoryExactMatcherA
                         _ => String::new(),
                     };
                     // 检查是否是精确匹配
-                    let is_exact = content_text.contains(&format!("商品ID: {}", query))
+                    let is_exact = content_text.contains(&format!("商品ID: {query}"))
                         || content_text == query;
                     SearchResult {
                         id: mem.id.as_str().to_string(),

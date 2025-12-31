@@ -2,7 +2,7 @@
 //! 
 //! 自动收集并发请求，批量处理嵌入生成，减少 Mutex 锁竞争
 
-use agent_mem_traits::{AgentMemError, Embedder, Result};
+use agent_mem_traits::{Embedder, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tracing::debug;

@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[cfg(feature = "libsql")]
 use libsql::{Builder, Connection, Database};
@@ -15,7 +15,7 @@ use libsql::{Builder, Connection, Database};
 // Helper function to convert libsql errors to AgentMemError
 #[cfg(feature = "libsql")]
 fn convert_libsql_error(e: libsql::Error) -> AgentMemError {
-    AgentMemError::StorageError(format!("LibSQL error: {}", e))
+    AgentMemError::StorageError(format!("LibSQL error: {e}"))
 }
 
 /// FTS5搜索结果
@@ -253,16 +253,16 @@ impl LibSQLFTS5Store {
         // 添加过滤条件
         if let Some(filters) = filters {
             if let Some(agent_id) = filters.get("agent_id") {
-                sql.push_str(&format!(" AND m.agent_id = '{}'", agent_id));
+                sql.push_str(&format!(" AND m.agent_id = '{agent_id}'"));
             }
             if let Some(user_id) = filters.get("user_id") {
-                sql.push_str(&format!(" AND m.user_id = '{}'", user_id));
+                sql.push_str(&format!(" AND m.user_id = '{user_id}'"));
             }
         }
 
         sql.push_str(" AND m.is_deleted = 0");
         sql.push_str(" ORDER BY score");
-        sql.push_str(&format!(" LIMIT {}", limit));
+        sql.push_str(&format!(" LIMIT {limit}"));
 
         debug!("SQL: {}", sql);
 
@@ -304,7 +304,7 @@ impl LibSQLFTS5Store {
             })?;
 
             let created_at =
-                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(|| Utc::now());
+                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(Utc::now);
 
             let metadata_json: String = row
                 .get(6)
@@ -348,16 +348,16 @@ impl LibSQLFTS5Store {
         // 添加过滤条件
         if let Some(filters) = filters {
             if let Some(agent_id) = filters.get("agent_id") {
-                sql.push_str(&format!(" AND agent_id = '{}'", agent_id));
+                sql.push_str(&format!(" AND agent_id = '{agent_id}'"));
             }
             if let Some(user_id) = filters.get("user_id") {
-                sql.push_str(&format!(" AND user_id = '{}'", user_id));
+                sql.push_str(&format!(" AND user_id = '{user_id}'"));
             }
         }
 
-        sql.push_str(&format!(" LIMIT {}", limit));
+        sql.push_str(&format!(" LIMIT {limit}"));
 
-        let like_pattern = format!("%{}%", query);
+        let like_pattern = format!("%{query}%");
         let mut rows = self
             .conn
             .query(&sql, libsql::params![query, like_pattern])
@@ -389,7 +389,7 @@ impl LibSQLFTS5Store {
                 AgentMemError::StorageError(format!("Failed to get created_at: {e}"))
             })?;
             let created_at =
-                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(|| Utc::now());
+                DateTime::from_timestamp(created_at_ts, 0).unwrap_or_else(Utc::now);
             let metadata_json: String = row
                 .get(6)
                 .map_err(|e| AgentMemError::StorageError(format!("Failed to get metadata: {e}")))?;
@@ -525,15 +525,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_fts5_search_empty() {
-        let store = LibSQLFTS5Store::new(":memory:").await.unwrap();
-        let results = store.search_bm25("test", 10, None).await.unwrap();
+        let store = LibSQLFTS5Store::new(":memory:").await?;
+        let results = store.search_bm25("test", 10, None).await?;
         assert_eq!(results.len(), 0);
     }
 
     #[tokio::test]
     async fn test_exact_match_empty() {
-        let store = LibSQLFTS5Store::new(":memory:").await.unwrap();
-        let results = store.exact_match("test", 10, None).await.unwrap();
+        let store = LibSQLFTS5Store::new(":memory:").await?;
+        let results = store.exact_match("test", 10, None).await?;
         assert_eq!(results.len(), 0);
     }
 }

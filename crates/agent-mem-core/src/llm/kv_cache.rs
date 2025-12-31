@@ -4,12 +4,12 @@
 //!
 //! KV-cache是LLM推理过程中的关键优化，通过缓存已计算的key-value对，避免重复计算。
 
-use agent_mem_traits::{AgentMemError, Result};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// KV-Cache entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -316,7 +316,7 @@ mod tests {
         let values = vec![vec![7.0, 8.0, 9.0], vec![10.0, 11.0, 12.0]];
 
         // Store
-        cache.set(prompt_hash.to_string(), keys.clone(), values.clone()).await.unwrap();
+        cache.set(prompt_hash.to_string(), keys.clone(), values.clone()).await?;
 
         // Retrieve
         let entry = cache.get(prompt_hash).await;
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(entry.cached_values, values);
 
         // Inject memory
-        let injected = cache.inject_memory(prompt_hash).await.unwrap();
+        let injected = cache.inject_memory(prompt_hash).await?;
         assert!(injected.is_some());
         let (injected_keys, injected_values) = injected.unwrap();
         assert_eq!(injected_keys, keys);
@@ -343,7 +343,7 @@ mod tests {
         let keys = vec![vec![1.0]];
         let values = vec![vec![2.0]];
 
-        cache.set(prompt_hash.to_string(), keys, values).await.unwrap();
+        cache.set(prompt_hash.to_string(), keys, values).await?;
 
         // Should be available immediately
         assert!(cache.get(prompt_hash).await.is_some());
@@ -363,7 +363,7 @@ mod tests {
         let keys = vec![vec![1.0, 2.0]];
         let values = vec![vec![3.0, 4.0]];
 
-        cache.set(prompt_hash.to_string(), keys, values).await.unwrap();
+        cache.set(prompt_hash.to_string(), keys, values).await?;
         cache.get(prompt_hash).await; // Hit
         cache.get("nonexistent").await; // Miss
 

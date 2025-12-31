@@ -15,8 +15,7 @@ use colored::*;
 use ignore::WalkBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{error, info, warn};
-use walkdir::WalkDir;
+use tracing::{error, warn};
 
 /// 代码文件信息
 #[derive(Debug, Clone)]
@@ -33,7 +32,7 @@ impl CodeFile {
     /// 从路径创建代码文件
     fn from_path(path: &Path, base_path: &Path) -> Result<Self> {
         let content =
-            fs::read_to_string(path).with_context(|| format!("Failed to read file: {:?}", path))?;
+            fs::read_to_string(path).with_context(|| format!("Failed to read file: {path:?}"))?;
 
         let relative_path = path
             .strip_prefix(base_path)
@@ -80,7 +79,7 @@ impl CodeFile {
     fn to_memory_content(&self) -> String {
         // 添加更多上下文信息，帮助LLM理解
         let mut content = String::new();
-        content.push_str(&format!("=== 文件信息 ===\n"));
+        content.push_str(&"=== 文件信息 ===\n".to_string());
         content.push_str(&format!("路径: {}\n", self.relative_path));
         content.push_str(&format!("语言: {}\n", self.language));
         content.push_str(&format!("行数: {}\n", self.lines));
@@ -199,9 +198,9 @@ impl CodebaseScanner {
         }
 
         println!("✓ 扫描完成：");
-        println!("  - 总文件数: {}", total_files);
+        println!("  - 总文件数: {total_files}");
         println!("  - 代码文件: {}", files.len().to_string().green());
-        println!("  - 跳过文件: {}", skipped_files);
+        println!("  - 跳过文件: {skipped_files}");
 
         Ok(files)
     }
@@ -364,7 +363,7 @@ impl CodebaseMemory {
 
     /// 搜索代码
     async fn search(&self, query: &str, limit: Option<usize>) -> Result<Vec<String>> {
-        println!("\n{}", format!("🔍 搜索: \"{}\"", query).cyan().bold());
+        println!("\n{}", format!("🔍 搜索: \"{query}\"").cyan().bold());
 
         let results = self
             .memory
@@ -420,7 +419,7 @@ impl CodebaseMemory {
                     continue;
                 }
                 if show_code && code_lines < 5 {
-                    println!("  {}", line);
+                    println!("  {line}");
                     code_lines += 1;
                 }
             }
@@ -458,7 +457,7 @@ impl CodebaseMemory {
             return Ok(());
         }
 
-        println!("\n{}", format!("🤖 AI分析: \"{}\"", query).cyan().bold());
+        println!("\n{}", format!("🤖 AI分析: \"{query}\"").cyan().bold());
         println!("正在调用LLM进行智能分析...\n");
 
         // 先搜索相关代码
@@ -542,8 +541,7 @@ async fn interactive_search(codebase: &CodebaseMemory) -> Result<()> {
             continue;
         }
 
-        if query.starts_with("analyze ") {
-            let analysis_query = &query[8..];
+        if let Some(analysis_query) = query.strip_prefix("analyze ") {
             if let Err(e) = codebase.analyze_code(analysis_query).await {
                 error!("Analysis failed: {}", e);
             }

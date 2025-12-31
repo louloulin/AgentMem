@@ -9,7 +9,7 @@ use agent_mem_compat::compute_optimization::{
 };
 use agent_mem_traits::Result;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -198,7 +198,7 @@ async fn demo_batch_processing(manager: &ComputeOptimizationManager) -> Result<(
     info!("📦 演示批处理功能");
 
     // 创建测试请求
-    let requests: Vec<String> = (0..150).map(|i| format!("request_{}", i)).collect();
+    let requests: Vec<String> = (0..150).map(|i| format!("request_{i}")).collect();
 
     info!("测试批处理...");
     info!("总请求数: {}", requests.len());
@@ -209,7 +209,7 @@ async fn demo_batch_processing(manager: &ComputeOptimizationManager) -> Result<(
             // 模拟处理逻辑
             let processed: Vec<String> = batch
                 .into_iter()
-                .map(|req| format!("processed_{}", req))
+                .map(|req| format!("processed_{req}"))
                 .collect();
             Ok(processed)
         })

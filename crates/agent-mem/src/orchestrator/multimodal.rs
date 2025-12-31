@@ -24,7 +24,7 @@ impl MultimodalModule {
         agent_id: String,
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
-        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use agent_mem_intelligence::multimodal::MultimodalContent;
         use uuid::Uuid;
 
         info!(
@@ -148,7 +148,7 @@ impl MultimodalModule {
         agent_id: String,
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
-        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use agent_mem_intelligence::multimodal::MultimodalContent;
         use uuid::Uuid;
 
         info!(
@@ -270,7 +270,7 @@ impl MultimodalModule {
         agent_id: String,
         metadata: Option<HashMap<String, String>>,
     ) -> Result<AddResult> {
-        use agent_mem_intelligence::multimodal::{ContentType, MultimodalContent};
+        use agent_mem_intelligence::multimodal::MultimodalContent;
         use uuid::Uuid;
 
         info!(

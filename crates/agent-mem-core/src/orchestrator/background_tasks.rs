@@ -123,7 +123,7 @@ impl BackgroundTaskManager {
         self.spawn_task(task_type, async move {
             match run_memory_extraction(extractor, request, messages).await {
                 Ok(count) => TaskResult::Completed {
-                    detail: format!("extracted {} memories", count),
+                    detail: format!("extracted {count} memories"),
                 },
                 Err(e) => TaskResult::Failed {
                     error: e.to_string(),

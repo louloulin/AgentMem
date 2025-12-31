@@ -20,7 +20,7 @@ impl PermissionChecker {
         if self.allowed_capabilities.contains(required) {
             Ok(())
         } else {
-            Err(anyhow!("Permission denied: {:?} not allowed", required))
+            Err(anyhow!("Permission denied: {required:?} not allowed"))
         }
     }
 

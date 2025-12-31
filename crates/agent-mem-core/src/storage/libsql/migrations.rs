@@ -731,7 +731,7 @@ mod tests {
     async fn test_run_migrations() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
 
         let result = run_migrations(conn.clone()).await;
         assert!(result.is_ok());
@@ -743,7 +743,7 @@ mod tests {
             .await
             .unwrap();
 
-        let row = rows.next().await.unwrap().unwrap();
+        let row = rows.next().await?.unwrap();
         let count: i64 = row.get(0).unwrap();
         assert_eq!(count, 14); // 14 migrations (including memory_vectors)
     }
@@ -752,10 +752,10 @@ mod tests {
     async fn test_migrations_idempotent() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
 
         // Run migrations twice
-        run_migrations(conn.clone()).await.unwrap();
+        run_migrations(conn.clone()).await?;
         let result = run_migrations(conn.clone()).await;
         assert!(result.is_ok());
 
@@ -766,7 +766,7 @@ mod tests {
             .await
             .unwrap();
 
-        let row = rows.next().await.unwrap().unwrap();
+        let row = rows.next().await?.unwrap();
         let count: i64 = row.get(0).unwrap();
         assert_eq!(count, 14); // 14 migrations (including memory_vectors)
     }
@@ -776,10 +776,10 @@ mod tests {
     async fn test_composite_indexes_created() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
 
         // Run migrations
-        run_migrations(conn.clone()).await.unwrap();
+        run_migrations(conn.clone()).await?;
 
         // Check if composite indexes exist by querying sqlite_master
         let conn_guard = conn.lock().await;
@@ -794,7 +794,7 @@ mod tests {
             .unwrap();
         
         let mut index_names = Vec::new();
-        while let Some(row) = rows.next().await.unwrap() {
+        while let Some(row) = rows.next().await? {
             let name: String = row.get(0).unwrap();
             index_names.push(name);
         }

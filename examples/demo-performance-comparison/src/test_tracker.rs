@@ -109,7 +109,7 @@ impl TestTracker {
                 let msg = if message.is_empty() {
                     String::new()
                 } else {
-                    format!(" - {}", message)
+                    format!(" - {message}")
                 };
                 println!("  {} {}{}", "✅".green(), subtest.name, msg.bright_black());
             }
@@ -136,7 +136,7 @@ impl TestTracker {
             let msg = if message.is_empty() {
                 String::new()
             } else {
-                format!(" - {}", message)
+                format!(" - {message}")
             };
             println!(
                 "{} PASSED: {}{}",
@@ -236,11 +236,11 @@ impl TestTracker {
             println!(
                 "  - 通过率: {:.1}%",
                 if pass_rate >= 90.0 {
-                    format!("{:.1}%", pass_rate).green().bold()
+                    format!("{pass_rate:.1}%").green().bold()
                 } else if pass_rate >= 70.0 {
-                    format!("{:.1}%", pass_rate).yellow().bold()
+                    format!("{pass_rate:.1}%").yellow().bold()
                 } else {
-                    format!("{:.1}%", pass_rate).red().bold()
+                    format!("{pass_rate:.1}%").red().bold()
                 }
             );
         }

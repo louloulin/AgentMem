@@ -112,13 +112,13 @@ impl RetryExecutor {
                     last_error = Some(error.to_string());
 
                     // Check if we should retry
-                    if attempts >= self.policy.max_retries + 1 || !error.is_retryable() {
+                    if attempts > self.policy.max_retries || !error.is_retryable() {
                         warn!(
                             "Operation failed after {} attempts, last error: {}",
                             attempts, error
                         );
 
-                        if attempts >= self.policy.max_retries + 1 {
+                        if attempts > self.policy.max_retries {
                             return Err(ClientError::RetryExhausted {
                                 attempts,
                                 last_error: error.to_string(),

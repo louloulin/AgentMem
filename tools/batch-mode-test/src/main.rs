@@ -70,8 +70,7 @@ async fn test_batch_performance(
         .map(|i| {
             (
                 format!(
-                    "批量测试记忆 #{} - 这是一条测试数据，用于验证批量添加性能",
-                    i
+                    "批量测试记忆 #{i} - 这是一条测试数据，用于验证批量添加性能"
                 ),
                 "test-agent".to_string(),
                 Some("test-user".to_string()),
@@ -131,7 +130,7 @@ async fn comparison_test(
     for i in 0..test_count {
         orchestrator
             .add_memory(
-                format!("单个测试记忆 #{}", i),
+                format!("单个测试记忆 #{i}"),
                 "test-agent".to_string(),
                 Some("test-user".to_string()),
                 Some(MemoryType::Episodic),
@@ -153,7 +152,7 @@ async fn comparison_test(
     let items: Vec<_> = (0..test_count)
         .map(|i| {
             (
-                format!("批量测试记忆 #{}", i),
+                format!("批量测试记忆 #{i}"),
                 "test-agent".to_string(),
                 Some("test-user".to_string()),
                 Some(MemoryType::Episodic),

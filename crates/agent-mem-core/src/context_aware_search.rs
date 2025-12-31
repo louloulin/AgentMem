@@ -898,7 +898,7 @@ mod tests {
             result_preferences: ResultPreferences::default(),
         };
 
-        let results = engine.search(query, &memories).await.unwrap();
+        let results = engine.search(query, &memories).await?;
         assert!(!results.is_empty());
         assert_eq!(results[0].rank, 1);
     }

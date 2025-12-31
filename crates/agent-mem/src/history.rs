@@ -10,7 +10,6 @@ use sqlx::{Row, SqlitePool};
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{info, warn};
-use uuid::Uuid;
 
 /// 历史记录条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,9 +72,8 @@ impl HistoryManager {
         // 这样 SQLx 会自动创建数据库文件（如果不存在）
         let options = SqliteConnectOptions::from_str(db_path)
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "解析数据库路径失败: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "解析数据库路径失败: {e}"
                 ))
             })?
             .create_if_missing(true);
@@ -85,7 +83,7 @@ impl HistoryManager {
             .connect_with(options)
             .await
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!("连接数据库失败: {}", e))
+                agent_mem_traits::AgentMemError::storage_error(format!("连接数据库失败: {e}"))
             })?;
 
         let manager = Self {
@@ -119,7 +117,7 @@ impl HistoryManager {
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!("创建历史表失败: {}", e))
+            agent_mem_traits::AgentMemError::storage_error(format!("创建历史表失败: {e}"))
         })?;
 
         // 创建索引以提高查询性能
@@ -132,7 +130,7 @@ impl HistoryManager {
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!("创建索引失败: {}", e))
+            agent_mem_traits::AgentMemError::storage_error(format!("创建索引失败: {e}"))
         })?;
 
         info!("✅ 历史记录表已创建");
@@ -191,9 +189,8 @@ impl HistoryManager {
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!(
-                "添加历史记录失败: {}",
-                e
+            agent_mem_traits::AgentMemError::storage_error(format!(
+                "添加历史记录失败: {e}"
             ))
         })?;
 
@@ -225,7 +222,7 @@ impl HistoryManager {
         .fetch_all(self.pool.as_ref())
         .await
         .map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!("获取历史记录失败: {}", e))
+            agent_mem_traits::AgentMemError::storage_error(format!("获取历史记录失败: {e}"))
         })?;
 
         let mut entries = Vec::new();
@@ -263,8 +260,7 @@ impl HistoryManager {
     pub async fn get_all_history(&self, limit: Option<usize>) -> Result<Vec<HistoryEntry>> {
         let query_str = if let Some(limit) = limit {
             format!(
-                "SELECT * FROM history ORDER BY created_at DESC LIMIT {}",
-                limit
+                "SELECT * FROM history ORDER BY created_at DESC LIMIT {limit}"
             )
         } else {
             "SELECT * FROM history ORDER BY created_at DESC".to_string()
@@ -274,9 +270,8 @@ impl HistoryManager {
             .fetch_all(self.pool.as_ref())
             .await
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!(
-                    "获取所有历史记录失败: {}",
-                    e
+                agent_mem_traits::AgentMemError::storage_error(format!(
+                    "获取所有历史记录失败: {e}"
                 ))
             })?;
 
@@ -315,7 +310,7 @@ impl HistoryManager {
             .execute(self.pool.as_ref())
             .await
             .map_err(|e| {
-                agent_mem_traits::AgentMemError::storage_error(&format!("重置历史记录失败: {}", e))
+                agent_mem_traits::AgentMemError::storage_error(format!("重置历史记录失败: {e}"))
             })?;
 
         info!("✅ 所有历史记录已清空");
@@ -337,7 +332,7 @@ impl HistoryManager {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| {
-            agent_mem_traits::AgentMemError::storage_error(&format!("获取统计信息失败: {}", e))
+            agent_mem_traits::AgentMemError::storage_error(format!("获取统计信息失败: {e}"))
         })?;
 
         Ok(HistoryStats {
@@ -374,7 +369,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_and_get_history() {
-        let manager = HistoryManager::new(":memory:").await.unwrap();
+        let manager = HistoryManager::new(":memory:").await?;
 
         let entry = HistoryEntry {
             id: Uuid::new_v4().to_string(),
@@ -394,7 +389,7 @@ mod tests {
         assert!(result.is_ok());
 
         // 获取历史记录
-        let history = manager.get_history("mem_test_123").await.unwrap();
+        let history = manager.get_history("mem_test_123").await?;
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].memory_id, "mem_test_123");
         assert_eq!(history[0].event, "ADD");
@@ -402,7 +397,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_history_entries() {
-        let manager = HistoryManager::new(":memory:").await.unwrap();
+        let manager = HistoryManager::new(":memory:").await?;
         let memory_id = "mem_multi_test";
 
         // 添加多个历史记录
@@ -424,11 +419,11 @@ mod tests {
                 role: Some("user".to_string()),
             };
 
-            manager.add_history(entry).await.unwrap();
+            manager.add_history(entry).await?;
         }
 
         // 获取历史记录
-        let history = manager.get_history(memory_id).await.unwrap();
+        let history = manager.get_history(memory_id).await?;
         assert_eq!(history.len(), 4);
 
         // 验证顺序（最新的在前）
@@ -438,7 +433,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_history_stats() {
-        let manager = HistoryManager::new(":memory:").await.unwrap();
+        let manager = HistoryManager::new(":memory:").await?;
 
         // 添加不同类型的历史记录
         for event in ["ADD", "ADD", "UPDATE", "DELETE"].iter() {
@@ -455,11 +450,11 @@ mod tests {
                 role: None,
             };
 
-            manager.add_history(entry).await.unwrap();
+            manager.add_history(entry).await?;
         }
 
         // 获取统计
-        let stats = manager.get_stats().await.unwrap();
+        let stats = manager.get_stats().await?;
         assert_eq!(stats.total_count, 4);
         assert_eq!(stats.add_count, 2);
         assert_eq!(stats.update_count, 1);
@@ -468,7 +463,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_reset() {
-        let manager = HistoryManager::new(":memory:").await.unwrap();
+        let manager = HistoryManager::new(":memory:").await?;
 
         // 添加一些记录
         let entry = HistoryEntry {
@@ -484,14 +479,14 @@ mod tests {
             role: None,
         };
 
-        manager.add_history(entry).await.unwrap();
+        manager.add_history(entry).await?;
 
         // 重置
         let result = manager.reset().await;
         assert!(result.is_ok());
 
         // 验证已清空
-        let all = manager.get_all_history(None).await.unwrap();
+        let all = manager.get_all_history(None).await?;
         assert_eq!(all.len(), 0);
     }
 }

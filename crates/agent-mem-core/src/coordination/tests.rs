@@ -254,7 +254,7 @@ async fn test_core_agent_creation() {
 #[tokio::test]
 async fn test_agent_task_execution() {
     let mut agent = EpisodicAgent::new("test_execution".to_string());
-    agent.initialize().await.unwrap();
+    agent.initialize().await?;
 
     // Create a test task
     let task = TaskRequest::new(
@@ -275,7 +275,7 @@ async fn test_agent_task_execution() {
 #[tokio::test]
 async fn test_agent_message_handling() {
     let mut agent = EpisodicAgent::new("test_messages".to_string());
-    agent.initialize().await.unwrap();
+    agent.initialize().await?;
 
     // Create a test message
     let message = AgentMessage::new(
@@ -293,7 +293,7 @@ async fn test_agent_message_handling() {
 #[tokio::test]
 async fn test_agent_statistics() {
     let mut agent = EpisodicAgent::new("test_stats".to_string());
-    agent.initialize().await.unwrap();
+    agent.initialize().await?;
 
     // Get initial stats
     let stats = agent.get_stats().await;
@@ -309,7 +309,7 @@ async fn test_agent_statistics() {
         json!({"user_id": "test_user", "query": "test"}),
     );
 
-    agent.execute_task(task).await.unwrap();
+    agent.execute_task(task).await?;
 
     // Check updated stats
     let stats = agent.get_stats().await;

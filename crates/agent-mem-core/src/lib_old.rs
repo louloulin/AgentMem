@@ -94,7 +94,7 @@ mod tests {
             .await
             .unwrap();
 
-        let retrieved = manager.get_memory(&memory_id).await.unwrap();
+        let retrieved = manager.get_memory(&memory_id).await?;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().content, "I love playing tennis");
     }
@@ -144,7 +144,7 @@ mod tests {
         let query = crate::types::MemoryQuery::new("test-agent".to_string())
             .with_text_query("tennis".to_string())
             .with_limit(10);
-        let results = manager.search_memories(query).await.unwrap();
+        let results = manager.search_memories(query).await?;
         assert!(results.len() >= 2); // Should find at least 2 tennis-related memories
     }
 
@@ -171,7 +171,7 @@ mod tests {
             .unwrap();
 
         // Verify the update
-        let retrieved = manager.get_memory(&memory_id).await.unwrap();
+        let retrieved = manager.get_memory(&memory_id).await?;
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().content, "Updated content");
     }
@@ -193,10 +193,10 @@ mod tests {
             .unwrap();
 
         // Delete the memory
-        manager.delete_memory(&memory_id).await.unwrap();
+        manager.delete_memory(&memory_id).await?;
 
         // Verify deletion
-        let retrieved = manager.get_memory(&memory_id).await.unwrap();
+        let retrieved = manager.get_memory(&memory_id).await?;
         assert!(retrieved.is_none());
     }
 

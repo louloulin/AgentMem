@@ -15,7 +15,7 @@ use agent_mem_compat::enterprise_monitoring::{
 use anyhow::Result;
 use chrono::Utc;
 use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {

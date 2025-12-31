@@ -3,8 +3,8 @@
 //! 为Memory添加和查询定义具体的Pipeline stages
 
 use crate::types::{
-    AttributeKey, AttributeValue, ComparisonOperator, Constraint, Memory, PipelineContext,
-    PipelineStage, Preference, PreferenceType, Query, QueryIntent, StageResult,
+    AttributeKey, AttributeValue, Constraint, Memory, PipelineContext,
+    PipelineStage, Query, QueryIntent, StageResult,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -93,7 +93,7 @@ impl PipelineStage for DeduplicationStage {
                     let _ = context.set("duplicate_similarity", similarity);
                     let _ = context.set(
                         "skip_reason",
-                        format!("Duplicate memory detected (similarity: {:.2})", similarity),
+                        format!("Duplicate memory detected (similarity: {similarity:.2})"),
                     );
 
                     return Ok(StageResult::Skip(input));
@@ -314,7 +314,7 @@ impl PipelineStage for EntityExtractionStage {
                     let octets: Vec<&str> = ip_str.split('.').collect();
                     let valid = octets.iter().all(|o| o.parse::<u8>().is_ok());
                     if valid {
-                        entities.push(format!("IP:{}", ip_str));
+                        entities.push(format!("IP:{ip_str}"));
                     }
                 }
             }
@@ -438,7 +438,7 @@ impl PipelineStage for QueryExpansionStage {
 
     async fn execute(
         &self,
-        mut input: Self::Input,
+        input: Self::Input,
         context: &mut PipelineContext,
     ) -> anyhow::Result<StageResult<Self::Output>> {
         let mut expanded_terms = Vec::new();
@@ -570,7 +570,7 @@ impl PipelineStage for RelationBuildingStage {
                     if shared_count > 0 {
                         let entity_score = (shared_count as f32) * 0.2;
                         relation_strength += entity_score.min(0.5);
-                        relation_reasons.push(format!("shared_entities:{}", shared_count));
+                        relation_reasons.push(format!("shared_entities:{shared_count}"));
                     }
                 }
             }
@@ -599,7 +599,7 @@ impl PipelineStage for RelationBuildingStage {
 
                 if similarity >= self.similarity_threshold {
                     relation_strength += similarity * 0.5;
-                    relation_reasons.push(format!("content_similarity:{:.2}", similarity));
+                    relation_reasons.push(format!("content_similarity:{similarity:.2}"));
                 }
             }
 
@@ -720,7 +720,7 @@ impl PipelineStage for ImportanceReassessmentStage {
                 0.0
             };
 
-            adjustment_factors.push(format!("access_freq:{:.2}", freq_score));
+            adjustment_factors.push(format!("access_freq:{freq_score:.2}"));
             total_adjustment += freq_score * self.access_freq_weight;
             total_weight += self.access_freq_weight;
         }
@@ -735,7 +735,7 @@ impl PipelineStage for ImportanceReassessmentStage {
             // We calculate the decay multiplier
             let decay_multiplier = 0.5_f32.powf(age_days / self.decay_halflife_days);
 
-            adjustment_factors.push(format!("temporal_decay:{:.2}", decay_multiplier));
+            adjustment_factors.push(format!("temporal_decay:{decay_multiplier:.2}"));
             // Negative adjustment if old (decay_multiplier < 1.0)
             total_adjustment += (decay_multiplier - 1.0) * self.temporal_decay_weight;
             total_weight += self.temporal_decay_weight;
@@ -747,7 +747,7 @@ impl PipelineStage for ImportanceReassessmentStage {
             // More relations = more important (reference count)
             let relation_score = (relation_count as f32 / 10.0).min(1.0); // Normalize, cap at 1.0
 
-            adjustment_factors.push(format!("relation_boost:{:.2}", relation_score));
+            adjustment_factors.push(format!("relation_boost:{relation_score:.2}"));
             total_adjustment += relation_score * self.relation_boost_weight;
             total_weight += self.relation_boost_weight;
         }
@@ -755,7 +755,7 @@ impl PipelineStage for ImportanceReassessmentStage {
         // 4. Context relevance (optional, needs context data)
         if self.enable_context_relevance {
             if let Some(relevance_score) = context.get::<f32>("context_relevance") {
-                adjustment_factors.push(format!("context_relevance:{:.2}", relevance_score));
+                adjustment_factors.push(format!("context_relevance:{relevance_score:.2}"));
                 total_adjustment += relevance_score * self.context_relevance_weight;
                 total_weight += self.context_relevance_weight;
             }
@@ -1170,7 +1170,7 @@ mod tests {
         let memory = MemoryBuilder::new().text("Test content").build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(memory, &mut context).await.unwrap();
+        let result = stage.execute(memory, &mut context).await?;
 
         assert!(matches!(result, StageResult::Continue(_)));
         assert_eq!(context.get::<usize>("original_length"), Some(12));
@@ -1186,7 +1186,7 @@ mod tests {
         let memory = MemoryBuilder::new().text("Short").build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(memory, &mut context).await.unwrap();
+        let result = stage.execute(memory, &mut context).await?;
 
         assert!(matches!(result, StageResult::Abort(_)));
     }
@@ -1209,7 +1209,7 @@ mod tests {
             .build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(memory, &mut context).await.unwrap();
+        let result = stage.execute(memory, &mut context).await?;
 
         if let StageResult::Continue(mem) = result {
             let entities = context.get::<Vec<String>>("entities").unwrap();
@@ -1239,7 +1239,7 @@ mod tests {
             .build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(memory, &mut context).await.unwrap();
+        let result = stage.execute(memory, &mut context).await?;
 
         if let StageResult::Continue(_mem) = result {
             let entities = context.get::<Vec<String>>("entities").unwrap();
@@ -1284,7 +1284,7 @@ mod tests {
         let query = QueryBuilder::new().text("Test query").limit(10).build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(query, &mut context).await.unwrap();
+        let result = stage.execute(query, &mut context).await?;
 
         assert!(matches!(result, StageResult::Continue(_)));
         assert_eq!(
@@ -1302,7 +1302,7 @@ mod tests {
         let query = QueryBuilder::new().text("Test").limit(100).build();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(query, &mut context).await.unwrap();
+        let result = stage.execute(query, &mut context).await?;
         assert!(matches!(result, StageResult::Continue(_)));
 
         // Invalid query (limit = 0)
@@ -1318,7 +1318,7 @@ mod tests {
         };
 
         let mut context2 = PipelineContext::new();
-        let result2 = stage.execute(invalid_query, &mut context2).await.unwrap();
+        let result2 = stage.execute(invalid_query, &mut context2).await?;
         assert!(matches!(result2, StageResult::Abort(_)));
     }
 
@@ -1406,7 +1406,7 @@ mod tests {
         let original_count = memories.len();
 
         let mut context = PipelineContext::new();
-        let result = stage.execute(memories, &mut context).await.unwrap();
+        let result = stage.execute(memories, &mut context).await?;
 
         if let StageResult::Continue(compressed) = result {
             // Check compression stats
@@ -1481,7 +1481,7 @@ mod tests {
         let original_importance = memory.importance();
         let mut context = PipelineContext::new();
 
-        let result = stage.execute(memory, &mut context).await.unwrap();
+        let result = stage.execute(memory, &mut context).await?;
 
         if let StageResult::Continue(updated_memory) = result {
             let new_importance = updated_memory.importance();
@@ -1523,7 +1523,7 @@ mod tests {
         let query = Query::from_string("搜索产品订单");
         let mut context = PipelineContext::new();
 
-        let result = stage.execute(query, &mut context).await.unwrap();
+        let result = stage.execute(query, &mut context).await?;
 
         match result {
             StageResult::Continue(_) => {

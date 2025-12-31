@@ -633,7 +633,7 @@ mod tests {
         monitor.record_metric(metric2).await;
 
         // 获取统计信息
-        let stats = monitor.get_stats("search").await.unwrap();
+        let stats = monitor.get_stats("search").await?;
         assert_eq!(stats.total_requests, 2);
         assert_eq!(stats.successful_requests, 2);
         assert_eq!(stats.success_rate, 1.0);

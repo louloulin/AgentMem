@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
 use std::time::Duration;
 
 // --- 数据结构定义 ---
@@ -115,7 +114,7 @@ impl LLMProvider for HuaweiMaasProvider {
             .as_deref()
             .unwrap_or("https://api.modelarts-maas.com/v2");
 
-        let url = format!("{}/chat/completions", base_url);
+        let url = format!("{base_url}/chat/completions");
 
         let request = HuaweiMaasRequest {
             model: self.config.model.clone(),
@@ -128,7 +127,7 @@ impl LLMProvider for HuaweiMaasProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
@@ -141,8 +140,7 @@ impl LLMProvider for HuaweiMaasProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::LLMError(format!(
-                "Huawei MaaS API error: {}",
-                error_text
+                "Huawei MaaS API error: {error_text}"
             )));
         }
 
@@ -171,7 +169,7 @@ impl LLMProvider for HuaweiMaasProvider {
             .as_deref()
             .unwrap_or("https://api.modelarts-maas.com/v2");
 
-        let url = format!("{}/chat/completions", base_url);
+        let url = format!("{base_url}/chat/completions");
 
         let request = HuaweiMaasRequest {
             model: self.config.model.clone(),
@@ -184,7 +182,7 @@ impl LLMProvider for HuaweiMaasProvider {
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
@@ -197,8 +195,7 @@ impl LLMProvider for HuaweiMaasProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::LLMError(format!(
-                "Huawei MaaS API error: {}",
-                error_text
+                "Huawei MaaS API error: {error_text}"
             )));
         }
 

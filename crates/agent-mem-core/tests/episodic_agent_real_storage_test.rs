@@ -25,7 +25,7 @@ impl MockEpisodicStore {
     }
 
     fn make_key(user_id: &str, event_id: &str) -> String {
-        format!("{}:{}", user_id, event_id)
+        format!("{user_id}:{event_id}")
     }
 }
 
@@ -58,15 +58,15 @@ impl EpisodicMemoryStore for MockEpisodicStore {
                 event.user_id == user_id
                     && query
                         .start_time
-                        .map_or(true, |start| event.occurred_at >= start)
-                    && query.end_time.map_or(true, |end| event.occurred_at <= end)
+                        .is_none_or(|start| event.occurred_at >= start)
+                    && query.end_time.is_none_or(|end| event.occurred_at <= end)
                     && query
                         .event_type
                         .as_ref()
-                        .map_or(true, |et| &event.event_type == et)
+                        .is_none_or(|et| &event.event_type == et)
                     && query
                         .min_importance
-                        .map_or(true, |min| event.importance_score >= min)
+                        .is_none_or(|min| event.importance_score >= min)
             })
             .cloned()
             .collect();
@@ -84,8 +84,8 @@ impl EpisodicMemoryStore for MockEpisodicStore {
     async fn update_event(&self, event: EpisodicEvent) -> agent_mem_traits::Result<bool> {
         let key = Self::make_key(&event.user_id, &event.id);
         let mut events = self.events.lock().await;
-        if events.contains_key(&key) {
-            events.insert(key, event);
+        if let std::collections::hash_map::Entry::Occupied(mut e) = events.entry(key) {
+            e.insert(event);
             Ok(true)
         } else {
             Ok(false)

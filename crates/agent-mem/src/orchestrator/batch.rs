@@ -98,7 +98,7 @@ impl BatchModule {
                 content.clone(),
                 agent_id.clone(),
                 user_id.clone(),
-                memory_type.clone(),
+                memory_type,
                 metadata_for_manager,
             ));
 
@@ -146,7 +146,7 @@ impl BatchModule {
                         .add_vectors(vector_data_batch)
                         .await
                         .map(|_| ())
-                        .map_err(|e| format!("VectorStore批量写入失败: {}", e))
+                        .map_err(|e| format!("VectorStore批量写入失败: {e}"))
                 } else {
                     Ok::<(), String>(())
                 }
@@ -183,7 +183,7 @@ impl BatchModule {
                             }
                             Err(e) => {
                                 error!("MemoryManager批量写入失败: {} - {}", memory_id, e);
-                                return Err(format!("MemoryManager批量写入失败: {}", e));
+                                return Err(format!("MemoryManager批量写入失败: {e}"));
                             }
                         }
                     }
@@ -210,9 +210,8 @@ impl BatchModule {
                     }
                 }
             }
-            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                "VectorStore批量写入失败，已回滚MemoryManager: {}",
-                e
+            return Err(agent_mem_traits::AgentMemError::storage_error(format!(
+                "VectorStore批量写入失败，已回滚MemoryManager: {e}"
             )));
         }
 
@@ -222,9 +221,8 @@ impl BatchModule {
 
         if let Err(e) = db_result {
             error!("MemoryManager批量写入失败: {}", e);
-            return Err(agent_mem_traits::AgentMemError::storage_error(&format!(
-                "MemoryManager批量写入失败: {}",
-                e
+            return Err(agent_mem_traits::AgentMemError::storage_error(format!(
+                "MemoryManager批量写入失败: {e}"
             )));
         }
 

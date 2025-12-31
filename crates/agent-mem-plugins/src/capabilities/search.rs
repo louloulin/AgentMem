@@ -191,7 +191,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = search.search("hello", 10).await.unwrap();
+        let results = search.search("hello", 10).await?;
         assert_eq!(results.len(), 2);
     }
 
@@ -212,7 +212,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = search.search_by_type("message", 10).await.unwrap();
+        let results = search.search_by_type("message", 10).await?;
         assert_eq!(results.len(), 2);
     }
 
@@ -233,7 +233,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = search.search_by_user("user1", 10).await.unwrap();
+        let results = search.search_by_user("user1", 10).await?;
         assert_eq!(results.len(), 2);
     }
 
@@ -253,7 +253,7 @@ mod tests {
                 .unwrap();
         }
 
-        let results = search.search("test", 5).await.unwrap();
+        let results = search.search("test", 5).await?;
         assert_eq!(results.len(), 5);
     }
 
@@ -270,9 +270,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(search.count().await.unwrap(), 2);
+        assert_eq!(search.count().await?, 2);
 
-        search.clear().await.unwrap();
-        assert_eq!(search.count().await.unwrap(), 0);
+        search.clear().await?;
+        assert_eq!(search.count().await?, 0);
     }
 }

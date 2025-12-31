@@ -146,7 +146,7 @@ impl SimpleMemory {
             info!("Updated memory: {}", memory_id);
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Memory not found: {}", memory_id))
+            Err(anyhow::anyhow!("Memory not found: {memory_id}"))
         }
     }
 
@@ -160,7 +160,7 @@ impl SimpleMemory {
             info!("Deleted memory: {}", memory_id);
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Memory not found: {}", memory_id))
+            Err(anyhow::anyhow!("Memory not found: {memory_id}"))
         }
     }
 

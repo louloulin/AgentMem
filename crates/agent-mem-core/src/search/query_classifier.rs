@@ -4,7 +4,6 @@
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// 查询类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -225,7 +224,7 @@ impl QueryClassifier {
 
         let has_english = query
             .chars()
-            .any(|c| ('a'..='z').contains(&c) || ('A'..='Z').contains(&c));
+            .any(|c: char| c.is_ascii_lowercase() || c.is_ascii_uppercase());
 
         match (has_chinese, has_english) {
             (true, true) => Language::Mixed,

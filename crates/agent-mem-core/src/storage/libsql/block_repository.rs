@@ -460,7 +460,7 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let block = create_test_block("block2");
-        repo.create(&block).await.unwrap();
+        repo.create(&block).await?;
 
         let result = repo.find_by_id("block2").await;
         assert!(result.is_ok());
@@ -475,8 +475,8 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let block = create_test_block("block3");
-        repo.create(&block).await.unwrap();
-        repo.link_to_agent("block3", "agent1").await.unwrap();
+        repo.create(&block).await?;
+        repo.link_to_agent("block3", "agent1").await?;
 
         let result = repo.find_by_agent_id("agent1").await;
         assert!(result.is_ok());
@@ -491,14 +491,14 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let mut block = create_test_block("block4");
-        repo.create(&block).await.unwrap();
+        repo.create(&block).await?;
 
         block.value = "Updated value".to_string();
         block.limit = 2000;
         let result = repo.update(&block).await;
 
         assert!(result.is_ok());
-        let updated = repo.find_by_id("block4").await.unwrap().unwrap();
+        let updated = repo.find_by_id("block4").await?.unwrap();
         assert_eq!(updated.value, "Updated value");
         assert_eq!(updated.limit, 2000);
     }
@@ -509,12 +509,12 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let block = create_test_block("block5");
-        repo.create(&block).await.unwrap();
+        repo.create(&block).await?;
 
         let result = repo.delete("block5").await;
         assert!(result.is_ok());
 
-        let found = repo.find_by_id("block5").await.unwrap();
+        let found = repo.find_by_id("block5").await?;
         assert!(found.is_none());
     }
 
@@ -524,12 +524,12 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let block = create_test_block("block6");
-        repo.create(&block).await.unwrap();
+        repo.create(&block).await?;
 
         let result = repo.link_to_agent("block6", "agent1").await;
         assert!(result.is_ok());
 
-        let blocks = repo.find_by_agent_id("agent1").await.unwrap();
+        let blocks = repo.find_by_agent_id("agent1").await?;
         assert_eq!(blocks.len(), 1);
     }
 
@@ -539,13 +539,13 @@ mod tests {
         let repo = LibSqlBlockRepository::new(conn);
 
         let block = create_test_block("block7");
-        repo.create(&block).await.unwrap();
-        repo.link_to_agent("block7", "agent1").await.unwrap();
+        repo.create(&block).await?;
+        repo.link_to_agent("block7", "agent1").await?;
 
         let result = repo.unlink_from_agent("block7", "agent1").await;
         assert!(result.is_ok());
 
-        let blocks = repo.find_by_agent_id("agent1").await.unwrap();
+        let blocks = repo.find_by_agent_id("agent1").await?;
         assert_eq!(blocks.len(), 0);
     }
 
@@ -556,8 +556,8 @@ mod tests {
 
         let block1 = create_test_block("block8");
         let block2 = create_test_block("block9");
-        repo.create(&block1).await.unwrap();
-        repo.create(&block2).await.unwrap();
+        repo.create(&block1).await?;
+        repo.create(&block2).await?;
 
         let result = repo.list(10, 0).await;
         assert!(result.is_ok());

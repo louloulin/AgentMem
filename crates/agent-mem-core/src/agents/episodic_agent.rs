@@ -251,13 +251,13 @@ impl EpisodicAgent {
                     AgentError::InvalidParameters("end_time is required for time range query".to_string())
                 })?;
 
-                let start_time = chrono::DateTime::parse_from_rfc3339(&start_time_str)
+                let start_time = chrono::DateTime::parse_from_rfc3339(start_time_str)
                     .map_err(|e| {
                         AgentError::InvalidParameters(format!("Invalid start_time format: {e}"))
                     })?
                     .with_timezone(&chrono::Utc);
 
-                let end_time = chrono::DateTime::parse_from_rfc3339(&end_time_str)
+                let end_time = chrono::DateTime::parse_from_rfc3339(end_time_str)
                     .map_err(|e| {
                         AgentError::InvalidParameters(format!("Invalid end_time format: {e}"))
                     })?

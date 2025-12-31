@@ -67,7 +67,7 @@ mod libsql_agent_tests {
 
         // Create multiple agents
         for i in 1..=3 {
-            let agent = Agent::new(org.id.clone(), Some(format!("Agent {}", i)));
+            let agent = Agent::new(org.id.clone(), Some(format!("Agent {i}")));
             agent_repo.create(&agent).await.unwrap();
         }
 
@@ -130,7 +130,7 @@ mod libsql_agent_tests {
 
         // Create multiple agents
         for i in 1..=5 {
-            let agent = Agent::new(org.id.clone(), Some(format!("Agent {}", i)));
+            let agent = Agent::new(org.id.clone(), Some(format!("Agent {i}")));
             agent_repo.create(&agent).await.unwrap();
         }
 

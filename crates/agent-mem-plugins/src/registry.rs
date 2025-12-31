@@ -46,7 +46,7 @@ impl PluginRegistry {
         let plugin = self
             .plugins
             .get_mut(id)
-            .ok_or_else(|| anyhow!("Plugin not found: {}", id))?;
+            .ok_or_else(|| anyhow!("Plugin not found: {id}"))?;
 
         plugin.status = status;
         Ok(())
@@ -56,7 +56,7 @@ impl PluginRegistry {
     pub fn unregister(&mut self, id: &str) -> Result<RegisteredPlugin> {
         self.plugins
             .remove(id)
-            .ok_or_else(|| anyhow!("Plugin not found: {}", id))
+            .ok_or_else(|| anyhow!("Plugin not found: {id}"))
     }
 }
 

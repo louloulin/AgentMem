@@ -19,7 +19,7 @@ use crate::importance_evaluator::{
 };
 use agent_mem_llm::{factory::RealLLMFactory, LLMProvider};
 use agent_mem_traits::{
-    LLMConfig, MemoryItem, MemoryType, MemoryV4 as Memory, Message, MetadataV4, Result, Session,
+    LLMConfig, MemoryItem, MemoryV4 as Memory, Message, MetadataV4, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -922,7 +922,7 @@ impl EnhancedIntelligentProcessor {
 
         let temp_memories: Vec<Memory> = temp_memory_items
             .iter()
-            .map(|item| agent_mem_core::storage::conversion::legacy_to_v4(item))
+            .map(agent_mem_core::storage::conversion::legacy_to_v4)
             .collect();
 
         let conflict_detections = self

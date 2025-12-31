@@ -333,7 +333,7 @@ impl VectorEcosystemManager {
         // 简化实现：从预定义的能力中获取
         self.get_capability(provider)
             .await
-            .ok_or_else(|| anyhow!("Unknown provider: {}", provider))
+            .ok_or_else(|| anyhow!("Unknown provider: {provider}"))
     }
 
     /// 推荐存储提供商
@@ -412,7 +412,7 @@ impl VectorEcosystemManager {
         recommendations.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
-                .unwrap_or_else(|| {
+                .unwrap_or({
                     // Fallback: if scores are NaN or incomparable, maintain order
                     std::cmp::Ordering::Equal
                 })
@@ -621,7 +621,7 @@ mod tests {
         let manager = VectorEcosystemManager::new_with_defaults().await;
 
         let criteria = SelectionCriteria::default();
-        let recommendations = manager.recommend_storage(&criteria).await.unwrap();
+        let recommendations = manager.recommend_storage(&criteria).await?;
 
         assert!(!recommendations.is_empty());
         assert!(recommendations[0].score > 0.0);

@@ -5,7 +5,7 @@
 //! intelligent routing.
 
 use crate::hierarchy::{MemoryLevel, MemoryScope};
-use crate::types::{ImportanceLevel, Memory, MemoryType};
+use crate::types::ImportanceLevel;
 use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -230,9 +230,8 @@ impl HierarchicalMemoryService {
         if let Some((scope, level, memory_index)) = index.get(memory_id) {
             // Check access permissions
             if !request_scope.can_access(scope) {
-                return Err(AgentMemError::memory_error(&format!(
-                    "Scope {:?} cannot access memory in scope {:?}",
-                    request_scope, scope
+                return Err(AgentMemError::memory_error(format!(
+                    "Scope {request_scope:?} cannot access memory in scope {scope:?}"
                 )));
             }
 
@@ -401,7 +400,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_hierarchical_memory() {
         let config = HierarchicalServiceConfig::default();
-        let service = HierarchicalMemoryService::new(config).await.unwrap();
+        let service = HierarchicalMemoryService::new(config).await?;
 
         let memory = service
             .add_hierarchical_memory(
@@ -423,7 +422,7 @@ mod tests {
     #[tokio::test]
     async fn test_memory_access_control() {
         let config = HierarchicalServiceConfig::default();
-        let service = HierarchicalMemoryService::new(config).await.unwrap();
+        let service = HierarchicalMemoryService::new(config).await?;
 
         // Add a user-scoped memory
         let memory = service

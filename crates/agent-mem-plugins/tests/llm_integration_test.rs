@@ -15,7 +15,7 @@ fn get_wasm_plugin_path(plugin_name: &str) -> PathBuf {
         .unwrap()
         .to_path_buf();
 
-    workspace_root.join(format!("target/wasm32-wasip1/release/{}.wasm", plugin_name))
+    workspace_root.join(format!("target/wasm32-wasip1/release/{plugin_name}.wasm"))
 }
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn test_llm_plugin_summarize() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         eprintln!("   Run: ./build_plugins.sh");
         return;
     }
@@ -73,7 +73,7 @@ async fn test_llm_plugin_summarize() {
             assert!(response["original_length"].as_u64().unwrap() > 0);
         }
         Err(e) => {
-            eprintln!("  ❌ Failed: {}", e);
+            eprintln!("  ❌ Failed: {e}");
             panic!("Summarize test failed");
         }
     }
@@ -87,7 +87,7 @@ async fn test_llm_plugin_translate() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -134,7 +134,7 @@ async fn test_llm_plugin_translate() {
             assert_eq!(response["target_language"], "zh-CN");
         }
         Err(e) => {
-            eprintln!("  ❌ Failed: {}", e);
+            eprintln!("  ❌ Failed: {e}");
             panic!("Translate test failed");
         }
     }
@@ -148,7 +148,7 @@ async fn test_llm_plugin_answer_question() {
     let wasm_path = get_wasm_plugin_path("llm_plugin");
 
     if !wasm_path.exists() {
-        eprintln!("⚠️  WASM file not found: {:?}", wasm_path);
+        eprintln!("⚠️  WASM file not found: {wasm_path:?}");
         return;
     }
 
@@ -195,7 +195,7 @@ async fn test_llm_plugin_answer_question() {
             assert!(response["confidence"].as_f64().unwrap() > 0.0);
         }
         Err(e) => {
-            eprintln!("  ❌ Failed: {}", e);
+            eprintln!("  ❌ Failed: {e}");
             panic!("Answer question test failed");
         }
     }

@@ -180,11 +180,9 @@ async fn demo_memory_pool(
     info!("测试内存池管理...");
 
     // 分配向量对象
-    let vector_objects = vec![
+    let vector_objects = [manager.allocate_object("Vector").await?,
         manager.allocate_object("Vector").await?,
-        manager.allocate_object("Vector").await?,
-        manager.allocate_object("Vector").await?,
-    ];
+        manager.allocate_object("Vector").await?];
     info!("✅ 分配了 {} 个向量对象", vector_objects.len());
 
     // 分配内存对象

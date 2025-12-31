@@ -21,7 +21,7 @@ impl PyMemory {
         // Create a new Memory instance
         let inner = pyo3_asyncio::tokio::get_runtime()
             .block_on(async { RustMemory::new().await })
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create Memory: {}", e)))?;
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create Memory: {e}")))?;
 
         Ok(Self { inner })
     }
@@ -40,7 +40,7 @@ impl PyMemory {
             let result: AddResult = memory
                 .add(&content)
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to add memory: {}", e)))?;
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to add memory: {e}")))?;
 
             // Return the first memory ID from results
             if let Some(first) = result.results.first() {
@@ -65,7 +65,7 @@ impl PyMemory {
             let results = memory
                 .search(&query)
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to search: {}", e)))?;
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to search: {e}")))?;
 
             // Convert to Python-friendly format
             let py_results: Vec<HashMap<String, String>> = results
@@ -94,7 +94,7 @@ impl PyMemory {
             let results = memory
                 .get_all(GetAllOptions::default())
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to get all: {}", e)))?;
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to get all: {e}")))?;
 
             let py_results: Vec<HashMap<String, String>> = results
                 .into_iter()
@@ -125,7 +125,7 @@ impl PyMemory {
             memory
                 .delete(&memory_id)
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to delete: {}", e)))?;
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to delete: {e}")))?;
 
             Ok(true)
         })
@@ -142,7 +142,7 @@ impl PyMemory {
             let count = memory
                 .delete_all(DeleteAllOptions::default())
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear: {}", e)))?;
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear: {e}")))?;
 
             Ok(count)
         })

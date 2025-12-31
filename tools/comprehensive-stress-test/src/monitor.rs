@@ -1,6 +1,5 @@
 //! 系统监控模块
 
-use anyhow::Result;
 use std::sync::Arc;
 use std::time::Duration;
 use sysinfo::{Pid, System};

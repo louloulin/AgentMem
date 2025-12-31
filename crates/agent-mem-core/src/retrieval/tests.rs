@@ -59,10 +59,10 @@ async fn test_topic_extractor_creation() {
 #[tokio::test]
 async fn test_topic_extraction() {
     let config = TopicExtractorConfig::default();
-    let extractor = TopicExtractor::new(config).await.unwrap();
+    let extractor = TopicExtractor::new(config).await?;
 
     let text = "这是一个关于人工智能和机器学习的技术讨论";
-    let topics = extractor.extract_topics(text, None).await.unwrap();
+    let topics = extractor.extract_topics(text, None).await?;
 
     assert!(!topics.is_empty());
     assert!(topics
@@ -73,7 +73,7 @@ async fn test_topic_extraction() {
 #[tokio::test]
 async fn test_topic_extraction_with_context() {
     let config = TopicExtractorConfig::default();
-    let extractor = TopicExtractor::new(config).await.unwrap();
+    let extractor = TopicExtractor::new(config).await?;
 
     let text = "讨论项目进展和业务需求";
     let mut context = HashMap::new();
@@ -93,12 +93,12 @@ async fn test_topic_extraction_with_context() {
 #[tokio::test]
 async fn test_topic_extractor_stats() {
     let config = TopicExtractorConfig::default();
-    let extractor = TopicExtractor::new(config).await.unwrap();
+    let extractor = TopicExtractor::new(config).await?;
 
     // 执行一些提取操作
-    let _ = extractor.extract_topics("测试文本", None).await.unwrap();
+    let _ = extractor.extract_topics("测试文本", None).await?;
 
-    let stats = extractor.get_stats().await.unwrap();
+    let stats = extractor.get_stats().await?;
     assert!(stats.is_object());
 }
 
@@ -112,7 +112,7 @@ async fn test_retrieval_router_creation() {
 #[tokio::test]
 async fn test_retrieval_routing() {
     let config = RetrievalRouterConfig::default();
-    let router = RetrievalRouter::new(config).await.unwrap();
+    let router = RetrievalRouter::new(config).await?;
 
     let request = create_test_retrieval_request();
     let topics = vec![ExtractedTopic {
@@ -126,7 +126,7 @@ async fn test_retrieval_routing() {
         relevance_score: 0.9,
     }];
 
-    let result = router.route_retrieval(&request, &topics).await.unwrap();
+    let result = router.route_retrieval(&request, &topics).await?;
 
     assert!(result.success);
     assert!(!result.decision.selected_strategies.is_empty());
@@ -137,7 +137,7 @@ async fn test_retrieval_routing() {
 #[tokio::test]
 async fn test_router_strategy_selection() {
     let config = RetrievalRouterConfig::default();
-    let router = RetrievalRouter::new(config).await.unwrap();
+    let router = RetrievalRouter::new(config).await?;
 
     let request = RetrievalRequest {
         query: "查找相关文档".to_string(),
@@ -149,7 +149,7 @@ async fn test_router_strategy_selection() {
         enable_context_synthesis: false,
     };
 
-    let result = router.route_retrieval(&request, &[]).await.unwrap();
+    let result = router.route_retrieval(&request, &[]).await?;
 
     assert!(result.success);
     assert!(!result.decision.selected_strategies.is_empty());
@@ -158,12 +158,12 @@ async fn test_router_strategy_selection() {
 #[tokio::test]
 async fn test_router_stats() {
     let config = RetrievalRouterConfig::default();
-    let router = RetrievalRouter::new(config).await.unwrap();
+    let router = RetrievalRouter::new(config).await?;
 
     let request = create_test_retrieval_request();
-    let _ = router.route_retrieval(&request, &[]).await.unwrap();
+    let _ = router.route_retrieval(&request, &[]).await?;
 
-    let stats = router.get_stats().await.unwrap();
+    let stats = router.get_stats().await?;
     assert!(stats.is_object());
 }
 
@@ -177,7 +177,7 @@ async fn test_context_synthesizer_creation() {
 #[tokio::test]
 async fn test_context_synthesis() {
     let config = ContextSynthesizerConfig::default();
-    let synthesizer = ContextSynthesizer::new(config).await.unwrap();
+    let synthesizer = ContextSynthesizer::new(config).await?;
 
     let memories = create_test_retrieved_memories();
     let request = create_test_retrieval_request();
@@ -200,7 +200,7 @@ async fn test_conflict_detection() {
         conflict_detection_threshold: 0.5,
         ..Default::default()
     };
-    let synthesizer = ContextSynthesizer::new(config).await.unwrap();
+    let synthesizer = ContextSynthesizer::new(config).await?;
 
     // 创建相似的记忆项来触发冲突检测
     let memories = vec![
@@ -237,7 +237,7 @@ async fn test_conflict_detection() {
 #[tokio::test]
 async fn test_synthesizer_stats() {
     let config = ContextSynthesizerConfig::default();
-    let synthesizer = ContextSynthesizer::new(config).await.unwrap();
+    let synthesizer = ContextSynthesizer::new(config).await?;
 
     let memories = create_test_retrieved_memories();
     let request = create_test_retrieval_request();
@@ -246,7 +246,7 @@ async fn test_synthesizer_stats() {
         .await
         .unwrap();
 
-    let stats = synthesizer.get_stats().await.unwrap();
+    let stats = synthesizer.get_stats().await?;
     assert!(stats.is_object());
 }
 
@@ -260,10 +260,10 @@ async fn test_active_retrieval_system_creation() {
 #[tokio::test]
 async fn test_active_retrieval_system_retrieve() {
     let config = ActiveRetrievalConfig::default();
-    let system = ActiveRetrievalSystem::new(config).await.unwrap();
+    let system = ActiveRetrievalSystem::new(config).await?;
 
     let request = create_test_retrieval_request();
-    let result = system.retrieve(request).await.unwrap();
+    let result = system.retrieve(request).await?;
 
     assert!(result.processing_time_ms > 0);
     assert!(result.confidence_score >= 0.0 && result.confidence_score <= 1.0);
@@ -276,16 +276,16 @@ async fn test_retrieval_system_caching() {
         cache_ttl_seconds: 60,
         ..Default::default()
     };
-    let system = ActiveRetrievalSystem::new(config).await.unwrap();
+    let system = ActiveRetrievalSystem::new(config).await?;
 
     let request = create_test_retrieval_request();
 
     // 第一次检索
-    let result1 = system.retrieve(request.clone()).await.unwrap();
+    let result1 = system.retrieve(request.clone()).await?;
     let time1 = result1.processing_time_ms;
 
     // 第二次检索（应该使用缓存）
-    let result2 = system.retrieve(request).await.unwrap();
+    let result2 = system.retrieve(request).await?;
     let time2 = result2.processing_time_ms;
 
     // 缓存的检索应该更快
@@ -295,12 +295,12 @@ async fn test_retrieval_system_caching() {
 #[tokio::test]
 async fn test_retrieval_system_stats() {
     let config = ActiveRetrievalConfig::default();
-    let system = ActiveRetrievalSystem::new(config).await.unwrap();
+    let system = ActiveRetrievalSystem::new(config).await?;
 
     let request = create_test_retrieval_request();
-    let _ = system.retrieve(request).await.unwrap();
+    let _ = system.retrieve(request).await?;
 
-    let stats = system.get_stats().await.unwrap();
+    let stats = system.get_stats().await?;
     assert!(stats.cache_size >= 0);
 }
 
@@ -311,18 +311,18 @@ async fn test_cache_cleanup() {
         cache_ttl_seconds: 1, // 1秒过期
         ..Default::default()
     };
-    let system = ActiveRetrievalSystem::new(config).await.unwrap();
+    let system = ActiveRetrievalSystem::new(config).await?;
 
     let request = create_test_retrieval_request();
-    let _ = system.retrieve(request).await.unwrap();
+    let _ = system.retrieve(request).await?;
 
     // 等待缓存过期
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
     // 清理缓存
-    system.cleanup_cache().await.unwrap();
+    system.cleanup_cache().await?;
 
-    let stats = system.get_stats().await.unwrap();
+    let stats = system.get_stats().await?;
     assert_eq!(stats.cache_size, 0);
 }
 

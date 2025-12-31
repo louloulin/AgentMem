@@ -237,10 +237,10 @@ mod tests {
         let config = PerformanceConfig::default();
         let manager = PerformanceManager::new(config);
 
-        manager.start().await.unwrap();
+        manager.start().await?;
         assert!(*manager.running.read().await);
 
-        manager.stop().await.unwrap();
+        manager.stop().await?;
         assert!(!*manager.running.read().await);
     }
 

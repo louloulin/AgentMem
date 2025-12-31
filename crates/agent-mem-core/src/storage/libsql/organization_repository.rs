@@ -279,8 +279,8 @@ mod tests {
     async fn setup_test_db() -> (TempDir, Arc<Mutex<Connection>>) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let conn = create_libsql_pool(db_path.to_str().unwrap()).await.unwrap();
-        run_migrations(conn.clone()).await.unwrap();
+        let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
+        run_migrations(conn.clone()).await?;
         (temp_dir, conn)
     }
 
@@ -291,34 +291,34 @@ mod tests {
 
         // Create
         let org = Organization::new("Test Org".to_string());
-        let created = repo.create(&org).await.unwrap();
+        let created = repo.create(&org).await?;
         assert_eq!(created.name, "Test Org");
 
         // Find by ID
-        let found = repo.find_by_id(&created.id).await.unwrap();
+        let found = repo.find_by_id(&created.id).await?;
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "Test Org");
 
         // Find by name
-        let found_by_name = repo.find_by_name("Test Org").await.unwrap();
+        let found_by_name = repo.find_by_name("Test Org").await?;
         assert!(found_by_name.is_some());
 
         // Update
         let mut updated_org = created.clone();
         updated_org.name = "Updated Org".to_string();
-        let updated = repo.update(&updated_org).await.unwrap();
+        let updated = repo.update(&updated_org).await?;
         assert_eq!(updated.name, "Updated Org");
 
         // List (includes default organization from migrations)
-        let orgs = repo.list(10, 0).await.unwrap();
+        let orgs = repo.list(10, 0).await?;
         assert!(
             !orgs.is_empty(),
             "Should have at least 1 organization (created + default)"
         );
 
         // Delete
-        repo.delete(&created.id).await.unwrap();
-        let deleted = repo.find_by_id(&created.id).await.unwrap();
+        repo.delete(&created.id).await?;
+        let deleted = repo.find_by_id(&created.id).await?;
         assert!(deleted.is_none());
     }
 }

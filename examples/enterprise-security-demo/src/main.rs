@@ -7,9 +7,7 @@
 //! - Audit Logging
 //! - Data Masking and PII Protection
 
-use agent_mem_compat::{EnterpriseSecurityConfig, Mem0Client, Permission};
-use std::collections::HashMap;
-use tracing::{error, info, warn};
+use agent_mem_compat::{Mem0Client, Permission};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -93,18 +91,18 @@ async fn demo_authentication(client: &Mem0Client) -> Result<(), Box<dyn std::err
                     );
                 }
                 Err(e) => {
-                    println!("  ❌ Token 验证失败: {}", e);
+                    println!("  ❌ Token 验证失败: {e}");
                 }
             }
 
             // Logout
             match client.logout(&session.id).await {
                 Ok(_) => println!("  ✅ 用户登出成功"),
-                Err(e) => println!("  ❌ 登出失败: {}", e),
+                Err(e) => println!("  ❌ 登出失败: {e}"),
             }
         }
         Err(e) => {
-            println!("  ❌ 认证失败: {}", e);
+            println!("  ❌ 认证失败: {e}");
         }
     }
 
@@ -128,13 +126,13 @@ async fn demo_rbac(client: &Mem0Client) -> Result<(), Box<dyn std::error::Error>
         match client.check_permission("admin", &permission).await {
             Ok(has_permission) => {
                 if has_permission {
-                    println!("  ✅ 权限检查通过: {:?}", permission);
+                    println!("  ✅ 权限检查通过: {permission:?}");
                 } else {
-                    println!("  ❌ 权限检查失败: {:?}", permission);
+                    println!("  ❌ 权限检查失败: {permission:?}");
                 }
             }
             Err(e) => {
-                println!("  ⚠️ 权限检查错误: {:?} - {}", permission, e);
+                println!("  ⚠️ 权限检查错误: {permission:?} - {e}");
             }
         }
     }
@@ -146,7 +144,7 @@ async fn demo_encryption(client: &Mem0Client) -> Result<(), Box<dyn std::error::
     println!("  🔐 测试数据加密和解密...");
 
     let sensitive_data = "这是一些敏感数据：用户密码 = secret123, API密钥 = sk-1234567890abcdef";
-    println!("    📝 原始数据: {}", sensitive_data);
+    println!("    📝 原始数据: {sensitive_data}");
 
     // Encrypt data
     match client.encrypt_data(sensitive_data).await {
@@ -161,7 +159,7 @@ async fn demo_encryption(client: &Mem0Client) -> Result<(), Box<dyn std::error::
             match client.decrypt_data(&encrypted_data).await {
                 Ok(decrypted_data) => {
                     println!("  ✅ 数据解密成功");
-                    println!("    🔓 解密数据: {}", decrypted_data);
+                    println!("    🔓 解密数据: {decrypted_data}");
 
                     if decrypted_data == sensitive_data {
                         println!("  ✅ 加密解密验证成功！");
@@ -170,12 +168,12 @@ async fn demo_encryption(client: &Mem0Client) -> Result<(), Box<dyn std::error::
                     }
                 }
                 Err(e) => {
-                    println!("  ❌ 数据解密失败: {}", e);
+                    println!("  ❌ 数据解密失败: {e}");
                 }
             }
         }
         Err(e) => {
-            println!("  ❌ 数据加密失败: {}", e);
+            println!("  ❌ 数据加密失败: {e}");
         }
     }
 
@@ -194,14 +192,14 @@ async fn demo_data_masking(client: &Mem0Client) -> Result<(), Box<dyn std::error
     ];
 
     for data in pii_data {
-        println!("    📝 原始数据: {}", data);
+        println!("    📝 原始数据: {data}");
 
         match client.mask_sensitive_data(data).await {
             Ok(masked_data) => {
-                println!("    🎭 脱敏数据: {}", masked_data);
+                println!("    🎭 脱敏数据: {masked_data}");
             }
             Err(e) => {
-                println!("    ❌ 数据脱敏失败: {}", e);
+                println!("    ❌ 数据脱敏失败: {e}");
             }
         }
         println!();
@@ -228,7 +226,7 @@ async fn demo_audit_logging(client: &Mem0Client) -> Result<(), Box<dyn std::erro
             }
         }
         Err(e) => {
-            println!("  ❌ 获取审计日志失败: {}", e);
+            println!("  ❌ 获取审计日志失败: {e}");
         }
     }
 
@@ -239,18 +237,18 @@ async fn demo_user_management(client: &Mem0Client) -> Result<(), Box<dyn std::er
     println!("  👥 测试用户管理...");
 
     // Create a new user
-    let username = format!("test_user_{}", Uuid::new_v4().to_string()[..8].to_string());
-    let email = format!("{}@example.com", username);
+    let username = format!("test_user_{}", &Uuid::new_v4().to_string()[..8]);
+    let email = format!("{username}@example.com");
     let password = "test_password_123";
     let roles = vec!["user".to_string()];
 
-    println!("    👤 创建新用户: {}", username);
+    println!("    👤 创建新用户: {username}");
 
     match client.create_user(&username, &email, password, roles).await {
         Ok(user_id) => {
             println!("  ✅ 用户创建成功!");
-            println!("    🆔 用户ID: {}", user_id);
-            println!("    📧 邮箱: {}", email);
+            println!("    🆔 用户ID: {user_id}");
+            println!("    📧 邮箱: {email}");
             println!("    🎭 角色: [\"user\"]");
 
             // Try to authenticate with the new user
@@ -281,17 +279,17 @@ async fn demo_user_management(client: &Mem0Client) -> Result<(), Box<dyn std::er
                             }
                         }
                         Err(e) => {
-                            println!("  ❌ 权限检查失败: {}", e);
+                            println!("  ❌ 权限检查失败: {e}");
                         }
                     }
                 }
                 Err(e) => {
-                    println!("  ❌ 新用户认证失败: {}", e);
+                    println!("  ❌ 新用户认证失败: {e}");
                 }
             }
         }
         Err(e) => {
-            println!("  ❌ 用户创建失败: {}", e);
+            println!("  ❌ 用户创建失败: {e}");
         }
     }
 

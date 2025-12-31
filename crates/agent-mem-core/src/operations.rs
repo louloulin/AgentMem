@@ -419,7 +419,7 @@ impl MemoryOperations for InMemoryOperations {
             total_importance += importance;
 
             let access_count = memory.metadata.access_count as u64;
-            total_access_count += access_count as u64;
+            total_access_count += access_count;
 
             if access_count > most_accessed_count {
                 most_accessed_count = access_count;
@@ -448,8 +448,7 @@ impl MemoryOperations for InMemoryOperations {
 
             if self.memories.contains_key(&memory_id_str) {
                 return Err(AgentMemError::memory_error(format!(
-                    "Memory {} already exists",
-                    memory_id_str
+                    "Memory {memory_id_str} already exists"
                 )));
             }
 

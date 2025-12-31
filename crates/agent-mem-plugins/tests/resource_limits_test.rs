@@ -345,7 +345,7 @@ fn test_resource_limits_display() {
         used: 1024,
         limit: 512,
     };
-    let message = format!("{}", error);
+    let message = format!("{error}");
     assert!(message.contains("Memory limit exceeded"));
     assert!(message.contains("1024"));
     assert!(message.contains("512"));
@@ -357,7 +357,7 @@ fn test_default_resource_limits_reasonable() {
 
     // Memory limits should be reasonable
     assert_eq!(limits.memory.max_heap_bytes, 100 * 1024 * 1024); // 100 MB
-    assert_eq!(limits.memory.max_stack_bytes, 1 * 1024 * 1024); // 1 MB
+    assert_eq!(limits.memory.max_stack_bytes, 1024 * 1024); // 1 MB
     assert_eq!(limits.memory.max_total_allocations, 10_000);
 
     // CPU limits should be reasonable

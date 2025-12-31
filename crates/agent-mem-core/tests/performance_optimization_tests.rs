@@ -12,7 +12,6 @@ use agent_mem_traits::{
     Result,
 };
 use std::sync::Arc;
-use tokio;
 
 /// Task 2.1.4 测试：多层缓存性能测试
 #[tokio::test]
@@ -22,10 +21,10 @@ async fn test_multi_layer_cache_performance() -> Result<()> {
     // 测试L1缓存性能
     let start = std::time::Instant::now();
     for i in 0..1000 {
-        let key = format!("test_key_{}", i);
+        let key = format!("test_key_{i}");
         let memory = Memory::new(
-            format!("agent_{}", i),
-            Some(format!("user_{}", i)),
+            format!("agent_{i}"),
+            Some(format!("user_{i}")),
             "episodic",
             "test content",
             0.8,
@@ -38,8 +37,8 @@ async fn test_multi_layer_cache_performance() -> Result<()> {
     // 测试L2缓存性能
     let start = std::time::Instant::now();
     for i in 0..1000 {
-        let key = format!("test_prompt_{}", i);
-        cache.set_llm_response(key.clone(), format!("response_{}", i));
+        let key = format!("test_prompt_{i}");
+        cache.set_llm_response(key.clone(), format!("response_{i}"));
         cache.get_llm_response(&key);
     }
     let l2_duration = start.elapsed();
@@ -47,7 +46,7 @@ async fn test_multi_layer_cache_performance() -> Result<()> {
     // 测试L3缓存性能
     let start = std::time::Instant::now();
     for i in 0..1000 {
-        let key = format!("test_text_{}", i);
+        let key = format!("test_text_{i}");
         let embedding = vec![0.1; 384]; // 模拟384维嵌入
         cache.set_embedding(key.clone(), embedding);
         cache.get_embedding(&key);
@@ -95,8 +94,8 @@ async fn test_cache_warming_performance() -> Result<()> {
     let cache = MultiLayerCache::new();
 
     // 准备测试数据
-    let common_queries: Vec<String> = (0..100).map(|i| format!("常见查询 {}", i)).collect();
-    let common_texts: Vec<String> = (0..100).map(|i| format!("常见文本 {}", i)).collect();
+    let common_queries: Vec<String> = (0..100).map(|i| format!("常见查询 {i}")).collect();
+    let common_texts: Vec<String> = (0..100).map(|i| format!("常见文本 {i}")).collect();
 
     // 测试预热性能
     let start = std::time::Instant::now();
@@ -131,27 +130,27 @@ async fn test_cache_concurrent_performance() -> Result<()> {
     for i in 0..100 {
         let cache_clone = cache.clone();
         let handle = tokio::spawn(async move {
-            let key = format!("concurrent_key_{}", i);
+            let key = format!("concurrent_key_{i}");
 
             // L1缓存操作
             let memory = Memory::new(
-                format!("agent_{}", i),
-                Some(format!("user_{}", i)),
+                format!("agent_{i}"),
+                Some(format!("user_{i}")),
                 "episodic",
                 "test content",
                 0.8,
             );
-            cache_clone.set_memories(format!("{}_mem", key), vec![memory]);
-            let _mem_result = cache_clone.get_memories(&format!("{}_mem", key));
+            cache_clone.set_memories(format!("{key}_mem"), vec![memory]);
+            let _mem_result = cache_clone.get_memories(&format!("{key}_mem"));
 
             // L2缓存操作
-            cache_clone.set_llm_response(format!("{}_llm", key), format!("response_{}", i));
-            let _llm_result = cache_clone.get_llm_response(&format!("{}_llm", key));
+            cache_clone.set_llm_response(format!("{key}_llm"), format!("response_{i}"));
+            let _llm_result = cache_clone.get_llm_response(&format!("{key}_llm"));
 
             // L3缓存操作
             let embedding = vec![0.1; 384];
-            cache_clone.set_embedding(format!("{}_emb", key), embedding);
-            let _emb_result = cache_clone.get_embedding(&format!("{}_emb", key));
+            cache_clone.set_embedding(format!("{key}_emb"), embedding);
+            let _emb_result = cache_clone.get_embedding(&format!("{key}_emb"));
         });
         handles.push(handle);
     }

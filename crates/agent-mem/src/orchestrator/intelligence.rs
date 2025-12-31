@@ -3,8 +3,6 @@
 //! 负责所有智能处理相关操作，包括事实提取、重要性评估、冲突检测、决策等
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use futures::future::join_all;
 use tracing::{debug, info, warn};
 
 use agent_mem_intelligence::{
@@ -356,7 +354,7 @@ impl IntelligenceModule {
                                 importance: r.similarity,
                                 created_at: chrono::Utc::now().to_rfc3339(),
                                 updated_at: None,
-                                metadata: r.metadata.into_iter().map(|(k, v)| (k, v)).collect(),
+                                metadata: r.metadata.into_iter().collect(),
                             })
                         }
                     })
@@ -409,12 +407,12 @@ impl IntelligenceModule {
             use agent_mem_traits::MemoryV4;
             let new_memories_v4: Vec<MemoryV4> = new_memory_items
                 .iter()
-                .map(|item| MemoryV4::from_legacy_item(item))
+                .map(MemoryV4::from_legacy_item)
                 .collect();
 
             let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
                 .iter()
-                .map(|item| MemoryV4::from_legacy_item(item))
+                .map(MemoryV4::from_legacy_item)
                 .collect();
 
             // 调用 ConflictResolver
@@ -458,7 +456,7 @@ impl IntelligenceModule {
             use agent_mem_traits::MemoryV4;
             let existing_memories_v4: Vec<MemoryV4> = existing_memory_items
                 .iter()
-                .map(|item| MemoryV4::from_legacy_item(item))
+                .map(MemoryV4::from_legacy_item)
                 .collect();
 
             // 构建 DecisionContext
@@ -523,7 +521,7 @@ impl IntelligenceModule {
                         metadata: fact.metadata.clone(),
                     },
                     confidence: importance,
-                    reasoning: format!("简化决策: {:.2}", importance),
+                    reasoning: format!("简化决策: {importance:.2}"),
                     affected_memories: Vec::new(),
                     estimated_impact: importance,
                 });
@@ -549,7 +547,7 @@ impl IntelligenceModule {
         info!("执行 {} 个决策", decisions.len());
 
         let mut results = Vec::new();
-        let mut relations = None;
+        let relations = None;
 
         for decision in decisions {
             match &decision.action {
@@ -695,7 +693,7 @@ impl IntelligenceModule {
     ) -> Result<AddResult> {
         use super::storage::StorageModule;
         use crate::types::MemoryEvent;
-        use tracing::{debug, info, warn};
+        use tracing::{info, warn};
 
         info!(
             "智能添加记忆: content={}, agent_id={}, user_id={:?}",

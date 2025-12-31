@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use agent_mem_traits::{MemoryItem, MemoryType};
+use agent_mem_traits::MemoryItem;
 
 /// 添加记忆的选项（Mem0 兼容）
 ///
@@ -391,6 +391,7 @@ impl Default for MemoryStats {
 
 /// 记忆可视化结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct MemoryVisualization {
     /// 总记忆数
     pub total_count: usize,
@@ -408,19 +409,6 @@ pub struct MemoryVisualization {
     pub stats: MemoryStats,
 }
 
-impl Default for MemoryVisualization {
-    fn default() -> Self {
-        Self {
-            total_count: 0,
-            core_memories: Vec::new(),
-            episodic_memories: Vec::new(),
-            semantic_memories: Vec::new(),
-            procedural_memories: Vec::new(),
-            resource_memories: Vec::new(),
-            stats: MemoryStats::default(),
-        }
-    }
-}
 
 /// 备份选项
 #[derive(Debug, Clone)]

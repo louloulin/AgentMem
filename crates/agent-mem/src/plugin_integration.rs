@@ -177,6 +177,12 @@ impl PluginEnhancedMemory {
 pub struct PluginEnhancedMemory;
 
 #[cfg(not(feature = "plugins"))]
+impl Default for PluginEnhancedMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginEnhancedMemory {
     pub fn new() -> Self {
         Self

@@ -31,7 +31,7 @@ async fn test_retrieval_orchestrator_basic() {
         .expect("Failed to retrieve memories");
 
     // 验证结果
-    assert!(response.memories.len() > 0, "Should return some memories");
+    assert!(!response.memories.is_empty(), "Should return some memories");
     assert!(
         response.memories.len() <= 10,
         "Should not exceed max_results"
@@ -81,7 +81,7 @@ async fn test_retrieval_orchestrator_multiple_memory_types() {
     let memory_types: std::collections::HashSet<_> = response
         .memories
         .iter()
-        .map(|m| m.memory_type.clone())
+        .map(|m| m.memory_type)
         .collect();
 
     assert!(
@@ -95,7 +95,7 @@ async fn test_retrieval_orchestrator_multiple_memory_types() {
 
     println!("✅ Multiple memory types test passed");
     println!("   Retrieved {} memories", response.memories.len());
-    println!("   Memory types: {:?}", memory_types);
+    println!("   Memory types: {memory_types:?}");
 }
 
 #[tokio::test]
@@ -157,7 +157,7 @@ async fn test_retrieval_orchestrator_max_results() {
     // 测试不同的 max_results 值
     for max_results in [1, 3, 5, 10] {
         let request = RetrievalRequest {
-            query: format!("test query {}", max_results),
+            query: format!("test query {max_results}"),
             target_memory_types: Some(vec![
                 MemoryType::Core,
                 MemoryType::Episodic,
@@ -177,8 +177,7 @@ async fn test_retrieval_orchestrator_max_results() {
 
         assert!(
             response.memories.len() <= max_results,
-            "Should not exceed max_results of {}",
-            max_results
+            "Should not exceed max_results of {max_results}"
         );
 
         println!(

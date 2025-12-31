@@ -69,11 +69,11 @@ pub fn get_memory(_id: &str) -> Result<Option<Memory>> {
 pub fn log(level: &str, message: &str) -> Result<()> {
     // Simple stderr logging as fallback
     match level {
-        "error" => eprintln!("[PLUGIN ERROR] {}", message),
-        "warn" => eprintln!("[PLUGIN WARN] {}", message),
-        "info" => eprintln!("[PLUGIN INFO] {}", message),
-        "debug" => eprintln!("[PLUGIN DEBUG] {}", message),
-        _ => eprintln!("[PLUGIN] {}", message),
+        "error" => eprintln!("[PLUGIN ERROR] {message}"),
+        "warn" => eprintln!("[PLUGIN WARN] {message}"),
+        "info" => eprintln!("[PLUGIN INFO] {message}"),
+        "debug" => eprintln!("[PLUGIN DEBUG] {message}"),
+        _ => eprintln!("[PLUGIN] {message}"),
     }
     Ok(())
 }

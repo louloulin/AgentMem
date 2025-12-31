@@ -330,15 +330,15 @@ mod tests {
         };
 
         // Create
-        repo.create_feedback(&record).await.unwrap();
+        repo.create_feedback(&record).await?;
 
         // Get all
-        let all_feedback = repo.get_all_feedback().await.unwrap();
+        let all_feedback = repo.get_all_feedback().await?;
         assert_eq!(all_feedback.len(), 1);
         assert_eq!(all_feedback[0].id, "test-1");
 
         // Get by pattern
-        let pattern_feedback = repo.get_feedback_by_pattern("exact_match").await.unwrap();
+        let pattern_feedback = repo.get_feedback_by_pattern("exact_match").await?;
         assert_eq!(pattern_feedback.len(), 1);
 
         // Get count
@@ -398,8 +398,8 @@ mod tests {
             user_id: None,
         };
 
-        repo.create_feedback(&old_record).await.unwrap();
-        repo.create_feedback(&new_record).await.unwrap();
+        repo.create_feedback(&old_record).await?;
+        repo.create_feedback(&new_record).await?;
 
         // Delete old feedback (older than 7 days)
         let deleted_count = repo
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(deleted_count, 1);
 
         // Verify only new record remains
-        let remaining = repo.get_all_feedback().await.unwrap();
+        let remaining = repo.get_all_feedback().await?;
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, "new-1");
     }

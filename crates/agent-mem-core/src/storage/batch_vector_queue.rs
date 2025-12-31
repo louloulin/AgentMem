@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 /// 向量存储任务
 #[derive(Debug, Clone)]
@@ -195,7 +195,7 @@ impl BatchVectorStorageQueue {
 
         let batch_size = batch.len();
         let start = Instant::now();
-        let vectors = batch.drain(..).collect();
+        let vectors = std::mem::take(batch);
 
         match vector_store.add_vectors(vectors).await {
             Ok(_) => {

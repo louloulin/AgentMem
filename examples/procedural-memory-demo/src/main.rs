@@ -7,13 +7,13 @@
 //! - 过程记忆存储
 
 use agent_mem_compat::{
-    Mem0Client, ProceduralMemoryConfig, StepStatus, StepType, Task, TaskPriority, WorkflowStep,
+    Mem0Client, StepStatus, StepType, Task, TaskPriority, WorkflowStep,
 };
 use agent_mem_traits::Session;
 use chrono::Utc;
 use serde_json::json;
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 #[tokio::main]
@@ -137,7 +137,7 @@ async fn demo_workflow_creation_and_execution(
         )
         .await?;
 
-    println!("✅ 工作流创建成功: {}", workflow_id);
+    println!("✅ 工作流创建成功: {workflow_id}");
 
     // 开始执行工作流
     let execution_id = client
@@ -154,11 +154,11 @@ async fn demo_workflow_creation_and_execution(
         )
         .await?;
 
-    println!("✅ 工作流执行开始: {}", execution_id);
+    println!("✅ 工作流执行开始: {execution_id}");
 
     // 执行工作流步骤
     for i in 1..=3 {
-        println!("\n📋 执行第 {} 步", i);
+        println!("\n📋 执行第 {i} 步");
 
         let result = client.execute_next_step(&execution_id).await?;
 
@@ -267,7 +267,7 @@ async fn demo_task_chain_management(client: &Mem0Client) -> Result<(), Box<dyn s
         .create_task_chain("数据处理任务链".to_string(), tasks)
         .await?;
 
-    println!("✅ 任务链创建成功: {}", chain_id);
+    println!("✅ 任务链创建成功: {chain_id}");
 
     // 获取任务链信息
     if let Some(task_chain) = client.get_task_chain(&chain_id).await? {
@@ -280,7 +280,7 @@ async fn demo_task_chain_management(client: &Mem0Client) -> Result<(), Box<dyn s
 
     // 执行任务链中的任务
     for i in 1..=4 {
-        println!("\n🔄 执行任务 {}", i);
+        println!("\n🔄 执行任务 {i}");
 
         let result = client.execute_next_task(&chain_id).await?;
 
@@ -317,8 +317,8 @@ async fn demo_task_chain_management(client: &Mem0Client) -> Result<(), Box<dyn s
             .filter(|t| t.status == agent_mem_compat::TaskStatus::Failed)
             .count();
 
-        println!("  已完成任务: {}", completed_count);
-        println!("  失败任务: {}", failed_count);
+        println!("  已完成任务: {completed_count}");
+        println!("  失败任务: {failed_count}");
     }
 
     Ok(())
@@ -410,7 +410,7 @@ async fn demo_complex_workflow(
         )
         .await?;
 
-    println!("✅ 复杂工作流创建成功: {}", workflow_id);
+    println!("✅ 复杂工作流创建成功: {workflow_id}");
 
     // 开始执行工作流
     let execution_id = client
@@ -426,10 +426,10 @@ async fn demo_complex_workflow(
         )
         .await?;
 
-    println!("✅ 复杂工作流执行开始: {}", execution_id);
+    println!("✅ 复杂工作流执行开始: {execution_id}");
 
     // 执行所有步骤
-    let step_names = vec!["初始化", "决策步骤", "记忆操作"];
+    let step_names = ["初始化", "决策步骤", "记忆操作"];
 
     for (i, step_name) in step_names.iter().enumerate() {
         println!("\n🔄 执行步骤 {}: {}", i + 1, step_name);

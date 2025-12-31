@@ -26,7 +26,7 @@ fn test_network_multiple_requests() {
     // Make multiple requests
     for i in 0..10 {
         let request = HttpRequest {
-            url: format!("https://api.example.com/user/{}", i),
+            url: format!("https://api.example.com/user/{i}"),
             method: HttpMethod::GET,
             headers: std::collections::HashMap::new(),
             body: None,
@@ -96,7 +96,7 @@ fn test_network_request_limit_enforcement() {
     // Make 5 requests (should succeed)
     for i in 0..5 {
         let request = HttpRequest {
-            url: format!("https://api.example.com/test/{}", i),
+            url: format!("https://api.example.com/test/{i}"),
             method: HttpMethod::GET,
             headers: std::collections::HashMap::new(),
             body: None,
@@ -104,7 +104,7 @@ fn test_network_request_limit_enforcement() {
         };
 
         let result = network.http_request(request);
-        assert!(result.is_ok(), "Request {} should succeed", i);
+        assert!(result.is_ok(), "Request {i} should succeed");
     }
 
     // 6th request should fail
@@ -131,7 +131,7 @@ fn test_network_reset_counter() {
     // Make some requests
     for i in 0..5 {
         let request = HttpRequest {
-            url: format!("https://api.example.com/test/{}", i),
+            url: format!("https://api.example.com/test/{i}"),
             method: HttpMethod::GET,
             headers: std::collections::HashMap::new(),
             body: None,
@@ -182,6 +182,6 @@ fn test_network_different_http_methods() {
         };
 
         let result = network.http_request(request);
-        assert!(result.is_ok(), "Method {:?} should succeed", method);
+        assert!(result.is_ok(), "Method {method:?} should succeed");
     }
 }

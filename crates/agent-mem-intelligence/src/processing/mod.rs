@@ -218,7 +218,7 @@ mod tests {
             create_test_memory("mem3", "Third memory", 0.9),
         ];
 
-        let stats = processor.process_memories(&mut memories).await.unwrap();
+        let stats = processor.process_memories(&mut memories).await?;
         assert_eq!(stats.processed_count, 3);
         // Processing time might be 0 in fast tests, so just check it's valid
         assert!(stats.processing_time_ms >= 0);

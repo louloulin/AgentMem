@@ -469,7 +469,7 @@ mod tests {
             .record_feedback(QueryType::ShortKeyword, 0.3)
             .await;
 
-        let stats = calculator.get_stats().await.unwrap();
+        let stats = calculator.get_stats().await?;
         let adjustment = stats.get_adjustment(&QueryType::ShortKeyword);
 
         // 应该建议降低阈值

@@ -130,7 +130,7 @@ async fn demo_old_memory_decay(
 
     for (label, age) in ages {
         let memory = create_test_memory(
-            &format!("{}的记忆", label),
+            &format!("{label}的记忆"),
             10,               // 固定访问次数
             Utc::now() - age, // 不同创建时间
             0.5,              // 固定基础重要性
@@ -172,7 +172,7 @@ async fn demo_importance_updates(
             .update_importance("test-memory-id", access_type.clone())
             .await?;
 
-        println!("{:?}\t\t+{:.3}", access_type, boost);
+        println!("{access_type:?}\t\t+{boost:.3}");
     }
 
     println!("\n💡 不同访问类型对重要性的影响不同：");

@@ -520,7 +520,7 @@ mod tests {
         let mut manager = AdaptiveStrategyManager::new(config);
         let context = ScoringContext::default();
 
-        let recommendation = manager.recommend_strategy(&context, None).await.unwrap();
+        let recommendation = manager.recommend_strategy(&context, None).await?;
 
         // Check that we got a valid strategy
         match recommendation.recommended_strategy {

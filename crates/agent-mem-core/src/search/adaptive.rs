@@ -5,7 +5,6 @@
 use super::SearchQuery;
 use super::SearchResult;
 use agent_mem_config::agentmem_config::{AgentMemConfig, SearchConfig};
-use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -84,7 +83,7 @@ impl QueryFeatures {
         // 简单的实体计数（大写词、@提及等）
         let entity_count = query
             .split_whitespace()
-            .filter(|word| word.chars().next().map_or(false, |c| c.is_uppercase()))
+            .filter(|word| word.chars().next().is_some_and(|c| c.is_uppercase()))
             .count();
 
         Self {

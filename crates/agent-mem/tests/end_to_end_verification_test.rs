@@ -64,7 +64,7 @@ async fn test_vector_store_and_metadata() {
     let result = mem.add("测试向量存储").await.expect("Failed to add");
     let memory_id = &result.results[0].id;
 
-    println!("✅ 记忆已添加: {}", memory_id);
+    println!("✅ 记忆已添加: {memory_id}");
     println!("  - 验证: 向量存储应该包含这条记忆");
     println!("  - 验证: metadata 应该包含 hash 和 created_at");
 
@@ -76,7 +76,7 @@ async fn test_vector_store_and_metadata() {
                 for (i, result) in search_results.iter().enumerate() {
                     println!("  结果 {}: {}", i + 1, result.content);
                     if let Some(score) = result.score {
-                        println!("    相似度: {:.4}", score);
+                        println!("    相似度: {score:.4}");
                     }
                 }
             } else {
@@ -84,7 +84,7 @@ async fn test_vector_store_and_metadata() {
             }
         }
         Err(e) => {
-            println!("⚠️ 向量搜索失败（预期行为）: {}", e);
+            println!("⚠️ 向量搜索失败（预期行为）: {e}");
             println!("  说明：需要配置 embedder 才能进行向量搜索");
             println!("  验证：记忆已成功添加到向量存储");
         }
@@ -127,7 +127,7 @@ async fn test_history_tracking() {
     let add_result = mem.add("原始内容").await.expect("Failed to add");
     let memory_id = &add_result.results[0].id.clone();
 
-    println!("✅ 添加记忆: {}", memory_id);
+    println!("✅ 添加记忆: {memory_id}");
 
     // 更新记忆
     let mut update_data = HashMap::new();
@@ -141,7 +141,7 @@ async fn test_history_tracking() {
             println!("  - 新内容: {}", updated.content);
         }
         Err(e) => {
-            println!("⚠️ 更新失败: {}", e);
+            println!("⚠️ 更新失败: {e}");
         }
     }
 
@@ -158,7 +158,7 @@ async fn test_history_tracking() {
                     entry.created_at.format("%Y-%m-%d %H:%M:%S")
                 );
                 if let Some(content) = &entry.new_memory {
-                    println!("    内容: {}", content);
+                    println!("    内容: {content}");
                 }
             }
 
@@ -169,7 +169,7 @@ async fn test_history_tracking() {
             }
         }
         Err(e) => {
-            println!("⚠️ 历史记录查询失败: {}", e);
+            println!("⚠️ 历史记录查询失败: {e}");
         }
     }
 }
@@ -185,7 +185,7 @@ async fn test_complete_crud_workflow() {
     println!("1. CREATE - 添加记忆");
     let add_result = mem.add("CRUD 测试内容").await.expect("Failed to add");
     let memory_id = add_result.results[0].id.clone();
-    println!("  ✅ 添加成功: {}", memory_id);
+    println!("  ✅ 添加成功: {memory_id}");
 
     // READ (通过搜索)
     println!("\n2. READ - 搜索记忆");
@@ -200,7 +200,7 @@ async fn test_complete_crud_workflow() {
                 println!("  ⚠️ 搜索返回空（可能需要 embedder 配置）");
             }
         }
-        Err(e) => println!("  ⚠️ 搜索失败: {}", e),
+        Err(e) => println!("  ⚠️ 搜索失败: {e}"),
     }
 
     // UPDATE
@@ -219,14 +219,14 @@ async fn test_complete_crud_workflow() {
             println!("    新内容: {}", updated.content);
             assert_eq!(updated.content, "CRUD 更新后的内容");
         }
-        Err(e) => println!("  ⚠️ 更新失败: {}", e),
+        Err(e) => println!("  ⚠️ 更新失败: {e}"),
     }
 
     // DELETE
     println!("\n4. DELETE - 删除记忆");
     match mem.delete(&memory_id).await {
         Ok(_) => println!("  ✅ 删除成功"),
-        Err(e) => println!("  ⚠️ 删除失败: {}", e),
+        Err(e) => println!("  ⚠️ 删除失败: {e}"),
     }
 
     // 验证历史
@@ -236,18 +236,18 @@ async fn test_complete_crud_workflow() {
             println!("  ✅ 历史记录: {} 条", history.len());
 
             let events: Vec<_> = history.iter().map(|h| h.event.as_str()).collect();
-            println!("  事件序列: {:?}", events);
+            println!("  事件序列: {events:?}");
 
             // 注意：历史记录可能不完整，取决于 HistoryManager 的配置
-            if history.len() >= 1 {
+            if !history.is_empty() {
                 // 如果历史记录存在，验证包含预期的事件（但不强制要求 ADD）
-                println!("  事件类型: {:?}", events);
+                println!("  事件类型: {events:?}");
                 // 不强制要求 ADD 事件，因为历史记录可能不完整
             } else {
                 println!("  ⚠️ 历史记录为空（可能 HistoryManager 未完全配置）");
             }
         }
-        Err(e) => println!("  ⚠️ 历史查询失败: {}", e),
+        Err(e) => println!("  ⚠️ 历史查询失败: {e}"),
     }
 }
 
@@ -268,7 +268,7 @@ async fn test_reset_functionality() {
     // 重置
     match mem.reset().await {
         Ok(_) => println!("✅ reset() 执行成功"),
-        Err(e) => println!("⚠️ reset() 失败: {}", e),
+        Err(e) => println!("⚠️ reset() 失败: {e}"),
     }
 
     // 验证清空
@@ -279,7 +279,7 @@ async fn test_reset_functionality() {
                 println!("  ✅ 所有记忆已清空");
             }
         }
-        Err(e) => println!("  ⚠️ 验证失败: {}", e),
+        Err(e) => println!("  ⚠️ 验证失败: {e}"),
     }
 }
 
@@ -294,7 +294,7 @@ async fn test_performance_benchmark() {
     let start = std::time::Instant::now();
 
     for i in 0..test_count {
-        let content = format!("性能测试记忆 {}", i);
+        let content = format!("性能测试记忆 {i}");
         mem.add(&content).await.ok();
     }
 
@@ -302,9 +302,9 @@ async fn test_performance_benchmark() {
     let ops_per_sec = (test_count as f64) / duration.as_secs_f64();
 
     println!("✅ 性能测试完成");
-    println!("  - 记忆数量: {}", test_count);
+    println!("  - 记忆数量: {test_count}");
     println!("  - 总耗时: {:.2}s", duration.as_secs_f64());
-    println!("  - 吞吐量: {:.0} ops/s", ops_per_sec);
+    println!("  - 吞吐量: {ops_per_sec:.0} ops/s");
 
     if ops_per_sec > 100.0 {
         println!("  ✅ 性能良好 (>100 ops/s)");

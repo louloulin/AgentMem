@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
-use tracing::{debug, info, warn};
+use tracing::info;
 
 /// Persona提取配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +86,7 @@ pub struct PersonaProfile {
 
 /// Persona统计信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PersonaStats {
     /// 总属性数
     pub total_attributes: usize,
@@ -97,16 +98,6 @@ pub struct PersonaStats {
     pub last_extraction_at: Option<DateTime<Utc>>,
 }
 
-impl Default for PersonaStats {
-    fn default() -> Self {
-        Self {
-            total_attributes: 0,
-            high_confidence_attributes: 0,
-            update_count: 0,
-            last_extraction_at: None,
-        }
-    }
-}
 
 /// Persona提取引擎
 pub struct PersonaExtractionEngine {
@@ -288,7 +279,7 @@ impl PersonaExtractionEngine {
         memory: &MemoryContent,
     ) -> Result<Vec<PersonaAttribute>> {
         // 简化的属性提取（实际应使用LLM或NLP工具）
-        let mut attributes = Vec::new();
+        let attributes = Vec::new();
 
         // 提取偏好、习惯、特征等
         // TODO: 使用更高级的提取方法（LLM、NER等）
@@ -366,7 +357,7 @@ impl PersonaExtractionEngine {
         new: &HashMap<String, PersonaAttribute>,
     ) -> Result<f64> {
         let mut changes = 0;
-        let mut total = current.attributes.len().max(new.len());
+        let total = current.attributes.len().max(new.len());
 
         for (key, new_attr) in new {
             if let Some(old_attr) = current.attributes.get(key) {

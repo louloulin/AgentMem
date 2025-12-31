@@ -22,7 +22,7 @@ impl PluginLoader {
         // Create Extism plugin
         let manifest = Manifest::new([wasm_bytes]);
         let plugin = Plugin::new(&manifest, [], true)
-            .map_err(|e| anyhow!("Failed to create plugin: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create plugin: {e}"))?;
 
         // Return loaded plugin
         Ok(LoadedPlugin {
@@ -36,7 +36,7 @@ impl PluginLoader {
     pub fn call_plugin(plugin: &mut Plugin, function_name: &str, input: &str) -> Result<String> {
         plugin
             .call(function_name, input)
-            .map_err(|e| anyhow!("Failed to call plugin function {}: {}", function_name, e))
+            .map_err(|e| anyhow!("Failed to call plugin function {function_name}: {e}"))
     }
 }
 

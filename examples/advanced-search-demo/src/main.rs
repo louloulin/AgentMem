@@ -10,7 +10,7 @@ use agent_mem_compat::client::{
     BatchAddRequest, EnhancedAddRequest, EnhancedSearchRequest, Messages,
 };
 use agent_mem_compat::{
-    BatchAddResult, BatchDeleteItem, BatchDeleteRequest, BatchUpdateItem, BatchUpdateRequest,
+    BatchDeleteItem, BatchDeleteRequest, BatchUpdateItem, BatchUpdateRequest,
     Mem0Client, MemoryFilter,
 };
 use anyhow::Result;

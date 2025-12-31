@@ -57,13 +57,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             simple_options.clone(),
         )
         .await?;
-    println!("✅ 添加成功: {:?}\n", result1);
+    println!("✅ 添加成功: {result1:?}\n");
 
     println!("添加记忆 2: 'Another raw message'");
     let result2 = mem
         .add_with_options("Another raw message".to_string(), simple_options.clone())
         .await?;
-    println!("✅ 添加成功: {:?}\n", result2);
+    println!("✅ 添加成功: {result2:?}\n");
 
     println!("添加记忆 3: 'Log entry: User logged in at 10:30 AM'");
     let result3 = mem
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             simple_options.clone(),
         )
         .await?;
-    println!("✅ 添加成功: {:?}\n", result3);
+    println!("✅ 添加成功: {result3:?}\n");
 
     // ========================================
     // 步骤 3: 对比智能模式
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("添加记忆 4: 'I love pizza'（智能模式）");
     let result4 = mem.add("I love pizza").await?;
-    println!("✅ 添加成功: {:?}\n", result4);
+    println!("✅ 添加成功: {result4:?}\n");
 
     // ========================================
     // 步骤 4: 搜索记忆
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 步骤 4: 搜索记忆");
 
     let query = "raw";
-    println!("搜索查询: '{}'", query);
+    println!("搜索查询: '{query}'");
 
     let results = mem.search(query).await?;
     println!("✅ 搜索成功，找到 {} 条记忆:\n", results.len());
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, result) in results.iter().enumerate() {
         let score_str = result
             .score
-            .map(|s| format!("{:.2}", s))
+            .map(|s| format!("{s:.2}"))
             .unwrap_or_else(|| "N/A".to_string());
         println!("  {}. {} (相关性: {})", i + 1, result.content, score_str);
     }
