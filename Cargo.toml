@@ -164,6 +164,18 @@ members = [
     # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 
+# Workspace package configuration
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+authors = ["AgentMem Team <team@agentmem.dev>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/agentmem/agentmem"
+homepage = "https://agentmem.dev"
+documentation = "https://docs.rs/agent-mem"
+keywords = ["ai", "memory", "agent", "llm", "vector"]
+categories = ["database", "science", "web-programming"]
+
 # ⚡ 编译时间优化配置
 [profile.release]
 # 优化级别：3 = 最高优化
@@ -230,3 +242,21 @@ anyhow = "1.0"
 thiserror = "1.0"
 async-trait = "0.1"
 futures = "0.3"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+sha2 = "0.10"
+hex = "0.4"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+toml = "0.8"
+config = "0.14"
+num_cpus = "1.16"
+rand = "0.8"
+dashmap = "5.5"
+reqwest = { version = "0.11", features = ["json"] }
+hyper = { version = "0.14", features = ["full"] }
+tower = "0.4"
+axum = "0.7"
+bytes = "1.5"
+parking_lot = "0.12"
+crossbeam = "0.8"
+once_cell = "1.19"

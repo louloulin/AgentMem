@@ -151,7 +151,7 @@ mod intelligence_tests {
 
     /// 测试时间信息提取
     #[tokio::test]
-    async fn test temporal_information_extraction() {
+    async fn test_temporal_information_extraction() {
         let content = "明天下午3点开会，地点在会议室A";
 
         assert!(content.contains("明天"));
