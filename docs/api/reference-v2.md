@@ -6,15 +6,15 @@ Agent State Database 是一个高性能的AI Agent状态管理系统，提供了
 
 ## 核心API
 
-### AgentDB
+### AgentMem
 
 主要的数据库接口，提供所有核心功能。
 
 ```rust
-use agent_state_db::{AgentDB, AgentState, Memory, Document, StateType, MemoryType};
+use agent_state_db::{AgentMem, AgentState, Memory, Document, StateType, MemoryType};
 
 // 创建数据库实例
-let db = AgentDB::new("./my_agent_db", 384).await?;
+let db = AgentMem::new("./my_agent_db", 384).await?;
 ```
 
 #### Agent状态管理
@@ -204,19 +204,19 @@ let health = db.get_system_health().await?;
 
 ## 配置管理
 
-### AgentDbConfig
+### AgentMemConfig
 
 ```rust
-use agent_state_db::{AgentDbConfig, ConfigManager};
+use agent_state_db::{AgentMemConfig, ConfigManager};
 
 // 使用默认配置
-let config = AgentDbConfig::default();
+let config = AgentMemConfig::default();
 
 // 从文件加载配置
-let config = AgentDbConfig::from_file("config.json")?;
+let config = AgentMemConfig::from_file("config.json")?;
 
 // 从环境变量加载配置
-let config = AgentDbConfig::from_env();
+let config = AgentMemConfig::from_env();
 
 // 配置管理器
 let mut manager = ConfigManager::new();
@@ -367,28 +367,28 @@ let is_expired = time::is_expired(timestamp, 3600); // 1小时TTL
 
 ## 错误处理
 
-所有API都返回`Result<T, AgentDbError>`类型，主要错误类型包括：
+所有API都返回`Result<T, AgentMemError>`类型，主要错误类型包括：
 
 ```rust
-use agent_state_db::AgentDbError;
+use agent_state_db::AgentMemError;
 
 match result {
     Ok(data) => {
         // 处理成功结果
     }
-    Err(AgentDbError::NotFound) => {
+    Err(AgentMemError::NotFound) => {
         // 处理未找到错误
     }
-    Err(AgentDbError::InvalidArgument(msg)) => {
+    Err(AgentMemError::InvalidArgument(msg)) => {
         // 处理参数错误
     }
-    Err(AgentDbError::Internal(msg)) => {
+    Err(AgentMemError::Internal(msg)) => {
         // 处理内部错误
     }
-    Err(AgentDbError::Serde(err)) => {
+    Err(AgentMemError::Serde(err)) => {
         // 处理序列化错误
     }
-    Err(AgentDbError::LanceDb(err)) => {
+    Err(AgentMemError::LanceDb(err)) => {
         // 处理数据库错误
     }
 }

@@ -75,10 +75,10 @@ let candidates = self.search_layer_hnsw(&hnsw.nodes, query, current, ef, 0);
 **批量操作接口**：
 ```rust
 // 批量添加向量
-pub fn batch_add_vectors(&mut self, index_id: &str, vectors: Vec<Vec<f32>>, metadata: Vec<String>) -> Result<Vec<String>, AgentDbError>
+pub fn batch_add_vectors(&mut self, index_id: &str, vectors: Vec<Vec<f32>>, metadata: Vec<String>) -> Result<Vec<String>, AgentMemError>
 
 // 批量向量搜索
-pub fn batch_search_vectors(&self, index_id: &str, queries: Vec<Vec<f32>>, k: usize) -> Result<Vec<Vec<VectorSearchResult>>, AgentDbError>
+pub fn batch_search_vectors(&self, index_id: &str, queries: Vec<Vec<f32>>, k: usize) -> Result<Vec<Vec<VectorSearchResult>>, AgentMemError>
 ```
 
 **批量处理特性**：

@@ -25,7 +25,7 @@ if !std::path::Path::new(db_path).exists() {
 
 // 使用绝对路径
 let absolute_path = std::env::current_dir()?.join("agent_db");
-let db = AgentDB::new(absolute_path.to_str().unwrap(), 384).await?;
+let db = AgentMem::new(absolute_path.to_str().unwrap(), 384).await?;
 ```
 
 #### 问题：连接池耗尽
@@ -36,7 +36,7 @@ Error: Failed to acquire connection: semaphore closed
 **解决方案：**
 ```rust
 // 增加连接池大小
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.performance.parallel_workers = 50; // 增加到50个连接
 config.database.max_connections = 50;
 
@@ -54,7 +54,7 @@ Vector search taking too long (>5 seconds)
 **解决方案：**
 ```rust
 // 1. 使用HNSW索引
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.vector.index_type = VectorIndexType::HNSW;
 
 // 2. 调整HNSW参数
@@ -77,7 +77,7 @@ System running out of memory
 **解决方案：**
 ```rust
 // 1. 设置内存限制
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.performance.memory_limit_mb = 4096; // 4GB限制
 
 // 2. 启用记忆压缩
@@ -105,7 +105,7 @@ Error: Data corruption detected
 **解决方案：**
 ```rust
 // 1. 启用备份
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.database.backup_enabled = true;
 config.database.backup_interval_hours = 6; // 每6小时备份
 
@@ -175,7 +175,7 @@ Error: Invalid configuration: Vector dimension must be greater than 0
 **解决方案：**
 ```rust
 // 1. 验证配置
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.vector.dimension = 384; // 确保大于0
 config.vector.similarity_threshold = 0.7; // 0.0-1.0之间
 
@@ -184,13 +184,13 @@ config.validate()?;
 
 // 2. 使用环境变量覆盖
 std::env::set_var("AGENT_DB_VECTOR_DIMENSION", "768");
-let config = AgentDbConfig::from_env();
+let config = AgentMemConfig::from_env();
 
 // 3. 从文件加载配置
-let config = AgentDbConfig::from_file("config.json")
+let config = AgentMemConfig::from_file("config.json")
     .unwrap_or_else(|_| {
         println!("使用默认配置");
-        AgentDbConfig::default()
+        AgentMemConfig::default()
     });
 ```
 
@@ -199,7 +199,7 @@ let config = AgentDbConfig::from_file("config.json")
 #### 启用详细日志
 ```rust
 // 1. 设置日志级别
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.logging.level = "debug".to_string();
 config.logging.console_enabled = true;
 config.logging.file_enabled = true;
@@ -245,7 +245,7 @@ async fn health_check_loop(monitor: &MonitoringManager) {
 #### 向量搜索优化
 ```rust
 // 1. 选择合适的索引类型
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 
 // 小数据集使用Flat索引
 if vector_count < 1000 {
@@ -266,7 +266,7 @@ config.performance.parallel_workers = num_cpus::get(); // 使用所有CPU核心
 #### 缓存优化
 ```rust
 // 1. 调整缓存大小
-let mut config = AgentDbConfig::default();
+let mut config = AgentMemConfig::default();
 config.performance.cache_size_mb = 1024; // 1GB缓存
 
 // 2. 缓存预热
@@ -285,15 +285,15 @@ for query_hash in common_queries {
 
 #### 自动恢复机制
 ```rust
-use agent_state_db::{AgentDB, AgentDbError};
+use agent_state_db::{AgentMem, AgentMemError};
 
-struct ResilientAgentDB {
-    primary_db: AgentDB,
-    backup_db: Option<AgentDB>,
+struct ResilientAgentMem {
+    primary_db: AgentMem,
+    backup_db: Option<AgentMem>,
 }
 
-impl ResilientAgentDB {
-    async fn save_agent_state_with_retry(&self, state: &AgentState) -> Result<(), AgentDbError> {
+impl ResilientAgentMem {
+    async fn save_agent_state_with_retry(&self, state: &AgentState) -> Result<(), AgentMemError> {
         // 尝试主数据库
         match self.primary_db.save_agent_state(state).await {
             Ok(()) => Ok(()),

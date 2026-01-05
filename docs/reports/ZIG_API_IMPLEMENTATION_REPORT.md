@@ -143,7 +143,7 @@ pub const AgentDatabase = struct {
 
 **错误处理**：
 ```zig
-pub const AgentDbError = error{
+pub const AgentMemError = error{
     DatabaseCreationFailed,
     StateNotFound,
     SaveFailed,

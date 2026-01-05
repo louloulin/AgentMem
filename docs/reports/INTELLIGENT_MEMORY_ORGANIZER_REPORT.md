@@ -10,7 +10,7 @@
 
 **核心算法**：
 ```rust
-pub async fn evaluate_memory_importance(&self, memory: &Memory) -> Result<f32, AgentDbError> {
+pub async fn evaluate_memory_importance(&self, memory: &Memory) -> Result<f32, AgentMemError> {
     let mut importance_score = memory.importance;
     
     // 1. 基于访问频率的重要性
@@ -49,7 +49,7 @@ pub async fn evaluate_memory_importance(&self, memory: &Memory) -> Result<f32, A
 
 **K-means聚类算法**：
 ```rust
-pub async fn cluster_memories(&self, agent_id: u64) -> Result<Vec<MemoryCluster>, AgentDbError> {
+pub async fn cluster_memories(&self, agent_id: u64) -> Result<Vec<MemoryCluster>, AgentMemError> {
     let memories = self.get_agent_memories(agent_id).await?;
     let k = (memories.len() as f32).sqrt() as usize + 1;
     let clusters = self.kmeans_clustering(&memories, k)?;
@@ -80,7 +80,7 @@ pub struct MemoryCluster {
 
 **归档策略**：
 ```rust
-pub async fn archive_old_memories(&self, agent_id: u64) -> Result<Vec<MemoryArchive>, AgentDbError> {
+pub async fn archive_old_memories(&self, agent_id: u64) -> Result<Vec<MemoryArchive>, AgentMemError> {
     let archive_threshold = current_time - (self.archive_threshold_days * 24 * 3600);
     let old_memories = self.get_old_memories(agent_id, archive_threshold).await?;
     

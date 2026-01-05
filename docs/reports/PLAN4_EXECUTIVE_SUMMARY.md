@@ -1,8 +1,8 @@
-# AgentDB Plan 4.0 - 执行摘要
+# AgentMem Plan 4.0 - 执行摘要
 
 ## 🎯 战略愿景
 
-**核心目标**: 将AgentDB从技术产品转型为全球领先的**企业级AI Agent基础设施平台**，成为AI Agent时代的基础设施标准。
+**核心目标**: 将AgentMem从技术产品转型为全球领先的**企业级AI Agent基础设施平台**，成为AI Agent时代的基础设施标准。
 
 **市场定位**: 企业级AI Agent编排和管理平台，专注于大规模、多模态、云原生的AI Agent部署和运维。
 
@@ -29,7 +29,7 @@
 - **多模态AI**: 文本、图像、音频、视频统一处理
 
 ### 2. **云原生基础设施**
-- **Kubernetes原生**: AgentDB Operator和Helm Charts
+- **Kubernetes原生**: AgentMem Operator和Helm Charts
 - **多云支持**: AWS、Azure、GCP统一部署
 - **边缘计算**: 边缘-云协同的混合架构
 - **自动扩缩容**: 基于负载的智能伸缩
@@ -195,7 +195,7 @@
 
 ---
 
-**AgentDB Plan 4.0 Executive Summary**  
+**AgentMem Plan 4.0 Executive Summary**  
 **制定时间**: 2025年6月19日  
 **战略周期**: 2025-2027 (30个月)  
 **核心目标**: 构建全球领先的企业级AI Agent基础设施平台  

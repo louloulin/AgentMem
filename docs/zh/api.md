@@ -1,8 +1,8 @@
-# AgentDB API 参考文档
+# AgentMem API 参考文档
 
 ## 📋 API 概述
 
-AgentDB 提供了多层次的 API 接口，支持不同编程语言和使用场景：
+AgentMem 提供了多层次的 API 接口，支持不同编程语言和使用场景：
 
 - **Rust API**: 原生高性能接口
 - **Zig API**: 零成本抽象层
@@ -32,16 +32,16 @@ pub struct AgentDatabase {
 
 ```rust
 // 创建基础数据库实例
-pub async fn new(config: DatabaseConfig) -> Result<Self, AgentDbError>
+pub async fn new(config: DatabaseConfig) -> Result<Self, AgentMemError>
 
 // 添加向量搜索引擎
-pub async fn with_vector_engine(self, config: VectorIndexConfig) -> Result<Self, AgentDbError>
+pub async fn with_vector_engine(self, config: VectorIndexConfig) -> Result<Self, AgentMemError>
 
 // 添加安全管理器
 pub fn with_security_manager(self) -> Self
 
 // 添加RAG引擎
-pub async fn with_rag_engine(self) -> Result<Self, AgentDbError>
+pub async fn with_rag_engine(self) -> Result<Self, AgentMemError>
 ```
 
 #### 使用示例
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #### 保存Agent状态
 
 ```rust
-pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentDbError>
+pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentMemError>
 ```
 
 **参数**:
@@ -93,7 +93,7 @@ db.save_agent_state(&state).await?;
 #### 加载Agent状态
 
 ```rust
-pub async fn load_agent_state(&self, agent_id: u64) -> Result<Option<AgentState>, AgentDbError>
+pub async fn load_agent_state(&self, agent_id: u64) -> Result<Option<AgentState>, AgentMemError>
 ```
 
 **参数**:
@@ -117,7 +117,7 @@ if let Some(state) = db.load_agent_state(12345).await? {
 #### 存储记忆
 
 ```rust
-pub async fn store_memory(&self, memory: &Memory) -> Result<(), AgentDbError>
+pub async fn store_memory(&self, memory: &Memory) -> Result<(), AgentMemError>
 ```
 
 **参数**:
@@ -138,7 +138,7 @@ db.store_memory(&memory).await?;
 #### 获取记忆
 
 ```rust
-pub async fn get_memories(&self, agent_id: u64) -> Result<Vec<Memory>, AgentDbError>
+pub async fn get_memories(&self, agent_id: u64) -> Result<Vec<Memory>, AgentMemError>
 ```
 
 **参数**:
@@ -157,7 +157,7 @@ pub async fn add_vector(
     id: u64, 
     vector: Vec<f32>, 
     metadata: HashMap<String, String>
-) -> Result<(), AgentDbError>
+) -> Result<(), AgentMemError>
 ```
 
 #### 向量搜索
@@ -167,7 +167,7 @@ pub async fn search_vectors(
     &self, 
     query: &[f32], 
     limit: usize
-) -> Result<Vec<VectorSearchResult>, AgentDbError>
+) -> Result<Vec<VectorSearchResult>, AgentMemError>
 ```
 
 ### RAG操作
@@ -175,7 +175,7 @@ pub async fn search_vectors(
 #### 索引文档
 
 ```rust
-pub async fn index_document(&self, document: &Document) -> Result<String, AgentDbError>
+pub async fn index_document(&self, document: &Document) -> Result<String, AgentMemError>
 ```
 
 #### 搜索文档
@@ -185,7 +185,7 @@ pub async fn search_documents(
     &self, 
     query: &str, 
     limit: usize
-) -> Result<Vec<SearchResult>, AgentDbError>
+) -> Result<Vec<SearchResult>, AgentMemError>
 ```
 
 #### 语义搜索
@@ -195,7 +195,7 @@ pub async fn semantic_search_documents(
     &self, 
     query_embedding: Vec<f32>, 
     limit: usize
-) -> Result<Vec<SearchResult>, AgentDbError>
+) -> Result<Vec<SearchResult>, AgentMemError>
 ```
 
 ## ⚡ Zig API
@@ -379,16 +379,16 @@ int main() {
 ### 基础用法
 
 ```python
-import agentdb
+import AgentMem
 
 # 创建数据库
-db = agentdb.AgentDatabase("./agent_db")
+db = AgentMem.AgentDatabase("./agent_db")
 
 # 保存Agent状态
-state = agentdb.AgentState(
+state = AgentMem.AgentState(
     agent_id=12345,
     session_id=67890,
-    state_type=agentdb.StateType.WORKING_MEMORY,
+    state_type=AgentMem.StateType.WORKING_MEMORY,
     data=b"agent state data"
 )
 await db.save_agent_state(state)
@@ -405,7 +405,7 @@ if loaded_state:
 
 ```rust
 #[derive(Debug, thiserror::Error)]
-pub enum AgentDbError {
+pub enum AgentMemError {
     #[error("数据库错误: {0}")]
     Database(String),
     
@@ -435,7 +435,7 @@ match db.load_agent_state(agent_id).await {
         // 处理未找到的情况
         println!("未找到Agent状态");
     },
-    Err(AgentDbError::Database(msg)) => {
+    Err(AgentMemError::Database(msg)) => {
         // 处理数据库错误
         eprintln!("数据库错误: {}", msg);
     },
@@ -479,4 +479,4 @@ impl Default for DatabaseConfig {
 
 **文档版本**: v1.0  
 **最后更新**: 2025年6月19日  
-**维护者**: AgentDB开发团队
+**维护者**: AgentMem开发团队

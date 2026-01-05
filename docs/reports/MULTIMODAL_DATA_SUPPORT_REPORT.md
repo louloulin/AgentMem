@@ -13,8 +13,8 @@
 pub struct ImageFeatureExtractor;
 
 impl FeatureExtractor for ImageFeatureExtractor {
-    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentDbError>
-    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentDbError>
+    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentMemError>
+    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentMemError>
 }
 ```
 
@@ -51,8 +51,8 @@ pub struct ImageFeatures {
 pub struct AudioFeatureExtractor;
 
 impl FeatureExtractor for AudioFeatureExtractor {
-    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentDbError>
-    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentDbError>
+    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentMemError>
+    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentMemError>
 }
 ```
 
@@ -91,8 +91,8 @@ pub struct AudioFeatures {
 pub struct TextFeatureExtractor;
 
 impl FeatureExtractor for TextFeatureExtractor {
-    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentDbError>
-    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentDbError>
+    fn extract_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<f32>, AgentMemError>
+    fn extract_detailed_features(&self, data: &[u8], metadata: &HashMap<String, String>) -> Result<HashMap<String, f32>, AgentMemError>
 }
 ```
 
@@ -121,7 +121,7 @@ pub struct MultimodalEngine {
 **数据融合策略**：
 ```rust
 // 融合多个嵌入
-fn fuse_embeddings(&self, embeddings: &[Vec<f32>], modalities: &[ModalityType]) -> Result<Vec<f32>, AgentDbError>
+fn fuse_embeddings(&self, embeddings: &[Vec<f32>], modalities: &[ModalityType]) -> Result<Vec<f32>, AgentMemError>
 
 // 加权平均融合
 let weights = self.calculate_modality_weights(modalities);
@@ -151,10 +151,10 @@ pub struct CrossModalMapping {
 **跨模态搜索功能**：
 ```rust
 // 跨模态搜索
-pub fn cross_modal_search(&self, query_data_id: &str, target_modality: ModalityType, k: usize) -> Result<Vec<MultimodalSearchResult>, AgentDbError>
+pub fn cross_modal_search(&self, query_data_id: &str, target_modality: ModalityType, k: usize) -> Result<Vec<MultimodalSearchResult>, AgentMemError>
 
 // 多模态融合搜索
-pub fn multimodal_fusion_search(&self, query_data_ids: Vec<String>, k: usize) -> Result<Vec<MultimodalSearchResult>, AgentDbError>
+pub fn multimodal_fusion_search(&self, query_data_ids: Vec<String>, k: usize) -> Result<Vec<MultimodalSearchResult>, AgentMemError>
 ```
 
 **检索特性**：
@@ -168,10 +168,10 @@ pub fn multimodal_fusion_search(&self, query_data_ids: Vec<String>, k: usize) ->
 **线性映射学习**：
 ```rust
 // 学习跨模态映射
-pub fn learn_cross_modal_mapping(&mut self, source_modality: ModalityType, target_modality: ModalityType, paired_data: Vec<(String, String)>) -> Result<String, AgentDbError>
+pub fn learn_cross_modal_mapping(&mut self, source_modality: ModalityType, target_modality: ModalityType, paired_data: Vec<(String, String)>) -> Result<String, AgentMemError>
 
 // 学习线性映射
-fn learn_linear_mapping(&self, source_features: &[Vec<f32>], target_features: &[Vec<f32>]) -> Result<(Vec<Vec<f32>>, Vec<f32>), AgentDbError>
+fn learn_linear_mapping(&self, source_features: &[Vec<f32>], target_features: &[Vec<f32>]) -> Result<(Vec<Vec<f32>>, Vec<f32>), AgentMemError>
 ```
 
 **映射学习特性**：

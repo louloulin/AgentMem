@@ -1,6 +1,6 @@
-# Contributing to AgentDB
+# Contributing to AgentMem
 
-We welcome contributions to AgentDB! This document provides guidelines for contributing to the project.
+We welcome contributions to AgentMem! This document provides guidelines for contributing to the project.
 
 ## 🚀 Getting Started
 
@@ -159,7 +159,7 @@ Contributors will be recognized in:
 
 ## 📄 License
 
-By contributing to AgentDB, you agree that your contributions will be licensed under the MIT License.
+By contributing to AgentMem, you agree that your contributions will be licensed under the MIT License.
 
 ## ❓ Questions?
 
@@ -169,4 +169,4 @@ If you have questions about contributing, please:
 3. Create a new issue with the "question" label
 4. Join our community discussions
 
-Thank you for contributing to AgentDB! 🚀
+Thank you for contributing to AgentMem! 🚀

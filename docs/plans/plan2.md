@@ -682,13 +682,13 @@ pub const Database = struct {
 **技术要点**：
 ```zig
 // agent_db.zig - 主要API
-pub const AgentDB = struct {
+pub const AgentMem = struct {
     state_manager: AgentStateManager,
     memory_manager: MemoryManager,
     rag_engine: RAGEngine,
 
-    pub fn init(db_path: []const u8, allocator: std.mem.Allocator) !AgentDB {
-        return AgentDB{
+    pub fn init(db_path: []const u8, allocator: std.mem.Allocator) !AgentMem {
+        return AgentMem{
             .state_manager = try AgentStateManager.init(db_path, allocator),
             .memory_manager = try MemoryManager.init(db_path, allocator),
             .rag_engine = try RAGEngine.init(db_path, allocator),
@@ -696,7 +696,7 @@ pub const AgentDB = struct {
     }
 
     // 导出C接口
-    export fn agent_db_save_state(db: *AgentDB, agent_id: u64, state_data: [*]const u8, len: usize) c_int {
+    export fn agent_db_save_state(db: *AgentMem, agent_id: u64, state_data: [*]const u8, len: usize) c_int {
         // 实现...
     }
 };
@@ -732,7 +732,7 @@ const lib = dlopen(`./libagent_db.${suffix}`, {
   },
 });
 
-export class AgentDB {
+export class AgentMem {
   constructor(dbPath) {
     this.handle = lib.symbols.agent_db_init(dbPath);
   }

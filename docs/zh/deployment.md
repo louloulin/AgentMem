@@ -1,8 +1,8 @@
-# AgentDB 部署指南
+# AgentMem 部署指南
 
 ## 🚀 部署概述
 
-本指南详细介绍了如何在不同环境中部署 AgentDB，包括单机部署、分布式部署和云原生部署。
+本指南详细介绍了如何在不同环境中部署 AgentMem，包括单机部署、分布式部署和云原生部署。
 
 ## 📋 部署前准备
 
@@ -51,8 +51,8 @@ source ~/.bashrc
 
 ```bash
 # 克隆仓库
-git clone https://github.com/louloulin/AgentDB.git
-cd AgentDB
+git clone https://github.com/louloulin/AgentMem.git
+cd AgentMem
 
 # 编译发布版本
 cargo build --release
@@ -70,11 +70,11 @@ zig build test
 
 ### 2. 配置文件设置
 
-创建 `/etc/agentdb/config.toml`:
+创建 `/etc/AgentMem/config.toml`:
 
 ```toml
 [database]
-path = "/var/lib/agentdb/data"
+path = "/var/lib/AgentMem/data"
 max_connections = 100
 connection_timeout = 30
 query_timeout = 120
@@ -108,7 +108,7 @@ io_threads = 4
 
 [logging]
 level = "info"
-file = "/var/log/agentdb/agentdb.log"
+file = "/var/log/AgentMem/AgentMem.log"
 max_size = "100MB"
 max_files = 10
 
@@ -120,20 +120,20 @@ health_check_port = 8080
 
 ### 3. 系统服务配置
 
-创建 `/etc/systemd/system/agentdb.service`:
+创建 `/etc/systemd/system/AgentMem.service`:
 
 ```ini
 [Unit]
-Description=AgentDB High-Performance AI Agent Database
+Description=AgentMem High-Performance AI Agent Database
 After=network.target
 Wants=network.target
 
 [Service]
 Type=simple
-User=agentdb
-Group=agentdb
-WorkingDirectory=/opt/agentdb
-ExecStart=/opt/agentdb/target/release/agentdb-server --config /etc/agentdb/config.toml
+User=AgentMem
+Group=AgentMem
+WorkingDirectory=/opt/AgentMem
+ExecStart=/opt/AgentMem/target/release/AgentMem-server --config /etc/AgentMem/config.toml
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -145,7 +145,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/agentdb /var/log/agentdb
+ReadWritePaths=/var/lib/AgentMem /var/log/AgentMem
 
 [Install]
 WantedBy=multi-user.target
@@ -155,24 +155,24 @@ WantedBy=multi-user.target
 
 ```bash
 # 创建用户和目录
-sudo useradd -r -s /bin/false agentdb
-sudo mkdir -p /var/lib/agentdb/data
-sudo mkdir -p /var/log/agentdb
-sudo mkdir -p /etc/agentdb
-sudo chown -R agentdb:agentdb /var/lib/agentdb /var/log/agentdb
+sudo useradd -r -s /bin/false AgentMem
+sudo mkdir -p /var/lib/AgentMem/data
+sudo mkdir -p /var/log/AgentMem
+sudo mkdir -p /etc/AgentMem
+sudo chown -R AgentMem:AgentMem /var/lib/AgentMem /var/log/AgentMem
 
 # 复制二进制文件
-sudo cp target/release/agentdb-server /opt/agentdb/
-sudo chown agentdb:agentdb /opt/agentdb/agentdb-server
-sudo chmod +x /opt/agentdb/agentdb-server
+sudo cp target/release/AgentMem-server /opt/AgentMem/
+sudo chown AgentMem:AgentMem /opt/AgentMem/AgentMem-server
+sudo chmod +x /opt/AgentMem/AgentMem-server
 
 # 启动服务
 sudo systemctl daemon-reload
-sudo systemctl enable agentdb
-sudo systemctl start agentdb
+sudo systemctl enable AgentMem
+sudo systemctl start AgentMem
 
 # 检查状态
-sudo systemctl status agentdb
+sudo systemctl status AgentMem
 ```
 
 ## 🌐 分布式部署
@@ -181,7 +181,7 @@ sudo systemctl status agentdb
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AgentDB 分布式集群                        │
+│                    AgentMem 分布式集群                        │
 ├─────────────────────────────────────────────────────────────┤
 │  负载均衡层                                                  │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
@@ -189,7 +189,7 @@ sudo systemctl status agentdb
 │  │   (主)      │ │   (备)      │ │  (服务发现)  │           │
 │  └─────────────┘ └─────────────┘ └─────────────┘           │
 ├─────────────────────────────────────────────────────────────┤
-│  AgentDB 节点层                                             │
+│  AgentMem 节点层                                             │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
 │  │  Node-1     │ │  Node-2     │ │  Node-3     │           │
 │  │  (主节点)   │ │  (工作节点)  │ │  (工作节点)  │           │
@@ -264,22 +264,22 @@ defaults
     timeout server 50000ms
     option httplog
 
-frontend agentdb_frontend
+frontend AgentMem_frontend
     bind *:8080
-    default_backend agentdb_backend
+    default_backend AgentMem_backend
 
-backend agentdb_backend
+backend AgentMem_backend
     balance roundrobin
     option httpchk GET /health
     server node1 node-1:8080 check
     server node2 node-2:8080 check
     server node3 node-3:8080 check
 
-frontend agentdb_api
+frontend AgentMem_api
     bind *:9000
-    default_backend agentdb_api_backend
+    default_backend AgentMem_api_backend
 
-backend agentdb_api_backend
+backend AgentMem_api_backend
     balance leastconn
     server node1 node-1:9000 check
     server node2 node-2:9000 check
@@ -314,7 +314,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=rust-builder /app/target/release/agentdb-server ./
+COPY --from=rust-builder /app/target/release/AgentMem-server ./
 COPY --from=zig-builder /app/zig-out/bin/* ./
 COPY config/docker.toml ./config.toml
 
@@ -324,7 +324,7 @@ USER 1000:1000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["./agentdb-server", "--config", "config.toml"]
+CMD ["./AgentMem-server", "--config", "config.toml"]
 ```
 
 #### Docker Compose
@@ -333,85 +333,85 @@ CMD ["./agentdb-server", "--config", "config.toml"]
 version: '3.8'
 
 services:
-  agentdb-node1:
+  AgentMem-node1:
     build: .
-    container_name: agentdb-node1
+    container_name: AgentMem-node1
     hostname: node1
     ports:
       - "8081:8080"
       - "9001:9000"
       - "9091:9090"
     volumes:
-      - agentdb-data1:/var/lib/agentdb
+      - AgentMem-data1:/var/lib/AgentMem
       - ./config/node1.toml:/app/config.toml
     environment:
-      - AGENTDB_NODE_ID=node-1
-      - AGENTDB_NODE_TYPE=master
+      - AgentMem_NODE_ID=node-1
+      - AgentMem_NODE_TYPE=master
     networks:
-      - agentdb-network
+      - AgentMem-network
 
-  agentdb-node2:
+  AgentMem-node2:
     build: .
-    container_name: agentdb-node2
+    container_name: AgentMem-node2
     hostname: node2
     ports:
       - "8082:8080"
       - "9002:9000"
       - "9092:9090"
     volumes:
-      - agentdb-data2:/var/lib/agentdb
+      - AgentMem-data2:/var/lib/AgentMem
       - ./config/node2.toml:/app/config.toml
     environment:
-      - AGENTDB_NODE_ID=node-2
-      - AGENTDB_NODE_TYPE=worker
+      - AgentMem_NODE_ID=node-2
+      - AgentMem_NODE_TYPE=worker
     depends_on:
-      - agentdb-node1
+      - AgentMem-node1
     networks:
-      - agentdb-network
+      - AgentMem-network
 
-  agentdb-node3:
+  AgentMem-node3:
     build: .
-    container_name: agentdb-node3
+    container_name: AgentMem-node3
     hostname: node3
     ports:
       - "8083:8080"
       - "9003:9000"
       - "9093:9090"
     volumes:
-      - agentdb-data3:/var/lib/agentdb
+      - AgentMem-data3:/var/lib/AgentMem
       - ./config/node3.toml:/app/config.toml
     environment:
-      - AGENTDB_NODE_ID=node-3
-      - AGENTDB_NODE_TYPE=worker
+      - AgentMem_NODE_ID=node-3
+      - AgentMem_NODE_TYPE=worker
     depends_on:
-      - agentdb-node1
+      - AgentMem-node1
     networks:
-      - agentdb-network
+      - AgentMem-network
 
   redis:
     image: redis:7-alpine
-    container_name: agentdb-redis
+    container_name: AgentMem-redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
-      - agentdb-network
+      - AgentMem-network
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: agentdb-prometheus
+    container_name: AgentMem-prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     networks:
-      - agentdb-network
+      - AgentMem-network
 
   grafana:
     image: grafana/grafana:latest
-    container_name: agentdb-grafana
+    container_name: AgentMem-grafana
     ports:
       - "3000:3000"
     volumes:
@@ -420,18 +420,18 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     networks:
-      - agentdb-network
+      - AgentMem-network
 
 volumes:
-  agentdb-data1:
-  agentdb-data2:
-  agentdb-data3:
+  AgentMem-data1:
+  AgentMem-data2:
+  AgentMem-data3:
   redis-data:
   prometheus-data:
   grafana-data:
 
 networks:
-  agentdb-network:
+  AgentMem-network:
     driver: bridge
 ```
 
@@ -443,9 +443,9 @@ networks:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: agentdb
+  name: AgentMem
   labels:
-    name: agentdb
+    name: AgentMem
 ```
 
 #### ConfigMap
@@ -454,12 +454,12 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agentdb-config
-  namespace: agentdb
+  name: AgentMem-config
+  namespace: AgentMem
 data:
   config.toml: |
     [database]
-    path = "/var/lib/agentdb/data"
+    path = "/var/lib/AgentMem/data"
     max_connections = 200
     connection_timeout = 30
     query_timeout = 120
@@ -484,22 +484,22 @@ data:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: agentdb
-  namespace: agentdb
+  name: AgentMem
+  namespace: AgentMem
 spec:
-  serviceName: agentdb-headless
+  serviceName: AgentMem-headless
   replicas: 3
   selector:
     matchLabels:
-      app: agentdb
+      app: AgentMem
   template:
     metadata:
       labels:
-        app: agentdb
+        app: AgentMem
     spec:
       containers:
-      - name: agentdb
-        image: agentdb:latest
+      - name: AgentMem
+        image: AgentMem:latest
         ports:
         - containerPort: 8080
           name: http
@@ -518,7 +518,7 @@ spec:
           value: "worker"
         volumeMounts:
         - name: data
-          mountPath: /var/lib/agentdb
+          mountPath: /var/lib/AgentMem
         - name: config
           mountPath: /app/config.toml
           subPath: config.toml
@@ -544,7 +544,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: agentdb-config
+          name: AgentMem-config
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -575,13 +575,13 @@ curl http://localhost:9090/metrics
 
 ```bash
 # 查看服务日志
-sudo journalctl -u agentdb -f
+sudo journalctl -u AgentMem -f
 
 # 查看应用日志
-tail -f /var/log/agentdb/agentdb.log
+tail -f /var/log/AgentMem/AgentMem.log
 
 # 日志轮转配置
-sudo logrotate -d /etc/logrotate.d/agentdb
+sudo logrotate -d /etc/logrotate.d/AgentMem
 ```
 
 ### 3. 备份策略
@@ -590,18 +590,18 @@ sudo logrotate -d /etc/logrotate.d/agentdb
 #!/bin/bash
 # 备份脚本 backup.sh
 
-BACKUP_DIR="/backup/agentdb"
+BACKUP_DIR="/backup/AgentMem"
 DATE=$(date +%Y%m%d_%H%M%S)
-DATA_DIR="/var/lib/agentdb/data"
+DATA_DIR="/var/lib/AgentMem/data"
 
 # 创建备份目录
 mkdir -p $BACKUP_DIR
 
 # 数据备份
-tar -czf $BACKUP_DIR/agentdb_data_$DATE.tar.gz -C $DATA_DIR .
+tar -czf $BACKUP_DIR/AgentMem_data_$DATE.tar.gz -C $DATA_DIR .
 
 # 配置备份
-cp /etc/agentdb/config.toml $BACKUP_DIR/config_$DATE.toml
+cp /etc/AgentMem/config.toml $BACKUP_DIR/config_$DATE.toml
 
 # 清理旧备份 (保留30天)
 find $BACKUP_DIR -name "*.tar.gz" -mtime +30 -delete
@@ -650,4 +650,4 @@ max_connections = 1000
 
 **文档版本**: v1.0  
 **最后更新**: 2025年6月19日  
-**维护者**: AgentDB开发团队
+**维护者**: AgentMem开发团队

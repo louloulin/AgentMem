@@ -1,8 +1,8 @@
-# AgentDB Architecture Documentation
+# AgentMem Architecture Documentation
 
 ## 🏗️ System Architecture Overview
 
-AgentDB is a high-performance AI Agent state database built on a hybrid Rust+Zig+LanceDB architecture, designed for large-scale AI Agent deployments.
+AgentMem is a high-performance AI Agent state database built on a hybrid Rust+Zig+LanceDB architecture, designed for large-scale AI Agent deployments.
 
 ### Core Design Principles
 
@@ -15,7 +15,7 @@ AgentDB is a high-performance AI Agent state database built on a hybrid Rust+Zig
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AgentDB System Architecture              │
+│                    AgentMem System Architecture              │
 ├─────────────────────────────────────────────────────────────┤
 │  Application Layer (Multi-language Support)                 │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
@@ -256,7 +256,7 @@ State Change → Local Update → Vector Clock → Broadcast Notify → Conflict
 ├─────────────────────────────────────────────────────────────┤
 │                    C FFI Interface                          │
 ├─────────────────────────────────────────────────────────────┤
-│                    AgentDB Core                             │
+│                    AgentMem Core                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -292,4 +292,4 @@ State Change → Local Update → Vector Clock → Broadcast Notify → Conflict
 
 **Document Version**: v1.0  
 **Last Updated**: June 19, 2025  
-**Maintainer**: AgentDB Development Team
+**Maintainer**: AgentMem Development Team

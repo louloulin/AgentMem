@@ -1,8 +1,8 @@
-# AgentDB Phase 2 战略发展计划 (Plan 4.0)
+# AgentMem Phase 2 战略发展计划 (Plan 4.0)
 
 ## 🎯 战略概述
 
-基于市场调研和技术趋势分析，AgentDB Phase 2 将专注于**企业级AI Agent基础设施平台**的构建，目标是成为全球领先的AI Agent编排和管理平台，实现从技术产品到商业平台的转型。
+基于市场调研和技术趋势分析，AgentMem Phase 2 将专注于**企业级AI Agent基础设施平台**的构建，目标是成为全球领先的AI Agent编排和管理平台，实现从技术产品到商业平台的转型。
 
 ## 📊 市场机会分析
 
@@ -36,7 +36,7 @@
 | **Chroma** | 简单易用 | 扩展性有限，企业级功能缺失 | 8% |
 | **Milvus** | 开源生态 | 复杂度高，运维困难 | 15% |
 
-#### **AgentDB竞争优势**
+#### **AgentMem竞争优势**
 - **架构创新**: 首创Rust+Zig+LanceDB混合架构
 - **性能领先**: 毫秒级响应，5x性能优势
 - **企业就绪**: 完整的企业级功能和安全
@@ -95,8 +95,8 @@
 
 #### **2.1 Kubernetes原生支持**
 ```yaml
-# AgentDB Operator
-apiVersion: agentdb.io/v1
+# AgentMem Operator
+apiVersion: AgentMem.io/v1
 kind: AgentCluster
 metadata:
   name: production-cluster
@@ -124,7 +124,7 @@ spec:
 ```
 
 **核心组件**:
-- **AgentDB Operator**: Kubernetes原生操作器
+- **AgentMem Operator**: Kubernetes原生操作器
 - **Helm Charts**: 标准化部署模板
 - **自动扩缩容**: 基于负载的自动伸缩
 - **滚动更新**: 零停机的版本更新
@@ -222,7 +222,7 @@ spec:
 #### **1. 开源核心 + 商业增值模式**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                AgentDB商业模式架构                           │
+│                AgentMem商业模式架构                           │
 ├─────────────────────────────────────────────────────────────┤
 │  开源版本 (Community Edition)                               │
 │  • 核心数据库引擎        • 基础API接口                      │
@@ -488,11 +488,11 @@ pub struct CrossModalRetrieval {
 #### **开发者平台**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                AgentDB开发者生态平台                         │
+│                AgentMem开发者生态平台                         │
 ├─────────────────────────────────────────────────────────────┤
 │  开发工具层 (Developer Tools)                               │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
-│  │ AgentDB CLI │ │ VS Code Ext │ │ Web IDE     │           │
+│  │ AgentMem CLI │ │ VS Code Ext │ │ Web IDE     │           │
 │  │             │ │             │ │             │           │
 │  └─────────────┘ └─────────────┘ └─────────────┘           │
 ├─────────────────────────────────────────────────────────────┤
@@ -511,7 +511,7 @@ pub struct CrossModalRetrieval {
 ```
 
 #### **开发者激励计划**
-- **认证计划**: AgentDB认证开发者计划
+- **认证计划**: AgentMem认证开发者计划
 - **奖励机制**: 贡献奖励和收入分成
 - **技术支持**: 专门的开发者技术支持
 - **培训体系**: 在线培训和认证课程
@@ -684,7 +684,7 @@ impl FederatedLearning {
 
 ---
 
-**AgentDB Plan 4.0** - 构建全球领先的企业级AI Agent基础设施平台
+**AgentMem Plan 4.0** - 构建全球领先的企业级AI Agent基础设施平台
 
 **制定时间**: 2025年6月19日
 **战略周期**: 2025-2027 (30个月)

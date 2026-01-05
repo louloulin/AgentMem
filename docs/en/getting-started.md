@@ -1,8 +1,8 @@
-# AgentDB Getting Started Guide
+# AgentMem Getting Started Guide
 
-## 🚀 Welcome to AgentDB
+## 🚀 Welcome to AgentMem
 
-AgentDB is a high-performance AI Agent state database built on a hybrid Rust+Zig+LanceDB architecture. This guide will help you get started with AgentDB quickly.
+AgentMem is a high-performance AI Agent state database built on a hybrid Rust+Zig+LanceDB architecture. This guide will help you get started with AgentMem quickly.
 
 ## 📋 System Requirements
 
@@ -52,8 +52,8 @@ zig version
 #### 2. Clone Repository
 
 ```bash
-git clone https://github.com/louloulin/AgentDB.git
-cd AgentDB
+git clone https://github.com/louloulin/AgentMem.git
+cd AgentMem
 ```
 
 #### 3. Build Project
@@ -91,18 +91,18 @@ npm install agent-db
 
 ### Rust Example
 
-Create `examples/hello_agentdb.rs`:
+Create `examples/hello_AgentMem.rs`:
 
 ```rust
 use agent_db::{AgentDatabase, DatabaseConfig, AgentState, StateType};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Welcome to AgentDB!");
+    println!("🚀 Welcome to AgentMem!");
     
     // 1. Create database configuration
     let config = DatabaseConfig {
-        db_path: "./hello_agentdb".to_string(),
+        db_path: "./hello_AgentMem".to_string(),
         ..Default::default()
     };
     
@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Create Agent state
     let agent_id = 12345;
     let session_id = 67890;
-    let state_data = b"Hello, AgentDB! This is my first Agent state.".to_vec();
+    let state_data = b"Hello, AgentMem! This is my first Agent state.".to_vec();
     
     let state = AgentState::new(
         agent_id,
@@ -139,19 +139,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("❌ Agent state not found");
     }
     
-    println!("🎉 AgentDB example completed!");
+    println!("🎉 AgentMem example completed!");
     Ok(())
 }
 ```
 
 Run the example:
 ```bash
-cargo run --example hello_agentdb
+cargo run --example hello_AgentMem
 ```
 
 ### Zig Example
 
-Create `examples/hello_agentdb.zig`:
+Create `examples/hello_AgentMem.zig`:
 
 ```zig
 const std = @import("std");
@@ -163,7 +163,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    std.debug.print("🚀 Welcome to AgentDB (Zig API)!\n", .{});
+    std.debug.print("🚀 Welcome to AgentMem (Zig API)!\n", .{});
     
     // 1. Create Agent state
     var state = try AgentState.init(
@@ -201,12 +201,12 @@ pub fn main() !void {
 
 Run the example:
 ```bash
-zig run examples/hello_agentdb.zig
+zig run examples/hello_AgentMem.zig
 ```
 
 ### C Example
 
-Create `examples/hello_agentdb.c`:
+Create `examples/hello_AgentMem.c`:
 
 ```c
 #include "../include/agent_state_db.h"
@@ -215,10 +215,10 @@ Create `examples/hello_agentdb.c`:
 #include <string.h>
 
 int main() {
-    printf("🚀 Welcome to AgentDB (C API)!\n");
+    printf("🚀 Welcome to AgentMem (C API)!\n");
     
     // 1. Create database instance
-    CAgentStateDB* db = agent_db_new("./hello_agentdb_c");
+    CAgentStateDB* db = agent_db_new("./hello_AgentMem_c");
     if (!db) {
         printf("❌ Failed to create database\n");
         return 1;
@@ -270,15 +270,15 @@ int main() {
 Compile and run:
 ```bash
 # Compile
-gcc -o hello_agentdb examples/hello_agentdb.c -L./target/release -lagent_db_rust
+gcc -o hello_AgentMem examples/hello_AgentMem.c -L./target/release -lagent_db_rust
 
 # Run (Windows)
 set PATH=%PATH%;./target/release
-hello_agentdb.exe
+hello_AgentMem.exe
 
 # Run (Linux/macOS)
 export LD_LIBRARY_PATH=./target/release:$LD_LIBRARY_PATH
-./hello_agentdb
+./hello_AgentMem
 ```
 
 ## 🧪 Running Tests
@@ -336,7 +336,7 @@ Create `config.toml`:
 
 ```toml
 [database]
-path = "./agentdb"
+path = "./AgentMem"
 max_connections = 10
 connection_timeout = 30
 query_timeout = 60
@@ -368,13 +368,13 @@ worker_threads = 4
 
 ```bash
 # Set database path
-export AGENTDB_PATH="./my_agentdb"
+export AgentMem_PATH="./my_AgentMem"
 
 # Set log level
 export RUST_LOG="info"
 
 # Set performance mode
-export AGENTDB_PERFORMANCE_MODE="high"
+export AgentMem_PERFORMANCE_MODE="high"
 ```
 
 ## 🚨 Common Issues
@@ -413,7 +413,7 @@ export LD_LIBRARY_PATH=./target/release:$LD_LIBRARY_PATH
 
 ## 📚 Next Steps
 
-Congratulations! You've successfully run your first AgentDB program. Next, you can:
+Congratulations! You've successfully run your first AgentMem program. Next, you can:
 
 1. **Deep Learning**: Read the [API Reference](api.md)
 2. **Architecture Understanding**: Check the [Architecture Design](architecture.md)  
@@ -425,11 +425,11 @@ Congratulations! You've successfully run your first AgentDB program. Next, you c
 
 - **Documentation**: [Complete Documentation](../README.md)
 - **Examples**: [examples/](../../examples/) directory
-- **Issue Reports**: [GitHub Issues](https://github.com/louloulin/AgentDB/issues)
-- **Community Discussion**: [GitHub Discussions](https://github.com/louloulin/AgentDB/discussions)
+- **Issue Reports**: [GitHub Issues](https://github.com/louloulin/AgentMem/issues)
+- **Community Discussion**: [GitHub Discussions](https://github.com/louloulin/AgentMem/discussions)
 
 ---
 
 **Document Version**: v1.0  
 **Last Updated**: June 19, 2025  
-**Maintainer**: AgentDB Development Team
+**Maintainer**: AgentMem Development Team

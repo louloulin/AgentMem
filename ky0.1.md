@@ -27,7 +27,7 @@
 - Mem0 兼容 API
 
 **主要差距** ❌
-- 项目名称不统一（AgentDB vs AgentMem）
+- 项目名称不统一（AgentMem vs AgentMem）
 - 缺少核心开源项目文档（SECURITY, CODE_OF_CONDUCT）
 - 170+ deprecated API 警告
 - CI/CD 配置不完整（仅 2 个 workflow）
@@ -113,16 +113,16 @@
 #### Week 1：项目统一和核心文档
 
 **Day 1-2：项目名称统一**
-- [ ] 修改 LICENSE 文件（AgentDB → AgentMem）
+- [ ] 修改 LICENSE 文件（AgentMem → AgentMem）
 - [ ] 修改 CONTRIBUTING.md
 - [ ] 修改 CHANGELOG.md 链接
-- [ ] 全局搜索替换所有 "AgentDB" 引用
+- [ ] 全局搜索替换所有 "AgentMem" 引用
 - [ ] 验证所有文档中的项目名称
 
 **验收标准**：
 ```bash
-# 无 "AgentDB" 引用
-git grep -i "agentdb" | wc -l  # 应该输出 0
+# 无 "AgentMem" 引用
+git grep -i "AgentMem" | wc -l  # 应该输出 0
 ```
 
 **Day 3-4：核心文档添加**
@@ -540,7 +540,7 @@ docs/
 
 | 指标 | 当前 | 目标 | 测量方法 |
 |------|------|------|---------|
-| 项目名称统一 | ❌ | ✅ 100% | `git grep -i "agentdb"` |
+| 项目名称统一 | ❌ | ✅ 100% | `git grep -i "AgentMem"` |
 | 核心文档 | 2/6 | 6/6 | 文件检查清单 |
 | 编译警告 | 170+ | < 10 | `cargo build 2>&1 \| grep warning` |
 | CI/CD workflows | 2 | ≥ 4 | `.github/workflows/` |
@@ -702,7 +702,7 @@ docs/
 
 ### 立即执行（本周）
 
-- [ ] 分析并修正所有 "AgentDB" 引用
+- [ ] 分析并修正所有 "AgentMem" 引用
 - [ ] 创建 SECURITY.md
 - [ ] 创建 CODE_OF_CONDUCT.md
 - [ ] 添加 rustfmt.toml 配置

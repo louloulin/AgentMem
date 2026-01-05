@@ -1,8 +1,8 @@
-# AgentDB 快速开始指南
+# AgentMem 快速开始指南
 
-## 🚀 欢迎使用 AgentDB
+## 🚀 欢迎使用 AgentMem
 
-AgentDB 是一个高性能的 AI Agent 状态数据库，基于 Rust+Zig+LanceDB 混合架构构建。本指南将帮助您快速上手 AgentDB。
+AgentMem 是一个高性能的 AI Agent 状态数据库，基于 Rust+Zig+LanceDB 混合架构构建。本指南将帮助您快速上手 AgentMem。
 
 ## 📋 系统要求
 
@@ -52,8 +52,8 @@ zig version
 #### 2. 克隆仓库
 
 ```bash
-git clone https://github.com/louloulin/AgentDB.git
-cd AgentDB
+git clone https://github.com/louloulin/AgentMem.git
+cd AgentMem
 ```
 
 #### 3. 构建项目
@@ -91,18 +91,18 @@ npm install agent-db
 
 ### Rust 示例
 
-创建 `examples/hello_agentdb.rs`:
+创建 `examples/hello_AgentMem.rs`:
 
 ```rust
 use agent_db::{AgentDatabase, DatabaseConfig, AgentState, StateType};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 欢迎使用 AgentDB!");
+    println!("🚀 欢迎使用 AgentMem!");
     
     // 1. 创建数据库配置
     let config = DatabaseConfig {
-        db_path: "./hello_agentdb".to_string(),
+        db_path: "./hello_AgentMem".to_string(),
         ..Default::default()
     };
     
@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. 创建 Agent 状态
     let agent_id = 12345;
     let session_id = 67890;
-    let state_data = b"Hello, AgentDB! 这是我的第一个 Agent 状态。".to_vec();
+    let state_data = b"Hello, AgentMem! 这是我的第一个 Agent 状态。".to_vec();
     
     let state = AgentState::new(
         agent_id,
@@ -139,19 +139,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("❌ 未找到 Agent 状态");
     }
     
-    println!("🎉 AgentDB 示例运行完成!");
+    println!("🎉 AgentMem 示例运行完成!");
     Ok(())
 }
 ```
 
 运行示例:
 ```bash
-cargo run --example hello_agentdb
+cargo run --example hello_AgentMem
 ```
 
 ### Zig 示例
 
-创建 `examples/hello_agentdb.zig`:
+创建 `examples/hello_AgentMem.zig`:
 
 ```zig
 const std = @import("std");
@@ -163,7 +163,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    std.debug.print("🚀 欢迎使用 AgentDB (Zig API)!\n", .{});
+    std.debug.print("🚀 欢迎使用 AgentMem (Zig API)!\n", .{});
     
     // 1. 创建 Agent 状态
     var state = try AgentState.init(
@@ -201,12 +201,12 @@ pub fn main() !void {
 
 运行示例:
 ```bash
-zig run examples/hello_agentdb.zig
+zig run examples/hello_AgentMem.zig
 ```
 
 ### C 示例
 
-创建 `examples/hello_agentdb.c`:
+创建 `examples/hello_AgentMem.c`:
 
 ```c
 #include "../include/agent_state_db.h"
@@ -215,10 +215,10 @@ zig run examples/hello_agentdb.zig
 #include <string.h>
 
 int main() {
-    printf("🚀 欢迎使用 AgentDB (C API)!\n");
+    printf("🚀 欢迎使用 AgentMem (C API)!\n");
     
     // 1. 创建数据库实例
-    CAgentStateDB* db = agent_db_new("./hello_agentdb_c");
+    CAgentStateDB* db = agent_db_new("./hello_AgentMem_c");
     if (!db) {
         printf("❌ 数据库创建失败\n");
         return 1;
@@ -270,15 +270,15 @@ int main() {
 编译和运行:
 ```bash
 # 编译
-gcc -o hello_agentdb examples/hello_agentdb.c -L./target/release -lagent_db_rust
+gcc -o hello_AgentMem examples/hello_AgentMem.c -L./target/release -lagent_db_rust
 
 # 运行 (Windows)
 set PATH=%PATH%;./target/release
-hello_agentdb.exe
+hello_AgentMem.exe
 
 # 运行 (Linux/macOS)
 export LD_LIBRARY_PATH=./target/release:$LD_LIBRARY_PATH
-./hello_agentdb
+./hello_AgentMem
 ```
 
 ## 🧪 运行测试
@@ -336,7 +336,7 @@ cat PERFORMANCE_REPORT.md
 
 ```toml
 [database]
-path = "./agentdb"
+path = "./AgentMem"
 max_connections = 10
 connection_timeout = 30
 query_timeout = 60
@@ -368,13 +368,13 @@ worker_threads = 4
 
 ```bash
 # 设置数据库路径
-export AGENTDB_PATH="./my_agentdb"
+export AgentMem_PATH="./my_AgentMem"
 
 # 设置日志级别
 export RUST_LOG="info"
 
 # 设置性能模式
-export AGENTDB_PERFORMANCE_MODE="high"
+export AgentMem_PERFORMANCE_MODE="high"
 ```
 
 ## 🚨 常见问题
@@ -413,7 +413,7 @@ export LD_LIBRARY_PATH=./target/release:$LD_LIBRARY_PATH
 
 ## 📚 下一步
 
-恭喜！您已经成功运行了第一个 AgentDB 程序。接下来可以：
+恭喜！您已经成功运行了第一个 AgentMem 程序。接下来可以：
 
 1. **深入学习**: 阅读 [API 参考文档](api.md)
 2. **架构理解**: 查看 [架构设计文档](architecture.md)  
@@ -425,11 +425,11 @@ export LD_LIBRARY_PATH=./target/release:$LD_LIBRARY_PATH
 
 - **文档**: [完整文档](../README.md)
 - **示例**: [examples/](../../examples/) 目录
-- **问题反馈**: [GitHub Issues](https://github.com/louloulin/AgentDB/issues)
-- **社区讨论**: [GitHub Discussions](https://github.com/louloulin/AgentDB/discussions)
+- **问题反馈**: [GitHub Issues](https://github.com/louloulin/AgentMem/issues)
+- **社区讨论**: [GitHub Discussions](https://github.com/louloulin/AgentMem/discussions)
 
 ---
 
 **文档版本**: v1.0  
 **最后更新**: 2025年6月19日  
-**维护者**: AgentDB开发团队
+**维护者**: AgentMem开发团队

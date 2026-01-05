@@ -5,13 +5,13 @@
 ### 基本设置
 
 ```rust
-use agent_state_db::{AgentDB, AgentState, Memory, Document, StateType, MemoryType};
+use agent_state_db::{AgentMem, AgentState, Memory, Document, StateType, MemoryType};
 use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 创建数据库实例
-    let db = AgentDB::new("./my_agent_db", 384).await?;
+    let db = AgentMem::new("./my_agent_db", 384).await?;
     
     println!("Agent State Database 已初始化!");
     Ok(())
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 async fn basic_agent_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./agent_example", 384).await?;
+    let db = AgentMem::new("./agent_example", 384).await?;
     
     // 创建Agent状态
     let agent_id = 1001u64;
@@ -54,7 +54,7 @@ async fn basic_agent_example() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 async fn memory_management_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./memory_example", 384).await?;
+    let db = AgentMem::new("./memory_example", 384).await?;
     let agent_id = 2001u64;
     
     // 创建不同类型的记忆
@@ -93,7 +93,7 @@ async fn memory_management_example() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 async fn vector_search_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./vector_example", 384).await?;
+    let db = AgentMem::new("./vector_example", 384).await?;
     
     // 创建一些示例向量（实际应用中这些会是嵌入向量）
     let vectors = vec![
@@ -133,7 +133,7 @@ async fn vector_search_example() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 async fn rag_system_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./rag_example", 384).await?;
+    let db = AgentMem::new("./rag_example", 384).await?;
     
     // 添加文档
     let documents = vec![
@@ -193,10 +193,10 @@ async fn rag_system_example() -> Result<(), Box<dyn std::error::Error>> {
 ## 示例5: 性能优化和缓存
 
 ```rust
-use agent_state_db::{CacheManager, AgentDbConfig};
+use agent_state_db::{CacheManager, AgentMemConfig};
 
 async fn performance_optimization_example() -> Result<(), Box<dyn std::error::Error>> {
-    let config = AgentDbConfig::default();
+    let config = AgentMemConfig::default();
     
     // 创建缓存管理器
     let cache_manager = CacheManager::new(config.performance);
@@ -234,10 +234,10 @@ async fn performance_optimization_example() -> Result<(), Box<dyn std::error::Er
 ## 示例6: 监控和日志
 
 ```rust
-use agent_state_db::{MonitoringManager, LogLevel, AgentDbConfig};
+use agent_state_db::{MonitoringManager, LogLevel, AgentMemConfig};
 
 async fn monitoring_example() -> Result<(), Box<dyn std::error::Error>> {
-    let config = AgentDbConfig::default();
+    let config = AgentMemConfig::default();
     let monitor = MonitoringManager::new(config.logging);
     
     // 记录不同级别的日志
@@ -287,7 +287,7 @@ async fn monitoring_example() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 async fn stream_processing_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./stream_example", 384).await?;
+    let db = AgentMem::new("./stream_example", 384).await?;
     let agent_id = 7001u64;
     
     // 首先创建大量测试数据
@@ -331,11 +331,11 @@ async fn stream_processing_example() -> Result<(), Box<dyn std::error::Error>> {
 ## 示例8: 配置管理
 
 ```rust
-use agent_state_db::{AgentDbConfig, ConfigManager, VectorIndexType};
+use agent_state_db::{AgentMemConfig, ConfigManager, VectorIndexType};
 
 fn configuration_example() -> Result<(), Box<dyn std::error::Error>> {
     // 创建自定义配置
-    let mut config = AgentDbConfig::default();
+    let mut config = AgentMemConfig::default();
     
     // 数据库配置
     config.database.path = "./custom_db".to_string();
@@ -380,10 +380,10 @@ fn configuration_example() -> Result<(), Box<dyn std::error::Error>> {
 ## 示例9: 错误处理最佳实践
 
 ```rust
-use agent_state_db::{AgentDB, AgentDbError};
+use agent_state_db::{AgentMem, AgentMemError};
 
 async fn error_handling_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db = AgentDB::new("./error_example", 384).await?;
+    let db = AgentMem::new("./error_example", 384).await?;
     
     // 处理不同类型的错误
     match db.load_agent_state(99999).await {
@@ -393,13 +393,13 @@ async fn error_handling_example() -> Result<(), Box<dyn std::error::Error>> {
         Ok(None) => {
             println!("Agent状态不存在");
         }
-        Err(AgentDbError::NotFound) => {
+        Err(AgentMemError::NotFound) => {
             println!("数据未找到");
         }
-        Err(AgentDbError::InvalidArgument(msg)) => {
+        Err(AgentMemError::InvalidArgument(msg)) => {
             println!("参数错误: {}", msg);
         }
-        Err(AgentDbError::Internal(msg)) => {
+        Err(AgentMemError::Internal(msg)) => {
             println!("内部错误: {}", msg);
         }
         Err(e) => {
@@ -431,15 +431,15 @@ use std::collections::HashMap;
 
 struct AIAgent {
     id: u64,
-    db: AgentDB,
-    config: AgentDbConfig,
+    db: AgentMem,
+    config: AgentMemConfig,
     monitor: MonitoringManager,
 }
 
 impl AIAgent {
     async fn new(agent_id: u64, db_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let config = AgentDbConfig::default();
-        let db = AgentDB::new(db_path, config.vector.dimension).await?;
+        let config = AgentMemConfig::default();
+        let db = AgentMem::new(db_path, config.vector.dimension).await?;
         let monitor = MonitoringManager::new(config.logging.clone());
         
         Ok(Self {

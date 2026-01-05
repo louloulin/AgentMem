@@ -1,8 +1,8 @@
-# AgentDB API Reference
+# AgentMem API Reference
 
 ## 📋 API Overview
 
-AgentDB provides multi-layered API interfaces supporting different programming languages and use cases:
+AgentMem provides multi-layered API interfaces supporting different programming languages and use cases:
 
 - **Rust API**: Native high-performance interface
 - **Zig API**: Zero-cost abstraction layer
@@ -32,16 +32,16 @@ pub struct AgentDatabase {
 
 ```rust
 // Create basic database instance
-pub async fn new(config: DatabaseConfig) -> Result<Self, AgentDbError>
+pub async fn new(config: DatabaseConfig) -> Result<Self, AgentMemError>
 
 // Add vector search engine
-pub async fn with_vector_engine(self, config: VectorIndexConfig) -> Result<Self, AgentDbError>
+pub async fn with_vector_engine(self, config: VectorIndexConfig) -> Result<Self, AgentMemError>
 
 // Add security manager
 pub fn with_security_manager(self) -> Self
 
 // Add RAG engine
-pub async fn with_rag_engine(self) -> Result<Self, AgentDbError>
+pub async fn with_rag_engine(self) -> Result<Self, AgentMemError>
 ```
 
 #### Usage Example
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #### Save Agent State
 
 ```rust
-pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentDbError>
+pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentMemError>
 ```
 
 **Parameters**:
@@ -93,7 +93,7 @@ db.save_agent_state(&state).await?;
 #### Load Agent State
 
 ```rust
-pub async fn load_agent_state(&self, agent_id: u64) -> Result<Option<AgentState>, AgentDbError>
+pub async fn load_agent_state(&self, agent_id: u64) -> Result<Option<AgentState>, AgentMemError>
 ```
 
 **Parameters**:
@@ -117,7 +117,7 @@ if let Some(state) = db.load_agent_state(12345).await? {
 #### Store Memory
 
 ```rust
-pub async fn store_memory(&self, memory: &Memory) -> Result<(), AgentDbError>
+pub async fn store_memory(&self, memory: &Memory) -> Result<(), AgentMemError>
 ```
 
 **Parameters**:
@@ -138,7 +138,7 @@ db.store_memory(&memory).await?;
 #### Get Memories
 
 ```rust
-pub async fn get_memories(&self, agent_id: u64) -> Result<Vec<Memory>, AgentDbError>
+pub async fn get_memories(&self, agent_id: u64) -> Result<Vec<Memory>, AgentMemError>
 ```
 
 **Parameters**:
@@ -157,7 +157,7 @@ pub async fn add_vector(
     id: u64, 
     vector: Vec<f32>, 
     metadata: HashMap<String, String>
-) -> Result<(), AgentDbError>
+) -> Result<(), AgentMemError>
 ```
 
 #### Vector Search
@@ -167,7 +167,7 @@ pub async fn search_vectors(
     &self, 
     query: &[f32], 
     limit: usize
-) -> Result<Vec<VectorSearchResult>, AgentDbError>
+) -> Result<Vec<VectorSearchResult>, AgentMemError>
 ```
 
 ### RAG Operations
@@ -175,7 +175,7 @@ pub async fn search_vectors(
 #### Index Document
 
 ```rust
-pub async fn index_document(&self, document: &Document) -> Result<String, AgentDbError>
+pub async fn index_document(&self, document: &Document) -> Result<String, AgentMemError>
 ```
 
 #### Search Documents
@@ -185,7 +185,7 @@ pub async fn search_documents(
     &self, 
     query: &str, 
     limit: usize
-) -> Result<Vec<SearchResult>, AgentDbError>
+) -> Result<Vec<SearchResult>, AgentMemError>
 ```
 
 #### Semantic Search
@@ -195,7 +195,7 @@ pub async fn semantic_search_documents(
     &self, 
     query_embedding: Vec<f32>, 
     limit: usize
-) -> Result<Vec<SearchResult>, AgentDbError>
+) -> Result<Vec<SearchResult>, AgentMemError>
 ```
 
 ## ⚡ Zig API
@@ -379,16 +379,16 @@ int main() {
 ### Basic Usage
 
 ```python
-import agentdb
+import AgentMem
 
 # Create database
-db = agentdb.AgentDatabase("./agent_db")
+db = AgentMem.AgentDatabase("./agent_db")
 
 # Save Agent state
-state = agentdb.AgentState(
+state = AgentMem.AgentState(
     agent_id=12345,
     session_id=67890,
-    state_type=agentdb.StateType.WORKING_MEMORY,
+    state_type=AgentMem.StateType.WORKING_MEMORY,
     data=b"agent state data"
 )
 await db.save_agent_state(state)
@@ -405,7 +405,7 @@ if loaded_state:
 
 ```rust
 #[derive(Debug, thiserror::Error)]
-pub enum AgentDbError {
+pub enum AgentMemError {
     #[error("Database error: {0}")]
     Database(String),
     
@@ -435,7 +435,7 @@ match db.load_agent_state(agent_id).await {
         // Handle not found case
         println!("Agent state not found");
     },
-    Err(AgentDbError::Database(msg)) => {
+    Err(AgentMemError::Database(msg)) => {
         // Handle database error
         eprintln!("Database error: {}", msg);
     },
@@ -479,4 +479,4 @@ impl Default for DatabaseConfig {
 
 **Document Version**: v1.0  
 **Last Updated**: June 19, 2025  
-**Maintainer**: AgentDB Development Team
+**Maintainer**: AgentMem Development Team

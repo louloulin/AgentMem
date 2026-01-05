@@ -1,8 +1,8 @@
-# AgentDB 仓颉 FFI 集成计划
+# AgentMem 仓颉 FFI 集成计划
 
 ## 项目概述
 
-基于对 tree-sitter.cj 项目 FFI 实现的深度分析，制定为 AgentDB 添加仓颉（Cangjie）语言 FFI 支持的完整计划。该计划将在现有的 Rust+Zig+C FFI 架构基础上，增加仓颉语言绑定，形成四语言混合架构。
+基于对 tree-sitter.cj 项目 FFI 实现的深度分析，制定为 AgentMem 添加仓颉（Cangjie）语言 FFI 支持的完整计划。该计划将在现有的 Rust+Zig+C FFI 架构基础上，增加仓颉语言绑定，形成四语言混合架构。
 
 ## 技术分析
 
@@ -17,7 +17,7 @@
 5. **动态库加载**：支持 dlopen/dlsym 动态加载
 6. **包装函数**：通过 public 函数封装 unsafe FFI 调用
 
-### AgentDB 现有 FFI 架构
+### AgentMem 现有 FFI 架构
 
 ```
 当前架构：
@@ -34,7 +34,7 @@
 
 #### 1.1 项目结构创建
 ```
-AgentDB/
+AgentMem/
 ├── agent-db-cangjie/           # 新增仓颉模块
 │   ├── src/
 │   │   ├── core/               # 核心类型定义
@@ -48,10 +48,10 @@ AgentDB/
 
 #### 1.2 核心类型定义 (src/core/types.cj)
 ```cangjie
-package agentdb.core
+package AgentMem.core
 
 // 错误码枚举
-public enum AgentDbErrorCode {
+public enum AgentMemErrorCode {
     | Success
     | InvalidParam
     | NotFound
@@ -120,7 +120,7 @@ public enum MemoryType {
 
 #### 1.3 FFI 绑定层 (src/ffi/bindings.cj)
 ```cangjie
-package agentdb.ffi
+package AgentMem.ffi
 
 // C 结构体声明
 @C
@@ -162,10 +162,10 @@ foreign func agent_db_version(): CString
 
 #### 2.1 数据库管理类 (src/api/database.cj)
 ```cangjie
-package agentdb.api
+package AgentMem.api
 
-import agentdb.core.*
-import agentdb.ffi.*
+import AgentMem.core.*
+import AgentMem.ffi.*
 
 public class AgentDatabase {
     private var _handle: ?CPointer<CAgentStateDB> = Option<CPointer<CAgentStateDB>>.None
@@ -176,20 +176,20 @@ public class AgentDatabase {
         this._path = dbPath
     }
 
-    public func open(): Result<Unit, AgentDbError> {
+    public func open(): Result<Unit, AgentMemError> {
         let cPath = stringToCString(this._path)
         let handle = unsafe { agent_db_create(cPath) }
         unsafe { LibC.free(cPath) }
 
         if (handle.isNull()) {
-            return Result<Unit, AgentDbError>.Err(
-                AgentDbError("Failed to create database")
+            return Result<Unit, AgentMemError>.Err(
+                AgentMemError("Failed to create database")
             )
         }
 
         this._handle = Option<CPointer<CAgentStateDB>>.Some(handle)
         this._initialized = true
-        return Result<Unit, AgentDbError>.Ok(Unit())
+        return Result<Unit, AgentMemError>.Ok(Unit())
     }
 
     public func close(): Unit {
@@ -205,7 +205,7 @@ public class AgentDatabase {
 
 #### 2.2 Agent 状态管理 (src/api/agent_state.cj)
 ```cangjie
-package agentdb.api
+package AgentMem.api
 
 public struct AgentState {
     public var agentId: UInt64
@@ -239,10 +239,10 @@ public struct AgentState {
 }
 
 extend AgentDatabase {
-    public func saveState(state: AgentState): Result<Unit, AgentDbError> {
+    public func saveState(state: AgentState): Result<Unit, AgentMemError> {
         if (!this._initialized || this._handle.isNone()) {
-            return Result<Unit, AgentDbError>.Err(
-                AgentDbError("Database not initialized")
+            return Result<Unit, AgentMemError>.Err(
+                AgentMemError("Database not initialized")
             )
         }
 
@@ -263,18 +263,18 @@ extend AgentDatabase {
         unsafe { LibC.free(cData) }
 
         if (result == 0) {
-            return Result<Unit, AgentDbError>.Ok(Unit())
+            return Result<Unit, AgentMemError>.Ok(Unit())
         } else {
-            return Result<Unit, AgentDbError>.Err(
-                AgentDbError("Failed to save state")
+            return Result<Unit, AgentMemError>.Err(
+                AgentMemError("Failed to save state")
             )
         }
     }
 
-    public func loadState(agentId: UInt64): Result<?AgentState, AgentDbError> {
+    public func loadState(agentId: UInt64): Result<?AgentState, AgentMemError> {
         if (!this._initialized || this._handle.isNone()) {
-            return Result<?AgentState, AgentDbError>.Err(
-                AgentDbError("Database not initialized")
+            return Result<?AgentState, AgentMemError>.Err(
+                AgentMemError("Database not initialized")
             )
         }
 
@@ -301,9 +301,9 @@ extend AgentDatabase {
                 StateType.WorkingMemory,
                 data
             )
-            return Result<?AgentState, AgentDbError>.Ok(Option<AgentState>.Some(state))
+            return Result<?AgentState, AgentMemError>.Ok(Option<AgentState>.Some(state))
         } else {
-            return Result<?AgentState, AgentDbError>.Ok(Option<AgentState>.None)
+            return Result<?AgentState, AgentMemError>.Ok(Option<AgentState>.None)
         }
     }
 }
@@ -355,7 +355,7 @@ extend AgentDatabase {
 ## 预期成果
 
 ### 功能完整性
-- 完整的 AgentDB 功能覆盖
+- 完整的 AgentMem 功能覆盖
 - 类型安全的 API 接口
 - 丰富的使用示例
 
@@ -383,4 +383,4 @@ extend AgentDatabase {
 
 ## 总结
 
-该计划将为 AgentDB 提供完整的仓颉语言支持，形成业界首个四语言混合架构的 AI Agent 数据库。通过借鉴 tree-sitter.cj 的成功经验，确保实现的稳定性和性能。预计10周内完成全部开发工作，为仓颉生态系统贡献重要的基础设施组件。
+该计划将为 AgentMem 提供完整的仓颉语言支持，形成业界首个四语言混合架构的 AI Agent 数据库。通过借鉴 tree-sitter.cj 的成功经验，确保实现的稳定性和性能。预计10周内完成全部开发工作，为仓颉生态系统贡献重要的基础设施组件。

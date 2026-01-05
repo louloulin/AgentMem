@@ -1,19 +1,19 @@
-# AgentDB English Documentation
+# AgentMem English Documentation
 
 ## 📚 Documentation Navigation
 
-Welcome to AgentDB English Documentation! This contains comprehensive technical documentation and usage guides for AgentDB.
+Welcome to AgentMem English Documentation! This contains comprehensive technical documentation and usage guides for AgentMem.
 
 ### 🚀 Quick Start
 
-- **[Getting Started Guide](getting-started.md)** - Start using AgentDB from scratch
+- **[Getting Started Guide](getting-started.md)** - Start using AgentMem from scratch
   - System requirements and installation guide
-  - Your first AgentDB program
+  - Your first AgentMem program
   - Basic configuration and common issues
 
 ### 🏗️ Architecture Design
 
-- **[Architecture Documentation](architecture.md)** - Deep dive into AgentDB's technical architecture
+- **[Architecture Documentation](architecture.md)** - Deep dive into AgentMem's technical architecture
   - System architecture overview
   - Core component details
   - Performance optimization strategies
@@ -36,7 +36,7 @@ Welcome to AgentDB English Documentation! This contains comprehensive technical 
 
 ### 🔄 Development Plans
 
-- **[Development Roadmap](../../plan3.md)** - AgentDB future development plans
+- **[Development Roadmap](../../plan3.md)** - AgentMem future development plans
   - Phase 3: Ecosystem expansion and optimization
   - Phase 4: Intelligence and cloud-native
   - Phase 5: Commercialization and industry solutions
@@ -168,15 +168,15 @@ Documentation is synchronized with code updates, ensuring:
 ## 🤝 Community Participation
 
 ### Contribution Guide
-- **[Contributing Guide](../../CONTRIBUTING.md)** - How to participate in AgentDB development
+- **[Contributing Guide](../../CONTRIBUTING.md)** - How to participate in AgentMem development
 - **Code Standards**: Coding standards and best practices
 - **Testing Requirements**: Test coverage and quality standards
 - **Documentation Updates**: Documentation maintenance and update process
 
 ### Community Resources
-- **GitHub Repository**: [https://github.com/louloulin/AgentDB](https://github.com/louloulin/AgentDB)
-- **Issue Reports**: [GitHub Issues](https://github.com/louloulin/AgentDB/issues)
-- **Feature Discussions**: [GitHub Discussions](https://github.com/louloulin/AgentDB/discussions)
+- **GitHub Repository**: [https://github.com/louloulin/AgentMem](https://github.com/louloulin/AgentMem)
+- **Issue Reports**: [GitHub Issues](https://github.com/louloulin/AgentMem/issues)
+- **Feature Discussions**: [GitHub Discussions](https://github.com/louloulin/AgentMem/discussions)
 - **Technical Blog**: Regular technical articles and best practices
 
 ### Technical Support
@@ -187,7 +187,7 @@ Documentation is synchronized with code updates, ensuring:
 
 ## 📄 License
 
-AgentDB is licensed under the MIT License, see [LICENSE](../../LICENSE) file for details.
+AgentMem is licensed under the MIT License, see [LICENSE](../../LICENSE) file for details.
 
 ## 🔗 Related Links
 
@@ -200,6 +200,6 @@ AgentDB is licensed under the MIT License, see [LICENSE](../../LICENSE) file for
 
 **Document Version**: v1.0  
 **Last Updated**: June 19, 2025  
-**Maintainer**: AgentDB Development Team
+**Maintainer**: AgentMem Development Team
 
 If you encounter any issues during use, or have any suggestions, please feel free to contact us through GitHub Issues or Discussions!

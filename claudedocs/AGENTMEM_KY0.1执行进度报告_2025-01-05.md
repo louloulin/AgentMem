@@ -44,7 +44,7 @@
 | 社区建设 | 严重不足 | 🟢 P2 |
 
 **关键发现**：
-- ❌ 项目名称不统一：94 个文件包含 "AgentDB" 引用
+- ❌ 项目名称不统一：94 个文件包含 "AgentMem" 引用
 - ❌ 缺少 SECURITY.md（安全合规）
 - ❌ 缺少 CODE_OF_CONDUCT.md（社区管理）
 - ❌ 测试覆盖率 60%（顶级标准 90%+）
@@ -195,7 +195,7 @@
 ### 6. 项目名称统一 ✅（部分）
 
 **已完成**：
-- ✅ LICENSE 文件（AgentDB → AgentMem）
+- ✅ LICENSE 文件（AgentMem → AgentMem）
 
 **待完成**：
 - ⏳ CONTRIBUTING.md（94 个文件之一）
@@ -204,7 +204,7 @@
 
 **检测命令**：
 ```bash
-git grep -il "agentdb" | wc -l  # 当前输出 94
+git grep -il "AgentMem" | wc -l  # 当前输出 94
 ```
 
 ---
@@ -285,7 +285,7 @@ git grep -il "agentdb" | wc -l  # 当前输出 94
 
 1. **完成项目名称统一**（优先级：🔴 最高）
    - 修改剩余 93 个文件
-   - 验证无 "AgentDB" 引用
+   - 验证无 "AgentMem" 引用
 
 2. **创建 FAQ.md**（优先级：🔴 高）
    - 常见问题解答
