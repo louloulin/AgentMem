@@ -129,7 +129,6 @@ members = [
     "examples/storage-optimization-demo",
     "examples/compute-optimization-demo",
     "examples/cloud-integration-demo",
-    "examples/graph-memory-demo",
     "examples/procedural-memory-demo",
     "examples/deepseek-test",
     "examples/multimodal-demo",
@@ -150,12 +149,12 @@ members = [
     # "examples/advanced-features",
     # "examples/migration-from-agentmen",
     # "examples/mem0-compatibility",
-    
+
 # 新的真实演示示例（2025-10-24）
-"examples/demo-memory-api",           # Memory API基础演示
-"examples/demo-multimodal",           # 多模态处理演示
-"examples/demo-intelligent-chat",     # 智能对话演示
-"examples/demo-performance-benchmark", # 性能基准测试工具
+    "examples/demo-memory-api",           # Memory API基础演示
+    "examples/demo-multimodal",           # 多模态处理演示
+    "examples/demo-intelligent-chat",     # 智能对话演示
+    "examples/demo-performance-benchmark", # 性能基准测试工具
     "examples/demo-codebase-memory",      # 代码库记忆与搜索演示（需FastEmbed）
     "examples/demo-performance-simple",    # 简化性能测试（无Embedder依赖）
     "examples/demo-memory-viewer",        # 记忆可视化工具（对标MIRIX）
@@ -165,106 +164,69 @@ members = [
     # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 
-[workspace.package]
-version = "2.0.0"
-edition = "2021"
-authors = ["AgentMem Team <team@agentmem.dev>"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/agentmem/agentmem"
-homepage = "https://agentmem.dev"
-documentation = "https://docs.rs/agent-mem"
-keywords = ["ai", "memory", "agent", "llm", "vector"]
-categories = ["database", "science", "web-programming"]
+# ⚡ 编译时间优化配置
+[profile.release]
+# 优化级别：3 = 最高优化
+opt-level = 3
+# 链接时优化：thin = 平衡性能和编译时间
+lto = "thin"
+# 代码生成单元：1 = 最慢编译但最好性能（可以改为 16 加快编译）
+codegen-units = 16
+# 增量编译
+incremental = true
+# 调试信息：1 = 行号表（足够用于backtrace，但编译更快）
+debug = 1
+# Strip 符号：减小二进制大小
+strip = "debuginfo"
 
+[profile.dev]
+# 开发模式优化：0 = 无优化（最快编译）
+opt-level = 0
+# 开发模式不使用 LTO（加快编译）
+lto = false
+# 更多代码生成单元（加快增量编译）
+codegen-units = 256
+# 增量编译
+incremental = true
+# 保留完整调试信息
+debug = 2
+
+[profile.dev.package."*"]
+# 依赖项使用一些优化（不花太多时间编译依赖）
+opt-level = 1
+
+# ⚡ 测试配置优化
+[profile.test]
+opt-level = 1
+debug = 2
+codegen-units = 16
+lto = false
+incremental = true
+
+# ⚡ Bench 配置优化
+[profile.bench]
+opt-level = 3
+debug = 1
+codegen-units = 1
+lto = "thin"
+incremental = false
+
+# 🔧 构建优化
+[build]
+# 使用更快的链接器
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]  # Linux only, 需要安装 lld
+
+# 📦 依赖优化
 [workspace.dependencies]
-# 核心依赖
-tokio = { version = "1.0", features = ["full"] }
+# 固定版本以避免重复解析
+tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-uuid = { version = "1.0", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
-tracing = "0.1"
-tracing-subscriber = "0.3"
 async-trait = "0.1"
-
-# 异步HTTP客户端
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
-hyper = { version = "0.14", features = ["full"] }
-
-# 数据库和存储
-lancedb = "0.21.2"
-redis = { version = "0.23", features = ["tokio-comp"] }
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "chrono", "uuid"] }
-
-# 向量数据库客户端
-# pinecone-sdk = "0.1"
-# qdrant-client = "1.0"
-
-# 图数据库客户端  
-# neo4rs = "0.7"
-
-# LLM客户端
-# openai-api-rs = "4.0"
-# anthropic-sdk = "0.1"
-
-# 嵌入和ML
-# candle-core = "0.3"
-# candle-nn = "0.3"
-# tokenizers = "0.14"
-
-# 配置和CLI
-clap = { version = "4.0", features = ["derive"] }
-config = "0.13"
-toml = "0.8"
-
-# 多语言绑定
-pyo3 = { version = "0.20", features = ["extension-module"] }
-napi = { version = "2.0", features = ["napi4"] }
-napi-derive = "2.0"
-
-# Web服务器
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
-
-# 测试和基准
-criterion = { version = "0.5", features = ["html_reports"] }
-proptest = "1.0"
-
-# 性能优化
-dashmap = "5.5"
-lru = "0.12"
-parking_lot = "0.12"
-metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
-bytes = "1.5"
-crossbeam = "0.8"
-rayon = "1.8"
-
-# 分布式系统
-ring = "0.17"
-
-# 文本处理
-regex = "1.0"
-
-# 现有依赖保持兼容
-# 更新到 56.2 以匹配 LanceDB 0.22 的要求
-arrow = "56.2"
-arrow-array = "56.2"
-arrow-schema = "56.2"
-arrow-buffer = "56.2"
 futures = "0.3"
-libc = "0.2"
-rand = "0.8"
-env_logger = "0.11.8"
-num_cpus = "1.17.0"
-bincode = "2.0.1"
-flate2 = "1.1.2"
-log = "0.4.27"
-sha2 = "0.10"
-aes-gcm = "0.10"
-hex = "0.4"
-cbindgen = "0.26"
-tempfile = "3.20.0"

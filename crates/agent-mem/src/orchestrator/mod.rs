@@ -6,8 +6,11 @@ pub mod batch;
 pub mod core;
 pub mod initialization;
 pub mod intelligence;
+pub mod intelligence_tests;
 pub mod multimodal;
+pub mod multimodal_tests;
 pub mod retrieval;
+pub mod retrieval_tests;
 pub mod storage;
 pub mod utils;
 

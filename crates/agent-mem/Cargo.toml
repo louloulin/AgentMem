@@ -48,8 +48,13 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 tracing-subscriber.workspace = true
 tempfile.workspace = true
+
+[[bench]]
+name = "memory_benchmarks"
+harness = false
 
 [features]
 default = ["libsql", "fastembed"]
