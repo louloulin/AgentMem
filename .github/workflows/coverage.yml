@@ -1,0 +1,118 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate coverage report
+        run: |
+          cargo tarpaulin \
+            --workspace \
+            --exclude-files "*/tests/*" \
+            --exclude-files "*/examples/*" \
+            --exclude-files "*/bench/*" \
+            --timeout 600 \
+            --out Xml \
+            --out Html \
+            --verbose
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./cobertura.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            tarpaulin-report.html
+            cobertura.xml
+          retention-days: 30
+
+      - name: Coverage summary
+        run: |
+          echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage report has been generated and uploaded." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed report in the artifacts." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coverageXml = fs.readFileSync('cobertura.xml', 'utf8');
+
+            // Extract coverage percentage (simple regex)
+            const match = coverageXml.match(/line-rate="([^"]+)"/);
+            const coverage = match ? (parseFloat(match[1]) * 100).toFixed(2) : 'N/A';
+
+            const comment = `### 📊 Coverage Report
+            **Current Coverage**: ${coverage}%
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  coverage-threshold:
+    name: Check Coverage Threshold
+    runs-on: ubuntu-latest
+    needs: coverage
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run coverage with threshold check
+        run: |
+          cargo tarpaulin \
+            --workspace \
+            --exclude-files "*/tests/*" \
+            --exclude-files "*/examples/*" \
+            --exclude-files "*/bench/*" \
+            --timeout 600 \
+            --out Xml \
+            --ignore-tests \
+            --fail-under 60
+
+      - name: Check if coverage meets threshold
+        run: |
+          echo "## ✅ Coverage Check Passed" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage meets the minimum threshold of 60%" >> $GITHUB_STEP_SUMMARY

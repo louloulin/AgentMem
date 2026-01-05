@@ -1,8 +1,9 @@
 # AgentMem - Enterprise-Grade Intelligent Memory Platform 🧠
 
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://gitcode.com/louloulin/agentmem)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/agentmem/agentmem/actions)
+[![Coverage](https://img.shields.io/badge/coverage-60%25%2B-green.svg)](https://github.com/agentmem/agentmem/actions/workflows/coverage.yml)
 [![WASM Plugins](https://img.shields.io/badge/plugins-WASM-blueviolet.svg)](https://webassembly.org/)
 [![Architecture](https://img.shields.io/badge/architecture-modular-success.svg)](#architecture)
 

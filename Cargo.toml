@@ -223,11 +223,6 @@ codegen-units = 1
 lto = "thin"
 incremental = false
 
-# 🔧 构建优化
-[build]
-# 使用更快的链接器
-# rustflags = ["-C", "link-arg=-fuse-ld=lld"]  # Linux only, 需要安装 lld
-
 # 📦 依赖优化
 [workspace.dependencies]
 # 固定版本以避免重复解析
