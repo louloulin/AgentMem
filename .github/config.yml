@@ -3,7 +3,7 @@
 repository:
   name: AgentMem
   description: "Enterprise-Grade Intelligent Memory Platform for AI Agents and LLM Applications"
-  homepage: https://agentmem.dev
+  homepage: https://www.agentmem.cc
   topics: [ai, memory, agent, llm, vector-database, embeddings, rust, python, javascript, wasm, plugins, semantic-search, knowledge-graph]
 
 # Branch Protection

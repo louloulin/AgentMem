@@ -2553,7 +2553,7 @@ export function activate(context: vscode.ExtensionContext) {
 ### C. 联系方式
 
 **项目**: AgentMem
-**官网**: https://agentmem.dev
+**官网**: https://www.agentmem.cc
 **GitHub**: https://github.com/louloulin/agentmem
 **文档**: https://docs.agentmem.dev
 **Email**: team@agentmem.dev

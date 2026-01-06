@@ -4,13 +4,13 @@ description: AgentMem - Enterprise-grade memory management for AI agents
 type: application
 version: 6.0.0
 appVersion: "6.0.0"
-home: https://agentmem.dev
+home: https://www.agentmem.cc
 sources:
   - https://github.com/louloulin/agentmem
 maintainers:
   - name: AgentMem Team
     email: support@agentmem.dev
-    url: https://agentmem.dev
+    url: https://www.agentmem.cc
 keywords:
   - ai
   - memory

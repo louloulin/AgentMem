@@ -69,7 +69,7 @@ export {
 // Package metadata
 export const VERSION = '6.0.0';
 export const AUTHOR = 'AgentMem Team';
-export const HOMEPAGE = 'https://agentmem.dev';
+export const HOMEPAGE = 'https://www.agentmem.cc';
 
 /**
  * Create a new AgentMem client with environment-based configuration

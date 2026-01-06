@@ -6,7 +6,7 @@ description = "AgentMem 云原生部署演示程序"
 authors = ["AgentMem Team <support@agentmem.dev>"]
 license = "MIT"
 repository = "https://github.com/louloulin/agentmem"
-homepage = "https://agentmem.dev"
+homepage = "https://www.agentmem.cc"
 
 [dependencies]
 # 异步运行时

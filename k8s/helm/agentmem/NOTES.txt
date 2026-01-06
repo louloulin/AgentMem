@@ -93,7 +93,7 @@ AgentMem 安装成功提示信息
 
 📚 文档和支持:
 
-  - 文档: https://agentmem.dev/docs
+  - 文档: https://www.agentmem.cc/docs
   - GitHub: https://github.com/louloulin/agentmem
   - 问题反馈: https://github.com/louloulin/agentmem/issues
   - Email: support@agentmem.dev

@@ -2911,7 +2911,7 @@ pub async fn search_with_tracing(query: &str) -> Result<Vec<CodeResult>, Error> 
 
 **推荐计划**:
 - 推荐奖励: 每推荐1个付费用户,双方各得1月免费
-- 推荐链接: https://agentmem.dev?ref=username
+- 推荐链接: https://www.agentmem.cc?ref=username
 - 推荐Dashboard: 查看推荐收益
 
 #### 内容营销
@@ -3778,7 +3778,7 @@ pub async fn search_with_tracing(query: &str) -> Result<Vec<CodeResult>, Error> 
 ### C. 联系方式
 
 **项目**: AgentMem
-**官网**: https://agentmem.dev
+**官网**: https://www.agentmem.cc
 **GitHub**: https://github.com/louloulin/agentmem
 **文档**: https://docs.agentmem.dev
 **Email**: team@agentmem.dev

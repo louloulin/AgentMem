@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
         eprintln!("{}", "Error: API key is required. Set AGENTMEM_API_KEY environment variable or use --api-key flag.".red());
         eprintln!(
             "Get your API key at: {}",
-            "https://agentmem.dev/dashboard/api-keys".blue()
+            "https://www.agentmem.cc/dashboard/api-keys".blue()
         );
         std::process::exit(1);
     }
