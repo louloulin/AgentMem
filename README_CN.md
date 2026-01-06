@@ -512,7 +512,7 @@ AgentMem 经过实战测试，生产就绪：
 
 ## 🌟 Star 历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=agentmem/agentmem&type=Date)](https://star-history.com/#agentmem/agentmem&Date)
+
 
 ---
 

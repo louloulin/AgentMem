@@ -508,11 +508,6 @@ Built with amazing open-source projects:
 - [LanceDB](https://lancedb.github.io/lancedb/) - Vector database
 - [LibSQL](https://libsql.org/) - Embedded SQL database
 
----
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=agentmem/agentmem&type=Date)](https://star-history.com/#agentmem/agentmem&Date)
 
 ---
 
