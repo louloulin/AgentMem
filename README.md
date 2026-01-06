@@ -214,6 +214,80 @@ let result = plugin_manager.execute("weather", &input).await?;
 
 ---
 
+## 🔌 Model Context Protocol (MCP) Integration
+
+AgentMem provides a complete **Model Context Protocol (MCP)** server implementation, enabling seamless integration with Claude Code, Claude Desktop, and other MCP-compatible clients.
+
+### MCP Features
+
+- ✅ **5 Core Tools**: Memory management, search, chat, system prompts, and agent listing
+- ✅ **Multiple Transports**: stdio, HTTP, SSE (Server-Sent Events)
+- ✅ **Resource Management**: Dynamic resource discovery and subscription
+- ✅ **Prompt Templates**: Reusable prompt templates with variables
+- ✅ **Authentication**: JWT and API key support
+- ✅ **Production Ready**: Battle-tested with Claude Code integration
+
+### Quick Start with Claude Code
+
+```bash
+# 1. Build the MCP server
+cargo build --package mcp-stdio-server --release
+
+# 2. Create .mcp.json in your project root
+cat > .mcp.json << EOF
+{
+  "mcpServers": {
+    "agentmem": {
+      "command": "./target/release/agentmem-mcp-server",
+      "args": [],
+      "env": {
+        "AGENTMEM_API_URL": "http://127.0.0.1:8080",
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+EOF
+
+# 3. Start Claude Code in the project directory
+claude
+```
+
+### Available MCP Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `agentmem_add_memory` | Add a new memory to the system | `content`, `user_id`, `agent_id` (optional), `memory_type` (optional) |
+| `agentmem_search_memories` | Search memories semantically | `query`, `user_id`, `limit` (optional), `search_type` (optional) |
+| `agentmem_chat` | Intelligent chat with memory context | `message`, `user_id`, `agent_id` (optional) |
+| `agentmem_get_system_prompt` | Get personalized system prompt | `user_id`, `agent_id` (optional) |
+| `agentmem_list_agents` | List all available agents | None |
+
+### Example Usage in Claude Code
+
+```
+User: Remember that I prefer dark mode and use Rust for backend development
+
+Claude: [Calls agentmem_add_memory]
+✅ Memory saved successfully
+
+User: What do you know about my preferences?
+
+Claude: [Calls agentmem_search_memories]
+Based on your saved memories:
+- You prefer dark mode
+- You use Rust for backend development
+```
+
+### Documentation
+
+- 📖 [MCP Complete Guide](docs/api/mcp-complete-guide.md) - Full integration guide
+- 🚀 [Claude Code Quickstart](docs/getting-started/claude-code-quickstart.md) - 5-minute setup
+- 🔧 [MCP Commands Reference](docs/api/mcp-commands.md) - All available commands
+- 🖥️ [Claude Desktop Integration](examples/mcp-stdio-server/CLAUDE_DESKTOP_INTEGRATION.md) - Desktop app setup
+
+---
+
 ## 🌐 Language Bindings
 
 AgentMem provides official SDKs for multiple languages:
@@ -279,7 +353,8 @@ let results = memory.search("user preferences")
 - 📚 [User Guide](docs/user-guide/) - Comprehensive user documentation
 - 🔍 [Search Guide](docs/getting-started/search-quickstart.md) - Search engine usage
 - 🔌 [Plugin Guide](docs/getting-started/plugins-quickstart.md) - Plugin development
-- 💬 [Claude Code Integration](docs/getting-started/claude-code-quickstart.md) - MCP integration
+- 💬 [Claude Code Integration](docs/getting-started/claude-code-quickstart.md) - MCP integration guide
+- 🔗 [MCP Complete Guide](docs/api/mcp-complete-guide.md) - Full MCP integration documentation
 
 ### Developer Resources
 
