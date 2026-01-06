@@ -37,7 +37,7 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 
 # Collections and utilities
 dashmap = "5.5"
-lru = "0.12"
+lru = "0.16"
 parking_lot = "0.12"
 
 # Metrics and monitoring
