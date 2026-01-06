@@ -21,7 +21,7 @@ agent-mem-observability = { path = "../agent-mem-observability" }
 agent-mem-performance = { path = "../agent-mem-performance" }  # ✅ Phase 2.2.5: 熔断器模式
 agent-mem-storage = { path = "../agent-mem-storage", optional = true }
 # agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成 - TEMPORARILY DISABLED
-# lumosai_core = { path = "../../lumosai/lumosai_core", optional = true }  # LumosAI集成 - TEMPORARILY DISABLED
+# lumosai_core = { git = "https://github.com/louloulin/lumos.ai", package = "lumosai_core", optional = true }  # LumosAI集成 - TEMPORARILY DISABLED
 
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart", "ws"] }

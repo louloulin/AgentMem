@@ -12,7 +12,7 @@ categories.workspace = true
 
 [dependencies]
 # LumosAI 核心
-lumosai_core = { path = "../../lumosai/lumosai_core" }
+lumosai_core = { git = "https://github.com/louloulin/lumos.ai", package = "lumosai_core" }
 
 # AgentMem 核心
 agent-mem = { path = "../agent-mem" }  # 顶层统一API
