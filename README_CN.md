@@ -342,26 +342,35 @@ let results = memory.search("用户偏好")
 
 ## 📚 文档
 
+**📖 [完整文档索引](docs/README.md)** - 所有文档的中心枢纽
+
 ### 快速开始
 
 - 📖 [安装指南](INSTALL.md) - 详细设置说明
 - 🚀 [快速开始指南](QUICKSTART.md) - 5 分钟上手
-- 📝 [API 参考](docs/api/) - 完整 API 文档
+- 📝 [API 参考](docs/api/API_REFERENCE.md) - 完整 API 文档
+- 💬 [Claude Code 集成](docs/getting-started/claude-code-quickstart.md) - MCP 集成指南
 
 ### 用户指南
 
-- 📚 [用户指南](docs/user-guide/) - 全面的用户文档
+- 📚 [用户指南](docs/user-guide/getting-started.md) - 全面的用户文档
 - 🔍 [搜索指南](docs/getting-started/search-quickstart.md) - 搜索引擎使用
 - 🔌 [插件指南](docs/getting-started/plugins-quickstart.md) - 插件开发
-- 💬 [Claude Code 集成](docs/getting-started/claude-code-quickstart.md) - MCP 集成指南
 - 🔗 [MCP 完整指南](docs/api/mcp-complete-guide.md) - 完整 MCP 集成文档
 
 ### 开发者资源
 
-- 🏗️ [架构文档](docs/architecture/) - 系统架构和设计
-- 🔧 [开发者指南](docs/developer-guide/) - 开发设置和指南
-- 🚀 [部署指南](docs/deployment/) - 生产部署策略
+- 🏗️ [架构文档](docs/architecture/architecture-overview.md) - 系统架构和设计
+- 🔧 [开发者指南](docs/developer-guide/architecture.md) - 开发设置和指南
+- 🚀 [部署指南](docs/deployment/PRODUCTION_DEPLOYMENT_GUIDE.md) - 生产部署策略
 - 🧪 [测试指南](docs/testing/) - 测试策略和最佳实践
+- 🔒 [安全文档](docs/SECURITY.md) - 安全模型和最佳实践
+
+### API 和集成
+
+- 📝 [API 参考](docs/api/API_REFERENCE.md) - 完整 REST API 文档
+- 🔌 [MCP 工具参考](docs/api/mcp-tools-reference.md) - Model Context Protocol 工具
+- 📋 [OpenAPI 规范](docs/api/openapi.yaml) - 机器可读的 API 规范
 
 ---
 

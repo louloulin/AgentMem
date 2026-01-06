@@ -342,26 +342,35 @@ let results = memory.search("user preferences")
 
 ## 📚 Documentation
 
+**📖 [Complete Documentation Index](docs/README.md)** - Central hub for all documentation
+
 ### Getting Started
 
 - 📖 [Installation Guide](INSTALL.md) - Detailed setup instructions
 - 🚀 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- 📝 [API Reference](docs/api/) - Complete API documentation
+- 📝 [API Reference](docs/api/API_REFERENCE.md) - Complete API documentation
+- 💬 [Claude Code Integration](docs/getting-started/claude-code-quickstart.md) - MCP integration guide
 
 ### User Guides
 
-- 📚 [User Guide](docs/user-guide/) - Comprehensive user documentation
+- 📚 [User Guide](docs/user-guide/getting-started.md) - Comprehensive user documentation
 - 🔍 [Search Guide](docs/getting-started/search-quickstart.md) - Search engine usage
 - 🔌 [Plugin Guide](docs/getting-started/plugins-quickstart.md) - Plugin development
-- 💬 [Claude Code Integration](docs/getting-started/claude-code-quickstart.md) - MCP integration guide
 - 🔗 [MCP Complete Guide](docs/api/mcp-complete-guide.md) - Full MCP integration documentation
 
 ### Developer Resources
 
-- 🏗️ [Architecture](docs/architecture/) - System architecture and design
-- 🔧 [Developer Guide](docs/developer-guide/) - Development setup and guidelines
-- 🚀 [Deployment Guide](docs/deployment/) - Production deployment strategies
+- 🏗️ [Architecture](docs/architecture/architecture-overview.md) - System architecture and design
+- 🔧 [Developer Guide](docs/developer-guide/architecture.md) - Development setup and guidelines
+- 🚀 [Deployment Guide](docs/deployment/PRODUCTION_DEPLOYMENT_GUIDE.md) - Production deployment strategies
 - 🧪 [Testing Guide](docs/testing/) - Testing strategies and best practices
+- 🔒 [Security Documentation](docs/SECURITY.md) - Security model and best practices
+
+### API & Integration
+
+- 📝 [API Reference](docs/api/API_REFERENCE.md) - Complete REST API documentation
+- 🔌 [MCP Tools Reference](docs/api/mcp-tools-reference.md) - Model Context Protocol tools
+- 📋 [OpenAPI Specification](docs/api/openapi.yaml) - Machine-readable API spec
 
 ---
 
