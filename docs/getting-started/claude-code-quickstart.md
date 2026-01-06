@@ -1,18 +1,98 @@
 # Claude Code MCP 快速启动指南
 
-**Claude Code**: 命令行AI编程助手  
-**日期**: 2025-11-07
+**AgentMem MCP Integration for Claude Code**  
+**Version**: 2.0.0  
+**Last Updated**: 2025-01-05
 
 ---
 
-## 🎯 问题诊断
+## 🎯 Overview
 
-您在Claude Code中看不到AgentMem MCP工具。可能的原因：
+This guide will help you integrate AgentMem's Model Context Protocol (MCP) server with Claude Code, enabling intelligent memory management, semantic search, and personalized conversations directly within your coding workflow.
 
-1. ❌ 不在正确的项目目录
-2. ❌ `.mcp.json`位置不对
-3. ❌ Claude Code未正确加载配置
-4. ❌ 需要使用特定命令启动
+### What You'll Get
+
+- ✅ **5 MCP Tools**: Memory management, search, chat, system prompts, and agent listing
+- ✅ **Seamless Integration**: Natural language commands in Claude Code
+- ✅ **Persistent Memory**: Cross-session memory retention
+- ✅ **Intelligent Search**: Semantic search across all your memories
+- ✅ **Production Ready**: Battle-tested integration
+
+---
+
+## 🚀 Quick Start (5 Minutes)
+
+### Prerequisites
+
+- ✅ Claude Code installed (`npm install -g @anthropic-ai/claude-code`)
+- ✅ Rust toolchain (for building MCP server)
+- ✅ AgentMem backend running (optional but recommended)
+
+### Step 1: Build MCP Server
+
+```bash
+cd /path/to/agentmen
+cargo build --package mcp-stdio-server --release
+```
+
+The binary will be at: `target/release/agentmem-mcp-server`
+
+### Step 2: Create MCP Configuration
+
+Create `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "agentmem": {
+      "command": "./target/release/agentmem-mcp-server",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info",
+        "AGENTMEM_API_URL": "http://127.0.0.1:8080",
+        "AGENTMEM_DEFAULT_AGENT_ID": "coding_assistant"
+      }
+    }
+  }
+}
+```
+
+### Step 3: Start Claude Code
+
+```bash
+# Navigate to project directory
+cd /path/to/agentmen
+
+# Start Claude Code
+claude
+```
+
+### Step 4: Verify Integration
+
+In Claude Code, try:
+
+```
+User: /mcp list
+
+Claude: Available MCP Servers:
+• agentmem
+  Status: Connected
+  Tools: 5
+```
+
+---
+
+## 🎯 Common Issues
+
+### Issue 1: MCP Tools Not Visible
+
+**Symptoms**: Claude Code doesn't show AgentMem tools
+
+**Solutions**:
+1. Ensure you're in the project directory (where `.mcp.json` exists)
+2. Verify `.mcp.json` syntax: `cat .mcp.json | jq .`
+3. Check binary exists: `ls -lh ./target/release/agentmem-mcp-server`
+4. Restart Claude Code completely
 
 ---
 

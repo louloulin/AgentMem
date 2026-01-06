@@ -214,6 +214,80 @@ let result = plugin_manager.execute("weather", &input).await?;
 
 ---
 
+## 🔌 Model Context Protocol (MCP) 集成
+
+AgentMem 提供完整的 **Model Context Protocol (MCP)** 服务器实现，可与 Claude Code、Claude Desktop 和其他 MCP 兼容客户端无缝集成。
+
+### MCP 特性
+
+- ✅ **5 个核心工具**: 记忆管理、搜索、对话、系统提示词和 Agent 列表
+- ✅ **多种传输方式**: stdio、HTTP、SSE（服务器发送事件）
+- ✅ **资源管理**: 动态资源发现和订阅
+- ✅ **提示词模板**: 支持变量的可重用提示词模板
+- ✅ **身份认证**: JWT 和 API 密钥支持
+- ✅ **生产就绪**: 已通过 Claude Code 集成实战测试
+
+### 与 Claude Code 快速开始
+
+```bash
+# 1. 编译 MCP 服务器
+cargo build --package mcp-stdio-server --release
+
+# 2. 在项目根目录创建 .mcp.json
+cat > .mcp.json << EOF
+{
+  "mcpServers": {
+    "agentmem": {
+      "command": "./target/release/agentmem-mcp-server",
+      "args": [],
+      "env": {
+        "AGENTMEM_API_URL": "http://127.0.0.1:8080",
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+EOF
+
+# 3. 在项目目录中启动 Claude Code
+claude
+```
+
+### 可用的 MCP 工具
+
+| 工具 | 描述 | 参数 |
+|------|------|------|
+| `agentmem_add_memory` | 向系统添加新记忆 | `content`、`user_id`、`agent_id`（可选）、`memory_type`（可选） |
+| `agentmem_search_memories` | 语义搜索记忆 | `query`、`user_id`、`limit`（可选）、`search_type`（可选） |
+| `agentmem_chat` | 带记忆上下文的智能对话 | `message`、`user_id`、`agent_id`（可选） |
+| `agentmem_get_system_prompt` | 获取个性化系统提示词 | `user_id`、`agent_id`（可选） |
+| `agentmem_list_agents` | 列出所有可用 Agent | 无 |
+
+### 在 Claude Code 中的使用示例
+
+```
+用户: 记住我偏好深色模式，并且使用 Rust 进行后端开发
+
+Claude: [调用 agentmem_add_memory]
+✅ 记忆保存成功
+
+用户: 你了解我的哪些偏好？
+
+Claude: [调用 agentmem_search_memories]
+根据您保存的记忆：
+- 您偏好深色模式
+- 您使用 Rust 进行后端开发
+```
+
+### 文档
+
+- 📖 [MCP 完整指南](docs/api/mcp-complete-guide.md) - 完整集成指南
+- 🚀 [Claude Code 快速开始](docs/getting-started/claude-code-quickstart.md) - 5 分钟设置
+- 🔧 [MCP 命令参考](docs/api/mcp-commands.md) - 所有可用命令
+- 🖥️ [Claude Desktop 集成](examples/mcp-stdio-server/CLAUDE_DESKTOP_INTEGRATION.md) - 桌面应用设置
+
+---
+
 ## 🌐 语言绑定
 
 AgentMem 为多种语言提供官方 SDK：
@@ -279,7 +353,8 @@ let results = memory.search("用户偏好")
 - 📚 [用户指南](docs/user-guide/) - 全面的用户文档
 - 🔍 [搜索指南](docs/getting-started/search-quickstart.md) - 搜索引擎使用
 - 🔌 [插件指南](docs/getting-started/plugins-quickstart.md) - 插件开发
-- 💬 [Claude Code 集成](docs/getting-started/claude-code-quickstart.md) - MCP 集成
+- 💬 [Claude Code 集成](docs/getting-started/claude-code-quickstart.md) - MCP 集成指南
+- 🔗 [MCP 完整指南](docs/api/mcp-complete-guide.md) - 完整 MCP 集成文档
 
 ### 开发者资源
 

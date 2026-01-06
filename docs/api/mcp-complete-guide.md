@@ -1,14 +1,55 @@
-# Claude Code + AgentMem MCP 完整集成指南
+# AgentMem MCP Complete Integration Guide
 
-**版本**: v1.0  
-**日期**: 2025-11-06  
-**适用**: Claude Code (不是 Claude Desktop)
+**Version**: 2.0.0  
+**Last Updated**: 2025-01-05  
+**Target**: Claude Code, Claude Desktop, and MCP-compatible clients
 
 ---
 
-## 🎯 快速开始 (5分钟)
+## 📋 Table of Contents
 
-### Step 1: 编译 MCP 服务器
+1. [Overview](#overview)
+2. [Quick Start](#quick-start)
+3. [MCP Tools Reference](#mcp-tools-reference)
+4. [Configuration](#configuration)
+5. [Advanced Usage](#advanced-usage)
+6. [Troubleshooting](#troubleshooting)
+7. [Best Practices](#best-practices)
+
+---
+
+## 🎯 Overview
+
+AgentMem provides a complete **Model Context Protocol (MCP)** server implementation that enables seamless integration with AI assistants like Claude Code and Claude Desktop. The MCP server exposes AgentMem's powerful memory management capabilities through a standardized protocol.
+
+### Key Features
+
+- ✅ **5 Core Tools**: Complete memory lifecycle management
+- ✅ **Multiple Transports**: stdio, HTTP, SSE support
+- ✅ **Resource Management**: Dynamic resource discovery
+- ✅ **Prompt Templates**: Reusable prompt generation
+- ✅ **Authentication**: JWT and API key support
+- ✅ **Production Ready**: Battle-tested in production environments
+
+### Architecture
+
+```
+Claude Code/Desktop
+    ↓ (JSON-RPC over stdio)
+AgentMem MCP Server
+    ↓ (HTTP REST API)
+AgentMem Backend
+    ↓
+Storage (LibSQL/PostgreSQL/etc.)
+```
+
+---
+
+---
+
+## 🚀 Quick Start (5 Minutes)
+
+### Step 1: Build MCP Server
 
 ```bash
 cd /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen
@@ -20,7 +61,7 @@ cargo build --package mcp-stdio-server --release
 agentmen/target/release/agentmem-mcp-server
 ```
 
-### Step 2: 创建 Claude Code 配置
+### Step 2: Create Claude Code Configuration
 
 在项目根目录创建 `.mcp.json` 文件：
 
@@ -42,7 +83,7 @@ agentmen/target/release/agentmem-mcp-server
 
 **注意**: 已为你创建在 `/Users/louloulin/Documents/linchong/cjproject/contextengine/.mcp.json`
 
-### Step 3: 启动后端服务（可选但推荐）
+### Step 3: Start Backend Service (Optional but Recommended)
 
 为了使用完整功能（记忆持久化、Agent管理），需要启动后端服务：
 
@@ -52,11 +93,11 @@ cd /Users/louloulin/Documents/linchong/cjproject/contextengine/agentmen
 cargo run --bin agent-mem-server -- --config config.toml
 ```
 
-### Step 4: 重启 Claude Code
+### Step 4: Restart Claude Code
 
 完全关闭并重新启动 Claude Code，新的 MCP 配置将被加载。
 
-### Step 5: 验证集成
+### Step 5: Verify Integration
 
 在 Claude Code 中尝试：
 
