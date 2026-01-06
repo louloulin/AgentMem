@@ -1,0 +1,247 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "AgentMem Overview Dashboard",
+    "tags": ["agentmem", "overview"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 30,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"agentmem-server\"}, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"agentmem-server\"}",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "DOWN"}}, "type": "value"},
+              {"options": {"1": {"text": "UP"}}, "type": "value"}
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_http_requests_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "Requests/sec", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 9, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_http_requests_total{status=~\"5..\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "5xx Errors"
+          },
+          {
+            "expr": "rate(agentmem_http_requests_total{status=~\"4..\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "4xx Errors"
+          }
+        ],
+        "yAxes": [
+          {"label": "Errors/sec", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 9, "x": 15, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(agentmem_http_request_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(agentmem_http_request_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(agentmem_http_request_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "99th percentile"
+          }
+        ],
+        "yAxes": [
+          {"label": "Seconds", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "agentmem_memory_usage_bytes{instance=~\"$instance\"}",
+            "legendFormat": "Used Memory"
+          },
+          {
+            "expr": "agentmem_memory_limit_bytes{instance=~\"$instance\"}",
+            "legendFormat": "Memory Limit"
+          }
+        ],
+        "yAxes": [
+          {"label": "Bytes", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_cpu_usage_seconds_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "CPU Usage"
+          }
+        ],
+        "yAxes": [
+          {"label": "CPU Cores", "min": 0, "max": 1},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "agentmem_database_connections_active{instance=~\"$instance\"}",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "agentmem_database_connections_idle{instance=~\"$instance\"}",
+            "legendFormat": "Idle Connections"
+          },
+          {
+            "expr": "agentmem_database_connections_max{instance=~\"$instance\"}",
+            "legendFormat": "Max Connections"
+          }
+        ],
+        "yAxes": [
+          {"label": "Connections", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Cache Hit Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_cache_hits_total{instance=~\"$instance\"}[5m]) / (rate(agentmem_cache_hits_total{instance=~\"$instance\"}[5m]) + rate(agentmem_cache_misses_total{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "yAxes": [
+          {"label": "Percentage", "min": 0, "max": 1},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Memory Operations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_memory_operations_total{operation=\"create\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "Create"
+          },
+          {
+            "expr": "rate(agentmem_memory_operations_total{operation=\"read\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "Read"
+          },
+          {
+            "expr": "rate(agentmem_memory_operations_total{operation=\"update\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "Update"
+          },
+          {
+            "expr": "rate(agentmem_memory_operations_total{operation=\"delete\",instance=~\"$instance\"}[5m])",
+            "legendFormat": "Delete"
+          }
+        ],
+        "yAxes": [
+          {"label": "Operations/sec", "min": 0},
+          {"show": false}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Search Operations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agentmem_search_operations_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "Search Requests"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(agentmem_search_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "95th percentile latency"
+          }
+        ],
+        "yAxes": [
+          {"label": "Operations/sec", "min": 0},
+          {"label": "Seconds", "min": 0}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ]
+  }
+}

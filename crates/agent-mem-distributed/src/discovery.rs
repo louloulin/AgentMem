@@ -1,12 +1,12 @@
 //! Service discovery for distributed AgentMem
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,14 +78,14 @@ mod tests {
     async fn test_service_discovery() {
         let config = DiscoveryConfig::default();
         let discovery = ServiceDiscovery::new(config).await.unwrap();
-        
+
         let service = ServiceInfo {
             id: Uuid::new_v4(),
             name: "test-service".to_string(),
             address: "127.0.0.1:8080".parse().unwrap(),
             metadata: HashMap::new(),
         };
-        
+
         discovery.register_service(service.clone()).await.unwrap();
         let services = discovery.discover_services().await.unwrap();
         assert_eq!(services.len(), 1);

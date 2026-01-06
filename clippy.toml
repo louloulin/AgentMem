@@ -1,0 +1,108 @@
+# AgentMem Clippy Configuration
+# https://rust-lang.github.io/clippy/lints.html
+
+# Cognitive complexity threshold
+# Functions with complexity above this will trigger a warning
+cognitive-complexity-threshold = 30
+
+# Type complexity threshold
+# Types with complexity above this will trigger a warning
+type-complexity-threshold = 250
+
+# Documentation
+# Avoid broken links in documentation
+missing-docs-in-private-items = false
+
+# Literal representation
+# Threshold for integer literals that trigger the warning
+literal-representation-threshold = 10
+
+# Single char binding names threshold
+# Allow single char binding names if they match this pattern
+single-char-binding-names-threshold = 4
+
+# Too many arguments threshold
+# Functions with more than this many arguments will trigger a warning
+too-many-arguments-threshold = 7
+
+# Too many lines threshold
+# Functions/blocks with more than this many lines will trigger a warning
+too-many-lines-threshold = 100
+
+# Trivial copy size threshold
+# Types larger than this will trigger a warning for trivially copying
+trivial-copy-size-limit = 256
+
+# Vec box size threshold
+# Size at which to warn about using Box<Vec>
+vec-box-size-threshold = 4096
+
+# Stack size threshold
+# Size at which to warn about large stack allocations
+stack-size-threshold = 512000
+
+# Enum variant size threshold
+# Warn on enum variants larger than this
+enum-variant-size-threshold = 200
+
+# Verbose bit mask threshold
+# Warn on bit masks with more than this many bits
+verbose-bit-mask-threshold = 1
+
+# Blacklisted names (variable names that should not be used)
+# Common overly generic names that reduce code clarity
+blacklisted-names = ["foo", "bar", "baz", "quux"]
+
+# Allowed duplicate crates
+# Allow duplicate dependencies on these crates
+allowed-duplicate-crates = []
+
+# Disallowed methods
+# Methods that should not be used in the codebase
+disallowed-methods = []
+
+# Disallowed types
+# Types that should not be used in the codebase
+disallowed-types = []
+
+# Disallowed scripts
+# Scripts that should not be used
+disallowed-scripts = []
+
+# Allowed scripts
+# Scripts that are allowed
+allowed-scripts = []
+
+# Suppress lints from dependencies
+suppress-lint = []
+
+# Macro matcher names
+# Avoid certain names in macro matchers
+enforced-import-renames = []
+
+# Standard macro braces
+# Require braces for standard macros
+standard-macro-braces = []
+
+# Enforced import renames
+# Require certain imports to be renamed
+enforced-import-renames = [
+    # { path = "serde_json", rename = "json" }
+]
+
+# Third-party crates to allow
+# Allow certain third-party crates
+allowed-external-crates = []
+
+# Self named items
+# Allow certain self-named items
+# e.g., #[allow(clippy::items_after_statements)]
+allowed-self-known-items = []
+
+# Obsolete paths
+# Paths that are considered obsolete
+# obsolete-paths = []
+
+# Macro matcher builder names
+# Names that should not be used in macro matchers
+# macro-matchers-builder-names = []

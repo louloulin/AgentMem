@@ -1,0 +1,1104 @@
+#!/bin/bash
+
+###############################################################################
+# AgentMem 打包发布脚本
+# 
+# 功能：
+# 1. 构建 Rust 后端服务器 (agent-mem-server)
+# 2. 构建 Next.js 前端 (agentmem-ui)
+# 3. 支持独立部署模式
+# 4. 生成发布包
+#
+# 使用方法：
+#   ./build-release.sh [选项]
+#
+# 选项：
+#   --ui-only       仅构建前端
+#   --server-only   仅构建后端
+#   --all           构建前端和后端（默认）
+#   --release       发布模式（优化构建）
+#   --dev           开发模式（快速构建）
+#   --clean         清理构建缓存
+#   --help          显示帮助信息
+###############################################################################
+
+set -e  # 遇到错误立即退出
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# 默认配置
+BUILD_UI=true
+BUILD_SERVER=true
+BUILD_MODE="release"
+CLEAN_BUILD=false
+TARGET_PLATFORM="auto"          # mac-arm64 | linux-amd64 | auto
+PLATFORM_OVERRIDE=false
+USE_DOCKER=false                # 使用 Docker 进行交叉编译
+USE_CROSS=false                 # 使用 cross 工具进行交叉编译
+
+# 主机环境信息
+HOST_OS="$(uname -s)"
+HOST_ARCH="$(uname -m)"
+
+# 平台配置（在 detect/configure 后赋值）
+PLATFORM_NAME="unknown"
+CARGO_TARGET_TRIPLE=""
+LIB_SOURCE_DIR=""
+LIB_PATTERN_DESC=""
+
+# 项目根目录
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UI_DIR="$PROJECT_ROOT/agentmem-ui"
+SERVER_DIR="$PROJECT_ROOT/crates/agent-mem-server"
+DIST_DIR="$PROJECT_ROOT/dist"
+
+# 日志函数
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# 显示帮助信息
+show_help() {
+    cat << EOF
+AgentMem 打包发布脚本
+
+使用方法：
+  ./build-release.sh [选项]
+
+选项：
+  --ui-only       仅构建前端
+  --server-only   仅构建后端
+  --all           构建前端和后端（默认）
+  --release       发布模式（优化构建，默认）
+  --dev           开发模式（快速构建）
+  --clean         清理构建缓存
+  --platform      指定目标平台 (mac-arm64 | mac-amd64 | linux-amd64)，默认自动检测
+  --docker        使用 Docker 进行 Linux 交叉编译（推荐，避免 OpenSSL 问题）
+  --cross         使用 cross 工具进行交叉编译（需要先安装: cargo install cross）
+  --help          显示帮助信息
+
+示例：
+  # 构建所有组件（发布模式）
+  ./build-release.sh
+
+  # 仅构建前端
+  ./build-release.sh --ui-only
+
+  # 仅构建后端（开发模式）
+  ./build-release.sh --server-only --dev
+
+  # 清理并重新构建
+  ./build-release.sh --clean --all
+
+EOF
+}
+
+# 解析命令行参数
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --ui-only)
+                BUILD_UI=true
+                BUILD_SERVER=false
+                shift
+                ;;
+            --server-only)
+                BUILD_UI=false
+                BUILD_SERVER=true
+                shift
+                ;;
+            --all)
+                BUILD_UI=true
+                BUILD_SERVER=true
+                shift
+                ;;
+            --release)
+                BUILD_MODE="release"
+                shift
+                ;;
+            --dev)
+                BUILD_MODE="dev"
+                shift
+                ;;
+            --clean)
+                CLEAN_BUILD=true
+                shift
+                ;;
+            --platform)
+                if [ -z "${2:-}" ]; then
+                    log_error "选项 --platform 需要一个参数 (mac-arm64 或 linux-amd64)"
+                    exit 1
+                fi
+                TARGET_PLATFORM="$2"
+                validate_platform_arg "$TARGET_PLATFORM"
+                PLATFORM_OVERRIDE=true
+                shift 2
+                ;;
+            --docker)
+                USE_DOCKER=true
+                shift
+                ;;
+            --cross)
+                USE_CROSS=true
+                shift
+                ;;
+            --help)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "未知选项: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# 选择可用的库目录
+validate_platform_arg() {
+    case "$1" in
+        auto|mac-arm64|mac-amd64|linux-amd64)
+            ;;
+        *)
+            log_error "不支持的平台: $1 (可选值: mac-arm64 | mac-amd64 | linux-amd64 | auto)"
+            exit 1
+            ;;
+    esac
+}
+
+select_lib_source_dir() {
+    local pattern="$1"
+    shift
+
+    for relative_dir in "$@"; do
+        local candidate="$PROJECT_ROOT/$relative_dir"
+        if [ -d "$candidate" ]; then
+            if compgen -G "$candidate/$pattern" > /dev/null; then
+                LIB_SOURCE_DIR="$candidate"
+                return 0
+            fi
+        fi
+    done
+
+    LIB_SOURCE_DIR=""
+    return 0
+}
+
+# 自动检测平台
+detect_platform() {
+    if [ "$TARGET_PLATFORM" != "auto" ]; then
+        return
+    fi
+
+    case "$HOST_OS" in
+        Darwin)
+            if [ "$HOST_ARCH" = "arm64" ]; then
+                TARGET_PLATFORM="mac-arm64"
+            else
+                TARGET_PLATFORM="mac-amd64"
+            fi
+            ;;
+        Linux)
+            if [ "$HOST_ARCH" != "x86_64" ]; then
+                log_error "仅支持 Linux x86_64 (amd64)，当前架构: $HOST_ARCH"
+                exit 1
+            fi
+            TARGET_PLATFORM="linux-amd64"
+            ;;
+        *)
+            log_error "无法识别的主机平台: $HOST_OS ($HOST_ARCH)"
+            exit 1
+            ;;
+    esac
+}
+
+# 根据目标平台配置构建参数
+configure_platform() {
+    case "$TARGET_PLATFORM" in
+        mac-arm64|mac-amd64)
+            PLATFORM_NAME="macOS"
+            CARGO_TARGET_TRIPLE=""
+            LIB_PATTERN_DESC="libonnxruntime*.dylib"
+            select_lib_source_dir "libonnxruntime*.dylib" \
+                "lib/$TARGET_PLATFORM" \
+                "lib/macos" \
+                "lib"
+            ;;
+        linux-amd64)
+            PLATFORM_NAME="Linux (x86_64)"
+            if [ "$HOST_OS" = "Linux" ] && [ "$HOST_ARCH" = "x86_64" ] && [ "$PLATFORM_OVERRIDE" = false ]; then
+                CARGO_TARGET_TRIPLE=""
+            else
+                CARGO_TARGET_TRIPLE="x86_64-unknown-linux-gnu"
+                log_warning "将尝试交叉编译 linux-amd64 版本，请确保已安装对应的交叉编译工具链"
+            fi
+            LIB_PATTERN_DESC="libonnxruntime*.so"
+            select_lib_source_dir "libonnxruntime*.so*" \
+                "lib/linux-amd64" \
+                "lib/linux" \
+                "lib"
+            ;;
+        *)
+            log_error "不支持的目标平台: $TARGET_PLATFORM"
+            exit 1
+            ;;
+    esac
+}
+
+# 确保所需的 Rust target 已安装
+ensure_rust_target_installed() {
+    if [ -z "$CARGO_TARGET_TRIPLE" ]; then
+        return
+    fi
+
+    if rustup target list --installed | grep -q "$CARGO_TARGET_TRIPLE"; then
+        return
+    fi
+
+    log_info "安装 Rust target: $CARGO_TARGET_TRIPLE ..."
+    rustup target add "$CARGO_TARGET_TRIPLE"
+}
+
+# 拷贝运行时依赖库
+copy_runtime_libs() {
+    log_info "复制 ONNX Runtime 库文件..."
+    mkdir -p "$DIST_DIR/server/lib"
+
+    if [ -n "$LIB_SOURCE_DIR" ]; then
+        cp -r "$LIB_SOURCE_DIR"/. "$DIST_DIR/server/lib/" 2>/dev/null || true
+        log_success "已复制 $(basename "$LIB_SOURCE_DIR") 下的库文件"
+    else
+        log_warning "未找到匹配 $LIB_PATTERN_DESC 的库文件，请将对应平台的 ONNX Runtime 动态库放入 lib/${TARGET_PLATFORM}/ 目录"
+    fi
+}
+
+# 检查依赖
+check_dependencies() {
+    log_info "检查依赖..."
+    
+    # 检查 Node.js
+    if $BUILD_UI; then
+        if ! command -v node &> /dev/null; then
+            log_error "未找到 Node.js，请先安装 Node.js"
+            exit 1
+        fi
+        log_success "Node.js 版本: $(node --version)"
+        
+        if ! command -v npm &> /dev/null; then
+            log_error "未找到 npm，请先安装 npm"
+            exit 1
+        fi
+        log_success "npm 版本: $(npm --version)"
+    fi
+    
+    # 检查 Rust
+    if $BUILD_SERVER; then
+        if ! command -v cargo &> /dev/null; then
+            log_error "未找到 Cargo，请先安装 Rust"
+            exit 1
+        fi
+        log_success "Cargo 版本: $(cargo --version)"
+    fi
+}
+
+# 清理构建缓存
+clean_build() {
+    log_info "清理构建缓存..."
+    
+    if $BUILD_UI; then
+        log_info "清理前端缓存..."
+        cd "$UI_DIR"
+        rm -rf .next out node_modules/.cache
+        log_success "前端缓存已清理"
+    fi
+    
+    if $BUILD_SERVER; then
+        log_info "清理后端缓存..."
+        cd "$PROJECT_ROOT"
+        cargo clean -p agent-mem-server
+        log_success "后端缓存已清理"
+    fi
+    
+    # 清理发布目录
+    if [ -d "$DIST_DIR" ]; then
+        log_info "清理发布目录..."
+        rm -rf "$DIST_DIR"
+        log_success "发布目录已清理"
+    fi
+}
+
+# 构建前端
+build_ui() {
+    log_info "========================================="
+    log_info "开始构建前端 (agentmem-ui)"
+    log_info "========================================="
+    
+    cd "$UI_DIR"
+    
+    # 安装依赖
+    if [ ! -d "node_modules" ]; then
+        log_info "安装前端依赖..."
+        npm install
+        log_success "前端依赖安装完成"
+    fi
+    
+    # 构建前端
+    log_info "构建 Next.js 应用..."
+    # ✅ 重要：在构建时设置 NEXT_PUBLIC_API_URL，否则打包后配置不会生效
+    # Next.js 的 NEXT_PUBLIC_* 环境变量在构建时嵌入到代码中，运行时设置无效
+    export NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    log_info "构建时 API URL: $NEXT_PUBLIC_API_URL"
+    # 始终使用 production 模式构建，避免 Next.js 警告
+    NODE_ENV=production NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL npm run build
+    
+    log_success "前端构建完成"
+    
+    # 创建发布目录
+    mkdir -p "$DIST_DIR/ui"
+    
+    # 复制构建产物
+    log_info "复制前端构建产物..."
+    cp -r .next "$DIST_DIR/ui/"
+    cp -r public "$DIST_DIR/ui/"
+    cp package.json "$DIST_DIR/ui/"
+    cp next.config.ts "$DIST_DIR/ui/"
+    
+    # 创建启动脚本（使用 standalone 模式）
+    cat > "$DIST_DIR/ui/start.sh" << 'EOF'
+#!/bin/bash
+# AgentMem UI 启动脚本 (Standalone 模式，无需安装依赖)
+
+# 设置环境变量
+export NODE_ENV=production
+export PORT=${PORT:-3000}
+export NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+
+# 获取脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=========================================="
+echo "启动 AgentMem UI (Standalone 模式)"
+echo "=========================================="
+echo "工作目录: $SCRIPT_DIR"
+echo "端口: $PORT"
+echo "API URL: $NEXT_PUBLIC_API_URL"
+echo ""
+
+# 检查 standalone 构建是否存在
+if [ ! -f ".next/standalone/server.js" ]; then
+    echo "❌ 错误: 未找到 standalone 构建"
+    echo "请先运行: npm run build"
+    exit 1
+fi
+
+# 检查必要的目录和文件
+if [ ! -d ".next/static" ]; then
+    echo "⚠️  警告: .next/static 目录不存在"
+    echo "静态资源可能无法正常加载"
+fi
+
+if [ ! -d "public" ]; then
+    echo "⚠️  警告: public 目录不存在"
+    echo "公共资源可能无法正常加载"
+fi
+
+# 进入 standalone 目录
+cd .next/standalone
+
+# 强制重新创建符号链接（使用相对路径，避免绝对路径问题）
+# 删除可能存在的绝对路径符号链接
+if [ -L public ]; then
+    CURRENT_LINK=$(readlink public)
+    if [[ "$CURRENT_LINK" == /* ]]; then
+        echo "⚠️  发现绝对路径符号链接，将替换为相对路径..."
+        rm -f public
+    fi
+fi
+
+if [ -L .next/static ]; then
+    CURRENT_LINK=$(readlink .next/static)
+    if [[ "$CURRENT_LINK" == /* ]]; then
+        echo "⚠️  发现绝对路径符号链接，将替换为相对路径..."
+        rm -f .next/static
+    fi
+fi
+
+# 创建相对路径符号链接
+if [ ! -L public ] && [ -d "$SCRIPT_DIR/public" ]; then
+    echo "创建 public 符号链接（相对路径）..."
+    ln -sf "../../public" public
+fi
+
+if [ ! -d .next ]; then
+    mkdir -p .next
+fi
+
+if [ ! -L .next/static ] && [ -d "$SCRIPT_DIR/.next/static" ]; then
+    echo "创建 .next/static 符号链接（相对路径）..."
+    ln -sf "../../../.next/static" .next/static
+fi
+
+# 验证符号链接
+echo ""
+echo "验证资源路径..."
+if [ -L public ] && [ -L .next/static ]; then
+    echo "✅ public 符号链接: $(readlink public)"
+    echo "✅ .next/static 符号链接: $(readlink .next/static)"
+    
+    # 测试静态资源是否存在
+    if [ -d ".next/static" ]; then
+        STATIC_COUNT=$(find .next/static -type f | wc -l | tr -d ' ')
+        echo "✅ 找到 $STATIC_COUNT 个静态资源文件"
+    else
+        echo "❌ 警告: .next/static 目录不可访问"
+    fi
+else
+    echo "❌ 错误: 符号链接创建失败"
+    exit 1
+fi
+
+echo ""
+echo "✅ 启动服务器..."
+echo "=========================================="
+
+# 直接运行 server.js（standalone 模式已包含所有依赖）
+# 确保从 standalone 目录运行
+node server.js
+EOF
+    
+    chmod +x "$DIST_DIR/ui/start.sh"
+    
+    log_success "前端发布包已生成: $DIST_DIR/ui"
+}
+
+# 构建后端
+build_server() {
+    log_info "========================================="
+    log_info "开始构建后端 (agent-mem-server)"
+    log_info "========================================="
+    
+    cd "$PROJECT_ROOT"
+    
+    # 构建后端
+    log_info "构建 Rust 服务器..."
+    ensure_rust_target_installed
+    
+    # 检测是否使用交叉编译
+    local use_cross_compile=false
+    local cargo_binary="cargo"
+    
+    if [ -n "$CARGO_TARGET_TRIPLE" ] && [ "$HOST_OS" != "Linux" ]; then
+        use_cross_compile=true
+        log_info "检测到交叉编译: $HOST_OS -> $TARGET_PLATFORM"
+        
+        # 优先使用 cargo-zigbuild（更简单，自动处理 OpenSSL）
+        if command -v cargo-zigbuild &> /dev/null; then
+            log_info "使用 cargo-zigbuild 进行交叉编译（自动处理 OpenSSL）..."
+            cargo_binary="cargo zigbuild"
+        elif which x86_64-unknown-linux-gnu-gcc &> /dev/null; then
+            log_info "使用标准交叉编译工具链..."
+            export CC_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-gcc
+            export CXX_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-g++
+            export AR_x86_64_unknown_linux_gnu=x86_64-unknown-linux-gnu-ar
+            export PKG_CONFIG_ALLOW_CROSS=1
+        else
+            log_warning "未找到交叉编译工具链，尝试安装 cargo-zigbuild..."
+            log_info "安装 cargo-zigbuild: cargo install cargo-zigbuild --locked"
+            if cargo install cargo-zigbuild --locked 2>&1 | grep -q "Installed"; then
+                cargo_binary="cargo zigbuild"
+                log_success "cargo-zigbuild 安装成功"
+            else
+                log_error "无法安装 cargo-zigbuild，请手动安装或配置交叉编译工具链"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # 构建命令
+    local build_subdir="debug"
+    if [ "$cargo_binary" = "cargo zigbuild" ]; then
+        # cargo-zigbuild 使用不同的命令格式
+        local cargo_cmd=(cargo zigbuild --package agent-mem-server --features lumosai)
+    if [ "$BUILD_MODE" = "release" ]; then
+            cargo_cmd+=(--release)
+            build_subdir="release"
+        fi
+        if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+            cargo_cmd+=(--target "$CARGO_TARGET_TRIPLE")
+        fi
+    else
+        # 标准 cargo 命令
+        local cargo_cmd=(cargo build --package agent-mem-server --features lumosai)
+        if [ "$BUILD_MODE" = "release" ]; then
+            cargo_cmd+=(--release)
+            build_subdir="release"
+        fi
+        if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+            cargo_cmd+=(--target "$CARGO_TARGET_TRIPLE")
+        fi
+    fi
+
+    log_info "执行: ${cargo_cmd[*]}"
+    "${cargo_cmd[@]}"
+
+    if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+        BINARY_PATH="target/$CARGO_TARGET_TRIPLE/$build_subdir/agent-mem-server"
+    else
+        BINARY_PATH="target/$build_subdir/agent-mem-server"
+    fi
+    
+    log_success "后端构建完成"
+    
+    # 创建发布目录
+    mkdir -p "$DIST_DIR/server"
+    
+    # 复制二进制文件
+    log_info "复制后端二进制文件..."
+    cp "$BINARY_PATH" "$DIST_DIR/server/"
+
+    # 复制 ONNX Runtime 库文件
+    copy_runtime_libs
+
+    # 创建配置文件示例
+    cat > "$DIST_DIR/server/config.example.toml" << 'EOF'
+# AgentMem Server 配置文件
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "sqlite://agentmem.db"
+
+[cors]
+allowed_origins = ["http://localhost:3000"]
+
+[mcp]
+enabled = true
+
+# Embedder 配置（支持中文）
+embedder_provider = "fastembed"
+embedder_model = "multilingual-e5-small"
+EOF
+    
+    # 创建启动脚本
+    cat > "$DIST_DIR/server/start.sh" << 'EOF'
+#!/bin/bash
+# AgentMem Server 启动脚本
+
+# 设置环境变量
+export RUST_LOG=${RUST_LOG:-info}
+export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+export SERVER_PORT=${SERVER_PORT:-8080}
+export DATABASE_URL=${DATABASE_URL:-file:./data/agentmem.db}
+
+# 获取绝对路径
+LIB_DIR="$(pwd)/lib"
+
+# 设置库路径（macOS 使用 DYLD_LIBRARY_PATH，Linux 使用 LD_LIBRARY_PATH）
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export DYLD_LIBRARY_PATH="$LIB_DIR:$DYLD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
+else
+    export LD_LIBRARY_PATH="$LIB_DIR:$LD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.so.1.22.0"
+fi
+
+export RUST_BACKTRACE=1
+
+# 配置 Embedder (使用 FastEmbed) - 推荐配置（支持中文）
+export EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-"fastembed"}
+export EMBEDDER_MODEL=${EMBEDDER_MODEL:-"multilingual-e5-small"}
+
+# 配置 LLM Provider (可选)
+# 支持的 Provider: openai, zhipu, ollama 等
+# export LLM_PROVIDER="zhipu"
+# export LLM_MODEL="glm-4.6"
+# export ZHIPU_API_KEY="your_api_key_here"
+#
+# 或使用 OpenAI:
+# export LLM_PROVIDER="openai"
+# export LLM_MODEL="gpt-4"
+# export OPENAI_API_KEY="your_api_key_here"
+
+# 认证配置（默认启用）
+export ENABLE_AUTH=${ENABLE_AUTH:-"true"}
+export SERVER_ENABLE_AUTH=${SERVER_ENABLE_AUTH:-"true"}
+
+# 代理配置（如需要）
+# export http_proxy=http://127.0.0.1:4780
+# export https_proxy=http://127.0.0.1:4780
+
+echo "========================================="
+echo "🚀 启动 AgentMem Server"
+echo "========================================="
+echo "主机: $SERVER_HOST"
+echo "端口: $SERVER_PORT"
+echo "数据库: $DATABASE_URL"
+echo "Embedder: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
+echo "认证: $ENABLE_AUTH"
+
+if [ -n "$LLM_PROVIDER" ]; then
+    echo "LLM Provider: $LLM_PROVIDER / $LLM_MODEL"
+else
+    echo "⚠️  LLM Provider 未配置，Intelligence 组件将不可用"
+fi
+
+if [ -d "$LIB_DIR" ]; then
+    echo "库目录: $LIB_DIR"
+else
+    echo "⚠️  警告: 未找到 lib 目录，ONNX Runtime 可能无法加载"
+fi
+
+echo "========================================="
+echo ""
+echo "⏳ 正在启动服务器..."
+echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
+echo "   这可能需要几分钟时间，请耐心等待..."
+echo ""
+
+# 启动服务（支持配置文件）
+# 如果存在 config.toml，使用配置文件；否则仅使用环境变量
+if [ -f "config.toml" ]; then
+    echo "📝 使用配置文件: config.toml"
+    ./agent-mem-server --config config.toml
+else
+    echo "⚠️  未找到 config.toml，仅使用环境变量配置"
+    ./agent-mem-server
+fi
+EOF
+    
+    chmod +x "$DIST_DIR/server/start.sh"
+
+    # 创建带完整配置的启动脚本示例
+    cat > "$DIST_DIR/server/start-with-zhipu.sh" << 'EOF'
+#!/bin/bash
+# AgentMem Server 启动脚本 (智谱 AI 配置示例)
+
+# 设置环境变量
+export RUST_LOG=${RUST_LOG:-info}
+export SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+export SERVER_PORT=${SERVER_PORT:-8080}
+export DATABASE_URL=${DATABASE_URL:-file:./data/agentmem.db}
+
+# 获取绝对路径
+LIB_DIR="$(pwd)/lib"
+
+# 设置库路径
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export DYLD_LIBRARY_PATH="$LIB_DIR:$DYLD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.1.22.0.dylib"
+else
+    export LD_LIBRARY_PATH="$LIB_DIR:$LD_LIBRARY_PATH"
+    export ORT_DYLIB_PATH="$LIB_DIR/libonnxruntime.so.1.22.0"
+fi
+
+export RUST_BACKTRACE=1
+
+# 配置 Embedder (使用 FastEmbed，支持中文)
+export EMBEDDER_PROVIDER="fastembed"
+export EMBEDDER_MODEL="multilingual-e5-small"
+
+# 配置 LLM Provider (智谱 AI)
+export ZHIPU_API_KEY="your_zhipu_api_key_here"
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4.6"
+
+# 🔓 禁用认证（用于测试）
+export ENABLE_AUTH="false"
+export SERVER_ENABLE_AUTH="false"
+
+# 代理配置（如需要）
+# export http_proxy=http://127.0.0.1:4780
+# export https_proxy=http://127.0.0.1:4780
+
+echo "========================================="
+echo "🚀 启动 AgentMem Server (智谱 AI)"
+echo "========================================="
+echo "主机: $SERVER_HOST"
+echo "端口: $SERVER_PORT"
+echo "数据库: $DATABASE_URL"
+echo "Embedder: $EMBEDDER_PROVIDER / $EMBEDDER_MODEL"
+echo "LLM Provider: $LLM_PROVIDER / $LLM_MODEL"
+echo "认证: $ENABLE_AUTH (禁用)"
+echo "库目录: $LIB_DIR"
+echo "========================================="
+echo ""
+echo "⏳ 正在启动服务器..."
+echo "   首次运行时，FastEmbed 会下载模型文件（约 100MB）"
+echo "   这可能需要几分钟时间，请耐心等待..."
+echo ""
+
+# 启动服务（支持配置文件）
+# 如果存在 config.toml，使用配置文件；否则仅使用环境变量
+if [ -f "config.toml" ]; then
+    echo "📝 使用配置文件: config.toml"
+    ./agent-mem-server --config config.toml
+else
+    echo "⚠️  未找到 config.toml，仅使用环境变量配置"
+    ./agent-mem-server
+fi
+EOF
+
+    chmod +x "$DIST_DIR/server/start-with-zhipu.sh"
+
+    log_success "后端发布包已生成: $DIST_DIR/server"
+}
+
+# 生成部署文档
+generate_deployment_docs() {
+    log_info "生成部署文档..."
+    
+    cat > "$DIST_DIR/README.md" << 'EOF'
+# AgentMem 部署指南
+
+## 目录结构
+
+```
+dist/
+├── ui/              # 前端应用
+│   ├── .next/       # Next.js 构建产物
+│   ├── public/      # 静态资源
+│   ├── package.json
+│   └── start.sh     # 启动脚本
+├── server/          # 后端服务
+│   ├── agent-mem-server       # 二进制文件
+│   ├── lib/                   # ONNX Runtime 库文件
+│   │   └── libonnxruntime.*   # ONNX Runtime 动态库
+│   ├── config.example.toml    # 配置文件示例
+│   ├── start.sh               # 基础启动脚本
+│   └── start-with-zhipu.sh    # 智谱 AI 配置示例
+└── README.md        # 本文件
+```
+
+## 部署步骤
+
+### 1. 部署后端服务
+
+```bash
+cd server
+
+# 复制配置文件
+cp config.example.toml config.toml
+
+# 编辑配置文件（可选）
+vim config.toml
+
+# 启动服务
+./start.sh
+```
+
+后端服务默认运行在 `http://0.0.0.0:8080`
+
+### 2. 部署前端应用
+
+```bash
+cd ui
+
+# 设置 API 地址
+export NEXT_PUBLIC_API_URL=http://your-server-ip:8080
+
+# 启动服务
+./start.sh
+```
+
+前端应用默认运行在 `http://localhost:3000`
+
+### 3. 环境变量配置
+
+#### 后端环境变量
+
+**基础配置:**
+- `SERVER_HOST`: 服务器主机地址（默认: 0.0.0.0）
+- `SERVER_PORT`: 服务器端口（默认: 8080）
+- `DATABASE_URL`: 数据库连接字符串（默认: sqlite://agentmem.db）
+- `RUST_LOG`: 日志级别（默认: info）
+
+**Embedder 配置（必需）:**
+- `EMBEDDER_PROVIDER`: Embedder 提供商（推荐: fastembed）
+- `EMBEDDER_MODEL`: Embedder 模型（推荐: BAAI/bge-small-en-v1.5）
+
+**LLM 配置（可选）:**
+
+使用智谱 AI:
+```bash
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4.6"
+export ZHIPU_API_KEY="your_api_key_here"
+```
+
+使用 OpenAI:
+```bash
+export LLM_PROVIDER="openai"
+export LLM_MODEL="gpt-4"
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+**认证配置:**
+- `ENABLE_AUTH`: 是否启用认证（默认: true）
+- `SERVER_ENABLE_AUTH`: 服务器认证开关（默认: true）
+
+**库路径配置（自动设置）:**
+- macOS: `DYLD_LIBRARY_PATH` 和 `ORT_DYLIB_PATH`
+- Linux: `LD_LIBRARY_PATH` 和 `ORT_DYLIB_PATH`
+
+#### 前端环境变量
+
+- `PORT`: 前端端口（默认: 3000）
+- `NEXT_PUBLIC_API_URL`: 后端 API 地址（默认: http://localhost:8080）
+
+### 4. 快速启动示例
+
+#### 使用基础配置启动（仅 Embedder）
+
+```bash
+cd server
+./start.sh
+```
+
+#### 使用智谱 AI 配置启动
+
+```bash
+cd server
+# 编辑 start-with-zhipu.sh，设置你的 API Key
+vim start-with-zhipu.sh
+# 启动
+./start-with-zhipu.sh
+```
+
+#### 自定义配置启动
+
+```bash
+cd server
+export EMBEDDER_PROVIDER="fastembed"
+export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5"
+export LLM_PROVIDER="zhipu"
+export LLM_MODEL="glm-4.6"
+export ZHIPU_API_KEY="your_api_key_here"
+export ENABLE_AUTH="false"  # 禁用认证（测试用）
+./start.sh
+```
+
+### 5. 库文件说明
+
+后端服务依赖 ONNX Runtime 库文件，构建脚本会自动从项目根目录的 `lib/` 目录复制到 `dist/server/lib/`。
+
+**macOS:**
+- `libonnxruntime.1.22.0.dylib`
+
+**Linux:**
+- `libonnxruntime.so.1.22.0`
+
+我们建议将不同平台的库文件放置在以下目录中，构建脚本会自动按平台优先级选择：
+
+| 平台 | 推荐目录 | 需要包含的文件 |
+|------|----------|----------------|
+| macOS (arm64/x86_64) | `lib/macos-arm64/`、`lib/macos/` 或 `lib/` | `libonnxruntime*.dylib` |
+| Linux x86_64 | `lib/linux-amd64/`、`lib/linux/` 或 `lib/` | `libonnxruntime*.so*` |
+
+如果启动时提示找不到库文件，请确保：
+1. `lib/` 目录存在且包含正确的库文件
+2. 启动脚本正确设置了 `DYLD_LIBRARY_PATH` (macOS) 或 `LD_LIBRARY_PATH` (Linux)
+
+### 6. 使用 systemd 管理服务（推荐）
+
+#### 后端服务
+
+创建 `/etc/systemd/system/agentmem-server.service`:
+
+```ini
+[Unit]
+Description=AgentMem Server
+After=network.target
+
+[Service]
+Type=simple
+User=agentmem
+WorkingDirectory=/opt/agentmem/server
+Environment="RUST_LOG=info"
+Environment="SERVER_HOST=0.0.0.0"
+Environment="SERVER_PORT=8080"
+Environment="DATABASE_URL=sqlite://agentmem.db"
+Environment="LD_LIBRARY_PATH=/opt/agentmem/server/lib"
+Environment="ORT_DYLIB_PATH=/opt/agentmem/server/lib/libonnxruntime.so.1.22.0"
+Environment="EMBEDDER_PROVIDER=fastembed"
+Environment="EMBEDDER_MODEL=BAAI/bge-small-en-v1.5"
+Environment="ENABLE_AUTH=true"
+# 可选: LLM 配置
+# Environment="LLM_PROVIDER=zhipu"
+# Environment="LLM_MODEL=glm-4.6"
+# Environment="ZHIPU_API_KEY=your_api_key_here"
+ExecStart=/opt/agentmem/server/agent-mem-server
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 前端服务
+
+创建 `/etc/systemd/system/agentmem-ui.service`:
+
+```ini
+[Unit]
+Description=AgentMem UI
+After=network.target
+
+[Service]
+Type=simple
+User=agentmem
+WorkingDirectory=/opt/agentmem/ui
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="NEXT_PUBLIC_API_URL=http://localhost:8080"
+ExecStart=/opt/agentmem/ui/start.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启动服务：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable agentmem-server
+sudo systemctl enable agentmem-ui
+sudo systemctl start agentmem-server
+sudo systemctl start agentmem-ui
+```
+
+### 5. 使用 Nginx 反向代理（可选）
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # 前端
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # 后端 API
+    location /api {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+## 故障排查
+
+### 后端无法启动
+
+1. 检查端口是否被占用：`lsof -i :8080`
+2. 检查数据库连接：确保 DATABASE_URL 正确
+3. 查看日志：`RUST_LOG=debug ./agent-mem-server`
+
+### 前端无法连接后端
+
+1. 检查 NEXT_PUBLIC_API_URL 是否正确
+2. 检查 CORS 配置
+3. 检查网络连接
+
+## 性能优化
+
+1. 使用 CDN 加速静态资源
+2. 启用 Nginx gzip 压缩
+3. 配置数据库连接池
+4. 使用 Redis 缓存
+
+EOF
+    
+    log_success "部署文档已生成: $DIST_DIR/README.md"
+}
+
+# 主函数
+main() {
+    log_info "========================================="
+    log_info "AgentMem 打包发布脚本"
+    log_info "========================================="
+    
+    # 解析参数
+    parse_args "$@"
+    detect_platform
+    configure_platform
+    log_info "目标平台: $PLATFORM_NAME ($TARGET_PLATFORM)"
+    if [ -n "$CARGO_TARGET_TRIPLE" ]; then
+        log_info "Cargo Target Triple: $CARGO_TARGET_TRIPLE"
+    fi
+    
+    # 检查依赖
+    check_dependencies
+    
+    # 清理构建（如果需要）
+    if $CLEAN_BUILD; then
+        clean_build
+    fi
+    
+    # 构建前端
+    if $BUILD_UI; then
+        build_ui
+    fi
+    
+    # 构建后端
+    if $BUILD_SERVER; then
+        build_server
+    fi
+    
+    # 生成部署文档
+    generate_deployment_docs
+    
+    # 显示总结
+    log_info "========================================="
+    log_success "构建完成！"
+    log_info "========================================="
+    log_info "发布包位置: $DIST_DIR"
+    
+    if $BUILD_UI; then
+        log_info "前端: $DIST_DIR/ui"
+    fi
+    
+    if $BUILD_SERVER; then
+        log_info "后端: $DIST_DIR/server"
+    fi
+    
+    log_info ""
+    log_info "下一步："
+    log_info "1. 查看部署文档: cat $DIST_DIR/README.md"
+    log_info "2. 部署后端: cd $DIST_DIR/server && ./start.sh"
+    log_info "3. 部署前端: cd $DIST_DIR/ui && ./start.sh"
+    log_info "========================================="
+}
+
+# 执行主函数
+main "$@"
+

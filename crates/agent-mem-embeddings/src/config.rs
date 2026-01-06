@@ -9,28 +9,28 @@ use std::collections::HashMap;
 pub struct EmbeddingConfig {
     /// 提供商名称 (openai, huggingface, local)
     pub provider: String,
-    
+
     /// 模型名称
     pub model: String,
-    
+
     /// API密钥（用于远程提供商）
     pub api_key: Option<String>,
-    
+
     /// 基础URL（用于自定义端点）
     pub base_url: Option<String>,
-    
+
     /// 嵌入维度
     pub dimension: usize,
-    
+
     /// 批处理大小
     pub batch_size: usize,
-    
+
     /// 请求超时时间（秒）
     pub timeout_seconds: u64,
-    
+
     /// 最大重试次数
     pub max_retries: u32,
-    
+
     /// 额外配置参数
     pub extra_params: HashMap<String, String>,
 }
@@ -116,7 +116,7 @@ impl EmbeddingConfig {
     pub fn local(model_path: &str, dimension: usize) -> Self {
         let mut extra_params = HashMap::new();
         extra_params.insert("model_path".to_string(), model_path.to_string());
-        
+
         Self {
             provider: "local".to_string(),
             model: "local".to_string(),
@@ -133,31 +133,43 @@ impl EmbeddingConfig {
     /// 验证配置
     pub fn validate(&self) -> agent_mem_traits::Result<()> {
         if self.provider.is_empty() {
-            return Err(agent_mem_traits::AgentMemError::config_error("Provider cannot be empty"));
+            return Err(agent_mem_traits::AgentMemError::config_error(
+                "Provider cannot be empty",
+            ));
         }
 
         if self.model.is_empty() {
-            return Err(agent_mem_traits::AgentMemError::config_error("Model cannot be empty"));
+            return Err(agent_mem_traits::AgentMemError::config_error(
+                "Model cannot be empty",
+            ));
         }
 
         if self.dimension == 0 {
-            return Err(agent_mem_traits::AgentMemError::config_error("Dimension must be greater than 0"));
+            return Err(agent_mem_traits::AgentMemError::config_error(
+                "Dimension must be greater than 0",
+            ));
         }
 
         if self.batch_size == 0 {
-            return Err(agent_mem_traits::AgentMemError::config_error("Batch size must be greater than 0"));
+            return Err(agent_mem_traits::AgentMemError::config_error(
+                "Batch size must be greater than 0",
+            ));
         }
 
         // 验证提供商特定的配置
         match self.provider.as_str() {
             "openai" => {
                 if self.api_key.is_none() {
-                    return Err(agent_mem_traits::AgentMemError::config_error("OpenAI provider requires an API key"));
+                    return Err(agent_mem_traits::AgentMemError::config_error(
+                        "OpenAI provider requires an API key",
+                    ));
                 }
             }
             "local" => {
                 if !self.extra_params.contains_key("model_path") {
-                    return Err(agent_mem_traits::AgentMemError::config_error("Local provider requires model_path in extra_params"));
+                    return Err(agent_mem_traits::AgentMemError::config_error(
+                        "Local provider requires model_path in extra_params",
+                    ));
                 }
             }
             _ => {} // 其他提供商暂时不需要特殊验证

@@ -1,0 +1,13 @@
+[package]
+name = "local-embedding-demo"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings", features = ["local", "onnx"] }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -1,0 +1,311 @@
+Metadata-Version: 2.4
+Name: agentmem
+Version: 7.0.0
+Summary: Official Python SDK for AgentMem - Enterprise-grade memory management for AI agents
+Home-page: https://github.com/agentmem/agentmem
+Author: AgentMem Team
+Author-email: AgentMem Team <support@agentmem.dev>
+Maintainer-email: AgentMem Team <support@agentmem.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/agentmem/agentmem
+Project-URL: Documentation, https://docs.agentmem.dev
+Project-URL: Repository, https://github.com/agentmem/agentmem
+Project-URL: Bug Tracker, https://github.com/agentmem/agentmem/issues
+Project-URL: Changelog, https://github.com/agentmem/agentmem/blob/main/CHANGELOG.md
+Keywords: ai,memory,agent,llm,vector,database,embedding,semantic,search,enterprise
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Database
+Classifier: Typing :: Typed
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.24.0
+Requires-Dist: typing-extensions>=4.5.0; python_version < "3.10"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: isort>=5.12.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: pre-commit>=3.0.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=6.0.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=1.2.0; extra == "docs"
+Requires-Dist: sphinx-autodoc-typehints>=1.22.0; extra == "docs"
+Requires-Dist: myst-parser>=1.0.0; extra == "docs"
+Provides-Extra: test
+Requires-Dist: pytest>=7.0.0; extra == "test"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "test"
+Requires-Dist: pytest-cov>=4.0.0; extra == "test"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
+
+# AgentMem Python SDK
+
+Official Python client library for AgentMem - Enterprise-grade memory management for AI agents.
+
+## Features
+
+- 🚀 **High Performance**: Async-first design with connection pooling and caching
+- 🔒 **Enterprise Security**: Built-in authentication, rate limiting, and error handling
+- 🧠 **Rich Memory Types**: Support for episodic, semantic, procedural, and untyped memories
+- 🔍 **Advanced Search**: Text, vector, and hybrid search capabilities
+- 📊 **Analytics**: Comprehensive memory statistics and metrics
+- 🛠️ **Developer Friendly**: Type hints, comprehensive documentation, and examples
+
+## Installation
+
+```bash
+pip install agentmem
+```
+
+For development:
+```bash
+pip install agentmem[dev]
+```
+
+## Quick Start
+
+### Basic Usage
+
+```python
+import asyncio
+from agentmem import AgentMemClient, Config, MemoryType
+
+async def main():
+    # Initialize client with API key
+    config = Config.from_env()  # Reads AGENTMEM_API_KEY from environment
+    client = AgentMemClient(config)
+    
+    try:
+        # Add a memory
+        memory_id = await client.add_memory(
+            content="The user prefers dark mode and uses Python for development",
+            agent_id="assistant_1",
+            memory_type=MemoryType.SEMANTIC,
+            importance=0.8,
+            metadata={"category": "user_preferences"}
+        )
+        print(f"Added memory: {memory_id}")
+        
+        # Search memories
+        from agentmem import SearchQuery
+        results = await client.search_memories(
+            SearchQuery(
+                agent_id="assistant_1",
+                text_query="user preferences",
+                limit=5
+            )
+        )
+        
+        for result in results:
+            print(f"Found: {result.memory.content} (score: {result.score})")
+        
+        # Get statistics
+        stats = await client.get_memory_stats("assistant_1")
+        print(f"Total memories: {stats.total_memories}")
+        
+    finally:
+        await client.close()
+
+# Run the example
+asyncio.run(main())
+```
+
+### Configuration
+
+```python
+from agentmem import Config
+
+# From environment variables
+config = Config.from_env()
+
+# Manual configuration
+config = Config(
+    api_key="your-api-key",
+    base_url="https://api.agentmem.dev",
+    timeout=30,
+    max_retries=3,
+    enable_caching=True,
+    cache_ttl=300
+)
+```
+
+### Context Manager Usage
+
+```python
+async def main():
+    config = Config.from_env()
+    
+    async with AgentMemClient(config) as client:
+        memory_id = await client.add_memory(
+            content="Important information",
+            agent_id="agent_1"
+        )
+        
+        memory = await client.get_memory(memory_id)
+        print(f"Retrieved: {memory.content}")
+```
+
+## Advanced Features
+
+### Memory Types
+
+```python
+from agentmem import MemoryType
+
+# Different memory types for different use cases
+await client.add_memory(
+    content="User clicked the login button",
+    agent_id="agent_1",
+    memory_type=MemoryType.EPISODIC,  # Event-based memory
+    importance=0.6
+)
+
+await client.add_memory(
+    content="Python is a programming language",
+    agent_id="agent_1", 
+    memory_type=MemoryType.SEMANTIC,  # Factual knowledge
+    importance=0.9
+)
+
+await client.add_memory(
+    content="To authenticate, first validate the token",
+    agent_id="agent_1",
+    memory_type=MemoryType.PROCEDURAL,  # How-to knowledge
+    importance=0.8
+)
+```
+
+### Advanced Search
+
+```python
+from agentmem import SearchQuery, MemoryType
+
+# Text search with filters
+results = await client.search_memories(
+    SearchQuery(
+        agent_id="agent_1",
+        text_query="user preferences",
+        memory_type=MemoryType.SEMANTIC,
+        min_importance=0.7,
+        max_age_seconds=86400,  # Last 24 hours
+        limit=10,
+        metadata_filters={"category": "preferences"}
+    )
+)
+
+# Vector search (if you have embeddings)
+results = await client.search_memories(
+    SearchQuery(
+        agent_id="agent_1",
+        vector_query=[0.1, 0.2, 0.3, ...],  # Your embedding vector
+        limit=5
+    )
+)
+```
+
+### Batch Operations
+
+```python
+# Add multiple memories at once
+memories_data = [
+    {
+        "content": "First memory",
+        "agent_id": "agent_1",
+        "memory_type": "semantic",
+        "importance": 0.8
+    },
+    {
+        "content": "Second memory", 
+        "agent_id": "agent_1",
+        "memory_type": "episodic",
+        "importance": 0.6
+    }
+]
+
+memory_ids = await client.batch_add_memories(memories_data)
+print(f"Added {len(memory_ids)} memories")
+```
+
+### Error Handling
+
+```python
+from agentmem import (
+    AgentMemError,
+    AuthenticationError,
+    ValidationError,
+    NetworkError,
+    NotFoundError,
+    RateLimitError
+)
+
+try:
+    memory = await client.get_memory("non-existent-id")
+except NotFoundError:
+    print("Memory not found")
+except AuthenticationError:
+    print("Invalid API key")
+except RateLimitError:
+    print("Rate limit exceeded, please wait")
+except NetworkError as e:
+    print(f"Network error: {e}")
+except AgentMemError as e:
+    print(f"AgentMem error: {e}")
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AGENTMEM_API_KEY` | Your AgentMem API key | Required |
+| `AGENTMEM_BASE_URL` | API base URL | `https://api.agentmem.dev` |
+| `AGENTMEM_TIMEOUT` | Request timeout in seconds | `30` |
+| `AGENTMEM_MAX_RETRIES` | Maximum retry attempts | `3` |
+| `AGENTMEM_ENABLE_CACHING` | Enable response caching | `true` |
+| `AGENTMEM_CACHE_TTL` | Cache TTL in seconds | `300` |
+
+## Development
+
+```bash
+# Clone the repository
+git clone https://github.com/agentmem/agentmem
+cd agentmem/sdks/python
+
+# Install development dependencies
+pip install -e .[dev]
+
+# Run tests
+pytest
+
+# Run linting
+black agentmem/
+isort agentmem/
+flake8 agentmem/
+mypy agentmem/
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+- 📖 [Documentation](https://docs.agentmem.dev)
+- 💬 [Discord Community](https://discord.gg/agentmem)
+- 🐛 [Issue Tracker](https://github.com/agentmem/agentmem/issues)
+- 📧 [Email Support](mailto:support@agentmem.dev)

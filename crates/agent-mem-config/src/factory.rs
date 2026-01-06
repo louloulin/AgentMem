@@ -1,7 +1,7 @@
 //! Configuration factory
 
 use crate::MemoryConfig;
-use agent_mem_traits::{Result, LLMConfig, VectorStoreConfig};
+use agent_mem_traits::{LLMConfig, Result, VectorStoreConfig};
 use std::env;
 
 /// Configuration factory for creating configurations
@@ -12,7 +12,7 @@ impl ConfigFactory {
     pub fn create_memory_config() -> MemoryConfig {
         MemoryConfig::default()
     }
-    
+
     /// Create LLM configuration for a specific provider
     pub fn create_llm_config(provider: &str) -> LLMConfig {
         match provider {
@@ -45,7 +45,7 @@ impl ConfigFactory {
             _ => LLMConfig::default(),
         }
     }
-    
+
     /// Create vector store configuration for specific providers
     pub fn create_vector_store_config(provider: &str) -> VectorStoreConfig {
         match provider {
@@ -72,16 +72,18 @@ impl ConfigFactory {
             _ => VectorStoreConfig::default(),
         }
     }
-    
+
     /// Create configuration from environment variables
     pub fn from_env() -> Result<MemoryConfig> {
-        let llm_provider = env::var("AGENT_MEM_LLM_PROVIDER").unwrap_or_else(|_| "openai".to_string());
-        let vector_provider = env::var("AGENT_MEM_VECTOR_PROVIDER").unwrap_or_else(|_| "lancedb".to_string());
-        let graph_provider = env::var("AGENT_MEM_GRAPH_PROVIDER").ok();
-        
+        let llm_provider =
+            env::var("AGENT_MEM_LLM_PROVIDER").unwrap_or_else(|_| "openai".to_string());
+        let vector_provider =
+            env::var("AGENT_MEM_VECTOR_PROVIDER").unwrap_or_else(|_| "lancedb".to_string());
+        let _graph_provider = env::var("AGENT_MEM_GRAPH_PROVIDER").ok();
+
         let mut llm_config = Self::create_llm_config(&llm_provider);
         let vector_store_config = Self::create_vector_store_config(&vector_provider);
-        
+
         // Set API keys from environment
         if let Ok(api_key) = env::var("OPENAI_API_KEY") {
             llm_config.api_key = Some(api_key);
@@ -91,15 +93,15 @@ impl ConfigFactory {
                 llm_config.api_key = Some(api_key);
             }
         }
-        if let Ok(api_key) = env::var("PINECONE_API_KEY") {
+        if let Ok(_api_key) = env::var("PINECONE_API_KEY") {
             // Set Pinecone API key in storage config if needed
         }
-        
+
         let mut embedder_config = crate::memory::EmbedderConfig::default();
         if let Ok(api_key) = env::var("OPENAI_API_KEY") {
             embedder_config.api_key = Some(api_key);
         }
-        
+
         Ok(MemoryConfig {
             llm: llm_config,
             vector_store: vector_store_config,
@@ -108,52 +110,75 @@ impl ConfigFactory {
             ..Default::default()
         })
     }
-    
+
     /// Create configuration from TOML file
     pub fn from_file(path: &str) -> Result<MemoryConfig> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to read config file: {}", e)))?;
-        
-        let config: MemoryConfig = toml::from_str(&content)
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to parse config file: {}", e)))?;
-        
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            agent_mem_traits::AgentMemError::config_error(format!(
+                "Failed to read config file: {e}"
+            ))
+        })?;
+
+        let config: MemoryConfig = toml::from_str(&content).map_err(|e| {
+            agent_mem_traits::AgentMemError::config_error(format!(
+                "Failed to parse config file: {e}"
+            ))
+        })?;
+
         crate::validation::validate_memory_config(&config)?;
-        
+
         Ok(config)
     }
-    
+
     /// Create configuration using the config crate (supports multiple formats)
     pub fn from_config_sources() -> Result<MemoryConfig> {
         let settings = config::Config::builder()
             // Start with default values
             .add_source(config::File::with_name("config/default").required(false))
             // Add environment-specific config
-            .add_source(config::File::with_name(&format!("config/{}", 
-                env::var("AGENT_MEM_ENV").unwrap_or_else(|_| "development".to_string())
-            )).required(false))
+            .add_source(
+                config::File::with_name(&format!(
+                    "config/{}",
+                    env::var("AGENT_MEM_ENV").unwrap_or_else(|_| "development".to_string())
+                ))
+                .required(false),
+            )
             // Add local config (gitignored)
             .add_source(config::File::with_name("config/local").required(false))
             // Add environment variables with prefix
             .add_source(config::Environment::with_prefix("AGENT_MEM"))
             .build()
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to build config: {}", e)))?;
-        
-        let config: MemoryConfig = settings.try_deserialize()
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to deserialize config: {}", e)))?;
-        
+            .map_err(|e| {
+                agent_mem_traits::AgentMemError::config_error(format!(
+                    "Failed to build config: {e}"
+                ))
+            })?;
+
+        let config: MemoryConfig = settings.try_deserialize().map_err(|e| {
+            agent_mem_traits::AgentMemError::config_error(format!(
+                "Failed to deserialize config: {e}"
+            ))
+        })?;
+
         crate::validation::validate_memory_config(&config)?;
-        
+
         Ok(config)
     }
-    
+
     /// Save configuration to TOML file
     pub fn save_to_file(config: &MemoryConfig, path: &str) -> Result<()> {
-        let content = toml::to_string_pretty(config)
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to serialize config: {}", e)))?;
-        
-        std::fs::write(path, content)
-            .map_err(|e| agent_mem_traits::AgentMemError::config_error(format!("Failed to write config file: {}", e)))?;
-        
+        let content = toml::to_string_pretty(config).map_err(|e| {
+            agent_mem_traits::AgentMemError::config_error(format!(
+                "Failed to serialize config: {e}"
+            ))
+        })?;
+
+        std::fs::write(path, content).map_err(|e| {
+            agent_mem_traits::AgentMemError::config_error(format!(
+                "Failed to write config file: {e}"
+            ))
+        })?;
+
         Ok(())
     }
 }
@@ -161,14 +186,14 @@ impl ConfigFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_create_memory_config() {
         let config = ConfigFactory::create_memory_config();
         assert_eq!(config.llm.provider, "openai");
-        assert_eq!(config.vector_store.provider, "lancedb");
+        assert_eq!(config.vector_store.provider, "memory"); // Changed to "memory" for zero-config embedded mode
     }
 
     #[test]
@@ -219,11 +244,37 @@ clustering_threshold = 0.7
 enable_conflict_detection = true
 enable_memory_summarization = true
 importance_scoring = true
+enable_intelligent_extraction = true
+enable_decision_engine = true
+enable_deduplication = true
+
+[intelligence.fact_extraction]
+min_confidence = 0.7
+extract_entities = true
+extract_relations = true
+max_facts_per_message = 10
+
+[intelligence.decision_engine]
+similarity_threshold = 0.85
+min_decision_confidence = 0.75
+enable_intelligent_merge = true
+max_similar_memories = 5
+
+[intelligence.deduplication]
+similarity_threshold = 0.95
+time_window_seconds = 3600
+merge_strategy = "intelligent_merge"
+
+[performance]
+retry_attempts = 3
+base_delay_ms = 100
+max_delay_ms = 5000
+max_concurrent_operations = 10
 "#;
-        
+
         let mut temp_file = NamedTempFile::new().unwrap();
         temp_file.write_all(config_content.as_bytes()).unwrap();
-        
+
         let config = ConfigFactory::from_file(temp_file.path().to_str().unwrap()).unwrap();
         assert_eq!(config.llm.provider, "openai");
         assert_eq!(config.llm.model, "gpt-4");

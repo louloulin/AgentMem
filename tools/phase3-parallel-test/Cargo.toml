@@ -1,0 +1,14 @@
+[package]
+name = "phase3-parallel-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.42", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde_json = "1.0"
+futures = "0.3"
+

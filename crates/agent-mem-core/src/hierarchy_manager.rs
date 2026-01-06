@@ -1,17 +1,16 @@
 //! Advanced Hierarchical Memory Structure Management
-//! 
+//!
 //! Provides sophisticated memory hierarchy management with dynamic
 //! structure adjustment and optimization capabilities.
 
-use crate::hierarchy::{MemoryScope, MemoryLevel};
 use crate::hierarchical_service::{HierarchicalMemoryRecord, HierarchicalMemoryService};
-use crate::types::ImportanceLevel;
-use agent_mem_traits::{Result, AgentMemError};
+use crate::hierarchy::{MemoryLevel, MemoryScope};
+use agent_mem_traits::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 /// Advanced hierarchy management configuration
@@ -97,7 +96,7 @@ impl HierarchyNode {
     pub fn calculate_depth(&self, hierarchy: &HashMap<String, HierarchyNode>) -> usize {
         let mut depth = 0;
         let mut current_id = self.parent_id.as_ref();
-        
+
         while let Some(parent_id) = current_id {
             if let Some(parent) = hierarchy.get(parent_id) {
                 depth += 1;
@@ -106,7 +105,7 @@ impl HierarchyNode {
                 break;
             }
         }
-        
+
         depth
     }
 }
@@ -175,7 +174,7 @@ impl HierarchyManager {
     ) -> Result<String> {
         // Find optimal placement in hierarchy
         let optimal_node_id = self.find_optimal_placement(memory).await?;
-        
+
         // Add memory to the node
         {
             let mut nodes = self.nodes.write().await;
@@ -198,19 +197,16 @@ impl HierarchyManager {
     }
 
     /// Find optimal placement for a memory in the hierarchy
-    async fn find_optimal_placement(
-        &self,
-        memory: &HierarchicalMemoryRecord,
-    ) -> Result<String> {
+    async fn find_optimal_placement(&self, memory: &HierarchicalMemoryRecord) -> Result<String> {
         let nodes = self.nodes.read().await;
-        
+
         // Find nodes matching scope and level
         let matching_nodes: Vec<_> = nodes
             .values()
             .filter(|node| {
-                node.scope == memory.scope && 
-                node.level == memory.level &&
-                node.memory_ids.len() < self.config.max_memories_per_node
+                node.scope == memory.scope
+                    && node.level == memory.level
+                    && node.memory_ids.len() < self.config.max_memories_per_node
             })
             .collect();
 
@@ -218,7 +214,8 @@ impl HierarchyManager {
             Ok(best_node.id.clone())
         } else {
             // Create new node if no suitable node exists
-            self.create_hierarchy_node(memory.scope.clone(), memory.level.clone()).await
+            self.create_hierarchy_node(memory.scope.clone(), memory.level.clone())
+                .await
         }
     }
 
@@ -229,11 +226,11 @@ impl HierarchyManager {
         level: MemoryLevel,
     ) -> Result<String> {
         let mut node = HierarchyNode::new(scope.clone(), level.clone());
-        
+
         // Find appropriate parent
         if let Some(parent_id) = self.find_parent_node(&scope, &level).await? {
             node.parent_id = Some(parent_id.clone());
-            
+
             // Update parent's children list
             let mut nodes = self.nodes.write().await;
             if let Some(parent) = nodes.get_mut(&parent_id) {
@@ -249,11 +246,17 @@ impl HierarchyManager {
         // Update indices
         {
             let mut scope_index = self.scope_index.write().await;
-            scope_index.entry(scope).or_insert_with(Vec::new).push(node.id.clone());
+            scope_index
+                .entry(scope)
+                .or_insert_with(Vec::new)
+                .push(node.id.clone());
         }
         {
             let mut level_index = self.level_index.write().await;
-            level_index.entry(level).or_insert_with(Vec::new).push(node.id.clone());
+            level_index
+                .entry(level)
+                .or_insert_with(Vec::new)
+                .push(node.id.clone());
         }
 
         Ok(node.id)
@@ -266,13 +269,12 @@ impl HierarchyManager {
         level: &MemoryLevel,
     ) -> Result<Option<String>> {
         let nodes = self.nodes.read().await;
-        
+
         // Look for parent in higher level or broader scope
         let parent_candidates: Vec<_> = nodes
             .values()
             .filter(|node| {
-                self.is_valid_parent(&node.scope, scope) &&
-                self.is_higher_level(&node.level, level)
+                self.is_valid_parent(&node.scope, scope) && self.is_higher_level(&node.level, level)
             })
             .collect();
 
@@ -320,17 +322,15 @@ impl HierarchyManager {
         ];
 
         for level in levels {
-            self.create_hierarchy_node(MemoryScope::Global, level).await?;
+            self.create_hierarchy_node(MemoryScope::Global, level)
+                .await?;
         }
 
         Ok(())
     }
 
     /// Update indices after adding a memory
-    async fn update_indices_after_addition(
-        &self,
-        memory: &HierarchicalMemoryRecord,
-    ) -> Result<()> {
+    async fn update_indices_after_addition(&self, memory: &HierarchicalMemoryRecord) -> Result<()> {
         // Update scope-based statistics
         {
             let mut stats = self.statistics.write().await;
@@ -380,9 +380,10 @@ impl HierarchyManager {
     async fn check_and_optimize(&self) -> Result<()> {
         let last_optimization = *self.last_optimization.read().await;
         let now = Utc::now();
-        
-        if now.signed_duration_since(last_optimization).num_hours() >= 
-           self.config.rebalance_interval_hours as i64 {
+
+        if now.signed_duration_since(last_optimization).num_hours()
+            >= self.config.rebalance_interval_hours as i64
+        {
             self.optimize_hierarchy().await?;
             *self.last_optimization.write().await = now;
         }
@@ -394,7 +395,7 @@ impl HierarchyManager {
     async fn optimize_hierarchy(&self) -> Result<()> {
         // Identify overloaded nodes
         let overloaded_nodes = self.find_overloaded_nodes().await?;
-        
+
         // Rebalance overloaded nodes
         for node_id in overloaded_nodes {
             self.rebalance_node(&node_id).await?;
@@ -493,8 +494,12 @@ mod tests {
     async fn test_hierarchy_manager_creation() {
         let config = HierarchyManagerConfig::default();
         let service_config = HierarchicalServiceConfig::default();
-        let service = Arc::new(HierarchicalMemoryService::new(service_config).await.unwrap());
-        
+        let service = Arc::new(
+            HierarchicalMemoryService::new(service_config)
+                .await
+                .unwrap(),
+        );
+
         let manager = HierarchyManager::new(config, service).await;
         assert!(manager.is_ok());
     }
@@ -511,18 +516,18 @@ mod tests {
     #[tokio::test]
     async fn test_node_depth_calculation() {
         let mut hierarchy = HashMap::new();
-        
+
         let mut root = HierarchyNode::new(MemoryScope::Global, MemoryLevel::Strategic);
         let mut child = HierarchyNode::new(MemoryScope::Global, MemoryLevel::Tactical);
         let mut grandchild = HierarchyNode::new(MemoryScope::Global, MemoryLevel::Operational);
-        
+
         child.parent_id = Some(root.id.clone());
         grandchild.parent_id = Some(child.id.clone());
-        
+
         hierarchy.insert(root.id.clone(), root.clone());
         hierarchy.insert(child.id.clone(), child.clone());
         hierarchy.insert(grandchild.id.clone(), grandchild.clone());
-        
+
         assert_eq!(root.calculate_depth(&hierarchy), 0);
         assert_eq!(child.calculate_depth(&hierarchy), 1);
         assert_eq!(grandchild.calculate_depth(&hierarchy), 2);

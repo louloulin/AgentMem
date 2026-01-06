@@ -1,0 +1,21 @@
+[package]
+name = "phase1-integration-demo"
+version = "2.0.0"
+edition = "2021"
+
+[[bin]]
+name = "phase1_integration_demo"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-storage = { path = "../../crates/agent-mem-storage" }
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-config = { path = "../../crates/agent-mem-config" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }

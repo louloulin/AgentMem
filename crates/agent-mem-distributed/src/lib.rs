@@ -1,5 +1,5 @@
 //! AgentMem Distributed Computing Module
-//! 
+//!
 //! This module provides distributed computing capabilities including:
 //! - Cluster mode support
 //! - Data sharding strategies
@@ -8,26 +8,25 @@
 //! - Load balancing
 
 pub mod cluster;
-pub mod sharding;
 pub mod consensus;
-pub mod discovery;
 pub mod coordination;
-pub mod replication;
+pub mod discovery;
 pub mod load_balancer;
+pub mod replication;
+pub mod sharding;
 
 // Re-export main types
-pub use cluster::{ClusterManager, ClusterConfig, ClusterNode, NodeStatus};
-pub use sharding::{ShardManager, ShardConfig, ShardKey, ShardStrategy};
-pub use consensus::{ConsensusManager, ConsensusConfig, ConsensusState};
-pub use discovery::{ServiceDiscovery, DiscoveryConfig, ServiceInfo};
-pub use coordination::{CoordinationManager, CoordinationConfig};
-pub use replication::{ReplicationManager, ReplicationConfig, ReplicationStrategy};
+pub use cluster::{ClusterConfig, ClusterManager, ClusterNode, NodeStatus};
+pub use consensus::{ConsensusConfig, ConsensusManager, ConsensusState};
+pub use coordination::{CoordinationConfig, CoordinationManager};
+pub use discovery::{DiscoveryConfig, ServiceDiscovery, ServiceInfo};
 pub use load_balancer::{LoadBalancer, LoadBalancerConfig, LoadBalancingStrategy};
+pub use replication::{ReplicationConfig, ReplicationManager, ReplicationStrategy};
+pub use sharding::{ShardConfig, ShardKey, ShardManager, ShardStrategy};
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -89,13 +88,16 @@ impl DistributedManager {
     /// Create a new distributed manager
     pub async fn new(config: DistributedConfig) -> Result<Self> {
         let node_id = Uuid::new_v4();
-        
+
         let cluster_manager = Arc::new(ClusterManager::new(config.cluster.clone(), node_id).await?);
         let shard_manager = Arc::new(ShardManager::new(config.sharding.clone()).await?);
-        let consensus_manager = Arc::new(ConsensusManager::new(config.consensus.clone(), node_id).await?);
+        let consensus_manager =
+            Arc::new(ConsensusManager::new(config.consensus.clone(), node_id).await?);
         let service_discovery = Arc::new(ServiceDiscovery::new(config.discovery.clone()).await?);
-        let coordination_manager = Arc::new(CoordinationManager::new(config.coordination.clone()).await?);
-        let replication_manager = Arc::new(ReplicationManager::new(config.replication.clone()).await?);
+        let coordination_manager =
+            Arc::new(CoordinationManager::new(config.coordination.clone()).await?);
+        let replication_manager =
+            Arc::new(ReplicationManager::new(config.replication.clone()).await?);
         let load_balancer = Arc::new(LoadBalancer::new(config.load_balancer.clone()).await?);
 
         let manager = Self {
@@ -122,21 +124,21 @@ impl DistributedManager {
     async fn start_distributed_services(&self) -> Result<()> {
         // Start cluster management
         self.cluster_manager.start().await?;
-        
+
         // Start service discovery
         self.service_discovery.start().await?;
-        
+
         // Start consensus if enabled
         if self.config.enable_ha {
             self.consensus_manager.start().await?;
         }
-        
+
         // Start coordination
         self.coordination_manager.start().await?;
-        
+
         // Start replication
         self.replication_manager.start().await?;
-        
+
         tracing::info!("Distributed services started for node {}", self.node_id);
         Ok(())
     }
@@ -209,14 +211,14 @@ impl DistributedManager {
     pub async fn shutdown(&self) -> Result<()> {
         self.replication_manager.shutdown().await?;
         self.coordination_manager.shutdown().await?;
-        
+
         if self.config.enable_ha {
             self.consensus_manager.shutdown().await?;
         }
-        
+
         self.service_discovery.shutdown().await?;
         self.cluster_manager.shutdown().await?;
-        
+
         tracing::info!("Distributed services shutdown for node {}", self.node_id);
         Ok(())
     }

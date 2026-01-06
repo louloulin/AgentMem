@@ -1,20 +1,20 @@
 //! JSON processing utilities (inspired by mem0)
 
+use agent_mem_traits::Result;
 use regex::Regex;
 use serde_json::Value;
-use agent_mem_traits::Result;
 
 /// Extract JSON from text, handling code blocks and other formats
 pub fn extract_json(text: &str) -> Result<String> {
     let text = text.trim();
-    
+
     // Try to match JSON in code blocks first
     let code_block_regex = Regex::new(r"```(?:json)?\s*(.*?)\s*```").unwrap();
     if let Some(captures) = code_block_regex.captures(text) {
         let json_content = captures.get(1).unwrap().as_str();
         return Ok(json_content.to_string());
     }
-    
+
     // Try to find JSON object boundaries
     if let Some(start) = text.find('{') {
         if let Some(end) = text.rfind('}') {
@@ -27,7 +27,7 @@ pub fn extract_json(text: &str) -> Result<String> {
             }
         }
     }
-    
+
     // Try to find JSON array boundaries
     if let Some(start) = text.find('[') {
         if let Some(end) = text.rfind(']') {
@@ -40,7 +40,7 @@ pub fn extract_json(text: &str) -> Result<String> {
             }
         }
     }
-    
+
     // If no JSON structure found, assume the entire text is JSON
     Ok(text.to_string())
 }
@@ -49,7 +49,7 @@ pub fn extract_json(text: &str) -> Result<String> {
 pub fn remove_code_blocks(content: &str) -> String {
     let pattern = r"^```[a-zA-Z0-9]*\n([\s\S]*?)\n```$";
     let regex = Regex::new(pattern).unwrap();
-    
+
     if let Some(captures) = regex.captures(content.trim()) {
         captures.get(1).unwrap().as_str().trim().to_string()
     } else {
@@ -64,14 +64,13 @@ where
 {
     let cleaned_json = extract_json(json_str)?;
     let parsed: T = serde_json::from_str(&cleaned_json)
-        .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))?;
+        .map_err(agent_mem_traits::AgentMemError::SerializationError)?;
     Ok(parsed)
 }
 
 /// Pretty print JSON
 pub fn pretty_print_json(value: &Value) -> Result<String> {
-    serde_json::to_string_pretty(value)
-        .map_err(|e| agent_mem_traits::AgentMemError::SerializationError(e))
+    serde_json::to_string_pretty(value).map_err(agent_mem_traits::AgentMemError::SerializationError)
 }
 
 /// Validate JSON string
@@ -82,7 +81,6 @@ pub fn validate_json(json_str: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_extract_json_from_code_block() {
@@ -93,7 +91,7 @@ Here's the JSON:
 ```
 That's it.
         "#;
-        
+
         let result = extract_json(text).unwrap();
         assert_eq!(result, r#"{"name": "test", "value": 42}"#);
     }

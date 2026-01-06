@@ -1,0 +1,41 @@
+[package]
+name = "phase5-production-demo"
+version = "2.0.0"
+edition = "2021"
+description = "Phase 5 生产级特性演示 - 错误恢复和配置管理"
+
+[[bin]]
+name = "phase5_production_demo"
+path = "src/main.rs"
+
+[dependencies]
+# Core AgentMem dependencies
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-performance = { path = "../../crates/agent-mem-performance", features = ["telemetry"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4"] }
+
+# File handling
+tempfile = "3.8"

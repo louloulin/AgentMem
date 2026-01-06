@@ -1,0 +1,47 @@
+# Grafana 仪表板配置
+apiVersion: 1
+
+providers:
+  # AgentMem 核心仪表板
+  - name: 'agentmem-core'
+    orgId: 1
+    folder: 'AgentMem'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/agentmem
+
+  # 向量数据库仪表板
+  - name: 'vector-databases'
+    orgId: 1
+    folder: 'Vector Databases'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/vector-db
+
+  # 系统监控仪表板
+  - name: 'system-monitoring'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system
+
+  # 性能分析仪表板
+  - name: 'performance-analysis'
+    orgId: 1
+    folder: 'Performance'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/performance

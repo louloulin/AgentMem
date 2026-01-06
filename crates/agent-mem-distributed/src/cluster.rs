@@ -1,17 +1,17 @@
 //! Cluster management for distributed AgentMem
-//! 
+//!
 //! This module provides cluster management capabilities including
 //! node discovery, health monitoring, and cluster coordination.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn, error};
+use tokio::time::interval;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Cluster configuration
@@ -111,7 +111,7 @@ impl ClusterManager {
     /// Create a new cluster manager
     pub async fn new(config: ClusterConfig, node_id: Uuid) -> Result<Self> {
         let local_node = ClusterNode::new(node_id, config.node_address);
-        
+
         let manager = Self {
             config,
             node_id,
@@ -120,16 +120,18 @@ impl ClusterManager {
             is_running: Arc::new(RwLock::new(false)),
         };
 
-        info!("Cluster manager created for node {} at {}", 
-              node_id, manager.config.node_address);
-        
+        info!(
+            "Cluster manager created for node {} at {}",
+            node_id, manager.config.node_address
+        );
+
         Ok(manager)
     }
 
     /// Start cluster services
     pub async fn start(&self) -> Result<()> {
         *self.is_running.write().await = true;
-        
+
         // Add local node to cluster
         {
             let local_node = self.local_node.read().await;
@@ -139,7 +141,7 @@ impl ClusterManager {
 
         // Start health monitoring
         self.start_health_monitor().await;
-        
+
         // Start node discovery if enabled
         if self.config.enable_auto_discovery {
             self.start_node_discovery().await;
@@ -176,7 +178,7 @@ impl ClusterManager {
         // Simplified node discovery - in practice would use HTTP/gRPC
         let node_id = Uuid::new_v4(); // Would get from actual node
         let node = ClusterNode::new(node_id, address);
-        
+
         debug!("Discovered node {} at {}", node_id, address);
         Ok(node)
     }
@@ -191,10 +193,10 @@ impl ClusterManager {
 
         tokio::spawn(async move {
             let mut interval = interval(interval_duration);
-            
+
             while *is_running.read().await {
                 interval.tick().await;
-                
+
                 // Update local node health
                 {
                     let mut local = local_node.write().await;
@@ -205,7 +207,7 @@ impl ClusterManager {
                 {
                     let mut nodes_guard = nodes.write().await;
                     let mut failed_nodes = Vec::new();
-                    
+
                     for (node_id, node) in nodes_guard.iter_mut() {
                         if !node.is_healthy(timeout) && node.status != NodeStatus::Failed {
                             warn!("Node {} marked as failed", node_id);
@@ -213,7 +215,7 @@ impl ClusterManager {
                             failed_nodes.push(*node_id);
                         }
                     }
-                    
+
                     // Remove failed nodes after timeout
                     for node_id in failed_nodes {
                         if let Some(node) = nodes_guard.get(&node_id) {
@@ -230,18 +232,21 @@ impl ClusterManager {
 
     /// Start node discovery
     async fn start_node_discovery(&self) {
-        let nodes = Arc::clone(&self.nodes);
+        let _nodes = Arc::clone(&self.nodes);
         let is_running = Arc::clone(&self.is_running);
         let config = self.config.clone();
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(60)); // Discovery every minute
-            
+
             while *is_running.read().await {
                 interval.tick().await;
-                
+
                 // Simplified auto-discovery - in practice would use multicast, consul, etc.
-                debug!("Running node auto-discovery for cluster {}", config.cluster_name);
+                debug!(
+                    "Running node auto-discovery for cluster {}",
+                    config.cluster_name
+                );
             }
         });
     }
@@ -249,11 +254,11 @@ impl ClusterManager {
     /// Add a node to the cluster
     pub async fn add_node(&self, node: ClusterNode) -> Result<()> {
         let mut nodes = self.nodes.write().await;
-        
+
         if nodes.len() >= self.config.max_cluster_size {
             return Err(AgentMemError::memory_error("Cluster size limit reached"));
         }
-        
+
         nodes.insert(node.id, node.clone());
         info!("Added node {} to cluster", node.id);
         Ok(())
@@ -262,24 +267,25 @@ impl ClusterManager {
     /// Remove a node from the cluster
     pub async fn remove_node(&self, node_id: Uuid) -> Result<()> {
         let mut nodes = self.nodes.write().await;
-        
-        if let Some(mut node) = nodes.get_mut(&node_id) {
+
+        if let Some(node) = nodes.get_mut(&node_id) {
             node.status = NodeStatus::Leaving;
             info!("Marked node {} as leaving", node_id);
         }
-        
+
         Ok(())
     }
 
     /// Get cluster information
     pub async fn get_cluster_info(&self) -> Result<super::ClusterInfo> {
         let nodes = self.nodes.read().await;
-        let healthy_nodes = nodes.values()
+        let healthy_nodes = nodes
+            .values()
             .filter(|n| n.status == NodeStatus::Healthy)
             .count();
-        
+
         let leader_node = self.find_leader(&nodes).await;
-        
+
         Ok(super::ClusterInfo {
             total_nodes: nodes.len(),
             healthy_nodes,
@@ -290,7 +296,8 @@ impl ClusterManager {
 
     /// Find the cluster leader (simplified - highest node ID)
     async fn find_leader(&self, nodes: &HashMap<Uuid, ClusterNode>) -> Option<Uuid> {
-        nodes.values()
+        nodes
+            .values()
             .filter(|n| n.status == NodeStatus::Healthy)
             .max_by_key(|n| n.id)
             .map(|n| n.id)
@@ -299,21 +306,23 @@ impl ClusterManager {
     /// Get healthy nodes
     pub async fn get_healthy_nodes(&self) -> Result<Vec<ClusterNode>> {
         let nodes = self.nodes.read().await;
-        let healthy_nodes = nodes.values()
+        let healthy_nodes = nodes
+            .values()
             .filter(|n| n.status == NodeStatus::Healthy)
             .cloned()
             .collect();
-        
+
         Ok(healthy_nodes)
     }
 
     /// Check if cluster has minimum required nodes
     pub async fn has_quorum(&self) -> bool {
         let nodes = self.nodes.read().await;
-        let healthy_count = nodes.values()
+        let healthy_count = nodes
+            .values()
             .filter(|n| n.status == NodeStatus::Healthy)
             .count();
-        
+
         healthy_count >= self.config.min_cluster_size
     }
 
@@ -324,21 +333,25 @@ impl ClusterManager {
     }
 
     /// Update node metadata
-    pub async fn update_node_metadata(&self, node_id: Uuid, metadata: HashMap<String, String>) -> Result<()> {
+    pub async fn update_node_metadata(
+        &self,
+        node_id: Uuid,
+        metadata: HashMap<String, String>,
+    ) -> Result<()> {
         let mut nodes = self.nodes.write().await;
-        
+
         if let Some(node) = nodes.get_mut(&node_id) {
             node.metadata = metadata;
             info!("Updated metadata for node {}", node_id);
         }
-        
+
         Ok(())
     }
 
     /// Shutdown cluster services
     pub async fn shutdown(&self) -> Result<()> {
         *self.is_running.write().await = false;
-        
+
         // Mark local node as leaving
         {
             let mut local_node = self.local_node.write().await;
@@ -367,12 +380,12 @@ mod tests {
         let node_id = Uuid::new_v4();
         let address = "127.0.0.1:8080".parse().unwrap();
         let mut node = ClusterNode::new(node_id, address);
-        
+
         assert_eq!(node.status, NodeStatus::Joining);
-        
+
         node.update_health();
         assert_eq!(node.status, NodeStatus::Healthy);
-        
+
         let timeout = Duration::from_millis(1);
         sleep(Duration::from_millis(2)).await;
         assert!(!node.is_healthy(timeout));
@@ -386,11 +399,11 @@ mod tests {
         };
         let node_id = Uuid::new_v4();
         let manager = ClusterManager::new(config, node_id).await.unwrap();
-        
+
         // Start with no quorum (only local node)
         manager.start().await.unwrap();
         assert!(!manager.has_quorum().await);
-        
+
         // Add nodes to reach quorum
         for i in 0..2 {
             let new_node = ClusterNode {
@@ -404,7 +417,7 @@ mod tests {
             };
             manager.add_node(new_node).await.unwrap();
         }
-        
+
         // Note: The test may need time for nodes to be properly registered
         // In a real implementation, this would be more deterministic
         let has_quorum = manager.has_quorum().await;

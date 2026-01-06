@@ -1,0 +1,40 @@
+[package]
+name = "production-telemetry-demo"
+version = "2.0.0"
+edition = "2021"
+description = "Production-grade telemetry system demonstration"
+
+[dependencies]
+# Core AgentMem dependencies
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-performance = { path = "../../crates/agent-mem-performance", features = ["telemetry"] }
+agent-mem-storage = { path = "../../crates/agent-mem-storage" }
+agent-mem-llm = { path = "../../crates/agent-mem-llm" }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Time handling
+chrono = { workspace = true, features = ["serde"] }
+
+# UUID generation
+uuid = { workspace = true, features = ["v4"] }
+
+# HTTP client for testing
+reqwest = { workspace = true, features = ["json"] }
+
+[[bin]]
+name = "production_telemetry_demo"
+path = "src/main.rs"

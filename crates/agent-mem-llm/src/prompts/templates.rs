@@ -139,13 +139,28 @@ impl PromptTemplates {
     /// 创建新的提示词模板管理器
     pub fn new() -> Self {
         let mut templates = HashMap::new();
-        
-        templates.insert("memory_extraction".to_string(), MEMORY_EXTRACTION_PROMPT.to_string());
-        templates.insert("memory_summarization".to_string(), MEMORY_SUMMARIZATION_PROMPT.to_string());
-        templates.insert("memory_conflict_detection".to_string(), MEMORY_CONFLICT_DETECTION_PROMPT.to_string());
-        templates.insert("memory_importance_scoring".to_string(), MEMORY_IMPORTANCE_SCORING_PROMPT.to_string());
-        templates.insert("memory_query_enhancement".to_string(), MEMORY_QUERY_ENHANCEMENT_PROMPT.to_string());
-        
+
+        templates.insert(
+            "memory_extraction".to_string(),
+            MEMORY_EXTRACTION_PROMPT.to_string(),
+        );
+        templates.insert(
+            "memory_summarization".to_string(),
+            MEMORY_SUMMARIZATION_PROMPT.to_string(),
+        );
+        templates.insert(
+            "memory_conflict_detection".to_string(),
+            MEMORY_CONFLICT_DETECTION_PROMPT.to_string(),
+        );
+        templates.insert(
+            "memory_importance_scoring".to_string(),
+            MEMORY_IMPORTANCE_SCORING_PROMPT.to_string(),
+        );
+        templates.insert(
+            "memory_query_enhancement".to_string(),
+            MEMORY_QUERY_ENHANCEMENT_PROMPT.to_string(),
+        );
+
         Self { templates }
     }
 
@@ -170,15 +185,19 @@ impl PromptTemplates {
     }
 
     /// 渲染模板（简单的字符串替换）
-    pub fn render_template(&self, name: &str, variables: &HashMap<String, String>) -> Option<String> {
+    pub fn render_template(
+        &self,
+        name: &str,
+        variables: &HashMap<String, String>,
+    ) -> Option<String> {
         if let Some(template) = self.get_template(name) {
             let mut rendered = template.clone();
-            
+
             for (key, value) in variables {
-                let placeholder = format!("{{{}}}", key);
+                let placeholder = format!("{{{key}}}");
                 rendered = rendered.replace(&placeholder, value);
             }
-            
+
             Some(rendered)
         } else {
             None
@@ -207,8 +226,11 @@ mod tests {
     #[test]
     fn test_add_custom_template() {
         let mut templates = PromptTemplates::new();
-        templates.add_template("custom".to_string(), "Custom template: {variable}".to_string());
-        
+        templates.add_template(
+            "custom".to_string(),
+            "Custom template: {variable}".to_string(),
+        );
+
         assert!(templates.get_template("custom").is_some());
     }
 
@@ -216,8 +238,11 @@ mod tests {
     fn test_render_template() {
         let templates = PromptTemplates::new();
         let mut variables = HashMap::new();
-        variables.insert("conversation".to_string(), "Hello, how are you?".to_string());
-        
+        variables.insert(
+            "conversation".to_string(),
+            "Hello, how are you?".to_string(),
+        );
+
         let rendered = templates.render_template("memory_extraction", &variables);
         assert!(rendered.is_some());
         assert!(rendered.unwrap().contains("Hello, how are you?"));

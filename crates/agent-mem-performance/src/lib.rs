@@ -1,5 +1,5 @@
 //! AgentMem Performance Optimization Module
-//! 
+//!
 //! This module provides performance optimization components including:
 //! - Async batch processing
 //! - Memory pools and object pools
@@ -8,23 +8,44 @@
 //! - Concurrency control
 
 pub mod batch;
+pub mod benchmark;
 pub mod cache;
-pub mod pool;
-pub mod metrics;
 pub mod concurrency;
+pub mod config_manager;
+pub mod error_recovery;
+pub mod metrics;
+pub mod optimization;
+pub mod pool;
 pub mod query;
+pub mod telemetry;
 
 // Re-export main types
-pub use batch::{BatchProcessor, BatchConfig, BatchResult};
-pub use cache::{CacheManager, CacheConfig, CacheStats};
-pub use pool::{ObjectPool, MemoryPool, PoolConfig};
-pub use metrics::{PerformanceMetrics, MetricsCollector};
-pub use concurrency::{ConcurrencyManager, ConcurrencyConfig};
-pub use query::{QueryOptimizer, QueryPlan, OptimizationHint};
+pub use batch::{BatchConfig, BatchProcessor, BatchResult};
+pub use benchmark::{BenchmarkSuite, MemoryBenchmarkResults, VectorBenchmarkResults};
+pub use cache::{CacheConfig, CacheManager, CacheStats};
+pub use concurrency::{ConcurrencyConfig, ConcurrencyManager};
+pub use config_manager::{
+    AgentMemConfig, ConfigSource, EmbedderConfig, EnvConfigSource, FileConfigSource,
+    GraphStoreConfig, IntelligenceConfig, LLMConfig, PerformanceConfig as ConfigPerformanceConfig,
+    TelemetryConfig as ConfigTelemetryConfig, UnifiedConfigManager, VectorStoreConfig,
+};
+pub use error_recovery::{
+    BackoffStrategy, CircuitBreaker, CircuitBreakerConfig, ErrorRecoveryConfig, ErrorType,
+    FallbackStrategy, ProductionErrorHandler, RetryPolicy,
+};
+pub use metrics::{MetricsCollector, PerformanceMetrics};
+pub use optimization::{
+    CachePerformanceStats, OptimizationEngine, OptimizationRecord, QueryPerformanceStats,
+};
+pub use pool::{MemoryPool, ObjectPool, PoolConfig};
+pub use query::{OptimizationHint, QueryOptimizer, QueryPlan};
+pub use telemetry::{
+    AdaptiveOptimizer, EventTracker, EventType, MemoryEvent, PerformanceMonitor, TelemetryConfig,
+    TelemetryReport, TelemetrySystem,
+};
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Performance configuration
 #[derive(Debug, Clone)]
@@ -37,10 +58,14 @@ pub struct PerformanceConfig {
     pub pool: PoolConfig,
     /// Concurrency configuration
     pub concurrency: ConcurrencyConfig,
+    /// Telemetry configuration
+    pub telemetry: TelemetryConfig,
     /// Enable metrics collection
     pub enable_metrics: bool,
     /// Enable query optimization
     pub enable_query_optimization: bool,
+    /// Enable tracing
+    pub enable_tracing: bool,
 }
 
 impl Default for PerformanceConfig {
@@ -50,8 +75,10 @@ impl Default for PerformanceConfig {
             cache: CacheConfig::default(),
             pool: PoolConfig::default(),
             concurrency: ConcurrencyConfig::default(),
+            telemetry: TelemetryConfig::default(),
             enable_metrics: true,
             enable_query_optimization: true,
+            enable_tracing: true,
         }
     }
 }
@@ -66,6 +93,7 @@ pub struct PerformanceManager {
     metrics_collector: Arc<MetricsCollector>,
     concurrency_manager: Arc<ConcurrencyManager>,
     query_optimizer: Arc<QueryOptimizer>,
+    telemetry_system: Arc<TelemetrySystem>,
 }
 
 impl PerformanceManager {
@@ -78,6 +106,14 @@ impl PerformanceManager {
         let metrics_collector = Arc::new(MetricsCollector::new(config.enable_metrics)?);
         let concurrency_manager = Arc::new(ConcurrencyManager::new(config.concurrency.clone())?);
         let query_optimizer = Arc::new(QueryOptimizer::new(config.enable_query_optimization)?);
+        let telemetry_config = telemetry::TelemetryConfig {
+            enabled: true,
+            max_events: 10000,
+            monitoring_interval_seconds: 30,
+            health_check_interval_seconds: 60,
+            adaptive_optimization_enabled: true,
+        };
+        let telemetry_system = Arc::new(TelemetrySystem::new(telemetry_config));
 
         Ok(Self {
             config,
@@ -88,6 +124,7 @@ impl PerformanceManager {
             metrics_collector,
             concurrency_manager,
             query_optimizer,
+            telemetry_system,
         })
     }
 
@@ -126,6 +163,11 @@ impl PerformanceManager {
         Arc::clone(&self.query_optimizer)
     }
 
+    /// Get telemetry system
+    pub fn telemetry_system(&self) -> Arc<TelemetrySystem> {
+        Arc::clone(&self.telemetry_system)
+    }
+
     /// Get performance statistics
     pub async fn get_stats(&self) -> Result<PerformanceStats> {
         let cache_stats = self.cache_manager.get_stats().await?;
@@ -133,6 +175,7 @@ impl PerformanceManager {
         let pool_stats = self.object_pool.get_stats()?;
         let memory_stats = self.memory_pool.get_stats()?;
         let concurrency_stats = self.concurrency_manager.get_stats().await?;
+        let telemetry_report = self.telemetry_system.get_telemetry_report().await;
 
         Ok(PerformanceStats {
             cache: cache_stats,
@@ -140,6 +183,7 @@ impl PerformanceManager {
             pool: pool_stats,
             memory: memory_stats,
             concurrency: concurrency_stats,
+            telemetry: telemetry_report,
         })
     }
 
@@ -148,6 +192,7 @@ impl PerformanceManager {
         self.batch_processor.shutdown().await?;
         self.cache_manager.shutdown().await?;
         self.metrics_collector.shutdown().await?;
+        self.telemetry_system.stop_monitoring().await?;
         Ok(())
     }
 }
@@ -160,11 +205,11 @@ pub struct PerformanceStats {
     pub pool: pool::PoolStats,
     pub memory: pool::MemoryStats,
     pub concurrency: concurrency::ConcurrencyStats,
+    pub telemetry: TelemetryReport,
 }
 
-
-
 #[cfg(test)]
+#[cfg(not(feature = "skip-performance-tests"))]
 mod tests {
     use super::*;
 

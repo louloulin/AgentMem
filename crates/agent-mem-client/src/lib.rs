@@ -1,5 +1,5 @@
 //! AgentMem HTTP Client SDK
-//! 
+//!
 //! Enterprise-grade HTTP client for AgentMem memory management platform.
 //! Provides both synchronous and asynchronous interfaces with connection pooling,
 //! retry logic, and comprehensive error handling.
@@ -7,12 +7,14 @@
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod mem5_client;
 pub mod models;
 pub mod retry;
 
 pub use client::{AgentMemClient, AsyncAgentMemClient};
 pub use config::ClientConfig;
 pub use error::{ClientError, ClientResult};
+pub use mem5_client::Mem5Client;
 pub use models::*;
 
 /// Re-export commonly used types

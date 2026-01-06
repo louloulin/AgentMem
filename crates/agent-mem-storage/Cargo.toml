@@ -31,13 +31,22 @@ tracing.workspace = true
 # HTTP客户端（用于多个提供商）
 reqwest = { version = "0.11", features = ["json"] }
 
-# 向量存储依赖
-# lancedb = { version = "0.4", optional = true }
-# arrow = { version = "52", optional = true }
+# 嵌入式数据库
+libsql = { version = "0.6", optional = true }
+
+# 向量存储依赖 (最新版本，已修复 chrono 冲突)
+# Disable default-features to avoid SIMD/AVX-512 issues in cross-compilation
+# This prevents lancedb from enabling CPU-specific optimizations that cause linking errors
+lancedb = { version = "0.22.2", optional = true, default-features = false }
+arrow = { version = "56", optional = true }
+
+# FAISS 向量搜索 (可选，需要系统级安装)
+# faiss = { version = "0.12", optional = true }  # 需要系统级 FAISS 安装
+# ndarray = { version = "0.15", optional = true }
 
 # 云端向量存储（使用HTTP客户端实现）
-# qdrant-client = { version = "1.7", optional = true }
-# pinecone-sdk = { version = "0.1", optional = true }
+qdrant-client = { version = "1.7", optional = true }
+# pinecone-sdk = { version = "0.1", optional = true }  # 版本可能不存在
 
 # 本地存储
 sled = { version = "0.34", optional = true }
@@ -46,18 +55,42 @@ rocksdb = { version = "0.21", optional = true }
 # 内存存储
 dashmap = { version = "5.5", optional = true }
 
+# MongoDB 文档存储
+mongodb = { version = "2.8", optional = true }
+bson = { version = "2.9", optional = true }
+futures = { version = "0.3", optional = true }
+
+# Redis 缓存存储
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
+
+# Database optimization
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres"], optional = true }
+
 [dev-dependencies]
 tempfile.workspace = true
 tokio-test = "0.4"
 
 [features]
-default = ["memory"]
+default = ["embedded"]
+
+# 嵌入式存储（零配置）
+# 使用最新版本: lancedb 0.22.1 + arrow 56.2.0 + chrono 0.4.41
+embedded = ["libsql", "lancedb", "memory"]
+libsql = ["dep:libsql"]
 
 # 向量存储后端
+azure-ai-search = [] # Azure AI Search 企业级搜索
 chroma = []
-lancedb = [] # 使用HTTP实现，暂不依赖原生SDK
-qdrant = [] # 使用HTTP实现
+faiss = [] # 本地高性能向量搜索 (使用内存实现)
+lancedb = ["dep:lancedb", "dep:arrow", "dep:futures"] # LanceDB 向量数据库
+mongodb = ["dep:mongodb", "dep:bson", "dep:futures"] # MongoDB 文档存储
+qdrant = ["dep:qdrant-client"] # Qdrant 向量数据库
 pinecone = [] # 使用HTTP实现
+elasticsearch = [] # 使用HTTP实现
+milvus = [] # 使用HTTP实现
+redis = ["dep:redis"] # Redis 缓存层
+supabase = [] # Supabase PostgreSQL + 向量扩展
+weaviate = [] # 使用HTTP实现
 
 # 图存储后端
 neo4j = [] # 使用HTTP实现
@@ -70,8 +103,16 @@ rocksdb = ["dep:rocksdb"]
 # 内存存储
 memory = ["dep:dashmap"]
 
+# 数据库后端
+postgres = ["dep:sqlx"]
+
+# 数据库优化
+optimizations = ["dep:sqlx"]
+
 # 所有后端
 all-backends = [
-    "chroma", "sled", "rocksdb", "memory"
-    # "lancedb", "qdrant", "pinecone"
+    "azure-ai-search", "chroma", "faiss", "lancedb", "mongodb", "qdrant", "pinecone",
+    "elasticsearch", "milvus", "redis", "supabase", "weaviate",
+    "neo4j", "memgraph",
+    "sled", "rocksdb", "memory"
 ]

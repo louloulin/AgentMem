@@ -1,0 +1,15 @@
+[package]
+name = "multimodal-demo"
+version = "2.0.0"
+edition = "2021"
+
+[[bin]]
+name = "multimodal-demo"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem-llm = { path = "../../crates/agent-mem-llm" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+anyhow = "1.0"

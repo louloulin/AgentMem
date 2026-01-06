@@ -1,21 +1,20 @@
 //! Multi-level caching system for improved performance
-//! 
+//!
 //! This module provides a sophisticated caching system with multiple levels,
 //! intelligent eviction policies, and cache warming capabilities.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use dashmap::DashMap;
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock as AsyncRwLock;
-use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tokio::time::interval;
+use tracing::{debug, info};
 
 /// Cache configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,12 +148,12 @@ pub struct CacheManager {
 impl CacheManager {
     /// Create a new cache manager
     pub async fn new(config: CacheConfig) -> Result<Self> {
-        let l1_cache = Arc::new(RwLock::new(
-            LruCache::new(NonZeroUsize::new(config.l1_size).unwrap())
-        ));
-        
+        let l1_cache = Arc::new(RwLock::new(LruCache::new(
+            NonZeroUsize::new(config.l1_size).unwrap(),
+        )));
+
         let l2_cache = Arc::new(DashMap::new());
-        
+
         let l3_cache = if config.l3_size.is_some() {
             Some(Arc::new(AsyncRwLock::new(HashMap::new())))
         } else {
@@ -175,13 +174,13 @@ impl CacheManager {
         if manager.config.enable_stats {
             manager.start_stats_updater().await;
         }
-        
+
         manager.start_cleanup_task().await;
 
-        info!("Cache manager initialized with L1: {}, L2: {}, L3: {:?}", 
-              manager.config.l1_size, 
-              manager.config.l2_size, 
-              manager.config.l3_size);
+        info!(
+            "Cache manager initialized with L1: {}, L2: {}, L3: {:?}",
+            manager.config.l1_size, manager.config.l2_size, manager.config.l3_size
+        );
 
         Ok(manager)
     }
@@ -219,16 +218,21 @@ impl CacheManager {
     }
 
     /// Put a value into cache
-    pub async fn put<K: AsRef<str>>(&self, key: K, value: Vec<u8>, ttl: Option<Duration>) -> Result<()> {
+    pub async fn put<K: AsRef<str>>(
+        &self,
+        key: K,
+        value: Vec<u8>,
+        ttl: Option<Duration>,
+    ) -> Result<()> {
         let key_str = key.as_ref().to_string();
         let size = value.len();
-        
+
         // Always put in L1 first
         self.put_to_l1(&key_str, &value).await;
-        
+
         // Put in L2 if it doesn't fit in L1 or for redundancy
         self.put_to_l2(&key_str, &value).await;
-        
+
         // Put in L3 if available
         if self.l3_cache.is_some() {
             self.put_to_l3(&key_str, &value).await;
@@ -241,18 +245,18 @@ impl CacheManager {
     /// Remove a value from cache
     pub async fn remove<K: AsRef<str>>(&self, key: K) -> Result<bool> {
         let key_str = key.as_ref();
-        
+
         let mut removed = false;
-        
+
         // Remove from all levels
         if self.remove_from_l1(key_str).await {
             removed = true;
         }
-        
+
         if self.remove_from_l2(key_str).await {
             removed = true;
         }
-        
+
         if self.remove_from_l3(key_str).await {
             removed = true;
         }
@@ -268,7 +272,7 @@ impl CacheManager {
     pub async fn clear(&self) -> Result<()> {
         self.l1_cache.write().clear();
         self.l2_cache.clear();
-        
+
         if let Some(l3) = &self.l3_cache {
             l3.write().await.clear();
         }
@@ -379,7 +383,7 @@ impl CacheManager {
     // Statistics and maintenance
     async fn update_stats_hit(&self, level: u8, access_time: Duration) {
         let mut stats = self.stats.write().await;
-        
+
         match level {
             1 => stats.l1_hits += 1,
             2 => stats.l2_hits += 1,
@@ -391,16 +395,21 @@ impl CacheManager {
         let total_accesses = stats.l1_hits + stats.l2_hits + stats.l3_hits;
         if total_accesses > 0 {
             let access_time_ms = access_time.as_millis() as f64;
-            stats.average_access_time_ms = 
-                (stats.average_access_time_ms * (total_accesses - 1) as f64 + access_time_ms) 
-                / total_accesses as f64;
+            stats.average_access_time_ms =
+                (stats.average_access_time_ms * (total_accesses - 1) as f64 + access_time_ms)
+                    / total_accesses as f64;
         }
 
         // Update hit rate
-        let total_requests = stats.l1_hits + stats.l2_hits + stats.l3_hits + 
-                           stats.l1_misses + stats.l2_misses + stats.l3_misses;
+        let total_requests = stats.l1_hits
+            + stats.l2_hits
+            + stats.l3_hits
+            + stats.l1_misses
+            + stats.l2_misses
+            + stats.l3_misses;
         if total_requests > 0 {
-            stats.hit_rate = (stats.l1_hits + stats.l2_hits + stats.l3_hits) as f64 / total_requests as f64;
+            stats.hit_rate =
+                (stats.l1_hits + stats.l2_hits + stats.l3_hits) as f64 / total_requests as f64;
         }
     }
 
@@ -411,10 +420,15 @@ impl CacheManager {
         stats.l3_misses += 1;
 
         // Update hit rate
-        let total_requests = stats.l1_hits + stats.l2_hits + stats.l3_hits + 
-                           stats.l1_misses + stats.l2_misses + stats.l3_misses;
+        let total_requests = stats.l1_hits
+            + stats.l2_hits
+            + stats.l3_hits
+            + stats.l1_misses
+            + stats.l2_misses
+            + stats.l3_misses;
         if total_requests > 0 {
-            stats.hit_rate = (stats.l1_hits + stats.l2_hits + stats.l3_hits) as f64 / total_requests as f64;
+            stats.hit_rate =
+                (stats.l1_hits + stats.l2_hits + stats.l3_hits) as f64 / total_requests as f64;
         }
     }
 
@@ -426,16 +440,16 @@ impl CacheManager {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(60)); // Update every minute
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let mut stats_guard = stats.write().await;
-                
+
                 // Update entry counts and memory usage
                 stats_guard.total_entries = l1_cache.read().len() + l2_cache.len();
                 stats_guard.memory_usage_bytes = 0; // Simplified - would calculate actual usage
-                
+
                 if let Some(l3) = &l3_cache {
                     stats_guard.total_entries += l3.read().await.len();
                 }
@@ -449,13 +463,13 @@ impl CacheManager {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(300)); // Cleanup every 5 minutes
-            
+
             loop {
                 interval.tick().await;
-                
+
                 // Clean expired entries from L2
                 l2_cache.retain(|_, entry| !entry.is_expired());
-                
+
                 // Clean expired entries from L3
                 if let Some(l3) = &l3_cache {
                     let mut cache = l3.write().await;
@@ -481,13 +495,13 @@ mod tests {
     async fn test_cache_put_get() {
         let config = CacheConfig::default();
         let manager = CacheManager::new(config).await.unwrap();
-        
+
         let key = "test_key";
         let value = b"test_value".to_vec();
-        
+
         manager.put(key, value.clone(), None).await.unwrap();
         let retrieved = manager.get(key).await.unwrap();
-        
+
         assert_eq!(retrieved, Some(value));
     }
 
@@ -495,14 +509,14 @@ mod tests {
     async fn test_cache_remove() {
         let config = CacheConfig::default();
         let manager = CacheManager::new(config).await.unwrap();
-        
+
         let key = "test_key";
         let value = b"test_value".to_vec();
-        
+
         manager.put(key, value, None).await.unwrap();
         let removed = manager.remove(key).await.unwrap();
         assert!(removed);
-        
+
         let retrieved = manager.get(key).await.unwrap();
         assert_eq!(retrieved, None);
     }
@@ -511,7 +525,7 @@ mod tests {
     async fn test_cache_stats() {
         let config = CacheConfig::default();
         let manager = CacheManager::new(config).await.unwrap();
-        
+
         let stats = manager.get_stats().await.unwrap();
         assert_eq!(stats.l1_hits, 0);
         assert_eq!(stats.total_entries, 0);

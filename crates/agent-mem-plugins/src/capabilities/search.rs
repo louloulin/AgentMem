@@ -1,0 +1,278 @@
+//! Search capability for plugins
+
+use agent_mem_plugin_sdk::{Memory, SearchResult};
+use anyhow::Result;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+/// Search capability allows plugins to search memories
+#[derive(Clone)]
+pub struct SearchCapability {
+    memories: Arc<RwLock<Vec<Memory>>>,
+}
+
+impl SearchCapability {
+    /// Create a new search capability
+    pub fn new() -> Self {
+        Self {
+            memories: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Add a memory to the search index
+    pub async fn index_memory(&self, memory: Memory) -> Result<()> {
+        let mut memories = self.memories.write().await;
+        memories.push(memory);
+        Ok(())
+    }
+
+    /// Search memories by query
+    pub async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>> {
+        let memories = self.memories.read().await;
+        let query_lower = query.to_lowercase();
+
+        let mut results: Vec<SearchResult> = memories
+            .iter()
+            .filter_map(|memory| {
+                let content_lower = memory.content.to_lowercase();
+
+                // Simple scoring: count occurrences of query words
+                let mut score = 0.0;
+                for word in query_lower.split_whitespace() {
+                    if content_lower.contains(word) {
+                        score += 1.0;
+                    }
+                }
+
+                if score > 0.0 {
+                    let mut metadata = HashMap::new();
+                    metadata.insert(
+                        "content_preview".to_string(),
+                        serde_json::Value::String(
+                            memory.content.chars().take(100).collect::<String>(),
+                        ),
+                    );
+                    metadata.insert(
+                        "created_at".to_string(),
+                        serde_json::Value::String(memory.created_at.clone()),
+                    );
+
+                    Some(SearchResult {
+                        memory: memory.clone(),
+                        score,
+                        metadata,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by score descending
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+
+        // Apply limit
+        results.truncate(limit);
+
+        Ok(results)
+    }
+
+    /// Search memories by type
+    pub async fn search_by_type(
+        &self,
+        memory_type: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>> {
+        let memories = self.memories.read().await;
+
+        let mut results: Vec<SearchResult> = memories
+            .iter()
+            .filter(|memory| memory.memory_type == memory_type)
+            .map(|memory| {
+                let mut metadata = HashMap::new();
+                metadata.insert(
+                    "user_id".to_string(),
+                    serde_json::Value::String(memory.user_id.clone()),
+                );
+
+                SearchResult {
+                    memory: memory.clone(),
+                    score: 1.0,
+                    metadata,
+                }
+            })
+            .collect();
+
+        // Apply limit
+        results.truncate(limit);
+
+        Ok(results)
+    }
+
+    /// Search memories by user ID
+    pub async fn search_by_user(&self, user_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
+        let memories = self.memories.read().await;
+
+        let mut results: Vec<SearchResult> = memories
+            .iter()
+            .filter(|memory| memory.user_id == user_id)
+            .map(|memory| SearchResult {
+                memory: memory.clone(),
+                score: 1.0,
+                metadata: HashMap::new(),
+            })
+            .collect();
+
+        // Apply limit
+        results.truncate(limit);
+
+        Ok(results)
+    }
+
+    /// Get total number of indexed memories
+    pub async fn count(&self) -> Result<usize> {
+        let memories = self.memories.read().await;
+        Ok(memories.len())
+    }
+
+    /// Clear all indexed memories
+    pub async fn clear(&self) -> Result<()> {
+        let mut memories = self.memories.write().await;
+        memories.clear();
+        Ok(())
+    }
+}
+
+impl Default for SearchCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn create_test_memory(id: &str, content: &str, memory_type: &str, user_id: &str) -> Memory {
+        let now = Utc::now().to_rfc3339();
+        Memory {
+            id: id.to_string(),
+            content: content.to_string(),
+            memory_type: memory_type.to_string(),
+            user_id: user_id.to_string(),
+            agent_id: None,
+            metadata: HashMap::new(),
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_by_content() {
+        let search = SearchCapability::new();
+
+        search
+            .index_memory(create_test_memory("1", "Hello world", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Goodbye world", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory(
+                "3",
+                "Hello universe",
+                "message",
+                "user1",
+            ))
+            .await
+            .unwrap();
+
+        let results = search.search("hello", 10).await?;
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_search_by_type() {
+        let search = SearchCapability::new();
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "note", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("3", "Content 3", "message", "user1"))
+            .await
+            .unwrap();
+
+        let results = search.search_by_type("message", 10).await?;
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_search_by_user() {
+        let search = SearchCapability::new();
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "message", "user2"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("3", "Content 3", "message", "user1"))
+            .await
+            .unwrap();
+
+        let results = search.search_by_user("user1", 10).await?;
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_search_limit() {
+        let search = SearchCapability::new();
+
+        for i in 0..10 {
+            search
+                .index_memory(create_test_memory(
+                    &i.to_string(),
+                    "test content",
+                    "message",
+                    "user1",
+                ))
+                .await
+                .unwrap();
+        }
+
+        let results = search.search("test", 5).await?;
+        assert_eq!(results.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn test_search_count_and_clear() {
+        let search = SearchCapability::new();
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "message", "user1"))
+            .await
+            .unwrap();
+
+        assert_eq!(search.count().await?, 2);
+
+        search.clear().await?;
+        assert_eq!(search.count().await?, 0);
+    }
+}

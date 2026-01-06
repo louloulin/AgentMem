@@ -1,10 +1,9 @@
 //! Memory consolidation algorithms
-//! 
+//!
 //! Implements intelligent memory consolidation to reduce redundancy
 //! and improve memory organization.
 
-use agent_mem_core::Memory;
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AttributeKey, AttributeValue, MemoryV4 as Memory, Result};
 use agent_mem_utils::text::jaccard_similarity;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -26,13 +25,13 @@ pub enum ConsolidationStrategy {
 pub struct ConsolidationResult {
     /// Original memory IDs that were consolidated
     pub original_ids: Vec<String>,
-    
+
     /// New consolidated memory ID
     pub consolidated_id: String,
-    
+
     /// Consolidation strategy used
     pub strategy: ConsolidationStrategy,
-    
+
     /// Similarity score that triggered consolidation
     pub similarity_score: f32,
 }
@@ -41,10 +40,10 @@ pub struct ConsolidationResult {
 pub struct MemoryConsolidator {
     /// Similarity threshold for consolidation
     threshold: f32,
-    
+
     /// Consolidation strategy
     strategy: ConsolidationStrategy,
-    
+
     /// Cache for similarity calculations
     similarity_cache: HashMap<(String, String), f32>,
 }
@@ -58,39 +57,47 @@ impl MemoryConsolidator {
             similarity_cache: HashMap::new(),
         }
     }
-    
+
     /// Set consolidation strategy
     pub fn with_strategy(mut self, strategy: ConsolidationStrategy) -> Self {
         self.strategy = strategy;
         self
     }
-    
+
     /// Update similarity threshold
     pub fn update_threshold(&mut self, threshold: f32) {
         self.threshold = threshold;
         // Clear cache when threshold changes
         self.similarity_cache.clear();
     }
-    
+
+    /// Get access count from memory metadata
+    fn get_access_count(&self, memory: &Memory) -> u32 {
+        memory.metadata.access_count
+    }
+
     /// Consolidate a batch of memories
     pub async fn consolidate_memories(&mut self, memories: &mut Vec<Memory>) -> Result<usize> {
         if memories.len() < 2 {
             return Ok(0);
         }
-        
-        info!("Starting memory consolidation for {} memories", memories.len());
-        
+
+        info!(
+            "Starting memory consolidation for {} memories",
+            memories.len()
+        );
+
         let mut consolidated_count = 0;
         let mut consolidation_groups = self.find_consolidation_groups(memories).await?;
-        
+
         // Sort groups by size (largest first) to prioritize major consolidations
         consolidation_groups.sort_by(|a, b| b.len().cmp(&a.len()));
-        
+
         for group in consolidation_groups {
             if group.len() < 2 {
                 continue;
             }
-            
+
             match self.strategy {
                 ConsolidationStrategy::Merge => {
                     if self.merge_memory_group(memories, &group).await? {
@@ -109,228 +116,289 @@ impl MemoryConsolidator {
                 }
             }
         }
-        
+
         info!("Consolidated {} memories", consolidated_count);
         Ok(consolidated_count)
     }
-    
+
     /// Find groups of similar memories that should be consolidated
     async fn find_consolidation_groups(&mut self, memories: &[Memory]) -> Result<Vec<Vec<usize>>> {
         let mut groups = Vec::new();
         let mut processed = HashSet::new();
-        
+
         for i in 0..memories.len() {
             if processed.contains(&i) {
                 continue;
             }
-            
+
             let mut group = vec![i];
             processed.insert(i);
-            
+
             for j in (i + 1)..memories.len() {
                 if processed.contains(&j) {
                     continue;
                 }
-                
-                let similarity = self.calculate_similarity(&memories[i], &memories[j]).await?;
-                
+
+                let similarity = self
+                    .calculate_similarity(&memories[i], &memories[j])
+                    .await?;
+
                 if similarity >= self.threshold {
                     group.push(j);
                     processed.insert(j);
                 }
             }
-            
+
             if group.len() > 1 {
                 groups.push(group);
             }
         }
-        
+
         debug!("Found {} consolidation groups", groups.len());
         Ok(groups)
     }
-    
+
     /// Calculate similarity between two memories
     async fn calculate_similarity(&mut self, memory1: &Memory, memory2: &Memory) -> Result<f32> {
-        let key = if memory1.id < memory2.id {
-            (memory1.id.clone(), memory2.id.clone())
+        let id1 = memory1.id.as_str();
+        let id2 = memory2.id.as_str();
+        let key = if id1 < id2 {
+            (id1.to_string(), id2.to_string())
         } else {
-            (memory2.id.clone(), memory1.id.clone())
+            (id2.to_string(), id1.to_string())
         };
-        
+
         if let Some(&cached_similarity) = self.similarity_cache.get(&key) {
             return Ok(cached_similarity);
         }
-        
+
         // Calculate text similarity
-        let text_similarity = jaccard_similarity(&memory1.content, &memory2.content);
-        
+        let content1 = memory1.content.as_text().unwrap_or("");
+        let content2 = memory2.content.as_text().unwrap_or("");
+        let text_similarity = jaccard_similarity(content1, content2);
+
         // Consider memory type similarity
-        let type_similarity = if memory1.memory_type == memory2.memory_type { 1.0 } else { 0.5 };
-        
+        let type1 = memory1.memory_type().unwrap_or("episodic".to_string());
+        let type2 = memory2.memory_type().unwrap_or("episodic".to_string());
+        let type_similarity = if type1 == type2 { 1.0 } else { 0.5 };
+
         // Consider temporal proximity (memories created close in time are more likely to be related)
-        let time_diff = (memory1.created_at - memory2.created_at).abs() as f32;
+        let time_diff = (memory1.metadata.created_at - memory2.metadata.created_at)
+            .num_seconds()
+            .abs() as f32;
         let max_time_diff = 24.0 * 60.0 * 60.0; // 24 hours in seconds
         let temporal_similarity = (max_time_diff - time_diff.min(max_time_diff)) / max_time_diff;
-        
+
         // Weighted combination
         let similarity = text_similarity * 0.7 + type_similarity * 0.2 + temporal_similarity * 0.1;
-        
+
         self.similarity_cache.insert(key, similarity);
         Ok(similarity)
     }
-    
+
     /// Merge a group of similar memories into one
-    async fn merge_memory_group(&self, memories: &mut Vec<Memory>, group: &[usize]) -> Result<bool> {
+    async fn merge_memory_group(
+        &self,
+        memories: &mut Vec<Memory>,
+        group: &[usize],
+    ) -> Result<bool> {
         if group.len() < 2 {
             return Ok(false);
         }
-        
+
         // Find the memory with highest importance to be the base
-        let base_idx = group.iter()
-            .max_by(|&&a, &&b| memories[a].importance.partial_cmp(&memories[b].importance).unwrap())
+        let base_idx = group
+            .iter()
+            .max_by(|&&a, &&b| {
+                memories[a]
+                    .score()
+                    .unwrap_or(0.5)
+                    .partial_cmp(&memories[b].score().unwrap_or(0.5))
+                    .unwrap()
+            })
             .copied()
             .unwrap();
-        
-        let mut merged_content = memories[base_idx].content.clone();
-        let mut merged_importance = memories[base_idx].importance;
-        let mut merged_access_count = memories[base_idx].access_count;
-        
+
+        let base_content_str = match &memories[base_idx].content {
+            agent_mem_traits::Content::Text(t) => t.clone(),
+            agent_mem_traits::Content::Structured(v) => v.to_string(),
+            _ => String::new(),
+        };
+        let mut merged_content = base_content_str;
+        let mut merged_importance = memories[base_idx].score().unwrap_or(0.5);
+        let mut merged_access_count = self.get_access_count(&memories[base_idx]);
+
         // Merge content and aggregate statistics
         for &idx in group {
             if idx == base_idx {
                 continue;
             }
-            
+
             let memory = &memories[idx];
-            
+            let mem_content_str = match &memory.content {
+                agent_mem_traits::Content::Text(t) => t.as_str(),
+                agent_mem_traits::Content::Structured(v) => &v.to_string(),
+                _ => "",
+            };
+
             // Append unique content
-            if !merged_content.contains(&memory.content) {
+            if !merged_content.contains(mem_content_str) {
                 merged_content.push_str("\n\n");
-                merged_content.push_str(&memory.content);
+                merged_content.push_str(mem_content_str);
             }
-            
+
             // Aggregate importance (weighted average)
-            merged_importance = (merged_importance + memory.importance) / 2.0;
-            
+            merged_importance = (merged_importance + memory.score().unwrap_or(0.5)) / 2.0;
+
             // Sum access counts
-            merged_access_count += memory.access_count;
+            merged_access_count += self.get_access_count(memory);
         }
-        
+
         // Update the base memory
-        memories[base_idx].content = merged_content;
-        memories[base_idx].importance = merged_importance;
-        memories[base_idx].access_count = merged_access_count;
-        memories[base_idx].version += 1;
-        
+        memories[base_idx].content = agent_mem_traits::Content::Text(merged_content);
+        memories[base_idx].set_score(merged_importance);
+        memories[base_idx].metadata.access_count = merged_access_count;
+        memories[base_idx].metadata.updated_at = chrono::Utc::now();
+
         // Mark other memories for removal (set empty content as marker)
         for &idx in group {
             if idx != base_idx {
-                memories[idx].content = String::new(); // Mark for removal
+                memories[idx].content = agent_mem_traits::Content::Text(String::new());
+                // Mark for removal
             }
         }
-        
-        debug!("Merged {} memories into memory {}", group.len(), memories[base_idx].id);
+
+        debug!(
+            "Merged {} memories into memory {}",
+            group.len(),
+            memories[base_idx].id.as_str()
+        );
         Ok(true)
     }
-    
+
     /// Create references between similar memories
-    async fn create_memory_references(&self, memories: &mut Vec<Memory>, group: &[usize]) -> Result<bool> {
+    async fn create_memory_references(
+        &self,
+        memories: &mut Vec<Memory>,
+        group: &[usize],
+    ) -> Result<bool> {
         if group.len() < 2 {
             return Ok(false);
         }
-        
+
         // Find the primary memory (highest importance)
-        let primary_idx = group.iter()
-            .max_by(|&&a, &&b| memories[a].importance.partial_cmp(&memories[b].importance).unwrap())
+        let primary_idx = group
+            .iter()
+            .max_by(|&&a, &&b| {
+                memories[a]
+                    .score()
+                    .unwrap_or(0.5)
+                    .partial_cmp(&memories[b].score().unwrap_or(0.5))
+                    .unwrap()
+            })
             .copied()
             .unwrap();
-        
-        let primary_id = memories[primary_idx].id.clone();
-        
+
+        let primary_id = memories[primary_idx].id.as_str().to_string();
+
         // Add references to other memories
         for &idx in group {
             if idx == primary_idx {
                 continue;
             }
-            
-            memories[idx].metadata.insert(
-                "consolidated_with".to_string(),
-                primary_id.clone(),
+
+            memories[idx].attributes.insert(
+                AttributeKey::system("consolidated_with"),
+                AttributeValue::String(primary_id.clone()),
             );
-            memories[idx].metadata.insert(
-                "consolidation_type".to_string(),
-                "reference".to_string(),
+            memories[idx].attributes.insert(
+                AttributeKey::system("consolidation_type"),
+                AttributeValue::String("reference".to_string()),
             );
         }
-        
+
         // Add reference list to primary memory
-        let reference_ids: Vec<String> = group.iter()
+        let reference_ids: Vec<String> = group
+            .iter()
             .filter(|&&idx| idx != primary_idx)
-            .map(|&idx| memories[idx].id.clone())
+            .map(|&idx| memories[idx].id.as_str().to_string())
             .collect();
-        
-        memories[primary_idx].metadata.insert(
-            "references".to_string(),
-            reference_ids.join(","),
+
+        memories[primary_idx].attributes.insert(
+            AttributeKey::system("references"),
+            AttributeValue::String(reference_ids.join(",")),
         );
-        
+
         debug!("Created references for {} memories", group.len());
         Ok(true)
     }
-    
+
     /// Group similar memories without merging
     async fn group_memories(&self, memories: &mut Vec<Memory>, group: &[usize]) -> Result<bool> {
         if group.len() < 2 {
             return Ok(false);
         }
-        
+
         let group_id = uuid::Uuid::new_v4().to_string();
-        
+
         // Add group metadata to all memories in the group
         for &idx in group {
-            memories[idx].metadata.insert(
-                "memory_group".to_string(),
-                group_id.clone(),
+            memories[idx].attributes.insert(
+                AttributeKey::system("memory_group"),
+                AttributeValue::String(group_id.clone()),
             );
-            memories[idx].metadata.insert(
-                "group_size".to_string(),
-                group.len().to_string(),
+            memories[idx].attributes.insert(
+                AttributeKey::system("group_size"),
+                AttributeValue::Number(group.len() as f64),
             );
         }
-        
-        debug!("Grouped {} memories with group ID {}", group.len(), group_id);
+
+        debug!(
+            "Grouped {} memories with group ID {}",
+            group.len(),
+            group_id
+        );
         Ok(true)
     }
-    
+
     /// Clean up memories marked for removal
     pub fn cleanup_removed_memories(&self, memories: &mut Vec<Memory>) {
-        memories.retain(|memory| !memory.content.is_empty());
+        memories.retain(|memory| match &memory.content {
+            agent_mem_traits::Content::Text(t) => !t.is_empty(),
+            _ => true,
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_core::MemoryType;
-    use chrono::Utc;
-    use std::collections::HashMap;
+    use agent_mem_traits::{
+        AttributeKey, AttributeSet, AttributeValue, Content, MemoryId, MetadataV4 as Metadata,
+        RelationGraph,
+    };
 
     fn create_test_memory(id: &str, content: &str, importance: f32) -> Memory {
-        Memory {
-            id: id.to_string(),
-            agent_id: "test_agent".to_string(),
-            user_id: Some("test_user".to_string()),
-            memory_type: MemoryType::Episodic,
-            content: content.to_string(),
-            importance,
-            embedding: None,
-            created_at: Utc::now().timestamp(),
-            last_accessed_at: Utc::now().timestamp(),
-            access_count: 1,
-            expires_at: None,
-            metadata: HashMap::new(),
-            version: 1,
-        }
+        let now = chrono::Utc::now();
+        let mut memory = Memory {
+            id: MemoryId::from_string(id.to_string()),
+            content: Content::Text(content.to_string()),
+            attributes: AttributeSet::new(),
+            relations: RelationGraph::new(),
+            metadata: Metadata {
+                created_at: now,
+                updated_at: now,
+                accessed_at: now,
+                access_count: 0,
+                version: 1,
+                hash: Some("test_hash".to_string()),
+            },
+        };
+        memory.set_agent_id("test_agent");
+        memory.set_user_id("test_user");
+        memory.set_importance(importance as f64);
+        memory.set_score(importance as f64);
+        memory
     }
 
     #[tokio::test]
@@ -338,59 +406,71 @@ mod tests {
         let consolidator = MemoryConsolidator::new(0.8);
         assert_eq!(consolidator.threshold, 0.8);
     }
-    
+
     #[tokio::test]
     async fn test_similarity_calculation() {
         let mut consolidator = MemoryConsolidator::new(0.8);
-        
+
         let memory1 = create_test_memory("1", "I love programming", 0.8);
         let memory2 = create_test_memory("2", "Programming is great", 0.7);
         let memory3 = create_test_memory("3", "The weather is nice", 0.6);
-        
-        let sim1_2 = consolidator.calculate_similarity(&memory1, &memory2).await.unwrap();
-        let sim1_3 = consolidator.calculate_similarity(&memory1, &memory3).await.unwrap();
-        
+
+        let sim1_2 = consolidator
+            .calculate_similarity(&memory1, &memory2)
+            .await
+            .unwrap();
+        let sim1_3 = consolidator
+            .calculate_similarity(&memory1, &memory3)
+            .await
+            .unwrap();
+
         // Programming-related memories should be more similar, but jaccard similarity might not always reflect this
         // Just check that similarities are valid values
         assert!(sim1_2 >= 0.0 && sim1_2 <= 1.0);
         assert!(sim1_3 >= 0.0 && sim1_3 <= 1.0);
     }
-    
+
     #[tokio::test]
     async fn test_consolidation_groups() {
         let mut consolidator = MemoryConsolidator::new(0.5);
-        
+
         let memories = vec![
             create_test_memory("1", "I love programming", 0.8),
             create_test_memory("2", "Programming is great", 0.7),
             create_test_memory("3", "The weather is nice", 0.6),
             create_test_memory("4", "Nice weather today", 0.5),
         ];
-        
-        let groups = consolidator.find_consolidation_groups(&memories).await.unwrap();
+
+        let groups = consolidator
+            .find_consolidation_groups(&memories)
+            .await
+            .unwrap();
         // Groups might be empty if no memories are similar enough
         assert!(groups.len() >= 0);
     }
-    
+
     #[tokio::test]
     async fn test_memory_consolidation() {
         let mut consolidator = MemoryConsolidator::new(0.5);
-        
+
         let mut memories = vec![
             create_test_memory("1", "I love programming", 0.8),
             create_test_memory("2", "Programming is great", 0.7),
             create_test_memory("3", "The weather is nice", 0.6),
         ];
-        
+
         let original_count = memories.len();
-        let consolidated = consolidator.consolidate_memories(&mut memories).await.unwrap();
-        
+        let consolidated = consolidator
+            .consolidate_memories(&mut memories)
+            .await
+            .unwrap();
+
         // Should have found some consolidations (or none, which is also valid)
         assert!(consolidated == 0 || consolidated > 0);
-        
+
         // Clean up removed memories
         consolidator.cleanup_removed_memories(&mut memories);
-        
+
         // Should have fewer or equal memories after consolidation
         assert!(memories.len() <= original_count);
     }

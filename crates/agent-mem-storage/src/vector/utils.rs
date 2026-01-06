@@ -1,6 +1,6 @@
 //! 向量操作工具函数
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 
 /// 向量操作工具集
 pub struct VectorUtils;
@@ -10,13 +10,15 @@ impl VectorUtils {
     pub fn normalize_l2(vector: &mut [f32]) -> Result<()> {
         let norm = Self::l2_norm(vector);
         if norm == 0.0 {
-            return Err(AgentMemError::validation_error("Cannot normalize zero vector"));
+            return Err(AgentMemError::validation_error(
+                "Cannot normalize zero vector",
+            ));
         }
-        
+
         for value in vector.iter_mut() {
             *value /= norm;
         }
-        
+
         Ok(())
     }
 
@@ -33,18 +35,22 @@ impl VectorUtils {
     /// 向量加法
     pub fn add_vectors(a: &[f32], b: &[f32]) -> Result<Vec<f32>> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
-        
+
         Ok(a.iter().zip(b.iter()).map(|(x, y)| x + y).collect())
     }
 
     /// 向量减法
     pub fn subtract_vectors(a: &[f32], b: &[f32]) -> Result<Vec<f32>> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
-        
+
         Ok(a.iter().zip(b.iter()).map(|(x, y)| x - y).collect())
     }
 
@@ -56,37 +62,43 @@ impl VectorUtils {
     /// 向量点积
     pub fn dot_product(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
-        
+
         Ok(a.iter().zip(b.iter()).map(|(x, y)| x * y).sum())
     }
 
     /// 向量平均值
     pub fn average_vectors(vectors: &[Vec<f32>]) -> Result<Vec<f32>> {
         if vectors.is_empty() {
-            return Err(AgentMemError::validation_error("Cannot average empty vector list"));
+            return Err(AgentMemError::validation_error(
+                "Cannot average empty vector list",
+            ));
         }
-        
+
         let dimension = vectors[0].len();
         for vector in vectors {
             if vector.len() != dimension {
-                return Err(AgentMemError::validation_error("All vectors must have the same dimension"));
+                return Err(AgentMemError::validation_error(
+                    "All vectors must have the same dimension",
+                ));
             }
         }
-        
+
         let mut result = vec![0.0; dimension];
         for vector in vectors {
             for (i, value) in vector.iter().enumerate() {
                 result[i] += value;
             }
         }
-        
+
         let count = vectors.len() as f32;
         for value in result.iter_mut() {
             *value /= count;
         }
-        
+
         Ok(result)
     }
 
@@ -143,9 +155,8 @@ impl VectorUtils {
         }
 
         let mean = sum / vector.len() as f32;
-        let variance = vector.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f32>() / vector.len() as f32;
+        let variance =
+            vector.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / vector.len() as f32;
 
         VectorStats {
             dimension: vector.len(),
@@ -196,11 +207,11 @@ mod tests {
     fn test_normalize_l2() {
         let mut vector = vec![3.0, 4.0];
         VectorUtils::normalize_l2(&mut vector).unwrap();
-        
+
         // 3-4-5三角形，标准化后应该是[0.6, 0.8]
         assert!((vector[0] - 0.6).abs() < 1e-6);
         assert!((vector[1] - 0.8).abs() < 1e-6);
-        
+
         // 验证L2范数为1
         let norm = VectorUtils::l2_norm(&vector);
         assert!((norm - 1.0).abs() < 1e-6);
@@ -253,11 +264,7 @@ mod tests {
 
     #[test]
     fn test_average_vectors() {
-        let vectors = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-            vec![5.0, 6.0],
-        ];
+        let vectors = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
         let result = VectorUtils::average_vectors(&vectors).unwrap();
         assert_eq!(result, vec![3.0, 4.0]);
     }
@@ -266,7 +273,7 @@ mod tests {
     fn test_is_zero_vector() {
         let zero_vector = vec![0.0, 0.0, 0.0];
         assert!(VectorUtils::is_zero_vector(&zero_vector, 1e-6));
-        
+
         let non_zero_vector = vec![0.0, 0.0, 0.1];
         assert!(!VectorUtils::is_zero_vector(&non_zero_vector, 1e-6));
     }
@@ -282,7 +289,7 @@ mod tests {
     fn test_vector_stats() {
         let vector = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let stats = VectorUtils::vector_stats(&vector);
-        
+
         assert_eq!(stats.dimension, 5);
         assert_eq!(stats.min, 1.0);
         assert_eq!(stats.max, 5.0);
@@ -294,7 +301,7 @@ mod tests {
     fn test_dimension_mismatch_errors() {
         let a = vec![1.0, 2.0];
         let b = vec![1.0, 2.0, 3.0];
-        
+
         assert!(VectorUtils::add_vectors(&a, &b).is_err());
         assert!(VectorUtils::subtract_vectors(&a, &b).is_err());
         assert!(VectorUtils::dot_product(&a, &b).is_err());

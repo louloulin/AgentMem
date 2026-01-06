@@ -1,0 +1,17 @@
+[package]
+name = "advanced-search-demo"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-compat = { path = "../../crates/agent-mem-compat" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde_json = "1.0"
+anyhow = "1.0"
+uuid = "1.0"
+
+[[bin]]
+name = "advanced-search-demo"
+path = "src/main.rs"

@@ -1,0 +1,34 @@
+# AgentMem 仓颉 SDK - v2.0.0 HTTP配置
+# 注：这是HTTP方案的参考配置，基于httpclient4cj实现
+
+[package]
+name = "agentmem"
+version = "2.0.0"
+cjc-version = "0.60.5"
+description = "AgentMem 仓颉 SDK - 基于HTTP REST API的企业级智能记忆管理平台"
+authors = ["AgentMem Team <team@agentmem.dev>"]
+license = "MIT"
+output-type = "static"  # 纯仓颉库，无需C编译
+src-dir = "src/http_new"
+main-file = "src/http_new/tests.cj"  # 测试入口
+compile-option = "-O2"
+
+[dependencies]
+# HTTP客户端（当前为模拟实现，实际需集成httpclient4cj）
+# httpclient4cj = ">=1.0.8"
+
+# 移除了所有FFI和native依赖！
+# [native-dependencies] - 不再需要
+# [link-option] - 不再需要
+
+[profile]
+build = {incremental = true, lto = "thin"}
+test = {}
+
+# 说明:
+# 1. 移除了所有native-dependencies和link-option
+# 2. 输出类型改为static（纯仓颉库）
+# 3. src-dir指向新的http_new实现
+# 4. 简化配置，无需C编译
+# 5. 待集成httpclient4cj后取消注释dependencies
+

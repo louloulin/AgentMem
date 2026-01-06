@@ -1,0 +1,293 @@
+# AgentMem Helm Chart 默认配置
+# 企业级 Kubernetes 部署配置
+
+# ================================
+# 全局配置
+# ================================
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# ================================
+# AgentMem 应用配置
+# ================================
+image:
+  registry: docker.io
+  repository: agentmem/server
+  tag: "6.0.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# 副本数配置
+replicaCount: 3
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Ingress 配置
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: agentmem.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: agentmem-tls
+      hosts:
+        - agentmem.example.com
+
+# 资源限制
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+# 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod 配置
+podAnnotations: {}
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# 节点选择器
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - agentmem
+        topologyKey: kubernetes.io/hostname
+
+# 健康检查
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# 环境变量
+env:
+  - name: RUST_LOG
+    value: "info"
+  - name: AGENTMEM_HOST
+    value: "0.0.0.0"
+  - name: AGENTMEM_PORT
+    value: "8080"
+
+# 配置映射
+configMap:
+  create: true
+  data:
+    config.toml: |
+      [server]
+      host = "0.0.0.0"
+      port = 8080
+      workers = 4
+      
+      [database]
+      max_connections = 100
+      connection_timeout = 30
+      
+      [cache]
+      ttl = 3600
+      max_size = 1000000
+      
+      [monitoring]
+      metrics_enabled = true
+      tracing_enabled = true
+
+# 密钥管理
+secrets:
+  create: true
+  data: {}
+
+# 持久化存储
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+# ================================
+# 依赖服务配置
+# ================================
+
+# PostgreSQL 配置
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "agentmem-postgres-password"
+    username: "agentmem"
+    password: "agentmem-password"
+    database: "agentmem"
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis 配置
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "agentmem-redis-password"
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# Elasticsearch 配置
+elasticsearch:
+  enabled: true
+  replicas: 3
+  minimumMasterNodes: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  volumeClaimTemplate:
+    accessModes: ["ReadWriteOnce"]
+    resources:
+      requests:
+        storage: 30Gi
+
+# ================================
+# 监控配置
+# ================================
+monitoring:
+  # Prometheus 配置
+  prometheus:
+    enabled: true
+    server:
+      persistentVolume:
+        enabled: true
+        size: 20Gi
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+  
+  # Grafana 配置
+  grafana:
+    enabled: true
+    adminPassword: "agentmem-grafana-password"
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# ServiceMonitor 配置（Prometheus Operator）
+serviceMonitor:
+  enabled: true
+  namespace: ""
+  labels: {}
+  interval: 30s
+  scrapeTimeout: 10s
+
+# ================================
+# 网络策略
+# ================================
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8080
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: TCP
+        port: 53
+      - protocol: UDP
+        port: 53
+
+# ================================
+# Pod 中断预算
+# ================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

@@ -1,7 +1,7 @@
 //! OpenAI嵌入提供商实现
 
 use crate::config::EmbeddingConfig;
-use agent_mem_traits::{Embedder, Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Embedder, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -51,16 +51,22 @@ pub struct OpenAIEmbedder {
 impl OpenAIEmbedder {
     /// 创建新的OpenAI嵌入器实例
     pub async fn new(config: EmbeddingConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("OpenAI API key is required"))?;
 
-        let base_url = config.base_url.clone()
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
 
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
             .build()
-            .map_err(|e| AgentMemError::network_error(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         Ok(Self {
             config,
@@ -84,10 +90,11 @@ impl OpenAIEmbedder {
         };
 
         let url = format!("{}/embeddings", self.base_url);
-        
+
         let mut retries = 0;
         loop {
-            let response = self.client
+            let response = self
+                .client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .header("Content-Type", "application/json")
@@ -98,17 +105,22 @@ impl OpenAIEmbedder {
             match response {
                 Ok(resp) => {
                     if resp.status().is_success() {
-                        let embedding_response: OpenAIEmbeddingResponse = resp.json().await
-                            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+                        let embedding_response: OpenAIEmbeddingResponse =
+                            resp.json().await.map_err(|e| {
+                                AgentMemError::parsing_error(format!(
+                                    "Failed to parse response: {e}"
+                                ))
+                            })?;
 
                         // 按索引排序并提取嵌入向量
-                        let mut embeddings: Vec<(usize, Vec<f32>)> = embedding_response.data
+                        let mut embeddings: Vec<(usize, Vec<f32>)> = embedding_response
+                            .data
                             .into_iter()
                             .map(|data| (data.index, data.embedding))
                             .collect();
-                        
+
                         embeddings.sort_by_key(|(index, _)| *index);
-                        
+
                         let result: Vec<Vec<f32>> = embeddings
                             .into_iter()
                             .map(|(_, embedding)| embedding)
@@ -117,18 +129,22 @@ impl OpenAIEmbedder {
                         return Ok(result);
                     } else {
                         let status = resp.status();
-                        let error_text = resp.text().await
+                        let error_text = resp
+                            .text()
+                            .await
                             .unwrap_or_else(|_| "Unknown error".to_string());
-                        
-                        if retries < self.config.max_retries && (status.is_server_error() || status == 429) {
+
+                        if retries < self.config.max_retries
+                            && (status.is_server_error() || status == 429)
+                        {
                             retries += 1;
                             let delay = Duration::from_millis(1000 * (1 << retries)); // 指数退避
                             tokio::time::sleep(delay).await;
                             continue;
                         }
-                        
+
                         return Err(AgentMemError::llm_error(format!(
-                            "OpenAI API error {}: {}", status, error_text
+                            "OpenAI API error {status}: {error_text}"
                         )));
                     }
                 }
@@ -139,8 +155,8 @@ impl OpenAIEmbedder {
                         tokio::time::sleep(delay).await;
                         continue;
                     }
-                    
-                    return Err(AgentMemError::network_error(format!("Request failed: {}", e)));
+
+                    return Err(AgentMemError::network_error(format!("Request failed: {e}")));
                 }
             }
         }
@@ -148,7 +164,8 @@ impl OpenAIEmbedder {
 
     /// 将文本分批处理
     fn split_into_batches(&self, texts: &[String]) -> Vec<Vec<String>> {
-        texts.chunks(self.config.batch_size)
+        texts
+            .chunks(self.config.batch_size)
             .map(|chunk| chunk.to_vec())
             .collect()
     }
@@ -158,7 +175,9 @@ impl OpenAIEmbedder {
 impl Embedder for OpenAIEmbedder {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         let results = self.embed_batch(&[text.to_string()]).await?;
-        results.into_iter().next()
+        results
+            .into_iter()
+            .next()
             .ok_or_else(|| AgentMemError::llm_error("No embedding returned"))
     }
 
@@ -226,7 +245,7 @@ mod tests {
 
         let result = OpenAIEmbedder::new(config).await;
         assert!(result.is_ok());
-        
+
         let embedder = result.unwrap();
         assert_eq!(embedder.provider_name(), "openai");
         assert_eq!(embedder.model_name(), "text-embedding-ada-002");

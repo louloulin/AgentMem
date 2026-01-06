@@ -32,6 +32,12 @@ pub struct ServerConfig {
     pub multi_tenant: bool,
     /// Rate limiting
     pub rate_limit_requests_per_minute: u32,
+    /// Database URL
+    pub database_url: String,
+    /// Embedder provider (e.g., "fastembed", "openai")
+    pub embedder_provider: Option<String>,
+    /// Embedder model name
+    pub embedder_model: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -41,8 +47,7 @@ impl Default for ServerConfig {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .unwrap_or(8080),
-            host: env::var("AGENT_MEM_HOST")
-                .unwrap_or_else(|_| "0.0.0.0".to_string()),
+            host: env::var("AGENT_MEM_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             enable_cors: env::var("AGENT_MEM_ENABLE_CORS")
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
@@ -73,8 +78,7 @@ impl Default for ServerConfig {
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
                 .unwrap_or(true),
-            log_level: env::var("AGENT_MEM_LOG_LEVEL")
-                .unwrap_or_else(|_| "info".to_string()),
+            log_level: env::var("AGENT_MEM_LOG_LEVEL").unwrap_or_else(|_| "info".to_string()),
             multi_tenant: env::var("AGENT_MEM_MULTI_TENANT")
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
@@ -83,6 +87,12 @@ impl Default for ServerConfig {
                 .unwrap_or_else(|_| "100".to_string())
                 .parse()
                 .unwrap_or(100),
+            database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                // Default to LibSQL local file database (auto-detected by server.rs logic)
+                "file:./data/agentmem.db".to_string()
+            }),
+            embedder_provider: env::var("EMBEDDER_PROVIDER").ok(),
+            embedder_model: env::var("EMBEDDER_MODEL").ok(),
         }
     }
 }
@@ -92,25 +102,100 @@ impl ServerConfig {
     pub fn from_env() -> Self {
         Self::default()
     }
-    
+
+    /// Load configuration from TOML file
+    ///
+    /// Phase 10 (MVP P0-1): 配置文件加载系统
+    pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read config file: {}", e))?;
+
+        toml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))
+    }
+
+    /// Load configuration with precedence: File < Env < CLI
+    ///
+    /// 1. Load from file (if specified)
+    /// 2. Override with environment variables
+    /// 3. Override with CLI arguments (done in main.rs)
+    pub fn load(config_file: Option<impl AsRef<std::path::Path>>) -> Result<Self, String> {
+        let mut config = if let Some(path) = config_file {
+            // Load from file
+            Self::from_file(path)?
+        } else {
+            // Use default with env vars
+            Self::default()
+        };
+
+        // Override with environment variables (explicit, higher priority than file)
+        config = config.override_from_env();
+
+        Ok(config)
+    }
+
+    /// Override configuration from environment variables
+    ///
+    /// This is called after loading from file to allow env vars to override file values
+    fn override_from_env(mut self) -> Self {
+        if let Ok(port) = env::var("AGENT_MEM_PORT") {
+            if let Ok(p) = port.parse() {
+                self.port = p;
+            }
+        }
+        if let Ok(host) = env::var("AGENT_MEM_HOST") {
+            self.host = host;
+        }
+        if let Ok(cors) = env::var("AGENT_MEM_ENABLE_CORS") {
+            if let Ok(c) = cors.parse() {
+                self.enable_cors = c;
+            }
+        }
+        if let Ok(auth) = env::var("AGENT_MEM_ENABLE_AUTH") {
+            if let Ok(a) = auth.parse() {
+                self.enable_auth = a;
+            }
+        }
+        if let Ok(secret) = env::var("AGENT_MEM_JWT_SECRET") {
+            self.jwt_secret = secret;
+        }
+        if let Ok(level) = env::var("AGENT_MEM_LOG_LEVEL") {
+            self.log_level = level;
+        }
+        if let Ok(db_url) = env::var("DATABASE_URL") {
+            self.database_url = db_url;
+        }
+        if let Ok(provider) = env::var("EMBEDDER_PROVIDER") {
+            self.embedder_provider = Some(provider);
+        }
+        if let Ok(model) = env::var("EMBEDDER_MODEL") {
+            self.embedder_model = Some(model);
+        }
+
+        self
+    }
+
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.port == 0 {
             return Err("Port cannot be 0".to_string());
         }
-        
+
         if self.jwt_secret.len() < 32 {
             return Err("JWT secret must be at least 32 characters".to_string());
         }
-        
+
         if self.request_timeout == 0 {
             return Err("Request timeout must be greater than 0".to_string());
         }
-        
+
         if self.max_body_size == 0 {
             return Err("Max body size must be greater than 0".to_string());
         }
-        
+
+        if self.database_url.is_empty() {
+            return Err("Database URL cannot be empty".to_string());
+        }
+
         Ok(())
     }
 }
@@ -126,12 +211,12 @@ mod tests {
         assert_eq!(config.host, "0.0.0.0");
         assert!(config.enable_cors);
     }
-    
+
     #[test]
     fn test_config_validation() {
         let mut config = ServerConfig::default();
         assert!(config.validate().is_ok());
-        
+
         config.port = 0;
         assert!(config.validate().is_err());
     }

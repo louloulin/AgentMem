@@ -1,7 +1,7 @@
 //! 提示词管理器
 
 use crate::prompts::templates::PromptTemplates;
-use agent_mem_traits::{Result, AgentMemError, Message, MessageRole};
+use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use std::collections::HashMap;
 
 /// 提示词管理器
@@ -27,8 +27,12 @@ impl PromptManager {
         let mut variables = HashMap::new();
         variables.insert("conversation".to_string(), conversation.to_string());
 
-        let prompt = self.templates.render_template("memory_extraction", &variables)
-            .ok_or_else(|| AgentMemError::llm_error("Failed to render memory extraction template"))?;
+        let prompt = self
+            .templates
+            .render_template("memory_extraction", &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error("Failed to render memory extraction template")
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -42,8 +46,12 @@ impl PromptManager {
         let mut variables = HashMap::new();
         variables.insert("memories".to_string(), memories.to_string());
 
-        let prompt = self.templates.render_template("memory_summarization", &variables)
-            .ok_or_else(|| AgentMemError::llm_error("Failed to render memory summarization template"))?;
+        let prompt = self
+            .templates
+            .render_template("memory_summarization", &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error("Failed to render memory summarization template")
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -53,13 +61,21 @@ impl PromptManager {
     }
 
     /// 构建记忆冲突检测提示词
-    pub fn build_memory_conflict_detection_prompt(&self, memory_a: &str, memory_b: &str) -> Result<Vec<Message>> {
+    pub fn build_memory_conflict_detection_prompt(
+        &self,
+        memory_a: &str,
+        memory_b: &str,
+    ) -> Result<Vec<Message>> {
         let mut variables = HashMap::new();
         variables.insert("memory_a".to_string(), memory_a.to_string());
         variables.insert("memory_b".to_string(), memory_b.to_string());
 
-        let prompt = self.templates.render_template("memory_conflict_detection", &variables)
-            .ok_or_else(|| AgentMemError::llm_error("Failed to render memory conflict detection template"))?;
+        let prompt = self
+            .templates
+            .render_template("memory_conflict_detection", &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error("Failed to render memory conflict detection template")
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -69,13 +85,21 @@ impl PromptManager {
     }
 
     /// 构建记忆重要性评分提示词
-    pub fn build_memory_importance_scoring_prompt(&self, memory_content: &str, user_context: &str) -> Result<Vec<Message>> {
+    pub fn build_memory_importance_scoring_prompt(
+        &self,
+        memory_content: &str,
+        user_context: &str,
+    ) -> Result<Vec<Message>> {
         let mut variables = HashMap::new();
         variables.insert("memory_content".to_string(), memory_content.to_string());
         variables.insert("user_context".to_string(), user_context.to_string());
 
-        let prompt = self.templates.render_template("memory_importance_scoring", &variables)
-            .ok_or_else(|| AgentMemError::llm_error("Failed to render memory importance scoring template"))?;
+        let prompt = self
+            .templates
+            .render_template("memory_importance_scoring", &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error("Failed to render memory importance scoring template")
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -89,8 +113,12 @@ impl PromptManager {
         let mut variables = HashMap::new();
         variables.insert("user_query".to_string(), user_query.to_string());
 
-        let prompt = self.templates.render_template("memory_query_enhancement", &variables)
-            .ok_or_else(|| AgentMemError::llm_error("Failed to render memory query enhancement template"))?;
+        let prompt = self
+            .templates
+            .render_template("memory_query_enhancement", &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error("Failed to render memory query enhancement template")
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -100,9 +128,17 @@ impl PromptManager {
     }
 
     /// 构建自定义提示词
-    pub fn build_custom_prompt(&self, template_name: &str, variables: HashMap<String, String>) -> Result<Vec<Message>> {
-        let prompt = self.templates.render_template(template_name, &variables)
-            .ok_or_else(|| AgentMemError::llm_error(&format!("Failed to render template: {}", template_name)))?;
+    pub fn build_custom_prompt(
+        &self,
+        template_name: &str,
+        variables: HashMap<String, String>,
+    ) -> Result<Vec<Message>> {
+        let prompt = self
+            .templates
+            .render_template(template_name, &variables)
+            .ok_or_else(|| {
+                AgentMemError::llm_error(format!("Failed to render template: {template_name}"))
+            })?;
 
         Ok(vec![Message {
             role: MessageRole::User,
@@ -129,7 +165,14 @@ impl PromptManager {
 
     /// 构建对话式提示词
     pub fn build_conversation_prompt(&self, messages: Vec<(MessageRole, String)>) -> Vec<Message> {
-        messages.into_iter().map(|(role, content)| Message { role, content, timestamp: None }).collect()
+        messages
+            .into_iter()
+            .map(|(role, content)| Message {
+                role,
+                content,
+                timestamp: None,
+            })
+            .collect()
     }
 
     /// 添加自定义模板
@@ -143,9 +186,14 @@ impl PromptManager {
     }
 
     /// 验证模板变量
-    pub fn validate_template_variables(&self, template_name: &str, variables: &HashMap<String, String>) -> Result<()> {
-        let template = self.templates.get_template(template_name)
-            .ok_or_else(|| AgentMemError::llm_error(&format!("Template not found: {}", template_name)))?;
+    pub fn validate_template_variables(
+        &self,
+        template_name: &str,
+        variables: &HashMap<String, String>,
+    ) -> Result<()> {
+        let template = self.templates.get_template(template_name).ok_or_else(|| {
+            AgentMemError::llm_error(format!("Template not found: {template_name}"))
+        })?;
 
         // 简单的变量验证：检查模板中的占位符是否都有对应的变量
         let mut missing_variables = Vec::new();
@@ -172,7 +220,7 @@ impl PromptManager {
                     // 检查是否是json块
                     let mut next_chars = String::new();
                     for _ in 0..4 {
-                        if let Some(&next_ch) = chars.peek() {
+                        if let Some(&_next_ch) = chars.peek() {
                             next_chars.push(chars.next().unwrap());
                         }
                     }
@@ -218,10 +266,8 @@ impl PromptManager {
         }
 
         if !missing_variables.is_empty() {
-            return Err(AgentMemError::llm_error(&format!(
-                "Missing variables for template {}: {:?}",
-                template_name,
-                missing_variables
+            return Err(AgentMemError::llm_error(format!(
+                "Missing variables for template {template_name}: {missing_variables:?}"
             )));
         }
 
@@ -249,7 +295,7 @@ mod tests {
     fn test_build_memory_extraction_prompt() {
         let manager = PromptManager::new();
         let result = manager.build_memory_extraction_prompt("Hello, I love tennis!");
-        
+
         assert!(result.is_ok());
         let messages = result.unwrap();
         assert_eq!(messages.len(), 1);
@@ -259,11 +305,9 @@ mod tests {
     #[test]
     fn test_build_system_prompt() {
         let manager = PromptManager::new();
-        let messages = manager.build_system_prompt(
-            "You are a helpful assistant",
-            "Hello, how are you?"
-        );
-        
+        let messages =
+            manager.build_system_prompt("You are a helpful assistant", "Hello, how are you?");
+
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].role, MessageRole::System);
         assert_eq!(messages[1].role, MessageRole::User);
@@ -277,7 +321,7 @@ mod tests {
             (MessageRole::User, "Hello".to_string()),
             (MessageRole::Assistant, "Hi there!".to_string()),
         ];
-        
+
         let messages = manager.build_conversation_prompt(conversation);
         assert_eq!(messages.len(), 3);
     }
@@ -290,7 +334,7 @@ mod tests {
 
         let result = manager.validate_template_variables("memory_extraction", &variables);
         if let Err(ref e) = result {
-            println!("Validation error: {}", e);
+            println!("Validation error: {e}");
         }
         assert!(result.is_ok());
 
@@ -304,10 +348,10 @@ mod tests {
     fn test_add_custom_template() {
         let mut manager = PromptManager::new();
         manager.add_template("test".to_string(), "Hello {name}!".to_string());
-        
+
         let mut variables = HashMap::new();
         variables.insert("name".to_string(), "World".to_string());
-        
+
         let result = manager.build_custom_prompt("test", variables);
         assert!(result.is_ok());
         assert!(result.unwrap()[0].content.contains("Hello World!"));

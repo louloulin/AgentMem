@@ -1,0 +1,276 @@
+# AgentMem Helm Chart 预发布环境配置
+# 用于生产前的最终测试和验证
+
+# ================================
+# 全局配置
+# ================================
+global:
+  imageRegistry: "registry.example.com"
+  imagePullSecrets:
+    - name: registry-credentials
+  storageClass: "standard-ssd"
+
+# ================================
+# AgentMem 应用配置
+# ================================
+image:
+  registry: registry.example.com
+  repository: agentmem/server
+  tag: "6.0.0-rc"
+  pullPolicy: Always  # 预发布环境总是拉取最新镜像
+  pullSecrets:
+    - name: registry-credentials
+
+# 副本数配置（预发布环境中等规模）
+replicaCount: 3
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+  labels:
+    environment: staging
+  headless:
+    enabled: true
+    publishNotReadyAddresses: false
+
+# Ingress 配置（预发布环境）
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+  hosts:
+    - host: staging.agentmem.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: agentmem-tls-staging
+      hosts:
+        - staging.agentmem.com
+
+# 资源限制（预发布环境）
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+# 自动扩缩容（预发布环境）
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod 配置
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# 节点选择器（预发布环境节点）
+nodeSelector:
+  workload: staging
+
+# 容忍度
+tolerations:
+  - key: "staging"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# 亲和性（软反亲和）
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - agentmem
+        topologyKey: kubernetes.io/hostname
+
+# 健康检查
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: 8080
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 30
+
+# Pod 中断预算（预发布环境）
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# 应用配置
+config:
+  logLevel: "debug"  # 预发布环境使用 debug 级别
+  rustLog: "agentmem=debug,tower_http=debug"
+  
+  # 数据库配置
+  database:
+    poolSize: 10
+    maxConnections: 100
+    connectionTimeout: 30
+  
+  # Redis 配置
+  redis:
+    poolSize: 10
+    maxConnections: 50
+    connectionTimeout: 5
+  
+  # 向量搜索配置
+  vector:
+    dimension: 384
+    similarityThreshold: 0.7
+  
+  # 记忆配置
+  memory:
+    maxSize: 50000
+    ttlSeconds: 259200  # 3 天
+    cleanupInterval: 3600
+  
+  # 性能配置
+  performance:
+    workerThreads: 4
+    maxBlockingThreads: 256
+    threadStackSize: 2097152
+  
+  # 安全配置
+  security:
+    cors:
+      enabled: true
+      allowedOrigins: "https://staging-app.agentmem.com,http://localhost:3000"
+      allowedMethods: "GET,POST,PUT,DELETE,OPTIONS"
+      allowedHeaders: "Content-Type,Authorization"
+  
+  # 速率限制配置
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 500
+    burstSize: 1000
+
+# 监控配置
+metrics:
+  enabled: true
+  port: 9090
+  path: /metrics
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      prometheus: kube-prometheus
+
+# 追踪配置
+tracing:
+  enabled: true
+  endpoint: "http://jaeger-collector:14268/api/traces"
+  serviceName: "agentmem-staging"
+
+# 特性开关（预发布环境可以测试新特性）
+features:
+  entityExtraction: true
+  relationExtraction: true
+  vectorSearch: true
+  graphMemory: true
+
+# PostgreSQL 配置（使用内部 PostgreSQL）
+postgresql:
+  enabled: true
+  auth:
+    username: agentmem
+    password: ""  # 从 Secret 读取
+    database: agentmem
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: standard-ssd
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis 配置（使用内部 Redis）
+redis:
+  enabled: true
+  auth:
+    password: ""  # 从 Secret 读取
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard-ssd
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# Elasticsearch 配置（禁用）
+elasticsearch:
+  enabled: false
+
+# TLS 配置
+tls:
+  enabled: true
+  cert: ""  # 从 Secret 读取
+  key: ""   # 从 Secret 读取
+

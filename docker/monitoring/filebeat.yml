@@ -1,0 +1,279 @@
+# AgentMem Filebeat 日志收集配置
+# 企业级日志聚合和处理配置
+
+# ================================
+# 全局配置
+# ================================
+name: agentmem-filebeat
+tags: ["agentmem", "production"]
+
+# ================================
+# 输入配置
+# ================================
+filebeat.inputs:
+  # AgentMem 应用日志
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/agentmem/*.log
+      - /var/log/agentmem/**/*.log
+    fields:
+      service: agentmem
+      environment: production
+      log_type: application
+    fields_under_root: true
+    multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+    multiline.negate: true
+    multiline.match: after
+    json.keys_under_root: true
+    json.add_error_key: true
+    processors:
+      - add_host_metadata:
+          when.not.contains.tags: forwarded
+      - add_docker_metadata: ~
+      - add_kubernetes_metadata: ~
+
+  # Docker 容器日志
+  - type: container
+    enabled: true
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+
+  # 系统日志
+  - type: syslog
+    enabled: true
+    protocol.udp:
+      host: "0.0.0.0:514"
+    fields:
+      service: system
+      log_type: syslog
+    fields_under_root: true
+
+  # Nginx 访问日志
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+    fields:
+      service: nginx
+      log_type: access
+    fields_under_root: true
+    processors:
+      - dissect:
+          tokenizer: '%{client_ip} - %{user} [%{timestamp}] "%{method} %{url} %{http_version}" %{response_code} %{response_size} "%{referrer}" "%{user_agent}"'
+          field: "message"
+          target_prefix: "nginx"
+
+  # Nginx 错误日志
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/error.log
+    fields:
+      service: nginx
+      log_type: error
+    fields_under_root: true
+    multiline.pattern: '^\d{4}/\d{2}/\d{2}'
+    multiline.negate: true
+    multiline.match: after
+
+# ================================
+# 模块配置
+# ================================
+filebeat.modules:
+  # PostgreSQL 模块
+  - module: postgresql
+    log:
+      enabled: true
+      var.paths: ["/var/log/postgresql/*.log"]
+    slowlog:
+      enabled: true
+      var.paths: ["/var/log/postgresql/postgresql-*-slow.log"]
+
+  # Redis 模块
+  - module: redis
+    log:
+      enabled: true
+      var.paths: ["/var/log/redis/*.log"]
+    slowlog:
+      enabled: true
+
+  # Elasticsearch 模块
+  - module: elasticsearch
+    server:
+      enabled: true
+      var.paths: ["/var/log/elasticsearch/*.log"]
+    gc:
+      enabled: true
+      var.paths: ["/var/log/elasticsearch/gc.log"]
+    audit:
+      enabled: true
+      var.paths: ["/var/log/elasticsearch/*_audit.log"]
+    slowlog:
+      enabled: true
+      var.paths: ["/var/log/elasticsearch/*_index_search_slowlog.log"]
+    deprecation:
+      enabled: true
+      var.paths: ["/var/log/elasticsearch/*_deprecation.log"]
+
+# ================================
+# 处理器配置
+# ================================
+processors:
+  # 添加主机元数据
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+
+  # 添加 Docker 元数据
+  - add_docker_metadata: ~
+
+  # 添加 Kubernetes 元数据
+  - add_kubernetes_metadata:
+      host: ${NODE_NAME}
+      matchers:
+        - logs_path:
+            logs_path: "/var/log/containers/"
+
+  # 丢弃空事件
+  - drop_event:
+      when:
+        equals:
+          message: ""
+
+  # 时间戳处理
+  - timestamp:
+      field: "@timestamp"
+      layouts:
+        - '2006-01-02T15:04:05.000Z'
+        - '2006-01-02 15:04:05'
+      test:
+        - '2023-12-01T10:30:45.123Z'
+        - '2023-12-01 10:30:45'
+
+  # 字段重命名
+  - rename:
+      fields:
+        - from: "agent.hostname"
+          to: "host.name"
+        - from: "agent.name"
+          to: "agent.name"
+
+  # 添加标签
+  - add_tags:
+      tags: [agentmem, production]
+      when:
+        contains:
+          service: agentmem
+
+# ================================
+# 输出配置
+# ================================
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  protocol: "http"
+  username: "elastic"
+  password: "${ELASTICSEARCH_PASSWORD}"
+  index: "agentmem-logs-%{+yyyy.MM.dd}"
+  template.name: "agentmem-logs"
+  template.pattern: "agentmem-logs-*"
+  template.settings:
+    index.number_of_shards: 1
+    index.number_of_replicas: 1
+    index.refresh_interval: "5s"
+  template.mappings:
+    properties:
+      "@timestamp":
+        type: date
+      service:
+        type: keyword
+      environment:
+        type: keyword
+      log_type:
+        type: keyword
+      level:
+        type: keyword
+      message:
+        type: text
+        analyzer: standard
+      host:
+        properties:
+          name:
+            type: keyword
+      container:
+        properties:
+          name:
+            type: keyword
+          id:
+            type: keyword
+
+# 备用输出到 Logstash
+# output.logstash:
+#   hosts: ["logstash:5044"]
+#   compression_level: 3
+#   escape_html: false
+
+# ================================
+# 日志配置
+# ================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# ================================
+# 监控配置
+# ================================
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  username: "elastic"
+  password: "${ELASTICSEARCH_PASSWORD}"
+
+# ================================
+# HTTP 端点配置
+# ================================
+http.enabled: true
+http.host: 0.0.0.0
+http.port: 5066
+
+# ================================
+# 队列配置
+# ================================
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
+
+# ================================
+# 性能调优
+# ================================
+filebeat.registry.path: /usr/share/filebeat/data/registry
+filebeat.registry.file_permissions: 0600
+filebeat.registry.flush: 1s
+
+# 最大消息大小
+max_message_bytes: 1048576
+
+# 关闭文件超时
+close_inactive: 5m
+close_renamed: true
+close_removed: true
+close_eof: false
+
+# 扫描频率
+scan_frequency: 10s
+
+# 忽略文件
+ignore_older: 24h
+clean_inactive: 72h
+clean_removed: true

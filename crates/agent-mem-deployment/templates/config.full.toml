@@ -1,0 +1,72 @@
+# AgentMem 完整功能配置
+
+data_root = "./data"
+
+[database]
+backend = "libsql"
+url = "./data/agentmem.db"
+enable_wal = true
+cache_size_kb = 20480
+page_size = 4096
+auto_create_dir = true
+in_memory = false
+
+[database.pool]
+max_connections = 20
+min_connections = 5
+connection_timeout_secs = 30
+idle_timeout_secs = 600
+
+[vector_store]
+path = "./data/vectors"
+dimension = 768
+distance = "Cosine"
+enable_persistence = true
+auto_create_dir = true
+in_memory = false
+collection_name = "agentmem_vectors"
+
+[logging]
+level = "debug"
+format = "pretty"
+enable_file = true
+file_path = "./logs/agentmem.log"
+max_file_size_mb = 200
+max_files = 20
+
+[server]
+host = "127.0.0.1"
+port = 8080
+workers = 8
+enable_cors = true
+request_timeout_secs = 60
+
+[features]
+enable_mcp = true
+enable_multimodal = true
+enable_reasoning = true
+enable_graph = true
+
+[mcp]
+enable_resources = true
+enable_prompts = true
+enable_tools = true
+enable_sampling = true
+enable_logging = true
+
+[multimodal]
+enable_image = true
+enable_audio = true
+enable_video = true
+
+[reasoning]
+enable_causal = true
+enable_counterfactual = true
+enable_analogical = true
+
+[performance]
+enable_cache = true
+cache_size_mb = 512
+enable_batch = true
+batch_size = 100
+

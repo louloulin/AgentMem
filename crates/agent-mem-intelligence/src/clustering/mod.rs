@@ -1,17 +1,16 @@
 //! 记忆聚类分析模块
 
-pub mod kmeans;
-pub mod hierarchical;
 pub mod dbscan;
+pub mod hierarchical;
+pub mod kmeans;
 
-pub use kmeans::KMeansClusterer;
-pub use hierarchical::HierarchicalClusterer;
 pub use dbscan::DBSCANClusterer;
+pub use hierarchical::HierarchicalClusterer;
+pub use kmeans::KMeansClusterer;
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use async_trait::async_trait;
 
 /// 记忆聚类结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,10 +166,13 @@ impl ClusteringUtils {
     /// 计算向量间的欧几里得距离
     pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
-        let distance = a.iter()
+        let distance = a
+            .iter()
             .zip(b.iter())
             .map(|(x, y)| (x - y).powi(2))
             .sum::<f32>()
@@ -182,13 +184,17 @@ impl ClusteringUtils {
     /// 计算向量的质心
     pub fn calculate_centroid(vectors: &[Vec<f32>]) -> Result<Vec<f32>> {
         if vectors.is_empty() {
-            return Err(AgentMemError::validation_error("Cannot calculate centroid of empty vector set"));
+            return Err(AgentMemError::validation_error(
+                "Cannot calculate centroid of empty vector set",
+            ));
         }
 
         let dimension = vectors[0].len();
         for vector in vectors {
             if vector.len() != dimension {
-                return Err(AgentMemError::validation_error("All vectors must have the same dimension"));
+                return Err(AgentMemError::validation_error(
+                    "All vectors must have the same dimension",
+                ));
             }
         }
 
@@ -213,7 +219,8 @@ impl ClusteringUtils {
         cluster: &MemoryCluster,
         memory_vectors: &HashMap<String, Vec<f32>>,
     ) -> Result<f32> {
-        let cluster_vectors: Vec<&Vec<f32>> = cluster.memory_ids
+        let cluster_vectors: Vec<&Vec<f32>> = cluster
+            .memory_ids
             .iter()
             .filter_map(|id| memory_vectors.get(id))
             .collect();
@@ -247,7 +254,8 @@ impl ClusteringUtils {
 
         for i in 0..clusters.len() {
             for j in (i + 1)..clusters.len() {
-                let distance = Self::euclidean_distance(&clusters[i].centroid, &clusters[j].centroid)?;
+                let distance =
+                    Self::euclidean_distance(&clusters[i].centroid, &clusters[j].centroid)?;
                 total_distance += distance;
                 count += 1;
             }
@@ -268,7 +276,7 @@ impl ClusteringUtils {
         for k in 1..=max_k {
             let mut config = ClusteringConfig::default();
             config.num_clusters = Some(k);
-            
+
             let clusters = clusterer.cluster_memories(vectors, &memory_ids, &config)?;
             let wcss = Self::calculate_wcss(vectors, &clusters, &memory_ids)?;
             wcss_values.push(wcss);
@@ -377,11 +385,7 @@ mod tests {
 
     #[test]
     fn test_clustering_utils_calculate_centroid() {
-        let vectors = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-            vec![5.0, 6.0],
-        ];
+        let vectors = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
         let centroid = ClusteringUtils::calculate_centroid(&vectors).unwrap();
         assert_eq!(centroid, vec![3.0, 4.0]);
     }

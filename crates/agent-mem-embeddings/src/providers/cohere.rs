@@ -1,7 +1,7 @@
 //! Cohere嵌入模型实现
 
-use agent_mem_traits::{Embedder, Result, AgentMemError};
 use crate::config::EmbeddingConfig;
+use agent_mem_traits::{AgentMemError, Embedder, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -54,16 +54,22 @@ pub struct CohereEmbedder {
 impl CohereEmbedder {
     /// 创建新的Cohere嵌入器实例
     pub async fn new(config: EmbeddingConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Cohere API key is required"))?;
 
-        let base_url = config.base_url.clone()
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.cohere.ai/v1".to_string());
 
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| AgentMemError::network_error(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         let embedder = Self {
             config,
@@ -94,26 +100,31 @@ impl CohereEmbedder {
         };
 
         let url = format!("{}/embed", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::network_error(format!(
-                "Cohere API error {}: {}", status, error_text
+                "Cohere API error {status}: {error_text}"
             )));
         }
 
-        let embedding_response: CohereEmbeddingResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let embedding_response: CohereEmbeddingResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(embedding_response.embeddings)
     }
@@ -123,14 +134,16 @@ impl CohereEmbedder {
 impl Embedder for CohereEmbedder {
     async fn embed(&self, text: &str) -> Result<Vec<f32>> {
         let embeddings = self.embed_internal(&[text.to_string()]).await?;
-        embeddings.into_iter().next()
+        embeddings
+            .into_iter()
+            .next()
             .ok_or_else(|| AgentMemError::parsing_error("No embedding returned"))
     }
 
     async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         // Cohere支持批量嵌入，但有限制
         const MAX_BATCH_SIZE: usize = 96;
-        
+
         if texts.len() <= MAX_BATCH_SIZE {
             self.embed_internal(texts).await
         } else {
@@ -194,7 +207,7 @@ mod tests {
         // 注意：这个测试会尝试连接到Cohere API，在没有有效API密钥的情况下会失败
         // 这是预期的行为
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(CohereEmbedder::new(config));
+        let _result = rt.block_on(CohereEmbedder::new(config));
         // 我们不检查结果，因为API调用可能失败
     }
 
@@ -257,11 +270,11 @@ mod tests {
     fn test_batch_size_calculation() {
         // 测试批量处理逻辑
         let texts: Vec<String> = (0..200).map(|i| format!("text {}", i)).collect();
-        
-        // 模拟分批处理
+
+        // 测试分批处理
         const MAX_BATCH_SIZE: usize = 96;
         let chunks: Vec<_> = texts.chunks(MAX_BATCH_SIZE).collect();
-        
+
         assert_eq!(chunks.len(), 3); // 200 / 96 = 2.08, 所以需要3批
         assert_eq!(chunks[0].len(), 96);
         assert_eq!(chunks[1].len(), 96);

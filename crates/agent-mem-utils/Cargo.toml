@@ -13,6 +13,7 @@ description = "Utility functions and helpers for AgentMem memory platform"
 
 [dependencies]
 agent-mem-traits = { path = "../agent-mem-traits" }
+async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex = "1.0"
@@ -22,6 +23,7 @@ chrono.workspace = true
 uuid.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 
 [features]

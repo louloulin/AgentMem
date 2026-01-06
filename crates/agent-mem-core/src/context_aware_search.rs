@@ -1,17 +1,17 @@
 //! Context-Aware Memory Search System
-//! 
+//!
 //! Advanced search capabilities that understand and adapt to current context,
 //! providing intelligent memory retrieval and recommendations.
 
-use crate::hierarchical_service::{HierarchicalMemoryRecord, HierarchicalSearchFilters};
-use crate::importance_scorer::{ImportanceFactors, ScoringContext};
 use crate::adaptive_strategy::MemoryStrategy;
-use crate::hierarchy::{MemoryScope, MemoryLevel};
+use crate::hierarchical_service::{HierarchicalMemoryRecord, HierarchicalSearchFilters};
+use crate::hierarchy::{MemoryLevel, MemoryScope};
+use crate::importance_scorer::{ImportanceFactors, ScoringContext};
 use crate::types::{ImportanceLevel, MemoryType};
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap, HashSet};
-use chrono::{DateTime, Utc, Duration};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
 /// Configuration for context-aware search
@@ -173,7 +173,7 @@ impl ContextAwareSearchEngine {
         memories: &[HierarchicalMemoryRecord],
     ) -> Result<Vec<ContextualSearchResult>> {
         let start_time = std::time::Instant::now();
-        
+
         // Check cache first
         if self.config.enable_result_caching {
             let cache_key = self.generate_cache_key(&query);
@@ -203,7 +203,9 @@ impl ContextAwareSearchEngine {
         };
 
         // Apply context-aware filtering
-        results = self.apply_context_filtering(results, &query.context).await?;
+        results = self
+            .apply_context_filtering(results, &query.context)
+            .await?;
 
         // Apply hierarchical filters if provided
         if let Some(ref filters) = query.filters {
@@ -226,7 +228,8 @@ impl ContextAwareSearchEngine {
         // Cache results
         if self.config.enable_result_caching {
             let cache_key = self.generate_cache_key(&query);
-            self.search_cache.insert(cache_key, (results.clone(), Utc::now()));
+            self.search_cache
+                .insert(cache_key, (results.clone(), Utc::now()));
         }
 
         // Update analytics
@@ -251,12 +254,16 @@ impl ContextAwareSearchEngine {
 
         for memory in memories {
             for query in queries {
-                if memory.content.to_lowercase().contains(&query.to_lowercase()) {
+                if memory
+                    .content
+                    .to_lowercase()
+                    .contains(&query.to_lowercase())
+                {
                     let snippet = self.extract_snippet(&memory.content, query);
                     results.push(ContextualSearchResult {
                         memory: memory.clone(),
                         relevance_score: 1.0, // Exact match
-                        context_score: 0.0, // Will be calculated later
+                        context_score: 0.0,   // Will be calculated later
                         importance_factors: None,
                         match_reasons: vec!["Exact text match".to_string()],
                         snippet,
@@ -290,7 +297,8 @@ impl ContextAwareSearchEngine {
                 }
             }
 
-            if best_score > 0.3 { // Minimum fuzzy threshold
+            if best_score > 0.3 {
+                // Minimum fuzzy threshold
                 let snippet = self.extract_snippet(&memory.content, &best_query);
                 results.push(ContextualSearchResult {
                     memory: memory.clone(),
@@ -320,7 +328,9 @@ impl ContextAwareSearchEngine {
             let mut best_query = String::new();
 
             for query in queries {
-                let score = self.calculate_semantic_similarity(&memory.content, query).await?;
+                let score = self
+                    .calculate_semantic_similarity(&memory.content, query)
+                    .await?;
                 if score > best_score {
                     best_score = score;
                     best_query = query.clone();
@@ -366,7 +376,8 @@ impl ContextAwareSearchEngine {
         // Add fuzzy results, combining scores if memory already exists
         for result in fuzzy_results {
             if let Some(existing) = combined_results.get_mut(&result.memory.id) {
-                existing.relevance_score = (existing.relevance_score + result.relevance_score * 0.7) / 2.0;
+                existing.relevance_score =
+                    (existing.relevance_score + result.relevance_score * 0.7) / 2.0;
                 existing.match_reasons.extend(result.match_reasons);
             } else {
                 combined_results.insert(result.memory.id.clone(), result);
@@ -376,7 +387,8 @@ impl ContextAwareSearchEngine {
         // Add semantic results
         for result in semantic_results {
             if let Some(existing) = combined_results.get_mut(&result.memory.id) {
-                existing.relevance_score = (existing.relevance_score + result.relevance_score * 0.8) / 2.0;
+                existing.relevance_score =
+                    (existing.relevance_score + result.relevance_score * 0.8) / 2.0;
                 existing.match_reasons.extend(result.match_reasons);
             } else {
                 combined_results.insert(result.memory.id.clone(), result);
@@ -394,15 +406,28 @@ impl ContextAwareSearchEngine {
     ) -> Result<Vec<ContextualSearchResult>> {
         // Choose strategy based on query characteristics and context
         let strategy = self.determine_optimal_strategy(query);
-        
+
         match strategy {
-            SearchStrategy::Exact => self.exact_search(&[query.query_text.clone()], memories).await,
-            SearchStrategy::Fuzzy => self.fuzzy_search(&[query.query_text.clone()], memories).await,
-            SearchStrategy::Semantic => self.semantic_search(&[query.query_text.clone()], memories).await,
-            SearchStrategy::Hybrid => self.hybrid_search(&[query.query_text.clone()], memories).await,
+            SearchStrategy::Exact => {
+                self.exact_search(&[query.query_text.clone()], memories)
+                    .await
+            }
+            SearchStrategy::Fuzzy => {
+                self.fuzzy_search(&[query.query_text.clone()], memories)
+                    .await
+            }
+            SearchStrategy::Semantic => {
+                self.semantic_search(&[query.query_text.clone()], memories)
+                    .await
+            }
+            SearchStrategy::Hybrid => {
+                self.hybrid_search(&[query.query_text.clone()], memories)
+                    .await
+            }
             SearchStrategy::Adaptive => {
                 // Fallback to hybrid if we end up here recursively
-                self.hybrid_search(&[query.query_text.clone()], memories).await
+                self.hybrid_search(&[query.query_text.clone()], memories)
+                    .await
             }
         }
     }
@@ -436,10 +461,12 @@ impl ContextAwareSearchEngine {
 
             // Time-based context
             if self.config.enable_temporal_weighting {
-                let time_since_access = context.current_time
+                let time_since_access = context
+                    .current_time
                     .signed_duration_since(result.memory.accessed_at)
                     .num_hours() as f64;
-                let temporal_score = (-self.config.temporal_decay_factor * time_since_access / 24.0).exp();
+                let temporal_score =
+                    (-self.config.temporal_decay_factor * time_since_access / 24.0).exp();
                 context_score += temporal_score * 0.3;
             }
 
@@ -459,7 +486,12 @@ impl ContextAwareSearchEngine {
 
             // Task context
             if let Some(ref task) = context.current_task {
-                if result.memory.content.to_lowercase().contains(&task.to_lowercase()) {
+                if result
+                    .memory
+                    .content
+                    .to_lowercase()
+                    .contains(&task.to_lowercase())
+                {
                     context_score += 0.1;
                 }
             }
@@ -571,7 +603,11 @@ impl ContextAwareSearchEngine {
         }
 
         // Sort by composite score
-        results.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.relevance_score
+                .partial_cmp(&a.relevance_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(results)
     }
@@ -581,7 +617,7 @@ impl ContextAwareSearchEngine {
         let hours_since_access = Utc::now()
             .signed_duration_since(memory.accessed_at)
             .num_hours() as f64;
-        
+
         (-0.01 * hours_since_access).exp()
     }
 
@@ -590,10 +626,10 @@ impl ContextAwareSearchEngine {
         // Simple word overlap similarity
         let words1: HashSet<&str> = text1.split_whitespace().collect();
         let words2: HashSet<&str> = text2.split_whitespace().collect();
-        
+
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
-        
+
         if union == 0 {
             0.0
         } else {
@@ -620,7 +656,7 @@ impl ContextAwareSearchEngine {
 
         // Simple query expansion (in production, would use more sophisticated methods)
         let words: Vec<&str> = query.split_whitespace().collect();
-        
+
         // Add synonyms and related terms (simplified)
         let synonyms = HashMap::from([
             ("important", vec!["critical", "significant", "vital"]),
@@ -638,7 +674,8 @@ impl ContextAwareSearchEngine {
         }
 
         // Cache the expansions
-        self.expanded_queries.insert(query.to_string(), expanded[1..].to_vec());
+        self.expanded_queries
+            .insert(query.to_string(), expanded[1..].to_vec());
 
         Ok(expanded)
     }
@@ -647,15 +684,18 @@ impl ContextAwareSearchEngine {
     fn extract_snippet(&self, content: &str, query: &str) -> String {
         let query_words: Vec<&str> = query.split_whitespace().collect();
         let content_words: Vec<&str> = content.split_whitespace().collect();
-        
+
         // Find the best matching position
         let mut best_start = 0;
         let mut best_matches = 0;
-        
+
         for i in 0..content_words.len() {
             let mut matches = 0;
             for j in 0..query_words.len().min(content_words.len() - i) {
-                if content_words[i + j].to_lowercase().contains(&query_words[j].to_lowercase()) {
+                if content_words[i + j]
+                    .to_lowercase()
+                    .contains(&query_words[j].to_lowercase())
+                {
                     matches += 1;
                 }
             }
@@ -664,21 +704,21 @@ impl ContextAwareSearchEngine {
                 best_start = i;
             }
         }
-        
+
         // Extract snippet around best match
         let snippet_start = best_start.saturating_sub(5);
         let snippet_end = (best_start + 15).min(content_words.len());
-        
+
         let snippet_words = &content_words[snippet_start..snippet_end];
         let mut snippet = snippet_words.join(" ");
-        
+
         if snippet_start > 0 {
             snippet = format!("...{}", snippet);
         }
         if snippet_end < content_words.len() {
             snippet = format!("{}...", snippet);
         }
-        
+
         snippet
     }
 
@@ -696,24 +736,29 @@ impl ContextAwareSearchEngine {
     /// Update search analytics
     fn update_search_analytics(&mut self, query: &str, result_count: usize, response_time_ms: u64) {
         self.search_analytics.query_count += 1;
-        
+
         // Update average results per query
         let old_avg = self.search_analytics.average_results_per_query;
         let count = self.search_analytics.query_count as f64;
-        self.search_analytics.average_results_per_query = 
+        self.search_analytics.average_results_per_query =
             (old_avg * (count - 1.0) + result_count as f64) / count;
-        
+
         // Update average response time
         let old_time = self.search_analytics.average_response_time_ms;
-        self.search_analytics.average_response_time_ms = 
+        self.search_analytics.average_response_time_ms =
             ((old_time as f64 * (count - 1.0) + response_time_ms as f64) / count) as u64;
-        
+
         // Track query patterns
-        *self.search_analytics.search_patterns.entry(query.to_string()).or_insert(0) += 1;
-        
+        *self
+            .search_analytics
+            .search_patterns
+            .entry(query.to_string())
+            .or_insert(0) += 1;
+
         // Update query history
-        self.query_history.push((query.to_string(), Utc::now(), result_count));
-        
+        self.query_history
+            .push((query.to_string(), Utc::now(), result_count));
+
         // Limit history size
         if self.query_history.len() > 1000 {
             self.query_history.remove(0);
@@ -727,24 +772,28 @@ impl ContextAwareSearchEngine {
         results: &[ContextualSearchResult],
     ) -> Result<()> {
         if let Some(ref user_id) = query.context.user_id {
-            let user_prefs = self.user_preferences.entry(user_id.clone()).or_insert_with(HashMap::new);
-            
+            let user_prefs = self
+                .user_preferences
+                .entry(user_id.clone())
+                .or_insert_with(HashMap::new);
+
             // Learn from result characteristics
-            for result in results.iter().take(5) { // Top 5 results
+            for result in results.iter().take(5) {
+                // Top 5 results
                 // Update scope preferences
                 let scope_key = format!("scope_{:?}", result.memory.scope);
                 *user_prefs.entry(scope_key).or_insert(0.0) += 0.1;
-                
+
                 // Update level preferences
                 let level_key = format!("level_{:?}", result.memory.level);
                 *user_prefs.entry(level_key).or_insert(0.0) += 0.1;
-                
+
                 // Update importance preferences
                 let importance_key = format!("importance_{:?}", result.memory.importance);
                 *user_prefs.entry(importance_key).or_insert(0.0) += 0.1;
             }
         }
-        
+
         Ok(())
     }
 
@@ -778,7 +827,8 @@ mod tests {
             tags: Vec::new(),
             parent_memory_id: None,
             child_memory_ids: Vec::new(),
-            conflict_resolution_strategy: crate::hierarchical_service::ConflictResolutionStrategy::ImportanceBased,
+            conflict_resolution_strategy:
+                crate::hierarchical_service::ConflictResolutionStrategy::ImportanceBased,
             quality_score: 1.0,
             source_reliability: 1.0,
         }
@@ -788,7 +838,7 @@ mod tests {
     async fn test_context_aware_search_engine_creation() {
         let config = ContextAwareSearchConfig::default();
         let engine = ContextAwareSearchEngine::new(config);
-        
+
         assert_eq!(engine.search_cache.len(), 0);
         assert_eq!(engine.query_history.len(), 0);
     }
@@ -797,14 +847,17 @@ mod tests {
     async fn test_exact_search() {
         let config = ContextAwareSearchConfig::default();
         let engine = ContextAwareSearchEngine::new(config);
-        
+
         let memories = vec![
             create_test_memory("This is a test memory"),
             create_test_memory("Another memory for testing"),
             create_test_memory("Unrelated content"),
         ];
-        
-        let results = engine.exact_search(&["test".to_string()], &memories).await.unwrap();
+
+        let results = engine
+            .exact_search(&["test".to_string()], &memories)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2); // Two memories contain "test"
     }
 
@@ -812,14 +865,17 @@ mod tests {
     async fn test_fuzzy_search() {
         let config = ContextAwareSearchConfig::default();
         let engine = ContextAwareSearchEngine::new(config);
-        
+
         let memories = vec![
             create_test_memory("This is a test memory"),
             create_test_memory("Testing fuzzy search"),
             create_test_memory("Completely different content"),
         ];
-        
-        let results = engine.fuzzy_search(&["test memory".to_string()], &memories).await.unwrap();
+
+        let results = engine
+            .fuzzy_search(&["test memory".to_string()], &memories)
+            .await
+            .unwrap();
         assert!(!results.is_empty());
         assert!(results[0].relevance_score > 0.3);
     }
@@ -828,12 +884,12 @@ mod tests {
     async fn test_contextual_search() {
         let config = ContextAwareSearchConfig::default();
         let mut engine = ContextAwareSearchEngine::new(config);
-        
+
         let memories = vec![
             create_test_memory("Important task information"),
             create_test_memory("Regular memory content"),
         ];
-        
+
         let query = ContextualSearchQuery {
             query_text: "task".to_string(),
             context: ScoringContext::default(),
@@ -841,8 +897,8 @@ mod tests {
             search_strategy: SearchStrategy::Exact,
             result_preferences: ResultPreferences::default(),
         };
-        
-        let results = engine.search(query, &memories).await.unwrap();
+
+        let results = engine.search(query, &memories).await?;
         assert!(!results.is_empty());
         assert_eq!(results[0].rank, 1);
     }

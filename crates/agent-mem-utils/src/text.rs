@@ -27,7 +27,7 @@ pub fn truncate_text(text: &str, max_length: usize) -> String {
         text.to_string()
     } else {
         let truncated = &text[..max_length];
-        format!("{}...", truncated)
+        format!("{truncated}...")
     }
 }
 
@@ -44,7 +44,7 @@ pub fn extract_keywords(text: &str, min_length: usize) -> Vec<String> {
         .map(|m| m.as_str().to_lowercase())
         .filter(|word| word.len() >= min_length)
         .collect();
-    
+
     // Remove duplicates and sort
     keywords.sort();
     keywords.dedup();
@@ -54,7 +54,9 @@ pub fn extract_keywords(text: &str, min_length: usize) -> Vec<String> {
 /// Check if text contains any of the given patterns
 pub fn contains_patterns(text: &str, patterns: &[&str]) -> bool {
     let text_lower = text.to_lowercase();
-    patterns.iter().any(|pattern| text_lower.contains(&pattern.to_lowercase()))
+    patterns
+        .iter()
+        .any(|pattern| text_lower.contains(&pattern.to_lowercase()))
 }
 
 /// Remove URLs from text
@@ -73,10 +75,10 @@ pub fn remove_emails(text: &str) -> String {
 pub fn jaccard_similarity(text1: &str, text2: &str) -> f32 {
     let words1: std::collections::HashSet<&str> = text1.split_whitespace().collect();
     let words2: std::collections::HashSet<&str> = text2.split_whitespace().collect();
-    
+
     let intersection = words1.intersection(&words2).count();
     let union = words1.union(&words2).count();
-    
+
     if union == 0 {
         0.0
     } else {
@@ -99,7 +101,10 @@ mod tests {
     fn test_extract_sentences() {
         let text = "First sentence. Second sentence! Third sentence?";
         let sentences = extract_sentences(text);
-        assert_eq!(sentences, vec!["First sentence", "Second sentence", "Third sentence"]);
+        assert_eq!(
+            sentences,
+            vec!["First sentence", "Second sentence", "Third sentence"]
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! 提示词管理系统
 
-pub mod templates;
 pub mod manager;
+pub mod templates;
 
-pub use templates::*;
 pub use manager::PromptManager;
+pub use templates::*;

@@ -1,0 +1,33 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+backend = "libsql"
+url = "./data/agentmem.db"
+auto_migrate = true
+workers = 0
+request_timeout = 30
+
+[logging]
+level = "info"
+format = "pretty"
+output = "stdout"
+
+[auth]
+jwt_secret = "test-secret-key"
+enable = false
+
+[llm]
+default_provider = "zhipu"
+
+[llm.zhipu]
+api_key = "99a311fa7920a59e9399cf26ecc1e938.ac4w6buZHr2Ggc3k"
+model = "glm-4.6"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+max_tokens = 512
+temperature = 0.7
+
+[memory]
+provider = "lancedb"
+path = "./data/vectors"

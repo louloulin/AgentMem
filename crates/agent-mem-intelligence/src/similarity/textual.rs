@@ -1,9 +1,9 @@
 //! 文本相似度计算实现
 
-use agent_mem_traits::{Result, AgentMemError};
-use agent_mem_utils::text::{extract_keywords, jaccard_similarity};
+use agent_mem_traits::Result;
+use agent_mem_utils::text::extract_keywords;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// 文本相似度结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,10 +74,7 @@ impl TextualSimilarity {
         let similarity = self.calculate_jaccard_similarity(&keywords1, &keywords2);
 
         // 找到匹配的关键词
-        let matched_keywords: Vec<String> = keywords1
-            .intersection(&keywords2)
-            .cloned()
-            .collect();
+        let matched_keywords: Vec<String> = keywords1.intersection(&keywords2).cloned().collect();
 
         let total_keywords = keywords1.union(&keywords2).count();
 
@@ -91,10 +88,14 @@ impl TextualSimilarity {
     }
 
     /// 计算编辑距离相似度
-    pub fn calculate_edit_distance_similarity(&self, text1: &str, text2: &str) -> Result<TextSimilarityResult> {
+    pub fn calculate_edit_distance_similarity(
+        &self,
+        text1: &str,
+        text2: &str,
+    ) -> Result<TextSimilarityResult> {
         let distance = self.levenshtein_distance(text1, text2);
         let max_len = text1.len().max(text2.len());
-        
+
         let similarity = if max_len == 0 {
             1.0
         } else {
@@ -111,22 +112,24 @@ impl TextualSimilarity {
     }
 
     /// 计算N-gram相似度
-    pub fn calculate_ngram_similarity(&self, text1: &str, text2: &str, n: usize) -> Result<TextSimilarityResult> {
+    pub fn calculate_ngram_similarity(
+        &self,
+        text1: &str,
+        text2: &str,
+        n: usize,
+    ) -> Result<TextSimilarityResult> {
         let ngrams1 = self.extract_ngrams(text1, n);
         let ngrams2 = self.extract_ngrams(text2, n);
 
         let similarity = self.calculate_jaccard_similarity(&ngrams1, &ngrams2);
 
-        let matched_ngrams: Vec<String> = ngrams1
-            .intersection(&ngrams2)
-            .cloned()
-            .collect();
+        let matched_ngrams: Vec<String> = ngrams1.intersection(&ngrams2).cloned().collect();
 
         let total_ngrams = ngrams1.union(&ngrams2).count();
 
         Ok(TextSimilarityResult {
             similarity,
-            similarity_type: format!("{}-gram", n),
+            similarity_type: format!("{n}-gram"),
             matched_keywords: matched_ngrams,
             total_keywords: total_ngrams,
             is_similar: similarity >= self.config.threshold,
@@ -136,7 +139,7 @@ impl TextualSimilarity {
     /// 预处理文本
     fn preprocess_text(&self, text: &str) -> String {
         let mut processed = text.to_string();
-        
+
         if self.config.ignore_case {
             processed = processed.to_lowercase();
         }
@@ -144,7 +147,13 @@ impl TextualSimilarity {
         // 移除标点符号和多余空格
         processed = processed
             .chars()
-            .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c } else { ' ' })
+            .map(|c| {
+                if c.is_alphanumeric() || c.is_whitespace() {
+                    c
+                } else {
+                    ' '
+                }
+            })
             .collect::<String>()
             .split_whitespace()
             .collect::<Vec<&str>>()
@@ -163,7 +172,7 @@ impl TextualSimilarity {
     fn levenshtein_distance(&self, s1: &str, s2: &str) -> usize {
         let len1 = s1.chars().count();
         let len2 = s2.chars().count();
-        
+
         if len1 == 0 {
             return len2;
         }
@@ -216,29 +225,38 @@ impl TextualSimilarity {
     }
 
     /// 批量文本相似度计算
-    pub fn batch_similarity(&self, query: &str, texts: &[String]) -> Result<Vec<TextSimilarityResult>> {
+    pub fn batch_similarity(
+        &self,
+        query: &str,
+        texts: &[String],
+    ) -> Result<Vec<TextSimilarityResult>> {
         let mut results = Vec::new();
-        
+
         for text in texts {
             let result = self.calculate_similarity(query, text)?;
             results.push(result);
         }
-        
+
         Ok(results)
     }
 
     /// 找到最相似的文本
-    pub fn find_most_similar(&self, query: &str, texts: &[String]) -> Result<Option<(usize, TextSimilarityResult)>> {
+    pub fn find_most_similar(
+        &self,
+        query: &str,
+        texts: &[String],
+    ) -> Result<Option<(usize, TextSimilarityResult)>> {
         if texts.is_empty() {
             return Ok(None);
         }
 
         let results = self.batch_similarity(query, texts)?;
-        
-        let max_result = results
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.similarity.partial_cmp(&b.similarity).unwrap_or(std::cmp::Ordering::Equal));
+
+        let max_result = results.iter().enumerate().max_by(|(_, a), (_, b)| {
+            a.similarity
+                .partial_cmp(&b.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some((index, result)) = max_result {
             Ok(Some((index, result.clone())))
@@ -284,10 +302,10 @@ mod tests {
     #[test]
     fn test_jaccard_similarity() {
         let similarity = TextualSimilarity::default();
-        
+
         let text1 = "The quick brown fox jumps over the lazy dog";
         let text2 = "A quick brown fox leaps over a lazy dog";
-        
+
         let result = similarity.calculate_similarity(text1, text2).unwrap();
         assert!(result.similarity > 0.5);
         assert_eq!(result.similarity_type, "jaccard");
@@ -297,11 +315,13 @@ mod tests {
     #[test]
     fn test_edit_distance_similarity() {
         let similarity = TextualSimilarity::default();
-        
+
         let text1 = "hello world";
         let text2 = "hello word";
-        
-        let result = similarity.calculate_edit_distance_similarity(text1, text2).unwrap();
+
+        let result = similarity
+            .calculate_edit_distance_similarity(text1, text2)
+            .unwrap();
         assert!(result.similarity > 0.8);
         assert_eq!(result.similarity_type, "edit_distance");
     }
@@ -309,11 +329,13 @@ mod tests {
     #[test]
     fn test_ngram_similarity() {
         let similarity = TextualSimilarity::default();
-        
+
         let text1 = "hello world";
         let text2 = "hello word";
-        
-        let result = similarity.calculate_ngram_similarity(text1, text2, 3).unwrap();
+
+        let result = similarity
+            .calculate_ngram_similarity(text1, text2, 3)
+            .unwrap();
         assert!(result.similarity > 0.0);
         assert_eq!(result.similarity_type, "3-gram");
     }
@@ -321,7 +343,7 @@ mod tests {
     #[test]
     fn test_preprocess_text() {
         let similarity = TextualSimilarity::default();
-        
+
         let text = "Hello, World! This is a TEST.";
         let processed = similarity.preprocess_text(text);
         assert_eq!(processed, "hello world this is a test");
@@ -330,7 +352,7 @@ mod tests {
     #[test]
     fn test_levenshtein_distance() {
         let similarity = TextualSimilarity::default();
-        
+
         assert_eq!(similarity.levenshtein_distance("", ""), 0);
         assert_eq!(similarity.levenshtein_distance("hello", ""), 5);
         assert_eq!(similarity.levenshtein_distance("", "world"), 5);
@@ -342,7 +364,7 @@ mod tests {
     #[test]
     fn test_extract_ngrams() {
         let similarity = TextualSimilarity::default();
-        
+
         let ngrams = similarity.extract_ngrams("hello", 2);
         assert!(ngrams.contains("he"));
         assert!(ngrams.contains("el"));

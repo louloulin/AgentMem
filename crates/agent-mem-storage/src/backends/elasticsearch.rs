@@ -1,14 +1,14 @@
 //! Elasticsearch vector database backend implementation
-//! 
+//!
 //! Provides integration with Elasticsearch for vector similarity search
 //! using dense vector fields and kNN search capabilities.
 
-use agent_mem_traits::{Result, AgentMemError, EmbeddingVectorStore, SearchResult};
+use agent_mem_traits::{AgentMemError, EmbeddingVectorStore, Result, SearchResult};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// Elasticsearch configuration
 #[derive(Debug, Clone)]
@@ -128,22 +128,27 @@ impl ElasticsearchStore {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .build()
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e)))?;
-        
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
+
         Ok(Self { config, client })
     }
-    
+
     /// Initialize the Elasticsearch index
     pub async fn initialize_index(&self) -> Result<()> {
-        info!("Initializing Elasticsearch index: {}", self.config.index_name);
-        
+        info!(
+            "Initializing Elasticsearch index: {}",
+            self.config.index_name
+        );
+
         // Check if index exists
         let exists = self.index_exists().await?;
         if exists {
             info!("Index {} already exists", self.config.index_name);
             return Ok(());
         }
-        
+
         // Create index mapping
         let mapping = serde_json::json!({
             "mappings": {
@@ -176,17 +181,18 @@ impl ElasticsearchStore {
                 "number_of_replicas": 0
             }
         });
-        
-        let response = self.build_request(
-            reqwest::Method::PUT,
-            &format!("{}/{}", self.config.url, self.config.index_name)
-        )
-        .header("Content-Type", "application/json")
-        .json(&mapping)
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to create index: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::PUT,
+                &format!("{}/{}", self.config.url, self.config.index_name),
+            )
+            .header("Content-Type", "application/json")
+            .json(&mapping)
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to create index: {e}")))?;
+
         if response.status().is_success() {
             info!("Elasticsearch index created successfully");
             Ok(())
@@ -194,31 +200,34 @@ impl ElasticsearchStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to create index: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!("Index creation failed: {}", error_text)))
+            Err(AgentMemError::storage_error(format!(
+                "Index creation failed: {error_text}"
+            )))
         }
     }
-    
+
     /// Check if index exists
     async fn index_exists(&self) -> Result<bool> {
-        let response = self.build_request(
-            reqwest::Method::HEAD,
-            &format!("{}/{}", self.config.url, self.config.index_name)
-        )
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to check index: {}", e)))?;
-        
+        let response = self
+            .build_request(
+                reqwest::Method::HEAD,
+                &format!("{}/{}", self.config.url, self.config.index_name),
+            )
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to check index: {e}")))?;
+
         Ok(response.status().is_success())
     }
-    
+
     /// Build request with authentication
     fn build_request(&self, method: reqwest::Method, url: &str) -> reqwest::RequestBuilder {
         let mut request = self.client.request(method, url);
-        
+
         if let (Some(username), Some(password)) = (&self.config.username, &self.config.password) {
             request = request.basic_auth(username, Some(password));
         }
-        
+
         request
     }
 }
@@ -232,14 +241,14 @@ impl EmbeddingVectorStore for ElasticsearchStore {
         metadata: &HashMap<String, String>,
     ) -> Result<()> {
         debug!("Storing embedding for memory: {}", memory_id);
-        
+
         let mut doc_metadata = HashMap::new();
         for (key, value) in metadata {
             if !["memory_id", "content", "agent_id", "user_id"].contains(&key.as_str()) {
                 doc_metadata.insert(key.clone(), serde_json::Value::String(value.clone()));
             }
         }
-        
+
         let document = ElasticsearchDocument {
             memory_id: memory_id.to_string(),
             embedding: embedding.to_vec(),
@@ -249,17 +258,21 @@ impl EmbeddingVectorStore for ElasticsearchStore {
             created_at: chrono::Utc::now().timestamp(),
             metadata: doc_metadata,
         };
-        
-        let response = self.build_request(
-            reqwest::Method::PUT,
-            &format!("{}/{}/_doc/{}", self.config.url, self.config.index_name, memory_id)
-        )
-        .header("Content-Type", "application/json")
-        .json(&document)
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to store embedding: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::PUT,
+                &format!(
+                    "{}/{}/_doc/{}",
+                    self.config.url, self.config.index_name, memory_id
+                ),
+            )
+            .header("Content-Type", "application/json")
+            .json(&document)
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to store embedding: {e}")))?;
+
         if response.status().is_success() {
             debug!("Successfully stored embedding for memory: {}", memory_id);
             Ok(())
@@ -267,10 +280,12 @@ impl EmbeddingVectorStore for ElasticsearchStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to store embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!("Failed to store embedding: {}", error_text)))
+            Err(AgentMemError::storage_error(format!(
+                "Failed to store embedding: {error_text}"
+            )))
         }
     }
-    
+
     async fn search_similar(
         &self,
         query_embedding: &[f32],
@@ -278,7 +293,7 @@ impl EmbeddingVectorStore for ElasticsearchStore {
         threshold: Option<f32>,
     ) -> Result<Vec<SearchResult>> {
         debug!("Searching for similar embeddings with limit: {}", limit);
-        
+
         let search_request = ElasticsearchSearchRequest {
             size: limit,
             query: ElasticsearchQuery {
@@ -296,28 +311,34 @@ impl EmbeddingVectorStore for ElasticsearchStore {
                 "user_id".to_string(),
             ],
         };
-        
-        let response = self.build_request(
-            reqwest::Method::POST,
-            &format!("{}/{}/_search", self.config.url, self.config.index_name)
-        )
-        .header("Content-Type", "application/json")
-        .json(&search_request)
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to search: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::POST,
+                &format!("{}/{}/_search", self.config.url, self.config.index_name),
+            )
+            .header("Content-Type", "application/json")
+            .json(&search_request)
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to search: {e}")))?;
+
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Search failed: {} - {}", status, error_text);
-            return Err(AgentMemError::storage_error(&format!("Search failed: {}", error_text)));
+            return Err(AgentMemError::storage_error(format!(
+                "Search failed: {error_text}"
+            )));
         }
-        
-        let search_response: ElasticsearchSearchResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse search response: {}", e)))?;
-        
-        let results: Vec<SearchResult> = search_response.hits.hits
+
+        let search_response: ElasticsearchSearchResponse = response.json().await.map_err(|e| {
+            AgentMemError::parsing_error(format!("Failed to parse search response: {e}"))
+        })?;
+
+        let results: Vec<SearchResult> = search_response
+            .hits
+            .hits
             .into_iter()
             .filter_map(|hit| {
                 // Apply threshold filter
@@ -326,11 +347,20 @@ impl EmbeddingVectorStore for ElasticsearchStore {
                         return None;
                     }
                 }
-                
+
                 let mut metadata = HashMap::new();
-                metadata.insert("content".to_string(), serde_json::Value::String(hit.source.content));
-                metadata.insert("agent_id".to_string(), serde_json::Value::String(hit.source.agent_id));
-                metadata.insert("user_id".to_string(), serde_json::Value::String(hit.source.user_id));
+                metadata.insert(
+                    "content".to_string(),
+                    serde_json::Value::String(hit.source.content),
+                );
+                metadata.insert(
+                    "agent_id".to_string(),
+                    serde_json::Value::String(hit.source.agent_id),
+                );
+                metadata.insert(
+                    "user_id".to_string(),
+                    serde_json::Value::String(hit.source.user_id),
+                );
 
                 Some(SearchResult {
                     id: hit.source.memory_id,
@@ -339,22 +369,28 @@ impl EmbeddingVectorStore for ElasticsearchStore {
                 })
             })
             .collect();
-        
+
         debug!("Found {} similar embeddings", results.len());
         Ok(results)
     }
-    
+
     async fn delete_embedding(&self, memory_id: &str) -> Result<()> {
         debug!("Deleting embedding for memory: {}", memory_id);
-        
-        let response = self.build_request(
-            reqwest::Method::DELETE,
-            &format!("{}/{}/_doc/{}", self.config.url, self.config.index_name, memory_id)
-        )
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to delete embedding: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::DELETE,
+                &format!(
+                    "{}/{}/_doc/{}",
+                    self.config.url, self.config.index_name, memory_id
+                ),
+            )
+            .send()
+            .await
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to delete embedding: {e}"))
+            })?;
+
         if response.status().is_success() {
             debug!("Successfully deleted embedding for memory: {}", memory_id);
             Ok(())
@@ -362,10 +398,12 @@ impl EmbeddingVectorStore for ElasticsearchStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to delete embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!("Failed to delete embedding: {}", error_text)))
+            Err(AgentMemError::storage_error(format!(
+                "Failed to delete embedding: {error_text}"
+            )))
         }
     }
-    
+
     async fn update_embedding(
         &self,
         memory_id: &str,
@@ -373,42 +411,55 @@ impl EmbeddingVectorStore for ElasticsearchStore {
         metadata: &HashMap<String, String>,
     ) -> Result<()> {
         debug!("Updating embedding for memory: {}", memory_id);
-        
+
         // Elasticsearch PUT will update or create
         self.store_embedding(memory_id, embedding, metadata).await
     }
-    
+
     async fn get_embedding(&self, memory_id: &str) -> Result<Option<Vec<f32>>> {
         debug!("Getting embedding for memory: {}", memory_id);
-        
-        let response = self.build_request(
-            reqwest::Method::GET,
-            &format!("{}/{}/_doc/{}", self.config.url, self.config.index_name, memory_id)
-        )
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to get embedding: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::GET,
+                &format!(
+                    "{}/{}/_doc/{}",
+                    self.config.url, self.config.index_name, memory_id
+                ),
+            )
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to get embedding: {e}")))?;
+
         if response.status().is_success() {
-            let doc_response: serde_json::Value = response.json().await
-                .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse document: {}", e)))?;
-            
+            let doc_response: serde_json::Value = response.json().await.map_err(|e| {
+                AgentMemError::parsing_error(format!("Failed to parse document: {e}"))
+            })?;
+
             if let Some(source) = doc_response.get("_source") {
                 if let Some(embedding) = source.get(&self.config.vector_field) {
                     if let Some(embedding_array) = embedding.as_array() {
                         let embedding_vec: std::result::Result<Vec<f32>, &str> = embedding_array
                             .iter()
-                            .map(|v| v.as_f64().map(|f| f as f32).ok_or("Invalid embedding value"))
+                            .map(|v| {
+                                v.as_f64()
+                                    .map(|f| f as f32)
+                                    .ok_or("Invalid embedding value")
+                            })
                             .collect();
-                        
+
                         match embedding_vec {
                             Ok(vec) => return Ok(Some(vec)),
-                            Err(e) => return Err(AgentMemError::parsing_error(&format!("Failed to parse embedding: {}", e))),
+                            Err(e) => {
+                                return Err(AgentMemError::parsing_error(format!(
+                                    "Failed to parse embedding: {e}"
+                                )))
+                            }
                         }
                     }
                 }
             }
-            
+
             Ok(None)
         } else if response.status().as_u16() == 404 {
             Ok(None)
@@ -416,13 +467,15 @@ impl EmbeddingVectorStore for ElasticsearchStore {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to get embedding: {} - {}", status, error_text);
-            Err(AgentMemError::storage_error(&format!("Failed to get embedding: {}", error_text)))
+            Err(AgentMemError::storage_error(format!(
+                "Failed to get embedding: {error_text}"
+            )))
         }
     }
-    
+
     async fn list_embeddings(&self, prefix: Option<&str>) -> Result<Vec<String>> {
         debug!("Listing embeddings with prefix: {:?}", prefix);
-        
+
         let query = if let Some(prefix) = prefix {
             serde_json::json!({
                 "query": {
@@ -442,32 +495,38 @@ impl EmbeddingVectorStore for ElasticsearchStore {
                 "size": 10000
             })
         };
-        
-        let response = self.build_request(
-            reqwest::Method::POST,
-            &format!("{}/{}/_search", self.config.url, self.config.index_name)
-        )
-        .header("Content-Type", "application/json")
-        .json(&query)
-        .send()
-        .await
-        .map_err(|e| AgentMemError::network_error(&format!("Failed to list embeddings: {}", e)))?;
-        
+
+        let response = self
+            .build_request(
+                reqwest::Method::POST,
+                &format!("{}/{}/_search", self.config.url, self.config.index_name),
+            )
+            .header("Content-Type", "application/json")
+            .json(&query)
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to list embeddings: {e}")))?;
+
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             error!("Failed to list embeddings: {} - {}", status, error_text);
-            return Err(AgentMemError::storage_error(&format!("Failed to list embeddings: {}", error_text)));
+            return Err(AgentMemError::storage_error(format!(
+                "Failed to list embeddings: {error_text}"
+            )));
         }
-        
-        let search_response: ElasticsearchSearchResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse list response: {}", e)))?;
-        
-        let memory_ids: Vec<String> = search_response.hits.hits
+
+        let search_response: ElasticsearchSearchResponse = response.json().await.map_err(|e| {
+            AgentMemError::parsing_error(format!("Failed to parse list response: {e}"))
+        })?;
+
+        let memory_ids: Vec<String> = search_response
+            .hits
+            .hits
             .into_iter()
             .map(|hit| hit.source.memory_id)
             .collect();
-        
+
         debug!("Found {} embeddings", memory_ids.len());
         Ok(memory_ids)
     }
@@ -495,7 +554,7 @@ mod tests {
         let store = ElasticsearchStore::new(config);
         assert!(store.is_ok());
     }
-    
+
     #[test]
     fn test_config_default() {
         let config = ElasticsearchConfig::default();

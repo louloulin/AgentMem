@@ -1,0 +1,328 @@
+version: '3.8'
+
+# AgentMem 向量数据库生态系统
+# 支持 Milvus, Chroma, Weaviate, Qdrant, Elasticsearch, PostgreSQL, Redis
+
+networks:
+  agentmem-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET:-172.20.0.0/16}
+
+volumes:
+  etcd_data:
+  minio_data:
+  milvus_data:
+  chroma_data:
+  weaviate_data:
+  qdrant_data:
+  elasticsearch_data:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+services:
+  # =============================================================================
+  # Milvus 向量数据库
+  # =============================================================================
+  
+  # Milvus 依赖：etcd
+  etcd:
+    container_name: agentmem-etcd
+    image: quay.io/coreos/etcd:${ETCD_VERSION:-v3.5.5}
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # Milvus 依赖：MinIO
+  minio:
+    container_name: agentmem-minio
+    image: minio/minio:${MINIO_VERSION:-RELEASE.2023-03-20T20-16-18Z}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # Milvus 主服务
+  milvus:
+    container_name: agentmem-milvus
+    image: milvusdb/milvus:${MILVUS_VERSION:-v2.3.4}
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "${MILVUS_HTTP_PORT:-9091}:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${MILVUS_MEMORY_LIMIT:-4g}
+          cpus: '${MILVUS_CPU_LIMIT:-2}'
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # Chroma 向量数据库
+  # =============================================================================
+  
+  chroma:
+    container_name: agentmem-chroma
+    image: chromadb/chroma:${CHROMA_VERSION:-0.4.18}
+    ports:
+      - "${CHROMA_PORT:-8000}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_HOST=0.0.0.0
+      - CHROMA_PORT=8000
+      - CHROMA_LOG_LEVEL=${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # Weaviate 向量数据库
+  # =============================================================================
+  
+  weaviate:
+    container_name: agentmem-weaviate
+    image: semitechnologies/weaviate:${WEAVIATE_VERSION:-1.22.4}
+    ports:
+      - "${WEAVIATE_PORT:-8080}:8080"
+      - "${WEAVIATE_GRPC_PORT:-50051}:50051"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: '${DEFAULT_VECTORIZER_MODULE:-text2vec-openai}'
+      ENABLE_MODULES: '${ENABLE_MODULES:-text2vec-openai,text2vec-cohere,text2vec-huggingface,qna-openai}'
+      CLUSTER_HOSTNAME: '${CLUSTER_HOSTNAME:-node1}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # Qdrant 向量数据库
+  # =============================================================================
+  
+  qdrant:
+    container_name: agentmem-qdrant
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.7.3}
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # Elasticsearch
+  # =============================================================================
+  
+  elasticsearch:
+    container_name: agentmem-elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION:-8.11.0}
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+      - "${ELASTICSEARCH_TRANSPORT_PORT:-9300}:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms${ELASTICSEARCH_HEAP_SIZE:-2g} -Xmx${ELASTICSEARCH_HEAP_SIZE:-2g}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: ${ELASTICSEARCH_MEMORY_LIMIT:-4g}
+          cpus: '${ELASTICSEARCH_CPU_LIMIT:-2}'
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # PostgreSQL + pgvector
+  # =============================================================================
+  
+  postgres:
+    container_name: agentmem-postgres
+    image: pgvector/pgvector:pg${POSTGRES_VERSION:-15}-v${PGVECTOR_VERSION:-0.5.1}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentmem}
+      POSTGRES_USER: ${POSTGRES_USER:-agentmem}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentmem}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-2g}
+          cpus: '${POSTGRES_CPU_LIMIT:-1}'
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # Redis
+  # =============================================================================
+  
+  redis:
+    container_name: agentmem-redis
+    image: redis:${REDIS_VERSION:-7.2-alpine}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-changeme}
+      --maxmemory ${REDIS_MAXMEMORY:-2gb}
+      --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
+      --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEMORY_LIMIT:-2g}
+          cpus: '${REDIS_CPU_LIMIT:-1}'
+    networks:
+      - agentmem-network
+
+  # =============================================================================
+  # 监控服务
+  # =============================================================================
+
+  # Prometheus 监控
+  prometheus:
+    container_name: agentmem-prometheus
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.47.2}
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # Grafana 可视化
+  grafana:
+    container_name: agentmem-grafana
+    image: grafana/grafana:${GRAFANA_VERSION:-10.2.0}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network
+
+  # Jaeger 分布式追踪
+  jaeger:
+    container_name: agentmem-jaeger
+    image: jaegertracing/all-in-one:${JAEGER_VERSION:-1.51}
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${JAEGER_COLLECTOR_PORT:-14268}:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - agentmem-network

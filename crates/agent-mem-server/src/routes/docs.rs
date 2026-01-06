@@ -1,9 +1,6 @@
 //! Documentation routes
 
-use axum::{
-    response::Html,
-    http::StatusCode,
-};
+use axum::{http::StatusCode, response::Html};
 
 /// Serve OpenAPI documentation
 pub async fn serve_docs() -> Result<Html<String>, StatusCode> {
@@ -30,7 +27,7 @@ pub async fn serve_docs() -> Result<Html<String>, StatusCode> {
 </body>
 </html>
     "#;
-    
+
     Ok(Html(html.to_string()))
 }
 
@@ -42,7 +39,7 @@ mod tests {
     async fn test_serve_docs() {
         let result = serve_docs().await;
         assert!(result.is_ok());
-        
+
         let html = result.unwrap().0;
         assert!(html.contains("AgentMem API Documentation"));
     }

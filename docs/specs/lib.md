@@ -12,7 +12,7 @@
 #### A. 错误处理与类型定义 (行1-131)
 ```rust
 // 核心组件
-- AgentDbError: 统一错误类型
+- AgentMemError: 统一错误类型
 - StateType: Agent状态类型枚举
 - AgentState: Agent状态核心结构
 ```
@@ -391,7 +391,7 @@ lib.rs (根模块)
 ### 6.3 可维护性
 - [x] 单个模块控制在合理范围 (最大约500行)
 - [x] 清晰的模块边界
-- [x] 统一的错误处理 (AgentDbError)
+- [x] 统一的错误处理 (AgentMemError)
 - [x] 基础日志支持 (env_logger)
 
 这个计划将确保从单文件巨石架构平滑迁移到高质量的模块化架构，同时保持功能完整性和性能水平。

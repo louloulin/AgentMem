@@ -1,0 +1,233 @@
+groups:
+  - name: agentmem_alerts
+    interval: 30s
+    rules:
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: rate(agentmem_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors/sec (threshold: 10 errors/sec)"
+          runbook_url: "https://docs.agentmem.io/runbooks/high-error-rate"
+
+      # High Request Latency Alert
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(agentmem_request_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High request latency detected"
+          description: "95th percentile latency is {{ $value | humanize }}s (threshold: 1s)"
+          runbook_url: "https://docs.agentmem.io/runbooks/high-latency"
+
+      # Database Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhausted
+        expr: agentmem_db_connections_active >= 45
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Active connections: {{ $value }} (max: 50)"
+          runbook_url: "https://docs.agentmem.io/runbooks/db-pool-exhausted"
+
+      # Low Cache Hit Rate
+      - alert: LowCacheHitRate
+        expr: |
+          rate(agentmem_cache_hits_total[5m]) / 
+          (rate(agentmem_cache_hits_total[5m]) + rate(agentmem_cache_misses_total[5m])) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 70%)"
+          runbook_url: "https://docs.agentmem.io/runbooks/low-cache-hit-rate"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 2e9
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize1024 }}B (threshold: 2GB)"
+          runbook_url: "https://docs.agentmem.io/runbooks/high-memory-usage"
+
+      # Service Down
+      - alert: ServiceDown
+        expr: up{job="agentmem"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "AgentMem service is down"
+          description: "AgentMem service has been down for more than 1 minute"
+          runbook_url: "https://docs.agentmem.io/runbooks/service-down"
+
+      # High Tool Execution Time
+      - alert: HighToolExecutionTime
+        expr: histogram_quantile(0.95, rate(agentmem_tool_execution_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: tools
+        annotations:
+          summary: "High tool execution time"
+          description: "Tool {{ $labels.tool_name }} p95 execution time is {{ $value | humanize }}s (threshold: 5s)"
+          runbook_url: "https://docs.agentmem.io/runbooks/high-tool-execution-time"
+
+      # LLM API Failures
+      - alert: LLMAPIFailures
+        expr: rate(agentmem_llm_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "LLM API failures detected"
+          description: "LLM API error rate is {{ $value | humanize }} errors/sec for provider {{ $labels.provider }}"
+          runbook_url: "https://docs.agentmem.io/runbooks/llm-api-failures"
+
+      # Memory Operations Slow
+      - alert: MemoryOperationsSlow
+        expr: histogram_quantile(0.95, rate(agentmem_memory_operation_duration_seconds_bucket[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: memory
+        annotations:
+          summary: "Memory operations are slow"
+          description: "Memory {{ $labels.operation }} p95 duration is {{ $value | humanize }}s (threshold: 0.5s)"
+          runbook_url: "https://docs.agentmem.io/runbooks/memory-operations-slow"
+
+      # Database Query Slow
+      - alert: DatabaseQuerySlow
+        expr: histogram_quantile(0.95, rate(agentmem_db_query_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database queries are slow"
+          description: "Database query p95 duration is {{ $value | humanize }}s (threshold: 1s)"
+          runbook_url: "https://docs.agentmem.io/runbooks/database-query-slow"
+
+      # High Request Rate
+      - alert: HighRequestRate
+        expr: rate(agentmem_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: info
+          component: api
+        annotations:
+          summary: "High request rate"
+          description: "Request rate is {{ $value | humanize }} req/sec (threshold: 1000 req/sec)"
+          runbook_url: "https://docs.agentmem.io/runbooks/high-request-rate"
+
+      # Agent Inactive
+      - alert: AgentInactive
+        expr: |
+          (time() - agentmem_agent_last_activity_timestamp) > 3600
+          and agentmem_agent_state{state="active"} == 1
+        for: 5m
+        labels:
+          severity: info
+          component: agent
+        annotations:
+          summary: "Agent {{ $labels.agent_id }} is inactive"
+          description: "Agent has been inactive for more than 1 hour"
+          runbook_url: "https://docs.agentmem.io/runbooks/agent-inactive"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} available (threshold: 10%)"
+          runbook_url: "https://docs.agentmem.io/runbooks/disk-space-low"
+
+      # Too Many Active Connections
+      - alert: TooManyActiveConnections
+        expr: agentmem_active_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Too many active connections"
+          description: "Active connections: {{ $value }} (threshold: 1000)"
+          runbook_url: "https://docs.agentmem.io/runbooks/too-many-connections"
+
+      # Memory Leak Suspected
+      - alert: MemoryLeakSuspected
+        expr: |
+          rate(process_resident_memory_bytes[1h]) > 1e7
+        for: 2h
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Possible memory leak detected"
+          description: "Memory usage is increasing at {{ $value | humanize1024 }}B/sec"
+          runbook_url: "https://docs.agentmem.io/runbooks/memory-leak"
+
+  - name: agentmem_recording_rules
+    interval: 30s
+    rules:
+      # Request rate by endpoint
+      - record: agentmem:requests:rate5m
+        expr: rate(agentmem_requests_total[5m])
+
+      # Error rate by type
+      - record: agentmem:errors:rate5m
+        expr: rate(agentmem_errors_total[5m])
+
+      # Request duration quantiles
+      - record: agentmem:request_duration:p50
+        expr: histogram_quantile(0.50, rate(agentmem_request_duration_seconds_bucket[5m]))
+
+      - record: agentmem:request_duration:p95
+        expr: histogram_quantile(0.95, rate(agentmem_request_duration_seconds_bucket[5m]))
+
+      - record: agentmem:request_duration:p99
+        expr: histogram_quantile(0.99, rate(agentmem_request_duration_seconds_bucket[5m]))
+
+      # Cache hit rate
+      - record: agentmem:cache:hit_rate
+        expr: |
+          rate(agentmem_cache_hits_total[5m]) / 
+          (rate(agentmem_cache_hits_total[5m]) + rate(agentmem_cache_misses_total[5m]))
+
+      # Memory operations rate
+      - record: agentmem:memory_operations:rate5m
+        expr: rate(agentmem_memory_operations_total[5m])
+
+      # Tool execution duration p95
+      - record: agentmem:tool_execution:p95
+        expr: histogram_quantile(0.95, rate(agentmem_tool_execution_duration_seconds_bucket[5m]))
+
+      # LLM call rate
+      - record: agentmem:llm_calls:rate5m
+        expr: rate(agentmem_llm_calls_total[5m])
+
+      # Database query duration p95
+      - record: agentmem:db_query:p95
+        expr: histogram_quantile(0.95, rate(agentmem_db_query_duration_seconds_bucket[5m]))
+

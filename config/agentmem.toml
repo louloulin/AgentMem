@@ -1,0 +1,107 @@
+# AgentMem V4.0 Configuration
+# This file eliminates all hardcoded values from the codebase
+
+[search]
+# Search engine weights (sum should equal 1.0)
+vector_weight = 0.7
+fulltext_weight = 0.3
+graph_weight = 0.0
+
+# Adaptive learning
+adaptive_learning = true
+learning_rate = 0.01
+
+# Search parameters
+default_threshold = 0.3
+max_results = 10
+timeout_seconds = 30
+
+[importance]
+# Importance scoring weights (sum should equal 1.0)
+recency_weight = 0.25
+frequency_weight = 0.20
+relevance_weight = 0.25
+emotional_weight = 0.15
+context_weight = 0.10
+interaction_weight = 0.05
+
+# Dynamic adjustment
+enable_dynamic_weights = true
+learning_rate = 0.01
+
+# Score bounds
+min_score_threshold = 0.0
+max_score_cap = 10.0
+
+[intelligence]
+# Intelligence module weights
+recency = 0.3
+frequency = 0.2
+relevance = 0.3
+interaction = 0.2
+
+# Conflict resolution
+conflict_sensitivity = 0.8
+auto_resolution_threshold = 0.9
+
+[memory_integration]
+# Memory retrieval settings
+max_memories = 10
+relevance_threshold = 0.1
+include_timestamp = true
+sort_by_importance = true
+
+# Cognitive architecture weights (based on Adaptive Memory Framework)
+episodic_weight = 1.2    # Long-term memory priority
+working_weight = 1.0     # Context supplement
+semantic_weight = 0.9    # Broader range backup
+
+[adaptive_threshold]
+# Query length influence
+length_factor = 0.3
+
+# Query complexity influence
+complexity_factor = 0.2
+
+# Historical feedback
+enable_historical_feedback = true
+
+# Threshold bounds
+min_threshold = 0.0
+max_threshold = 0.9
+
+# Base thresholds for different query types
+[adaptive_threshold.base_thresholds]
+exact_id = 0.0
+short_keyword = 0.1
+natural_language = 0.3
+semantic = 0.5
+temporal = 0.0
+
+[performance]
+# Batch processing
+batch_size = 1000
+
+# Caching
+enable_cache = true
+cache_size = 10000
+cache_ttl_seconds = 3600
+
+# Parallelism
+num_workers = 0  # 0 = auto-detect (num_cpus)
+
+# Connection pooling
+enable_connection_pool = true
+connection_pool_size = 10
+
+[storage]
+# Storage backend
+backend = "libsql"
+database_url = "agentmem.db"
+
+# Vector store
+vector_store = "lancedb"
+# vector_store_url = ""  # Optional: for remote vector stores
+
+# Auto-migration
+enable_auto_migration = true

@@ -1,0 +1,250 @@
+//! LLM capability for plugins
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+/// LLM request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmRequest {
+    /// Model name
+    pub model: String,
+
+    /// Prompt
+    pub prompt: String,
+
+    /// System message (optional)
+    pub system: Option<String>,
+
+    /// Temperature (0.0 - 2.0)
+    pub temperature: Option<f32>,
+
+    /// Max tokens
+    pub max_tokens: Option<usize>,
+
+    /// Additional parameters
+    pub parameters: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// LLM response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmResponse {
+    /// Generated text
+    pub text: String,
+
+    /// Model used
+    pub model: String,
+
+    /// Tokens used
+    pub tokens_used: usize,
+
+    /// Finish reason
+    pub finish_reason: String,
+
+    /// Additional metadata
+    pub metadata: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// LLM capability allows plugins to call LLM APIs
+#[derive(Clone)]
+pub struct LlmCapability {
+    /// Request history for testing
+    history: Arc<RwLock<Vec<LlmRequest>>>,
+
+    /// Mock mode for testing
+    mock_mode: bool,
+}
+
+impl LlmCapability {
+    /// Create a new LLM capability
+    pub fn new(mock_mode: bool) -> Self {
+        Self {
+            history: Arc::new(RwLock::new(Vec::new())),
+            mock_mode,
+        }
+    }
+
+    /// Call LLM API
+    pub async fn call_llm(&self, request: LlmRequest) -> Result<LlmResponse> {
+        // Store request in history
+        {
+            let mut history = self.history.write().await;
+            history.push(request.clone());
+        }
+
+        // In mock mode, return a simulated response
+        if self.mock_mode {
+            return Ok(self.mock_response(&request));
+        }
+
+        // TODO: In production, integrate with actual LLM API
+        // This would call OpenAI, Anthropic, or other LLM providers
+        // For now, return a placeholder response
+        Ok(LlmResponse {
+            text: format!("LLM Response to: {}", request.prompt),
+            model: request.model,
+            tokens_used: 50,
+            finish_reason: "stop".to_string(),
+            metadata: std::collections::HashMap::new(),
+        })
+    }
+
+    /// Generate a mock response for testing
+    fn mock_response(&self, request: &LlmRequest) -> LlmResponse {
+        let prompt_lower = request.prompt.to_lowercase();
+        let text = if prompt_lower.contains("summarize") || prompt_lower.contains("summary") {
+            "This is a concise summary of the content.".to_string()
+        } else if prompt_lower.contains("translate") || prompt_lower.contains("翻译") {
+            "这是翻译后的文本。".to_string()
+        } else if prompt_lower.contains("analyze") || prompt_lower.contains("analysis") {
+            "Analysis: The content contains key insights about the topic.".to_string()
+        } else {
+            format!("Response to: {}", request.prompt)
+        };
+
+        LlmResponse {
+            text,
+            model: request.model.clone(),
+            tokens_used: request.prompt.len() / 4, // Rough estimate
+            finish_reason: "stop".to_string(),
+            metadata: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Get request history (for testing)
+    pub async fn get_history(&self) -> Vec<LlmRequest> {
+        let history = self.history.read().await;
+        history.clone()
+    }
+
+    /// Clear history
+    pub async fn clear_history(&self) -> Result<()> {
+        let mut history = self.history.write().await;
+        history.clear();
+        Ok(())
+    }
+}
+
+impl Default for LlmCapability {
+    fn default() -> Self {
+        Self::new(true) // Default to mock mode
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_llm_call() {
+        let llm = LlmCapability::new(true);
+
+        let request = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Summarize this text".to_string(),
+            system: Some("You are a helpful assistant".to_string()),
+            temperature: Some(0.7),
+            max_tokens: Some(100),
+            parameters: std::collections::HashMap::new(),
+        };
+
+        let response = llm.call_llm(request).await?;
+
+        assert!(response.text.contains("summary"));
+        assert_eq!(response.model, "gpt-4");
+        assert!(response.tokens_used > 0);
+    }
+
+    #[tokio::test]
+    async fn test_llm_history() {
+        let llm = LlmCapability::new(true);
+
+        let request1 = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Test 1".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+
+        let request2 = LlmRequest {
+            model: "gpt-3.5-turbo".to_string(),
+            prompt: "Test 2".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+
+        llm.call_llm(request1).await?;
+        llm.call_llm(request2).await?;
+
+        let history = llm.get_history().await;
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].prompt, "Test 1");
+        assert_eq!(history[1].prompt, "Test 2");
+    }
+
+    #[tokio::test]
+    async fn test_llm_mock_responses() {
+        let llm = LlmCapability::new(true);
+
+        // Test summarize
+        let request = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Please summarize this document".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+        let response = llm.call_llm(request).await?;
+        assert!(response.text.contains("summary"));
+
+        // Test translate
+        let request = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Translate to Chinese".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+        let response = llm.call_llm(request).await?;
+        assert!(response.text.contains("翻译"));
+
+        // Test analyze
+        let request = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Analyze this data".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+        let response = llm.call_llm(request).await?;
+        assert!(response.text.contains("Analysis"));
+    }
+
+    #[tokio::test]
+    async fn test_llm_clear_history() {
+        let llm = LlmCapability::new(true);
+
+        let request = LlmRequest {
+            model: "gpt-4".to_string(),
+            prompt: "Test".to_string(),
+            system: None,
+            temperature: None,
+            max_tokens: None,
+            parameters: std::collections::HashMap::new(),
+        };
+
+        llm.call_llm(request).await?;
+        assert_eq!(llm.get_history().await.len(), 1);
+
+        llm.clear_history().await?;
+        assert_eq!(llm.get_history().await.len(), 0);
+    }
+}

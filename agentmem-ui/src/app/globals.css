@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义动画 */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(62, 207, 142, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(62, 207, 142, 0.6);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 工具类 */
+.animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.bg-size-300 {
+  background-size: 300% 300%;
+}
+
+/* 平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 自定义滚动条 - Supabase风格 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1C1C1C;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3ECF8E;
+}
+
+/* 代码块样式 - Supabase风格 */
+code[class*="language-"],
+pre[class*="language-"] {
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  line-height: 1.5;
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 0.5rem;
+}
+
+/* 响应式文本截断 */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 玻璃态效果 */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 渐变边框 - Supabase风格 */
+.gradient-border {
+  position: relative;
+  background: linear-gradient(45deg, #3ECF8E, #2CB574, #3ECF8E);
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+  padding: 2px;
+  border-radius: 1rem;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: #1A1A1A;
+  border-radius: calc(1rem - 2px);
+  z-index: -1;
+}
+
+/* 主题切换过渡 */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* 浅色模式样式 */
+html:not(.dark) {
+  --background: 255 255 255;
+  --foreground: 15 23 42;
+}
+
+html:not(.dark) .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #f8fafc, #e2e8f0, #f8fafc);
+}
+
+html:not(.dark) .text-white {
+  color: #0f172a;
+}
+
+html:not(.dark) .text-slate-300 {
+  color: #475569;
+}
+
+html:not(.dark) .bg-slate-800\/50 {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+html:not(.dark) .border-slate-700 {
+  border-color: #e2e8f0;
+}
+
+/* Supabase 风格 CSS 变量配置 */
+
+@layer base {
+  :root {
+    --background: 0 0% 11%;           /* #1C1C1C - Supabase dark bg */
+    --foreground: 0 0% 100%;           /* #FFFFFF - white text */
+    --card: 0 0% 10%;                  /* #1A1A1A - card bg */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 158 67% 53%;            /* #3ECF8E - Supabase Green */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 16%;             /* #2A2A2A */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 61%;      /* #9CA3AF */
+    --accent: 158 67% 53%;             /* #3ECF8E */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 16%;                /* #2A2A2A */
+    --input: 0 0% 16%;
+    --ring: 158 67% 53%;               /* #3ECF8E */
+    --radius: 1rem;                    /* 16px - Supabase style */
+    --chart-1: 158 67% 53%;            /* Supabase Green */
+    --chart-2: 158 58% 46%;            /* Darker green */
+    --chart-3: 158 75% 60%;            /* Lighter green */
+    --chart-4: 220 70% 50%;            /* Blue accent */
+    --chart-5: 280 65% 60%;            /* Purple accent */
+  }
+
+  .dark {
+    --background: 0 0% 11%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 158 67% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 61%;
+    --accent: 158 67% 53%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 158 67% 53%;
+    --chart-1: 158 67% 53%;
+    --chart-2: 158 58% 46%;
+    --chart-3: 158 75% 60%;
+    --chart-4: 220 70% 50%;
+    --chart-5: 280 65% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-bg-primary text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Supabase-style Button */
+  .btn-supabase {
+    @apply bg-gradient-primary text-white font-semibold px-6 py-3 rounded-lg 
+           transition-all duration-200 hover:-translate-y-0.5 
+           shadow-glow-green hover:shadow-glow-green-lg;
+  }
+  
+  /* Supabase-style Card */
+  .card-supabase {
+    @apply bg-bg-tertiary border border-border rounded-2xl p-8 
+           transition-all duration-300 hover:border-supabase-green 
+           hover:bg-gradient-card hover:shadow-glow-green 
+           hover:-translate-y-1;
+  }
+  
+  /* Supabase-style Navigation Item */
+  .nav-item-supabase {
+    @apply px-4 py-2 rounded-lg transition-all duration-200 font-medium;
+    @apply text-slate-300 hover:text-white hover:bg-slate-800/50;
+  }
+  
+  .nav-item-supabase.active {
+    @apply bg-purple-900/30 text-purple-400 font-semibold;
+    @apply border-l-4 border-purple-400 pl-[12px];
+  }
+}

@@ -1,0 +1,16 @@
+[package]
+name = "llm-provider-demo"
+version = "2.0.0"
+edition = "2021"
+description = "AgentMem 6.0 LLM 提供商真实化演示程序"
+
+[dependencies]
+agent-mem-llm = { path = "../../crates/agent-mem-llm" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }

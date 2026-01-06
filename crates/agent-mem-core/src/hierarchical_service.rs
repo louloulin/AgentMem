@@ -1,20 +1,18 @@
 //! Enhanced Hierarchical Memory Service
-//! 
+//!
 //! Complete implementation of ContextEngine's hierarchical memory architecture
 //! with advanced features like memory inheritance, conflict resolution, and
 //! intelligent routing.
 
-use crate::hierarchy::{MemoryScope, MemoryLevel};
-use crate::types::{Memory, MemoryType, ImportanceLevel};
-use agent_mem_traits::{Result, AgentMemError};
+use crate::hierarchy::{MemoryLevel, MemoryScope};
+use crate::types::ImportanceLevel;
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-
-
 
 /// Hierarchical memory record with enhanced metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,7 +88,8 @@ pub enum InheritanceCondition {
 /// Enhanced hierarchical memory service
 pub struct HierarchicalMemoryService {
     /// Memory storage organized by scope and level
-    memories: Arc<RwLock<BTreeMap<MemoryScope, BTreeMap<MemoryLevel, Vec<HierarchicalMemoryRecord>>>>>,
+    memories:
+        Arc<RwLock<BTreeMap<MemoryScope, BTreeMap<MemoryLevel, Vec<HierarchicalMemoryRecord>>>>>,
     /// Memory index for fast lookups
     memory_index: Arc<RwLock<HashMap<String, (MemoryScope, MemoryLevel, usize)>>>,
     /// Inheritance rules
@@ -178,7 +177,7 @@ impl HierarchicalMemoryService {
             parent_memory_id: None,
             child_memory_ids: Vec::new(),
             conflict_resolution_strategy: self.config.default_conflict_strategy.clone(),
-            quality_score: 1.0, // Default quality score
+            quality_score: 1.0,      // Default quality score
             source_reliability: 1.0, // Default source reliability
         };
 
@@ -192,7 +191,7 @@ impl HierarchicalMemoryService {
             let mut memories = self.memories.write().await;
             let scope_memories = memories.entry(scope.clone()).or_insert_with(BTreeMap::new);
             let level_memories = scope_memories.entry(level.clone()).or_insert_with(Vec::new);
-            
+
             // Check capacity limits
             if level_memories.len() >= self.config.max_memories_per_scope_level {
                 // Remove oldest memory if at capacity
@@ -203,7 +202,7 @@ impl HierarchicalMemoryService {
                     index.remove(&removed.id);
                 }
             }
-            
+
             let memory_index = level_memories.len();
             level_memories.push(memory.clone());
 
@@ -227,13 +226,13 @@ impl HierarchicalMemoryService {
         request_scope: &MemoryScope,
     ) -> Result<Option<HierarchicalMemoryRecord>> {
         let index = self.memory_index.read().await;
-        
+
         if let Some((scope, level, memory_index)) = index.get(memory_id) {
             // Check access permissions
             if !request_scope.can_access(scope) {
-                return Err(AgentMemError::memory_error(
-                    &format!("Scope {:?} cannot access memory in scope {:?}", request_scope, scope)
-                ));
+                return Err(AgentMemError::memory_error(format!(
+                    "Scope {request_scope:?} cannot access memory in scope {scope:?}"
+                )));
             }
 
             let memories = self.memories.read().await;
@@ -277,7 +276,11 @@ impl HierarchicalMemoryService {
                     }
 
                     // Simple text search (in production, would use semantic search)
-                    if memory.content.to_lowercase().contains(&query.to_lowercase()) {
+                    if memory
+                        .content
+                        .to_lowercase()
+                        .contains(&query.to_lowercase())
+                    {
                         results.push(memory.clone());
                     }
                 }
@@ -286,8 +289,13 @@ impl HierarchicalMemoryService {
 
         // Sort by relevance and importance
         results.sort_by(|a, b| {
-            b.importance.cmp(&a.importance)
-                .then_with(|| b.quality_score.partial_cmp(&a.quality_score).unwrap_or(std::cmp::Ordering::Equal))
+            b.importance
+                .cmp(&a.importance)
+                .then_with(|| {
+                    b.quality_score
+                        .partial_cmp(&a.quality_score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .then_with(|| b.accessed_at.cmp(&a.accessed_at))
         });
 
@@ -297,7 +305,7 @@ impl HierarchicalMemoryService {
     /// Initialize default inheritance rules
     async fn initialize_default_inheritance_rules(&self) -> Result<()> {
         let mut rules = self.inheritance_rules.write().await;
-        
+
         // Global memories are inherited by all scopes
         rules.push(MemoryInheritanceRule {
             from_scope: MemoryScope::Global,
@@ -312,7 +320,10 @@ impl HierarchicalMemoryService {
         // Agent memories are inherited by user scopes
         rules.push(MemoryInheritanceRule {
             from_scope: MemoryScope::Agent("*".to_string()),
-            to_scope: MemoryScope::User { agent_id: "*".to_string(), user_id: "*".to_string() },
+            to_scope: MemoryScope::User {
+                agent_id: "*".to_string(),
+                user_id: "*".to_string(),
+            },
             inheritance_type: InheritanceType::Summary,
             conditions: vec![
                 InheritanceCondition::MinImportance(ImportanceLevel::High),
@@ -339,7 +350,8 @@ impl HierarchicalMemoryService {
 
     /// Find oldest memory index in a level
     fn find_oldest_memory_index(&self, memories: &[HierarchicalMemoryRecord]) -> Option<usize> {
-        memories.iter()
+        memories
+            .iter()
             .enumerate()
             .min_by_key(|(_, memory)| memory.created_at)
             .map(|(index, _)| index)
@@ -352,7 +364,11 @@ impl HierarchicalMemoryService {
     }
 
     /// Check if memory matches search filters
-    fn matches_filters(&self, memory: &HierarchicalMemoryRecord, filters: &HierarchicalSearchFilters) -> bool {
+    fn matches_filters(
+        &self,
+        _memory: &HierarchicalMemoryRecord,
+        _filters: &HierarchicalSearchFilters,
+    ) -> bool {
         // Implementation would check various filter conditions
         true
     }
@@ -384,16 +400,18 @@ mod tests {
     #[tokio::test]
     async fn test_add_hierarchical_memory() {
         let config = HierarchicalServiceConfig::default();
-        let service = HierarchicalMemoryService::new(config).await.unwrap();
-        
-        let memory = service.add_hierarchical_memory(
-            "Test memory content".to_string(),
-            MemoryScope::Global,
-            MemoryLevel::Strategic,
-            ImportanceLevel::High,
-            HashMap::new(),
-        ).await;
-        
+        let service = HierarchicalMemoryService::new(config).await?;
+
+        let memory = service
+            .add_hierarchical_memory(
+                "Test memory content".to_string(),
+                MemoryScope::Global,
+                MemoryLevel::Strategic,
+                ImportanceLevel::High,
+                HashMap::new(),
+            )
+            .await;
+
         assert!(memory.is_ok());
         let memory = memory.unwrap();
         assert_eq!(memory.content, "Test memory content");
@@ -404,30 +422,46 @@ mod tests {
     #[tokio::test]
     async fn test_memory_access_control() {
         let config = HierarchicalServiceConfig::default();
-        let service = HierarchicalMemoryService::new(config).await.unwrap();
-        
+        let service = HierarchicalMemoryService::new(config).await?;
+
         // Add a user-scoped memory
-        let memory = service.add_hierarchical_memory(
-            "User memory".to_string(),
-            MemoryScope::User { agent_id: "agent1".to_string(), user_id: "user1".to_string() },
-            MemoryLevel::Operational,
-            ImportanceLevel::Medium,
-            HashMap::new(),
-        ).await.unwrap();
-        
+        let memory = service
+            .add_hierarchical_memory(
+                "User memory".to_string(),
+                MemoryScope::User {
+                    agent_id: "agent1".to_string(),
+                    user_id: "user1".to_string(),
+                },
+                MemoryLevel::Operational,
+                ImportanceLevel::Medium,
+                HashMap::new(),
+            )
+            .await
+            .unwrap();
+
         // Test access from same scope - should succeed
-        let result = service.get_hierarchical_memory(
-            &memory.id,
-            &MemoryScope::User { agent_id: "agent1".to_string(), user_id: "user1".to_string() }
-        ).await;
+        let result = service
+            .get_hierarchical_memory(
+                &memory.id,
+                &MemoryScope::User {
+                    agent_id: "agent1".to_string(),
+                    user_id: "user1".to_string(),
+                },
+            )
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_some());
-        
+
         // Test access from different user - should fail
-        let result = service.get_hierarchical_memory(
-            &memory.id,
-            &MemoryScope::User { agent_id: "agent1".to_string(), user_id: "user2".to_string() }
-        ).await;
+        let result = service
+            .get_hierarchical_memory(
+                &memory.id,
+                &MemoryScope::User {
+                    agent_id: "agent1".to_string(),
+                    user_id: "user2".to_string(),
+                },
+            )
+            .await;
         assert!(result.is_err());
     }
 }

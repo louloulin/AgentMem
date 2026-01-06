@@ -1,0 +1,19 @@
+[package]
+name = "migration-demo"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "migration-demo"
+path = "main.rs"
+
+[dependencies]
+agent-mem-storage = { path = "../../crates/agent-mem-storage" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-utils = { path = "../../crates/agent-mem-utils" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }

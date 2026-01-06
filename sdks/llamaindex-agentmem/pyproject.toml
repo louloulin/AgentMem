@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llamaindex-agentmem"
+version = "1.0.0"
+description = "Official LlamaIndex integration for AgentMem - Enterprise-grade memory management"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "AgentMem Team", email = "support@agentmem.dev"}
+]
+keywords = [
+    "llamaindex",
+    "agentmem",
+    "memory",
+    "ai",
+    "llm",
+    "vector",
+    "database",
+    "embedding",
+    "semantic",
+    "search",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "agentmem>=7.0.0",
+    "llama-index-core>=0.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+
+all = [
+    "llama-index>=0.10.0",
+    "llama-index-llms-openai>=0.1.0",
+    "llama-index-embeddings-openai>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/agentmem/agentmem"
+Documentation = "https://docs.agentmem.dev"
+Repository = "https://github.com/agentmem/agentmem"
+Issues = "https://github.com/agentmem/agentmem/issues"
+
+[tool.setuptools]
+packages = ["llamaindex_agentmem"]
+
+[tool.setuptools.package-data]
+llamaindex_agentmem = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --cov=llamaindex_agentmem --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["llamaindex_agentmem"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

@@ -1,14 +1,14 @@
 //! Production Monitoring and Telemetry System
-//! 
+//!
 //! Comprehensive monitoring, metrics collection, and telemetry for production
 //! environments with support for alerts, dashboards, and observability.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 /// Monitoring system configuration
@@ -226,18 +226,35 @@ impl MonitoringSystem {
     }
 
     /// Record a counter metric
-    pub async fn increment_counter(&self, name: &str, labels: HashMap<String, String>) -> Result<()> {
-        self.record_metric(name.to_string(), 1.0, MetricType::Counter, labels).await
+    pub async fn increment_counter(
+        &self,
+        name: &str,
+        labels: HashMap<String, String>,
+    ) -> Result<()> {
+        self.record_metric(name.to_string(), 1.0, MetricType::Counter, labels)
+            .await
     }
 
     /// Record a gauge metric
-    pub async fn set_gauge(&self, name: &str, value: f64, labels: HashMap<String, String>) -> Result<()> {
-        self.record_metric(name.to_string(), value, MetricType::Gauge, labels).await
+    pub async fn set_gauge(
+        &self,
+        name: &str,
+        value: f64,
+        labels: HashMap<String, String>,
+    ) -> Result<()> {
+        self.record_metric(name.to_string(), value, MetricType::Gauge, labels)
+            .await
     }
 
     /// Record a histogram metric
-    pub async fn record_histogram(&self, name: &str, value: f64, labels: HashMap<String, String>) -> Result<()> {
-        self.record_metric(name.to_string(), value, MetricType::Histogram, labels).await
+    pub async fn record_histogram(
+        &self,
+        name: &str,
+        value: f64,
+        labels: HashMap<String, String>,
+    ) -> Result<()> {
+        self.record_metric(name.to_string(), value, MetricType::Histogram, labels)
+            .await
     }
 
     /// Update health check status
@@ -290,8 +307,9 @@ impl MonitoringSystem {
             let recent_metrics: Vec<_> = metrics
                 .iter()
                 .filter(|m| {
-                    m.name == rule.metric_name &&
-                    Utc::now().signed_duration_since(m.timestamp).num_seconds() <= rule.duration_seconds as i64
+                    m.name == rule.metric_name
+                        && Utc::now().signed_duration_since(m.timestamp).num_seconds()
+                            <= rule.duration_seconds as i64
                 })
                 .collect();
 
@@ -300,7 +318,8 @@ impl MonitoringSystem {
             }
 
             // Calculate aggregate value (average for simplicity)
-            let avg_value = recent_metrics.iter().map(|m| m.value).sum::<f64>() / recent_metrics.len() as f64;
+            let avg_value =
+                recent_metrics.iter().map(|m| m.value).sum::<f64>() / recent_metrics.len() as f64;
 
             // Check condition
             let condition_met = match rule.condition {
@@ -320,7 +339,11 @@ impl MonitoringSystem {
                     severity: rule.severity.clone(),
                     message: format!(
                         "Alert {} triggered: {} {} {} (current: {})",
-                        rule.name, rule.metric_name, format!("{:?}", rule.condition), rule.threshold, avg_value
+                        rule.name,
+                        rule.metric_name,
+                        format!("{:?}", rule.condition),
+                        rule.threshold,
+                        avg_value
                     ),
                     started_at: Utc::now(),
                     last_triggered: Utc::now(),
@@ -379,7 +402,7 @@ impl MonitoringSystem {
     /// Get overall system health
     pub async fn get_overall_health(&self) -> ComponentStatus {
         let health_checks = self.health_checks.read().await;
-        
+
         if health_checks.is_empty() {
             return ComponentStatus::Unknown;
         }
@@ -447,9 +470,9 @@ impl MonitoringSystem {
         // Start alert evaluation task
         let monitoring_system = self.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                tokio::time::Duration::from_secs(monitoring_system.config.alert_evaluation_interval_seconds)
-            );
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                monitoring_system.config.alert_evaluation_interval_seconds,
+            ));
 
             loop {
                 interval.tick().await;
@@ -498,7 +521,7 @@ mod tests {
     async fn test_monitoring_system_creation() {
         let config = MonitoringConfig::default();
         let monitoring = MonitoringSystem::new(config);
-        
+
         let system_info = monitoring.get_system_info().await;
         assert!(!system_info.version.is_empty());
     }
@@ -507,13 +530,19 @@ mod tests {
     async fn test_metric_recording() {
         let config = MonitoringConfig::default();
         let monitoring = MonitoringSystem::new(config);
-        
+
         let mut labels = HashMap::new();
         labels.insert("component".to_string(), "test".to_string());
-        
-        monitoring.increment_counter("test_counter", labels.clone()).await.unwrap();
-        monitoring.set_gauge("test_gauge", 42.0, labels).await.unwrap();
-        
+
+        monitoring
+            .increment_counter("test_counter", labels.clone())
+            .await
+            .unwrap();
+        monitoring
+            .set_gauge("test_gauge", 42.0, labels)
+            .await
+            .unwrap();
+
         let metrics = monitoring.get_metrics().await;
         assert_eq!(metrics.len(), 2);
     }
@@ -522,22 +551,28 @@ mod tests {
     async fn test_health_checks() {
         let config = MonitoringConfig::default();
         let monitoring = MonitoringSystem::new(config);
-        
+
         let mut details = HashMap::new();
         details.insert("version".to_string(), "1.0.0".to_string());
-        
-        monitoring.update_health_check(
-            "database".to_string(),
-            ComponentStatus::Healthy,
-            "All systems operational".to_string(),
-            50,
-            details,
-        ).await.unwrap();
-        
+
+        monitoring
+            .update_health_check(
+                "database".to_string(),
+                ComponentStatus::Healthy,
+                "All systems operational".to_string(),
+                50,
+                details,
+            )
+            .await
+            .unwrap();
+
         let health_status = monitoring.get_health_status().await;
         assert_eq!(health_status.len(), 1);
-        assert_eq!(health_status.get("database").unwrap().status, ComponentStatus::Healthy);
-        
+        assert_eq!(
+            health_status.get("database").unwrap().status,
+            ComponentStatus::Healthy
+        );
+
         let overall_health = monitoring.get_overall_health().await;
         assert_eq!(overall_health, ComponentStatus::Healthy);
     }
@@ -546,7 +581,7 @@ mod tests {
     async fn test_alert_rules() {
         let config = MonitoringConfig::default();
         let monitoring = MonitoringSystem::new(config);
-        
+
         let rule = AlertRule {
             id: "test_rule".to_string(),
             name: "High CPU Usage".to_string(),
@@ -558,13 +593,16 @@ mod tests {
             enabled: true,
             labels: HashMap::new(),
         };
-        
-        monitoring.add_alert_rule(rule).await.unwrap();
-        
+
+        monitoring.add_alert_rule(rule).await?;
+
         // Record high CPU usage
-        monitoring.set_gauge("cpu_usage", 85.0, HashMap::new()).await.unwrap();
-        
-        let alerts = monitoring.evaluate_alerts().await.unwrap();
+        monitoring
+            .set_gauge("cpu_usage", 85.0, HashMap::new())
+            .await
+            .unwrap();
+
+        let alerts = monitoring.evaluate_alerts().await?;
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::Warning);
     }

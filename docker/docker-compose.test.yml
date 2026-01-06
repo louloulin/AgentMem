@@ -1,0 +1,250 @@
+version: '3.8'
+
+# AgentMem 测试环境配置
+# 轻量级配置，用于集成测试和 CI/CD
+
+networks:
+  agentmem-test-network:
+    driver: bridge
+
+volumes:
+  test_chroma_data:
+  test_qdrant_data:
+  test_redis_data:
+  test_postgres_data:
+
+services:
+  # =============================================================================
+  # 轻量级向量数据库 (测试用)
+  # =============================================================================
+  
+  # Chroma - 最轻量的向量数据库
+  chroma-test:
+    container_name: agentmem-chroma-test
+    image: chromadb/chroma:0.4.18
+    ports:
+      - "18000:8000"
+    volumes:
+      - test_chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_HOST=0.0.0.0
+      - CHROMA_PORT=8000
+      - CHROMA_LOG_LEVEL=warning
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - agentmem-test-network
+
+  # Qdrant - 快速启动的向量数据库
+  qdrant-test:
+    container_name: agentmem-qdrant-test
+    image: qdrant/qdrant:v1.7.3
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+    volumes:
+      - test_qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - agentmem-test-network
+
+  # =============================================================================
+  # 传统数据库 (测试用)
+  # =============================================================================
+  
+  # PostgreSQL + pgvector
+  postgres-test:
+    container_name: agentmem-postgres-test
+    image: pgvector/pgvector:pg15-v0.5.1
+    ports:
+      - "15432:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: agentmem_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - agentmem-test-network
+
+  # Redis
+  redis-test:
+    container_name: agentmem-redis-test
+    image: redis:7.2-alpine
+    ports:
+      - "16379:6379"
+    volumes:
+      - test_redis_data:/data
+    command: >
+      redis-server
+      --requirepass test_password
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - agentmem-test-network
+
+  # =============================================================================
+  # 测试工具
+  # =============================================================================
+  
+  # 测试数据初始化容器
+  test-init:
+    container_name: agentmem-test-init
+    image: curlimages/curl:latest
+    depends_on:
+      chroma-test:
+        condition: service_healthy
+      qdrant-test:
+        condition: service_healthy
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        echo 'Testing Chroma connection...' &&
+        curl -f http://chroma-test:8000/api/v1/heartbeat &&
+        echo 'Testing Qdrant connection...' &&
+        curl -f http://qdrant-test:6333/health &&
+        echo 'All services are ready for testing!'
+      "
+    networks:
+      - agentmem-test-network
+
+  # 性能测试容器
+  performance-test:
+    container_name: agentmem-performance-test
+    image: rust:1.75
+    volumes:
+      - ../:/workspace
+    working_dir: /workspace
+    depends_on:
+      test-init:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        echo 'Running performance tests...' &&
+        cargo test --release --features integration-tests performance_tests
+      "
+    environment:
+      - CHROMA_URL=http://chroma-test:8000
+      - QDRANT_URL=http://qdrant-test:6333
+      - POSTGRES_URL=postgresql://test_user:test_password@postgres-test:5432/agentmem_test
+      - REDIS_URL=redis://:test_password@redis-test:6379
+    networks:
+      - agentmem-test-network
+
+  # 集成测试容器
+  integration-test:
+    container_name: agentmem-integration-test
+    image: rust:1.75
+    volumes:
+      - ../:/workspace
+    working_dir: /workspace
+    depends_on:
+      test-init:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        echo 'Running integration tests...' &&
+        cargo test --features integration-tests integration_tests
+      "
+    environment:
+      - CHROMA_URL=http://chroma-test:8000
+      - QDRANT_URL=http://qdrant-test:6333
+      - POSTGRES_URL=postgresql://test_user:test_password@postgres-test:5432/agentmem_test
+      - REDIS_URL=redis://:test_password@redis-test:6379
+      - RUST_LOG=debug
+    networks:
+      - agentmem-test-network
+
+  # 兼容性测试容器
+  compatibility-test:
+    container_name: agentmem-compatibility-test
+    image: rust:1.75
+    volumes:
+      - ../:/workspace
+    working_dir: /workspace
+    depends_on:
+      test-init:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        echo 'Running Mem0 compatibility tests...' &&
+        cargo test --package agent-mem-compat compatibility_tests
+      "
+    environment:
+      - CHROMA_URL=http://chroma-test:8000
+      - QDRANT_URL=http://qdrant-test:6333
+      - POSTGRES_URL=postgresql://test_user:test_password@postgres-test:5432/agentmem_test
+      - REDIS_URL=redis://:test_password@redis-test:6379
+    networks:
+      - agentmem-test-network
+
+  # 压力测试容器
+  stress-test:
+    container_name: agentmem-stress-test
+    image: rust:1.75
+    volumes:
+      - ../:/workspace
+    working_dir: /workspace
+    depends_on:
+      test-init:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        echo 'Running stress tests...' &&
+        cargo run --release --example stress-test -- --concurrent 100 --duration 60s
+      "
+    environment:
+      - CHROMA_URL=http://chroma-test:8000
+      - QDRANT_URL=http://qdrant-test:6333
+      - POSTGRES_URL=postgresql://test_user:test_password@postgres-test:5432/agentmem_test
+      - REDIS_URL=redis://:test_password@redis-test:6379
+    networks:
+      - agentmem-test-network
+
+  # 基准测试容器
+  benchmark-test:
+    container_name: agentmem-benchmark-test
+    image: rust:1.75
+    volumes:
+      - ../:/workspace
+    working_dir: /workspace
+    depends_on:
+      test-init:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        echo 'Running benchmark tests...' &&
+        cargo run --release --example performance-benchmark
+      "
+    environment:
+      - CHROMA_URL=http://chroma-test:8000
+      - QDRANT_URL=http://qdrant-test:6333
+      - POSTGRES_URL=postgresql://test_user:test_password@postgres-test:5432/agentmem_test
+      - REDIS_URL=redis://:test_password@redis-test:6379
+    networks:
+      - agentmem-test-network

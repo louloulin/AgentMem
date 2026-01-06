@@ -15,6 +15,7 @@ description = "Intelligent memory processing for AgentMem memory platform"
 agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-core = { path = "../agent-mem-core" }
+agent-mem-llm = { path = "../agent-mem-llm" }
 
 # 核心依赖
 serde.workspace = true
@@ -26,6 +27,13 @@ async-trait.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 tracing.workspace = true
+base64 = "0.21"
+regex = "1.0"
+futures = "0.3"
+dashmap = "5.5"
+num_cpus = "1.16"
+lru = "0.12"
+sha2 = "0.10"
 
 # 数学和统计计算
 nalgebra = { version = "0.32", optional = true }
@@ -34,6 +42,22 @@ ndarray = { version = "0.15", optional = true }
 # 机器学习算法（可选）
 linfa = { version = "0.7", optional = true }
 linfa-clustering = { version = "0.7", optional = true }
+
+# 多模态处理依赖
+reqwest = { version = "0.11", features = ["json", "multipart"], optional = true }
+image = { version = "0.24", optional = true }
+imageproc = { version = "0.23", optional = true }
+rusttype = { version = "0.9", optional = true }
+
+# OCR 和文本识别
+tesseract = { version = "0.13", optional = true }
+
+# 音频处理
+hound = { version = "3.5", optional = true }
+symphonia = { version = "0.5", optional = true }
+
+# 视频处理
+ffmpeg-next = { version = "6.0", optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -52,5 +76,31 @@ advanced-math = ["dep:nalgebra", "dep:ndarray"]
 # 机器学习算法
 ml-algorithms = ["dep:linfa", "dep:linfa-clustering", "advanced-math"]
 
+# 多模态处理功能
+multimodal = [
+    "dep:reqwest",
+    "dep:image",
+    "dep:imageproc",
+    "dep:rusttype",
+    "dep:hound",
+    "dep:symphonia",
+]
+
+# 多模态处理功能（完整版，包含 OCR 和视频）
+multimodal-full = [
+    "multimodal",
+    "dep:tesseract",
+    "dep:ffmpeg-next"
+]
+
+# 图像处理
+image-processing = ["dep:image", "dep:imageproc", "dep:rusttype", "dep:tesseract"]
+
+# 音频处理
+audio-processing = ["dep:hound", "dep:symphonia"]
+
+# 视频处理
+video-processing = ["dep:ffmpeg-next"]
+
 # 所有功能
-all-features = ["basic", "advanced-math", "ml-algorithms"]
+all-features = ["basic", "advanced-math", "ml-algorithms", "multimodal"]

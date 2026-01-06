@@ -1,0 +1,14 @@
+[package]
+name = "quickstart-zero-config"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "quickstart-zero-config"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+tokio = { version = "1.42", features = ["full"] }
+anyhow = "1.0"
+

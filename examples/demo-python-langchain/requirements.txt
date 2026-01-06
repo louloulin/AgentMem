@@ -1,0 +1,20 @@
+# AgentMem + LangGraph 集成示例依赖
+
+# LangGraph和LangChain核心
+langgraph>=0.0.50
+langchain-core>=0.1.0
+
+# LLM提供商（至少选择一个）
+langchain-openai>=0.0.5      # OpenAI GPT-3.5/GPT-4
+langchain-anthropic>=0.1.0   # Anthropic Claude
+
+# 可选：其他LLM提供商
+# langchain-google-genai>=0.0.5  # Google Gemini
+
+# 工具库
+colorama>=0.4.6              # 彩色终端输出
+python-dotenv>=1.0.0         # 环境变量管理
+
+# AgentMem Python绑定（需要编译）
+# 请参考 ../../crates/agent-mem-python/README.md
+

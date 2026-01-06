@@ -1,14 +1,14 @@
 //! Production Logging and Audit System
-//! 
+//!
 //! Comprehensive logging, audit trails, and security monitoring for production
 //! environments with structured logging and compliance support.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 /// Logging system configuration
@@ -242,7 +242,8 @@ impl LoggingSystem {
             None,
             HashMap::new(),
             Vec::new(),
-        ).await
+        )
+        .await
     }
 
     /// Log a warning message
@@ -257,14 +258,23 @@ impl LoggingSystem {
             None,
             HashMap::new(),
             Vec::new(),
-        ).await
+        )
+        .await
     }
 
     /// Log an error message
-    pub async fn error(&self, message: &str, component: &str, error: Option<&dyn std::error::Error>) -> Result<()> {
+    pub async fn error(
+        &self,
+        message: &str,
+        component: &str,
+        error: Option<&dyn std::error::Error>,
+    ) -> Result<()> {
         let mut fields = HashMap::new();
         if let Some(err) = error {
-            fields.insert("error".to_string(), serde_json::Value::String(err.to_string()));
+            fields.insert(
+                "error".to_string(),
+                serde_json::Value::String(err.to_string()),
+            );
         }
 
         self.log(
@@ -277,7 +287,8 @@ impl LoggingSystem {
             None,
             fields,
             vec!["error".to_string()],
-        ).await
+        )
+        .await
     }
 
     /// Log an audit event
@@ -400,7 +411,7 @@ impl LoggingSystem {
     /// Get log entries with optional filtering
     pub async fn get_logs(&self, filter: Option<&LogFilter>) -> Vec<LogEntry> {
         let log_entries = self.log_entries.read().await;
-        
+
         if let Some(filter) = filter {
             log_entries
                 .iter()
@@ -487,7 +498,8 @@ impl LoggingSystem {
 
     /// Clean up old logs
     pub async fn cleanup_old_logs(&self) -> Result<()> {
-        let cutoff_time = Utc::now() - chrono::Duration::days(self.config.log_retention_days as i64);
+        let cutoff_time =
+            Utc::now() - chrono::Duration::days(self.config.log_retention_days as i64);
 
         // Clean up old log entries
         {
@@ -570,9 +582,12 @@ mod tests {
     async fn test_logging_system_creation() {
         let config = LoggingConfig::default();
         let logging = LoggingSystem::new(config);
-        
-        logging.info("Test message", "test_component").await.unwrap();
-        
+
+        logging
+            .info("Test message", "test_component")
+            .await
+            .unwrap();
+
         let logs = logging.get_logs(None).await;
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].message, "Test message");
@@ -582,23 +597,29 @@ mod tests {
     async fn test_audit_logging() {
         let config = LoggingConfig::default();
         let logging = LoggingSystem::new(config);
-        
+
         let mut details = HashMap::new();
-        details.insert("memory_id".to_string(), serde_json::Value::String("test-123".to_string()));
-        
-        logging.audit(
-            AuditEventType::MemoryCreated,
-            Some("user123".to_string()),
-            Some("session456".to_string()),
-            Some("memory789".to_string()),
-            Some("memory".to_string()),
-            "create_memory".to_string(),
-            AuditResult::Success,
-            Some("192.168.1.1".to_string()),
-            Some("Mozilla/5.0".to_string()),
-            details,
-        ).await.unwrap();
-        
+        details.insert(
+            "memory_id".to_string(),
+            serde_json::Value::String("test-123".to_string()),
+        );
+
+        logging
+            .audit(
+                AuditEventType::MemoryCreated,
+                Some("user123".to_string()),
+                Some("session456".to_string()),
+                Some("memory789".to_string()),
+                Some("memory".to_string()),
+                "create_memory".to_string(),
+                AuditResult::Success,
+                Some("192.168.1.1".to_string()),
+                Some("Mozilla/5.0".to_string()),
+                details,
+            )
+            .await
+            .unwrap();
+
         let audit_logs = logging.get_audit_logs().await;
         assert_eq!(audit_logs.len(), 1);
         assert_eq!(audit_logs[0].action, "create_memory");
@@ -609,23 +630,26 @@ mod tests {
     async fn test_security_logging() {
         let config = LoggingConfig::default();
         let logging = LoggingSystem::new(config);
-        
-        logging.security(
-            SecurityEventType::AuthenticationFailure,
-            SecuritySeverity::High,
-            Some("192.168.1.100".to_string()),
-            Some("attacker".to_string()),
-            None,
-            "Multiple failed login attempts".to_string(),
-            vec!["brute_force".to_string(), "suspicious_ip".to_string()],
-            vec!["ip_blocked".to_string(), "user_notified".to_string()],
-            HashMap::new(),
-        ).await.unwrap();
-        
+
+        logging
+            .security(
+                SecurityEventType::AuthenticationFailure,
+                SecuritySeverity::High,
+                Some("192.168.1.100".to_string()),
+                Some("attacker".to_string()),
+                None,
+                "Multiple failed login attempts".to_string(),
+                vec!["brute_force".to_string(), "suspicious_ip".to_string()],
+                vec!["ip_blocked".to_string(), "user_notified".to_string()],
+                HashMap::new(),
+            )
+            .await
+            .unwrap();
+
         let security_logs = logging.get_security_logs().await;
         assert_eq!(security_logs.len(), 1);
         assert_eq!(security_logs[0].severity, SecuritySeverity::High);
-        
+
         let critical_events = logging.get_critical_security_events().await;
         assert_eq!(critical_events.len(), 1);
     }
@@ -634,10 +658,12 @@ mod tests {
     async fn test_risk_score_calculation() {
         let config = LoggingConfig::default();
         let logging = LoggingSystem::new(config);
-        
-        let score1 = logging.calculate_risk_score(&AuditEventType::MemoryAccessed, &AuditResult::Success);
-        let score2 = logging.calculate_risk_score(&AuditEventType::SecurityViolation, &AuditResult::Denied);
-        
+
+        let score1 =
+            logging.calculate_risk_score(&AuditEventType::MemoryAccessed, &AuditResult::Success);
+        let score2 =
+            logging.calculate_risk_score(&AuditEventType::SecurityViolation, &AuditResult::Denied);
+
         assert!(score1 < score2);
         assert!(score2 > 90);
     }

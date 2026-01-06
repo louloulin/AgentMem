@@ -1,0 +1,21 @@
+[package]
+name = "agentmem_example"
+version = "1.0.0"
+cjc-version = "0.60.5"
+description = "AgentMem 仓颉 SDK 使用示例"
+authors = ["AgentMem Team"]
+license = "MIT"
+output-type = "executable"
+src-dir = "src"
+compile-option = "-O2"
+link-option = ""
+
+[dependencies]
+agentmem = { path = ".." }
+
+[native-dependencies]
+agentmem_c = { path = "../lib/libagentmem_c.a" }
+
+[profile]
+build = {incremental = false, lto = ""}
+test = {}

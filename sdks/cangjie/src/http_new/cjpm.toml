@@ -1,0 +1,17 @@
+[package]
+name = "agentmem_http"
+version = "2.0.0"
+cjc-version = "0.60.5"
+description = "AgentMem HTTP SDK - Pure Cangjie Implementation"
+authors = ["AgentMem Team"]
+license = "MIT"
+output-type = "executable"
+src-dir = "."
+main-file = "tests.cj"
+
+[dependencies]
+
+[profile]
+build = {incremental = false}
+test = {}
+

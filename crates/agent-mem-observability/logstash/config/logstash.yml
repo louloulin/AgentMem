@@ -1,0 +1,28 @@
+# Logstash 配置文件 - AgentMem 日志聚合
+
+# HTTP API 配置
+http.host: "0.0.0.0"
+http.port: 9600
+
+# 日志配置
+log.level: info
+path.logs: /var/log/logstash
+
+# Pipeline 配置
+path.config: /usr/share/logstash/pipeline
+config.reload.automatic: true
+config.reload.interval: 3s
+
+# 队列配置
+queue.type: persisted
+queue.max_bytes: 1gb
+queue.checkpoint.writes: 1024
+
+# 死信队列配置
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 1gb
+
+# 监控配置
+monitoring.enabled: true
+monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+

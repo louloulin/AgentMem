@@ -20,6 +20,8 @@ uuid.workspace = true
 chrono.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+sqlx = { workspace = true, optional = true }
 
 [features]
 default = []
+sqlx = ["dep:sqlx"]

@@ -1,0 +1,45 @@
+apiVersion: v2
+name: agentmem
+description: AgentMem - Enterprise-grade memory management for AI agents
+type: application
+version: 6.0.0
+appVersion: "6.0.0"
+home: https://agentmem.dev
+sources:
+  - https://github.com/agentmem/agentmem
+maintainers:
+  - name: AgentMem Team
+    email: support@agentmem.dev
+    url: https://agentmem.dev
+keywords:
+  - ai
+  - memory
+  - agent
+  - llm
+  - vector
+  - database
+  - enterprise
+annotations:
+  category: Database
+  licenses: MIT
+dependencies:
+  - name: postgresql
+    version: 12.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: 18.x.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: elasticsearch
+    version: 19.x.x
+    repository: https://helm.elastic.co
+    condition: elasticsearch.enabled
+  - name: prometheus
+    version: 25.x.x
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: 7.x.x
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled

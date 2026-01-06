@@ -1,15 +1,18 @@
 # Multi-stage Docker build for AgentMem production deployment
 # Optimized for security, performance, and minimal image size
+# Supports Linux amd64 architecture for production servers
+# Reference: feature-claudecode branch - simplified build approach
 
-# Build stage
-FROM rust:1.75-slim as builder
+# Build stage - using latest Rust for Cargo.lock v4 support
+FROM rust:latest AS builder
 
-# Install build dependencies
+# Install build dependencies including protobuf-compiler
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     libpq-dev \
     ca-certificates \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -18,46 +21,24 @@ RUN useradd -m -u 1001 agentmem
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files first for better caching
-COPY Cargo.toml Cargo.lock ./
-COPY crates/*/Cargo.toml ./crates/*/
-
-# Create dummy source files to build dependencies
-RUN mkdir -p crates/agent-mem-core/src \
-    crates/agent-mem-traits/src \
-    crates/agent-mem-llm/src \
-    crates/agent-mem-storage/src \
-    crates/agent-mem-intelligence/src \
-    crates/agent-mem-graph/src \
-    crates/agent-mem-server/src \
-    crates/agent-mem-client/src \
-    crates/agent-mem-performance/src \
-    crates/agent-mem-distributed/src \
-    && echo "fn main() {}" > crates/agent-mem-server/src/main.rs \
-    && echo "// dummy" > crates/agent-mem-core/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-traits/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-llm/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-storage/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-intelligence/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-graph/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-client/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-performance/src/lib.rs \
-    && echo "// dummy" > crates/agent-mem-distributed/src/lib.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release --bin agent-mem-server
-
-# Remove dummy files
-RUN rm -rf crates/*/src
-
-# Copy actual source code
+# Copy all source code (simplified approach from feature-claudecode)
 COPY . .
 
-# Build the actual application
-RUN cargo build --release --bin agent-mem-server
+# Build the application with RUSTFLAGS to handle SQLite linking conflicts
+# Use --allow-multiple-definition to resolve libsql_ffi and libsqlite3_sys conflicts
+RUN RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition" \
+    cargo build --release --workspace \
+    --bin agent-mem-server \
+    --exclude agent-mem-python \
+    --exclude demo-multimodal \
+    --exclude demo-codebase-memory
 
 # Runtime stage
-FROM debian:bookworm-slim
+# Use debian:sid-slim (unstable alias) for GLIBC 2.38+ compatibility
+# bookworm-slim only has GLIBC 2.36, which is too old for binaries built with rust:latest
+# sid-slim (unstable) contains GLIBC 2.39, compatible with rust:latest builds
+# Alternative: ubuntu:24.04 (also has GLIBC 2.39) if debian:sid-slim is unavailable
+FROM debian:sid-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -104,6 +85,13 @@ ENV AGENT_MEM_HOST=0.0.0.0
 ENV AGENT_MEM_DATA_DIR=/app/data
 ENV AGENT_MEM_LOG_DIR=/app/logs
 ENV AGENT_MEM_CONFIG_DIR=/app/config
+
+# LLM Provider configuration (Zhipu AI)
+# These can be overridden at runtime if needed
+ENV ZHIPU_API_KEY=""
+ENV LLM_PROVIDER="zhipu"
+ENV LLM_MODEL="glm-4.6"
+ENV ZHIPU_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
 
 # Run the application
 CMD ["./agent-mem-server"]

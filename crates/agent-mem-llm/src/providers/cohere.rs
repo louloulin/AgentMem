@@ -1,13 +1,14 @@
 //! Cohere LLM provider implementation
-//! 
+//!
 //! Provides integration with Cohere's Command models including
 //! Command R, Command R+, and Command Light.
 
 use agent_mem_traits::LLMConfig;
-use agent_mem_traits::{Result, AgentMemError, Message, MessageRole};
+use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 use tracing::{debug, error, info};
 
@@ -97,17 +98,23 @@ pub struct CohereProvider {
 impl CohereProvider {
     /// Create a new Cohere provider
     pub fn new(config: LLMConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Cohere API key is required"))?;
-        
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e)))?;
-        
-        let base_url = config.base_url.clone()
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
+
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.cohere.ai".to_string());
-        
+
         Ok(Self {
             config,
             client,
@@ -115,7 +122,7 @@ impl CohereProvider {
             base_url,
         })
     }
-    
+
     /// Get available Cohere models
     pub fn available_models() -> Vec<&'static str> {
         vec![
@@ -127,13 +134,20 @@ impl CohereProvider {
             "command-light-nightly",
         ]
     }
-    
+
     /// Convert AgentMem messages to Cohere format
-    fn convert_messages(&self, messages: &[Message]) -> (Option<String>, Option<String>, Option<Vec<CohereChatMessage>>) {
+    fn convert_messages(
+        &self,
+        messages: &[Message],
+    ) -> (
+        Option<String>,
+        Option<String>,
+        Option<Vec<CohereChatMessage>>,
+    ) {
         let mut preamble = None;
         let mut current_message = None;
         let mut chat_history = Vec::new();
-        
+
         for (i, message) in messages.iter().enumerate() {
             match message.role {
                 MessageRole::System => {
@@ -159,19 +173,23 @@ impl CohereProvider {
                 }
             }
         }
-        
-        let history = if chat_history.is_empty() { None } else { Some(chat_history) };
-        
+
+        let history = if chat_history.is_empty() {
+            None
+        } else {
+            Some(chat_history)
+        };
+
         (preamble, current_message, history)
     }
-    
+
     /// Build Cohere API request
     fn build_request(&self, messages: &[Message]) -> Result<CohereRequest> {
         let (preamble, current_message, chat_history) = self.convert_messages(messages);
-        
+
         let message = current_message
             .ok_or_else(|| AgentMemError::validation_error("No user message found"))?;
-        
+
         let request = CohereRequest {
             model: self.config.model.clone(),
             message,
@@ -180,41 +198,50 @@ impl CohereProvider {
             temperature: self.config.temperature,
             max_tokens: self.config.max_tokens,
             p: self.config.top_p,
-            k: None, // Not available in LLMConfig
+            k: None,              // Not available in LLMConfig
             stop_sequences: None, // Not available in LLMConfig
         };
-        
+
         Ok(request)
     }
-    
+
     /// Make API request to Cohere
     async fn make_request(&self, request: &CohereRequest) -> Result<CohereResponse> {
         debug!("Making Cohere API request to model: {}", request.model);
-        
-        let response = self.client
-            .post(&format!("{}/v1/chat", self.base_url))
+
+        let response = self
+            .client
+            .post(format!("{}/v1/chat", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Cohere API request failed: {}", e)))?;
-        
+            .map_err(|e| AgentMemError::network_error(format!("Cohere API request failed: {e}")))?;
+
         let status = response.status();
-        let response_text = response.text().await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to read response: {}", e)))?;
-        
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
+
         if status.is_success() {
-            serde_json::from_str(&response_text)
-                .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse Cohere response: {}", e)))
+            serde_json::from_str(&response_text).map_err(|e| {
+                AgentMemError::parsing_error(format!("Failed to parse Cohere response: {e}"))
+            })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<CohereError>(&response_text) {
                 error!("Cohere API error: {}", error.message);
-                Err(AgentMemError::llm_error(&format!("Cohere API error: {}", error.message)))
+                Err(AgentMemError::llm_error(format!(
+                    "Cohere API error: {}",
+                    error.message
+                )))
             } else {
                 error!("Cohere API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!("Cohere API error: HTTP {}", status)))
+                Err(AgentMemError::llm_error(format!(
+                    "Cohere API error: HTTP {status}"
+                )))
             }
         }
     }
@@ -223,30 +250,38 @@ impl CohereProvider {
 #[async_trait]
 impl crate::LLMProvider for CohereProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
-        info!("Generating response using Cohere model: {}", self.config.model);
-        
+        info!(
+            "Generating response using Cohere model: {}",
+            self.config.model
+        );
+
         let request = self.build_request(messages)?;
         let response = self.make_request(&request).await?;
-        
+
         if response.text.is_empty() {
             return Err(AgentMemError::llm_error("Cohere returned empty response"));
         }
-        
+
         if let Some(token_count) = &response.token_count {
-            info!("Cohere response generated successfully (tokens: prompt={}, response={}, total={})", 
-                  token_count.prompt_tokens, token_count.response_tokens, token_count.total_tokens);
+            info!(
+                "Cohere response generated successfully (tokens: prompt={}, response={}, total={})",
+                token_count.prompt_tokens, token_count.response_tokens, token_count.total_tokens
+            );
         }
-        
+
         Ok(response.text)
     }
-    
-    async fn generate_stream(&self, messages: &[Message]) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+
+    async fn generate_stream(
+        &self,
+        messages: &[Message],
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // For now, fall back to non-streaming
         let response = self.generate(messages).await?;
         let stream = futures::stream::once(async move { Ok(response) });
-        Ok(Box::new(Box::pin(stream)))
+        Ok(Box::pin(stream))
     }
-    
+
     fn get_model_info(&self) -> agent_mem_traits::ModelInfo {
         agent_mem_traits::ModelInfo {
             provider: "cohere".to_string(),
@@ -263,14 +298,12 @@ impl crate::LLMProvider for CohereProvider {
         }
         Ok(())
     }
-
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{MessageRole, LLMProvider};
+    use agent_mem_traits::{LLMProvider, MessageRole};
 
     fn create_test_config() -> LLMConfig {
         LLMConfig {
@@ -293,7 +326,7 @@ mod tests {
         let provider = CohereProvider::new(config);
         assert!(provider.is_ok());
     }
-    
+
     #[test]
     fn test_available_models() {
         let models = CohereProvider::available_models();
@@ -301,12 +334,12 @@ mod tests {
         assert!(models.contains(&"command-r-plus"));
         assert!(models.contains(&"command-r"));
     }
-    
+
     #[test]
     fn test_message_conversion() {
         let config = create_test_config();
         let provider = CohereProvider::new(config).unwrap();
-        
+
         let messages = vec![
             Message {
                 role: MessageRole::System,
@@ -329,13 +362,13 @@ mod tests {
                 timestamp: None,
             },
         ];
-        
+
         let (preamble, current_message, chat_history) = provider.convert_messages(&messages);
-        
+
         assert_eq!(preamble, Some("You are a helpful assistant.".to_string()));
         assert_eq!(current_message, Some("How are you?".to_string()));
         assert!(chat_history.is_some());
-        
+
         let history = chat_history.unwrap();
         assert_eq!(history.len(), 2);
         assert_eq!(history[0].role, "USER");
@@ -343,12 +376,12 @@ mod tests {
         assert_eq!(history[1].role, "CHATBOT");
         assert_eq!(history[1].message, "Hi there!");
     }
-    
+
     #[test]
     fn test_model_info() {
         let config = create_test_config();
         let provider = CohereProvider::new(config).unwrap();
-        
+
         let info = provider.get_model_info();
         assert_eq!(info.provider, "cohere");
         assert_eq!(info.model, "command-r");

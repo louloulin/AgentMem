@@ -1,0 +1,266 @@
+# AgentMem 生产环境 Docker Compose 配置
+# 企业级部署配置，包含完整的监控和日志系统
+
+version: '3.8'
+
+services:
+  # ================================
+  # AgentMem 核心服务
+  # ================================
+  agentmem-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.optimized
+      target: runtime
+    image: agentmem/server:6.0.0
+    container_name: agentmem-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+      - AGENTMEM_HOST=0.0.0.0
+      - AGENTMEM_PORT=8080
+      - AGENTMEM_DATABASE_URL=postgresql://agentmem:${POSTGRES_PASSWORD}@postgres:5432/agentmem
+      - AGENTMEM_REDIS_URL=redis://redis:6379
+      - AGENTMEM_ELASTICSEARCH_URL=http://elasticsearch:9200
+      - AGENTMEM_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - AGENTMEM_PROMETHEUS_ENDPOINT=http://prometheus:9090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - agentmem-network
+    volumes:
+      - agentmem-logs:/app/logs
+      - agentmem-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # ================================
+  # 数据库服务
+  # ================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentmem-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=agentmem
+      - POSTGRES_USER=agentmem
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - agentmem-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentmem -d agentmem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # ================================
+  # 缓存服务
+  # ================================
+  redis:
+    image: redis:7-alpine
+    container_name: agentmem-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - agentmem-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # ================================
+  # 搜索引擎
+  # ================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: agentmem-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - agentmem-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # ================================
+  # 监控服务
+  # ================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: agentmem-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - agentmem-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: agentmem-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - agentmem-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ================================
+  # 日志服务
+  # ================================
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: agentmem-filebeat
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./monitoring/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - agentmem-logs:/var/log/agentmem:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - agentmem-network
+    depends_on:
+      - elasticsearch
+
+  # ================================
+  # 链路追踪
+  # ================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: agentmem-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - agentmem-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# ================================
+# 网络配置
+# ================================
+networks:
+  agentmem-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ================================
+# 数据卷配置
+# ================================
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  agentmem-logs:
+    driver: local
+  agentmem-data:
+    driver: local

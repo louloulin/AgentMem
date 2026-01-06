@@ -1,7 +1,7 @@
 //! Memgraph图存储实现
 
-use agent_mem_traits::{GraphStore, Entity, Relation, Session, GraphResult, Result, AgentMemError};
 use agent_mem_config::memory::GraphStoreConfig;
+use agent_mem_traits::{AgentMemError, Entity, GraphResult, GraphStore, Relation, Result, Session};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -65,21 +65,27 @@ impl MemgraphStore {
             config.uri.clone()
         } else {
             // 将bolt://转换为http://，Memgraph默认HTTP端口是7444
-            config.uri.replace("bolt://", "http://").replace(":7687", ":7444")
+            config
+                .uri
+                .replace("bolt://", "http://")
+                .replace(":7687", ":7444")
         };
 
         // 创建认证头（如果提供了用户名和密码）
-        let auth_header = if let (Some(username), Some(password)) = (&config.username, &config.password) {
-            let auth_string = format!("{}:{}", username, password);
-            Some(format!("Basic {}", base64::encode(&auth_string)))
-        } else {
-            None
-        };
+        let auth_header =
+            if let (Some(username), Some(password)) = (&config.username, &config.password) {
+                let auth_string = format!("{username}:{password}");
+                Some(format!("Basic {}", base64::encode(&auth_string)))
+            } else {
+                None
+            };
 
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| AgentMemError::network_error(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         let store = Self {
             config,
@@ -104,8 +110,9 @@ impl MemgraphStore {
         };
 
         let url = format!("{}/db/data/transaction/commit", self.base_url);
-        
-        let mut request = self.client
+
+        let mut request = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&query);
@@ -114,24 +121,31 @@ impl MemgraphStore {
             request = request.header("Authorization", auth);
         }
 
-        let response = request.send().await
-            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {}", e)))?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Connection test failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph connection test failed {}: {}", status, error_text
+                "Memgraph connection test failed {status}: {error_text}"
             )));
         }
 
-        let result: MemgraphQueryResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let result: MemgraphQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph error: {}", result.errors[0].message
+                "Memgraph error: {}",
+                result.errors[0].message
             )));
         }
 
@@ -139,7 +153,11 @@ impl MemgraphStore {
     }
 
     /// 执行Cypher查询
-    async fn execute_query(&self, statement: &str, parameters: Option<HashMap<String, serde_json::Value>>) -> Result<MemgraphQueryResponse> {
+    async fn execute_query(
+        &self,
+        statement: &str,
+        parameters: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<MemgraphQueryResponse> {
         let query = MemgraphQueryRequest {
             statements: vec![MemgraphStatement {
                 statement: statement.to_string(),
@@ -148,8 +166,9 @@ impl MemgraphStore {
         };
 
         let url = format!("{}/db/data/transaction/commit", self.base_url);
-        
-        let mut request = self.client
+
+        let mut request = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&query);
@@ -158,24 +177,31 @@ impl MemgraphStore {
             request = request.header("Authorization", auth);
         }
 
-        let response = request.send().await
-            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {}", e)))?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Query execution failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph query failed {}: {}", status, error_text
+                "Memgraph query failed {status}: {error_text}"
             )));
         }
 
-        let result: MemgraphQueryResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let result: MemgraphQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if !result.errors.is_empty() {
             return Err(AgentMemError::storage_error(format!(
-                "Memgraph error: {}", result.errors[0].message
+                "Memgraph error: {}",
+                result.errors[0].message
             )));
         }
 
@@ -185,9 +211,18 @@ impl MemgraphStore {
     /// 将Entity转换为Cypher参数
     fn entity_to_parameters(&self, entity: &Entity) -> HashMap<String, serde_json::Value> {
         let mut params = HashMap::new();
-        params.insert("id".to_string(), serde_json::Value::String(entity.id.clone()));
-        params.insert("entity_type".to_string(), serde_json::Value::String(entity.entity_type.clone()));
-        params.insert("name".to_string(), serde_json::Value::String(entity.name.clone()));
+        params.insert(
+            "id".to_string(),
+            serde_json::Value::String(entity.id.clone()),
+        );
+        params.insert(
+            "entity_type".to_string(),
+            serde_json::Value::String(entity.entity_type.clone()),
+        );
+        params.insert(
+            "name".to_string(),
+            serde_json::Value::String(entity.name.clone()),
+        );
 
         // 添加属性
         for (key, value) in &entity.attributes {
@@ -200,10 +235,24 @@ impl MemgraphStore {
     /// 将Relation转换为Cypher参数
     fn relation_to_parameters(&self, relation: &Relation) -> HashMap<String, serde_json::Value> {
         let mut params = HashMap::new();
-        params.insert("source".to_string(), serde_json::Value::String(relation.source.clone()));
-        params.insert("target".to_string(), serde_json::Value::String(relation.target.clone()));
-        params.insert("relation_type".to_string(), serde_json::Value::String(relation.relation.clone()));
-        params.insert("confidence".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(relation.confidence as f64).unwrap()));
+        params.insert(
+            "source".to_string(),
+            serde_json::Value::String(relation.source.clone()),
+        );
+        params.insert(
+            "target".to_string(),
+            serde_json::Value::String(relation.target.clone()),
+        );
+        params.insert(
+            "relation_type".to_string(),
+            serde_json::Value::String(relation.relation_type.clone()),
+        );
+        params.insert(
+            "confidence".to_string(),
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(relation.confidence as f64).unwrap(),
+            ),
+        );
 
         params
     }
@@ -220,18 +269,19 @@ impl GraphStore for MemgraphStore {
                     e += $properties
                 RETURN e
             "#;
-            
+
             let mut parameters = self.entity_to_parameters(entity);
-            
+
             // 将属性作为单独的参数传递
             let attributes: HashMap<String, serde_json::Value> = entity.attributes.clone();
-            parameters.insert("properties".to_string(), serde_json::Value::Object(
-                attributes.into_iter().collect()
-            ));
-            
+            parameters.insert(
+                "properties".to_string(),
+                serde_json::Value::Object(attributes.into_iter().collect()),
+            );
+
             self.execute_query(statement, Some(parameters)).await?;
         }
-        
+
         Ok(())
     }
 
@@ -248,7 +298,7 @@ impl GraphStore for MemgraphStore {
 
             self.execute_query(statement, Some(parameters)).await?;
         }
-        
+
         Ok(())
     }
 
@@ -261,17 +311,20 @@ impl GraphStore for MemgraphStore {
             RETURN e, collect(r) as relations, collect(related) as related_entities
             LIMIT 10
         "#;
-        
+
         let mut parameters = HashMap::new();
-        parameters.insert("query".to_string(), serde_json::Value::String(query.to_string()));
-        
+        parameters.insert(
+            "query".to_string(),
+            serde_json::Value::String(query.to_string()),
+        );
+
         let response = self.execute_query(statement, Some(parameters)).await?;
-        
+
         let mut results = Vec::new();
-        
+
         for result in response.results {
             for data_row in result.data {
-                if let Some(_entity_data) = data_row.row.get(0) {
+                if let Some(_entity_data) = data_row.row.first() {
                     // 解析实体数据（简化实现）
                     let entity = Entity {
                         id: "parsed_id".to_string(), // 实际实现需要从JSON中解析
@@ -279,39 +332,44 @@ impl GraphStore for MemgraphStore {
                         name: "parsed_name".to_string(),
                         attributes: HashMap::new(),
                     };
-                    
+
                     let graph_result = GraphResult {
                         entity,
                         relations: Vec::new(), // 实际实现需要解析关系
                         score: 1.0,
                     };
-                    
+
                     results.push(graph_result);
                 }
             }
         }
-        
+
         Ok(results)
     }
 
     async fn get_neighbors(&self, entity_id: &str, depth: usize) -> Result<Vec<Entity>> {
-        let statement = format!(r#"
+        let statement = format!(
+            r#"
             MATCH (start:Entity {{id: $entity_id}})
-            MATCH (start)-[*1..{}]-(neighbor:Entity)
+            MATCH (start)-[*1..{depth}]-(neighbor:Entity)
             RETURN DISTINCT neighbor
             LIMIT 50
-        "#, depth);
-        
+        "#
+        );
+
         let mut parameters = HashMap::new();
-        parameters.insert("entity_id".to_string(), serde_json::Value::String(entity_id.to_string()));
-        
+        parameters.insert(
+            "entity_id".to_string(),
+            serde_json::Value::String(entity_id.to_string()),
+        );
+
         let response = self.execute_query(&statement, Some(parameters)).await?;
-        
+
         let mut entities = Vec::new();
-        
+
         for result in response.results {
             for data_row in result.data {
-                if let Some(_entity_data) = data_row.row.get(0) {
+                if let Some(_entity_data) = data_row.row.first() {
                     // 解析实体数据（简化实现）
                     let entity = Entity {
                         id: "neighbor_id".to_string(), // 实际实现需要从JSON中解析
@@ -319,12 +377,12 @@ impl GraphStore for MemgraphStore {
                         name: "neighbor_name".to_string(),
                         attributes: HashMap::new(),
                     };
-                    
+
                     entities.push(entity);
                 }
             }
         }
-        
+
         Ok(entities)
     }
 
@@ -341,21 +399,29 @@ mod base64 {
         const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let mut result = String::new();
         let bytes = input.as_bytes();
-        
+
         for chunk in bytes.chunks(3) {
             let mut buf = [0u8; 3];
             for (i, &byte) in chunk.iter().enumerate() {
                 buf[i] = byte;
             }
-            
+
             let b = ((buf[0] as u32) << 16) | ((buf[1] as u32) << 8) | (buf[2] as u32);
-            
+
             result.push(CHARS[((b >> 18) & 63) as usize] as char);
             result.push(CHARS[((b >> 12) & 63) as usize] as char);
-            result.push(if chunk.len() > 1 { CHARS[((b >> 6) & 63) as usize] as char } else { '=' });
-            result.push(if chunk.len() > 2 { CHARS[(b & 63) as usize] as char } else { '=' });
+            result.push(if chunk.len() > 1 {
+                CHARS[((b >> 6) & 63) as usize] as char
+            } else {
+                '='
+            });
+            result.push(if chunk.len() > 2 {
+                CHARS[(b & 63) as usize] as char
+            } else {
+                '='
+            });
         }
-        
+
         result
     }
 }
@@ -399,7 +465,10 @@ mod tests {
         };
 
         let mut properties = HashMap::new();
-        properties.insert("key1".to_string(), serde_json::Value::String("value1".to_string()));
+        properties.insert(
+            "key1".to_string(),
+            serde_json::Value::String("value1".to_string()),
+        );
 
         let entity = Entity {
             id: "test-id".to_string(),
@@ -409,10 +478,22 @@ mod tests {
         };
 
         let params = store.entity_to_parameters(&entity);
-        assert_eq!(params.get("id").unwrap(), &serde_json::Value::String("test-id".to_string()));
-        assert_eq!(params.get("entity_type").unwrap(), &serde_json::Value::String("Person".to_string()));
-        assert_eq!(params.get("name").unwrap(), &serde_json::Value::String("Test Person".to_string()));
-        assert_eq!(params.get("key1").unwrap(), &serde_json::Value::String("value1".to_string()));
+        assert_eq!(
+            params.get("id").unwrap(),
+            &serde_json::Value::String("test-id".to_string())
+        );
+        assert_eq!(
+            params.get("entity_type").unwrap(),
+            &serde_json::Value::String("Person".to_string())
+        );
+        assert_eq!(
+            params.get("name").unwrap(),
+            &serde_json::Value::String("Test Person".to_string())
+        );
+        assert_eq!(
+            params.get("key1").unwrap(),
+            &serde_json::Value::String("value1".to_string())
+        );
     }
 
     #[test]
@@ -436,22 +517,33 @@ mod tests {
         properties.insert("strength".to_string(), "high".to_string());
 
         let relation = Relation {
-            id: "rel1".to_string(),
+            relation_type: "KNOWS".to_string(),
             source: "person1".to_string(),
             target: "person2".to_string(),
-            relation: "KNOWS".to_string(),
             confidence: 0.9,
         };
 
         let params = store.relation_to_parameters(&relation);
-        assert_eq!(params.get("source").unwrap(), &serde_json::Value::String("person1".to_string()));
-        assert_eq!(params.get("target").unwrap(), &serde_json::Value::String("person2".to_string()));
-        assert_eq!(params.get("relation_type").unwrap(), &serde_json::Value::String("KNOWS".to_string()));
+        assert_eq!(
+            params.get("source").unwrap(),
+            &serde_json::Value::String("person1".to_string())
+        );
+        assert_eq!(
+            params.get("target").unwrap(),
+            &serde_json::Value::String("person2".to_string())
+        );
+        assert_eq!(
+            params.get("relation_type").unwrap(),
+            &serde_json::Value::String("KNOWS".to_string())
+        );
 
         // 检查confidence值（允许浮点数精度误差）
         if let Some(serde_json::Value::Number(n)) = params.get("confidence") {
             let confidence = n.as_f64().unwrap();
-            assert!((confidence - 0.9).abs() < 1e-6, "Expected confidence ~0.9, got {}", confidence);
+            assert!(
+                (confidence - 0.9).abs() < 1e-6,
+                "Expected confidence ~0.9, got {confidence}"
+            );
         } else {
             panic!("Expected confidence to be a number");
         }

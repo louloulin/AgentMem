@@ -1,0 +1,57 @@
+[package]
+name = "agent-mem-observability"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Tracing and logging
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-opentelemetry = "0.28"
+
+# OpenTelemetry
+opentelemetry = { version = "0.27", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.27", features = ["trace", "metrics", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["trace", "metrics", "grpc-tonic"] }
+
+# Prometheus
+prometheus = "0.13"
+prometheus-client = "0.22"
+
+# HTTP server for metrics
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# System metrics
+sysinfo = "0.32"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { workspace = true }
+
+[[bench]]
+name = "observability"
+harness = false

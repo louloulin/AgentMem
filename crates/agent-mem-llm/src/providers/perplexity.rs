@@ -1,13 +1,14 @@
 //! Perplexity AI LLM provider implementation
-//! 
+//!
 //! Provides integration with Perplexity AI models including
 //! Sonar models and Llama-based models.
 
 use agent_mem_traits::LLMConfig;
-use agent_mem_traits::{Result, AgentMemError, Message, MessageRole};
+use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 use tracing::{debug, error, info};
 
@@ -91,17 +92,23 @@ pub struct PerplexityProvider {
 impl PerplexityProvider {
     /// Create a new Perplexity provider
     pub fn new(config: LLMConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Perplexity API key is required"))?;
-        
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e)))?;
-        
-        let base_url = config.base_url.clone()
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
+
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.perplexity.ai".to_string());
-        
+
         Ok(Self {
             config,
             client,
@@ -109,7 +116,7 @@ impl PerplexityProvider {
             base_url,
         })
     }
-    
+
     /// Get available Perplexity models
     pub fn available_models() -> Vec<&'static str> {
         vec![
@@ -124,7 +131,7 @@ impl PerplexityProvider {
             "mistral-7b-instruct",
         ]
     }
-    
+
     /// Convert AgentMem message to Perplexity message
     fn convert_message(&self, message: &Message) -> PerplexityMessage {
         let role = match message.role {
@@ -132,24 +139,24 @@ impl PerplexityProvider {
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
         };
-        
+
         PerplexityMessage {
             role: role.to_string(),
             content: message.content.clone(),
         }
     }
-    
+
     /// Build Perplexity API request
     fn build_request(&self, messages: &[Message]) -> Result<PerplexityRequest> {
         let perplexity_messages: Vec<PerplexityMessage> = messages
             .iter()
             .map(|msg| self.convert_message(msg))
             .collect();
-        
+
         if perplexity_messages.is_empty() {
             return Err(AgentMemError::validation_error("No messages provided"));
         }
-        
+
         let request = PerplexityRequest {
             model: self.config.model.clone(),
             messages: perplexity_messages,
@@ -160,38 +167,55 @@ impl PerplexityProvider {
             presence_penalty: None,
             frequency_penalty: None,
         };
-        
+
         Ok(request)
     }
-    
+
     /// Make API request to Perplexity
     async fn make_request(&self, request: &PerplexityRequest) -> Result<PerplexityResponse> {
         debug!("Making Perplexity API request to model: {}", request.model);
-        
-        let response = self.client
-            .post(&format!("{}/chat/completions", self.base_url))
+
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Perplexity API request failed: {}", e)))?;
-        
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Perplexity API request failed: {e}"))
+            })?;
+
         let status = response.status();
-        let response_text = response.text().await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to read response: {}", e)))?;
-        
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
+
         if status.is_success() {
-            serde_json::from_str(&response_text)
-                .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse Perplexity response: {}", e)))
+            serde_json::from_str(&response_text).map_err(|e| {
+                AgentMemError::parsing_error(format!("Failed to parse Perplexity response: {e}"))
+            })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<PerplexityError>(&response_text) {
-                error!("Perplexity API error: {} - {}", error.error.error_type, error.error.message);
-                Err(AgentMemError::llm_error(&format!("Perplexity API error: {}", error.error.message)))
+                error!(
+                    "Perplexity API error: {} - {}",
+                    error.error.error_type, error.error.message
+                );
+                Err(AgentMemError::llm_error(format!(
+                    "Perplexity API error: {}",
+                    error.error.message
+                )))
             } else {
-                error!("Perplexity API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!("Perplexity API error: HTTP {}", status)))
+                error!(
+                    "Perplexity API error (status {}): {}",
+                    status, response_text
+                );
+                Err(AgentMemError::llm_error(format!(
+                    "Perplexity API error: HTTP {status}"
+                )))
             }
         }
     }
@@ -200,34 +224,42 @@ impl PerplexityProvider {
 #[async_trait]
 impl crate::LLMProvider for PerplexityProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
-        info!("Generating response using Perplexity model: {}", self.config.model);
-        
+        info!(
+            "Generating response using Perplexity model: {}",
+            self.config.model
+        );
+
         let request = self.build_request(messages)?;
         let response = self.make_request(&request).await?;
-        
+
         if response.choices.is_empty() {
             return Err(AgentMemError::llm_error("Perplexity returned no choices"));
         }
-        
+
         let text = response.choices[0].message.content.clone();
-        
+
         if text.is_empty() {
-            return Err(AgentMemError::llm_error("Perplexity returned empty response"));
+            return Err(AgentMemError::llm_error(
+                "Perplexity returned empty response",
+            ));
         }
-        
+
         info!("Perplexity response generated successfully (tokens: prompt={}, completion={}, total={})", 
               response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens);
-        
+
         Ok(text)
     }
-    
-    async fn generate_stream(&self, messages: &[Message]) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+
+    async fn generate_stream(
+        &self,
+        messages: &[Message],
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // For now, fall back to non-streaming
         let response = self.generate(messages).await?;
         let stream = futures::stream::once(async move { Ok(response) });
-        Ok(Box::new(Box::pin(stream)))
+        Ok(Box::pin(stream))
     }
-    
+
     fn get_model_info(&self) -> agent_mem_traits::ModelInfo {
         agent_mem_traits::ModelInfo {
             provider: "perplexity".to_string(),
@@ -240,18 +272,18 @@ impl crate::LLMProvider for PerplexityProvider {
 
     fn validate_config(&self) -> Result<()> {
         if self.api_key.is_empty() {
-            return Err(AgentMemError::config_error("Perplexity API key is required"));
+            return Err(AgentMemError::config_error(
+                "Perplexity API key is required",
+            ));
         }
         Ok(())
     }
-
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{MessageRole, LLMProvider};
+    use agent_mem_traits::{LLMProvider, MessageRole};
 
     fn create_test_config() -> LLMConfig {
         LLMConfig {
@@ -274,7 +306,7 @@ mod tests {
         let provider = PerplexityProvider::new(config);
         assert!(provider.is_ok());
     }
-    
+
     #[test]
     fn test_available_models() {
         let models = PerplexityProvider::available_models();
@@ -282,28 +314,28 @@ mod tests {
         assert!(models.contains(&"llama-3.1-sonar-large-128k-online"));
         assert!(models.contains(&"mixtral-8x7b-instruct"));
     }
-    
+
     #[test]
     fn test_message_conversion() {
         let config = create_test_config();
         let provider = PerplexityProvider::new(config).unwrap();
-        
+
         let message = Message {
             role: MessageRole::User,
             content: "Hello, Perplexity!".to_string(),
             timestamp: None,
         };
-        
+
         let perplexity_message = provider.convert_message(&message);
         assert_eq!(perplexity_message.role, "user");
         assert_eq!(perplexity_message.content, "Hello, Perplexity!");
     }
-    
+
     #[test]
     fn test_model_info() {
         let config = create_test_config();
         let provider = PerplexityProvider::new(config).unwrap();
-        
+
         let info = provider.get_model_info();
         assert_eq!(info.provider, "perplexity");
         assert_eq!(info.model, "llama-3.1-sonar-small-128k-chat");

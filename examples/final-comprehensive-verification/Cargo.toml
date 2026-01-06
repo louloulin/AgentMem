@@ -1,0 +1,21 @@
+[package]
+name = "final-comprehensive-verification"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+# 独立workspace，不继承父级
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[[bin]]
+name = "final-verification"
+path = "src/main.rs"
+

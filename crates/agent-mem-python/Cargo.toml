@@ -1,0 +1,30 @@
+[package]
+name = "agent-mem-python"
+version = "2.0.0"
+edition = "2021"
+authors = ["AgentMem Team"]
+description = "Python bindings for AgentMem using PyO3"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "agentmem_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
+
+# AgentMem unified API
+agent-mem = { path = "../agent-mem" }
+agent-mem-traits = { path = "../agent-mem-traits" }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+
+# Serialization
+serde_json = "1.0"
+
+[build-dependencies]
+pyo3-build-config = "0.20"
+

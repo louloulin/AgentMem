@@ -1,16 +1,16 @@
 //! Consensus management for distributed AgentMem
-//! 
+//!
 //! This module provides consensus capabilities for distributed coordination
 //! and leader election.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 /// Consensus configuration
@@ -130,10 +130,12 @@ impl ConsensusManager {
                 sleep(election_timeout).await;
 
                 let current_state = state.read().await.clone();
-                if current_state == ConsensusState::Follower || current_state == ConsensusState::Candidate {
+                if current_state == ConsensusState::Follower
+                    || current_state == ConsensusState::Candidate
+                {
                     // Start election
                     info!("Node {} starting election", node_id);
-                    
+
                     *state.write().await = ConsensusState::Candidate;
                     *current_term.write().await += 1;
                     *voted_for.write().await = Some(node_id);
@@ -181,7 +183,7 @@ impl ConsensusManager {
             last_heartbeat: Instant::now(),
         };
         peers.insert(peer_id, peer_info);
-        
+
         info!("Added peer {} to consensus group", peer_id);
         Ok(())
     }
@@ -190,7 +192,7 @@ impl ConsensusManager {
     pub async fn remove_peer(&self, peer_id: Uuid) -> Result<()> {
         let mut peers = self.peers.write().await;
         peers.remove(&peer_id);
-        
+
         info!("Removed peer {} from consensus group", peer_id);
         Ok(())
     }
@@ -199,7 +201,9 @@ impl ConsensusManager {
     pub async fn append_entry(&self, command: String) -> Result<u64> {
         let state = self.state.read().await.clone();
         if state != ConsensusState::Leader {
-            return Err(AgentMemError::memory_error("Only leader can append entries"));
+            return Err(AgentMemError::memory_error(
+                "Only leader can append entries",
+            ));
         }
 
         let mut log = self.log.write().await;
@@ -249,7 +253,7 @@ impl ConsensusManager {
     pub async fn shutdown(&self) -> Result<()> {
         *self.is_running.write().await = false;
         *self.state.write().await = ConsensusState::Follower;
-        
+
         info!("Consensus services shutdown for node {}", self.node_id);
         Ok(())
     }
@@ -272,7 +276,7 @@ mod tests {
         let config = ConsensusConfig::default();
         let node_id = Uuid::new_v4();
         let manager = ConsensusManager::new(config, node_id).await.unwrap();
-        
+
         let state = manager.get_state().await.unwrap();
         assert_eq!(state, ConsensusState::Follower);
     }
@@ -282,10 +286,10 @@ mod tests {
         let config = ConsensusConfig::default();
         let node_id = Uuid::new_v4();
         let manager = ConsensusManager::new(config, node_id).await.unwrap();
-        
+
         let peer_id = Uuid::new_v4();
         manager.add_peer(peer_id).await.unwrap();
-        
+
         let peers = manager.peers.read().await;
         assert!(peers.contains_key(&peer_id));
     }
@@ -295,13 +299,13 @@ mod tests {
         let config = ConsensusConfig::default();
         let node_id = Uuid::new_v4();
         let manager = ConsensusManager::new(config, node_id).await.unwrap();
-        
+
         // Set as leader to allow log append
         *manager.state.write().await = ConsensusState::Leader;
-        
+
         let result = manager.append_entry("test command".to_string()).await;
         assert!(result.is_ok());
-        
+
         let log_length = manager.get_log_length().await;
         assert_eq!(log_length, 1);
     }

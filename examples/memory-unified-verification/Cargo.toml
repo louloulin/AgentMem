@@ -1,0 +1,16 @@
+[package]
+name = "memory-unified-verification"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+# 独立项目，不加入workspace
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+

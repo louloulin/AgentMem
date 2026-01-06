@@ -1,0 +1,17 @@
+[package]
+name = "test-fastembed"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "test-fastembed"
+path = "src/main.rs"
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings" }
+tokio = { version = "1.42", features = ["full"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+

@@ -1,0 +1,12 @@
+[package]
+name = "mcp-tool-discovery-demo"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agent-mem-tools = { path = "../../crates/agent-mem-tools" }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = "0.3"
+

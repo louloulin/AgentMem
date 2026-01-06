@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__serena__list_dir",
+      "mcp__sequential-thinking__sequentialthinking",
+      "WebSearch",
+      "mcp__serena__read_file",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)",
+      "mcp__agentmem__agentmem_search_memories",
+      "mcp__serena__activate_project",
+      "mcp__agentmem__agentmem_add_memory",
+      "mcp__agentmem__agentmem_list_agents",
+      "Bash(find:*)",
+      "mcp__agentmem__agentmem_chat",
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__onboarding",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__search_for_pattern",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(cargo test)",
+      "WebFetch(domain:developer.harmonyos.com)",
+      "Bash(pkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "agentmem"
+  ]
+}

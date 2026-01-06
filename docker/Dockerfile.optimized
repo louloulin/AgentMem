@@ -1,0 +1,129 @@
+# AgentMem 优化的多阶段 Docker 构建
+# 企业级生产环境 Docker 镜像
+
+# ================================
+# Stage 1: 构建环境
+# ================================
+FROM rust:1.75-slim as builder
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制 Cargo 文件以利用 Docker 缓存
+COPY Cargo.toml Cargo.lock ./
+COPY crates/*/Cargo.toml ./crates/*/
+
+# 创建虚拟源文件以预构建依赖
+RUN mkdir -p crates/agent-mem-traits/src \
+    crates/agent-mem-utils/src \
+    crates/agent-mem-config/src \
+    crates/agent-mem-core/src \
+    crates/agent-mem-llm/src \
+    crates/agent-mem-storage/src \
+    crates/agent-mem-embeddings/src \
+    crates/agent-mem-intelligence/src \
+    crates/agent-mem-server/src \
+    crates/agent-mem-client/src \
+    crates/agent-mem-performance/src \
+    crates/agent-mem-distributed/src \
+    crates/agent-mem-compat/src \
+    && echo "fn main() {}" > crates/agent-mem-traits/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-utils/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-config/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-core/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-llm/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-storage/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-embeddings/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-intelligence/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-server/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-client/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-performance/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-distributed/src/lib.rs \
+    && echo "fn main() {}" > crates/agent-mem-compat/src/lib.rs
+
+# 预构建依赖（利用 Docker 层缓存）
+RUN cargo build --release --package agent-mem-server && rm -rf target/release/deps/agent_mem*
+
+# 复制实际源代码
+COPY . .
+
+# 构建应用程序
+RUN cargo build --release --package agent-mem-server
+
+# ================================
+# Stage 2: 运行时环境
+# ================================
+FROM debian:bookworm-slim as runtime
+
+# 安装运行时依赖
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建非 root 用户
+RUN groupadd -r agentmem && useradd -r -g agentmem agentmem
+
+# 设置工作目录
+WORKDIR /app
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /app/target/release/agent-mem-server /app/agentmem-server
+
+# 复制配置文件和静态资源
+COPY --from=builder /app/crates/agent-mem-server/config /app/config
+COPY --from=builder /app/crates/agent-mem-server/static /app/static
+
+# 设置权限
+RUN chown -R agentmem:agentmem /app
+USER agentmem
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 暴露端口
+EXPOSE 8080
+
+# 设置环境变量
+ENV RUST_LOG=info
+ENV AGENTMEM_HOST=0.0.0.0
+ENV AGENTMEM_PORT=8080
+
+# 启动命令
+CMD ["./agentmem-server"]
+
+# ================================
+# Stage 3: 开发环境 (可选)
+# ================================
+FROM builder as development
+
+# 安装开发工具
+RUN cargo install cargo-watch cargo-edit
+
+# 设置开发环境变量
+ENV RUST_LOG=debug
+ENV AGENTMEM_ENV=development
+
+# 开发模式启动命令
+CMD ["cargo", "watch", "-x", "run --package agent-mem-server"]
+
+# ================================
+# 镜像元数据
+# ================================
+LABEL maintainer="AgentMem Team <support@agentmem.dev>"
+LABEL version="6.0.0"
+LABEL description="AgentMem - Enterprise-grade memory management for AI agents"
+LABEL org.opencontainers.image.source="https://github.com/agentmem/agentmem"
+LABEL org.opencontainers.image.documentation="https://docs.agentmem.dev"
+LABEL org.opencontainers.image.licenses="MIT"

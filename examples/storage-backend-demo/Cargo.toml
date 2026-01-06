@@ -1,0 +1,19 @@
+[package]
+name = "storage-backend-demo"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+
+[[bin]]
+name = "storage-backend-demo"
+path = "src/main.rs"

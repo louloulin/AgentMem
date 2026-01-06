@@ -30,6 +30,7 @@ futures = "0.3"
 
 # 可选的LLM提供商依赖
 openai-api-rs = { version = "5.0", optional = true }
+rand.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -42,4 +43,5 @@ anthropic = []
 azure = []
 gemini = []
 ollama = []
+integration-tests = []
 all-providers = ["openai", "anthropic", "azure", "gemini", "ollama"]

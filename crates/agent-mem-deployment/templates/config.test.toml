@@ -1,0 +1,46 @@
+# AgentMem 测试环境配置
+
+data_root = ":memory:"
+
+[database]
+backend = "libsql"
+url = ":memory:"
+enable_wal = false
+cache_size_kb = 1024
+page_size = 4096
+auto_create_dir = false
+in_memory = true
+
+[database.pool]
+max_connections = 5
+min_connections = 1
+connection_timeout_secs = 10
+idle_timeout_secs = 60
+
+[vector_store]
+path = ":memory:"
+dimension = 384
+distance = "Cosine"
+enable_persistence = false
+auto_create_dir = false
+in_memory = true
+collection_name = "test_vectors"
+
+[logging]
+level = "debug"
+format = "pretty"
+enable_file = false
+
+[server]
+host = "127.0.0.1"
+port = 0
+workers = 1
+enable_cors = true
+request_timeout_secs = 10
+
+[features]
+enable_mcp = true
+enable_multimodal = false
+enable_reasoning = true
+enable_graph = false
+

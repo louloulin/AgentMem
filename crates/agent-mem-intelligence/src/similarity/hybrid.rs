@@ -1,7 +1,7 @@
 //! 混合相似度计算实现
 
 use super::{SemanticSimilarity, TextualSimilarity};
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -85,8 +85,10 @@ impl HybridSimilarity {
         vector2: &[f32],
     ) -> Result<HybridSimilarityResult> {
         // 计算语义相似度
-        let semantic_result = self.semantic_similarity.detect_similarity(vector1, vector2)?;
-        
+        let semantic_result = self
+            .semantic_similarity
+            .detect_similarity(vector1, vector2)?;
+
         // 计算文本相似度
         let textual_result = self.textual_similarity.calculate_similarity(text1, text2)?;
 
@@ -98,8 +100,8 @@ impl HybridSimilarity {
         };
 
         // 计算加权平均相似度
-        let final_similarity = semantic_result.similarity * semantic_weight + 
-                              textual_result.similarity * textual_weight;
+        let final_similarity = semantic_result.similarity * semantic_weight
+            + textual_result.similarity * textual_weight;
 
         // 构建权重映射
         let mut weights = HashMap::new();
@@ -121,16 +123,16 @@ impl HybridSimilarity {
         // 基于相似度分数的置信度调整权重
         let semantic_confidence = self.calculate_confidence(*semantic_sim);
         let textual_confidence = self.calculate_confidence(*textual_sim);
-        
+
         let total_confidence = semantic_confidence + textual_confidence;
-        
+
         if total_confidence == 0.0 {
             return (self.config.semantic_weight, self.config.textual_weight);
         }
-        
+
         let semantic_weight = semantic_confidence / total_confidence;
         let textual_weight = textual_confidence / total_confidence;
-        
+
         (semantic_weight, textual_weight)
     }
 
@@ -150,16 +152,18 @@ impl HybridSimilarity {
         vectors: &[Vec<f32>],
     ) -> Result<Vec<HybridSimilarityResult>> {
         if texts.len() != vectors.len() {
-            return Err(AgentMemError::validation_error("Texts and vectors must have the same length"));
+            return Err(AgentMemError::validation_error(
+                "Texts and vectors must have the same length",
+            ));
         }
 
         let mut results = Vec::new();
-        
+
         for (text, vector) in texts.iter().zip(vectors.iter()) {
             let result = self.calculate_similarity(query_text, text, query_vector, vector)?;
             results.push(result);
         }
-        
+
         Ok(results)
     }
 
@@ -176,11 +180,12 @@ impl HybridSimilarity {
         }
 
         let results = self.batch_similarity(query_text, query_vector, texts, vectors)?;
-        
-        let max_result = results
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.similarity.partial_cmp(&b.similarity).unwrap_or(std::cmp::Ordering::Equal));
+
+        let max_result = results.iter().enumerate().max_by(|(_, a), (_, b)| {
+            a.similarity
+                .partial_cmp(&b.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some((index, result)) = max_result {
             Ok(Some((index, result.clone())))
@@ -203,15 +208,17 @@ impl HybridSimilarity {
         }
 
         let results = self.batch_similarity(query_text, query_vector, texts, vectors)?;
-        
-        let mut indexed_results: Vec<(usize, HybridSimilarityResult)> = results
-            .into_iter()
-            .enumerate()
-            .collect();
+
+        let mut indexed_results: Vec<(usize, HybridSimilarityResult)> =
+            results.into_iter().enumerate().collect();
 
         // 按相似度降序排序
-        indexed_results.sort_by(|(_, a), (_, b)| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        
+        indexed_results.sort_by(|(_, a), (_, b)| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         // 取前K个
         indexed_results.truncate(k);
 
@@ -227,10 +234,10 @@ impl HybridSimilarity {
         vector2: &[f32],
     ) -> Result<SimilarityAnalysis> {
         let result = self.calculate_similarity(text1, text2, vector1, vector2)?;
-        
+
         let semantic_contribution = result.semantic_similarity * result.weights["semantic"];
         let textual_contribution = result.textual_similarity * result.weights["textual"];
-        
+
         Ok(SimilarityAnalysis {
             final_similarity: result.similarity,
             semantic_similarity: result.semantic_similarity,
@@ -286,13 +293,15 @@ mod tests {
     #[test]
     fn test_calculate_similarity() {
         let hybrid = HybridSimilarity::default();
-        
+
         let text1 = "hello world";
         let text2 = "hello world";
         let vector1 = vec![1.0, 0.0, 0.0];
         let vector2 = vec![1.0, 0.0, 0.0];
-        
-        let result = hybrid.calculate_similarity(text1, text2, &vector1, &vector2).unwrap();
+
+        let result = hybrid
+            .calculate_similarity(text1, text2, &vector1, &vector2)
+            .unwrap();
         assert!(result.similarity > 0.8);
         assert!(result.is_similar);
         assert_eq!(result.weights.len(), 2);
@@ -302,21 +311,23 @@ mod tests {
     fn test_adaptive_weights() {
         let mut config = HybridSimilarityConfig::default();
         config.adaptive_weights = true;
-        
+
         let hybrid = HybridSimilarity::new(
             config,
             SemanticSimilarity::default(),
             TextualSimilarity::default(),
         );
-        
+
         let text1 = "hello world";
         let text2 = "hello world";
         let vector1 = vec![1.0, 0.0, 0.0];
         let vector2 = vec![1.0, 0.0, 0.0];
-        
-        let result = hybrid.calculate_similarity(text1, text2, &vector1, &vector2).unwrap();
+
+        let result = hybrid
+            .calculate_similarity(text1, text2, &vector1, &vector2)
+            .unwrap();
         assert!(result.similarity > 0.0);
-        
+
         // 权重应该根据置信度调整
         let semantic_weight = result.weights["semantic"];
         let textual_weight = result.weights["textual"];
@@ -326,10 +337,10 @@ mod tests {
     #[test]
     fn test_calculate_confidence() {
         let hybrid = HybridSimilarity::default();
-        
+
         let high_sim_confidence = hybrid.calculate_confidence(0.9);
         let low_sim_confidence = hybrid.calculate_confidence(0.1);
-        
+
         assert!(high_sim_confidence > low_sim_confidence);
         assert!(high_sim_confidence > 0.5);
         assert!(low_sim_confidence < 0.5);
@@ -338,19 +349,15 @@ mod tests {
     #[test]
     fn test_batch_similarity() {
         let hybrid = HybridSimilarity::default();
-        
+
         let query_text = "hello world";
         let query_vector = vec![1.0, 0.0];
-        let texts = vec![
-            "hello world".to_string(),
-            "goodbye world".to_string(),
-        ];
-        let vectors = vec![
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
-        
-        let results = hybrid.batch_similarity(query_text, &query_vector, &texts, &vectors).unwrap();
+        let texts = vec!["hello world".to_string(), "goodbye world".to_string()];
+        let vectors = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+
+        let results = hybrid
+            .batch_similarity(query_text, &query_vector, &texts, &vectors)
+            .unwrap();
         assert_eq!(results.len(), 2);
         assert!(results[0].similarity > results[1].similarity);
     }
@@ -358,19 +365,15 @@ mod tests {
     #[test]
     fn test_find_most_similar() {
         let hybrid = HybridSimilarity::default();
-        
+
         let query_text = "hello world";
         let query_vector = vec![1.0, 0.0];
-        let texts = vec![
-            "goodbye world".to_string(),
-            "hello world".to_string(),
-        ];
-        let vectors = vec![
-            vec![0.0, 1.0],
-            vec![1.0, 0.0],
-        ];
-        
-        let result = hybrid.find_most_similar(query_text, &query_vector, &texts, &vectors).unwrap();
+        let texts = vec!["goodbye world".to_string(), "hello world".to_string()];
+        let vectors = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+
+        let result = hybrid
+            .find_most_similar(query_text, &query_vector, &texts, &vectors)
+            .unwrap();
         assert!(result.is_some());
         let (index, _) = result.unwrap();
         assert_eq!(index, 1);
@@ -379,13 +382,15 @@ mod tests {
     #[test]
     fn test_analyze_similarity_components() {
         let hybrid = HybridSimilarity::default();
-        
+
         let text1 = "hello world";
         let text2 = "hello world";
         let vector1 = vec![1.0, 0.0, 0.0];
         let vector2 = vec![1.0, 0.0, 0.0];
-        
-        let analysis = hybrid.analyze_similarity_components(text1, text2, &vector1, &vector2).unwrap();
+
+        let analysis = hybrid
+            .analyze_similarity_components(text1, text2, &vector1, &vector2)
+            .unwrap();
         assert!(analysis.final_similarity > 0.8);
         assert!(analysis.semantic_contribution > 0.0);
         assert!(analysis.textual_contribution > 0.0);
@@ -395,13 +400,13 @@ mod tests {
     #[test]
     fn test_dimension_mismatch() {
         let hybrid = HybridSimilarity::default();
-        
+
         let text1 = "hello";
         let text2 = "world";
         let vector1 = vec![1.0, 0.0];
         let vectors = vec![vec![1.0, 0.0, 0.0]]; // 不同维度
         let texts = vec!["world".to_string()];
-        
+
         let result = hybrid.batch_similarity(text1, &vector1, &texts, &vectors);
         assert!(result.is_err());
     }

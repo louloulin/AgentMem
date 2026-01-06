@@ -1,0 +1,61 @@
+[package]
+name = "comprehensive-stress-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# AgentMem dependencies - 使用真实 SDK
+agent-mem = { path = "../../crates/agent-mem", features = ["libsql", "fastembed"] }
+agent-mem-traits = { path = "../../crates/agent-mem-traits" }
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-performance = { path = "../../crates/agent-mem-performance" }
+agent-mem-storage = { path = "../../crates/agent-mem-storage", features = ["libsql"] }
+agent-mem-embeddings = { path = "../../crates/agent-mem-embeddings", features = ["fastembed"] }
+
+# Database - 使用与 agent-mem 相同的版本
+libsql = "0.6"
+
+# UUID
+uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# Async runtime
+tokio = { version = "1.42", features = ["full"] }
+async-trait = "0.1"
+
+# CLI and UI
+clap = { version = "4.5", features = ["derive"] }
+console = "0.15"
+indicatif = "0.17"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time and random
+chrono = "0.4"
+rand = "0.8"
+
+# Statistics
+hdrhistogram = "7.5"
+
+# System monitoring
+sysinfo = "0.32"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# HTTP client (for API testing)
+reqwest = { version = "0.12", features = ["json"] }
+
+# Metrics
+prometheus = "0.13"
+
+[[bin]]
+name = "stress-test"
+path = "src/main.rs"
+

@@ -1,6 +1,6 @@
 //! Coordination services for distributed AgentMem
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -79,11 +79,11 @@ mod tests {
     async fn test_coordination_manager() {
         let config = CoordinationConfig::default();
         let manager = CoordinationManager::new(config).await.unwrap();
-        
+
         let node_id = Uuid::new_v4();
         let acquired = manager.acquire_lock("test_key", node_id).await.unwrap();
         assert!(acquired);
-        
+
         let released = manager.release_lock("test_key", node_id).await.unwrap();
         assert!(released);
     }

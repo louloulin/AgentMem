@@ -14,6 +14,7 @@ description = "Embedding models for AgentMem memory platform"
 [dependencies]
 agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-utils = { path = "../agent-mem-utils" }
+agent-mem-intelligence = { path = "../agent-mem-intelligence" }
 
 # 核心依赖
 serde.workspace = true
@@ -24,32 +25,51 @@ thiserror.workspace = true
 async-trait.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+tracing.workspace = true
 
 # HTTP客户端（用于API调用）
 reqwest = { version = "0.11", features = ["json"] }
 
 # 本地嵌入模型依赖（可选）
-candle-core = { version = "0.3", optional = true }
-candle-nn = { version = "0.3", optional = true }
-candle-transformers = { version = "0.3", optional = true }
-tokenizers = { version = "0.15", optional = true }
+candle-core = { version = "0.6", optional = true }
+candle-nn = { version = "0.6", optional = true }
+candle-transformers = { version = "0.6", optional = true }
+tokenizers = { version = "0.19", optional = true }
+
+# ONNX Runtime 支持
+# 使用 download-binaries 功能自动下载匹配的 ONNX Runtime
+ort = { version = "2.0.0-rc.10", features = ["download-binaries"], optional = true }
+ndarray = { version = "0.15", optional = true }
 
 # HuggingFace Hub集成（可选）
 hf-hub = { version = "0.3", optional = true }
 
+# FastEmbed-rs 支持（推荐的本地嵌入方案）
+# 升级到5.2.0以支持最新的ONNX Runtime
+fastembed = { version = "5.2.0", optional = true }
+
+# 本地模型缓存和管理
+dirs = "5.0"
+sha2 = "0.10"
+bytes = "1.0"
+num_cpus = "1.0"
+
 [dev-dependencies]
 tempfile.workspace = true
 tokio-test = "0.4"
+futures = "0.3"
 
 [features]
-default = ["openai"]
+default = ["openai"]  # FastEmbed 依赖 ONNX Runtime，可能导致编译问题，默认禁用
 
 # 嵌入提供商
 openai = []
 huggingface = ["dep:hf-hub"]
+fastembed = ["dep:fastembed"]  # FastEmbed-rs（推荐的本地嵌入方案）
 local = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+onnx = ["dep:ort", "dep:ndarray", "dep:tokenizers"]
 anthropic = []
 cohere = []
 
 # 所有提供商
-all-providers = ["openai", "huggingface", "local"]
+all-providers = ["openai", "huggingface", "fastembed", "local", "onnx"]

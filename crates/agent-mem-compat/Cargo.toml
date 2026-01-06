@@ -1,0 +1,63 @@
+[package]
+name = "agent-mem-compat"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Mem0 compatibility layer for AgentMem"
+
+[dependencies]
+# AgentMem core dependencies (minimal for compatibility layer)
+agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem-performance = { path = "../agent-mem-performance" }
+agent-mem-config = { path = "../agent-mem-config" }
+agent-mem-storage = { path = "../agent-mem-storage" }
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+
+# Collections
+dashmap.workspace = true
+
+# Regex support for advanced filtering
+regex = "1.10"
+
+# System information
+num_cpus = "1.0"
+
+# Enterprise security dependencies
+jsonwebtoken = "9.2"
+bcrypt = "0.14"
+aes-gcm = "0.10"
+base64 = "0.21"
+rand = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile.workspace = true
+
+[features]
+default = []
+python-bindings = []

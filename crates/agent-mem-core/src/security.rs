@@ -1,14 +1,14 @@
 //! Production Security and Hardening System
-//! 
+//!
 //! Comprehensive security features including encryption, access control,
 //! threat detection, and security hardening for production environments.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 
 /// Security system configuration
@@ -56,23 +56,36 @@ impl Default for SecurityConfig {
 /// User permissions
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Permission {
+    /// 读取内存权限
     ReadMemory,
+    /// 写入内存权限
     WriteMemory,
+    /// 删除内存权限
     DeleteMemory,
+    /// 管理员访问权限
     AdminAccess,
+    /// 配置系统权限
     ConfigureSystem,
+    /// 查看审计日志权限
     ViewAuditLogs,
+    /// 导出数据权限
     ExportData,
+    /// 导入数据权限
     ImportData,
+    /// 管理用户权限
     ManageUsers,
+    /// 查看指标权限
     ViewMetrics,
 }
 
 /// User role with permissions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
+    /// 角色名称
     pub name: String,
+    /// 角色权限集合
     pub permissions: HashSet<Permission>,
+    /// 角色描述
     pub description: String,
 }
 
@@ -230,7 +243,7 @@ impl SecuritySystem {
         let system_clone = system.clone();
         tokio::spawn(async move {
             if let Err(e) = system_clone.initialize_defaults().await {
-                eprintln!("Failed to initialize security defaults: {}", e);
+                eprintln!("Failed to initialize security defaults: {e}");
             }
         });
 
@@ -253,24 +266,30 @@ impl SecuritySystem {
                 Permission::ImportData,
                 Permission::ManageUsers,
                 Permission::ViewMetrics,
-            ].iter().cloned().collect(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
             description: "Full system administrator".to_string(),
-        }).await?;
+        })
+        .await?;
 
         self.create_role(Role {
             name: "user".to_string(),
-            permissions: [
-                Permission::ReadMemory,
-                Permission::WriteMemory,
-            ].iter().cloned().collect(),
+            permissions: [Permission::ReadMemory, Permission::WriteMemory]
+                .iter()
+                .cloned()
+                .collect(),
             description: "Regular user with basic memory access".to_string(),
-        }).await?;
+        })
+        .await?;
 
         self.create_role(Role {
             name: "readonly".to_string(),
             permissions: [Permission::ReadMemory].iter().cloned().collect(),
             description: "Read-only access to memories".to_string(),
-        }).await?;
+        })
+        .await?;
 
         // Create default threat rules
         self.add_threat_rule(ThreatRule {
@@ -283,7 +302,8 @@ impl SecuritySystem {
             severity: ThreatSeverity::Medium,
             enabled: true,
             actions: vec![ThreatAction::LogEvent, ThreatAction::LockAccount],
-        }).await?;
+        })
+        .await?;
 
         self.add_threat_rule(ThreatRule {
             id: "rate_limit_exceeded".to_string(),
@@ -295,7 +315,8 @@ impl SecuritySystem {
             severity: ThreatSeverity::High,
             enabled: true,
             actions: vec![ThreatAction::LogEvent, ThreatAction::BlockIP],
-        }).await?;
+        })
+        .await?;
 
         Ok(())
     }
@@ -333,7 +354,8 @@ impl SecuritySystem {
         }
 
         let mut users = self.users.write().await;
-        let user = users.values_mut()
+        let user = users
+            .values_mut()
             .find(|u| u.username == username && u.active)
             .ok_or_else(|| AgentMemError::memory_error("Invalid credentials"))?;
 
@@ -353,16 +375,22 @@ impl SecuritySystem {
 
         if !password_valid {
             user.failed_login_attempts += 1;
-            
+
             // Lock account if too many failed attempts
             if user.failed_login_attempts >= self.config.max_failed_login_attempts {
                 user.locked_until = Some(
-                    Utc::now() + Duration::minutes(self.config.account_lockout_duration_minutes as i64)
+                    Utc::now()
+                        + Duration::minutes(self.config.account_lockout_duration_minutes as i64),
                 );
             }
 
             // Trigger threat detection
-            self.detect_threat(ThreatRuleType::FailedLoginAttempts, ip_address, Some(&user.user_id)).await?;
+            self.detect_threat(
+                ThreatRuleType::FailedLoginAttempts,
+                ip_address,
+                Some(&user.user_id),
+            )
+            .await?;
 
             return Err(AgentMemError::memory_error("Invalid credentials"));
         }
@@ -393,7 +421,8 @@ impl SecuritySystem {
     /// Validate session
     pub async fn validate_session(&self, session_id: &str) -> Result<Session> {
         let mut sessions = self.sessions.write().await;
-        let session = sessions.get_mut(session_id)
+        let session = sessions
+            .get_mut(session_id)
             .ok_or_else(|| AgentMemError::memory_error("Invalid session"))?;
 
         if !session.active || Utc::now() > session.expires_at {
@@ -403,7 +432,8 @@ impl SecuritySystem {
 
         // Update last accessed time
         session.last_accessed = Utc::now();
-        session.expires_at = Utc::now() + Duration::minutes(self.config.session_timeout_minutes as i64);
+        session.expires_at =
+            Utc::now() + Duration::minutes(self.config.session_timeout_minutes as i64);
 
         Ok(session.clone())
     }
@@ -415,7 +445,8 @@ impl SecuritySystem {
         }
 
         let users = self.users.read().await;
-        let user = users.get(user_id)
+        let user = users
+            .get(user_id)
             .ok_or_else(|| AgentMemError::memory_error("User not found"))?;
 
         let roles = self.roles.read().await;
@@ -449,8 +480,12 @@ impl SecuritySystem {
         }
 
         let threat_rules = self.threat_rules.read().await;
-        let matching_rules: Vec<_> = threat_rules.values()
-            .filter(|rule| rule.enabled && std::mem::discriminant(&rule.rule_type) == std::mem::discriminant(&rule_type))
+        let matching_rules: Vec<_> = threat_rules
+            .values()
+            .filter(|rule| {
+                rule.enabled
+                    && std::mem::discriminant(&rule.rule_type) == std::mem::discriminant(&rule_type)
+            })
             .collect();
 
         for rule in matching_rules {
@@ -472,7 +507,8 @@ impl SecuritySystem {
 
             // Execute threat actions
             for action in &rule.actions {
-                self.execute_threat_action(action, source_ip, user_id).await?;
+                self.execute_threat_action(action, source_ip, user_id)
+                    .await?;
             }
 
             // Store incident
@@ -493,7 +529,7 @@ impl SecuritySystem {
         match action {
             ThreatAction::LogEvent => {
                 // Log would be handled by logging system
-                println!("Threat detected from IP: {}", source_ip);
+                println!("Threat detected from IP: {source_ip}");
             }
             ThreatAction::SendAlert => {
                 // Send alert to administrators
@@ -545,7 +581,7 @@ impl SecuritySystem {
         let mut users = self.users.write().await;
         if let Some(user) = users.get_mut(user_id) {
             user.locked_until = Some(
-                Utc::now() + Duration::minutes(self.config.account_lockout_duration_minutes as i64)
+                Utc::now() + Duration::minutes(self.config.account_lockout_duration_minutes as i64),
             );
         }
         Ok(())
@@ -571,111 +607,11 @@ impl SecuritySystem {
     /// Get active sessions
     pub async fn get_active_sessions(&self) -> Vec<Session> {
         let sessions = self.sessions.read().await;
-        sessions.values()
+        sessions
+            .values()
             .filter(|s| s.active && Utc::now() <= s.expires_at)
             .cloned()
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_security_system_creation() {
-        let config = SecurityConfig::default();
-        let security = SecuritySystem::new(config);
-        
-        // Wait for initialization
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
-        let roles = security.roles.read().await;
-        assert!(roles.contains_key("admin"));
-        assert!(roles.contains_key("user"));
-    }
-
-    #[tokio::test]
-    async fn test_user_authentication() {
-        let config = SecurityConfig::default();
-        let security = SecuritySystem::new(config);
-        
-        // Create test user
-        let user = UserAccount {
-            user_id: "test_user".to_string(),
-            username: "testuser".to_string(),
-            email: "test@example.com".to_string(),
-            roles: vec!["user".to_string()],
-            created_at: Utc::now(),
-            last_login: None,
-            failed_login_attempts: 0,
-            locked_until: None,
-            active: true,
-            metadata: HashMap::new(),
-        };
-        
-        security.create_user(user).await.unwrap();
-        
-        // Test authentication failure
-        let result = security.authenticate_user(
-            "testuser",
-            "wrong_password",
-            "192.168.1.1",
-            "Mozilla/5.0"
-        ).await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_permission_checking() {
-        let config = SecurityConfig::default();
-        let security = SecuritySystem::new(config);
-        
-        // Wait for initialization
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
-        // Create test user with admin role
-        let user = UserAccount {
-            user_id: "admin_user".to_string(),
-            username: "admin".to_string(),
-            email: "admin@example.com".to_string(),
-            roles: vec!["admin".to_string()],
-            created_at: Utc::now(),
-            last_login: None,
-            failed_login_attempts: 0,
-            locked_until: None,
-            active: true,
-            metadata: HashMap::new(),
-        };
-        
-        security.create_user(user).await.unwrap();
-        
-        // Check admin permissions
-        let has_admin_access = security.check_permission("admin_user", &Permission::AdminAccess).await.unwrap();
-        assert!(has_admin_access);
-        
-        let has_read_access = security.check_permission("admin_user", &Permission::ReadMemory).await.unwrap();
-        assert!(has_read_access);
-    }
-
-    #[tokio::test]
-    async fn test_threat_detection() {
-        let config = SecurityConfig::default();
-        let security = SecuritySystem::new(config);
-        
-        // Wait for initialization
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
-        // Trigger threat detection
-        security.detect_threat(
-            ThreatRuleType::FailedLoginAttempts,
-            "192.168.1.100",
-            Some("test_user")
-        ).await.unwrap();
-        
-        let incidents = security.get_threat_incidents().await;
-        assert!(!incidents.is_empty());
-        assert_eq!(incidents[0].severity, ThreatSeverity::Medium);
     }
 }
 
@@ -693,5 +629,112 @@ impl Clone for SecuritySystem {
             ip_blacklist: Arc::clone(&self.ip_blacklist),
             rate_limits: Arc::clone(&self.rate_limits),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_security_system_creation() {
+        let config = SecurityConfig::default();
+        let security = SecuritySystem::new(config);
+
+        // Wait for initialization
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let roles = security.roles.read().await;
+        assert!(roles.contains_key("admin"));
+        assert!(roles.contains_key("user"));
+    }
+
+    #[tokio::test]
+    async fn test_user_authentication() {
+        let config = SecurityConfig::default();
+        let security = SecuritySystem::new(config);
+
+        // Create test user
+        let user = UserAccount {
+            user_id: "test_user".to_string(),
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            roles: vec!["user".to_string()],
+            created_at: Utc::now(),
+            last_login: None,
+            failed_login_attempts: 0,
+            locked_until: None,
+            active: true,
+            metadata: HashMap::new(),
+        };
+
+        security.create_user(user).await?;
+
+        // Test authentication failure
+        let result = security
+            .authenticate_user("testuser", "wrong_password", "192.168.1.1", "Mozilla/5.0")
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_permission_checking() {
+        let config = SecurityConfig::default();
+        let security = SecuritySystem::new(config);
+
+        // Wait for initialization
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Create test user with admin role
+        let user = UserAccount {
+            user_id: "admin_user".to_string(),
+            username: "admin".to_string(),
+            email: "admin@example.com".to_string(),
+            roles: vec!["admin".to_string()],
+            created_at: Utc::now(),
+            last_login: None,
+            failed_login_attempts: 0,
+            locked_until: None,
+            active: true,
+            metadata: HashMap::new(),
+        };
+
+        security.create_user(user).await?;
+
+        // Check admin permissions
+        let has_admin_access = security
+            .check_permission("admin_user", &Permission::AdminAccess)
+            .await
+            .unwrap();
+        assert!(has_admin_access);
+
+        let has_read_access = security
+            .check_permission("admin_user", &Permission::ReadMemory)
+            .await
+            .unwrap();
+        assert!(has_read_access);
+    }
+
+    #[tokio::test]
+    async fn test_threat_detection() {
+        let config = SecurityConfig::default();
+        let security = SecuritySystem::new(config);
+
+        // Wait for initialization
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Trigger threat detection
+        security
+            .detect_threat(
+                ThreatRuleType::FailedLoginAttempts,
+                "192.168.1.100",
+                Some("test_user"),
+            )
+            .await
+            .unwrap();
+
+        let incidents = security.get_threat_incidents().await;
+        assert!(!incidents.is_empty());
+        assert_eq!(incidents[0].severity, ThreatSeverity::Medium);
     }
 }

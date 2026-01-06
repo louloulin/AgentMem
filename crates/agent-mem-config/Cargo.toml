@@ -19,6 +19,7 @@ toml.workspace = true
 config.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+num_cpus.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

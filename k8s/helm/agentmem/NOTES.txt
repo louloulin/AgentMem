@@ -1,0 +1,102 @@
+{{/*
+AgentMem 安装成功提示信息
+*/}}
+🎉 AgentMem 已成功部署到 Kubernetes 集群！
+
+📦 Release 信息:
+  名称: {{ .Release.Name }}
+  命名空间: {{ .Release.Namespace }}
+  版本: {{ .Chart.Version }}
+  应用版本: {{ .Chart.AppVersion }}
+
+🚀 访问 AgentMem:
+
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "agentmem.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  注意: 可能需要几分钟时间来分配 LoadBalancer IP。
+  您可以通过以下命令查看服务状态:
+
+  kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "agentmem.fullname" . }}
+
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "agentmem.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "agentmem.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "访问 http://127.0.0.1:8080 来使用您的应用"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+{{- end }}
+
+📊 监控和管理:
+
+1. 查看 Pod 状态:
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "agentmem.name" . }}
+
+2. 查看日志:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "agentmem.name" . }} --tail=100
+
+3. 查看服务状态:
+   kubectl get svc -n {{ .Release.Namespace }} {{ include "agentmem.fullname" . }}
+
+{{- if .Values.autoscaling.enabled }}
+4. 查看自动扩缩容状态:
+   kubectl get hpa -n {{ .Release.Namespace }} {{ include "agentmem.fullname" . }}
+{{- end }}
+
+{{- if .Values.metrics.enabled }}
+5. 访问 Prometheus 指标:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "agentmem.fullname" . }} 9090:{{ .Values.metrics.port }}
+   然后访问 http://localhost:9090{{ .Values.metrics.path }}
+{{- end }}
+
+🔧 配置信息:
+
+  副本数: {{ .Values.replicaCount }}
+  镜像: {{ include "agentmem.image" . }}
+  {{- if .Values.autoscaling.enabled }}
+  自动扩缩容: 启用 ({{ .Values.autoscaling.minReplicas }}-{{ .Values.autoscaling.maxReplicas }} 副本)
+  {{- end }}
+  {{- if .Values.postgresql.enabled }}
+  PostgreSQL: 内部部署
+  {{- else }}
+  PostgreSQL: 外部 ({{ .Values.externalDatabase.host }})
+  {{- end }}
+  {{- if .Values.redis.enabled }}
+  Redis: 内部部署
+  {{- else }}
+  Redis: 外部 ({{ .Values.externalRedis.host }})
+  {{- end }}
+
+⚠️  重要提示:
+
+{{- if not .Values.config.jwtSecret }}
+  - JWT 密钥已自动生成。生产环境请设置 config.jwtSecret
+{{- end }}
+{{- if not .Values.config.apiKey }}
+  - API 密钥已自动生成。生产环境请设置 config.apiKey
+{{- end }}
+{{- if and .Values.postgresql.enabled (not .Values.postgresql.auth.password) }}
+  - PostgreSQL 密码已自动生成。请妥善保管
+{{- end }}
+{{- if and .Values.redis.enabled (not .Values.redis.auth.password) }}
+  - Redis 密码已自动生成。请妥善保管
+{{- end }}
+
+📚 文档和支持:
+
+  - 文档: https://agentmem.dev/docs
+  - GitHub: https://github.com/agentmem/agentmem
+  - 问题反馈: https://github.com/agentmem/agentmem/issues
+  - Email: support@agentmem.dev
+
+感谢使用 AgentMem！🚀
+

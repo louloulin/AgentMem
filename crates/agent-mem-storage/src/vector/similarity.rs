@@ -1,6 +1,6 @@
 //! 向量相似度计算函数
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 
 /// 相似度计算方法枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +25,9 @@ impl SimilarityCalculator {
     /// 返回值范围：[-1, 1]，1表示完全相同，-1表示完全相反，0表示正交
     pub fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
         let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
@@ -43,10 +45,13 @@ impl SimilarityCalculator {
     /// 返回值范围：[0, +∞)，0表示完全相同，值越大表示差异越大
     pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
-        let distance = a.iter()
+        let distance = a
+            .iter()
             .zip(b.iter())
             .map(|(x, y)| (x - y).powi(2))
             .sum::<f32>()
@@ -59,13 +64,12 @@ impl SimilarityCalculator {
     /// 返回值范围：[0, +∞)，0表示完全相同，值越大表示差异越大
     pub fn manhattan_distance(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
-        let distance = a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| (x - y).abs())
-            .sum();
+        let distance = a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum();
 
         Ok(distance)
     }
@@ -74,7 +78,9 @@ impl SimilarityCalculator {
     /// 返回值范围：(-∞, +∞)，值越大表示相似度越高
     pub fn dot_product_similarity(a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
         let dot_product = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
@@ -85,10 +91,13 @@ impl SimilarityCalculator {
     /// 返回值范围：[0, n]，其中n是向量维度，0表示完全相同
     pub fn hamming_distance(a: &[bool], b: &[bool]) -> Result<usize> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
-        let distance = a.iter()
+        let distance = a
+            .iter()
             .zip(b.iter())
             .map(|(x, y)| if x != y { 1 } else { 0 })
             .sum();
@@ -106,10 +115,14 @@ impl SimilarityCalculator {
     /// 使用公式：distance = (1 - similarity) / similarity
     pub fn similarity_to_distance(similarity: f32) -> Result<f32> {
         if similarity <= 0.0 {
-            return Err(AgentMemError::validation_error("Similarity must be positive"));
+            return Err(AgentMemError::validation_error(
+                "Similarity must be positive",
+            ));
         }
         if similarity > 1.0 {
-            return Err(AgentMemError::validation_error("Similarity must not exceed 1.0"));
+            return Err(AgentMemError::validation_error(
+                "Similarity must not exceed 1.0",
+            ));
         }
 
         Ok((1.0 - similarity) / similarity)
@@ -137,7 +150,7 @@ impl SimilarityCalculator {
                 SimilarityMetric::DotProduct => Self::dot_product_similarity(query, vector)?,
                 SimilarityMetric::Hamming => {
                     return Err(AgentMemError::validation_error(
-                        "Hamming distance requires boolean vectors"
+                        "Hamming distance requires boolean vectors",
                     ));
                 }
             };
@@ -158,7 +171,7 @@ impl SimilarityCalculator {
         }
 
         let similarities = Self::batch_similarity(query, vectors, metric)?;
-        
+
         let max_index = similarities
             .iter()
             .enumerate()
@@ -180,15 +193,14 @@ impl SimilarityCalculator {
         }
 
         let similarities = Self::batch_similarity(query, vectors, metric)?;
-        
-        let mut indexed_similarities: Vec<(usize, f32)> = similarities
-            .into_iter()
-            .enumerate()
-            .collect();
+
+        let mut indexed_similarities: Vec<(usize, f32)> =
+            similarities.into_iter().enumerate().collect();
 
         // 按相似度降序排序
-        indexed_similarities.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-        
+        indexed_similarities
+            .sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+
         // 取前K个
         indexed_similarities.truncate(k);
 
@@ -196,10 +208,7 @@ impl SimilarityCalculator {
     }
 
     /// 计算向量集合的平均相似度
-    pub fn average_similarity(
-        vectors: &[Vec<f32>],
-        metric: SimilarityMetric,
-    ) -> Result<f32> {
+    pub fn average_similarity(vectors: &[Vec<f32>], metric: SimilarityMetric) -> Result<f32> {
         if vectors.len() < 2 {
             return Ok(0.0);
         }
@@ -219,10 +228,12 @@ impl SimilarityCalculator {
                         let distance = Self::manhattan_distance(&vectors[i], &vectors[j])?;
                         Self::distance_to_similarity(distance)
                     }
-                    SimilarityMetric::DotProduct => Self::dot_product_similarity(&vectors[i], &vectors[j])?,
+                    SimilarityMetric::DotProduct => {
+                        Self::dot_product_similarity(&vectors[i], &vectors[j])?
+                    }
                     SimilarityMetric::Hamming => {
                         return Err(AgentMemError::validation_error(
-                            "Hamming distance requires boolean vectors"
+                            "Hamming distance requires boolean vectors",
                         ));
                     }
                 };
@@ -304,20 +315,14 @@ mod tests {
     #[test]
     fn test_batch_similarity() {
         let query = vec![1.0, 0.0];
-        let vectors = vec![
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-            vec![-1.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![-1.0, 0.0]];
 
-        let similarities = SimilarityCalculator::batch_similarity(
-            &query,
-            &vectors,
-            SimilarityMetric::Cosine,
-        ).unwrap();
+        let similarities =
+            SimilarityCalculator::batch_similarity(&query, &vectors, SimilarityMetric::Cosine)
+                .unwrap();
 
-        assert!((similarities[0] - 1.0).abs() < 1e-6);  // 相同
-        assert!((similarities[1] - 0.0).abs() < 1e-6);  // 正交
+        assert!((similarities[0] - 1.0).abs() < 1e-6); // 相同
+        assert!((similarities[1] - 0.0).abs() < 1e-6); // 正交
         assert!((similarities[2] - (-1.0)).abs() < 1e-6); // 相反
     }
 
@@ -325,16 +330,14 @@ mod tests {
     fn test_find_most_similar() {
         let query = vec![1.0, 0.0];
         let vectors = vec![
-            vec![0.0, 1.0],    // 正交
-            vec![1.0, 0.0],    // 相同
-            vec![-1.0, 0.0],   // 相反
+            vec![0.0, 1.0],  // 正交
+            vec![1.0, 0.0],  // 相同
+            vec![-1.0, 0.0], // 相反
         ];
 
-        let most_similar = SimilarityCalculator::find_most_similar(
-            &query,
-            &vectors,
-            SimilarityMetric::Cosine,
-        ).unwrap();
+        let most_similar =
+            SimilarityCalculator::find_most_similar(&query, &vectors, SimilarityMetric::Cosine)
+                .unwrap();
 
         assert_eq!(most_similar, Some(1)); // 索引1是最相似的
     }
@@ -343,18 +346,15 @@ mod tests {
     fn test_find_top_k_similar() {
         let query = vec![1.0, 0.0];
         let vectors = vec![
-            vec![0.0, 1.0],    // 正交，相似度0
-            vec![1.0, 0.0],    // 相同，相似度1
-            vec![-1.0, 0.0],   // 相反，相似度-1
-            vec![0.5, 0.0],    // 部分相似，相似度0.5
+            vec![0.0, 1.0],  // 正交，相似度0
+            vec![1.0, 0.0],  // 相同，相似度1
+            vec![-1.0, 0.0], // 相反，相似度-1
+            vec![0.5, 0.0],  // 部分相似，相似度0.5
         ];
 
-        let top_k = SimilarityCalculator::find_top_k_similar(
-            &query,
-            &vectors,
-            2,
-            SimilarityMetric::Cosine,
-        ).unwrap();
+        let top_k =
+            SimilarityCalculator::find_top_k_similar(&query, &vectors, 2, SimilarityMetric::Cosine)
+                .unwrap();
 
         assert_eq!(top_k.len(), 2);
         assert_eq!(top_k[0].0, 1); // 最相似的是索引1

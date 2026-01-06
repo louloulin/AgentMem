@@ -1,0 +1,7 @@
+# Core dependencies
+httpx>=0.25.0
+pydantic>=2.0.0
+
+# Optional dependencies for enhanced features
+orjson>=3.9.0  # Fast JSON serialization
+uvloop>=0.17.0; sys_platform != "win32"  # Fast event loop for Unix systems

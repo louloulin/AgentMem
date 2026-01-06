@@ -1,0 +1,46 @@
+# Docker 构建忽略文件
+# 排除不需要的文件和目录以加快构建速度
+
+# 构建产物
+target/
+dist/
+*.log
+
+# 开发工具和测试
+# tools/  # 注释掉：workspace member，需要 Cargo.toml
+# examples/  # 注释掉：workspace member，需要 Cargo.toml
+# benches/  # 注释掉：需要目录结构用于 Cargo.toml 验证
+tests/
+benchmarks/
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 版本控制
+.git/
+.gitignore
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 前端构建产物（如果不需要）
+agentmem-ui/node_modules/
+agentmem-ui/.next/
+agentmem-ui/dist/
+
+# 其他
+*.zip
+*.tar.gz
+*.bak
+*.backup

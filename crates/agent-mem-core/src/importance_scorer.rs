@@ -1,15 +1,14 @@
 //! Advanced Importance Scoring System
-//! 
+//!
 //! Multi-dimensional importance scoring with dynamic weight adjustment
 //! and context-aware evaluation for memory prioritization.
 
 use crate::hierarchical_service::HierarchicalMemoryRecord;
-use crate::types::{ImportanceLevel, MemoryType};
-use agent_mem_traits::{Result, AgentMemError};
+use crate::types::ImportanceLevel;
+use agent_mem_traits::Result;
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration, Timelike};
-use uuid::Uuid;
 
 /// Configuration for importance scoring
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,12 +147,24 @@ impl AdvancedImportanceScorer {
         let stats = self.get_or_create_stats(&memory.id).clone();
 
         // Calculate individual factor scores
-        let recency_score = self.calculate_recency_score(memory, context, &stats).await?;
-        let frequency_score = self.calculate_frequency_score(memory, context, &stats).await?;
-        let relevance_score = self.calculate_relevance_score(memory, context, &stats).await?;
-        let emotional_score = self.calculate_emotional_score(memory, context, &stats).await?;
-        let context_score = self.calculate_context_score(memory, context, &stats).await?;
-        let interaction_score = self.calculate_interaction_score(memory, context, &stats).await?;
+        let recency_score = self
+            .calculate_recency_score(memory, context, &stats)
+            .await?;
+        let frequency_score = self
+            .calculate_frequency_score(memory, context, &stats)
+            .await?;
+        let relevance_score = self
+            .calculate_relevance_score(memory, context, &stats)
+            .await?;
+        let emotional_score = self
+            .calculate_emotional_score(memory, context, &stats)
+            .await?;
+        let context_score = self
+            .calculate_context_score(memory, context, &stats)
+            .await?;
+        let interaction_score = self
+            .calculate_interaction_score(memory, context, &stats)
+            .await?;
 
         // Calculate composite score with current weights
         let composite_score = self.calculate_composite_score(
@@ -167,7 +178,8 @@ impl AdvancedImportanceScorer {
 
         // Apply dynamic weight adjustment if enabled
         if self.config.enable_dynamic_weights {
-            self.adjust_weights_based_on_performance(memory, composite_score).await?;
+            self.adjust_weights_based_on_performance(memory, composite_score)
+                .await?;
         }
 
         Ok(ImportanceFactors {
@@ -189,7 +201,9 @@ impl AdvancedImportanceScorer {
         context: &ScoringContext,
         stats: &MemoryUsageStats,
     ) -> Result<f64> {
-        let time_since_access = context.current_time.signed_duration_since(stats.last_accessed);
+        let time_since_access = context
+            .current_time
+            .signed_duration_since(stats.last_accessed);
         let hours_since_access = time_since_access.num_hours() as f64;
 
         // Exponential decay function
@@ -211,7 +225,8 @@ impl AdvancedImportanceScorer {
         context: &ScoringContext,
         stats: &MemoryUsageStats,
     ) -> Result<f64> {
-        let days_since_creation = context.current_time
+        let days_since_creation = context
+            .current_time
             .signed_duration_since(stats.creation_time)
             .num_days()
             .max(1) as f64;
@@ -270,9 +285,15 @@ impl AdvancedImportanceScorer {
 
         // Analyze emotional keywords in content
         let emotional_keywords = vec![
-            ("important", 0.8), ("critical", 0.9), ("urgent", 0.7),
-            ("love", 0.6), ("hate", 0.6), ("excited", 0.5),
-            ("worried", 0.4), ("happy", 0.5), ("sad", 0.4),
+            ("important", 0.8),
+            ("critical", 0.9),
+            ("urgent", 0.7),
+            ("love", 0.6),
+            ("hate", 0.6),
+            ("excited", 0.5),
+            ("worried", 0.4),
+            ("happy", 0.5),
+            ("sad", 0.4),
         ];
 
         let content_lower = memory.content.to_lowercase();
@@ -321,8 +342,8 @@ impl AdvancedImportanceScorer {
 
         // Time-based context (e.g., work hours, weekends)
         let hour = context.current_time.hour();
-        let is_work_hours = hour >= 9 && hour <= 17;
-        
+        let is_work_hours = (9..=17).contains(&hour);
+
         if let Some(memory_context) = memory.metadata.get("context_type") {
             match memory_context.as_str() {
                 "work" if is_work_hours => context_score += 0.2,
@@ -372,13 +393,12 @@ impl AdvancedImportanceScorer {
         context: f64,
         interaction: f64,
     ) -> f64 {
-        let weighted_score = 
-            recency * self.config.recency_weight +
-            frequency * self.config.frequency_weight +
-            relevance * self.config.relevance_weight +
-            emotional * self.config.emotional_weight +
-            context * self.config.context_weight +
-            interaction * self.config.interaction_weight;
+        let weighted_score = recency * self.config.recency_weight
+            + frequency * self.config.frequency_weight
+            + relevance * self.config.relevance_weight
+            + emotional * self.config.emotional_weight
+            + context * self.config.context_weight
+            + interaction * self.config.interaction_weight;
 
         // Apply bounds
         weighted_score
@@ -394,7 +414,7 @@ impl AdvancedImportanceScorer {
     ) -> Result<()> {
         // This is a simplified version of dynamic weight adjustment
         // In a full implementation, this would use machine learning techniques
-        
+
         // Track performance metrics based on importance level instead of memory type
         let importance_key = format!("{:?}", memory.importance);
         self.performance_metrics.insert(importance_key, score);
@@ -431,12 +451,12 @@ impl AdvancedImportanceScorer {
 
     /// Normalize weights to sum to 1.0
     fn normalize_weights(&mut self) {
-        let total_weight = self.config.recency_weight +
-            self.config.frequency_weight +
-            self.config.relevance_weight +
-            self.config.emotional_weight +
-            self.config.context_weight +
-            self.config.interaction_weight;
+        let total_weight = self.config.recency_weight
+            + self.config.frequency_weight
+            + self.config.relevance_weight
+            + self.config.emotional_weight
+            + self.config.context_weight
+            + self.config.interaction_weight;
 
         if total_weight > 0.0 {
             self.config.recency_weight /= total_weight;
@@ -452,10 +472,10 @@ impl AdvancedImportanceScorer {
     fn calculate_text_similarity(&self, text1: &str, text2: &str) -> f64 {
         let words1: std::collections::HashSet<&str> = text1.split_whitespace().collect();
         let words2: std::collections::HashSet<&str> = text2.split_whitespace().collect();
-        
+
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
-        
+
         if union == 0 {
             0.0
         } else {
@@ -465,13 +485,15 @@ impl AdvancedImportanceScorer {
 
     /// Get or create usage statistics for a memory
     fn get_or_create_stats(&mut self, memory_id: &str) -> &mut MemoryUsageStats {
-        self.usage_stats.entry(memory_id.to_string()).or_insert_with(MemoryUsageStats::default)
+        self.usage_stats
+            .entry(memory_id.to_string())
+            .or_default()
     }
 
     /// Update usage statistics for a memory
     pub fn update_usage_stats(&mut self, memory_id: &str, access_type: AccessType) {
         let stats = self.get_or_create_stats(memory_id);
-        
+
         match access_type {
             AccessType::Read => {
                 stats.access_count += 1;
@@ -518,7 +540,7 @@ pub enum AccessType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy::{MemoryScope, MemoryLevel};
+    use crate::hierarchy::{MemoryLevel, MemoryScope};
 
     fn create_test_memory() -> HierarchicalMemoryRecord {
         HierarchicalMemoryRecord {
@@ -535,7 +557,8 @@ mod tests {
             tags: Vec::new(),
             parent_memory_id: None,
             child_memory_ids: Vec::new(),
-            conflict_resolution_strategy: crate::hierarchical_service::ConflictResolutionStrategy::ImportanceBased,
+            conflict_resolution_strategy:
+                crate::hierarchical_service::ConflictResolutionStrategy::ImportanceBased,
             quality_score: 1.0,
             source_reliability: 1.0,
         }
@@ -555,8 +578,11 @@ mod tests {
         let memory = create_test_memory();
         let context = ScoringContext::default();
 
-        let factors = scorer.calculate_importance(&memory, &context).await.unwrap();
-        
+        let factors = scorer
+            .calculate_importance(&memory, &context)
+            .await
+            .unwrap();
+
         assert!(factors.composite_score >= 0.0);
         assert!(factors.composite_score <= 10.0);
         assert!(factors.recency_score >= 0.0 && factors.recency_score <= 1.0);

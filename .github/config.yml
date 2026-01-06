@@ -1,0 +1,132 @@
+# GitHub Repository Configuration
+
+repository:
+  name: AgentMem
+  description: "Enterprise-Grade Intelligent Memory Platform for AI Agents and LLM Applications"
+  homepage: https://agentmem.dev
+  topics: [ai, memory, agent, llm, vector-database, embeddings, rust, python, javascript, wasm, plugins, semantic-search, knowledge-graph]
+
+# Branch Protection
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      require_status_checks: true
+      required_status_checks:
+        - Test
+        - Lint
+        - Security
+      enforce_admins: false
+      allow_force_pushes: false
+      allow_deletions: false
+
+  - name: develop
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      require_status_checks: true
+      enforce_admins: false
+      allow_force_pushes: true
+
+# Labels
+labels:
+  - name: bug
+    color: d73a4a
+    description: Something isn't working
+
+  - name: enhancement
+    color: a2eeef
+    description: New feature or request
+
+  - name: documentation
+    color: 0075ca
+    description: Improvements or additions to documentation
+
+  - name: good first issue
+    color: 7057ff
+    description: Good for newcomers
+
+  - name: help wanted
+    color: 008672
+    description: Extra attention is needed
+
+  - name: priority: critical
+    color: b60205
+    description: Critical priority
+
+  - name: priority: high
+    color: d93f0b
+    description: High priority
+
+  - name: priority: medium
+    color: fbca04
+    description: Medium priority
+
+  - name: priority: low
+    color: 0e8a16
+    description: Low priority
+
+  - name: security
+    color: d4c5f9
+    description: Security vulnerabilities or issues
+
+  - name: performance
+    color: 5319e7
+    description: Performance related issues
+
+  - name: refactor
+    color: c2e0c6
+    description: Code refactoring
+
+  - name: testing
+    color: bfd4f2
+    description: Adding or improving tests
+
+  - name: dependencies
+    color: 0366d6
+    description: Pull requests that update dependencies
+
+  - name: docker
+    color: 0b8ed7
+    description: Docker related changes
+
+  - name: breaking-change
+    color: b60205
+    description: Breaking changes
+
+  - name: deprecated
+    color: e11d21
+    description: Deprecated functionality
+
+# Milestones
+milestones:
+  - title: v2.0.0 Release
+    description: Major release with new architecture
+    state: open
+
+  - title: v2.1.0 Release
+    description: Feature enhancements
+    state: open
+
+# Collaboration
+collaboration:
+  # Code Owners
+  code_owners:
+    - path: crates/agent-mem/
+      owners: [louloulin]
+      minimum_reviewers: 1
+
+    - path: crates/agent-mem-server/
+      owners: [louloulin]
+      minimum_reviewers: 1
+
+    - path: docs/
+      owners: [louloulin]
+      minimum_reviewers: 1
+
+  # Review assignments
+  review_requests:
+    teams:
+      - core-team
+      - maintainers

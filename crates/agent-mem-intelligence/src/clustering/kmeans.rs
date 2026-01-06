@@ -1,7 +1,7 @@
 //! K-means聚类算法实现
 
-use super::{MemoryCluster, MemoryClusterer, ClusteringConfig, ClusteringMetrics, ClusteringUtils};
-use agent_mem_traits::{Result, AgentMemError};
+use super::{ClusteringConfig, ClusteringMetrics, ClusteringUtils, MemoryCluster, MemoryClusterer};
+use agent_mem_traits::{AgentMemError, Result};
 use std::collections::HashMap;
 
 /// K-means聚类器
@@ -24,15 +24,21 @@ impl KMeansClusterer {
     /// 初始化聚类中心
     fn initialize_centroids(&self, vectors: &[Vec<f32>], k: usize) -> Result<Vec<Vec<f32>>> {
         if vectors.is_empty() {
-            return Err(AgentMemError::validation_error("Cannot initialize centroids for empty vector set"));
+            return Err(AgentMemError::validation_error(
+                "Cannot initialize centroids for empty vector set",
+            ));
         }
 
         if k == 0 {
-            return Err(AgentMemError::validation_error("Number of clusters must be greater than 0"));
+            return Err(AgentMemError::validation_error(
+                "Number of clusters must be greater than 0",
+            ));
         }
 
         if k > vectors.len() {
-            return Err(AgentMemError::validation_error("Number of clusters cannot exceed number of vectors"));
+            return Err(AgentMemError::validation_error(
+                "Number of clusters cannot exceed number of vectors",
+            ));
         }
 
         let dimension = vectors[0].len();
@@ -85,7 +91,11 @@ impl KMeansClusterer {
     }
 
     /// 将向量分配到最近的聚类中心
-    fn assign_to_clusters(&self, vectors: &[Vec<f32>], centroids: &[Vec<f32>]) -> Result<Vec<usize>> {
+    fn assign_to_clusters(
+        &self,
+        vectors: &[Vec<f32>],
+        centroids: &[Vec<f32>],
+    ) -> Result<Vec<usize>> {
         let mut assignments = Vec::new();
 
         for vector in vectors {
@@ -114,7 +124,9 @@ impl KMeansClusterer {
         k: usize,
     ) -> Result<Vec<Vec<f32>>> {
         if vectors.is_empty() {
-            return Err(AgentMemError::validation_error("Cannot update centroids for empty vector set"));
+            return Err(AgentMemError::validation_error(
+                "Cannot update centroids for empty vector set",
+            ));
         }
 
         let dimension = vectors[0].len();
@@ -148,7 +160,12 @@ impl KMeansClusterer {
     }
 
     /// 检查收敛性
-    fn has_converged(&self, old_centroids: &[Vec<f32>], new_centroids: &[Vec<f32>], threshold: f32) -> Result<bool> {
+    fn has_converged(
+        &self,
+        old_centroids: &[Vec<f32>],
+        new_centroids: &[Vec<f32>],
+        threshold: f32,
+    ) -> Result<bool> {
         if old_centroids.len() != new_centroids.len() {
             return Ok(false);
         }
@@ -172,7 +189,9 @@ impl MemoryClusterer for KMeansClusterer {
         config: &ClusteringConfig,
     ) -> Result<Vec<MemoryCluster>> {
         if memory_vectors.len() != memory_ids.len() {
-            return Err(AgentMemError::validation_error("Memory vectors and IDs must have the same length"));
+            return Err(AgentMemError::validation_error(
+                "Memory vectors and IDs must have the same length",
+            ));
         }
 
         if memory_vectors.is_empty() {
@@ -231,7 +250,7 @@ impl MemoryClusterer for KMeansClusterer {
                 .collect();
 
             if cluster_memory_ids.len() >= config.min_cluster_size {
-                let cluster_id = format!("kmeans_cluster_{}", cluster_idx);
+                let cluster_id = format!("kmeans_cluster_{cluster_idx}");
                 let mut cluster = MemoryCluster::new(
                     cluster_id,
                     cluster_memory_ids,
@@ -347,7 +366,8 @@ impl MemoryClusterer for KMeansClusterer {
 
         // 简化的轮廓系数计算
         let silhouette_score = if inter_cluster_distance > 0.0 && intra_cluster_distance > 0.0 {
-            (inter_cluster_distance - intra_cluster_distance) / inter_cluster_distance.max(intra_cluster_distance)
+            (inter_cluster_distance - intra_cluster_distance)
+                / inter_cluster_distance.max(intra_cluster_distance)
         } else {
             0.0
         };
@@ -356,7 +376,7 @@ impl MemoryClusterer for KMeansClusterer {
             silhouette_score,
             intra_cluster_distance,
             inter_cluster_distance,
-            davies_bouldin_index: 0.0, // 简化实现
+            davies_bouldin_index: 0.0,    // 简化实现
             calinski_harabasz_index: 0.0, // 简化实现
         })
     }
@@ -400,10 +420,7 @@ mod tests {
             vec![10.0, 10.0],
             vec![11.0, 11.0],
         ];
-        let centroids = vec![
-            vec![1.5, 1.5],
-            vec![10.5, 10.5],
-        ];
+        let centroids = vec![vec![1.5, 1.5], vec![10.5, 10.5]];
 
         let assignments = clusterer.assign_to_clusters(&vectors, &centroids).unwrap();
         assert_eq!(assignments.len(), 4);
@@ -433,9 +450,11 @@ mod tests {
         config.num_clusters = Some(2);
         config.min_cluster_size = 1;
 
-        let clusters = clusterer.cluster_memories(&vectors, &memory_ids, &config).unwrap();
+        let clusters = clusterer
+            .cluster_memories(&vectors, &memory_ids, &config)
+            .unwrap();
         assert_eq!(clusters.len(), 2);
-        
+
         for cluster in &clusters {
             assert!(!cluster.memory_ids.is_empty());
             assert_eq!(cluster.centroid.len(), 2);
@@ -474,7 +493,9 @@ mod tests {
         let memory_ids: Vec<String> = vec![];
         let config = ClusteringConfig::default();
 
-        let clusters = clusterer.cluster_memories(&vectors, &memory_ids, &config).unwrap();
+        let clusters = clusterer
+            .cluster_memories(&vectors, &memory_ids, &config)
+            .unwrap();
         assert!(clusters.is_empty());
     }
 
@@ -487,7 +508,9 @@ mod tests {
         config.num_clusters = Some(1);
         config.min_cluster_size = 1;
 
-        let clusters = clusterer.cluster_memories(&vectors, &memory_ids, &config).unwrap();
+        let clusters = clusterer
+            .cluster_memories(&vectors, &memory_ids, &config)
+            .unwrap();
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].memory_ids.len(), 1);
     }

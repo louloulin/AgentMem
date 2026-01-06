@@ -1,0 +1,97 @@
+# Prometheus 配置文件
+# AgentMem 向量数据库监控
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# 规则文件
+rule_files:
+  - "rules/*.yml"
+
+# 抓取配置
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # AgentMem 应用监控
+  - job_name: 'agentmem'
+    static_configs:
+      - targets: ['host.docker.internal:8080']  # AgentMem 服务端口
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Milvus 监控
+  - job_name: 'milvus'
+    static_configs:
+      - targets: ['milvus:9091']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Chroma 监控
+  - job_name: 'chroma'
+    static_configs:
+      - targets: ['chroma:8000']
+    metrics_path: '/api/v1/metrics'
+    scrape_interval: 30s
+
+  # Qdrant 监控
+  - job_name: 'qdrant'
+    static_configs:
+      - targets: ['qdrant:6333']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Elasticsearch 监控
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: '/_prometheus/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL 监控 (需要 postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis 监控 (需要 redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # 系统监控 (需要 node_exporter)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Docker 容器监控 (需要 cadvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+
+# 告警管理器配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 远程写入配置 (可选)
+# remote_write:
+#   - url: "https://your-remote-prometheus-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "your-username"
+#       password: "your-password"
+
+# 远程读取配置 (可选)
+# remote_read:
+#   - url: "https://your-remote-prometheus-endpoint/api/v1/read"
+#     basic_auth:
+#       username: "your-username"
+#       password: "your-password"

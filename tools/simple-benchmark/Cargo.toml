@@ -1,0 +1,16 @@
+[package]
+name = "simple-benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+agent-mem = { path = "../../crates/agent-mem" }
+tokio = { version = "1.42", features = ["full"] }
+anyhow = "1.0"
+
+[[bin]]
+name = "benchmark"
+path = "src/main.rs"
+

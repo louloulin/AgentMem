@@ -1,14 +1,14 @@
 //! Claude (Anthropic) LLM provider implementation
-//! 
+//!
 //! Provides integration with Anthropic's Claude models including
 //! Claude-3, Claude-3.5, and Claude-2 series.
 
 use agent_mem_traits::LLMConfig;
-use agent_mem_traits::{Result, AgentMemError, Message, MessageRole};
+use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-
+use std::pin::Pin;
 use tracing::{debug, error, info};
 
 /// Claude API request structure
@@ -84,17 +84,23 @@ pub struct ClaudeProvider {
 impl ClaudeProvider {
     /// Create a new Claude provider
     pub fn new(config: LLMConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Claude API key is required"))?;
-        
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e)))?;
-        
-        let base_url = config.base_url.clone()
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
+
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.anthropic.com".to_string());
-        
+
         Ok(Self {
             config,
             client,
@@ -102,7 +108,7 @@ impl ClaudeProvider {
             base_url,
         })
     }
-    
+
     /// Get available Claude models
     pub fn available_models() -> Vec<&'static str> {
         vec![
@@ -116,7 +122,7 @@ impl ClaudeProvider {
             "claude-instant-1.2",
         ]
     }
-    
+
     /// Convert AgentMem message to Claude message
     fn convert_message(&self, message: &Message) -> ClaudeMessage {
         let role = match message.role {
@@ -124,18 +130,18 @@ impl ClaudeProvider {
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
         };
-        
+
         ClaudeMessage {
             role: role.to_string(),
             content: message.content.clone(),
         }
     }
-    
+
     /// Build Claude API request
     fn build_request(&self, messages: &[Message]) -> Result<ClaudeRequest> {
         let mut claude_messages = Vec::new();
         let mut system_message = None;
-        
+
         // Separate system message from conversation messages
         for message in messages {
             match message.role {
@@ -147,7 +153,7 @@ impl ClaudeProvider {
                 }
             }
         }
-        
+
         let request = ClaudeRequest {
             model: self.config.model.clone(),
             max_tokens: self.config.max_tokens.unwrap_or(4096),
@@ -155,42 +161,51 @@ impl ClaudeProvider {
             system: system_message,
             temperature: self.config.temperature,
             top_p: self.config.top_p,
-            top_k: None, // Not available in LLMConfig
+            top_k: None,          // Not available in LLMConfig
             stop_sequences: None, // Not available in LLMConfig
         };
-        
+
         Ok(request)
     }
-    
+
     /// Make API request to Claude
     async fn make_request(&self, request: &ClaudeRequest) -> Result<ClaudeResponse> {
         debug!("Making Claude API request to model: {}", request.model);
-        
-        let response = self.client
-            .post(&format!("{}/v1/messages", self.base_url))
+
+        let response = self
+            .client
+            .post(format!("{}/v1/messages", self.base_url))
             .header("Content-Type", "application/json")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .json(request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Claude API request failed: {}", e)))?;
-        
+            .map_err(|e| AgentMemError::network_error(format!("Claude API request failed: {e}")))?;
+
         let status = response.status();
-        let response_text = response.text().await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to read response: {}", e)))?;
-        
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
+
         if status.is_success() {
-            serde_json::from_str(&response_text)
-                .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse Claude response: {}", e)))
+            serde_json::from_str(&response_text).map_err(|e| {
+                AgentMemError::parsing_error(format!("Failed to parse Claude response: {e}"))
+            })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<ClaudeError>(&response_text) {
                 error!("Claude API error: {} - {}", error.error_type, error.message);
-                Err(AgentMemError::llm_error(&format!("Claude API error: {}", error.message)))
+                Err(AgentMemError::llm_error(format!(
+                    "Claude API error: {}",
+                    error.message
+                )))
             } else {
                 error!("Claude API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!("Claude API error: HTTP {}", status)))
+                Err(AgentMemError::llm_error(format!(
+                    "Claude API error: HTTP {status}"
+                )))
             }
         }
     }
@@ -199,36 +214,45 @@ impl ClaudeProvider {
 #[async_trait]
 impl crate::LLMProvider for ClaudeProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
-        info!("Generating response using Claude model: {}", self.config.model);
-        
+        info!(
+            "Generating response using Claude model: {}",
+            self.config.model
+        );
+
         let request = self.build_request(messages)?;
         let response = self.make_request(&request).await?;
-        
+
         // Extract text from response content
-        let text = response.content
+        let text = response
+            .content
             .into_iter()
             .filter(|content| content.content_type == "text")
             .map(|content| content.text)
             .collect::<Vec<_>>()
             .join("\n");
-        
+
         if text.is_empty() {
             return Err(AgentMemError::llm_error("Claude returned empty response"));
         }
-        
-        info!("Claude response generated successfully (tokens: input={}, output={})", 
-              response.usage.input_tokens, response.usage.output_tokens);
-        
+
+        info!(
+            "Claude response generated successfully (tokens: input={}, output={})",
+            response.usage.input_tokens, response.usage.output_tokens
+        );
+
         Ok(text)
     }
-    
-    async fn generate_stream(&self, messages: &[Message]) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+
+    async fn generate_stream(
+        &self,
+        messages: &[Message],
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // For now, fall back to non-streaming
         let response = self.generate(messages).await?;
         let stream = futures::stream::once(async move { Ok(response) });
-        Ok(Box::new(Box::pin(stream)))
+        Ok(Box::pin(stream))
     }
-    
+
     fn get_model_info(&self) -> agent_mem_traits::ModelInfo {
         agent_mem_traits::ModelInfo {
             provider: "anthropic".to_string(),
@@ -245,14 +269,12 @@ impl crate::LLMProvider for ClaudeProvider {
         }
         Ok(())
     }
-
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{MessageRole, LLMProvider};
+    use agent_mem_traits::{LLMProvider, MessageRole};
 
     fn create_test_config() -> LLMConfig {
         LLMConfig {
@@ -275,7 +297,7 @@ mod tests {
         let provider = ClaudeProvider::new(config);
         assert!(provider.is_ok());
     }
-    
+
     #[test]
     fn test_available_models() {
         let models = ClaudeProvider::available_models();
@@ -283,28 +305,28 @@ mod tests {
         assert!(models.contains(&"claude-3-5-sonnet-20241022"));
         assert!(models.contains(&"claude-3-opus-20240229"));
     }
-    
+
     #[test]
     fn test_message_conversion() {
         let config = create_test_config();
         let provider = ClaudeProvider::new(config).unwrap();
-        
+
         let message = Message {
             role: MessageRole::User,
             content: "Hello, Claude!".to_string(),
             timestamp: None, // No timestamp for testing
         };
-        
+
         let claude_message = provider.convert_message(&message);
         assert_eq!(claude_message.role, "user");
         assert_eq!(claude_message.content, "Hello, Claude!");
     }
-    
+
     #[test]
     fn test_request_building() {
         let config = create_test_config();
         let provider = ClaudeProvider::new(config).unwrap();
-        
+
         let messages = vec![
             Message {
                 role: MessageRole::System,
@@ -317,19 +339,22 @@ mod tests {
                 timestamp: None,
             },
         ];
-        
+
         let request = provider.build_request(&messages).unwrap();
         assert_eq!(request.model, "claude-3-haiku-20240307");
-        assert_eq!(request.system, Some("You are a helpful assistant.".to_string()));
+        assert_eq!(
+            request.system,
+            Some("You are a helpful assistant.".to_string())
+        );
         assert_eq!(request.messages.len(), 1);
         assert_eq!(request.messages[0].role, "user");
     }
-    
+
     #[test]
     fn test_model_info() {
         let config = create_test_config();
         let provider = ClaudeProvider::new(config).unwrap();
-        
+
         let info = provider.get_model_info();
         assert_eq!(info.provider, "anthropic");
         assert_eq!(info.model, "claude-3-haiku-20240307");

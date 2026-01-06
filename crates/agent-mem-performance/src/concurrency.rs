@@ -1,16 +1,16 @@
 //! Concurrency control and task management
-//! 
+//!
 //! This module provides advanced concurrency control mechanisms including
 //! rate limiting, circuit breakers, and adaptive task scheduling.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
-use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tokio::time::sleep;
+use tracing::info;
 
 /// Concurrency configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,7 +108,10 @@ impl ConcurrencyManager {
             failed_tasks: AtomicU64::new(0),
         };
 
-        info!("Concurrency manager initialized with {} max tasks", manager.config.max_concurrent_tasks);
+        info!(
+            "Concurrency manager initialized with {} max tasks",
+            manager.config.max_concurrent_tasks
+        );
         Ok(manager)
     }
 
@@ -128,14 +131,17 @@ impl ConcurrencyManager {
         self.rate_limiter.acquire().await?;
 
         // Acquire semaphore permit
-        let _permit = self.semaphore.acquire().await
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
             .map_err(|_| AgentMemError::memory_error("Failed to acquire semaphore permit"))?;
 
         self.active_tasks.fetch_add(1, Ordering::Relaxed);
         let start_time = Instant::now();
 
         let result = task().await;
-        
+
         let duration = start_time.elapsed();
         self.active_tasks.fetch_sub(1, Ordering::Relaxed);
 
@@ -162,19 +168,19 @@ impl ConcurrencyManager {
         stats.failed_tasks = self.failed_tasks.load(Ordering::Relaxed);
         stats.circuit_breaker_state = self.circuit_breaker.get_state().await;
         stats.current_rps = self.rate_limiter.get_current_rate().await;
-        
+
         Ok(stats)
     }
 
     async fn update_stats(&self, duration: Duration) {
         let mut stats = self.stats.write().await;
-        
+
         let total_tasks = stats.completed_tasks + stats.failed_tasks + 1;
         let duration_ms = duration.as_millis() as f64;
-        
-        stats.average_task_duration_ms = 
-            (stats.average_task_duration_ms * (total_tasks - 1) as f64 + duration_ms) 
-            / total_tasks as f64;
+
+        stats.average_task_duration_ms =
+            (stats.average_task_duration_ms * (total_tasks - 1) as f64 + duration_ms)
+                / total_tasks as f64;
     }
 }
 
@@ -215,7 +221,7 @@ impl RateLimiter {
         let now = Instant::now();
         let mut last_refill = self.last_refill.write().await;
         let elapsed = now.duration_since(*last_refill);
-        
+
         if elapsed >= Duration::from_millis(1) {
             let mut tokens = self.tokens.write().await;
             let tokens_to_add = elapsed.as_secs_f64() * self.max_rps as f64;
@@ -270,11 +276,11 @@ impl CircuitBreaker {
 
     async fn record_failure(&self) {
         let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
-        
+
         if failures >= self.failure_threshold as u64 {
             let mut state = self.state.write().await;
             *state = CircuitBreakerState::Open;
-            
+
             let mut last_failure = self.last_failure_time.write().await;
             *last_failure = Some(Instant::now());
         }
@@ -313,8 +319,10 @@ mod tests {
     async fn test_task_execution() {
         let config = ConcurrencyConfig::default();
         let manager = ConcurrencyManager::new(config).unwrap();
-        
-        let result = manager.execute(|| async { Ok::<i32, AgentMemError>(42) }).await;
+
+        let result = manager
+            .execute(|| async { Ok::<i32, AgentMemError>(42) })
+            .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
     }
@@ -324,7 +332,8 @@ mod tests {
         let rate_limiter = RateLimiter::new(100); // Higher rate to avoid timeout
 
         let start = Instant::now();
-        for _ in 0..3 { // Fewer requests
+        for _ in 0..3 {
+            // Fewer requests
             rate_limiter.acquire().await.unwrap();
         }
         let elapsed = start.elapsed();
@@ -336,15 +345,15 @@ mod tests {
     #[tokio::test]
     async fn test_circuit_breaker() {
         let circuit_breaker = CircuitBreaker::new(3, Duration::from_secs(1));
-        
+
         // Record failures to trip the circuit breaker
         for _ in 0..3 {
             circuit_breaker.record_failure().await;
         }
-        
+
         // Circuit breaker should be open
         assert!(!circuit_breaker.can_execute().await);
-        
+
         // Record success to close it
         circuit_breaker.record_success().await;
         assert!(circuit_breaker.can_execute().await);

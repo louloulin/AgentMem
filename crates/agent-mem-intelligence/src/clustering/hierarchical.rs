@@ -1,10 +1,16 @@
 //! 层次聚类算法实现
 
-use super::{MemoryCluster, MemoryClusterer, ClusteringConfig, ClusteringMetrics, ClusteringUtils};
-use agent_mem_traits::{Result, AgentMemError};
+use super::{ClusteringConfig, ClusteringMetrics, MemoryCluster, MemoryClusterer};
+use agent_mem_traits::Result;
 
 /// 层次聚类器
 pub struct HierarchicalClusterer;
+
+impl Default for HierarchicalClusterer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl HierarchicalClusterer {
     pub fn new() -> Self {

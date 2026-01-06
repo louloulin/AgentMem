@@ -10,7 +10,7 @@
 
 #### 1. **核心模块 (core.rs)** - 100% 完成 ✅
 - ✅ 基础数据结构：`AgentState`, `Memory`, `StateType`, `MemoryType`
-- ✅ 错误处理：`AgentDbError` 枚举
+- ✅ 错误处理：`AgentMemError` 枚举
 - ✅ 配置结构：`DatabaseConfig`, `QueryResult`, `PaginationParams`
 - ✅ 工具函数：时间戳、校验和计算
 - ✅ **新增**: Memory高级方法（重要性计算、嵌入向量管理）
@@ -63,10 +63,10 @@
 #### 1. **lib.rs.backup中的完整向量功能**
 ```rust
 // 缺失的向量表管理
-pub async fn ensure_vector_table(&self) -> Result<Table, AgentDbError>
-pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentDbError>
-pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
-pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
+pub async fn ensure_vector_table(&self) -> Result<Table, AgentMemError>
+pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentMemError>
+pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
+pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
 ```
 
 #### 2. **完整的RAG引擎实现**
@@ -103,7 +103,7 @@ pub struct RAGEngine {
 #### 3. **高级记忆功能**
 ```rust
 // 缺失的记忆高级功能
-pub async fn search_similar_memories(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<Memory>, AgentDbError>
+pub async fn search_similar_memories(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<Memory>, AgentMemError>
 pub fn calculate_importance(&self, current_time: i64) -> f32
 pub fn access(&mut self)
 pub fn set_embedding(&mut self, embedding: Vec<f32>)
@@ -115,13 +115,13 @@ pub fn is_expired(&self, current_time: i64) -> bool
 // lib.rs中的AgentDatabase需要完善
 impl AgentDatabase {
     // 缺失的向量操作
-    pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentDbError>
-    pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
+    pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentMemError>
+    pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
     
     // 缺失的RAG操作
-    pub async fn index_document(&self, document: &Document) -> Result<String, AgentDbError>
-    pub async fn search_documents(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    pub async fn build_context(&self, query: &str, max_tokens: usize) -> Result<RAGContext, AgentDbError>
+    pub async fn index_document(&self, document: &Document) -> Result<String, AgentMemError>
+    pub async fn search_documents(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    pub async fn build_context(&self, query: &str, max_tokens: usize) -> Result<RAGContext, AgentMemError>
 }
 ```
 
@@ -132,19 +132,19 @@ impl AgentDatabase {
 #### ✅ 1.1 扩展 agent_state.rs - 已实现
 ```rust
 impl AgentStateDB {
-    ✅ pub async fn ensure_vector_table(&self) -> Result<Table, AgentDbError>
-    ✅ pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentDbError>
-    ✅ pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
-    ✅ pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
+    ✅ pub async fn ensure_vector_table(&self) -> Result<Table, AgentMemError>
+    ✅ pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentMemError>
+    ✅ pub async fn vector_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
+    ✅ pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
 }
 ```
 
 #### ✅ 1.2 更新 lib.rs 集成接口 - 已实现
 ```rust
 impl AgentDatabase {
-    ✅ pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentDbError>
-    ✅ pub async fn vector_search_states(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
-    ✅ pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentDbError>
+    ✅ pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentMemError>
+    ✅ pub async fn vector_search_states(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
+    ✅ pub async fn search_by_agent_and_similarity(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<AgentState>, AgentMemError>
 }
 ```
 
@@ -159,12 +159,12 @@ impl AgentDatabase {
 ✅ pub struct RAGContext { /* 完整实现 */ }
 
 impl RAGEngine {
-    ✅ pub async fn new(db_path: &str) -> Result<Self, AgentDbError>
-    ✅ pub async fn index_document(&self, document: &Document) -> Result<String, AgentDbError>
-    ✅ pub async fn semantic_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn search_by_text(&self, text_query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn hybrid_search(&self, text_query: &str, query_embedding: Vec<f32>, alpha: f32, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn build_context(&self, query: &str, search_results: Vec<SearchResult>, max_tokens: usize) -> Result<RAGContext, AgentDbError>
+    ✅ pub async fn new(db_path: &str) -> Result<Self, AgentMemError>
+    ✅ pub async fn index_document(&self, document: &Document) -> Result<String, AgentMemError>
+    ✅ pub async fn semantic_search(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn search_by_text(&self, text_query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn hybrid_search(&self, text_query: &str, query_embedding: Vec<f32>, alpha: f32, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn build_context(&self, query: &str, search_results: Vec<SearchResult>, max_tokens: usize) -> Result<RAGContext, AgentMemError>
 }
 ```
 
@@ -175,12 +175,12 @@ impl RAGEngine {
 
 impl AgentDatabase {
     ✅ pub rag_engine: Option<RAGEngine>,
-    ✅ pub async fn with_rag_engine(mut self) -> Result<Self, AgentDbError>
-    ✅ pub async fn index_document(&self, document: &Document) -> Result<String, AgentDbError>
-    ✅ pub async fn search_documents(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn semantic_search_documents(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn hybrid_search_documents(&self, text_query: &str, query_embedding: Vec<f32>, alpha: f32, limit: usize) -> Result<Vec<SearchResult>, AgentDbError>
-    ✅ pub async fn build_context(&self, query: &str, search_results: Vec<SearchResult>, max_tokens: usize) -> Result<RAGContext, AgentDbError>
+    ✅ pub async fn with_rag_engine(mut self) -> Result<Self, AgentMemError>
+    ✅ pub async fn index_document(&self, document: &Document) -> Result<String, AgentMemError>
+    ✅ pub async fn search_documents(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn semantic_search_documents(&self, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn hybrid_search_documents(&self, text_query: &str, query_embedding: Vec<f32>, alpha: f32, limit: usize) -> Result<Vec<SearchResult>, AgentMemError>
+    ✅ pub async fn build_context(&self, query: &str, search_results: Vec<SearchResult>, max_tokens: usize) -> Result<RAGContext, AgentMemError>
 }
 ```
 
@@ -189,11 +189,11 @@ impl AgentDatabase {
 #### ✅ 3.1 扩展 memory.rs - 已实现
 ```rust
 impl MemoryManager {
-    ✅ pub async fn search_similar_memories(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<Memory>, AgentDbError>
-    ✅ pub async fn get_memory_statistics(&self, agent_id: u64) -> Result<MemoryStatistics, AgentDbError>
-    ✅ pub async fn cleanup_expired_memories(&self) -> Result<usize, AgentDbError>
-    ✅ pub async fn get_memories_by_importance(&self, agent_id: u64, min_importance: f64, limit: usize) -> Result<Vec<Memory>, AgentDbError>
-    ✅ pub async fn access_memory(&self, memory_id: &str) -> Result<(), AgentDbError>
+    ✅ pub async fn search_similar_memories(&self, agent_id: u64, query_embedding: Vec<f32>, limit: usize) -> Result<Vec<Memory>, AgentMemError>
+    ✅ pub async fn get_memory_statistics(&self, agent_id: u64) -> Result<MemoryStatistics, AgentMemError>
+    ✅ pub async fn cleanup_expired_memories(&self) -> Result<usize, AgentMemError>
+    ✅ pub async fn get_memories_by_importance(&self, agent_id: u64, min_importance: f64, limit: usize) -> Result<Vec<Memory>, AgentMemError>
+    ✅ pub async fn access_memory(&self, memory_id: &str) -> Result<(), AgentMemError>
 }
 
 impl Memory {
@@ -563,7 +563,7 @@ pub struct RAGService {
 ```rust
 // 所有数据库操作都使用async/await
 impl RAGEngine {
-    pub async fn index_document(&self, doc: &Document) -> Result<String, AgentDbError> {
+    pub async fn index_document(&self, doc: &Document) -> Result<String, AgentMemError> {
         // 异步实现，支持大文档处理
     }
 }
@@ -581,12 +581,12 @@ impl RAGEngine {
 // 保持现有API不变
 impl AgentDatabase {
     // 现有方法保持不变
-    pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentDbError> {
+    pub async fn save_agent_state(&self, state: &AgentState) -> Result<(), AgentMemError> {
         self.agent_state_db.save_state(state).await
     }
 
     // 新增方法使用新架构
-    pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentDbError> {
+    pub async fn save_vector_state(&self, state: &AgentState, embedding: Vec<f32>) -> Result<(), AgentMemError> {
         self.agent_state_db.save_vector_state(state, embedding).await
     }
 }
@@ -693,8 +693,8 @@ async fn test_complete_rag_workflow() {
 ```rust
 // 抽象层示例
 trait VectorStorage {
-    async fn save_vector(&self, id: u64, vector: Vec<f32>) -> Result<(), AgentDbError>;
-    async fn search_vectors(&self, query: &[f32], limit: usize) -> Result<Vec<VectorSearchResult>, AgentDbError>;
+    async fn save_vector(&self, id: u64, vector: Vec<f32>) -> Result<(), AgentMemError>;
+    async fn search_vectors(&self, query: &[f32], limit: usize) -> Result<Vec<VectorSearchResult>, AgentMemError>;
 }
 
 struct LanceDBStorage {
@@ -716,7 +716,7 @@ impl VectorStorage for LanceDBStorage {
 ```rust
 // 分批处理示例
 impl VectorEngine {
-    pub async fn batch_add_vectors(&self, vectors: Vec<(u64, Vec<f32>)>, batch_size: usize) -> Result<(), AgentDbError> {
+    pub async fn batch_add_vectors(&self, vectors: Vec<(u64, Vec<f32>)>, batch_size: usize) -> Result<(), AgentMemError> {
         for chunk in vectors.chunks(batch_size) {
             self.add_vectors_batch(chunk).await?;
             tokio::time::sleep(Duration::from_millis(10)).await; // 避免过载
@@ -736,7 +736,7 @@ impl VectorEngine {
 ```rust
 // 流式处理示例
 impl RAGEngine {
-    pub async fn index_large_document<R: AsyncRead>(&self, reader: R, chunk_size: usize) -> Result<String, AgentDbError> {
+    pub async fn index_large_document<R: AsyncRead>(&self, reader: R, chunk_size: usize) -> Result<String, AgentMemError> {
         let mut buffer = vec![0; chunk_size];
         let mut doc_chunks = Vec::new();
 
@@ -908,13 +908,13 @@ impl RAGEngine {
 // 示例：标准化错误处理
 pub trait DatabaseOperation {
     type Output;
-    async fn execute(&self) -> Result<Self::Output, AgentDbError>;
+    async fn execute(&self) -> Result<Self::Output, AgentMemError>;
 }
 
 // 所有数据库操作都实现这个trait
 impl DatabaseOperation for SaveStateOperation {
     type Output = ();
-    async fn execute(&self) -> Result<(), AgentDbError> {
+    async fn execute(&self) -> Result<(), AgentMemError> {
         // 标准化的实现
     }
 }

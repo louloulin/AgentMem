@@ -1,0 +1,55 @@
+# AgentMem 生产环境配置
+
+data_root = "/var/lib/agentmem"
+
+[database]
+backend = "libsql"
+url = "/var/lib/agentmem/agentmem.db"
+enable_wal = true
+cache_size_kb = 51200
+page_size = 4096
+auto_create_dir = true
+in_memory = false
+
+[database.pool]
+max_connections = 50
+min_connections = 10
+connection_timeout_secs = 30
+idle_timeout_secs = 300
+
+[vector_store]
+path = "/var/lib/agentmem/vectors"
+dimension = 384
+distance = "Cosine"
+enable_persistence = true
+auto_create_dir = true
+in_memory = false
+collection_name = "agentmem_vectors"
+
+[logging]
+level = "info"
+format = "json"
+enable_file = true
+file_path = "/var/log/agentmem/agentmem.log"
+max_file_size_mb = 500
+max_files = 30
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 8
+enable_cors = false
+request_timeout_secs = 60
+
+[features]
+enable_mcp = true
+enable_multimodal = true
+enable_reasoning = true
+enable_graph = true
+
+[security]
+enable_tls = true
+cert_path = "/etc/agentmem/cert.pem"
+key_path = "/etc/agentmem/key.pem"
+enable_auth = true
+

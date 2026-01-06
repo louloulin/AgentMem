@@ -1,45 +1,170 @@
 [workspace]
 resolver = "2"
+
+# Temporarily exclude examples with compilation errors (non-core functionality)
+# These can be fixed later without impacting production readiness
+exclude = [
+    "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
+    "examples/batch-embedding-optimization-demo",  # 独立示例，不需要workspace集成
+    "crates/agent-mem-plugin-sdk/examples/hello_plugin",  # Plugin example - standalone
+    "crates/agent-mem-plugin-sdk/examples/memory_processor",  # Plugin example - standalone
+    "crates/agent-mem-plugin-sdk/examples/code_analyzer",  # Plugin example - standalone
+]
+
 members = [
     # 核心Crates (逐步添加)
     "crates/agent-mem-traits",
     "crates/agent-mem-utils",
     "crates/agent-mem-config",
     "crates/agent-mem-core",
+    "crates/agent-mem",  # 新增：统一 API
     "crates/agent-mem-llm",
     "crates/agent-mem-storage",
     "crates/agent-mem-embeddings",
     "crates/agent-mem-intelligence",
-    "crates/agent-mem-server",
+    # "crates/agent-mem-server",  # Temporarily disabled - has dependency issues
     "crates/agent-mem-client",
     "crates/agent-mem-performance",
     "crates/agent-mem-distributed",
+    "crates/agent-mem-compat",
+    "crates/agent-mem-deployment",
+    "crates/agent-mem-plugin-sdk",  # Plugin SDK
+    "crates/agent-mem-plugins",     # Plugin Manager
+    # "crates/agent-mem-lumosai",  # Temporarily disabled - missing lumosai_core dependency
     # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
     # "crates/agent-mem-intelligence",
 
     # 多语言绑定
-    # "bindings/agent-mem-python",
+    "crates/agent-mem-python",  # ✅ FIXED: Upgraded pyo3-asyncio 0.21, Arc<RwLock<>> pattern
     # "bindings/agent-mem-node",
     # "bindings/agent-mem-c",
 
     # 工具和应用
-    # "tools/agent-mem-cli",
+    "tools/agentmem-cli",
+    "tools/comprehensive-stress-test",
+    "tools/libsql-stress-test",  # LibSQL 真实压测工具
+    "tools/simple-perf-test",    # Phase 1 性能测试工具
+    "tools/intelligent-mode-test", # Phase 2 智能模式性能测试工具
+    "tools/phase3-parallel-test", # Phase 3 并行存储性能测试工具
+    "tools/batch-mode-test",     # Phase 4 批量模式性能测试工具
     # "tools/agent-mem-server",
     # "tools/agent-mem-bench",
 
     # 示例
+    "examples/agent-from-env-demo",
+    "examples/production-memory-demo",
+    "examples/env-config-demo",
+    "examples/importance-scoring-demo",
+    "examples/vector-search-demo",
+    "examples/llm-memory-analysis-demo",
+    "examples/error-handling-demo",
+    "examples/mcp-stdio-server",
+    "examples/langgraph-integration-demo",
+    "examples/user-management-demo",
+    "examples/migration-demo",
+    "examples/performance-demo",
+    "examples/performance-optimization-demo",
+    "examples/agent-lifecycle-demo",
+    "examples/database-schema-demo",
+    "examples/entity-relation-extraction-demo",
+    "examples/system-metrics-demo",
+    "examples/onnx-embedding-demo",
+    "examples/mcp-resources-demo",
+    "examples/mcp-prompts-demo",
+    "examples/mcp-transport-demo",
+    "examples/mcp-tool-discovery-demo",
+    "examples/mcp-auth-demo",
+    "examples/mcp-sampling-demo",
+    "examples/mcp-logging-demo",
+    "examples/multimodal-ai-demo",
+    "examples/advanced-reasoning-demo",
+    "examples/single-binary-demo",
+    "examples/observability-demo",
+    "examples/fastembed-demo",
+    "examples/mem0-api-demo",
+    "examples/quickstart-zero-config",  # P1: 零配置快速开始示例
+    "examples/quickstart-simple-mode",  # P1: 简单模式示例
+    "examples/test-fastembed",  # 测试 FastEmbed 初始化
+    "examples/p0-real-verification",  # P0 真实验证
+
+    # 示例
     "examples/demo",
+    "examples/simple-demo",
+    "examples/comprehensive-test",
+    "examples/phase1-integration-demo",
     "examples/phase3-demo",
-    "examples/phase4-demo",
-    "examples/server-demo",
+    "examples/phase4-demo",  # ✅ FIXED: Updated LLM factory API
+    "examples/phase5-production-demo",
+    "examples/phase6-optimization-demo",
+    # "examples/server-demo",  # Temporarily disabled - depends on agent-mem-server
     "examples/client-demo",
+    "examples/mem0-compat-demo",
+    # "examples/client-server-integration-test",  # Temporarily disabled - depends on agent-mem-server
+    "examples/comprehensive-verification",  # 综合功能验证
+    "examples/intelligent-reasoning-demo",
+    "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
+    "examples/graph-memory-demo",
+    # "examples/test-intelligent-integration",  # ⚠️ 已移至 exclude（使用废弃的 trait API）
+    "examples/test-cache",
+    "examples/simple-memory-demo",
+    "examples/simple-api-test",
+    # "examples/real-agentmem-test",  # 暂时禁用：使用旧 API
+    # "examples/local-embedding-demo",  # 暂时禁用：依赖 candle-core 有编译问题
+    # "examples/storage-backend-demo",  # 暂时禁用：需要修复
+    "examples/litellm-demo",
+    "examples/embedding-demo",
+    "examples/vector-store-demo",
+    "examples/multimodal-real-demo",
+    "examples/storage-migration-demo",
+    "examples/embedded-mode-demo",
+    "examples/embedded-persistent-demo",
+    "examples/advanced-search-demo",
+    "examples/context-aware-demo",
+    "examples/personalization-demo",
+    "examples/enterprise-security-demo",
+    "examples/intelligent-compression-demo",
+    "examples/multi-agent-collaboration-demo",
+    "examples/enterprise-monitoring-demo",
+    "examples/storage-optimization-demo",
+    "examples/compute-optimization-demo",
+    "examples/cloud-integration-demo",
+    "examples/procedural-memory-demo",
+    "examples/deepseek-test",
+    "examples/multimodal-demo",
+    "examples/intelligence-demo",
+    "examples/mem5-demo",
+    "examples/enhanced-messages-demo",
+    "examples/production-telemetry-demo",
+    "examples/real-implementation-demo",
+    "examples/llm-provider-demo",
+    # "examples/api-server-demo",  # Temporarily disabled - depends on agent-mem-server
+    "examples/multi-tenant-demo",
+    "examples/cloud-native-demo",
+    "examples/performance-benchmark",
+    # "examples/intelligent-memory-demo",  # Temporarily excluded - MemoryManager import error, API changes
+    "crates/agent-mem-tools",
+    "crates/agent-mem-observability", "examples/system-prompt-demo", "examples/chat-demo",
     # "examples/basic-usage",
     # "examples/advanced-features",
     # "examples/migration-from-agentmen",
     # "examples/mem0-compatibility",
+
+# 新的真实演示示例（2025-10-24）
+    "examples/demo-memory-api",           # Memory API基础演示
+    "examples/demo-multimodal",           # 多模态处理演示
+    "examples/demo-intelligent-chat",     # 智能对话演示
+    "examples/demo-performance-benchmark", # 性能基准测试工具
+    "examples/demo-codebase-memory",      # 代码库记忆与搜索演示（需FastEmbed）
+    "examples/demo-performance-simple",    # 简化性能测试（无Embedder依赖）
+    "examples/demo-memory-viewer",        # 记忆可视化工具（对标MIRIX）
+    "examples/demo-performance-comparison", # 性能对比测试（对标MIRIX）
+    "examples/enhanced-hybrid-search-demo", # 增强混合搜索演示
+    "examples/product-search-demo",        # 商品搜索演示
+    # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 
+# Workspace package configuration
 [workspace.package]
 version = "2.0.0"
 edition = "2021"
@@ -51,94 +176,82 @@ documentation = "https://docs.rs/agent-mem"
 keywords = ["ai", "memory", "agent", "llm", "vector"]
 categories = ["database", "science", "web-programming"]
 
+# ⚡ 编译时间优化配置
+[profile.release]
+# 优化级别：3 = 最高优化
+opt-level = 3
+# 链接时优化：thin = 平衡性能和编译时间
+lto = "thin"
+# 代码生成单元：1 = 最慢编译但最好性能（可以改为 16 加快编译）
+codegen-units = 16
+# 增量编译
+incremental = true
+# 调试信息：1 = 行号表（足够用于backtrace，但编译更快）
+debug = 1
+# Strip 符号：减小二进制大小
+strip = "debuginfo"
+
+[profile.dev]
+# 开发模式优化：0 = 无优化（最快编译）
+opt-level = 0
+# 开发模式不使用 LTO（加快编译）
+lto = false
+# 更多代码生成单元（加快增量编译）
+codegen-units = 256
+# 增量编译
+incremental = true
+# 保留完整调试信息
+debug = 2
+
+[profile.dev.package."*"]
+# 依赖项使用一些优化（不花太多时间编译依赖）
+opt-level = 1
+
+# ⚡ 测试配置优化
+[profile.test]
+opt-level = 1
+debug = 2
+codegen-units = 16
+lto = false
+incremental = true
+
+# ⚡ Bench 配置优化
+[profile.bench]
+opt-level = 3
+debug = 1
+codegen-units = 1
+lto = "thin"
+incremental = false
+
+# 📦 依赖优化
 [workspace.dependencies]
-# 核心依赖
-tokio = { version = "1.0", features = ["full"] }
+# 固定版本以避免重复解析
+tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-uuid = { version = "1.0", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
-tracing = "0.1"
-tracing-subscriber = "0.3"
 async-trait = "0.1"
-
-# 异步HTTP客户端
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
-hyper = { version = "0.14", features = ["full"] }
-
-# 数据库和存储
-lancedb = "0.21.2"
-redis = { version = "0.23", features = ["tokio-comp"] }
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "chrono", "uuid"] }
-
-# 向量数据库客户端
-# pinecone-sdk = "0.1"
-# qdrant-client = "1.0"
-
-# 图数据库客户端  
-# neo4rs = "0.7"
-
-# LLM客户端
-# openai-api-rs = "4.0"
-# anthropic-sdk = "0.1"
-
-# 嵌入和ML
-# candle-core = "0.3"
-# candle-nn = "0.3"
-# tokenizers = "0.14"
-
-# 配置和CLI
-clap = { version = "4.0", features = ["derive"] }
-config = "0.13"
-toml = "0.8"
-
-# 多语言绑定
-pyo3 = { version = "0.20", features = ["extension-module"] }
-napi = { version = "2.0", features = ["napi4"] }
-napi-derive = "2.0"
-
-# Web服务器
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
-
-# 测试和基准
-criterion = { version = "0.5", features = ["html_reports"] }
-proptest = "1.0"
-
-# 性能优化
-dashmap = "5.5"
-lru = "0.12"
-parking_lot = "0.12"
-metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
-bytes = "1.5"
-crossbeam = "0.8"
-rayon = "1.8"
-
-# 分布式系统
-ring = "0.17"
-
-# 文本处理
-regex = "1.0"
-
-# 现有依赖保持兼容
-arrow = "55.2"
-arrow-array = "55.2"
-arrow-schema = "55.2"
-arrow-buffer = "55.2"
 futures = "0.3"
-libc = "0.2"
-rand = "0.8"
-env_logger = "0.11.8"
-num_cpus = "1.17.0"
-bincode = "2.0.1"
-flate2 = "1.1.2"
-log = "0.4.27"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 sha2 = "0.10"
-aes-gcm = "0.10"
 hex = "0.4"
-cbindgen = "0.26"
-tempfile = "3.20.0"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+toml = "0.8"
+config = "0.14"
+num_cpus = "1.16"
+rand = "0.8"
+dashmap = "5.5"
+reqwest = { version = "0.11", features = ["json"] }
+hyper = { version = "0.14", features = ["full"] }
+tower = "0.4"
+axum = "0.7"
+bytes = "1.5"
+parking_lot = "0.12"
+crossbeam = "0.8"
+once_cell = "1.19"

@@ -1,11 +1,13 @@
 //! Hierarchical memory management
-//! 
+//!
 //! Implements ContextEngine's layered memory architecture with scoped access control.
 
-use crate::types::{Memory, MemoryType};
-use agent_mem_traits::{Result, AgentMemError};
+use crate::Memory;
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// Memory levels following ContextEngine's design
@@ -21,6 +23,29 @@ pub enum MemoryLevel {
     Contextual,
 }
 
+impl MemoryLevel {
+    /// Convert memory level to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MemoryLevel::Strategic => "strategic",
+            MemoryLevel::Tactical => "tactical",
+            MemoryLevel::Operational => "operational",
+            MemoryLevel::Contextual => "contextual",
+        }
+    }
+
+    /// Create memory level from string representation
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "strategic" => Some(MemoryLevel::Strategic),
+            "tactical" => Some(MemoryLevel::Tactical),
+            "operational" => Some(MemoryLevel::Operational),
+            "contextual" => Some(MemoryLevel::Contextual),
+            _ => None,
+        }
+    }
+}
+
 /// Memory scope levels following ContextEngine's hierarchy
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum MemoryScope {
@@ -29,9 +54,21 @@ pub enum MemoryScope {
     /// Agent-specific memories
     Agent(String),
     /// User-specific memories within an agent context
-    User { agent_id: String, user_id: String },
+    User {
+        /// Agent identifier
+        agent_id: String,
+        /// User identifier
+        user_id: String,
+    },
     /// Session-specific memories
-    Session { agent_id: String, user_id: String, session_id: String },
+    Session {
+        /// Agent identifier
+        agent_id: String,
+        /// User identifier
+        user_id: String,
+        /// Session identifier
+        session_id: String,
+    },
 }
 
 impl MemoryScope {
@@ -40,39 +77,86 @@ impl MemoryScope {
         match (self, other) {
             // Global scope can access everything
             (MemoryScope::Global, _) => true,
-            
+
             // Agent scope can access global and own agent memories
-            (MemoryScope::Agent(agent_id), MemoryScope::Global) => true,
+            (MemoryScope::Agent(_agent_id), MemoryScope::Global) => true,
             (MemoryScope::Agent(agent_id), MemoryScope::Agent(other_agent_id)) => {
                 agent_id == other_agent_id
             }
-            
+
             // User scope can access global, agent, and own user memories
-            (MemoryScope::User { agent_id, user_id }, MemoryScope::Global) => true,
-            (MemoryScope::User { agent_id, user_id }, MemoryScope::Agent(other_agent_id)) => {
-                agent_id == other_agent_id
-            }
-            (MemoryScope::User { agent_id, user_id }, MemoryScope::User { agent_id: other_agent_id, user_id: other_user_id }) => {
-                agent_id == other_agent_id && user_id == other_user_id
-            }
-            
+            (
+                MemoryScope::User {
+                    agent_id: _,
+                    user_id: _,
+                },
+                MemoryScope::Global,
+            ) => true,
+            (
+                MemoryScope::User {
+                    agent_id,
+                    user_id: _,
+                },
+                MemoryScope::Agent(other_agent_id),
+            ) => agent_id == other_agent_id,
+            (
+                MemoryScope::User { agent_id, user_id },
+                MemoryScope::User {
+                    agent_id: other_agent_id,
+                    user_id: other_user_id,
+                },
+            ) => agent_id == other_agent_id && user_id == other_user_id,
+
             // Session scope can access all parent scopes and own session
-            (MemoryScope::Session { agent_id, user_id, session_id }, MemoryScope::Global) => true,
-            (MemoryScope::Session { agent_id, user_id, session_id }, MemoryScope::Agent(other_agent_id)) => {
+            (
+                MemoryScope::Session {
+                    agent_id: _,
+                    user_id: _,
+                    session_id: _,
+                },
+                MemoryScope::Global,
+            ) => true,
+            (
+                MemoryScope::Session {
+                    agent_id,
+                    user_id: _,
+                    session_id: _,
+                },
+                MemoryScope::Agent(other_agent_id),
+            ) => agent_id == other_agent_id,
+            (
+                MemoryScope::Session {
+                    agent_id,
+                    user_id,
+                    session_id: _,
+                },
+                MemoryScope::User {
+                    agent_id: other_agent_id,
+                    user_id: other_user_id,
+                },
+            ) => agent_id == other_agent_id && user_id == other_user_id,
+            (
+                MemoryScope::Session {
+                    agent_id,
+                    user_id,
+                    session_id,
+                },
+                MemoryScope::Session {
+                    agent_id: other_agent_id,
+                    user_id: other_user_id,
+                    session_id: other_session_id,
+                },
+            ) => {
                 agent_id == other_agent_id
+                    && user_id == other_user_id
+                    && session_id == other_session_id
             }
-            (MemoryScope::Session { agent_id, user_id, session_id }, MemoryScope::User { agent_id: other_agent_id, user_id: other_user_id }) => {
-                agent_id == other_agent_id && user_id == other_user_id
-            }
-            (MemoryScope::Session { agent_id, user_id, session_id }, MemoryScope::Session { agent_id: other_agent_id, user_id: other_user_id, session_id: other_session_id }) => {
-                agent_id == other_agent_id && user_id == other_user_id && session_id == other_session_id
-            }
-            
+
             // All other combinations are not allowed
             _ => false,
         }
     }
-    
+
     /// Get the hierarchy level (lower number = higher privilege)
     pub fn hierarchy_level(&self) -> u8 {
         match self {
@@ -82,35 +166,49 @@ impl MemoryScope {
             MemoryScope::Session { .. } => 3,
         }
     }
-    
+
     /// Get parent scope
     pub fn parent(&self) -> Option<MemoryScope> {
         match self {
             MemoryScope::Global => None,
             MemoryScope::Agent(_) => Some(MemoryScope::Global),
             MemoryScope::User { agent_id, .. } => Some(MemoryScope::Agent(agent_id.clone())),
-            MemoryScope::Session { agent_id, user_id, .. } => Some(MemoryScope::User {
+            MemoryScope::Session {
+                agent_id, user_id, ..
+            } => Some(MemoryScope::User {
                 agent_id: agent_id.clone(),
                 user_id: user_id.clone(),
             }),
         }
     }
-}
 
-/// Hierarchical memory with scope information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HierarchicalMemory {
-    /// Base memory data
-    pub memory: Memory,
-    
-    /// Memory scope
-    pub scope: MemoryScope,
-    
-    /// Inheritance rules
-    pub inheritance: MemoryInheritance,
-    
-    /// Access permissions
-    pub permissions: MemoryPermissions,
+    /// Convert memory scope to string representation (simplified)
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MemoryScope::Global => "global",
+            MemoryScope::Agent(_) => "agent",
+            MemoryScope::User { .. } => "user",
+            MemoryScope::Session { .. } => "session",
+        }
+    }
+
+    /// Create memory scope from string representation (simplified, returns Global for unknown)
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "global" => Some(MemoryScope::Global),
+            "agent" => Some(MemoryScope::Agent("unknown".to_string())),
+            "user" => Some(MemoryScope::User {
+                agent_id: "unknown".to_string(),
+                user_id: "unknown".to_string(),
+            }),
+            "session" => Some(MemoryScope::Session {
+                agent_id: "unknown".to_string(),
+                user_id: "unknown".to_string(),
+                session_id: "unknown".to_string(),
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// Memory inheritance configuration
@@ -118,13 +216,13 @@ pub struct HierarchicalMemory {
 pub struct MemoryInheritance {
     /// Whether this memory can be inherited by child scopes
     pub inheritable: bool,
-    
+
     /// Whether this memory was inherited from a parent scope
     pub inherited: bool,
-    
+
     /// Original scope if inherited
     pub original_scope: Option<MemoryScope>,
-    
+
     /// Inheritance decay factor (reduces importance over scope levels)
     pub decay_factor: f32,
 }
@@ -145,13 +243,13 @@ impl Default for MemoryInheritance {
 pub struct MemoryPermissions {
     /// Can read this memory
     pub readable: bool,
-    
+
     /// Can modify this memory
     pub writable: bool,
-    
+
     /// Can delete this memory
     pub deletable: bool,
-    
+
     /// Can share this memory with other scopes
     pub shareable: bool,
 }
@@ -171,9 +269,15 @@ impl Default for MemoryPermissions {
 pub struct HierarchicalMemoryManager {
     /// Memories organized by scope
     memories: HashMap<MemoryScope, Vec<HierarchicalMemory>>,
-    
+
     /// Scope inheritance cache
     inheritance_cache: HashMap<MemoryScope, Vec<MemoryScope>>,
+}
+
+impl Default for HierarchicalMemoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HierarchicalMemoryManager {
@@ -184,7 +288,7 @@ impl HierarchicalMemoryManager {
             inheritance_cache: HashMap::new(),
         }
     }
-    
+
     /// Add a memory to a specific scope
     pub fn add_memory(
         &mut self,
@@ -196,88 +300,105 @@ impl HierarchicalMemoryManager {
         let hierarchical_memory = HierarchicalMemory {
             memory,
             scope: scope.clone(),
-            inheritance: inheritance.unwrap_or_default(),
-            permissions: permissions.unwrap_or_default(),
+            level: MemoryLevel::Operational, // Default level
+            hierarchy_metadata: HierarchyMetadata {
+                level_assigned_at: chrono::Utc::now(),
+                promotion_count: 0,
+                demotion_count: 0,
+                inheritance: inheritance.unwrap_or_default(),
+                permissions: permissions.unwrap_or_default(),
+            },
         };
-        
+
         self.memories
             .entry(scope)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(hierarchical_memory);
-        
+
         Ok(Uuid::new_v4().to_string())
     }
-    
+
     /// Get memories accessible from a specific scope
     pub fn get_accessible_memories(&self, scope: &MemoryScope) -> Vec<&HierarchicalMemory> {
         let mut accessible = Vec::new();
-        
+
         // Get all scopes this scope can access
         let accessible_scopes = self.get_accessible_scopes(scope);
-        
+
         for accessible_scope in accessible_scopes {
             if let Some(memories) = self.memories.get(&accessible_scope) {
                 for memory in memories {
-                    if memory.permissions.readable && scope.can_access(&memory.scope) {
+                    if memory.hierarchy_metadata.permissions.readable
+                        && scope.can_access(&memory.scope)
+                    {
                         accessible.push(memory);
                     }
                 }
             }
         }
-        
+
         accessible
     }
-    
+
     /// Get inherited memories for a scope
     pub fn get_inherited_memories(&self, scope: &MemoryScope) -> Vec<HierarchicalMemory> {
         let mut inherited = Vec::new();
         let mut current_scope = scope.parent();
         let mut level = 1;
-        
+
         while let Some(parent_scope) = current_scope {
             if let Some(memories) = self.memories.get(&parent_scope) {
                 for memory in memories {
-                    if memory.inheritance.inheritable && memory.permissions.shareable {
+                    if memory.hierarchy_metadata.inheritance.inheritable
+                        && memory.hierarchy_metadata.permissions.shareable
+                    {
                         let mut inherited_memory = memory.clone();
-                        
+
                         // Apply inheritance decay
-                        inherited_memory.memory.importance =
-                            inherited_memory.memory.importance * memory.inheritance.decay_factor.powi(level);
-                        
+                        let current_score = inherited_memory.memory.score().unwrap_or(0.5);
+                        inherited_memory.memory.set_score(
+                            current_score
+                                * (memory.hierarchy_metadata.inheritance.decay_factor as f64)
+                                    .powi(level),
+                        );
+
                         // Mark as inherited
-                        inherited_memory.inheritance.inherited = true;
-                        inherited_memory.inheritance.original_scope = Some(parent_scope.clone());
+                        inherited_memory.hierarchy_metadata.inheritance.inherited = true;
+                        inherited_memory
+                            .hierarchy_metadata
+                            .inheritance
+                            .original_scope = Some(parent_scope.clone());
                         inherited_memory.scope = scope.clone();
-                        
+
                         inherited.push(inherited_memory);
                     }
                 }
             }
-            
+
             current_scope = parent_scope.parent();
             level += 1;
         }
-        
+
         inherited
     }
-    
+
     /// Get all scopes accessible from a given scope
     fn get_accessible_scopes(&self, scope: &MemoryScope) -> Vec<MemoryScope> {
         if let Some(cached) = self.inheritance_cache.get(scope) {
             return cached.clone();
         }
-        
+
         let mut accessible = vec![scope.clone()];
         let mut current = scope.parent();
-        
+
         while let Some(parent) = current {
             accessible.push(parent.clone());
             current = parent.parent();
         }
-        
+
         accessible
     }
-    
+
     /// Update memory permissions
     pub fn update_permissions(
         &mut self,
@@ -287,9 +408,9 @@ impl HierarchicalMemoryManager {
     ) -> Result<()> {
         if let Some(memories) = self.memories.get_mut(scope) {
             for memory in memories {
-                if memory.memory.id == memory_id {
-                    if memory.permissions.writable {
-                        memory.permissions = permissions;
+                if memory.memory.id.as_str() == memory_id {
+                    if memory.hierarchy_metadata.permissions.writable {
+                        memory.hierarchy_metadata.permissions = permissions;
                         return Ok(());
                     } else {
                         return Err(AgentMemError::memory_error("Memory is not writable"));
@@ -297,16 +418,19 @@ impl HierarchicalMemoryManager {
                 }
             }
         }
-        
+
         Err(AgentMemError::not_found("Memory not found"))
     }
-    
+
     /// Delete memory from scope
     pub fn delete_memory(&mut self, memory_id: &str, scope: &MemoryScope) -> Result<()> {
         if let Some(memories) = self.memories.get_mut(scope) {
-            if let Some(pos) = memories.iter().position(|m| m.memory.id == memory_id) {
+            if let Some(pos) = memories
+                .iter()
+                .position(|m| m.memory.id.as_str() == memory_id)
+            {
                 let memory = &memories[pos];
-                if memory.permissions.deletable {
+                if memory.hierarchy_metadata.permissions.deletable {
                     memories.remove(pos);
                     Ok(())
                 } else {
@@ -319,29 +443,43 @@ impl HierarchicalMemoryManager {
             Err(AgentMemError::not_found("Scope not found"))
         }
     }
-    
+
     /// Get memory statistics by scope
     pub fn get_scope_statistics(&self) -> HashMap<MemoryScope, ScopeStatistics> {
         let mut stats = HashMap::new();
-        
+
         for (scope, memories) in &self.memories {
             let mut scope_stats = ScopeStatistics::default();
-            
+
             for memory in memories {
                 scope_stats.total_memories += 1;
-                
-                match memory.memory.memory_type {
-                    MemoryType::Episodic => scope_stats.episodic_memories += 1,
-                    MemoryType::Semantic => scope_stats.semantic_memories += 1,
-                    MemoryType::Procedural => scope_stats.procedural_memories += 1,
-                    MemoryType::Working => scope_stats.untyped_memories += 1,
+
+                let mem_type_str = memory
+                    .memory
+                    .memory_type()
+                    .unwrap_or_else(|| "episodic".to_string());
+                match mem_type_str.to_lowercase().as_str() {
+                    // Legacy type
+                    "factual" => scope_stats.semantic_memories += 1,
+                    // Basic cognitive memories
+                    "episodic" => scope_stats.episodic_memories += 1,
+                    "semantic" => scope_stats.semantic_memories += 1,
+                    "procedural" => scope_stats.procedural_memories += 1,
+                    "working" => scope_stats.untyped_memories += 1,
+                    // Advanced cognitive memories (AgentMem 7.0)
+                    "core" => scope_stats.semantic_memories += 1, // Core memories are semantic-like
+                    "resource" => scope_stats.untyped_memories += 1, // Resource memories are untyped
+                    "knowledge" => scope_stats.semantic_memories += 1, // Knowledge memories are semantic-like
+                    // Default case for any other types
+                    _ => scope_stats.episodic_memories += 1,
+                    "contextual" => scope_stats.episodic_memories += 1, // Contextual memories are episodic-like
                 }
-                
-                if memory.inheritance.inherited {
+
+                if memory.hierarchy_metadata.inheritance.inherited {
                     scope_stats.inherited_memories += 1;
                 }
-                
-                let importance = memory.memory.importance;
+
+                let importance = memory.memory.score().unwrap_or(0.5) as f32;
                 scope_stats.total_importance += importance;
                 if importance > scope_stats.max_importance {
                     scope_stats.max_importance = importance;
@@ -350,14 +488,15 @@ impl HierarchicalMemoryManager {
                     scope_stats.min_importance = importance;
                 }
             }
-            
+
             if scope_stats.total_memories > 0 {
-                scope_stats.avg_importance = scope_stats.total_importance / scope_stats.total_memories as f32;
+                scope_stats.avg_importance =
+                    scope_stats.total_importance / scope_stats.total_memories as f32;
             }
-            
+
             stats.insert(scope.clone(), scope_stats);
         }
-        
+
         stats
     }
 }
@@ -365,39 +504,445 @@ impl HierarchicalMemoryManager {
 /// Statistics for a memory scope
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ScopeStatistics {
+    /// Total number of memories in this scope
     pub total_memories: usize,
+    /// Number of episodic memories
     pub episodic_memories: usize,
+    /// Number of semantic memories
     pub semantic_memories: usize,
+    /// Number of procedural memories
     pub procedural_memories: usize,
+    /// Number of untyped memories
     pub untyped_memories: usize,
+    /// Number of inherited memories from parent scopes
     pub inherited_memories: usize,
+    /// Sum of all importance scores
     pub total_importance: f32,
+    /// Average importance score
     pub avg_importance: f32,
+    /// Maximum importance score
     pub max_importance: f32,
+    /// Minimum importance score
     pub min_importance: f32,
+}
+
+/// Hierarchy configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchyConfig {
+    /// Auto-promotion enabled
+    pub auto_promotion: bool,
+
+    /// Auto-demotion enabled
+    pub auto_demotion: bool,
+
+    /// Enable inheritance
+    pub enable_inheritance: bool,
+
+    /// Promotion threshold
+    pub promotion_threshold: f64,
+
+    /// Demotion threshold
+    pub demotion_threshold: f64,
+
+    /// Level capacities
+    pub level_capacities: HashMap<MemoryLevel, usize>,
+}
+
+impl Default for HierarchyConfig {
+    fn default() -> Self {
+        let mut level_capacities = HashMap::new();
+        level_capacities.insert(MemoryLevel::Strategic, 100);
+        level_capacities.insert(MemoryLevel::Tactical, 500);
+        level_capacities.insert(MemoryLevel::Operational, 2000);
+        level_capacities.insert(MemoryLevel::Contextual, 5000);
+
+        Self {
+            auto_promotion: true,
+            auto_demotion: true,
+            enable_inheritance: true,
+            promotion_threshold: 1.2,
+            demotion_threshold: 0.8,
+            level_capacities,
+        }
+    }
+}
+
+/// Hierarchy metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchyMetadata {
+    /// When level was assigned
+    pub level_assigned_at: chrono::DateTime<chrono::Utc>,
+
+    /// Number of promotions
+    pub promotion_count: u32,
+
+    /// Number of demotions
+    pub demotion_count: u32,
+
+    /// Inheritance configuration
+    pub inheritance: MemoryInheritance,
+
+    /// Access permissions
+    pub permissions: MemoryPermissions,
+}
+
+impl Default for HierarchyMetadata {
+    fn default() -> Self {
+        Self {
+            level_assigned_at: chrono::Utc::now(),
+            promotion_count: 0,
+            demotion_count: 0,
+            inheritance: MemoryInheritance::default(),
+            permissions: MemoryPermissions::default(),
+        }
+    }
+}
+
+/// Hierarchical memory record
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchicalMemory {
+    /// The memory itself
+    pub memory: Memory,
+
+    /// Memory scope
+    pub scope: MemoryScope,
+
+    /// Hierarchy level
+    pub level: MemoryLevel,
+
+    /// Hierarchy metadata
+    pub hierarchy_metadata: HierarchyMetadata,
+}
+
+/// Hierarchy statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HierarchyStatistics {
+    /// Memories by level
+    pub memories_by_level: HashMap<MemoryLevel, usize>,
+
+    /// Average importance by level
+    pub avg_importance_by_level: HashMap<MemoryLevel, f64>,
+
+    /// Inheritance relationships
+    pub inheritance_relationships: usize,
+
+    /// Level utilization
+    pub level_utilization: HashMap<MemoryLevel, f64>,
+}
+
+/// Hierarchy manager trait
+#[async_trait::async_trait]
+pub trait HierarchyManager: Send + Sync {
+    /// Add memory to hierarchy
+    async fn add_memory(&self, memory: Memory) -> crate::CoreResult<HierarchicalMemory>;
+
+    /// Get memory by ID
+    async fn get_memory(&self, id: &str) -> crate::CoreResult<Option<HierarchicalMemory>>;
+
+    /// Update memory in hierarchy
+    async fn update_memory(
+        &self,
+        memory: HierarchicalMemory,
+    ) -> crate::CoreResult<HierarchicalMemory>;
+
+    /// Remove memory from hierarchy
+    async fn remove_memory(&self, id: &str) -> crate::CoreResult<bool>;
+
+    /// Get memories at specific level
+    async fn get_memories_at_level(
+        &self,
+        level: MemoryLevel,
+    ) -> crate::CoreResult<Vec<HierarchicalMemory>>;
+
+    /// Get hierarchy statistics
+    async fn get_hierarchy_stats(&self) -> crate::CoreResult<HierarchyStatistics>;
+
+    /// Search memories with query
+    async fn search_memories(
+        &self,
+        query: &str,
+        scope: Option<MemoryScope>,
+        limit: Option<usize>,
+    ) -> crate::CoreResult<Vec<HierarchicalMemory>>;
+}
+
+/// Default hierarchy manager implementation
+pub struct DefaultHierarchyManager {
+    config: HierarchyConfig,
+    /// In-memory storage for hierarchical memories
+    memories: Arc<RwLock<HashMap<String, HierarchicalMemory>>>,
+    /// Index by scope for faster lookups
+    scope_index: Arc<RwLock<HashMap<MemoryScope, Vec<String>>>>,
+    /// Index by level for faster lookups
+    level_index: Arc<RwLock<HashMap<MemoryLevel, Vec<String>>>>,
+}
+
+impl DefaultHierarchyManager {
+    /// Create new default hierarchy manager
+    pub fn new(config: HierarchyConfig) -> Self {
+        Self {
+            config,
+            memories: Arc::new(RwLock::new(HashMap::new())),
+            scope_index: Arc::new(RwLock::new(HashMap::new())),
+            level_index: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl HierarchyManager for DefaultHierarchyManager {
+    async fn add_memory(&self, memory: Memory) -> crate::CoreResult<HierarchicalMemory> {
+        // Determine appropriate level based on importance
+        let score = memory.score().unwrap_or(0.0);
+        let level = if score > 0.8 {
+            MemoryLevel::Strategic
+        } else if score > 0.6 {
+            MemoryLevel::Tactical
+        } else if score > 0.4 {
+            MemoryLevel::Operational
+        } else {
+            MemoryLevel::Contextual
+        };
+
+        // Determine scope from memory attributes or default to Global
+        let scope = memory
+            .attributes
+            .get(&agent_mem_traits::AttributeKey::core("scope"))
+            .and_then(|v| v.as_string())
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(MemoryScope::Global);
+
+        let hierarchical_memory = HierarchicalMemory {
+            memory,
+            scope: scope.clone(),
+            level: level.clone(),
+            hierarchy_metadata: HierarchyMetadata::default(),
+        };
+
+        let memory_id = hierarchical_memory.memory.id.as_str().to_string();
+
+        // Store in memory
+        {
+            let mut memories = self.memories.write().await;
+            memories.insert(memory_id.to_string(), hierarchical_memory.clone());
+        }
+
+        // Update scope index
+        {
+            let mut scope_index = self.scope_index.write().await;
+            scope_index
+                .entry(scope)
+                .or_insert_with(Vec::new)
+                .push(memory_id.clone());
+        }
+
+        // Update level index
+        {
+            let mut level_index = self.level_index.write().await;
+            level_index
+                .entry(level)
+                .or_insert_with(Vec::new)
+                .push(memory_id);
+        }
+
+        Ok(hierarchical_memory)
+    }
+
+    async fn get_memory(&self, id: &str) -> crate::CoreResult<Option<HierarchicalMemory>> {
+        let memories = self.memories.read().await;
+        Ok(memories.get(id).cloned())
+    }
+
+    async fn update_memory(
+        &self,
+        memory: HierarchicalMemory,
+    ) -> crate::CoreResult<HierarchicalMemory> {
+        let memory_id = memory.memory.id.clone();
+
+        // Update in memory storage
+        {
+            let mut memories = self.memories.write().await;
+            memories.insert(memory_id.to_string(), memory.clone());
+        }
+
+        Ok(memory)
+    }
+
+    async fn remove_memory(&self, id: &str) -> crate::CoreResult<bool> {
+        let removed_memory = {
+            let mut memories = self.memories.write().await;
+            memories.remove(id)
+        };
+
+        if let Some(memory) = removed_memory {
+            // Remove from scope index
+            {
+                let mut scope_index = self.scope_index.write().await;
+                if let Some(ids) = scope_index.get_mut(&memory.scope) {
+                    ids.retain(|memory_id| memory_id != id);
+                }
+            }
+
+            // Remove from level index
+            {
+                let mut level_index = self.level_index.write().await;
+                if let Some(ids) = level_index.get_mut(&memory.level) {
+                    ids.retain(|memory_id| memory_id != id);
+                }
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn get_memories_at_level(
+        &self,
+        level: MemoryLevel,
+    ) -> crate::CoreResult<Vec<HierarchicalMemory>> {
+        let level_index = self.level_index.read().await;
+        let memories = self.memories.read().await;
+
+        let memory_ids = level_index.get(&level).cloned().unwrap_or_default();
+        let mut result = Vec::new();
+
+        for id in memory_ids {
+            if let Some(memory) = memories.get(&id) {
+                result.push(memory.clone());
+            }
+        }
+
+        Ok(result)
+    }
+
+    async fn get_hierarchy_stats(&self) -> crate::CoreResult<HierarchyStatistics> {
+        let memories = self.memories.read().await;
+        let level_index = self.level_index.read().await;
+
+        let mut memories_by_level = HashMap::new();
+        let mut avg_importance_by_level = HashMap::new();
+        let mut level_utilization = HashMap::new();
+
+        // Count memories by level and calculate average importance
+        for (level, memory_ids) in level_index.iter() {
+            let count = memory_ids.len();
+            memories_by_level.insert(level.clone(), count);
+
+            let total_importance: f64 = memory_ids
+                .iter()
+                .filter_map(|id| memories.get(id))
+                .map(|memory| memory.memory.score().unwrap_or(0.0))
+                .sum();
+
+            let avg_importance = if count > 0 {
+                total_importance / count as f64
+            } else {
+                0.0
+            };
+            avg_importance_by_level.insert(level.clone(), avg_importance);
+
+            // Calculate utilization (simplified as memory count / max capacity)
+            let max_capacity = self
+                .config
+                .level_capacities
+                .get(level)
+                .copied()
+                .unwrap_or(1000) as f64;
+            let utilization = (count as f64 / max_capacity).min(1.0);
+            level_utilization.insert(level.clone(), utilization);
+        }
+
+        // Count inheritance relationships
+        let inheritance_relationships = memories
+            .values()
+            .filter(|memory| memory.hierarchy_metadata.inheritance.inherited)
+            .count();
+
+        Ok(HierarchyStatistics {
+            memories_by_level,
+            avg_importance_by_level,
+            inheritance_relationships,
+            level_utilization,
+        })
+    }
+
+    async fn search_memories(
+        &self,
+        query: &str,
+        scope: Option<MemoryScope>,
+        limit: Option<usize>,
+    ) -> crate::CoreResult<Vec<HierarchicalMemory>> {
+        let memories = self.memories.read().await;
+        let query_lower = query.to_lowercase();
+        let limit = limit.unwrap_or(10);
+
+        let mut results: Vec<HierarchicalMemory> = memories
+            .values()
+            .filter(|memory| {
+                // Filter by scope if specified
+                if let Some(ref target_scope) = scope {
+                    if &memory.scope != target_scope {
+                        return false;
+                    }
+                }
+
+                // Simple text search in content
+                let content_str = match &memory.memory.content {
+                    agent_mem_traits::Content::Text(t) => t.as_str(),
+                    agent_mem_traits::Content::Structured(v) => "",
+                    _ => "",
+                };
+                content_str.to_lowercase().contains(&query_lower)
+            })
+            .cloned()
+            .collect();
+
+        // Sort by importance score (descending)
+        results.sort_by(|a, b| {
+            let score_a = a.memory.score().unwrap_or(0.0);
+            let score_b = b.memory.score().unwrap_or(0.0);
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Apply limit
+        results.truncate(limit);
+
+        Ok(results)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    use agent_mem_traits::MemoryItem;
 
     fn create_test_memory(id: &str, content: &str) -> Memory {
-        Memory {
+        use agent_mem_traits::Session;
+        let item = MemoryItem {
             id: id.to_string(),
+            content: content.to_string(),
+            hash: None,
+            metadata: std::collections::HashMap::new(),
+            score: Some(0.8),
+            created_at: chrono::Utc::now(),
+            updated_at: Some(chrono::Utc::now()),
+            session: Session::new(),
+            memory_type: MemoryType::Episodic,
+            entities: Vec::new(),
+            relations: Vec::new(),
             agent_id: "test_agent".to_string(),
             user_id: Some("test_user".to_string()),
-            memory_type: MemoryType::Episodic,
-            content: content.to_string(),
-            importance: 0.8,
+            importance: 0.5,
             embedding: None,
-            created_at: chrono::Utc::now().timestamp(),
-            last_accessed_at: chrono::Utc::now().timestamp(),
+            last_accessed_at: chrono::Utc::now(),
             access_count: 0,
             expires_at: None,
-            metadata: std::collections::HashMap::new(),
             version: 1,
-        }
+        };
+        Memory::from_legacy_item(&item)
     }
 
     #[test]
@@ -413,60 +958,66 @@ mod tests {
             user_id: "user1".to_string(),
             session_id: "session1".to_string(),
         };
-        
+
         // Global can access everything
         assert!(global.can_access(&global));
         assert!(global.can_access(&agent));
         assert!(global.can_access(&user));
         assert!(global.can_access(&session));
-        
+
         // Agent can access global and own agent
         assert!(agent.can_access(&global));
         assert!(agent.can_access(&agent));
         assert!(!agent.can_access(&user));
         assert!(!agent.can_access(&session));
-        
+
         // User can access global, agent, and own user
         assert!(user.can_access(&global));
         assert!(user.can_access(&agent));
         assert!(user.can_access(&user));
         assert!(!user.can_access(&session));
-        
+
         // Session can access all parent scopes
         assert!(session.can_access(&global));
         assert!(session.can_access(&agent));
         assert!(session.can_access(&user));
         assert!(session.can_access(&session));
     }
-    
+
     #[test]
     fn test_hierarchical_memory_manager() {
         let mut manager = HierarchicalMemoryManager::new();
-        
+
         let memory1 = create_test_memory("mem1", "Global memory");
         let memory2 = create_test_memory("mem2", "Agent memory");
         let memory3 = create_test_memory("mem3", "User memory");
-        
+
         let global_scope = MemoryScope::Global;
         let agent_scope = MemoryScope::Agent("agent1".to_string());
         let user_scope = MemoryScope::User {
             agent_id: "agent1".to_string(),
             user_id: "user1".to_string(),
         };
-        
+
         // Add memories to different scopes
-        manager.add_memory(memory1, global_scope.clone(), None, None).unwrap();
-        manager.add_memory(memory2, agent_scope.clone(), None, None).unwrap();
-        manager.add_memory(memory3, user_scope.clone(), None, None).unwrap();
-        
+        manager
+            .add_memory(memory1, global_scope.clone(), None, None)
+            .unwrap();
+        manager
+            .add_memory(memory2, agent_scope.clone(), None, None)
+            .unwrap();
+        manager
+            .add_memory(memory3, user_scope.clone(), None, None)
+            .unwrap();
+
         // Test accessible memories from user scope
         let accessible = manager.get_accessible_memories(&user_scope);
         assert_eq!(accessible.len(), 3); // Should access all three
-        
+
         // Test accessible memories from agent scope
         let accessible = manager.get_accessible_memories(&agent_scope);
         assert_eq!(accessible.len(), 2); // Should access global and agent only
-        
+
         // Test statistics
         let stats = manager.get_scope_statistics();
         assert_eq!(stats.len(), 3);
@@ -474,19 +1025,72 @@ mod tests {
         assert_eq!(stats[&agent_scope].total_memories, 1);
         assert_eq!(stats[&user_scope].total_memories, 1);
     }
-    
+
+    #[tokio::test]
+    async fn test_default_hierarchy_manager() {
+        use agent_mem_traits::{MemoryType as TraitMemoryType, Session};
+        use chrono::Utc;
+
+        let config = HierarchyConfig::default();
+        let manager = DefaultHierarchyManager::new(config);
+
+        // 创建测试记忆
+        let now = Utc::now();
+        let memory_item = MemoryItem {
+            id: "test-memory-1".to_string(),
+            content: "This is a test memory".to_string(),
+            hash: None,
+            metadata: std::collections::HashMap::new(),
+            score: Some(0.8),
+            created_at: now,
+            updated_at: Some(now),
+            session: Session::new().with_agent_id(Some("test-agent".to_string())),
+            memory_type: TraitMemoryType::Episodic,
+            entities: Vec::new(),
+            relations: Vec::new(),
+            agent_id: "test-agent".to_string(),
+            user_id: Some("test-user".to_string()),
+            importance: 0.8,
+            embedding: None,
+            last_accessed_at: now,
+            access_count: 0,
+            expires_at: None,
+            version: 1,
+        };
+        let memory = Memory::from_legacy_item(&memory_item);
+
+        // 测试添加记忆
+        let hierarchical_memory = manager.add_memory(memory.clone()).await?;
+        assert_eq!(hierarchical_memory.memory.id.as_str(), memory.id.as_str());
+
+        // 测试获取记忆
+        let retrieved = manager.get_memory(memory.id.as_str()).await?;
+        assert!(retrieved.is_some());
+
+        // 测试搜索记忆
+        let search_results = manager
+            .search_memories("test memory", None, Some(5))
+            .await
+            .unwrap();
+        assert!(!search_results.is_empty());
+
+        // 测试删除记忆
+        let removed = manager.remove_memory(memory.id.as_str()).await?;
+        assert!(removed);
+    }
+
     #[test]
     fn test_memory_inheritance() {
         let mut manager = HierarchicalMemoryManager::new();
-        
+
         let global_memory = create_test_memory("global", "Global knowledge");
         let global_scope = MemoryScope::Global;
-        
+
         let user_scope = MemoryScope::User {
             agent_id: "agent1".to_string(),
             user_id: "user1".to_string(),
         };
-        
+
         // Add inheritable memory to global scope
         let inheritance = MemoryInheritance {
             inheritable: true,
@@ -494,17 +1098,23 @@ mod tests {
             original_scope: None,
             decay_factor: 0.8,
         };
-        
-        manager.add_memory(global_memory, global_scope, Some(inheritance), None).unwrap();
-        
+
+        manager
+            .add_memory(global_memory, global_scope, Some(inheritance), None)
+            .unwrap();
+
         // Get inherited memories for user scope
         let inherited = manager.get_inherited_memories(&user_scope);
         assert_eq!(inherited.len(), 1);
-        assert!(inherited[0].inheritance.inherited);
-        assert_eq!(inherited[0].inheritance.original_scope, Some(MemoryScope::Global));
-        
-        // Check importance decay (0.8 * 0.8^2 = 0.512)
-        let expected_importance = 0.8 * 0.8_f32.powi(2);
-        assert!((inherited[0].memory.importance - expected_importance).abs() < 0.001);
+        assert!(inherited[0].hierarchy_metadata.inheritance.inherited);
+        assert_eq!(
+            inherited[0].hierarchy_metadata.inheritance.original_scope,
+            Some(MemoryScope::Global)
+        );
+
+        // Check score decay (0.8 * 0.8^2 = 0.512)
+        let expected_score = 0.8 * 0.8_f32.powi(2);
+        let actual_score = inherited[0].memory.score().unwrap_or(0.0) as f32;
+        assert!((actual_score - expected_score).abs() < 0.001);
     }
 }

@@ -1,0 +1,9 @@
+[project]
+name = "mem0-benchmark"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "mem0ai>=1.0.1",
+    "fastembed",
+]

@@ -1,0 +1,35 @@
+[package]
+name = "agentmem"
+version = "1.0.0"
+cjc-version = "0.60.5"
+description = "AgentMem 仓颉 SDK - 企业级智能记忆管理平台的仓颉语言接口"
+authors = ["AgentMem Team"]
+license = "MIT"
+output-type = "executable"
+src-dir = "src"
+main-file = "src/test_main.cj"
+compile-option = "-O2"
+link-option = "-L./lib -lagentmem_c"
+
+[dependencies]
+
+[native-dependencies]
+agentmem_c = { path = "lib/libagentmem_c.a" }
+
+[profile]
+build = {incremental = false, lto = ""}
+test = {}
+
+[target]
+[target.x86_64-unknown-linux-gnu]
+[target.x86_64-unknown-linux-gnu.bin-dependencies]
+path-option = ["${CANGJIE_STDX_PATH}/linux_x86_64_llvm/dynamic/stdx"]
+
+[target.x86_64-unknown-windows-gnu]
+[target.x86_64-unknown-windows-gnu.bin-dependencies]
+path-option = ["${X86_64_LIBS}", "${X86_64_MACRO_LIBS}", "${CANGJIE_STDX_PATH}/windows_x86_64_llvm/dynamic/stdx"]
+
+[target.aarch64-linux-ohos]
+compile-option = "-B \"${DEVECO_CANGJIE_HOME}/compiler/third_party/llvm/bin\" -B \"${DEVECO_CANGJIE_HOME}/musl/usr/lib/aarch64-linux-ohos\" -L \"${DEVECO_CANGJIE_HOME}/musl/usr/lib/aarch64-linux-ohos\" -L \"${DEVECO_CANGJIE_HOME}/build/linux_ohos_aarch64_llvm/openssl\" --sysroot \"${DEVECO_CANGJIE_HOME}/musl\""
+[target.aarch64-linux-ohos.bin-dependencies]
+path-option = ["${AARCH64_LIBS}", "${AARCH64_MACRO_LIBS}", "${CANGJIE_STDX_PATH}/linux_ohos_aarch64_llvm/dynamic/stdx"]

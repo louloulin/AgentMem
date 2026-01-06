@@ -2,13 +2,14 @@
 name = "phase4-demo"
 version = "2.0.0"
 edition = "2021"
-description = "Phase 4 Performance and Scalability Demo"
+description = "Phase 4 智能处理集成增强演示"
 
 [dependencies]
 # AgentMem dependencies
 agent-mem-traits = { path = "../../crates/agent-mem-traits" }
 agent-mem-core = { path = "../../crates/agent-mem-core" }
-agent-mem-performance = { path = "../../crates/agent-mem-performance" }
+agent-mem-intelligence = { path = "../../crates/agent-mem-intelligence" }
+agent-mem-llm = { path = "../../crates/agent-mem-llm" }
 
 # Async runtime
 tokio = { workspace = true, features = ["full"] }
@@ -31,6 +32,9 @@ chrono = { workspace = true }
 # UUID generation
 uuid = { workspace = true, features = ["v4"] }
 
+# Futures
+futures = "0.3"
+
 [[bin]]
-name = "performance_demo"
+name = "intelligence_demo"
 path = "src/main.rs"

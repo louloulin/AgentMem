@@ -1,0 +1,215 @@
+# Alertmanager 配置
+# 告警通知和路由规则
+
+global:
+  # 默认配置
+  resolve_timeout: 5m
+  
+  # SMTP配置 (邮件通知)
+  smtp_from: 'alertmanager@agentmem.io'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'alertmanager@agentmem.io'
+  smtp_auth_password: '${SMTP_PASSWORD}'  # 从环境变量读取
+  smtp_require_tls: true
+
+  # Slack全局配置
+  slack_api_url: '${SLACK_WEBHOOK_URL}'  # 从环境变量读取
+
+# 告警路由规则
+route:
+  # 默认接收者
+  receiver: 'team-notifications'
+  
+  # 分组配置
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # 分组等待时间
+  group_wait: 30s
+  
+  # 分组间隔
+  group_interval: 5m
+  
+  # 重复告警间隔
+  repeat_interval: 4h
+  
+  # 子路由
+  routes:
+    # Critical级别告警 - 立即通知多个渠道
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+      routes:
+        # 工作时间外的Critical告警需要电话通知
+        - match_re:
+            time: '(weekend|night)'
+        receiver: 'oncall-phone'
+    
+    # Warning级别告警 - Slack通知
+    - match:
+        severity: warning
+      receiver: 'team-slack'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 2h
+    
+    # 数据库告警 - 专门的DBA团队
+    - match_re:
+        service: '(postgresql|redis|qdrant)'
+      receiver: 'dba-team'
+      group_wait: 30s
+    
+    # 安全告警 - 安全团队
+    - match:
+        category: security
+      receiver: 'security-team'
+      group_wait: 10s
+      repeat_interval: 1h
+
+# 接收者配置
+receivers:
+  # 1. 团队通知 (邮件+Slack)
+  - name: 'team-notifications'
+    email_configs:
+      - to: 'team@agentmem.io'
+        headers:
+          Subject: '[AgentMem] Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Time:</strong> {{ .StartsAt }}</p>
+          <hr>
+          <p><a href="{{ .GeneratorURL }}">View in Prometheus</a></p>
+    
+    slack_configs:
+      - channel: '#agentmem-alerts'
+        username: 'AlertManager'
+        icon_emoji: ':warning:'
+        title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: |
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          
+          *Firing Alerts:* {{ .Alerts.Firing | len }}
+          *Resolved Alerts:* {{ .Alerts.Resolved | len }}
+        send_resolved: true
+
+  # 2. Critical告警 (多渠道)
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@agentmem.io, team-lead@agentmem.io'
+        headers:
+          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: |
+          <div style="background-color: #ff0000; color: white; padding: 20px;">
+            <h1>🚨 CRITICAL ALERT</h1>
+          </div>
+          <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Service:</strong> {{ .CommonLabels.service }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+          <hr>
+          <p style="color: red;"><strong>IMMEDIATE ACTION REQUIRED!</strong></p>
+          <p><a href="{{ .GeneratorURL }}">View in Prometheus</a></p>
+    
+    slack_configs:
+      - channel: '#critical-alerts'
+        username: 'Critical AlertManager'
+        icon_emoji: ':rotating_light:'
+        color: 'danger'
+        title: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+        text: |
+          @channel CRITICAL ALERT FIRED!
+          
+          *Service:* {{ .CommonLabels.service }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          
+          *Started:* {{ .StartsAt }}
+          
+          *Action Required:* Immediate investigation needed!
+        send_resolved: true
+    
+    # PagerDuty集成 (可选)
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+
+  # 3. OnCall电话通知 (使用PagerDuty或Twilio)
+  - name: 'oncall-phone'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}'
+
+  # 4. Slack通知
+  - name: 'team-slack'
+    slack_configs:
+      - channel: '#agentmem-monitoring'
+        username: 'AlertManager'
+        icon_emoji: ':bell:'
+        title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: |
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          
+          {{ range .Alerts }}
+          - {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  # 5. DBA团队
+  - name: 'dba-team'
+    email_configs:
+      - to: 'dba-team@agentmem.io'
+        headers:
+          Subject: '[Database Alert] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: '[Database] {{ .GroupLabels.alertname }}'
+
+  # 6. 安全团队
+  - name: 'security-team'
+    email_configs:
+      - to: 'security@agentmem.io'
+        headers:
+          Subject: '[Security Alert] {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+    slack_configs:
+      - channel: '#security-alerts'
+        color: 'danger'
+        title: '🔒 [Security] {{ .GroupLabels.alertname }}'
+
+# 抑制规则 (避免告警风暴)
+inhibit_rules:
+  # 如果服务完全down，抑制所有其他告警
+  - source_match:
+      alertname: 'AgentMemServiceDown'
+    target_match_re:
+      alertname: '(AgentMemHigh.*|AgentMemLow.*)'
+    equal: ['service']
+  
+  # 如果数据库down，抑制相关的连接告警
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match:
+      alertname: 'AgentMemDatabaseConnectionPoolHigh'
+    equal: ['instance']
+  
+  # Critical告警抑制同一服务的Warning告警
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+# 告警模板
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+

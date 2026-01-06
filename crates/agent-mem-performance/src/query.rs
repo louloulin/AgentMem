@@ -1,15 +1,15 @@
 //! Query optimization and execution planning
-//! 
+//!
 //! This module provides intelligent query optimization capabilities
 //! to improve search performance and reduce resource usage.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Query optimizer
 pub struct QueryOptimizer {
@@ -120,10 +120,11 @@ impl QueryOptimizer {
 
         // Create optimized plan
         let plan = self.create_optimized_plan(query).await?;
-        
+
         // Cache the plan
-        self.cache_plan(query_hash, plan.clone(), start_time.elapsed()).await;
-        
+        self.cache_plan(query_hash, plan.clone(), start_time.elapsed())
+            .await;
+
         // Update statistics
         self.update_optimization_stats(start_time.elapsed()).await;
 
@@ -137,14 +138,18 @@ impl QueryOptimizer {
         Fut: std::future::Future<Output = Result<T>>,
     {
         let start_time = Instant::now();
-        
-        debug!("Executing query plan {} with {} steps", 
-               plan.query_id, plan.execution_steps.len());
+
+        debug!(
+            "Executing query plan {} with {} steps",
+            plan.query_id,
+            plan.execution_steps.len()
+        );
 
         let result = executor(plan).await;
-        
+
         let execution_time = start_time.elapsed();
-        self.update_execution_stats(&plan.query_id, execution_time, result.is_ok()).await;
+        self.update_execution_stats(&plan.query_id, execution_time, result.is_ok())
+            .await;
 
         result
     }
@@ -180,7 +185,7 @@ impl QueryOptimizer {
 
         // Analyze query characteristics
         let query_complexity = self.analyze_query_complexity(query);
-        
+
         // Vector search step
         if query.has_vector_search() {
             let vector_step = ExecutionStep {
@@ -209,10 +214,10 @@ impl QueryOptimizer {
                 estimated_time_ms: self.estimate_filter_time(query),
                 estimated_memory_mb: 10.0,
                 parallelizable: false,
-                dependencies: if query.has_vector_search() { 
-                    vec!["vector_search".to_string()] 
-                } else { 
-                    vec![] 
+                dependencies: if query.has_vector_search() {
+                    vec!["vector_search".to_string()]
+                } else {
+                    vec![]
                 },
             };
             estimated_cost += filter_step.estimated_time_ms;
@@ -285,7 +290,7 @@ impl QueryOptimizer {
 
     fn analyze_query_complexity(&self, query: &QueryRequest) -> f64 {
         let mut complexity = 0.0;
-        
+
         if query.has_vector_search() {
             complexity += 0.3;
         }
@@ -298,7 +303,7 @@ impl QueryOptimizer {
         if query.has_aggregations() {
             complexity += 0.4;
         }
-        
+
         complexity.min(1.0)
     }
 
@@ -307,7 +312,7 @@ impl QueryOptimizer {
         let base_time = 20.0;
         let limit_factor = (query.result_limit() as f64).log10() * 5.0;
         let dimension_factor = query.vector_dimensions().unwrap_or(1536) as f64 / 1536.0;
-        
+
         base_time + limit_factor + dimension_factor * 10.0
     }
 
@@ -315,8 +320,9 @@ impl QueryOptimizer {
         // Estimate memory usage in MB
         let base_memory = 10.0;
         let result_memory = query.result_limit() as f64 * 0.001; // 1KB per result
-        let vector_memory = query.vector_dimensions().unwrap_or(1536) as f64 * 4.0 / 1024.0 / 1024.0; // 4 bytes per dimension
-        
+        let vector_memory =
+            query.vector_dimensions().unwrap_or(1536) as f64 * 4.0 / 1024.0 / 1024.0; // 4 bytes per dimension
+
         base_memory + result_memory + vector_memory
     }
 
@@ -330,7 +336,7 @@ impl QueryOptimizer {
 
     fn hash_query(&self, query: &QueryRequest) -> String {
         // Simplified query hashing
-        format!("{:?}", query)
+        format!("{query:?}")
     }
 
     async fn get_cached_plan(&self, query_hash: &str) -> Option<CachedQueryPlan> {
@@ -345,7 +351,7 @@ impl QueryOptimizer {
             hit_count: 0,
             average_execution_time_ms: 0.0,
         };
-        
+
         let mut cache = self.query_cache.write().await;
         cache.insert(query_hash, cached_plan);
     }
@@ -360,16 +366,25 @@ impl QueryOptimizer {
         let mut stats = self.statistics.write().await;
         stats.optimized_queries += 1;
         stats.total_queries += 1;
-        
+
         let optimization_time_ms = optimization_time.as_millis() as f64;
-        stats.average_optimization_time_ms = 
-            (stats.average_optimization_time_ms * (stats.optimized_queries - 1) as f64 + optimization_time_ms) 
+        stats.average_optimization_time_ms = (stats.average_optimization_time_ms
+            * (stats.optimized_queries - 1) as f64
+            + optimization_time_ms)
             / stats.optimized_queries as f64;
     }
 
-    async fn update_execution_stats(&self, query_id: &str, execution_time: Duration, success: bool) {
+    async fn update_execution_stats(
+        &self,
+        query_id: &str,
+        execution_time: Duration,
+        success: bool,
+    ) {
         // Update execution statistics for the query plan
-        debug!("Query {} executed in {:?}, success: {}", query_id, execution_time, success);
+        debug!(
+            "Query {} executed in {:?}, success: {}",
+            query_id, execution_time, success
+        );
     }
 }
 
@@ -410,7 +425,7 @@ impl QueryRequest {
 
     pub fn is_frequent(&self) -> bool {
         // Simplified frequency detection
-        self.metadata.get("frequency").map_or(false, |f| f == "high")
+        self.metadata.get("frequency").is_some_and(|f| f == "high")
     }
 
     pub fn is_expensive(&self) -> bool {
@@ -442,7 +457,7 @@ mod tests {
     #[tokio::test]
     async fn test_query_optimization() {
         let optimizer = QueryOptimizer::new(true).unwrap();
-        
+
         let query = QueryRequest {
             vector: Some(vec![0.1; 1536]),
             filters: HashMap::new(),
@@ -450,10 +465,10 @@ mod tests {
             aggregations: vec![],
             metadata: HashMap::new(),
         };
-        
+
         let plan = optimizer.optimize_query(&query).await;
         assert!(plan.is_ok());
-        
+
         let plan = plan.unwrap();
         assert!(!plan.execution_steps.is_empty());
         assert!(plan.estimated_cost > 0.0);
@@ -462,7 +477,7 @@ mod tests {
     #[tokio::test]
     async fn test_query_complexity_analysis() {
         let optimizer = QueryOptimizer::new(true).unwrap();
-        
+
         let simple_query = QueryRequest {
             vector: Some(vec![0.1; 100]),
             filters: HashMap::new(),
@@ -470,7 +485,7 @@ mod tests {
             aggregations: vec![],
             metadata: HashMap::new(),
         };
-        
+
         let complexity = optimizer.analyze_query_complexity(&simple_query);
         assert!(complexity > 0.0 && complexity <= 1.0);
     }
@@ -478,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn test_optimizer_statistics() {
         let optimizer = QueryOptimizer::new(true).unwrap();
-        
+
         let stats = optimizer.get_statistics().await.unwrap();
         assert_eq!(stats.total_queries, 0);
         assert_eq!(stats.cache_hits, 0);

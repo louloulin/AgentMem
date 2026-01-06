@@ -1,6 +1,8 @@
 //! 内存向量存储实现
 
-use agent_mem_traits::{VectorStore, VectorStoreConfig, VectorData, VectorSearchResult, Result, AgentMemError};
+use agent_mem_traits::{
+    AgentMemError, Result, VectorData, VectorSearchResult, VectorStore, VectorStoreConfig,
+};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -55,7 +57,7 @@ impl MemoryVectorStore {
 impl VectorStore for MemoryVectorStore {
     async fn add_vectors(&self, vectors: Vec<VectorData>) -> Result<Vec<String>> {
         let mut ids = Vec::new();
-        
+
         for vector in vectors {
             // 验证向量维度
             if let Some(expected_dim) = self.config.dimension {
@@ -72,13 +74,18 @@ impl VectorStore for MemoryVectorStore {
             self.vectors.insert(id.clone(), vector);
             ids.push(id);
         }
-        
+
         Ok(ids)
     }
 
-    async fn search_vectors(&self, query_vector: Vec<f32>, limit: usize, threshold: Option<f32>) -> Result<Vec<VectorSearchResult>> {
+    async fn search_vectors(
+        &self,
+        query_vector: Vec<f32>,
+        limit: usize,
+        threshold: Option<f32>,
+    ) -> Result<Vec<VectorSearchResult>> {
         let mut results = Vec::new();
-        
+
         // 验证查询向量维度
         if let Some(expected_dim) = self.config.dimension {
             if query_vector.len() != expected_dim {
@@ -92,18 +99,18 @@ impl VectorStore for MemoryVectorStore {
 
         for entry in self.vectors.iter() {
             let vector_data = entry.value();
-            
+
             // 计算相似度和距离
             let similarity = self.cosine_similarity(&query_vector, &vector_data.vector);
             let distance = self.euclidean_distance(&query_vector, &vector_data.vector);
-            
+
             // 应用阈值过滤
             if let Some(threshold) = threshold {
                 if similarity < threshold {
                     continue;
                 }
             }
-            
+
             results.push(VectorSearchResult {
                 id: vector_data.id.clone(),
                 vector: vector_data.vector.clone(),
@@ -112,13 +119,17 @@ impl VectorStore for MemoryVectorStore {
                 distance,
             });
         }
-        
+
         // 按相似度排序（降序）
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         // 限制结果数量
         results.truncate(limit);
-        
+
         Ok(results)
     }
 
@@ -146,7 +157,9 @@ impl VectorStore for MemoryVectorStore {
             if self.vectors.contains_key(&id) {
                 self.vectors.insert(id, vector);
             } else {
-                return Err(AgentMemError::not_found(&format!("Vector with id {} not found", id)));
+                return Err(AgentMemError::not_found(format!(
+                    "Vector with id {id} not found"
+                )));
             }
         }
         Ok(())
@@ -164,6 +177,39 @@ impl VectorStore for MemoryVectorStore {
         self.vectors.clear();
         Ok(())
     }
+
+    async fn search_with_filters(
+        &self,
+        query_vector: Vec<f32>,
+        limit: usize,
+        filters: &std::collections::HashMap<String, serde_json::Value>,
+        threshold: Option<f32>,
+    ) -> Result<Vec<VectorSearchResult>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_search_with_filters(query_vector, limit, filters, threshold)
+            .await
+    }
+
+    async fn health_check(&self) -> Result<agent_mem_traits::HealthStatus> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_health_check("Memory").await
+    }
+
+    async fn get_stats(&self) -> Result<agent_mem_traits::VectorStoreStats> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_get_stats(self.config.dimension.unwrap_or(1536))
+            .await
+    }
+
+    async fn add_vectors_batch(&self, batches: Vec<Vec<VectorData>>) -> Result<Vec<Vec<String>>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_add_vectors_batch(batches).await
+    }
+
+    async fn delete_vectors_batch(&self, id_batches: Vec<Vec<String>>) -> Result<Vec<bool>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_delete_vectors_batch(id_batches).await
+    }
 }
 
 #[cfg(test)]
@@ -177,7 +223,7 @@ mod tests {
             dimension: Some(3),
             ..Default::default()
         };
-        MemoryVectorStore::new(config).await.unwrap()
+        MemoryVectorStore::new(config).await?
     }
 
     fn create_test_vector(id: &str, vector: Vec<f32>) -> VectorData {
@@ -191,16 +237,16 @@ mod tests {
     #[tokio::test]
     async fn test_add_and_get_vectors() {
         let store = create_test_store().await;
-        
+
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
-        
-        let ids = store.add_vectors(vectors).await.unwrap();
+
+        let ids = store.add_vectors(vectors).await?;
         assert_eq!(ids.len(), 2);
-        
-        let vector = store.get_vector("1").await.unwrap();
+
+        let vector = store.get_vector("1").await?;
         assert!(vector.is_some());
         assert_eq!(vector.unwrap().vector, vec![1.0, 0.0, 0.0]);
     }
@@ -208,17 +254,20 @@ mod tests {
     #[tokio::test]
     async fn test_search_vectors() {
         let store = create_test_store().await;
-        
+
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
             create_test_vector("3", vec![0.0, 0.0, 1.0]),
         ];
-        
-        store.add_vectors(vectors).await.unwrap();
-        
+
+        store.add_vectors(vectors).await?;
+
         // 搜索与第一个向量相似的向量
-        let results = store.search_vectors(vec![1.0, 0.0, 0.0], 2, None).await.unwrap();
+        let results = store
+            .search_vectors(vec![1.0, 0.0, 0.0], 2, None)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].id, "1");
         assert_eq!(results[0].similarity, 1.0); // 完全匹配
@@ -227,56 +276,56 @@ mod tests {
     #[tokio::test]
     async fn test_delete_vectors() {
         let store = create_test_store().await;
-        
+
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
-        
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
-        
-        store.delete_vectors(vec!["1".to_string()]).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 1);
-        
-        let vector = store.get_vector("1").await.unwrap();
+
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
+
+        store.delete_vectors(vec!["1".to_string()]).await?;
+        assert_eq!(store.count_vectors().await?, 1);
+
+        let vector = store.get_vector("1").await?;
         assert!(vector.is_none());
     }
 
     #[tokio::test]
     async fn test_update_vectors() {
         let store = create_test_store().await;
-        
+
         let vectors = vec![create_test_vector("1", vec![1.0, 0.0, 0.0])];
-        store.add_vectors(vectors).await.unwrap();
-        
+        store.add_vectors(vectors).await?;
+
         let updated_vectors = vec![create_test_vector("1", vec![0.0, 1.0, 0.0])];
-        store.update_vectors(updated_vectors).await.unwrap();
-        
-        let vector = store.get_vector("1").await.unwrap().unwrap();
+        store.update_vectors(updated_vectors).await?;
+
+        let vector = store.get_vector("1").await?.unwrap();
         assert_eq!(vector.vector, vec![0.0, 1.0, 0.0]);
     }
 
     #[tokio::test]
     async fn test_clear() {
         let store = create_test_store().await;
-        
+
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
-        
-        store.add_vectors(vectors).await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 2);
-        
-        store.clear().await.unwrap();
-        assert_eq!(store.count_vectors().await.unwrap(), 0);
+
+        store.add_vectors(vectors).await?;
+        assert_eq!(store.count_vectors().await?, 2);
+
+        store.clear().await?;
+        assert_eq!(store.count_vectors().await?, 0);
     }
 
     #[tokio::test]
     async fn test_dimension_validation() {
         let store = create_test_store().await;
-        
+
         // 尝试添加错误维度的向量
         let vectors = vec![create_test_vector("1", vec![1.0, 0.0])]; // 2维而不是3维
         let result = store.add_vectors(vectors).await;
@@ -286,14 +335,14 @@ mod tests {
     #[tokio::test]
     async fn test_cosine_similarity() {
         let store = create_test_store().await;
-        
+
         // 测试余弦相似度计算
         let sim = store.cosine_similarity(&[1.0, 0.0, 0.0], &[1.0, 0.0, 0.0]);
         assert_eq!(sim, 1.0);
-        
+
         let sim = store.cosine_similarity(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]);
         assert_eq!(sim, 0.0);
-        
+
         let sim = store.cosine_similarity(&[1.0, 0.0, 0.0], &[-1.0, 0.0, 0.0]);
         assert_eq!(sim, -1.0);
     }

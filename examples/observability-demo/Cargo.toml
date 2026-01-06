@@ -1,0 +1,14 @@
+[package]
+name = "observability-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-observability = { path = "../../crates/agent-mem-observability" }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+

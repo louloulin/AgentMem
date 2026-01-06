@@ -1,18 +1,15 @@
 //! Performance metrics collection and monitoring
-//! 
+//!
 //! This module provides comprehensive metrics collection for monitoring
 //! AgentMem performance and identifying bottlenecks.
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
-
-#[cfg(feature = "metrics")]
-use metrics::{counter, gauge, histogram, register_counter, register_gauge, register_histogram};
 
 /// Performance metrics collector
 pub struct MetricsCollector {
@@ -74,16 +71,16 @@ impl MetricsCollector {
 
         let mut metrics = self.metrics.write().await;
         metrics.request_count += 1;
-        
+
         if !success {
             metrics.error_count += 1;
         }
 
         // Update average response time
         let duration_ms = duration.as_millis() as f64;
-        metrics.average_response_time_ms = 
-            (metrics.average_response_time_ms * (metrics.request_count - 1) as f64 + duration_ms) 
-            / metrics.request_count as f64;
+        metrics.average_response_time_ms =
+            (metrics.average_response_time_ms * (metrics.request_count - 1) as f64 + duration_ms)
+                / metrics.request_count as f64;
 
         // Update throughput
         let elapsed_seconds = self.start_time.elapsed().as_secs_f64();
@@ -94,7 +91,10 @@ impl MetricsCollector {
         #[cfg(feature = "metrics")]
         {
             // Simplified metrics implementation
-            debug!("Request recorded: duration={}ms, success={}", duration_ms, success);
+            debug!(
+                "Request recorded: duration={}ms, success={}",
+                duration_ms, success
+            );
         }
     }
 
@@ -226,8 +226,10 @@ mod tests {
     #[tokio::test]
     async fn test_record_request() {
         let collector = MetricsCollector::new(true).unwrap();
-        collector.record_request(Duration::from_millis(100), true).await;
-        
+        collector
+            .record_request(Duration::from_millis(100), true)
+            .await;
+
         let metrics = collector.get_metrics().await.unwrap();
         assert_eq!(metrics.request_count, 1);
         assert_eq!(metrics.error_count, 0);
@@ -236,8 +238,10 @@ mod tests {
     #[tokio::test]
     async fn test_record_error() {
         let collector = MetricsCollector::new(true).unwrap();
-        collector.record_request(Duration::from_millis(100), false).await;
-        
+        collector
+            .record_request(Duration::from_millis(100), false)
+            .await;
+
         let metrics = collector.get_metrics().await.unwrap();
         assert_eq!(metrics.request_count, 1);
         assert_eq!(metrics.error_count, 1);
@@ -247,7 +251,7 @@ mod tests {
     async fn test_custom_metrics() {
         let collector = MetricsCollector::new(true).unwrap();
         collector.record_custom_metric("test_metric", 42.0).await;
-        
+
         let metrics = collector.get_metrics().await.unwrap();
         assert_eq!(metrics.custom_metrics.get("test_metric"), Some(&42.0));
     }
@@ -256,10 +260,10 @@ mod tests {
     async fn test_metrics_timer() {
         let collector = Arc::new(MetricsCollector::new(true).unwrap());
         let timer = MetricsTimer::start(Arc::clone(&collector));
-        
+
         tokio::time::sleep(Duration::from_millis(10)).await;
         timer.finish(true).await;
-        
+
         let metrics = collector.get_metrics().await.unwrap();
         assert_eq!(metrics.request_count, 1);
         assert!(metrics.average_response_time_ms >= 10.0);

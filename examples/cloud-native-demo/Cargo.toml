@@ -1,0 +1,58 @@
+[package]
+name = "cloud-native-demo"
+version = "6.0.0"
+edition = "2021"
+description = "AgentMem 云原生部署演示程序"
+authors = ["AgentMem Team <support@agentmem.dev>"]
+license = "MIT"
+repository = "https://github.com/agentmem/agentmem"
+homepage = "https://agentmem.dev"
+
+[dependencies]
+# 异步运行时
+tokio = { version = "1.0", features = ["full"] }
+
+# HTTP 客户端
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# 配置
+config = "0.14"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# 命令行
+clap = { version = "4.0", features = ["derive", "env"] }
+
+# 终端输出
+colored = "2.0"
+indicatif = "0.17"
+
+# Kubernetes 客户端
+kube = { version = "0.87", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.20", features = ["v1_28"] }
+
+# Docker 客户端
+bollard = "0.17"  # 升级以兼容testcontainers 0.22
+
+# 云平台 SDK
+aws-config = "1.0"
+aws-sdk-eks = "1.0"
+aws-sdk-rds = "1.0"
+aws-sdk-elasticache = "1.0"

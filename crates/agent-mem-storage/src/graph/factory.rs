@@ -1,8 +1,8 @@
 //! 图存储工厂实现
 
-use crate::graph::{Neo4jStore, MemgraphStore};
-use agent_mem_traits::{GraphStore, Result, AgentMemError};
+// use crate::graph::{MemgraphStore, Neo4jStore};
 use agent_mem_config::memory::GraphStoreConfig;
+use agent_mem_traits::{AgentMemError, GraphStore, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -18,7 +18,11 @@ pub enum GraphStoreEnum {
 
 #[async_trait]
 impl GraphStore for GraphStoreEnum {
-    async fn add_entities(&self, entities: &[agent_mem_traits::Entity], session: &agent_mem_traits::Session) -> Result<()> {
+    async fn add_entities(
+        &self,
+        entities: &[agent_mem_traits::Entity],
+        session: &agent_mem_traits::Session,
+    ) -> Result<()> {
         match self {
             #[cfg(feature = "neo4j")]
             GraphStoreEnum::Neo4j(store) => store.add_entities(entities, session).await,
@@ -29,7 +33,11 @@ impl GraphStore for GraphStoreEnum {
         }
     }
 
-    async fn add_relations(&self, relations: &[agent_mem_traits::Relation], session: &agent_mem_traits::Session) -> Result<()> {
+    async fn add_relations(
+        &self,
+        relations: &[agent_mem_traits::Relation],
+        session: &agent_mem_traits::Session,
+    ) -> Result<()> {
         match self {
             #[cfg(feature = "neo4j")]
             GraphStoreEnum::Neo4j(store) => store.add_relations(relations, session).await,
@@ -40,7 +48,11 @@ impl GraphStore for GraphStoreEnum {
         }
     }
 
-    async fn search_graph(&self, query: &str, session: &agent_mem_traits::Session) -> Result<Vec<agent_mem_traits::GraphResult>> {
+    async fn search_graph(
+        &self,
+        query: &str,
+        session: &agent_mem_traits::Session,
+    ) -> Result<Vec<agent_mem_traits::GraphResult>> {
         match self {
             #[cfg(feature = "neo4j")]
             GraphStoreEnum::Neo4j(store) => store.search_graph(query, session).await,
@@ -51,7 +63,11 @@ impl GraphStore for GraphStoreEnum {
         }
     }
 
-    async fn get_neighbors(&self, entity_id: &str, depth: usize) -> Result<Vec<agent_mem_traits::Entity>> {
+    async fn get_neighbors(
+        &self,
+        entity_id: &str,
+        depth: usize,
+    ) -> Result<Vec<agent_mem_traits::Entity>> {
         match self {
             #[cfg(feature = "neo4j")]
             GraphStoreEnum::Neo4j(store) => store.get_neighbors(entity_id, depth).await,
@@ -79,7 +95,9 @@ pub struct GraphStoreFactory;
 
 impl GraphStoreFactory {
     /// 根据配置创建图存储实例
-    pub async fn create_graph_store(config: &GraphStoreConfig) -> Result<Arc<dyn GraphStore + Send + Sync>> {
+    pub async fn create_graph_store(
+        config: &GraphStoreConfig,
+    ) -> Result<Arc<dyn GraphStore + Send + Sync>> {
         match config.provider.as_str() {
             "neo4j" => {
                 #[cfg(feature = "neo4j")]
@@ -90,7 +108,9 @@ impl GraphStoreFactory {
                 }
                 #[cfg(not(feature = "neo4j"))]
                 {
-                    Err(AgentMemError::unsupported_provider("Neo4j feature not enabled"))
+                    Err(AgentMemError::unsupported_provider(
+                        "Neo4j feature not enabled",
+                    ))
                 }
             }
             "memgraph" => {
@@ -102,7 +122,9 @@ impl GraphStoreFactory {
                 }
                 #[cfg(not(feature = "memgraph"))]
                 {
-                    Err(AgentMemError::unsupported_provider("Memgraph feature not enabled"))
+                    Err(AgentMemError::unsupported_provider(
+                        "Memgraph feature not enabled",
+                    ))
                 }
             }
             _ => Err(AgentMemError::unsupported_provider(&config.provider)),
@@ -113,13 +135,13 @@ impl GraphStoreFactory {
     pub fn supported_providers() -> Vec<&'static str> {
         #[allow(unused_mut)]
         let mut providers = Vec::new();
-        
+
         #[cfg(feature = "neo4j")]
         providers.push("neo4j");
-        
+
         #[cfg(feature = "memgraph")]
         providers.push("memgraph");
-        
+
         providers
     }
 
@@ -130,7 +152,11 @@ impl GraphStoreFactory {
 
     /// 创建Neo4j存储
     #[cfg(feature = "neo4j")]
-    pub async fn create_neo4j_store(uri: &str, username: &str, password: &str) -> Result<Arc<dyn GraphStore + Send + Sync>> {
+    pub async fn create_neo4j_store(
+        uri: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<Arc<dyn GraphStore + Send + Sync>> {
         let config = GraphStoreConfig {
             provider: "neo4j".to_string(),
             uri: uri.to_string(),
@@ -143,7 +169,11 @@ impl GraphStoreFactory {
 
     /// 创建Memgraph存储
     #[cfg(feature = "memgraph")]
-    pub async fn create_memgraph_store(uri: &str, username: Option<&str>, password: Option<&str>) -> Result<Arc<dyn GraphStore + Send + Sync>> {
+    pub async fn create_memgraph_store(
+        uri: &str,
+        username: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<Arc<dyn GraphStore + Send + Sync>> {
         let config = GraphStoreConfig {
             provider: "memgraph".to_string(),
             uri: uri.to_string(),
@@ -162,10 +192,10 @@ mod tests {
     #[test]
     fn test_supported_providers() {
         let providers = GraphStoreFactory::supported_providers();
-        
+
         #[cfg(feature = "neo4j")]
         assert!(providers.contains(&"neo4j"));
-        
+
         #[cfg(feature = "memgraph")]
         assert!(providers.contains(&"memgraph"));
     }
@@ -174,11 +204,13 @@ mod tests {
     fn test_is_provider_supported() {
         #[cfg(feature = "neo4j")]
         assert!(GraphStoreFactory::is_provider_supported("neo4j"));
-        
+
         #[cfg(feature = "memgraph")]
         assert!(GraphStoreFactory::is_provider_supported("memgraph"));
-        
-        assert!(!GraphStoreFactory::is_provider_supported("unsupported_provider"));
+
+        assert!(!GraphStoreFactory::is_provider_supported(
+            "unsupported_provider"
+        ));
     }
 
     #[test]
@@ -199,11 +231,9 @@ mod tests {
     #[cfg(feature = "neo4j")]
     #[tokio::test]
     async fn test_create_neo4j_store() {
-        let result = GraphStoreFactory::create_neo4j_store(
-            "bolt://localhost:7687",
-            "neo4j",
-            "password"
-        ).await;
+        let result =
+            GraphStoreFactory::create_neo4j_store("bolt://localhost:7687", "neo4j", "password")
+                .await;
         assert!(result.is_ok());
     }
 
@@ -213,8 +243,9 @@ mod tests {
         let result = GraphStoreFactory::create_memgraph_store(
             "bolt://localhost:7687",
             Some("memgraph"),
-            Some("password")
-        ).await;
+            Some("password"),
+        )
+        .await;
         assert!(result.is_ok());
     }
 }

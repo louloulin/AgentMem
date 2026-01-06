@@ -1,13 +1,14 @@
 //! Mistral AI LLM provider implementation
-//! 
+//!
 //! Provides integration with Mistral AI models including
 //! Mistral Large, Mistral Medium, and Mistral Small.
 
 use agent_mem_traits::LLMConfig;
-use agent_mem_traits::{Result, AgentMemError, Message, MessageRole};
+use agent_mem_traits::{AgentMemError, Message, MessageRole, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 use tracing::{debug, error, info};
 
@@ -91,17 +92,23 @@ pub struct MistralProvider {
 impl MistralProvider {
     /// Create a new Mistral provider
     pub fn new(config: LLMConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Mistral API key is required"))?;
-        
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30)) // Default timeout
             .build()
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to create HTTP client: {}", e)))?;
-        
-        let base_url = config.base_url.clone()
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
+
+        let base_url = config
+            .base_url
+            .clone()
             .unwrap_or_else(|| "https://api.mistral.ai".to_string());
-        
+
         Ok(Self {
             config,
             client,
@@ -109,7 +116,7 @@ impl MistralProvider {
             base_url,
         })
     }
-    
+
     /// Get available Mistral models
     pub fn available_models() -> Vec<&'static str> {
         vec![
@@ -125,7 +132,7 @@ impl MistralProvider {
             "open-mixtral-8x22b",
         ]
     }
-    
+
     /// Convert AgentMem message to Mistral message
     fn convert_message(&self, message: &Message) -> MistralMessage {
         let role = match message.role {
@@ -133,24 +140,24 @@ impl MistralProvider {
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
         };
-        
+
         MistralMessage {
             role: role.to_string(),
             content: message.content.clone(),
         }
     }
-    
+
     /// Build Mistral API request
     fn build_request(&self, messages: &[Message]) -> Result<MistralRequest> {
         let mistral_messages: Vec<MistralMessage> = messages
             .iter()
             .map(|msg| self.convert_message(msg))
             .collect();
-        
+
         if mistral_messages.is_empty() {
             return Err(AgentMemError::validation_error("No messages provided"));
         }
-        
+
         let request = MistralRequest {
             model: self.config.model.clone(),
             messages: mistral_messages,
@@ -161,38 +168,52 @@ impl MistralProvider {
             safe_prompt: Some(false),
             random_seed: None,
         };
-        
+
         Ok(request)
     }
-    
+
     /// Make API request to Mistral
     async fn make_request(&self, request: &MistralRequest) -> Result<MistralResponse> {
         debug!("Making Mistral API request to model: {}", request.model);
-        
-        let response = self.client
-            .post(&format!("{}/v1/chat/completions", self.base_url))
+
+        let response = self
+            .client
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", &format!("Bearer {}", self.api_key))
             .json(request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(&format!("Mistral API request failed: {}", e)))?;
-        
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Mistral API request failed: {e}"))
+            })?;
+
         let status = response.status();
-        let response_text = response.text().await
-            .map_err(|e| AgentMemError::network_error(&format!("Failed to read response: {}", e)))?;
-        
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AgentMemError::network_error(format!("Failed to read response: {e}")))?;
+
         if status.is_success() {
-            serde_json::from_str(&response_text)
-                .map_err(|e| AgentMemError::parsing_error(&format!("Failed to parse Mistral response: {}", e)))
+            serde_json::from_str(&response_text).map_err(|e| {
+                AgentMemError::parsing_error(format!("Failed to parse Mistral response: {e}"))
+            })
         } else {
             // Try to parse error response
             if let Ok(error) = serde_json::from_str::<MistralError>(&response_text) {
-                error!("Mistral API error: {} - {}", error.error.error_type, error.error.message);
-                Err(AgentMemError::llm_error(&format!("Mistral API error: {}", error.error.message)))
+                error!(
+                    "Mistral API error: {} - {}",
+                    error.error.error_type, error.error.message
+                );
+                Err(AgentMemError::llm_error(format!(
+                    "Mistral API error: {}",
+                    error.error.message
+                )))
             } else {
                 error!("Mistral API error (status {}): {}", status, response_text);
-                Err(AgentMemError::llm_error(&format!("Mistral API error: HTTP {}", status)))
+                Err(AgentMemError::llm_error(format!(
+                    "Mistral API error: HTTP {status}"
+                )))
             }
         }
     }
@@ -201,34 +222,44 @@ impl MistralProvider {
 #[async_trait]
 impl crate::LLMProvider for MistralProvider {
     async fn generate(&self, messages: &[Message]) -> Result<String> {
-        info!("Generating response using Mistral model: {}", self.config.model);
-        
+        info!(
+            "Generating response using Mistral model: {}",
+            self.config.model
+        );
+
         let request = self.build_request(messages)?;
         let response = self.make_request(&request).await?;
-        
+
         if response.choices.is_empty() {
             return Err(AgentMemError::llm_error("Mistral returned no choices"));
         }
-        
+
         let text = response.choices[0].message.content.clone();
-        
+
         if text.is_empty() {
             return Err(AgentMemError::llm_error("Mistral returned empty response"));
         }
-        
-        info!("Mistral response generated successfully (tokens: prompt={}, completion={}, total={})", 
-              response.usage.prompt_tokens, response.usage.completion_tokens, response.usage.total_tokens);
-        
+
+        info!(
+            "Mistral response generated successfully (tokens: prompt={}, completion={}, total={})",
+            response.usage.prompt_tokens,
+            response.usage.completion_tokens,
+            response.usage.total_tokens
+        );
+
         Ok(text)
     }
-    
-    async fn generate_stream(&self, messages: &[Message]) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Send + Unpin>> {
+
+    async fn generate_stream(
+        &self,
+        messages: &[Message],
+    ) -> Result<Pin<Box<dyn futures::Stream<Item = Result<String>> + Send>>> {
         // For now, fall back to non-streaming
         let response = self.generate(messages).await?;
         let stream = futures::stream::once(async move { Ok(response) });
-        Ok(Box::new(Box::pin(stream)))
+        Ok(Box::pin(stream))
     }
-    
+
     fn get_model_info(&self) -> agent_mem_traits::ModelInfo {
         agent_mem_traits::ModelInfo {
             provider: "mistral".to_string(),
@@ -245,14 +276,12 @@ impl crate::LLMProvider for MistralProvider {
         }
         Ok(())
     }
-
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{MessageRole, LLMProvider};
+    use agent_mem_traits::{LLMProvider, MessageRole};
 
     fn create_test_config() -> LLMConfig {
         LLMConfig {
@@ -275,7 +304,7 @@ mod tests {
         let provider = MistralProvider::new(config);
         assert!(provider.is_ok());
     }
-    
+
     #[test]
     fn test_available_models() {
         let models = MistralProvider::available_models();
@@ -283,28 +312,28 @@ mod tests {
         assert!(models.contains(&"mistral-large-latest"));
         assert!(models.contains(&"open-mixtral-8x7b"));
     }
-    
+
     #[test]
     fn test_message_conversion() {
         let config = create_test_config();
         let provider = MistralProvider::new(config).unwrap();
-        
+
         let message = Message {
             role: MessageRole::User,
             content: "Hello, Mistral!".to_string(),
             timestamp: None,
         };
-        
+
         let mistral_message = provider.convert_message(&message);
         assert_eq!(mistral_message.role, "user");
         assert_eq!(mistral_message.content, "Hello, Mistral!");
     }
-    
+
     #[test]
     fn test_request_building() {
         let config = create_test_config();
         let provider = MistralProvider::new(config).unwrap();
-        
+
         let messages = vec![
             Message {
                 role: MessageRole::System,
@@ -317,19 +346,19 @@ mod tests {
                 timestamp: None,
             },
         ];
-        
+
         let request = provider.build_request(&messages).unwrap();
         assert_eq!(request.model, "mistral-small-latest");
         assert_eq!(request.messages.len(), 2);
         assert_eq!(request.messages[0].role, "system");
         assert_eq!(request.messages[1].role, "user");
     }
-    
+
     #[test]
     fn test_model_info() {
         let config = create_test_config();
         let provider = MistralProvider::new(config).unwrap();
-        
+
         let info = provider.get_model_info();
         assert_eq!(info.provider, "mistral");
         assert_eq!(info.model, "mistral-small-latest");

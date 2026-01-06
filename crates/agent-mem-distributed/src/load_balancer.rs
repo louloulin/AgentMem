@@ -1,8 +1,7 @@
 //! Load balancing for distributed AgentMem
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -91,16 +90,16 @@ mod tests {
     async fn test_load_balancer() {
         let config = LoadBalancerConfig::default();
         let lb = LoadBalancer::new(config).await.unwrap();
-        
+
         let node1 = Uuid::new_v4();
         let node2 = Uuid::new_v4();
-        
+
         lb.add_node(node1).await.unwrap();
         lb.add_node(node2).await.unwrap();
-        
+
         let selected1 = lb.select_node().await.unwrap();
         let selected2 = lb.select_node().await.unwrap();
-        
+
         assert!(selected1.is_some());
         assert!(selected2.is_some());
         assert_ne!(selected1, selected2); // Round robin should select different nodes

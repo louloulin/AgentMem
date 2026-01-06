@@ -1,7 +1,6 @@
 //! Memory history tracking and versioning
 
-use crate::types::Memory;
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, MemoryV4, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -80,7 +79,7 @@ impl Default for HistoryConfig {
         Self {
             max_versions_per_memory: 50,
             max_history_age_seconds: 365 * 24 * 3600, // 1 year
-            track_access_events: false, // Usually too noisy
+            track_access_events: false,               // Usually too noisy
             compress_old_entries: true,
         }
     }
@@ -101,14 +100,14 @@ impl MemoryHistory {
     }
 
     /// Record memory creation
-    pub fn record_creation(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_creation(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
-            timestamp: memory.created_at,
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
+            timestamp: memory.created_at().timestamp(),
             change_type: ChangeType::Created,
             change_description: Some("Memory created".to_string()),
         };
@@ -120,22 +119,23 @@ impl MemoryHistory {
     /// Record memory content update
     pub fn record_content_update(
         &mut self,
-        memory: &Memory,
+        memory: &MemoryV4,
         old_content: &str,
         change_description: Option<String>,
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ContentUpdated,
             change_description: change_description.or_else(|| {
-                Some(format!("Content updated from '{}' to '{}'", 
+                Some(format!(
+                    "Content updated from '{}' to '{}'",
                     self.truncate_text(old_content, 50),
-                    self.truncate_text(&memory.content, 50)
+                    self.truncate_text(&memory.content.to_string(), 50)
                 ))
             }),
         };
@@ -147,20 +147,20 @@ impl MemoryHistory {
     /// Record importance change
     pub fn record_importance_change(
         &mut self,
-        memory: &Memory,
+        memory: &MemoryV4,
         old_importance: f32,
     ) -> Result<()> {
+        let new_importance = memory.importance().unwrap_or(0.5) as f32;
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: new_importance,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::ImportanceChanged,
             change_description: Some(format!(
-                "Importance changed from {:.2} to {:.2}",
-                old_importance, memory.importance
+                "Importance changed from {old_importance:.2} to {new_importance:.2}"
             )),
         };
 
@@ -171,21 +171,18 @@ impl MemoryHistory {
     /// Record metadata update
     pub fn record_metadata_update(
         &mut self,
-        memory: &Memory,
+        memory: &MemoryV4,
         changed_keys: Vec<String>,
     ) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::MetadataUpdated,
-            change_description: Some(format!(
-                "Metadata updated: {}",
-                changed_keys.join(", ")
-            )),
+            change_description: Some(format!("Metadata updated: {}", changed_keys.join(", "))),
         };
 
         self.add_history_entry(entry);
@@ -193,20 +190,23 @@ impl MemoryHistory {
     }
 
     /// Record memory access (if enabled)
-    pub fn record_access(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_access(&mut self, memory: &MemoryV4) -> Result<()> {
         if !self.config.track_access_events {
             return Ok(());
         }
 
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Accessed,
-            change_description: Some(format!("Memory accessed (count: {})", memory.access_count)),
+            change_description: Some(format!(
+                "Memory accessed (count: {})",
+                memory.metadata.access_count
+            )),
         };
 
         self.add_history_entry(entry);
@@ -214,13 +214,13 @@ impl MemoryHistory {
     }
 
     /// Record memory archival
-    pub fn record_archival(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_archival(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Archived,
             change_description: Some("Memory archived".to_string()),
@@ -231,13 +231,13 @@ impl MemoryHistory {
     }
 
     /// Record memory restoration
-    pub fn record_restoration(&mut self, memory: &Memory) -> Result<()> {
+    pub fn record_restoration(&mut self, memory: &MemoryV4) -> Result<()> {
         let entry = MemoryHistoryEntry {
-            memory_id: memory.id.clone(),
-            version: memory.version,
-            content: memory.content.clone(),
-            importance: memory.importance,
-            metadata: memory.metadata.clone(),
+            memory_id: memory.id.0.clone(),
+            version: memory.version(),
+            content: memory.content.to_string(),
+            importance: memory.importance().unwrap_or(0.5) as f32,
+            metadata: memory.metadata.to_hashmap(),
             timestamp: chrono::Utc::now().timestamp(),
             change_type: ChangeType::Restored,
             change_description: Some("Memory restored from archive".to_string()),
@@ -269,15 +269,24 @@ impl MemoryHistory {
     }
 
     /// Get changes between two versions
-    pub fn get_version_diff(&self, memory_id: &str, from_version: u32, to_version: u32) -> Result<VersionDiff> {
-        let history = self.history.get(memory_id)
+    pub fn get_version_diff(
+        &self,
+        memory_id: &str,
+        from_version: u32,
+        to_version: u32,
+    ) -> Result<VersionDiff> {
+        let history = self
+            .history
+            .get(memory_id)
             .ok_or_else(|| AgentMemError::memory_error("Memory history not found"))?;
 
-        let from_entry = history.iter()
+        let from_entry = history
+            .iter()
             .find(|entry| entry.version == from_version)
             .ok_or_else(|| AgentMemError::memory_error("From version not found"))?;
 
-        let to_entry = history.iter()
+        let to_entry = history
+            .iter()
             .find(|entry| entry.version == to_version)
             .ok_or_else(|| AgentMemError::memory_error("To version not found"))?;
 
@@ -322,19 +331,23 @@ impl MemoryHistory {
     /// Get history statistics
     pub fn get_history_stats(&self) -> HistoryStats {
         let mut stats = HistoryStats::default();
-        
+
         stats.total_memories_tracked = self.history.len();
-        
+
         for entries in self.history.values() {
             stats.total_history_entries += entries.len();
-            
+
             for entry in entries {
-                *stats.changes_by_type.entry(entry.change_type.clone()).or_insert(0) += 1;
+                *stats
+                    .changes_by_type
+                    .entry(entry.change_type.clone())
+                    .or_insert(0) += 1;
             }
         }
 
         if !self.history.is_empty() {
-            stats.average_versions_per_memory = stats.total_history_entries as f32 / stats.total_memories_tracked as f32;
+            stats.average_versions_per_memory =
+                stats.total_history_entries as f32 / stats.total_memories_tracked as f32;
         }
 
         stats
@@ -345,7 +358,7 @@ impl MemoryHistory {
         let memory_id = entry.memory_id.clone();
         self.history
             .entry(memory_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(entry);
 
         // Enforce limits immediately

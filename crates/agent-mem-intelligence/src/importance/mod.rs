@@ -1,9 +1,9 @@
 //! 记忆重要性评估模块
 
-use agent_mem_traits::{Result, AgentMemError, MemoryType};
+use agent_mem_traits::{AgentMemError, MemoryType, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 /// 重要性评估结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,22 +202,26 @@ impl ImportanceEvaluator {
     fn calculate_content_score(&self, memory: &MemoryInfo) -> f32 {
         let content_length = memory.content.len() as f32;
         let word_count = memory.content.split_whitespace().count() as f32;
-        
+
         // 基于内容长度和词汇数量的综合评分
         let length_score = (content_length / 1000.0).min(1.0); // 1000字符为满分
         let word_score = (word_count / 100.0).min(1.0); // 100词为满分
-        
+
         (length_score + word_score) / 2.0
     }
 
     /// 计算记忆类型分数
     fn calculate_type_score(&self, memory: &MemoryInfo) -> f32 {
         match memory.memory_type {
-            MemoryType::Factual => 0.8,      // 事实记忆重要性较高
-            MemoryType::Episodic => 0.7,     // 情节记忆中等重要
-            MemoryType::Procedural => 0.9,   // 程序记忆非常重要
-            MemoryType::Semantic => 0.8,     // 语义记忆重要性较高
-            MemoryType::Working => 0.5,      // 工作记忆重要性较低
+            MemoryType::Factual => 0.8,    // 事实记忆重要性较高
+            MemoryType::Episodic => 0.7,   // 情节记忆中等重要
+            MemoryType::Procedural => 0.9, // 程序记忆非常重要
+            MemoryType::Semantic => 0.8,   // 语义记忆重要性较高
+            MemoryType::Working => 0.5,    // 工作记忆重要性较低
+            MemoryType::Core => 1.0,       // 核心记忆最重要
+            MemoryType::Resource => 0.6,   // 资源记忆中等重要
+            MemoryType::Knowledge => 0.85, // 知识记忆重要性高
+            MemoryType::Contextual => 0.7, // 上下文记忆中等重要
         }
     }
 
@@ -259,14 +263,16 @@ impl ImportanceEvaluator {
         }
 
         // 基于交互次数的评分
-        let interaction_score = (memory.interaction_count as f32 / 10.0).min(1.0);
-        interaction_score
+
+        (memory.interaction_count as f32 / 10.0).min(1.0)
     }
 
     /// 计算余弦相似度
     fn cosine_similarity(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
         let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
@@ -281,35 +287,27 @@ impl ImportanceEvaluator {
     }
 
     /// 批量评估重要性
-    pub fn batch_evaluate(
-        &self,
-        memories: &[MemoryInfo],
-    ) -> Result<Vec<ImportanceResult>> {
+    pub fn batch_evaluate(&self, memories: &[MemoryInfo]) -> Result<Vec<ImportanceResult>> {
         let mut results = Vec::new();
-        
+
         for memory in memories {
             let result = self.evaluate_importance(memory, memories)?;
             results.push(result);
         }
-        
+
         Ok(results)
     }
 
     /// 根据重要性排序记忆
-    pub fn rank_memories(
-        &self,
-        memories: &[MemoryInfo],
-    ) -> Result<Vec<(usize, ImportanceResult)>> {
+    pub fn rank_memories(&self, memories: &[MemoryInfo]) -> Result<Vec<(usize, ImportanceResult)>> {
         let results = self.batch_evaluate(memories)?;
-        
-        let mut ranked: Vec<(usize, ImportanceResult)> = results
-            .into_iter()
-            .enumerate()
-            .collect();
+
+        let mut ranked: Vec<(usize, ImportanceResult)> = results.into_iter().enumerate().collect();
 
         // 按重要性分数降序排序
         ranked.sort_by(|(_, a), (_, b)| {
-            b.importance_score.partial_cmp(&a.importance_score)
+            b.importance_score
+                .partial_cmp(&a.importance_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -373,28 +371,28 @@ mod tests {
     #[test]
     fn test_calculate_content_score() {
         let evaluator = ImportanceEvaluator::default();
-        
+
         let memory_short = create_test_memory("1", "short", 1);
         let memory_long = create_test_memory("2", &"long content ".repeat(50), 1);
-        
+
         let score_short = evaluator.calculate_content_score(&memory_short);
         let score_long = evaluator.calculate_content_score(&memory_long);
-        
+
         assert!(score_long > score_short);
     }
 
     #[test]
     fn test_calculate_type_score() {
         let evaluator = ImportanceEvaluator::default();
-        
+
         let mut memory = create_test_memory("1", "test", 1);
-        
+
         memory.memory_type = MemoryType::Procedural;
         let procedural_score = evaluator.calculate_type_score(&memory);
-        
+
         memory.memory_type = MemoryType::Working;
         let working_score = evaluator.calculate_type_score(&memory);
-        
+
         assert!(procedural_score > working_score);
     }
 
@@ -403,9 +401,9 @@ mod tests {
         let evaluator = ImportanceEvaluator::default();
         let memory = create_test_memory("1", "test content", 5);
         let context = vec![create_test_memory("2", "other content", 3)];
-        
+
         let result = evaluator.evaluate_importance(&memory, &context).unwrap();
-        
+
         assert!(result.importance_score >= 0.0);
         assert!(result.importance_score <= 1.0);
         assert!(!result.factor_scores.is_empty());
@@ -420,10 +418,10 @@ mod tests {
             create_test_memory("2", "second memory", 10),
             create_test_memory("3", "third memory", 2),
         ];
-        
+
         let results = evaluator.batch_evaluate(&memories).unwrap();
         assert_eq!(results.len(), 3);
-        
+
         for result in &results {
             assert!(result.importance_score >= 0.0);
             assert!(result.importance_score <= 1.0);
@@ -438,10 +436,10 @@ mod tests {
             create_test_memory("2", "high importance", 20),
             create_test_memory("3", "medium importance", 5),
         ];
-        
+
         let ranked = evaluator.rank_memories(&memories).unwrap();
         assert_eq!(ranked.len(), 3);
-        
+
         // 检查是否按重要性降序排列
         assert!(ranked[0].1.importance_score >= ranked[1].1.importance_score);
         assert!(ranked[1].1.importance_score >= ranked[2].1.importance_score);
@@ -450,12 +448,12 @@ mod tests {
     #[test]
     fn test_cosine_similarity() {
         let evaluator = ImportanceEvaluator::default();
-        
+
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
         let similarity = evaluator.cosine_similarity(&a, &b).unwrap();
         assert!((similarity - 1.0).abs() < 1e-6);
-        
+
         let c = vec![0.0, 1.0, 0.0];
         let similarity2 = evaluator.cosine_similarity(&a, &c).unwrap();
         assert!((similarity2 - 0.0).abs() < 1e-6);

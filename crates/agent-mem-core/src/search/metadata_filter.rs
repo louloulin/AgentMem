@@ -1,0 +1,678 @@
+//! 元数据过滤系统
+//!
+//! 实现Mem0级别的高级元数据过滤，支持逻辑操作符和比较操作符
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// 过滤操作符
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FilterOperator {
+    /// 等于
+    #[serde(rename = "eq")]
+    Eq,
+    /// 不等于
+    #[serde(rename = "ne")]
+    Ne,
+    /// 大于
+    #[serde(rename = "gt")]
+    Gt,
+    /// 大于等于
+    #[serde(rename = "gte")]
+    Gte,
+    /// 小于
+    #[serde(rename = "lt")]
+    Lt,
+    /// 小于等于
+    #[serde(rename = "lte")]
+    Lte,
+    /// 在列表中
+    #[serde(rename = "in")]
+    In,
+    /// 不在列表中
+    #[serde(rename = "nin")]
+    Nin,
+    /// 包含文本
+    #[serde(rename = "contains")]
+    Contains,
+    /// 不区分大小写包含
+    #[serde(rename = "icontains")]
+    IContains,
+}
+
+/// 过滤值
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum FilterValue {
+    String(String),
+    Number(f64),
+    Integer(i64),
+    Boolean(bool),
+    List(Vec<FilterValue>),
+    Null,
+}
+
+/// 元数据过滤条件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataFilter {
+    /// 字段名
+    pub field: String,
+    /// 操作符
+    pub operator: FilterOperator,
+    /// 值
+    pub value: FilterValue,
+}
+
+/// 逻辑操作符
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LogicalOperator {
+    /// 逻辑与
+    And(Vec<MetadataFilter>),
+    /// 逻辑或
+    Or(Vec<MetadataFilter>),
+    /// 逻辑非
+    Not(Box<MetadataFilter>),
+    /// 单个过滤条件
+    Single(MetadataFilter),
+}
+
+/// 元数据过滤系统
+pub struct MetadataFilterSystem;
+
+impl MetadataFilterSystem {
+    /// 检测是否包含高级操作符
+    ///
+    /// 检查过滤条件中是否包含逻辑操作符（AND, OR, NOT）或比较操作符
+    pub fn has_advanced_operators(filters: &HashMap<String, serde_json::Value>) -> bool {
+        for (key, _value) in filters {
+            // 检查逻辑操作符
+            if key == "AND" || key == "OR" || key == "NOT" {
+                return true;
+            }
+
+            // 检查值是否为对象（可能包含操作符）
+            // 例如: {"category": {"eq": "food"}}
+            if let Some(obj) = _value.as_object() {
+                // 检查是否包含操作符键
+                for op_key in obj.keys() {
+                    if matches!(
+                        op_key.as_str(),
+                        "eq" | "ne"
+                            | "gt"
+                            | "gte"
+                            | "lt"
+                            | "lte"
+                            | "in"
+                            | "nin"
+                            | "contains"
+                            | "icontains"
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// 处理元数据过滤器
+    ///
+    /// 将HashMap格式的过滤器转换为LogicalOperator结构
+    pub fn process_metadata_filters(
+        filters: &HashMap<String, serde_json::Value>,
+    ) -> Result<LogicalOperator, String> {
+        // 检查是否有逻辑操作符
+        if let Some(and_value) = filters.get("AND") {
+            if let Some(and_array) = and_value.as_array() {
+                let conditions: Result<Vec<MetadataFilter>, String> = and_array
+                    .iter()
+                    .map(Self::parse_filter_condition)
+                    .collect();
+                return Ok(LogicalOperator::And(conditions?));
+            }
+        }
+
+        if let Some(or_value) = filters.get("OR") {
+            if let Some(or_array) = or_value.as_array() {
+                let conditions: Result<Vec<MetadataFilter>, String> = or_array
+                    .iter()
+                    .map(Self::parse_filter_condition)
+                    .collect();
+                return Ok(LogicalOperator::Or(conditions?));
+            }
+        }
+
+        if let Some(not_value) = filters.get("NOT") {
+            let condition = Self::parse_filter_condition(not_value)?;
+            return Ok(LogicalOperator::Not(Box::new(condition)));
+        }
+
+        // 处理单个条件或多个条件（默认为AND）
+        let mut conditions = Vec::new();
+        for (key, value) in filters {
+            if key != "AND" && key != "OR" && key != "NOT" {
+                conditions.push(Self::parse_field_filter(key, value)?);
+            }
+        }
+
+        if conditions.len() == 1 {
+            Ok(LogicalOperator::Single(conditions.remove(0)))
+        } else if conditions.is_empty() {
+            Err("No filter conditions found".to_string())
+        } else {
+            Ok(LogicalOperator::And(conditions))
+        }
+    }
+
+    /// 解析过滤条件
+    fn parse_filter_condition(value: &serde_json::Value) -> Result<MetadataFilter, String> {
+        if let Some(obj) = value.as_object() {
+            // 格式: {"field": {"operator": "value"}}
+            if obj.len() == 1 {
+                if let Some((field, filter_obj)) = obj.iter().next() {
+                    if let Some(filter_map) = filter_obj.as_object() {
+                        return Self::parse_field_filter(
+                            field,
+                            &serde_json::Value::Object(filter_map.clone()),
+                        );
+                    }
+                }
+            }
+        }
+        Err("Invalid filter condition format".to_string())
+    }
+
+    /// 解析字段过滤器
+    fn parse_field_filter(
+        field: &str,
+        value: &serde_json::Value,
+    ) -> Result<MetadataFilter, String> {
+        // 如果值是对象，包含操作符
+        if let Some(obj) = value.as_object() {
+            // 查找操作符
+            if let Some((op_str, val)) = obj.into_iter().next() {
+                let operator = match op_str.as_str() {
+                    "eq" => FilterOperator::Eq,
+                    "ne" => FilterOperator::Ne,
+                    "gt" => FilterOperator::Gt,
+                    "gte" => FilterOperator::Gte,
+                    "lt" => FilterOperator::Lt,
+                    "lte" => FilterOperator::Lte,
+                    "in" => FilterOperator::In,
+                    "nin" => FilterOperator::Nin,
+                    "contains" => FilterOperator::Contains,
+                    "icontains" => FilterOperator::IContains,
+                    _ => return Err(format!("Unknown operator: {op_str}")),
+                };
+
+                let filter_value = Self::parse_filter_value(val)?;
+                return Ok(MetadataFilter {
+                    field: field.to_string(),
+                    operator,
+                    value: filter_value,
+                });
+            }
+        }
+
+        // 如果值是简单值，默认为eq操作符
+        let filter_value = Self::parse_filter_value(value)?;
+        Ok(MetadataFilter {
+            field: field.to_string(),
+            operator: FilterOperator::Eq,
+            value: filter_value,
+        })
+    }
+
+    /// 解析过滤值
+    fn parse_filter_value(value: &serde_json::Value) -> Result<FilterValue, String> {
+        match value {
+            serde_json::Value::String(s) => Ok(FilterValue::String(s.clone())),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Ok(FilterValue::Integer(i))
+                } else if let Some(f) = n.as_f64() {
+                    Ok(FilterValue::Number(f))
+                } else {
+                    Err("Invalid number format".to_string())
+                }
+            }
+            serde_json::Value::Bool(b) => Ok(FilterValue::Boolean(*b)),
+            serde_json::Value::Array(arr) => {
+                let list: Result<Vec<FilterValue>, String> =
+                    arr.iter().map(Self::parse_filter_value).collect();
+                Ok(FilterValue::List(list?))
+            }
+            serde_json::Value::Null => Ok(FilterValue::Null),
+            _ => Err("Unsupported filter value type".to_string()),
+        }
+    }
+
+    /// 检查记忆是否匹配过滤条件
+    ///
+    /// 根据元数据过滤条件检查记忆是否匹配
+    pub fn matches(
+        filter: &LogicalOperator,
+        metadata: &HashMap<String, serde_json::Value>,
+    ) -> bool {
+        match filter {
+            LogicalOperator::And(conditions) => {
+                conditions.iter().all(|c| Self::matches_single(c, metadata))
+            }
+            LogicalOperator::Or(conditions) => {
+                conditions.iter().any(|c| Self::matches_single(c, metadata))
+            }
+            LogicalOperator::Not(condition) => !Self::matches_single(condition, metadata),
+            LogicalOperator::Single(condition) => Self::matches_single(condition, metadata),
+        }
+    }
+
+    /// 检查单个过滤条件是否匹配
+    fn matches_single(
+        filter: &MetadataFilter,
+        metadata: &HashMap<String, serde_json::Value>,
+    ) -> bool {
+        let field_value = metadata.get(&filter.field);
+
+        match &filter.operator {
+            FilterOperator::Eq => {
+                Self::compare_values(field_value, &filter.value, |a, b| match (a, b) {
+                    (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                    (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                    (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                    (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                    (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                    (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                    _ => false,
+                })
+            }
+            FilterOperator::Ne => {
+                !Self::compare_values(field_value, &filter.value, |a, b| match (a, b) {
+                    (FilterValue::String(s1), FilterValue::String(s2)) => s1 == s2,
+                    (FilterValue::Number(n1), FilterValue::Number(n2)) => n1 == n2,
+                    (FilterValue::Integer(i1), FilterValue::Integer(i2)) => i1 == i2,
+                    (FilterValue::Boolean(b1), FilterValue::Boolean(b2)) => b1 == b2,
+                    (FilterValue::Integer(i1), FilterValue::Number(n2)) => (*i1 as f64) == *n2,
+                    (FilterValue::Number(n1), FilterValue::Integer(i2)) => *n1 == (*i2 as f64),
+                    _ => false,
+                })
+            }
+            FilterOperator::Gt => Self::compare_numeric(field_value, &filter.value, |a, b| a > b),
+            FilterOperator::Gte => Self::compare_numeric(field_value, &filter.value, |a, b| a >= b),
+            FilterOperator::Lt => Self::compare_numeric(field_value, &filter.value, |a, b| a < b),
+            FilterOperator::Lte => Self::compare_numeric(field_value, &filter.value, |a, b| a <= b),
+            FilterOperator::In => {
+                if let FilterValue::List(list) = &filter.value {
+                    list.iter()
+                        .any(|v| Self::compare_values(field_value, v, |a, b| a == b))
+                } else {
+                    false
+                }
+            }
+            FilterOperator::Nin => {
+                if let FilterValue::List(list) = &filter.value {
+                    !list
+                        .iter()
+                        .any(|v| Self::compare_values(field_value, v, |a, b| a == b))
+                } else {
+                    true
+                }
+            }
+            FilterOperator::Contains => {
+                Self::compare_string(field_value, &filter.value, |a, b| a.contains(b))
+            }
+            FilterOperator::IContains => {
+                Self::compare_string(field_value, &filter.value, |a, b| {
+                    a.to_lowercase().contains(&b.to_lowercase())
+                })
+            }
+        }
+    }
+
+    /// 比较值
+    fn compare_values<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
+    where
+        F: Fn(&FilterValue, &FilterValue) -> bool,
+    {
+        if let Some(fv) = field_value {
+            if let Some(fv_converted) = Self::json_to_filter_value(fv) {
+                cmp(&fv_converted, filter_value)
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// 将serde_json::Value转换为可比较的值
+    fn json_to_filter_value(value: &serde_json::Value) -> Option<FilterValue> {
+        match value {
+            serde_json::Value::String(s) => Some(FilterValue::String(s.clone())),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Some(FilterValue::Integer(i))
+                } else { n.as_f64().map(FilterValue::Number) }
+            }
+            serde_json::Value::Bool(b) => Some(FilterValue::Boolean(*b)),
+            serde_json::Value::Array(arr) => {
+                let list: Result<Vec<FilterValue>, String> =
+                    arr.iter().map(Self::parse_filter_value).collect();
+                list.ok().map(FilterValue::List)
+            }
+            serde_json::Value::Null => Some(FilterValue::Null),
+            _ => None,
+        }
+    }
+
+    /// 比较数值
+    fn compare_numeric<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
+    where
+        F: Fn(f64, f64) -> bool,
+    {
+        let field_num = field_value.and_then(|v| v.as_f64());
+        let filter_num = match filter_value {
+            FilterValue::Number(n) => Some(*n),
+            FilterValue::Integer(i) => Some(*i as f64),
+            _ => None,
+        };
+
+        if let (Some(fn_val), Some(ft_val)) = (field_num, filter_num) {
+            cmp(fn_val, ft_val)
+        } else {
+            false
+        }
+    }
+
+    /// 比较字符串
+    fn compare_string<F>(
+        field_value: Option<&serde_json::Value>,
+        filter_value: &FilterValue,
+        cmp: F,
+    ) -> bool
+    where
+        F: Fn(&str, &str) -> bool,
+    {
+        let field_str = field_value.and_then(|v| v.as_str());
+        let filter_str = match filter_value {
+            FilterValue::String(s) => Some(s.as_str()),
+            _ => None,
+        };
+
+        if let (Some(fs_val), Some(ft_val)) = (field_str, filter_str) {
+            cmp(fs_val, ft_val)
+        } else {
+            false
+        }
+    }
+}
+
+// 为serde_json::Value实现比较
+impl PartialEq<FilterValue> for serde_json::Value {
+    fn eq(&self, other: &FilterValue) -> bool {
+        match (self, other) {
+            (serde_json::Value::String(s1), FilterValue::String(s2)) => s1 == s2,
+            (serde_json::Value::Number(n1), FilterValue::Number(n2)) => {
+                n1.as_f64().map(|f| f == *n2).unwrap_or(false)
+            }
+            (serde_json::Value::Number(n1), FilterValue::Integer(i2)) => {
+                n1.as_i64().map(|i| i == *i2).unwrap_or(false)
+            }
+            (serde_json::Value::Bool(b1), FilterValue::Boolean(b2)) => b1 == b2,
+            _ => false,
+        }
+    }
+}
+
+impl MetadataFilterSystem {
+    /// 构建SQL WHERE子句（PostgreSQL版本）
+    ///
+    /// 将LogicalOperator转换为PostgreSQL兼容的SQL WHERE子句
+    pub fn build_sql_where_clause(
+        filters: &LogicalOperator,
+        param_offset: usize,
+    ) -> Result<(String, Vec<serde_json::Value>), String> {
+        let mut params = Vec::new();
+        let clause = Self::build_sql_clause_recursive(filters, &mut params, param_offset)?;
+        Ok((clause, params))
+    }
+
+    /// 递归构建SQL子句
+    fn build_sql_clause_recursive(
+        filter: &LogicalOperator,
+        params: &mut Vec<serde_json::Value>,
+        param_offset: usize,
+    ) -> Result<String, String> {
+        match filter {
+            LogicalOperator::And(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_condition_clause(c, params, param_offset + params.len()))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" AND ")))
+            }
+            LogicalOperator::Or(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_condition_clause(c, params, param_offset + params.len()))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" OR ")))
+            }
+            LogicalOperator::Not(condition) => {
+                let clause =
+                    Self::build_condition_clause(condition, params, param_offset + params.len())?;
+                Ok(format!("NOT ({clause})"))
+            }
+            LogicalOperator::Single(condition) => {
+                Self::build_condition_clause(condition, params, param_offset)
+            }
+        }
+    }
+
+    /// 构建单个条件的SQL子句
+    fn build_condition_clause(
+        filter: &MetadataFilter,
+        params: &mut Vec<serde_json::Value>,
+        param_index: usize,
+    ) -> Result<String, String> {
+        let field_path = format!("metadata->>'{}'", filter.field);
+        let param_placeholder = format!("${}", param_index + 1);
+
+        let sql_op = match filter.operator {
+            FilterOperator::Eq => "=",
+            FilterOperator::Ne => "!=",
+            FilterOperator::Gt => ">",
+            FilterOperator::Gte => ">=",
+            FilterOperator::Lt => "<",
+            FilterOperator::Lte => "<=",
+            FilterOperator::In => "IN",
+            FilterOperator::Nin => "NOT IN",
+            FilterOperator::Contains => "LIKE",
+            FilterOperator::IContains => "ILIKE",
+        };
+
+        let value = match &filter.value {
+            FilterValue::String(s) => serde_json::Value::String(s.clone()),
+            FilterValue::Number(n) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?)
+            }
+            FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
+            FilterValue::List(list) => {
+                // 对于IN/NIN操作符，需要特殊处理
+                let values: Vec<String> = list
+                    .iter()
+                    .map(|v| match v {
+                        FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
+                        FilterValue::Number(n) => n.to_string(),
+                        FilterValue::Integer(i) => i.to_string(),
+                        FilterValue::Boolean(b) => b.to_string().to_uppercase(),
+                        _ => "NULL".to_string(),
+                    })
+                    .collect();
+                return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
+            }
+            FilterValue::Null => return Ok(format!("{field_path} IS NULL")),
+        };
+
+        params.push(value);
+
+        match filter.operator {
+            FilterOperator::Contains | FilterOperator::IContains => {
+                // 对于LIKE/ILIKE，需要添加通配符
+                Ok(format!("{field_path} {sql_op} {param_placeholder}"))
+            }
+            _ => Ok(format!("{field_path} {sql_op} {param_placeholder}")),
+        }
+    }
+
+    /// 构建SQL WHERE子句（LibSQL版本）
+    ///
+    /// LibSQL使用?作为参数占位符，而不是$1, $2
+    pub fn build_libsql_where_clause(
+        filters: &LogicalOperator,
+    ) -> Result<(String, Vec<serde_json::Value>), String> {
+        let mut params = Vec::new();
+        let clause = Self::build_libsql_clause_recursive(filters, &mut params)?;
+        Ok((clause, params))
+    }
+
+    /// 递归构建LibSQL子句
+    fn build_libsql_clause_recursive(
+        filter: &LogicalOperator,
+        params: &mut Vec<serde_json::Value>,
+    ) -> Result<String, String> {
+        match filter {
+            LogicalOperator::And(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_libsql_condition_clause(c, params))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" AND ")))
+            }
+            LogicalOperator::Or(conditions) => {
+                let clauses: Result<Vec<String>, String> = conditions
+                    .iter()
+                    .map(|c| Self::build_libsql_condition_clause(c, params))
+                    .collect();
+                Ok(format!("({})", clauses?.join(" OR ")))
+            }
+            LogicalOperator::Not(condition) => {
+                let clause = Self::build_libsql_condition_clause(condition, params)?;
+                Ok(format!("NOT ({clause})"))
+            }
+            LogicalOperator::Single(condition) => {
+                Self::build_libsql_condition_clause(condition, params)
+            }
+        }
+    }
+
+    /// 构建LibSQL单个条件的SQL子句
+    fn build_libsql_condition_clause(
+        filter: &MetadataFilter,
+        params: &mut Vec<serde_json::Value>,
+    ) -> Result<String, String> {
+        // LibSQL使用json_extract函数
+        let field_path = format!("json_extract(metadata, '$.{}')", filter.field);
+
+        let sql_op = match filter.operator {
+            FilterOperator::Eq => "=",
+            FilterOperator::Ne => "!=",
+            FilterOperator::Gt => ">",
+            FilterOperator::Gte => ">=",
+            FilterOperator::Lt => "<",
+            FilterOperator::Lte => "<=",
+            FilterOperator::In => "IN",
+            FilterOperator::Nin => "NOT IN",
+            FilterOperator::Contains => "LIKE",
+            FilterOperator::IContains => "LIKE", // LibSQL不区分大小写LIKE
+        };
+
+        let value = match &filter.value {
+            FilterValue::String(s) => {
+                match filter.operator {
+                    FilterOperator::Contains | FilterOperator::IContains => {
+                        // 添加通配符
+                        return Ok(format!("{field_path} {sql_op} ?"));
+                    }
+                    _ => serde_json::Value::String(s.clone()),
+                }
+            }
+            FilterValue::Number(n) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(*n).ok_or("Invalid number")?)
+            }
+            FilterValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            FilterValue::Boolean(b) => serde_json::Value::Bool(*b),
+            FilterValue::List(list) => {
+                // 对于IN/NIN操作符
+                let values: Vec<String> = list
+                    .iter()
+                    .map(|v| match v {
+                        FilterValue::String(s) => format!("'{}'", s.replace("'", "''")),
+                        FilterValue::Number(n) => n.to_string(),
+                        FilterValue::Integer(i) => i.to_string(),
+                        FilterValue::Boolean(b) => b.to_string().to_uppercase(),
+                        _ => "NULL".to_string(),
+                    })
+                    .collect();
+                return Ok(format!("{} {} ({})", field_path, sql_op, values.join(", ")));
+            }
+            FilterValue::Null => return Ok(format!("{field_path} IS NULL")),
+        };
+
+        params.push(value);
+        Ok(format!("{field_path} {sql_op} ?"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_advanced_operators() {
+        let mut filters = HashMap::new();
+        filters.insert("category".to_string(), serde_json::json!("food"));
+        assert!(!MetadataFilterSystem::has_advanced_operators(&filters));
+
+        filters.insert("AND".to_string(), serde_json::json!([]));
+        assert!(MetadataFilterSystem::has_advanced_operators(&filters));
+
+        filters.clear();
+        filters.insert("category".to_string(), serde_json::json!({"eq": "food"}));
+        assert!(MetadataFilterSystem::has_advanced_operators(&filters));
+    }
+
+    #[test]
+    fn test_process_metadata_filters() {
+        let mut filters = HashMap::new();
+        filters.insert("category".to_string(), serde_json::json!("food"));
+
+        let result = MetadataFilterSystem::process_metadata_filters(&filters);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_matches() {
+        let mut metadata = HashMap::new();
+        metadata.insert("category".to_string(), serde_json::json!("food"));
+        metadata.insert("importance".to_string(), serde_json::json!("high"));
+
+        let filter = MetadataFilter {
+            field: "category".to_string(),
+            operator: FilterOperator::Eq,
+            value: FilterValue::String("food".to_string()),
+        };
+
+        let logical = LogicalOperator::Single(filter);
+        assert!(MetadataFilterSystem::matches(&logical, &metadata));
+    }
+}

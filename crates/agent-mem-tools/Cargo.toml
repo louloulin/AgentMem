@@ -1,0 +1,67 @@
+[package]
+name = "agent-mem-tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# UUID generation
+uuid = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Collections
+dashmap = { workspace = true }
+
+# Template engine
+handlebars = "5.1"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "stream"] }
+ureq = { version = "2.10", features = ["json"] }
+
+# JWT authentication
+jsonwebtoken = "9.2"
+
+# SSE client
+eventsource-client = "0.12"
+futures = "0.3"
+pin-project = "1.1"
+
+# Async stream
+async-stream = "0.3"
+
+# AgentMem dependencies
+agent-mem-llm = { path = "../agent-mem-llm" }
+agent-mem-traits = { path = "../agent-mem-traits" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { workspace = true }
+tracing-subscriber = "0.3"
+
+[[bench]]
+name = "tool_execution"
+harness = false

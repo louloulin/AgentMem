@@ -1,14 +1,14 @@
 //! Memory Conflict Resolution
-//! 
+//!
 //! Advanced conflict resolution algorithms ported from ContextEngine
 //! for handling memory conflicts with multiple resolution strategies.
 
-use crate::hierarchical_service::{HierarchicalMemoryRecord, ConflictResolutionStrategy};
+use crate::hierarchical_service::{ConflictResolutionStrategy, HierarchicalMemoryRecord};
 use crate::types::ImportanceLevel;
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
 
 /// Conflict resolution engine
 pub struct ConflictResolver {
@@ -124,12 +124,14 @@ impl ConflictResolver {
             }
 
             // Check for different types of conflicts
-            let similarity = self.calculate_semantic_similarity(new_memory, existing_memory).await?;
-            
+            let similarity = self
+                .calculate_semantic_similarity(new_memory, existing_memory)
+                .await?;
+
             if similarity > self.config.similarity_threshold {
                 conflicting_memories.push(existing_memory.clone());
                 max_similarity = max_similarity.max(similarity);
-                
+
                 // Determine conflict type
                 if similarity > 0.95 {
                     conflict_type = ConflictType::Duplicate;
@@ -167,24 +169,30 @@ impl ConflictResolver {
 
         let resolution = match resolution_strategy {
             ConflictResolutionStrategy::TimeBasedNewest => {
-                self.resolve_time_based_newest(new_memory, conflicting_memories).await?
+                self.resolve_time_based_newest(new_memory, conflicting_memories)
+                    .await?
             }
             ConflictResolutionStrategy::ImportanceBased => {
-                self.resolve_importance_based(new_memory, conflicting_memories).await?
+                self.resolve_importance_based(new_memory, conflicting_memories)
+                    .await?
             }
             ConflictResolutionStrategy::SourceReliabilityBased => {
-                self.resolve_source_reliability_based(new_memory, conflicting_memories).await?
+                self.resolve_source_reliability_based(new_memory, conflicting_memories)
+                    .await?
             }
             ConflictResolutionStrategy::SemanticMerge => {
-                self.resolve_semantic_merge(new_memory, conflicting_memories).await?
+                self.resolve_semantic_merge(new_memory, conflicting_memories)
+                    .await?
             }
             ConflictResolutionStrategy::KeepBoth => {
-                self.resolve_keep_both(new_memory, conflicting_memories).await?
+                self.resolve_keep_both(new_memory, conflicting_memories)
+                    .await?
             }
         };
 
         // Cache the resolution
-        self.resolution_cache.insert(conflict_id.clone(), resolution.clone());
+        self.resolution_cache
+            .insert(conflict_id.clone(), resolution.clone());
 
         Ok(resolution)
     }
@@ -199,14 +207,14 @@ impl ConflictResolver {
         // In production, would use embedding-based semantic similarity
         let content1 = memory1.content.to_lowercase();
         let content2 = memory2.content.to_lowercase();
-        
+
         // Simple word overlap similarity
         let words1: std::collections::HashSet<&str> = content1.split_whitespace().collect();
         let words2: std::collections::HashSet<&str> = content2.split_whitespace().collect();
-        
+
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
-        
+
         if union == 0 {
             Ok(0.0)
         } else {
@@ -224,7 +232,7 @@ impl ConflictResolver {
         // In production, would use NLP techniques to detect contradictions
         let content1 = memory1.content.to_lowercase();
         let content2 = memory2.content.to_lowercase();
-        
+
         // Look for contradictory patterns
         let contradictory_pairs = [
             ("is", "is not"),
@@ -233,14 +241,15 @@ impl ConflictResolver {
             ("can", "cannot"),
             ("will", "will not"),
         ];
-        
+
         for (positive, negative) in contradictory_pairs.iter() {
-            if (content1.contains(positive) && content2.contains(negative)) ||
-               (content1.contains(negative) && content2.contains(positive)) {
+            if (content1.contains(positive) && content2.contains(negative))
+                || (content1.contains(negative) && content2.contains(positive))
+            {
                 return true;
             }
         }
-        
+
         false
     }
 
@@ -252,7 +261,9 @@ impl ConflictResolver {
     ) -> bool {
         // Simplified temporal conflict detection
         // In production, would parse dates and check for temporal inconsistencies
-        let time_diff = (memory1.created_at - memory2.created_at).num_minutes().abs();
+        let time_diff = (memory1.created_at - memory2.created_at)
+            .num_minutes()
+            .abs();
         time_diff < 60 // Conflicts if created within 1 hour
     }
 
@@ -264,12 +275,12 @@ impl ConflictResolver {
     ) -> Result<ConflictResolution> {
         let mut all_memories = vec![new_memory.clone()];
         all_memories.extend(conflicting_memories.iter().cloned());
-        
+
         // Sort by creation time, newest first
         all_memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-        
+
         let resolved_memory = all_memories.into_iter().next();
-        
+
         Ok(ConflictResolution {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             conflicting_memories: conflicting_memories.iter().map(|m| m.id.clone()).collect(),
@@ -290,12 +301,12 @@ impl ConflictResolver {
     ) -> Result<ConflictResolution> {
         let mut all_memories = vec![new_memory.clone()];
         all_memories.extend(conflicting_memories.iter().cloned());
-        
+
         // Sort by importance, highest first
         all_memories.sort_by(|a, b| b.importance.cmp(&a.importance));
-        
+
         let resolved_memory = all_memories.into_iter().next();
-        
+
         Ok(ConflictResolution {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             conflicting_memories: conflicting_memories.iter().map(|m| m.id.clone()).collect(),
@@ -316,12 +327,16 @@ impl ConflictResolver {
     ) -> Result<ConflictResolution> {
         let mut all_memories = vec![new_memory.clone()];
         all_memories.extend(conflicting_memories.iter().cloned());
-        
+
         // Sort by source reliability, highest first
-        all_memories.sort_by(|a, b| b.source_reliability.partial_cmp(&a.source_reliability).unwrap_or(std::cmp::Ordering::Equal));
-        
+        all_memories.sort_by(|a, b| {
+            b.source_reliability
+                .partial_cmp(&a.source_reliability)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         let resolved_memory = all_memories.into_iter().next();
-        
+
         Ok(ConflictResolution {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             conflicting_memories: conflicting_memories.iter().map(|m| m.id.clone()).collect(),
@@ -344,18 +359,18 @@ impl ConflictResolver {
         let mut merged_content = new_memory.content.clone();
         let mut merged_metadata = new_memory.metadata.clone();
         let mut merged_tags = new_memory.tags.clone();
-        
+
         for memory in conflicting_memories {
             // Simple merge - in production would use more sophisticated NLP
             if !merged_content.contains(&memory.content) {
                 merged_content.push_str(&format!(" | {}", memory.content));
             }
-            
+
             // Merge metadata
             for (key, value) in &memory.metadata {
                 merged_metadata.entry(key.clone()).or_insert(value.clone());
             }
-            
+
             // Merge tags
             for tag in &memory.tags {
                 if !merged_tags.contains(tag) {
@@ -363,13 +378,13 @@ impl ConflictResolver {
                 }
             }
         }
-        
+
         let mut merged_memory = new_memory.clone();
         merged_memory.content = merged_content;
         merged_memory.metadata = merged_metadata;
         merged_memory.tags = merged_tags;
         merged_memory.updated_at = Utc::now();
-        
+
         Ok(ConflictResolution {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             conflicting_memories: conflicting_memories.iter().map(|m| m.id.clone()).collect(),
@@ -390,13 +405,17 @@ impl ConflictResolver {
     ) -> Result<ConflictResolution> {
         let mut all_memories = vec![new_memory.clone()];
         all_memories.extend(conflicting_memories.iter().cloned());
-        
+
         // Mark all memories as conflicting
         for memory in &mut all_memories {
-            memory.metadata.insert("conflict_marker".to_string(), "true".to_string());
-            memory.metadata.insert("conflict_timestamp".to_string(), Utc::now().to_rfc3339());
+            memory
+                .metadata
+                .insert("conflict_marker".to_string(), "true".to_string());
+            memory
+                .metadata
+                .insert("conflict_timestamp".to_string(), Utc::now().to_rfc3339());
         }
-        
+
         Ok(ConflictResolution {
             conflict_id: uuid::Uuid::new_v4().to_string(),
             conflicting_memories: conflicting_memories.iter().map(|m| m.id.clone()).collect(),
@@ -413,7 +432,7 @@ impl ConflictResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy::{MemoryScope, MemoryLevel};
+    use crate::hierarchy::{MemoryLevel, MemoryScope};
 
     fn create_test_memory(content: &str, importance: ImportanceLevel) -> HierarchicalMemoryRecord {
         HierarchicalMemoryRecord {
@@ -439,12 +458,15 @@ mod tests {
     #[tokio::test]
     async fn test_conflict_detection() {
         let resolver = ConflictResolver::new(ConflictResolverConfig::default());
-        
+
         let new_memory = create_test_memory("The sky is blue", ImportanceLevel::Medium);
         let existing_memory = create_test_memory("The sky is blue", ImportanceLevel::High); // Make them more similar
-        
-        let detection = resolver.detect_conflicts(&new_memory, &[existing_memory]).await.unwrap();
-        
+
+        let detection = resolver
+            .detect_conflicts(&new_memory, &[existing_memory])
+            .await
+            .unwrap();
+
         assert!(detection.has_conflict);
         assert_eq!(detection.conflicting_memories.len(), 1);
         assert!(detection.similarity_score > 0.5);
@@ -453,16 +475,19 @@ mod tests {
     #[tokio::test]
     async fn test_importance_based_resolution() {
         let mut resolver = ConflictResolver::new(ConflictResolverConfig::default());
-        
+
         let new_memory = create_test_memory("Important fact", ImportanceLevel::Medium);
         let conflicting_memory = create_test_memory("Very important fact", ImportanceLevel::High);
-        
-        let resolution = resolver.resolve_conflicts(
-            &new_memory,
-            &[conflicting_memory.clone()],
-            Some(ConflictResolutionStrategy::ImportanceBased)
-        ).await.unwrap();
-        
+
+        let resolution = resolver
+            .resolve_conflicts(
+                &new_memory,
+                &[conflicting_memory.clone()],
+                Some(ConflictResolutionStrategy::ImportanceBased),
+            )
+            .await
+            .unwrap();
+
         assert!(resolution.resolved_memory.is_some());
         let resolved = resolution.resolved_memory.unwrap();
         assert_eq!(resolved.importance, ImportanceLevel::High);

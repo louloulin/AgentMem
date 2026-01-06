@@ -1,6 +1,8 @@
 //! Pinecone向量存储实现
 
-use agent_mem_traits::{VectorStore, VectorStoreConfig, VectorData, VectorSearchResult, Result, AgentMemError};
+use agent_mem_traits::{
+    AgentMemError, Result, VectorData, VectorSearchResult, VectorStore, VectorStoreConfig,
+};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -84,10 +86,14 @@ pub struct PineconeStore {
 impl PineconeStore {
     /// 创建新的Pinecone存储实例
     pub async fn new(config: VectorStoreConfig) -> Result<Self> {
-        let api_key = config.api_key.clone()
+        let api_key = config
+            .api_key
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Pinecone API key is required"))?;
 
-        let index_name = config.index_name.clone()
+        let index_name = config
+            .index_name
+            .clone()
             .ok_or_else(|| AgentMemError::config_error("Pinecone index name is required"))?;
 
         // 构建基础URL
@@ -95,16 +101,20 @@ impl PineconeStore {
             url.clone()
         } else {
             // 默认使用Pinecone的标准URL格式
-            format!("https://{}-{}.svc.{}.pinecone.io", 
-                    index_name, 
-                    "default", // 项目ID，实际使用时需要配置
-                    "us-east1-gcp") // 区域，实际使用时需要配置
+            format!(
+                "https://{}-{}.svc.{}.pinecone.io",
+                index_name,
+                "default", // 项目ID，实际使用时需要配置
+                "us-east1-gcp"
+            ) // 区域，实际使用时需要配置
         };
 
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| AgentMemError::network_error(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                AgentMemError::network_error(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         Ok(Self {
             config,
@@ -135,9 +145,12 @@ impl PineconeStore {
         let metadata = if data.metadata.is_empty() {
             None
         } else {
-            Some(data.metadata.iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                .collect())
+            Some(
+                data.metadata
+                    .iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .collect(),
+            )
         };
 
         PineconeVector {
@@ -149,7 +162,9 @@ impl PineconeStore {
 
     /// 转换PineconeMatch到VectorSearchResult
     fn from_pinecone_match(&self, pinecone_match: PineconeMatch) -> VectorSearchResult {
-        let metadata = pinecone_match.metadata.iter()
+        let metadata = pinecone_match
+            .metadata
+            .iter()
             .filter_map(|(k, v)| {
                 if let serde_json::Value::String(s) = v {
                     Some((k.clone(), s.clone()))
@@ -176,9 +191,8 @@ impl VectorStore for PineconeStore {
             return Ok(Vec::new());
         }
 
-        let pinecone_vectors: Vec<PineconeVector> = vectors.iter()
-            .map(|v| self.to_pinecone_vector(v))
-            .collect();
+        let pinecone_vectors: Vec<PineconeVector> =
+            vectors.iter().map(|v| self.to_pinecone_vector(v)).collect();
 
         let request = PineconeUpsertRequest {
             vectors: pinecone_vectors,
@@ -186,20 +200,23 @@ impl VectorStore for PineconeStore {
         };
 
         let url = format!("{}/vectors/upsert", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .headers(self.get_headers())
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}", status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
@@ -207,7 +224,12 @@ impl VectorStore for PineconeStore {
         Ok(vectors.iter().map(|v| v.id.clone()).collect())
     }
 
-    async fn search_vectors(&self, query_vector: Vec<f32>, limit: usize, threshold: Option<f32>) -> Result<Vec<VectorSearchResult>> {
+    async fn search_vectors(
+        &self,
+        query_vector: Vec<f32>,
+        limit: usize,
+        threshold: Option<f32>,
+    ) -> Result<Vec<VectorSearchResult>> {
         let request = PineconeQueryRequest {
             vector: query_vector,
             top_k: limit,
@@ -217,27 +239,33 @@ impl VectorStore for PineconeStore {
         };
 
         let url = format!("{}/query", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .headers(self.get_headers())
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}", status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
-        let query_response: PineconeQueryResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let query_response: PineconeQueryResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
-        let mut results: Vec<VectorSearchResult> = query_response.matches
+        let mut results: Vec<VectorSearchResult> = query_response
+            .matches
             .into_iter()
             .map(|m| self.from_pinecone_match(m))
             .collect();
@@ -261,20 +289,23 @@ impl VectorStore for PineconeStore {
         };
 
         let url = format!("{}/vectors/delete", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .headers(self.get_headers())
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}", status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
@@ -295,37 +326,44 @@ impl VectorStore for PineconeStore {
             "namespace": self.namespace
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .headers(self.get_headers())
             .json(&request)
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}", status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
-        let fetch_response: serde_json::Value = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let fetch_response: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         if let Some(vectors) = fetch_response.get("vectors") {
             if let Some(vector_data) = vectors.get(id) {
                 if let (Some(values), Some(metadata)) = (
                     vector_data.get("values").and_then(|v| v.as_array()),
-                    vector_data.get("metadata").and_then(|m| m.as_object())
+                    vector_data.get("metadata").and_then(|m| m.as_object()),
                 ) {
-                    let vector: Vec<f32> = values.iter()
+                    let vector: Vec<f32> = values
+                        .iter()
                         .filter_map(|v| v.as_f64().map(|f| f as f32))
                         .collect();
 
-                    let metadata_map: HashMap<String, String> = metadata.iter()
+                    let metadata_map: HashMap<String, String> = metadata
+                        .iter()
                         .filter_map(|(k, v)| {
                             if let serde_json::Value::String(s) = v {
                                 Some((k.clone(), s.clone()))
@@ -349,25 +387,30 @@ impl VectorStore for PineconeStore {
 
     async fn count_vectors(&self) -> Result<usize> {
         let url = format!("{}/describe_index_stats", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .headers(self.get_headers())
             .json(&serde_json::json!({}))
             .send()
             .await
-            .map_err(|e| AgentMemError::network_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| AgentMemError::network_error(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(AgentMemError::storage_error(format!(
-                "Pinecone API error {}: {}", status, error_text
+                "Pinecone API error {status}: {error_text}"
             )));
         }
 
-        let stats: PineconeStatsResponse = response.json().await
-            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {}", e)))?;
+        let stats: PineconeStatsResponse = response
+            .json()
+            .await
+            .map_err(|e| AgentMemError::parsing_error(format!("Failed to parse response: {e}")))?;
 
         Ok(stats.total_vector_count)
     }
@@ -376,8 +419,40 @@ impl VectorStore for PineconeStore {
         // Pinecone没有直接的清空操作，需要删除所有向量
         // 这里返回错误，建议用户手动删除索引
         Err(AgentMemError::storage_error(
-            "Pinecone does not support clear operation. Please delete the index manually."
+            "Pinecone does not support clear operation. Please delete the index manually.",
         ))
+    }
+
+    async fn search_with_filters(
+        &self,
+        query_vector: Vec<f32>,
+        limit: usize,
+        filters: &std::collections::HashMap<String, serde_json::Value>,
+        threshold: Option<f32>,
+    ) -> Result<Vec<VectorSearchResult>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_search_with_filters(query_vector, limit, filters, threshold)
+            .await
+    }
+
+    async fn health_check(&self) -> Result<agent_mem_traits::HealthStatus> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_health_check("Pinecone").await
+    }
+
+    async fn get_stats(&self) -> Result<agent_mem_traits::VectorStoreStats> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_get_stats(1536).await // 默认维度
+    }
+
+    async fn add_vectors_batch(&self, batches: Vec<Vec<VectorData>>) -> Result<Vec<Vec<String>>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_add_vectors_batch(batches).await
+    }
+
+    async fn delete_vectors_batch(&self, id_batches: Vec<Vec<String>>) -> Result<Vec<bool>> {
+        use crate::utils::VectorStoreDefaults;
+        self.default_delete_vectors_batch(id_batches).await
     }
 }
 
@@ -474,7 +549,10 @@ mod tests {
         let store = rt.block_on(PineconeStore::new(config)).unwrap();
 
         let mut metadata = HashMap::new();
-        metadata.insert("key1".to_string(), serde_json::Value::String("value1".to_string()));
+        metadata.insert(
+            "key1".to_string(),
+            serde_json::Value::String("value1".to_string()),
+        );
 
         let pinecone_match = PineconeMatch {
             id: "test-id".to_string(),

@@ -1,6 +1,6 @@
 //! 语义相似度计算实现
 
-use agent_mem_traits::{Result, AgentMemError};
+use agent_mem_traits::{AgentMemError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -49,7 +49,7 @@ impl Default for SemanticSimilarityConfig {
         let mut hybrid_weights = HashMap::new();
         hybrid_weights.insert("cosine".to_string(), 0.7);
         hybrid_weights.insert("euclidean".to_string(), 0.3);
-        
+
         Self {
             algorithm: "cosine".to_string(),
             cosine_threshold: 0.8,
@@ -75,10 +75,31 @@ impl SemanticSimilarity {
         Self::new(SemanticSimilarityConfig::default())
     }
 
+    /// 计算两个文本的语义相似度
+    pub async fn calculate_similarity(&self, text1: &str, text2: &str) -> Result<f32> {
+        // 简化的相似度计算实现
+        // 在实际应用中，这里会使用嵌入模型计算语义相似度
+
+        // 基于词汇重叠的简单相似度计算
+        let words1: std::collections::HashSet<&str> = text1.split_whitespace().collect();
+        let words2: std::collections::HashSet<&str> = text2.split_whitespace().collect();
+
+        let intersection = words1.intersection(&words2).count();
+        let union = words1.union(&words2).count();
+
+        if union > 0 {
+            Ok(intersection as f32 / union as f32)
+        } else {
+            Ok(0.0)
+        }
+    }
+
     /// 检测两个向量的相似性
     pub fn detect_similarity(&self, vector1: &[f32], vector2: &[f32]) -> Result<SimilarityResult> {
         if vector1.len() != vector2.len() {
-            return Err(AgentMemError::validation_error("Vector dimensions must match"));
+            return Err(AgentMemError::validation_error(
+                "Vector dimensions must match",
+            ));
         }
 
         match self.config.algorithm.as_str() {
@@ -90,10 +111,14 @@ impl SemanticSimilarity {
     }
 
     /// 余弦相似度检测
-    fn detect_cosine_similarity(&self, vector1: &[f32], vector2: &[f32]) -> Result<SimilarityResult> {
+    fn detect_cosine_similarity(
+        &self,
+        vector1: &[f32],
+        vector2: &[f32],
+    ) -> Result<SimilarityResult> {
         let similarity = self.cosine_similarity(vector1, vector2)?;
         let distance = 1.0 - similarity;
-        
+
         Ok(SimilarityResult::new(
             similarity,
             distance,
@@ -103,10 +128,14 @@ impl SemanticSimilarity {
     }
 
     /// 欧几里得相似度检测
-    fn detect_euclidean_similarity(&self, vector1: &[f32], vector2: &[f32]) -> Result<SimilarityResult> {
+    fn detect_euclidean_similarity(
+        &self,
+        vector1: &[f32],
+        vector2: &[f32],
+    ) -> Result<SimilarityResult> {
         let distance = self.euclidean_distance(vector1, vector2)?;
         let similarity = 1.0 / (1.0 + distance);
-        
+
         Ok(SimilarityResult::new(
             similarity,
             distance,
@@ -116,22 +145,26 @@ impl SemanticSimilarity {
     }
 
     /// 混合相似度检测
-    fn detect_hybrid_similarity(&self, vector1: &[f32], vector2: &[f32]) -> Result<SimilarityResult> {
+    fn detect_hybrid_similarity(
+        &self,
+        vector1: &[f32],
+        vector2: &[f32],
+    ) -> Result<SimilarityResult> {
         let cosine_result = self.detect_cosine_similarity(vector1, vector2)?;
         let euclidean_result = self.detect_euclidean_similarity(vector1, vector2)?;
-        
+
         let cosine_weight = self.config.hybrid_weights.get("cosine").unwrap_or(&0.7);
         let euclidean_weight = self.config.hybrid_weights.get("euclidean").unwrap_or(&0.3);
-        
-        let hybrid_similarity = cosine_result.similarity * cosine_weight + 
-                               euclidean_result.similarity * euclidean_weight;
-        
-        let hybrid_distance = cosine_result.distance * cosine_weight + 
-                             euclidean_result.distance * euclidean_weight;
-        
-        let hybrid_threshold = self.config.cosine_threshold * cosine_weight + 
-                              self.config.euclidean_threshold * euclidean_weight;
-        
+
+        let hybrid_similarity = cosine_result.similarity * cosine_weight
+            + euclidean_result.similarity * euclidean_weight;
+
+        let hybrid_distance =
+            cosine_result.distance * cosine_weight + euclidean_result.distance * euclidean_weight;
+
+        let hybrid_threshold = self.config.cosine_threshold * cosine_weight
+            + self.config.euclidean_threshold * euclidean_weight;
+
         Ok(SimilarityResult::new(
             hybrid_similarity,
             hybrid_distance,
@@ -155,7 +188,8 @@ impl SemanticSimilarity {
 
     /// 计算欧几里得距离
     fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
-        let distance = a.iter()
+        let distance = a
+            .iter()
             .zip(b.iter())
             .map(|(x, y)| (x - y).powi(2))
             .sum::<f32>()
@@ -165,29 +199,38 @@ impl SemanticSimilarity {
     }
 
     /// 批量相似度计算
-    pub fn batch_similarity(&self, query: &[f32], vectors: &[Vec<f32>]) -> Result<Vec<SimilarityResult>> {
+    pub fn batch_similarity(
+        &self,
+        query: &[f32],
+        vectors: &[Vec<f32>],
+    ) -> Result<Vec<SimilarityResult>> {
         let mut results = Vec::new();
-        
+
         for vector in vectors {
             let result = self.detect_similarity(query, vector)?;
             results.push(result);
         }
-        
+
         Ok(results)
     }
 
     /// 找到最相似的向量
-    pub fn find_most_similar(&self, query: &[f32], vectors: &[Vec<f32>]) -> Result<Option<(usize, SimilarityResult)>> {
+    pub fn find_most_similar(
+        &self,
+        query: &[f32],
+        vectors: &[Vec<f32>],
+    ) -> Result<Option<(usize, SimilarityResult)>> {
         if vectors.is_empty() {
             return Ok(None);
         }
 
         let results = self.batch_similarity(query, vectors)?;
-        
-        let max_result = results
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.similarity.partial_cmp(&b.similarity).unwrap_or(std::cmp::Ordering::Equal));
+
+        let max_result = results.iter().enumerate().max_by(|(_, a), (_, b)| {
+            a.similarity
+                .partial_cmp(&b.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some((index, result)) = max_result {
             Ok(Some((index, result.clone())))
@@ -197,21 +240,28 @@ impl SemanticSimilarity {
     }
 
     /// 找到前K个最相似的向量
-    pub fn find_top_k_similar(&self, query: &[f32], vectors: &[Vec<f32>], k: usize) -> Result<Vec<(usize, SimilarityResult)>> {
+    pub fn find_top_k_similar(
+        &self,
+        query: &[f32],
+        vectors: &[Vec<f32>],
+        k: usize,
+    ) -> Result<Vec<(usize, SimilarityResult)>> {
         if vectors.is_empty() {
             return Ok(Vec::new());
         }
 
         let results = self.batch_similarity(query, vectors)?;
-        
-        let mut indexed_results: Vec<(usize, SimilarityResult)> = results
-            .into_iter()
-            .enumerate()
-            .collect();
+
+        let mut indexed_results: Vec<(usize, SimilarityResult)> =
+            results.into_iter().enumerate().collect();
 
         // 按相似度降序排序
-        indexed_results.sort_by(|(_, a), (_, b)| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        
+        indexed_results.sort_by(|(_, a), (_, b)| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         // 取前K个
         indexed_results.truncate(k);
 
@@ -263,7 +313,7 @@ mod tests {
     #[test]
     fn test_cosine_similarity() {
         let similarity = SemanticSimilarity::default();
-        
+
         // 测试相同向量
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
@@ -283,7 +333,7 @@ mod tests {
         let mut config = SemanticSimilarityConfig::default();
         config.algorithm = "euclidean".to_string();
         let similarity = SemanticSimilarity::new(config);
-        
+
         let a = vec![0.0, 0.0];
         let b = vec![3.0, 4.0];
         let result = similarity.detect_similarity(&a, &b).unwrap();
@@ -296,7 +346,7 @@ mod tests {
         let mut config = SemanticSimilarityConfig::default();
         config.algorithm = "hybrid".to_string();
         let similarity = SemanticSimilarity::new(config);
-        
+
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
         let result = similarity.detect_similarity(&a, &b).unwrap();
@@ -308,11 +358,7 @@ mod tests {
     fn test_batch_similarity() {
         let similarity = SemanticSimilarity::default();
         let query = vec![1.0, 0.0];
-        let vectors = vec![
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-            vec![-1.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![-1.0, 0.0]];
 
         let results = similarity.batch_similarity(&query, &vectors).unwrap();
         assert_eq!(results.len(), 3);
@@ -326,9 +372,9 @@ mod tests {
         let similarity = SemanticSimilarity::default();
         let query = vec![1.0, 0.0];
         let vectors = vec![
-            vec![0.0, 1.0],    // 正交
-            vec![1.0, 0.0],    // 相同
-            vec![-1.0, 0.0],   // 相反
+            vec![0.0, 1.0],  // 正交
+            vec![1.0, 0.0],  // 相同
+            vec![-1.0, 0.0], // 相反
         ];
 
         let result = similarity.find_most_similar(&query, &vectors).unwrap();
@@ -343,10 +389,10 @@ mod tests {
         let similarity = SemanticSimilarity::default();
         let query = vec![1.0, 0.0];
         let vectors = vec![
-            vec![0.0, 1.0],    // 正交，相似度0
-            vec![1.0, 0.0],    // 相同，相似度1
-            vec![-1.0, 0.0],   // 相反，相似度-1
-            vec![0.5, 0.0],    // 部分相似
+            vec![0.0, 1.0],  // 正交，相似度0
+            vec![1.0, 0.0],  // 相同，相似度1
+            vec![-1.0, 0.0], // 相反，相似度-1
+            vec![0.5, 0.0],  // 部分相似
         ];
 
         let results = similarity.find_top_k_similar(&query, &vectors, 2).unwrap();
