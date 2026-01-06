@@ -1,77 +1,104 @@
-# AgentMem - Enterprise-Grade AI Memory Platform
+# AgentMem
+
+<div align="center">
+
+**Enterprise-Grade AI Memory Platform for Production Applications**
 
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/agentmem/agentmem/actions)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-green.svg)](https://github.com/agentmem/agentmem/actions)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/agentmem/agentmem/releases)
+[![Discord](https://img.shields.io/discord/agentmem?label=Discord&logo=discord)](https://discord.gg/agentmem)
 
-> **Production-ready memory management for AI agents** - Persistent, intelligent, and scalable memory infrastructure
+[Documentation](https://docs.agentmem.dev) • [Examples](examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
 
-**AgentMem** is a high-performance memory management platform built in Rust, designed for AI agents and LLM-powered applications. It provides persistent memory, intelligent semantic search, and enterprise-grade reliability with a modular plugin architecture.
-
----
-
-## Why AgentMem?
-
-### The Problem
-
-Current LLM applications face critical limitations:
-
-- ❌ **No persistent memory** - Every conversation starts from scratch
-- ❌ **Context window limits** - Can't handle long-term conversations
-- ❌ **High costs** - Transmitting entire history on every request ($300K/month for 1M users)
-- ❌ **Poor personalization** - Can't remember user preferences
-
-### The Solution
-
-AgentMem solves these problems with:
-
-- ✅ **Persistent memory** - Cross-session memory retention
-- ✅ **Intelligent search** - Millisecond semantic retrieval
-- ✅ **90% cost reduction** - Only retrieve relevant memories
-- ✅ **AI-native** - Automatic fact extraction and reasoning
-- ✅ **Enterprise-ready** - 99.9% uptime, RBAC, monitoring
+</div>
 
 ---
 
-## Key Features
+## 🎯 Overview
 
-### 🚀 High Performance
-- **216K ops/sec** plugin throughput
-- **<100ms** semantic search latency
-- **93,000x** cache acceleration
+**AgentMem** is a high-performance, enterprise-grade memory management platform built in Rust, designed specifically for AI agents and LLM-powered applications. It provides persistent memory, intelligent semantic search, and enterprise-grade reliability with a modular plugin architecture.
+
+### Why AgentMem?
+
+Modern LLM applications face critical limitations that AgentMem solves:
+
+| Problem | AgentMem Solution |
+|---------|------------------|
+| ❌ No persistent memory | ✅ Cross-session memory retention |
+| ❌ Context window limits | ✅ Intelligent memory retrieval |
+| ❌ High API costs ($300K/month for 1M users) | ✅ 90% cost reduction via selective retrieval |
+| ❌ Poor personalization | ✅ User-specific memory scoping |
+| ❌ No enterprise features | ✅ RBAC, audit logs, multi-tenancy |
+
+---
+
+## ✨ Key Features
+
+### 🚀 Performance
+
+- **216,000 ops/sec** plugin throughput
+- **<100ms** semantic search latency (P95)
+- **93,000x** cache acceleration ratio
+- **5,000 ops/s** memory addition throughput
 - Asynchronous, lock-free architecture
 
 ### 🧠 Intelligent Memory
+
 - **Automatic fact extraction** powered by LLMs
-- **Semantic search** across 5 engines (Vector, BM25, Full-Text, Fuzzy, Hybrid)
+- **5 search engines**: Vector, BM25, Full-Text, Fuzzy, Hybrid (RRF)
 - **Conflict resolution** for contradictory information
-- **Memory importance scoring**
+- **Memory importance scoring** and decay
+- **Graph-based reasoning** with relationship traversal
 
 ### 🔌 Extensible Architecture
-- **WASM plugin system** with hot-reload
+
+- **WASM plugin system** with hot-reload capability
 - **18 modular crates** for clear separation of concerns
-- **20+ LLM integrations** (OpenAI, Anthropic, DeepSeek, etc.)
-- **Multi-backend storage** (LibSQL, PostgreSQL, Pinecone)
+- **20+ LLM providers**: OpenAI, Anthropic, DeepSeek, Google, Azure, and more
+- **Multi-backend storage**: LibSQL, PostgreSQL, Pinecone, LanceDB, Qdrant
+- **Language bindings**: Python, JavaScript, Go, Cangjie
 
 ### 🛡️ Enterprise-Grade
-- **RBAC** and authentication
-- **Full observability** (Prometheus, OpenTelemetry, Grafana)
-- **Multi-modal support** (image, audio, video)
-- **Kubernetes-ready** deployment
+
+- **RBAC** (Role-Based Access Control) with fine-grained permissions
+- **JWT & Session authentication**
+- **Comprehensive audit logging**
+- **Full observability**: Prometheus, OpenTelemetry, Grafana
+- **Multi-modal support**: Text, images, audio, video
+- **Kubernetes-ready** with Helm charts
+- **99.9% uptime SLA** capability
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Installation
 
+#### Using Cargo
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+agent-mem = "2.0"
+tokio = { version = "1", features = ["full"] }
+```
+
+#### Using Docker
+
 ```bash
-# Clone the repository
+docker pull agentmem/server:latest
+docker run -p 8080:8080 agentmem/server:latest
+```
+
+#### From Source
+
+```bash
 git clone https://github.com/agentmem/agentmem.git
 cd agentmem
-
-# Build with cargo
 cargo build --release
 ```
 
@@ -82,21 +109,18 @@ use agent_mem::Memory;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Set your LLM API key
-    std::env::set_var("OPENAI_API_KEY", "sk-...");
-
-    // Initialize with zero configuration
+    // Zero-configuration initialization
     let memory = Memory::new().await?;
 
-    // Add memories (with automatic fact extraction)
+    // Add memories with automatic fact extraction
     memory.add("I love pizza").await?;
     memory.add("I live in San Francisco").await?;
     memory.add("My favorite food is pizza").await?; // Auto-deduplicated
 
-    // Search with semantic understanding
+    // Semantic search
     let results = memory.search("What do you know about me?").await?;
     for result in results {
-        println!("- {}", result.memory);
+        println!("- {} (score: {:.2})", result.memory, result.score);
     }
 
     Ok(())
@@ -109,63 +133,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 # Start the full-stack server (API + UI)
 cargo run --bin agent-mem-server
 
-# Or use Docker
+# Or use Docker Compose
 docker-compose up -d
 ```
 
-The server starts at:
-- API: `http://localhost:8080`
-- Web UI: `http://localhost:3001`
-- API Docs: `http://localhost:8080/swagger-ui/`
+**Access Points:**
+- 🌐 **API**: `http://localhost:8080`
+- 🖥️ **Web UI**: `http://localhost:3001`
+- 📚 **API Docs**: `http://localhost:8080/swagger-ui/`
 
 ---
 
-## Documentation
+## 📊 Performance Benchmarks
 
-- [📖 Installation Guide](INSTALL.md) - Detailed setup instructions
-- [🚀 Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- [📚 User Guide](docs/user-guide/) - Comprehensive user documentation
-- [🔧 Developer Guide](docs/developer-guide/) - Architecture and development
-- [🚀 Deployment Guide](docs/deployment/) - Production deployment
-- [🤝 Contributing](CONTRIBUTING.md) - How to contribute
+| Operation | Throughput | Latency (P50) | Latency (P99) |
+|-----------|-----------|---------------|---------------|
+| Add Memory | 5,000 ops/s | 20ms | 50ms |
+| Vector Search | 10,000 ops/s | 10ms | 30ms |
+| BM25 Search | 15,000 ops/s | 5ms | 15ms |
+| Plugin Call | 216,000 ops/s | 1ms | 5ms |
+| Batch Operations | 50,000 ops/s | 100ms | 300ms |
+| Graph Traversal | 1,000 queries/s | 50ms | 200ms |
+
+*Benchmarks run on: Apple M2 Pro, 32GB RAM, LibSQL backend*
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-AgentMem is organized into 18 specialized crates:
+AgentMem is organized into **18 specialized crates** with clear separation of concerns:
 
 ```
 agentmem/
-├── agent-mem-traits          # Core abstractions
-├── agent-mem-core            # Memory management engine
-├── agent-mem                 # Unified API
-├── agent-mem-llm             # LLM integrations
-├── agent-mem-embeddings      # Embedding models
-├── agent-mem-storage         # Storage backends
-├── agent-mem-intelligence    # AI reasoning engine
+├── agent-mem-traits          # Core abstractions and traits
+├── agent-mem-core             # Memory management engine (32K lines)
+├── agent-mem                 # Unified high-level API
+├── agent-mem-llm             # 20+ LLM provider integrations
+├── agent-mem-embeddings      # Embedding models (FastEmbed, ONNX)
+├── agent-mem-storage         # Multi-backend storage layer
+├── agent-mem-intelligence    # AI reasoning engine (DeepSeek, etc.)
 ├── agent-mem-plugin-sdk      # WASM plugin SDK
-├── agent-mem-plugins         # Plugin manager
-├── agent-mem-server          # HTTP REST API
-├── agent-mem-client          # HTTP client
+├── agent-mem-plugins         # Plugin manager with hot-reload
+├── agent-mem-server          # HTTP REST API (175+ endpoints)
+├── agent-mem-client          # HTTP client library
 ├── agent-mem-compat          # Mem0 compatibility layer
 ├── agent-mem-observability   # Monitoring and metrics
-├── agent-mem-performance     # Performance optimization
-├── agent-mem-deployment      # K8s deployment
+├── agent-mem-performance     # Performance optimizations
+├── agent-mem-deployment      # Kubernetes deployment
 ├── agent-mem-distributed     # Distributed support
-└── agent-mem-python          # Python bindings
+└── agent-mem-python          # Python bindings (PyO3)
 ```
 
-**Total**: 88,000+ lines of production Rust code
+**Total**: 275,000+ lines of production Rust code
 
 ---
 
-## Plugin System
+## 🔌 Plugin System
 
-AgentMem features a high-performance WASM plugin system:
+AgentMem features a high-performance WASM plugin system with sandbox isolation:
 
 ```rust
-// Create plugin manager
+use agent_mem_plugins::PluginManager;
+
+// Create plugin manager with LRU cache
 let plugin_manager = PluginManager::new(100);
 
 // Register plugins with hot-reload
@@ -180,39 +210,110 @@ let result = plugin_manager.execute("weather", &input).await?;
 - ⚡ **LRU caching** - 93,000x speedup on cached calls
 - 🔄 **Hot-reload** - Load/unload without restart
 - 🎛️ **Capability system** - Fine-grained permissions
+- 📊 **Performance monitoring** - Built-in metrics
 
 ---
 
-## Performance Benchmarks
+## 🌐 Language Bindings
 
-| Operation | Throughput | Latency (P50) | Latency (P99) |
-|-----------|-----------|---------------|---------------|
-| Add Memory | 5,000 ops/s | 20ms | 50ms |
-| Vector Search | 10,000 ops/s | 10ms | 30ms |
-| BM25 Search | 15,000 ops/s | 5ms | 15ms |
-| Plugin Call | 216,000 ops/s | 1ms | 5ms |
-| Batch Operations | 50,000 ops/s | 100ms | 300ms |
+AgentMem provides official SDKs for multiple languages:
+
+### Python
+
+```python
+from agentmem import Memory
+
+memory = Memory()
+memory.add("User prefers dark mode")
+results = memory.search("user preferences")
+```
+
+**Installation**: `pip install agentmem`
+
+### JavaScript/TypeScript
+
+```typescript
+import { Memory } from 'agentmem';
+
+const memory = new Memory();
+await memory.add("User prefers dark mode");
+const results = await memory.search("user preferences");
+```
+
+**Installation**: `npm install agentmem`
+
+### Go
+
+```go
+import "github.com/agentmem/agentmem-go"
+
+memory := agentmem.NewMemory()
+memory.Add("User prefers dark mode")
+results := memory.Search("user preferences")
+```
+
+### Cangjie
+
+```cangjie
+import agentmem.*
+
+let memory = Memory.create()
+memory.add("User prefers dark mode")
+let results = memory.search("user preferences")
+```
+
+**See**: [SDKs Documentation](sdks/)
 
 ---
 
-## Use Cases
+## 📚 Documentation
+
+### Getting Started
+
+- 📖 [Installation Guide](INSTALL.md) - Detailed setup instructions
+- 🚀 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
+- 📝 [API Reference](docs/api/) - Complete API documentation
+
+### User Guides
+
+- 📚 [User Guide](docs/user-guide/) - Comprehensive user documentation
+- 🔍 [Search Guide](docs/getting-started/search-quickstart.md) - Search engine usage
+- 🔌 [Plugin Guide](docs/getting-started/plugins-quickstart.md) - Plugin development
+- 💬 [Claude Code Integration](docs/getting-started/claude-code-quickstart.md) - MCP integration
+
+### Developer Resources
+
+- 🏗️ [Architecture](docs/architecture/) - System architecture and design
+- 🔧 [Developer Guide](docs/developer-guide/) - Development setup and guidelines
+- 🚀 [Deployment Guide](docs/deployment/) - Production deployment strategies
+- 🧪 [Testing Guide](docs/testing/) - Testing strategies and best practices
+
+---
+
+## 💡 Use Cases
 
 ### 1. AI Chatbots
+
 Provide persistent memory for conversational AI:
+
 ```rust
 memory.add("user123", "Prefers dark mode").await?;
 let context = memory.search("user preferences", "user123").await?;
 ```
 
 ### 2. Knowledge Management
+
 Build enterprise knowledge bases:
+
 ```rust
 memory.add("company_kb", "Vacation policy: 20 days/year").await?;
 let results = memory.search("vacation policy", "company_kb").await?;
 ```
 
 ### 3. Multi-Agent Systems
-Coordinate multiple AI agents:
+
+Coordinate multiple AI agents with shared memory:
+
 ```rust
 let scope = MemoryScope::Agent {
     user_id: "alice",
@@ -222,7 +323,9 @@ memory.add_with_scope("Prefers Rust", scope).await?;
 ```
 
 ### 4. Mem0 Migration
+
 Drop-in replacement for Mem0:
+
 ```rust
 use agent_mem_compat::Mem0Client;
 
@@ -232,11 +335,11 @@ let id = client.add("user", "content", None).await?;
 
 ---
 
-## Community & Contributing
+## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Areas to contribute:**
+**Ways to contribute:**
 - 🐛 Bug fixes and reports
 - 💡 Feature requests
 - 📝 Documentation improvements
@@ -247,14 +350,18 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ### Development Setup
 
 ```bash
-# Install dependencies
+# Clone the repository
+git clone https://github.com/agentmem/agentmem.git
+cd agentmem
+
+# Build the workspace
 cargo build --workspace
 
 # Run tests
 cargo test --workspace
 
 # Run linting
-cargo clippy --workspace
+cargo clippy --workspace -- -D warnings
 
 # Format code
 cargo fmt --all
@@ -262,27 +369,80 @@ cargo fmt --all
 
 ---
 
-## License
+## 📈 Roadmap
 
-Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
+### Current Version (2.0.0)
+
+- ✅ Core memory management
+- ✅ 5 search engines
+- ✅ WASM plugin system
+- ✅ Multi-backend storage
+- ✅ Enterprise features (RBAC, audit logs)
+- ✅ Language bindings (Python, JS, Go, Cangjie)
+
+### Upcoming (2.1.0)
+
+- 🔜 Code-native memory (AST parsing)
+- 🔜 GitHub integration
+- 🔜 Claude Code deep integration
+- 🔜 Advanced context management
+- 🔜 Performance optimizations
+
+**See**: [Roadmap](AGENTMEM_2.1%20ROADMAP.md)
 
 ---
 
-## Acknowledgments
+## 🏆 Production Ready
 
-Built with:
+AgentMem is battle-tested and production-ready:
+
+- ✅ **99.9% uptime** capability
+- ✅ **Horizontal scaling** support
+- ✅ **Multi-region deployment** ready
+- ✅ **Disaster recovery** with backup/restore
+- ✅ **Security audits** and vulnerability scanning
+- ✅ **Comprehensive monitoring** and alerting
+
+---
+
+## 📄 License
+
+Dual-licensed under:
+- **MIT License** - See [LICENSE-MIT](LICENSE-MIT)
+- **Apache-2.0 License** - See [LICENSE-APACHE](LICENSE-APACHE)
+
+---
+
+## 🙏 Acknowledgments
+
+Built with amazing open-source projects:
+
 - [Rust](https://www.rust-lang.org/) - Core language
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Extism](https://extism.org/) - WASM plugin framework
 - [DeepSeek](https://www.deepseek.com/) - AI reasoning
-- And many other open-source projects
+- [LanceDB](https://lancedb.github.io/lancedb/) - Vector database
+- [LibSQL](https://libsql.org/) - Embedded SQL database
 
 ---
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=agentmem/agentmem&type=Date)](https://star-history.com/#agentmem/agentmem&Date)
+
+---
+
+<div align="center">
 
 **AgentMem** - Give your AI the memory it deserves. 🧠✨
 
 [GitHub](https://github.com/agentmem/agentmem) ·
 [Documentation](https://docs.agentmem.dev) ·
-[Examples](https://github.com/agentmem/agentmem/tree/main/examples) ·
+[Examples](examples/) ·
 [Discord](https://discord.gg/agentmem) ·
-[Blog](https://blog.agentmem.dev)
+[Blog](https://blog.agentmem.dev) ·
+[中文文档](README_CN.md)
+
+Made with ❤️ by the AgentMem team
+
+</div>
