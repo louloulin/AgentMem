@@ -243,7 +243,7 @@ hex = "0.4"
 tempfile = "3.8"
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 toml = "0.8"
-config = "0.14"
+config = "0.15"
 num_cpus = "1.16"
 rand = "0.8"
 dashmap = "5.5"
