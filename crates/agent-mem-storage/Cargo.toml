@@ -50,7 +50,7 @@ qdrant-client = { version = "1.7", optional = true }
 
 # 本地存储
 sled = { version = "0.34", optional = true }
-rocksdb = { version = "0.21", optional = true }
+rocksdb = { version = "0.24", optional = true }
 
 # 内存存储
 dashmap = { version = "5.5", optional = true }
