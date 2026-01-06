@@ -29,7 +29,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # 配置
-config = "0.14"
+config = "0.15"
 
 # 时间处理
 chrono = { version = "0.4", features = ["serde"] }
