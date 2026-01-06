@@ -94,8 +94,8 @@ AgentMem 安装成功提示信息
 📚 文档和支持:
 
   - 文档: https://agentmem.dev/docs
-  - GitHub: https://github.com/agentmem/agentmem
-  - 问题反馈: https://github.com/agentmem/agentmem/issues
+  - GitHub: https://github.com/louloulin/agentmem
+  - 问题反馈: https://github.com/louloulin/agentmem/issues
   - Email: support@agentmem.dev
 
 感谢使用 AgentMem！🚀

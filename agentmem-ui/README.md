@@ -229,7 +229,7 @@ MIT License - 查看 [LICENSE](LICENSE) 文件了解详情。
 ## 📞 联系我们
 
 - **官网**: https://agentmem.com
-- **GitHub**: https://github.com/agentmem/agentmem
+- **GitHub**: https://github.com/louloulin/agentmem
 - **邮箱**: hello@agentmem.com
 
 ---

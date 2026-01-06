@@ -63,10 +63,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/agentmem/agentmem"
+Homepage = "https://github.com/louloulin/agentmem"
 Documentation = "https://docs.agentmem.dev"
-Repository = "https://github.com/agentmem/agentmem"
-Issues = "https://github.com/agentmem/agentmem/issues"
+Repository = "https://github.com/louloulin/agentmem"
+Issues = "https://github.com/louloulin/agentmem/issues"
 
 [tool.setuptools]
 packages = ["llamaindex_agentmem"]

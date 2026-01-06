@@ -144,6 +144,6 @@ No breaking changes were introduced in 7.0.0.
 For questions, issues, or feature requests:
 - 📖 [Documentation](https://docs.agentmem.dev)
 - 💬 [Discord Community](https://discord.gg/agentmem)
-- 🐛 [Issue Tracker](https://github.com/agentmem/agentmem/issues)
+- 🐛 [Issue Tracker](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email Support](mailto:support@agentmem.dev)
 

@@ -6,9 +6,9 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/agentmem/agentmem/actions)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-green.svg)](https://github.com/agentmem/agentmem/actions)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/agentmem/agentmem/releases)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/louloulin/agentmem/actions)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-green.svg)](https://github.com/louloulin/agentmem/actions)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/louloulin/agentmem/releases)
 [![Discord](https://img.shields.io/discord/agentmem?label=Discord&logo=discord)](https://discord.gg/agentmem)
 
 [文档](https://docs.agentmem.dev) • [示例](examples/) • [更新日志](CHANGELOG.md) • [贡献指南](CONTRIBUTING.md)
@@ -97,7 +97,7 @@ docker run -p 8080:8080 agentmem/server:latest
 #### 从源码构建
 
 ```bash
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 cargo build --release
 ```
@@ -435,7 +435,7 @@ let id = client.add("user", "content", None).await?;
 
 ```bash
 # 克隆仓库
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 
 # 构建工作区
@@ -520,7 +520,7 @@ AgentMem 经过实战测试，生产就绪：
 
 **AgentMem** - 为您的 AI 提供应有的记忆。🧠✨
 
-[GitHub](https://github.com/agentmem/agentmem) ·
+[GitHub](https://github.com/louloulin/agentmem) ·
 [文档](https://docs.agentmem.dev) ·
 [示例](examples/) ·
 [Discord](https://discord.gg/agentmem) ·

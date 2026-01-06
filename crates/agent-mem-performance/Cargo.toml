@@ -4,7 +4,7 @@ version = "2.0.0"
 edition = "2021"
 description = "Performance optimization components for AgentMem"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/agentmem/agentmem"
+repository = "https://github.com/louloulin/agentmem"
 keywords = ["memory", "ai", "performance", "cache", "optimization"]
 categories = ["caching", "concurrency", "performance"]
 

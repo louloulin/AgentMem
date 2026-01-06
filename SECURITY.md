@@ -57,7 +57,7 @@ Security updates will be:
 
 1. **Keep Updated**
    - Always use the latest version
-   - Subscribe to [GitHub Releases](https://github.com/agentmem/agentmem/releases)
+   - Subscribe to [GitHub Releases](https://github.com/louloulin/agentmem/releases)
    - Monitor the [CHANGELOG.md](CHANGELOG.md)
 
 2. **Secure Configuration**
@@ -215,7 +215,7 @@ cargo outdated
 
 ## Related Resources
 
-- [SECURITY.md on GitHub](https://github.com/agentmem/agentmem/blob/main/SECURITY.md)
+- [SECURITY.md on GitHub](https://github.com/louloulin/agentmem/blob/main/SECURITY.md)
 - [Reporting vulnerabilities securely](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities)
 - [CVE Mitigation](https://cve.mitre.org/)
 

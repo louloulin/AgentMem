@@ -24,7 +24,7 @@ pip install agentmem
 Or install from source:
 
 ```bash
-git clone https://github.com/agentmem/agentmem
+git clone https://github.com/louloulin/agentmem
 cd agentmem/sdks/python
 pip install -e .
 ```
@@ -351,7 +351,7 @@ pytest tests/                    # 单元测试（需要安装pytest）
 
 - [API Documentation](https://docs.agentmem.dev)
 - [Examples](./examples/)
-- [Main Project](https://github.com/agentmem/agentmem)
+- [Main Project](https://github.com/louloulin/agentmem)
 
 ## 🤝 Contributing
 
@@ -363,15 +363,15 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🔗 Links
 
-- **GitHub**: https://github.com/agentmem/agentmem
+- **GitHub**: https://github.com/louloulin/agentmem
 - **Documentation**: https://docs.agentmem.dev
-- **Issues**: https://github.com/agentmem/agentmem/issues
+- **Issues**: https://github.com/louloulin/agentmem/issues
 
 ## 📞 Support
 
 - Email: support@agentmem.dev
 - Discord: https://discord.gg/agentmem
-- GitHub Issues: https://github.com/agentmem/agentmem/issues
+- GitHub Issues: https://github.com/louloulin/agentmem/issues
 
 ---
 

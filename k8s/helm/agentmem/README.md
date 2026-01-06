@@ -292,6 +292,6 @@ MIT License
 ## 支持
 
 - 文档: https://agentmem.dev/docs
-- GitHub: https://github.com/agentmem/agentmem
+- GitHub: https://github.com/louloulin/agentmem
 - Email: support@agentmem.dev
 

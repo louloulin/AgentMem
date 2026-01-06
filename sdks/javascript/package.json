@@ -44,11 +44,11 @@
   "homepage": "https://agentmem.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentmem/agentmem.git",
+    "url": "https://github.com/louloulin/agentmem.git",
     "directory": "sdks/javascript"
   },
   "bugs": {
-    "url": "https://github.com/agentmem/agentmem/issues"
+    "url": "https://github.com/louloulin/agentmem/issues"
   },
   "engines": {
     "node": ">=16.0.0"

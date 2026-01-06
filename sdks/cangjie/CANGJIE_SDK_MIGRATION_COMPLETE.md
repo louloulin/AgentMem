@@ -344,7 +344,7 @@ main() {
   
 - **代码位置**: `agentmen/sdks/cangjie/src/http_new/`
 
-- **GitHub**: https://github.com/agentmem/agentmem
+- **GitHub**: https://github.com/louloulin/agentmem
 
 ---
 

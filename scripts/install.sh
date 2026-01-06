@@ -98,7 +98,7 @@ download_binary() {
         BINARY_NAME="agentmem-macos-${BINARY_ARCH}"
     fi
 
-    DOWNLOAD_URL="https://github.com/agentmem/agentmem/releases/download/v${VERSION}/${BINARY_NAME}"
+    DOWNLOAD_URL="https://github.com/louloulin/agentmem/releases/download/v${VERSION}/${BINARY_NAME}"
 
     # 下载到临时目录
     TMP_FILE="/tmp/agentmem"
@@ -112,7 +112,7 @@ download_binary() {
         log_error "下载失败"
         echo ""
         echo "💡 提示：您可以手动下载："
-        echo "   1. 访问: https://github.com/agentmem/agentmem/releases"
+        echo "   1. 访问: https://github.com/louloulin/agentmem/releases"
         echo "   2. 下载: ${BINARY_NAME}"
         echo "   3. 放到: ${TMP_FILE}"
         exit 1
@@ -307,7 +307,7 @@ show_completion() {
     echo "📖 文档:"
     echo "   快速开始:   https://docs.agentmem.ai/quickstart"
     echo "   API 文档:   https://docs.agentmem.ai/api"
-    echo "   GitHub:     https://github.com/agentmem/agentmem"
+    echo "   GitHub:     https://github.com/louloulin/agentmem"
     echo ""
     echo "🔧 常用命令:"
     echo "   查看状态:   agentmem status"

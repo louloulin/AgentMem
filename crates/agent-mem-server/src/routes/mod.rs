@@ -534,7 +534,7 @@ pub async fn create_router(
         description = "Enterprise-grade memory management API for AI agents with authentication and multi-tenancy",
         contact(
             name = "AgentMem Team",
-            url = "https://github.com/agentmem/agentmem",
+            url = "https://github.com/louloulin/agentmem",
         ),
         license(
             name = "MIT OR Apache-2.0",

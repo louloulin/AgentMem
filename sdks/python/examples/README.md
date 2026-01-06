@@ -307,6 +307,6 @@ mypy your_script.py
 
 - 📖 [Documentation](https://docs.agentmem.dev)
 - 💬 [Discord](https://discord.gg/agentmem)
-- 🐛 [Issues](https://github.com/agentmem/agentmem/issues)
+- 🐛 [Issues](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email](mailto:support@agentmem.dev)
 

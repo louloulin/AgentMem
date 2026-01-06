@@ -187,9 +187,9 @@ We welcome documentation improvements! See [CONTRIBUTING.md](../CONTRIBUTING.md#
 
 ## 🔗 External Resources
 
-- **[GitHub Repository](https://github.com/agentmem/agentmem)** - Source code
-- **[Issue Tracker](https://github.com/agentmem/agentmem/issues)** - Report bugs
-- **[Discussions](https://github.com/agentmem/agentmem/discussions)** - Community discussions
+- **[GitHub Repository](https://github.com/louloulin/agentmem)** - Source code
+- **[Issue Tracker](https://github.com/louloulin/agentmem/issues)** - Report bugs
+- **[Discussions](https://github.com/louloulin/agentmem/discussions)** - Community discussions
 - **[Changelog](../CHANGELOG.md)** - Version history
 
 ---
@@ -236,8 +236,8 @@ We welcome documentation improvements! See [CONTRIBUTING.md](../CONTRIBUTING.md#
 
 ## 💡 Need Help?
 
-- **Documentation Issues**: [Open an issue](https://github.com/agentmem/agentmem/issues)
-- **Questions**: [Discussions](https://github.com/agentmem/agentmem/discussions)
+- **Documentation Issues**: [Open an issue](https://github.com/louloulin/agentmem/issues)
+- **Questions**: [Discussions](https://github.com/louloulin/agentmem/discussions)
 - **Security**: [SECURITY.md](../SECURITY.md)
 
 ---

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "HTTP client SDK for AgentMem - Enterprise-grade memory management"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/agentmem/agentmem"
+repository = "https://github.com/louloulin/agentmem"
 keywords = ["memory", "ai", "llm", "client", "sdk"]
 categories = ["api-bindings", "web-programming::http-client"]
 

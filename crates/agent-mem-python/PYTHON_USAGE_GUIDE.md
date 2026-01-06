@@ -567,7 +567,7 @@ maturin publish
 
 - 主项目: [AgentMem](../../README.md)
 - Rust API 文档: [docs.rs/agent-mem](https://docs.rs/agent-mem)
-- 问题跟踪: [GitHub Issues](https://github.com/agentmem/agentmem/issues)
+- 问题跟踪: [GitHub Issues](https://github.com/louloulin/agentmem/issues)
 
 ---
 

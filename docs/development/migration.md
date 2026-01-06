@@ -432,7 +432,7 @@ NEW_VERSION/cargo run --release -- --port 8081
 如果遇到问题:
 
 1. 查看日志: `tail -f logs/agentmem.log`
-2. 检查 GitHub Issues: https://github.com/agentmem/agentmem/issues
+2. 检查 GitHub Issues: https://github.com/louloulin/agentmem/issues
 3. 加入 Discord 社区: https://discord.gg/agentmem
 4. 发送邮件: support@agentmem.io
 

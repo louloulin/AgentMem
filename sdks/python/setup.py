@@ -23,11 +23,11 @@ setup(
     description="Official Python SDK for AgentMem - Enterprise-grade memory management for AI agents",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/agentmem/agentmem",
+    url="https://github.com/louloulin/agentmem",
     project_urls={
         "Documentation": "https://docs.agentmem.dev",
-        "Source": "https://github.com/agentmem/agentmem",
-        "Tracker": "https://github.com/agentmem/agentmem/issues",
+        "Source": "https://github.com/louloulin/agentmem",
+        "Tracker": "https://github.com/louloulin/agentmem/issues",
     },
     packages=find_packages(),
     classifiers=[

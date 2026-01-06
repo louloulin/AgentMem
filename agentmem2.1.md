@@ -88,7 +88,7 @@ AgentMem 2.1 represents a transformative evolution from an open-source memory pl
 
 ### 2.1 Architecture Strengths
 
-Based on analysis of [agentmem codebase](https://github.com/agentmem/agentmem):
+Based on analysis of [agentmem codebase](https://github.com/louloulin/agentmem):
 
 **Core Capabilities:**
 - **Memory Engine**: `agent-mem-core` with 5 search engines (Vector, BM25, Full-Text, Fuzzy, Hybrid)

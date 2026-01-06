@@ -149,7 +149,7 @@ main() {
 
 ## 📞 联系
 
-- **GitHub**: https://github.com/agentmem/agentmem
+- **GitHub**: https://github.com/louloulin/agentmem
 - **文档**: `cangjie.md`
 - **改造计划**: Phase 1-3 完成
 

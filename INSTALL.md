@@ -32,7 +32,7 @@ cargo build
 Clone the repository:
 
 ```bash
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 ```
 
@@ -223,9 +223,9 @@ After successful installation:
 If you encounter issues not covered here:
 
 - Check [Troubleshooting](docs/user-guide/troubleshooting.md)
-- Search [GitHub Issues](https://github.com/agentmem/agentmem/issues)
+- Search [GitHub Issues](https://github.com/louloulin/agentmem/issues)
 - Join our [Discord community](https://discord.gg/agentmem)
-- Open a [new issue](https://github.com/agentmem/agentmem/issues/new)
+- Open a [new issue](https://github.com/louloulin/agentmem/issues/new)
 
 ## Uninstallation
 
@@ -266,7 +266,7 @@ Available features:
 ### Install from Git Branch
 
 ```bash
-cargo install --git https://github.com/agentmem/agentmem.git --branch main
+cargo install --git https://github.com/louloulin/agentmem.git --branch main
 ```
 
 ### Development Installation
@@ -274,7 +274,7 @@ cargo install --git https://github.com/agentmem/agentmem.git --branch main
 For contributors:
 
 ```bash
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 
 # Install development tools

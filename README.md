@@ -6,9 +6,9 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/agentmem/agentmem/actions)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-green.svg)](https://github.com/agentmem/agentmem/actions)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/agentmem/agentmem/releases)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/louloulin/agentmem/actions)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-green.svg)](https://github.com/louloulin/agentmem/actions)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/louloulin/agentmem/releases)
 [![Discord](https://img.shields.io/discord/agentmem?label=Discord&logo=discord)](https://discord.gg/agentmem)
 
 [Documentation](https://docs.agentmem.dev) • [Examples](examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
@@ -97,7 +97,7 @@ docker run -p 8080:8080 agentmem/server:latest
 #### From Source
 
 ```bash
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 cargo build --release
 ```
@@ -435,7 +435,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ```bash
 # Clone the repository
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 
 # Build the workspace
@@ -520,7 +520,7 @@ Built with amazing open-source projects:
 
 **AgentMem** - Give your AI the memory it deserves. 🧠✨
 
-[GitHub](https://github.com/agentmem/agentmem) ·
+[GitHub](https://github.com/louloulin/agentmem) ·
 [Documentation](https://docs.agentmem.dev) ·
 [Examples](examples/) ·
 [Discord](https://discord.gg/agentmem) ·

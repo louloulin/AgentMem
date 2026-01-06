@@ -227,7 +227,7 @@ except AgentMemError as e:
 
 ```bash
 # Clone the repository
-git clone https://github.com/agentmem/agentmem
+git clone https://github.com/louloulin/agentmem
 cd agentmem/sdks/python
 
 # Install development dependencies
@@ -251,5 +251,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - 📖 [Documentation](https://docs.agentmem.dev)
 - 💬 [Discord Community](https://discord.gg/agentmem)
-- 🐛 [Issue Tracker](https://github.com/agentmem/agentmem/issues)
+- 🐛 [Issue Tracker](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email Support](mailto:support@agentmem.dev)

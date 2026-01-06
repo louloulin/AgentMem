@@ -23,7 +23,7 @@ cargo install agentmem-cli
 ### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem
 cargo build --release
 ```
@@ -252,5 +252,5 @@ export OPENAI_API_KEY="sk-..."
 
 - 📚 [Documentation](https://docs.agentmem.dev)
 - 💬 [Discord Community](https://discord.gg/agentmem)
-- 🐛 [Report Issues](https://github.com/agentmem/agentmem/issues)
+- 🐛 [Report Issues](https://github.com/louloulin/agentmem/issues)
 - ✉️ [Email Support](mailto:support@agentmem.dev)

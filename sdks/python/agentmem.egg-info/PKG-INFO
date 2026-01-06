@@ -2,16 +2,16 @@ Metadata-Version: 2.4
 Name: agentmem
 Version: 7.0.0
 Summary: Official Python SDK for AgentMem - Enterprise-grade memory management for AI agents
-Home-page: https://github.com/agentmem/agentmem
+Home-page: https://github.com/louloulin/agentmem
 Author: AgentMem Team
 Author-email: AgentMem Team <support@agentmem.dev>
 Maintainer-email: AgentMem Team <support@agentmem.dev>
 License: MIT
-Project-URL: Homepage, https://github.com/agentmem/agentmem
+Project-URL: Homepage, https://github.com/louloulin/agentmem
 Project-URL: Documentation, https://docs.agentmem.dev
-Project-URL: Repository, https://github.com/agentmem/agentmem
-Project-URL: Bug Tracker, https://github.com/agentmem/agentmem/issues
-Project-URL: Changelog, https://github.com/agentmem/agentmem/blob/main/CHANGELOG.md
+Project-URL: Repository, https://github.com/louloulin/agentmem
+Project-URL: Bug Tracker, https://github.com/louloulin/agentmem/issues
+Project-URL: Changelog, https://github.com/louloulin/agentmem/blob/main/CHANGELOG.md
 Keywords: ai,memory,agent,llm,vector,database,embedding,semantic,search,enterprise
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
@@ -283,7 +283,7 @@ except AgentMemError as e:
 
 ```bash
 # Clone the repository
-git clone https://github.com/agentmem/agentmem
+git clone https://github.com/louloulin/agentmem
 cd agentmem/sdks/python
 
 # Install development dependencies
@@ -307,5 +307,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - 📖 [Documentation](https://docs.agentmem.dev)
 - 💬 [Discord Community](https://discord.gg/agentmem)
-- 🐛 [Issue Tracker](https://github.com/agentmem/agentmem/issues)
+- 🐛 [Issue Tracker](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email Support](mailto:support@agentmem.dev)

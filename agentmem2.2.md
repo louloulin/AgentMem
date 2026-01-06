@@ -3751,7 +3751,7 @@ pub async fn search_with_tracing(query: &str) -> Result<Vec<CodeResult>, Error> 
 1. [Mem0 GitHub](https://github.com/mem0ai/mem0)
 2. [Tree-sitter](https://github.com/tree-sitter/tree-sitter)
 3. [GraphCodeBERT](https://github.com/microsoft/GraphCodeBERT)
-4. [AgentMem GitHub](https://github.com/agentmem/agentmem)
+4. [AgentMem GitHub](https://github.com/louloulin/agentmem)
 
 #### 官方文档
 1. [Claude Code Memory](https://code.claude.com/docs/en/memory)
@@ -3779,7 +3779,7 @@ pub async fn search_with_tracing(query: &str) -> Result<Vec<CodeResult>, Error> 
 
 **项目**: AgentMem
 **官网**: https://agentmem.dev
-**GitHub**: https://github.com/agentmem/agentmem
+**GitHub**: https://github.com/louloulin/agentmem
 **文档**: https://docs.agentmem.dev
 **Email**: team@agentmem.dev
 **Discord**: https://discord.gg/agentmem

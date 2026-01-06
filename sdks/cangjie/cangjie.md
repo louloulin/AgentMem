@@ -778,7 +778,7 @@ cjpm build
 
 ### C. 联系方式
 
-- **GitHub Issues**: https://github.com/agentmem/agentmem/issues
+- **GitHub Issues**: https://github.com/louloulin/agentmem/issues
 - **Discord**: https://discord.gg/agentmem
 - **Email**: team@agentmem.dev
 

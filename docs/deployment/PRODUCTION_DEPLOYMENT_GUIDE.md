@@ -767,7 +767,7 @@ docker update --memory 4g --cpus 2 agentmem-server
 ### 支持渠道
 
 - **文档**: https://docs.agentmem.dev
-- **GitHub Issues**: https://github.com/agentmem/agentmem/issues
+- **GitHub Issues**: https://github.com/louloulin/agentmem/issues
 - **Discord**: https://discord.gg/agentmem
 - **Email**: support@agentmem.dev
 

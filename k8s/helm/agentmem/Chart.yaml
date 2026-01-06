@@ -6,7 +6,7 @@ version: 6.0.0
 appVersion: "6.0.0"
 home: https://agentmem.dev
 sources:
-  - https://github.com/agentmem/agentmem
+  - https://github.com/louloulin/agentmem
 maintainers:
   - name: AgentMem Team
     email: support@agentmem.dev

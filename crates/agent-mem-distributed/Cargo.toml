@@ -4,7 +4,7 @@ version = "2.0.0"
 edition = "2021"
 description = "Distributed computing support for AgentMem"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/agentmem/agentmem"
+repository = "https://github.com/louloulin/agentmem"
 keywords = ["memory", "ai", "distributed", "cluster", "sharding"]
 categories = ["distributed-systems", "concurrency", "database"]
 

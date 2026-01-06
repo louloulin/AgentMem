@@ -5,7 +5,7 @@ edition = "2021"
 description = "AgentMem 云原生部署演示程序"
 authors = ["AgentMem Team <support@agentmem.dev>"]
 license = "MIT"
-repository = "https://github.com/agentmem/agentmem"
+repository = "https://github.com/louloulin/agentmem"
 homepage = "https://agentmem.dev"
 
 [dependencies]

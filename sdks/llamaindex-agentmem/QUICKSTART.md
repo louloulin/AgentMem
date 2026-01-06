@@ -220,7 +220,7 @@ python chat_engine.py
 
 ```bash
 # Clone the repository
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem/sdks/llamaindex-agentmem
 
 # Install development dependencies
@@ -312,7 +312,7 @@ pip install --upgrade llama-index-core agentmem
 - **Full Documentation**: [README.md](README.md)
 - **API Reference**: [README.md#api-reference](README.md#api-reference)
 - **Examples**: [examples/](examples/)
-- **Issues**: [GitHub Issues](https://github.com/agentmem/agentmem/issues)
+- **Issues**: [GitHub Issues](https://github.com/louloulin/agentmem/issues)
 - **Community**: [Discord](https://discord.gg/agentmem)
 
 ## Support
@@ -320,7 +320,7 @@ pip install --upgrade llama-index-core agentmem
 If you need help:
 1. Check the [README.md](README.md) for detailed documentation
 2. Review [examples/](examples/) for usage patterns
-3. Search [GitHub Issues](https://github.com/agentmem/agentmem/issues)
+3. Search [GitHub Issues](https://github.com/louloulin/agentmem/issues)
 4. Contact: support@agentmem.dev
 
 Happy coding with AgentMem and LlamaIndex!

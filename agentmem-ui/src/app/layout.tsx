@@ -149,7 +149,7 @@ export default function RootLayout({
       "开源"
     ],
     "screenshot": "https://agentmem.ai/screenshot.png",
-    "downloadUrl": "https://github.com/agentmem/agentmem",
+    "downloadUrl": "https://github.com/louloulin/agentmem",
     "softwareVersion": "1.0.0",
     "datePublished": "2024-01-15",
     "dateModified": "2024-01-15",

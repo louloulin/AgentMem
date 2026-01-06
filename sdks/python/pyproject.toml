@@ -73,11 +73,11 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/agentmem/agentmem"
+Homepage = "https://github.com/louloulin/agentmem"
 Documentation = "https://docs.agentmem.dev"
-Repository = "https://github.com/agentmem/agentmem"
-"Bug Tracker" = "https://github.com/agentmem/agentmem/issues"
-Changelog = "https://github.com/agentmem/agentmem/blob/main/CHANGELOG.md"
+Repository = "https://github.com/louloulin/agentmem"
+"Bug Tracker" = "https://github.com/louloulin/agentmem/issues"
+Changelog = "https://github.com/louloulin/agentmem/blob/main/CHANGELOG.md"
 
 [project.scripts]
 agentmem = "agentmem.cli:main"

@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/llamaindex-agentmem.svg)](https://pypi.org/project/llamaindex-agentmem/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Official integration adapter between [LlamaIndex](https://github.com/run-llama/llama_index) and [AgentMem](https://github.com/agentmem/agentmem) for enterprise-grade memory management in AI applications.
+Official integration adapter between [LlamaIndex](https://github.com/run-llama/llama_index) and [AgentMem](https://github.com/louloulin/agentmem) for enterprise-grade memory management in AI applications.
 
 ## Features
 
@@ -276,11 +276,11 @@ Contributions are welcome! Please see CONTRIBUTING.md for guidelines.
 
 ## Support
 
-- GitHub Issues: https://github.com/agentmem/agentmem/issues
+- GitHub Issues: https://github.com/louloulin/agentmem/issues
 - Documentation: https://docs.agentmem.dev
 - Email: support@agentmem.dev
 
 ## Related Projects
 
-- [AgentMem Python SDK](https://github.com/agentmem/agentmem)
+- [AgentMem Python SDK](https://github.com/louloulin/agentmem)
 - [LlamaIndex](https://github.com/run-llama/llama_index)

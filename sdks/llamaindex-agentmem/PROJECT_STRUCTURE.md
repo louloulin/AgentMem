@@ -250,7 +250,7 @@ Follows Semantic Versioning (MAJOR.MINOR.PATCH)
 ### Setting Up Development Environment
 ```bash
 # Clone repository
-git clone https://github.com/agentmem/agentmem.git
+git clone https://github.com/louloulin/agentmem.git
 cd agentmem/sdks/llamaindex-agentmem
 
 # Install in editable mode with dev dependencies
@@ -301,7 +301,7 @@ See CONTRIBUTING.md for guidelines on contributing to this project.
 
 ## Support
 
-- **Issues**: https://github.com/agentmem/agentmem/issues
+- **Issues**: https://github.com/louloulin/agentmem/issues
 - **Email**: support@agentmem.dev
 - **Documentation**: https://docs.agentmem.dev
 

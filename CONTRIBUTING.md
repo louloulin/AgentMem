@@ -38,7 +38,7 @@ git clone https://github.com/YOUR_USERNAME/agentmem.git
 cd agentmem
 
 # 2. Add upstream remote
-git remote add upstream https://github.com/agentmem/agentmem.git
+git remote add upstream https://github.com/louloulin/agentmem.git
 
 # 3. Install dependencies
 cargo build --workspace
@@ -69,7 +69,7 @@ agentmem/
 
 ### 1. Choose an Issue
 
-Check [GitHub Issues](https://github.com/agentmem/agentmem/issues) for open tasks.
+Check [GitHub Issues](https://github.com/louloulin/agentmem/issues) for open tasks.
 
 Look for labels:
 - `good first issue` - Beginner-friendly
