@@ -277,7 +277,7 @@ Contributions are welcome! Please see CONTRIBUTING.md for guidelines.
 ## Support
 
 - GitHub Issues: https://github.com/louloulin/agentmem/issues
-- Documentation: https://docs.agentmem.dev
+- Documentation: https://agentmem.cc
 - Email: support@agentmem.dev
 
 ## Related Projects

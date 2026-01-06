@@ -168,7 +168,7 @@ fn print_welcome() {
     println!("For help with any command, use:");
     println!("  {}", "agentmem <command> --help".green());
     println!();
-    println!("Documentation: {}", "https://docs.agentmem.dev".blue());
+    println!("Documentation: {}", "https://agentmem.cc".blue());
     println!("Support: {}", "https://discord.gg/agentmem".blue());
 }
 

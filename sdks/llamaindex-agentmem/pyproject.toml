@@ -64,7 +64,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/louloulin/agentmem"
-Documentation = "https://docs.agentmem.dev"
+Documentation = "https://agentmem.cc"
 Repository = "https://github.com/louloulin/agentmem"
 Issues = "https://github.com/louloulin/agentmem/issues"
 

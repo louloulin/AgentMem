@@ -375,6 +375,6 @@ while let Some(chunk) = stream.next().await {
 ## 支持
 
 - [GitHub Issues](https://github.com/your-org/agentmem/issues)
-- [文档](https://docs.agentmem.dev)
+- [文档](https://agentmem.cc)
 - [示例代码](../../examples/)
 

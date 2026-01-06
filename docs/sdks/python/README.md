@@ -249,7 +249,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- 📖 [Documentation](https://docs.agentmem.dev)
+- 📖 [Documentation](https://agentmem.cc)
 - 💬 [Discord Community](https://discord.gg/agentmem)
 - 🐛 [Issue Tracker](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email Support](mailto:support@agentmem.dev)

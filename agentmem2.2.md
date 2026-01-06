@@ -3780,7 +3780,7 @@ pub async fn search_with_tracing(query: &str) -> Result<Vec<CodeResult>, Error> 
 **项目**: AgentMem
 **官网**: https://www.agentmem.cc
 **GitHub**: https://github.com/louloulin/agentmem
-**文档**: https://docs.agentmem.dev
+**文档**: https://agentmem.cc
 **Email**: team@agentmem.dev
 **Discord**: https://discord.gg/agentmem
 

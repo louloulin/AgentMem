@@ -11,7 +11,7 @@
 [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/louloulin/agentmem/releases)
 [![Discord](https://img.shields.io/discord/agentmem?label=Discord&logo=discord)](https://discord.gg/agentmem)
 
-[文档](https://docs.agentmem.dev) • [示例](examples/) • [更新日志](CHANGELOG.md) • [贡献指南](CONTRIBUTING.md)
+[文档](https://agentmem.cc) • [示例](examples/) • [更新日志](CHANGELOG.md) • [贡献指南](CONTRIBUTING.md)
 
 </div>
 
@@ -521,7 +521,7 @@ AgentMem 经过实战测试，生产就绪：
 **AgentMem** - 为您的 AI 提供应有的记忆。🧠✨
 
 [GitHub](https://github.com/louloulin/agentmem) ·
-[文档](https://docs.agentmem.dev) ·
+[文档](https://agentmem.cc) ·
 [示例](examples/) ·
 [Discord](https://discord.gg/agentmem) ·
 [博客](https://blog.agentmem.dev) ·

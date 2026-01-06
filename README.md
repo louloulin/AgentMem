@@ -11,7 +11,7 @@
 [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/louloulin/agentmem/releases)
 [![Discord](https://img.shields.io/discord/agentmem?label=Discord&logo=discord)](https://discord.gg/agentmem)
 
-[Documentation](https://docs.agentmem.dev) • [Examples](examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
+[Documentation](https://agentmem.cc) • [Examples](examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -521,7 +521,7 @@ Built with amazing open-source projects:
 **AgentMem** - Give your AI the memory it deserves. 🧠✨
 
 [GitHub](https://github.com/louloulin/agentmem) ·
-[Documentation](https://docs.agentmem.dev) ·
+[Documentation](https://agentmem.cc) ·
 [Examples](examples/) ·
 [Discord](https://discord.gg/agentmem) ·
 [Blog](https://blog.agentmem.dev) ·

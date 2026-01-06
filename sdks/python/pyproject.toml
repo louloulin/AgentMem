@@ -74,7 +74,7 @@ test = [
 
 [project.urls]
 Homepage = "https://github.com/louloulin/agentmem"
-Documentation = "https://docs.agentmem.dev"
+Documentation = "https://agentmem.cc"
 Repository = "https://github.com/louloulin/agentmem"
 "Bug Tracker" = "https://github.com/louloulin/agentmem/issues"
 Changelog = "https://github.com/louloulin/agentmem/blob/main/CHANGELOG.md"

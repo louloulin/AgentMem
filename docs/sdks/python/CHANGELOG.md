@@ -142,7 +142,7 @@ No breaking changes were introduced in 7.0.0.
 ## Support
 
 For questions, issues, or feature requests:
-- 📖 [Documentation](https://docs.agentmem.dev)
+- 📖 [Documentation](https://agentmem.cc)
 - 💬 [Discord Community](https://discord.gg/agentmem)
 - 🐛 [Issue Tracker](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email Support](mailto:support@agentmem.dev)

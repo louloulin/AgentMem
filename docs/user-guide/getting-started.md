@@ -250,7 +250,7 @@ export OPENAI_API_KEY="sk-..."
 
 ## Getting Help
 
-- 📚 [Documentation](https://docs.agentmem.dev)
+- 📚 [Documentation](https://agentmem.cc)
 - 💬 [Discord Community](https://discord.gg/agentmem)
 - 🐛 [Report Issues](https://github.com/louloulin/agentmem/issues)
 - ✉️ [Email Support](mailto:support@agentmem.dev)

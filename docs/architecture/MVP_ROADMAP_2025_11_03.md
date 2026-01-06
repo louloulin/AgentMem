@@ -409,7 +409,7 @@
 
 **项目负责人**: AgentMem Team  
 **GitHub**: https://github.com/louloulin/agentmem  
-**文档站点**: https://docs.agentmem.dev (待建立)  
+**文档站点**: https://agentmem.cc (待建立)  
 **讨论区**: GitHub Discussions
 
 ---

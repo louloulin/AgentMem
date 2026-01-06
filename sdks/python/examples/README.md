@@ -305,7 +305,7 @@ mypy your_script.py
 
 ## Support
 
-- 📖 [Documentation](https://docs.agentmem.dev)
+- 📖 [Documentation](https://agentmem.cc)
 - 💬 [Discord](https://discord.gg/agentmem)
 - 🐛 [Issues](https://github.com/louloulin/agentmem/issues)
 - 📧 [Email](mailto:support@agentmem.dev)

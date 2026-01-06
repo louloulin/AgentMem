@@ -303,7 +303,7 @@ See CONTRIBUTING.md for guidelines on contributing to this project.
 
 - **Issues**: https://github.com/louloulin/agentmem/issues
 - **Email**: support@agentmem.dev
-- **Documentation**: https://docs.agentmem.dev
+- **Documentation**: https://agentmem.cc
 
 ## License
 

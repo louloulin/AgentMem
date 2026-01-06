@@ -349,7 +349,7 @@ pytest tests/                    # 单元测试（需要安装pytest）
 
 ## 📖 Documentation
 
-- [API Documentation](https://docs.agentmem.dev)
+- [API Documentation](https://agentmem.cc)
 - [Examples](./examples/)
 - [Main Project](https://github.com/louloulin/agentmem)
 
@@ -364,7 +364,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🔗 Links
 
 - **GitHub**: https://github.com/louloulin/agentmem
-- **Documentation**: https://docs.agentmem.dev
+- **Documentation**: https://agentmem.cc
 - **Issues**: https://github.com/louloulin/agentmem/issues
 
 ## 📞 Support

@@ -25,7 +25,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/louloulin/agentmem",
     project_urls={
-        "Documentation": "https://docs.agentmem.dev",
+        "Documentation": "https://agentmem.cc",
         "Source": "https://github.com/louloulin/agentmem",
         "Tracker": "https://github.com/louloulin/agentmem/issues",
     },
