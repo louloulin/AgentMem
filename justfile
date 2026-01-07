@@ -3,10 +3,15 @@
 # 使用方法: just <command>
 # 查看所有命令: just --list
 
+# ============================================================================
+# 全局配置
+# ============================================================================
+
 # 默认配置
 export RUST_BACKTRACE := "1"
-export DYLD_LIBRARY_PATH := justfile_directory() + "/lib:" + justfile_directory() + "/target/release"
-export ORT_DYLIB_PATH := justfile_directory() + "/lib/libonnxruntime.1.22.0.dylib"
+export PROJECT_ROOT := justfile_directory()
+export DYLD_LIBRARY_PATH := PROJECT_ROOT + "/lib:" + PROJECT_ROOT + "/target/release"
+export ORT_DYLIB_PATH := PROJECT_ROOT + "/lib/libonnxruntime.1.22.0.dylib"
 
 # LLM 配置
 # 注意: API Key 应该通过环境变量设置，不要硬编码
@@ -22,6 +27,21 @@ export LLM_MODEL := "glm-4.6"
 # Embedder 配置
 export EMBEDDER_PROVIDER := "fastembed"
 export EMBEDDER_MODEL := "BAAI/bge-small-en-v1.5"
+
+# 服务器配置
+export SERVER_PORT := "8080"
+export UI_PORT := "3001"
+export BACKEND_BINARY := PROJECT_ROOT + "/target/release/agent-mem-server"
+export BACKEND_BINARY_DEBUG := PROJECT_ROOT + "/target/debug/agent-mem-server"
+export BACKEND_LOG := PROJECT_ROOT + "/backend.log"
+export FRONTEND_LOG := PROJECT_ROOT + "/frontend.log"
+export BACKEND_PID := PROJECT_ROOT + "/backend.pid"
+export FRONTEND_PID := PROJECT_ROOT + "/frontend.pid"
+
+# 认证配置（开发环境默认关闭）
+export ENABLE_AUTH := "false"
+export SERVER_ENABLE_AUTH := "false"
+export AGENT_MEM_ENABLE_AUTH := "false"
 
 # 默认任务：显示帮助
 default:
@@ -61,7 +81,8 @@ clean:
     @echo "🧹 清理构建产物..."
     cargo clean
     rm -rf agentmem-ui/node_modules agentmem-ui/.next
-    rm -f *.log *.pid
+    @just clean-logs
+    @just clean-pids
 
 # ============================================================================
 # 测试相关
@@ -127,97 +148,195 @@ audit:
     cargo audit
 
 # ============================================================================
+# 服务启动辅助函数（内部使用）
+# ============================================================================
+
+# 等待服务就绪（智能健康检查）
+_wait-healthy url max_attempts="30":
+    @env SHELLOPTS= /bin/bash -lc 'set +u; i=1; while [ $i -le {{max_attempts}} ]; do \
+        if curl -s {{url}} > /dev/null 2>&1; then \
+            echo "✅ 服务已就绪 (尝试 $i/{{max_attempts}})"; \
+            exit 0; \
+        fi; \
+        echo "⏳ 等待服务启动... ($i/{{max_attempts}})"; \
+        i=$((i + 1)); \
+        sleep 1; \
+    done; \
+    echo "❌ 服务启动超时"; \
+    exit 1'
+
+# 停止现有服务进程
+_stop-backend:
+    @bash -c 'if pkill -f "agent-mem-server" 2>/dev/null; then \
+        echo "🛑 停止现有后端服务..."; \
+        sleep 2; \
+    else \
+        echo "ℹ️  后端服务未运行"; \
+    fi'
+
+_stop-frontend:
+    @bash -c 'if pkill -f "next dev" 2>/dev/null; then \
+        echo "🛑 停止现有前端服务..."; \
+        sleep 2; \
+    else \
+        echo "ℹ️  前端服务未运行"; \
+    fi'
+
+# ============================================================================
 # 服务启动
 # ============================================================================
 
-# 启动 HTTP API 服务器（无认证模式，前台运行）
+# 启动 HTTP API 服务器（前台运行，无认证模式）
 start-server:
-    @echo "🚀 启动 HTTP API 服务器（无认证模式，前台）..."
-    @export ENABLE_AUTH="false" && \
+    @echo "🚀 启动 HTTP API 服务器（前台运行）..."
+    @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
     export EMBEDDER_PROVIDER="fastembed" && \
     export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
-    ./target/release/agent-mem-server
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    ./target/release/agent-mem-server'
 
-# 启动 HTTP API 服务器（带插件支持，前台运行）
-start-server-with-plugins:
-    @echo "🚀 启动 HTTP API 服务器（插件支持，前台）..."
-    @echo "   编译带 plugins feature 的服务器..."
+# 启动 HTTP API 服务器（后台运行，无认证模式）
+start-server-bg:
+    @echo "🚀 启动 HTTP API 服务器（后台运行）..."
+    @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="fastembed" && \
+    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
+    PID=$! && echo $PID > backend.pid && \
+    echo "📝 后端 PID: $PID" && \
+    echo "📝 日志文件: backend.log"'
+    @just _wait-healthy "http://localhost:8080/health"
+    @echo "✅ 后端服务已启动"
+    @echo "   • API: http://localhost:8080"
+    @echo "   • 健康检查: http://localhost:8080/health"
+    @echo "   • API文档: http://localhost:8080/swagger-ui/"
+
+# 启动 HTTP API 服务器（带插件支持，后台运行）
+start-server-plugins:
+    @echo "🚀 启动 HTTP API 服务器（插件支持，后台运行）..."
+    @echo "1️⃣  编译带插件的服务器..."
     @cargo build --release --bin agent-mem-server --features agent-mem/plugins
-    @echo "   启动服务器..."
-    @export ENABLE_AUTH="false" && \
+    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
     export EMBEDDER_PROVIDER="fastembed" && \
     export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
-    ./target/release/agent-mem-server
-
-# 启动 HTTP API 服务器（无认证模式，后台运行）
-start-server-no-auth:
-    @echo "🚀 启动 HTTP API 服务器（无认证模式，后台）..."
-    @bash start_server_no_auth.sh
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
+    PID=$$! && echo $$PID > backend.pid && \
+    echo "📝 后端 PID: $$PID"'
+    @just _wait-healthy "http://localhost:8080/health"
+    @echo "✅ 后端服务已启动（插件支持）"
+    @echo "   • 插件API: http://localhost:8080/api/v1/plugins"
 
 # 启动 HTTP API 服务器（带 LumosAI 功能，后台运行）
 start-server-lumosai:
-    @echo "🚀 启动 HTTP API 服务器（LumosAI 功能，后台）..."
-    @echo "   编译带 lumosai feature 的服务器..."
+    @echo "🚀 启动 HTTP API 服务器（LumosAI 功能，后台运行）..."
+    @echo "1️⃣  编译带 lumosai feature 的服务器..."
     @cargo build --bin agent-mem-server --features lumosai
-    @echo "   启动服务器..."
-    @pkill -f agent-mem-server || true
-    @sleep 2
-    @export ENABLE_AUTH="false" && \
+    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
     export EMBEDDER_PROVIDER="fastembed" && \
     export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
     export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/debug:$$DYLD_LIBRARY_PATH" && \
     export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
-    nohup ./target/debug/agent-mem-server > backend-lumosai.log 2>&1 &
-    @sleep 8
-    @echo "   检查后端健康状态..."
-    @curl -s http://localhost:8080/health > /dev/null && echo "   ✅ 后端运行正常（LumosAI 已启用）" || echo "   ⚠️  后端可能未就绪"
-
-# 启动 HTTP API 服务器（带 ONNX Runtime 修复，后台运行）
-start-server-onnx:
-    @echo "🚀 启动 HTTP API 服务器（ONNX Runtime 修复版，后台）..."
-    @bash start_server_with_correct_onnx.sh
-
-# 启动 HTTP API 服务器（后台运行，通用）
-start-server-bg:
-    @echo "🚀 启动 HTTP API 服务器（后台）..."
-    @bash start_server_no_auth.sh
+    nohup ./target/debug/agent-mem-server > backend.log 2>&1 & \
+    echo $$! > backend.pid && \
+    echo "📝 后端 PID: $$(cat backend.pid)"'
+    @just _wait-healthy "http://localhost:8080/health"
+    @echo "✅ 后端服务已启动（LumosAI 已启用）"
 
 # 启动 MCP Stdio 服务器
 start-mcp:
     @echo "🚀 启动 MCP Stdio 服务器..."
+    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agentmem-mcp-server"; exit 1; fi'
     @./target/release/agentmem-mcp-server
 
-# 启动前端 UI
+# 启动前端 UI（前台运行）
 start-ui:
-    @echo "🚀 启动前端 UI..."
-    cd agentmem-ui && npm run dev
+    @echo "🚀 启动前端 UI（前台运行）..."
+    @bash -c 'if lsof -i :3001 > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用"; exit 1; fi'
+    @just _stop-frontend
+    @cd agentmem-ui && npm run dev
 
-# 启动全栈（后端 + 前端）
+# 启动前端 UI（后台运行）
+start-ui-bg:
+    @echo "🚀 启动前端 UI（后台运行）..."
+    @bash -c 'if lsof -i :3001 > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用"; exit 1; fi'
+    @just _stop-frontend
+    @bash -c 'cd agentmem-ui && \
+    if [ ! -d "node_modules" ]; then \
+        echo "📦 安装前端依赖..."; \
+        npm install; \
+    fi && \
+    nohup npm run dev > ../frontend.log 2>&1 & \
+    PID=$! && echo $PID > ../frontend.pid && \
+    echo "📝 前端 PID: $PID" && \
+    echo "📝 日志文件: frontend.log"'
+    @just _wait-healthy "http://localhost:3001"
+    @echo "✅ 前端服务已启动"
+    @echo "   • Web UI: http://localhost:3001"
+
+# 启动全栈（后端 + 前端，后台运行）
 start-full:
-    @echo "🚀 启动全栈服务..."
-    @bash start_full_stack.sh
+    @echo "🚀 启动全栈服务（后端 + 前端）..."
+    @echo ""
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "1️⃣  启动后端服务..."
+    @just start-server-bg
+    @echo ""
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "2️⃣  启动前端服务..."
+    @just start-ui-bg
+    @echo ""
+    @echo "╔════════════════════════════════════════════════════════╗"
+    @echo "║  ✅ AgentMem 全栈服务已启动                           ║"
+    @echo "╠════════════════════════════════════════════════════════╣"
+    @echo "║  🔹 后端API: http://localhost:8080                    ║"
+    @echo "║  🔹 前端UI:  http://localhost:3001                    ║"
+    @echo "║  🔹 健康检查: http://localhost:8080/health            ║"
+    @echo "║  🔹 API文档: http://localhost:8080/swagger-ui/        ║"
+    @echo "║  🔹 Embedder: FastEmbed (BAAI/bge-small-en-v1.5)      ║"
+    @echo "╚════════════════════════════════════════════════════════╝"
+    @echo ""
+    @echo "📝 日志文件:"
+    @echo "   • 后端: tail -f backend.log"
+    @echo "   • 前端: tail -f frontend.log"
+    @echo ""
+    @echo "🛑 停止服务: just stop"
+    @echo ""
+    @echo "💡 提示: 也可以使用 start_full_stack.sh 脚本启动"
 
 # 启动全栈（带插件支持）
-start-full-with-plugins:
+start-full-plugins:
     @echo "🚀 启动全栈服务（插件支持）..."
-    @echo "1️⃣  编译带插件的后端..."
-    @cargo build --release --bin agent-mem-server --features plugins
-    @echo "2️⃣  启动后端服务器（后台）..."
-    @pkill -f agent-mem-server || true
-    @export ENABLE_AUTH="false" && \
-    export SERVER_ENABLE_AUTH="false" && \
-    export EMBEDDER_PROVIDER="fastembed" && \
-    export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
-    nohup ./target/release/agent-mem-server > backend-plugins.log 2>&1 &
-    @sleep 8
-    @echo "3️⃣  检查后端健康状态..."
-    @curl -s http://localhost:8080/health > /dev/null && echo "   ✅ 后端运行正常" || echo "   ⚠️  后端可能未就绪"
-    @echo "4️⃣  启动前端 UI..."
-    @cd agentmem-ui && (pkill -f "next dev" || true) && nohup npm run dev > ../frontend.log 2>&1 &
-    @sleep 5
+    @echo ""
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "1️⃣  启动后端服务（插件支持）..."
+    @just start-server-plugins
+    @echo ""
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "2️⃣  启动前端服务..."
+    @just start-ui-bg
     @echo ""
     @echo "╔════════════════════════════════════════════════════════╗"
     @echo "║  ✅ AgentMem 全栈服务已启动（插件支持）               ║"
@@ -233,10 +352,18 @@ start-full-with-plugins:
 # 停止所有服务
 stop:
     @echo "🛑 停止所有服务..."
-    @pkill -f "agent-mem-server" || true
-    @pkill -f "agentmem-mcp-server" || true
-    @pkill -f "next dev" || true
+    @just _stop-backend
+    @just _stop-frontend
+    @bash -c 'pkill -f "agentmem-mcp-server" 2>/dev/null && echo "🛑 停止 MCP 服务器" || true'
+    @bash -c 'rm -f backend.pid frontend.pid 2>/dev/null && echo "🧹 清理 PID 文件" || true'
     @echo "✅ 所有服务已停止"
+
+# 重启所有服务
+restart:
+    @echo "🔄 重启所有服务..."
+    @just stop
+    @sleep 2
+    @just start-full
 
 # ============================================================================
 # 数据库管理
@@ -269,7 +396,12 @@ db-restore:
 # 验证 MCP 工具功能
 mcp-verify:
     @echo "🔍 验证 MCP 工具功能..."
-    @bash test_mcp_functionality.sh
+    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-server" ]; then \
+        echo "❌ MCP 服务器未编译，正在编译..."; \
+        just build-mcp; \
+    fi'
+    @echo "运行 MCP 测试..."
+    @just mcp-test-chat
 
 # 测试 MCP Chat 功能并验证 Working Memory
 mcp-test-chat:
@@ -306,24 +438,89 @@ run-example example:
 # 检查项目健康状态
 health:
     @echo "🏥 检查项目健康状态..."
-    @echo "后端服务:"
-    @curl -s http://localhost:8080/health | jq '.' || echo "❌ 后端未运行"
     @echo ""
-    @echo "前端服务:"
-    @curl -s http://localhost:3001 > /dev/null && echo "✅ 前端运行中" || echo "❌ 前端未运行"
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "后端服务 (http://localhost:8080):"
+    @bash -c 'if curl -s http://localhost:8080/health > /dev/null 2>&1; then \
+        echo "✅ 后端运行中"; \
+        curl -s http://localhost:8080/health | jq . 2>/dev/null || curl -s http://localhost:8080/health; \
+        if [ -f backend.pid ]; then \
+            echo "   PID: $$(cat backend.pid)"; \
+        fi; \
+    else \
+        echo "❌ 后端未运行"; \
+    fi'
+    @echo ""
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @echo "前端服务 (http://localhost:3001):"
+    @bash -c 'if curl -s http://localhost:3001 > /dev/null 2>&1; then \
+        echo "✅ 前端运行中"; \
+        if [ -f frontend.pid ]; then \
+            echo "   PID: $$(cat frontend.pid)"; \
+        fi; \
+    else \
+        echo "❌ 前端未运行"; \
+    fi'
+    @echo ""
 
 # 查看实时日志
 logs service="backend":
     @echo "📝 查看 {{service}} 日志..."
-    @if [ "{{service}}" = "backend" ]; then \
-        tail -f backend-no-auth.log 2>/dev/null || tail -f backend-test.log 2>/dev/null || echo "❌ 日志文件不存在"; \
+    @bash -c 'if [ "{{service}}" = "backend" ]; then \
+        if [ -f backend.log ]; then \
+            tail -f backend.log; \
+        else \
+            echo "❌ 日志文件不存在: backend.log"; \
+            echo "💡 提示: 使用 just start-server-bg 启动后台服务"; \
+        fi; \
     elif [ "{{service}}" = "frontend" ]; then \
-        tail -f frontend.log 2>/dev/null || echo "❌ 日志文件不存在"; \
-    elif [ "{{service}}" = "ui" ]; then \
-        tail -f agentmem-ui/ui.log 2>/dev/null || echo "❌ 日志文件不存在"; \
+        if [ -f frontend.log ]; then \
+            tail -f frontend.log; \
+        else \
+            echo "❌ 日志文件不存在: frontend.log"; \
+            echo "💡 提示: 使用 just start-ui-bg 启动后台前端服务"; \
+        fi; \
+    elif [ "{{service}}" = "all" ]; then \
+        echo "📝 查看所有日志 (按 Ctrl+C 退出)..."; \
+        tail -f backend.log frontend.log 2>/dev/null || echo "❌ 日志文件不存在"; \
     else \
         echo "❌ 未知服务: {{service}}"; \
-    fi
+        echo "💡 可用选项: backend, frontend, all"; \
+    fi'
+
+# 查看服务状态
+status:
+    @echo "📊 服务状态"
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @bash -c 'echo "后端服务:"; \
+    if [ -f backend.pid ]; then \
+        BACKEND_PID=$(cat backend.pid 2>/dev/null); \
+        if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then \
+            echo "  ✅ 运行中 (PID: $BACKEND_PID)"; \
+            echo "  📝 日志: backend.log"; \
+        else \
+            echo "  ⚠️  PID 文件存在但进程未运行"; \
+        fi; \
+    elif lsof -i :8080 > /dev/null 2>&1; then \
+        echo "  ⚠️  端口被占用但 PID 文件不存在"; \
+    else \
+        echo "  ❌ 未运行"; \
+    fi; \
+    echo ""; \
+    echo "前端服务:"; \
+    if [ -f frontend.pid ]; then \
+        FRONTEND_PID=$(cat frontend.pid 2>/dev/null); \
+        if [ -n "$FRONTEND_PID" ] && kill -0 "$FRONTEND_PID" 2>/dev/null; then \
+            echo "  ✅ 运行中 (PID: $FRONTEND_PID)"; \
+            echo "  📝 日志: frontend.log"; \
+        else \
+            echo "  ⚠️  PID 文件存在但进程未运行"; \
+        fi; \
+    elif lsof -i :3001 > /dev/null 2>&1; then \
+        echo "  ⚠️  端口被占用但 PID 文件不存在"; \
+    else \
+        echo "  ❌ 未运行"; \
+    fi'
 
 # ============================================================================
 # 部署相关
@@ -374,12 +571,98 @@ verify: build-release test
 # 开发模式：构建并启动（带热重载）
 dev:
     @echo "🔧 开发模式..."
+    @echo "⚠️  注意: 此命令将在前台运行，按 Ctrl+C 停止"
     @just watch &
     @just start-ui
 
 # 清理并重新构建
 rebuild: clean build-release
     @echo "✅ 重新构建完成"
+
+# 一键启动：检查构建 -> 启动服务 -> 显示状态
+go:
+    @echo "🚀 AgentMem 一键启动"
+    @echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then \
+        echo "📦 未找到编译后的服务器，开始构建..."; \
+        just build-server; \
+    else \
+        echo "✅ 找到编译后的服务器"; \
+    fi'
+    @echo ""
+    @just start-full
+    @echo ""
+    @just status
+
+# 检查依赖和工具
+check-deps:
+    @echo "🔍 检查依赖和工具..."
+    @echo ""
+    @echo "必需工具:"
+    @bash scripts/check_dependencies.sh 2>/dev/null || bash -c '\
+    MISSING=0; \
+    for cmd in rustc cargo just node npm; do \
+        if command -v $$cmd > /dev/null 2>&1; then \
+            VER=$$($$cmd --version 2>/dev/null | head -1); \
+            echo "  ✅ $$cmd: $$VER"; \
+        else \
+            echo "  ❌ $$cmd: 未安装"; \
+            MISSING=$$((MISSING + 1)); \
+        fi; \
+    done; \
+    echo ""; \
+    echo "可选工具:"; \
+    for cmd in jq curl docker docker-compose; do \
+        if command -v $$cmd > /dev/null 2>&1; then \
+            VER=$$($$cmd --version 2>/dev/null | head -1); \
+            echo "  ✅ $$cmd: $$VER"; \
+        else \
+            echo "  ⚠️  $$cmd: 未安装（可选）"; \
+        fi; \
+    done; \
+    echo ""; \
+    if [ $$MISSING -gt 0 ]; then \
+        echo "❌ 缺少 $$MISSING 个必需工具，请先安装"; \
+        exit 1; \
+    else \
+        echo "✅ 所有必需工具已安装"; \
+    fi'
+
+# 清理日志文件
+clean-logs:
+    @echo "🧹 清理日志文件..."
+    @bash -c 'rm -f *.log backend.log frontend.log 2>/dev/null && echo "✅ 日志文件已清理" || echo "ℹ️  没有日志文件需要清理"'
+
+# 清理 PID 文件
+clean-pids:
+    @echo "🧹 清理 PID 文件..."
+    @bash -c 'rm -f *.pid backend.pid frontend.pid 2>/dev/null && echo "✅ PID 文件已清理" || echo "ℹ️  没有 PID 文件需要清理"'
+
+# 完整清理：停止服务 + 清理文件
+clean-all: stop
+    @just clean-logs
+    @just clean-pids
+    @echo "✅ 完整清理完成"
+
+# 查看最近的日志（最后N行）
+tail-logs service="backend" lines="50":
+    @echo "📝 查看 {{service}} 最近 {{lines}} 行日志..."
+    @bash -c 'if [ "{{service}}" = "backend" ]; then \
+        if [ -f backend.log ]; then \
+            tail -n {{lines}} backend.log; \
+        else \
+            echo "❌ 日志文件不存在: backend.log"; \
+        fi; \
+    elif [ "{{service}}" = "frontend" ]; then \
+        if [ -f frontend.log ]; then \
+            tail -n {{lines}} frontend.log; \
+        else \
+            echo "❌ 日志文件不存在: frontend.log"; \
+        fi; \
+    else \
+        echo "❌ 未知服务: {{service}}"; \
+        echo "💡 可用选项: backend, frontend"; \
+    fi'
 
 # ============================================================================
 # 信息查看
@@ -389,9 +672,9 @@ rebuild: clean build-release
 info:
     @echo "📊 AgentMem 项目信息"
     @echo "===================="
-    @echo "版本: $(cargo pkgid | cut -d# -f2)"
-    @echo "Rust 版本: $(rustc --version)"
-    @echo "Cargo 版本: $(cargo --version)"
+    @bash -c 'VERSION=$(cargo pkgid 2>/dev/null | cut -d# -f2 || echo "workspace"); echo "版本: $VERSION"'
+    @bash -c 'RUST_VER=$(rustc --version 2>/dev/null || echo "未安装"); echo "Rust 版本: $RUST_VER"'
+    @bash -c 'CARGO_VER=$(cargo --version 2>/dev/null || echo "未安装"); echo "Cargo 版本: $CARGO_VER"'
     @echo ""
     @echo "服务地址:"
     @echo "  - 后端 API: http://localhost:8080"
@@ -406,12 +689,13 @@ info:
 env:
     @echo "🌍 环境变量"
     @echo "==========="
-    @echo "RUST_BACKTRACE: $RUST_BACKTRACE"
-    @echo "LLM_PROVIDER: $LLM_PROVIDER"
-    @echo "LLM_MODEL: $LLM_MODEL"
-    @echo "EMBEDDER_PROVIDER: $EMBEDDER_PROVIDER"
-    @echo "EMBEDDER_MODEL: $EMBEDDER_MODEL"
-    @echo "DYLD_LIBRARY_PATH: $DYLD_LIBRARY_PATH"
+    @bash -c 'echo "RUST_BACKTRACE: ${RUST_BACKTRACE:-未设置}"; \
+    echo "LLM_PROVIDER: ${LLM_PROVIDER:-未设置}"; \
+    echo "LLM_MODEL: ${LLM_MODEL:-未设置}"; \
+    echo "EMBEDDER_PROVIDER: ${EMBEDDER_PROVIDER:-未设置}"; \
+    echo "EMBEDDER_MODEL: ${EMBEDDER_MODEL:-未设置}"; \
+    echo "DYLD_LIBRARY_PATH: ${DYLD_LIBRARY_PATH:-未设置}"; \
+    echo "ORT_DYLIB_PATH: ${ORT_DYLIB_PATH:-未设置}"'
 
 # ============================================================================
 # 演示相关（按照 x.md 演示计划）
@@ -473,7 +757,7 @@ demo-verify-ui:
 demo-start:
     @echo "🚀 启动演示服务..."
     @echo "=========================================="
-    @bash start_full_stack.sh
+    @just start-full
     @echo ""
     @echo "✅ 服务启动完成"
     @echo ""

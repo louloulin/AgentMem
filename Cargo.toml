@@ -22,7 +22,7 @@ members = [
     "crates/agent-mem-storage",
     "crates/agent-mem-embeddings",
     "crates/agent-mem-intelligence",
-    # "crates/agent-mem-server",  # Temporarily disabled - has dependency issues
+    "crates/agent-mem-server",  # ✅ Re-enabled for justfile build support
     "crates/agent-mem-client",
     "crates/agent-mem-performance",
     "crates/agent-mem-distributed",
