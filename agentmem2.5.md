@@ -1913,11 +1913,33 @@ criterion_main!(benches);
   - 测试: crates/agent-mem-server/tests/test_p1_validation.rs
   - 测试: crates/agent-mem-server/tests/integration_test_p1.rs
 
-- [ ] **完善 JWT**
-  - [ ] 实现 refresh token
-  - [ ] 实现 token 黑名单
-  - [ ] 可配置过期时间
-  - [ ] 强制最小密钥长度
+- [x] **完善 JWT** ✅ P1 部分完成
+  - [x] 实现 refresh token (commit: fcba8c9)
+  - [x] 可配置过期时间 (access_token_duration, refresh_token_duration)
+  - [x] Token 类型验证 ("access" vs "refresh")
+  - [x] 向后兼容 (legacy generate_token() 仍可用)
+  - [ ] 实现 token 黑名单 (待实施)
+  - [ ] 强制最小密钥长度 (待实施)
+
+  **Commit**: fcba8c9 "feat(agentmem2.5): Implement JWT Refresh Token support"
+  **文件**: crates/agent-mem-server/src/auth.rs
+  **新增功能**:
+  - `TokenPair` 结构体 (access + refresh tokens)
+  - `generate_token_pair()` 方法 (生成 token 对)
+  - `refresh_access_token()` 方法 (刷新 access token)
+  - `validate_access_token()` 方法 (验证 access token)
+
+  **测试覆盖**:
+  - test_token_pair_generation
+  - test_refresh_access_token
+  - test_access_token_cannot_refresh
+  - test_token_generation_and_validation (updated)
+
+  **安全改进**:
+  - Access token: 15分钟 (可配置)
+  - Refresh token: 7天 (可配置)
+  - Token 类型验证 (防止误用)
+  - 向后兼容现有代码
 
 - [ ] **完善 RBAC**
   - [ ] 添加资源所有权检查
@@ -1969,11 +1991,52 @@ criterion_main!(benches);
 
 #### 开发者体验（🟠 高）
 
-- [ ] **实现分层配置**
-  - [ ] with_core_features()
-  - [ ] with_intelligent_features()
-  - [ ] with_auto_config()
-  - [ ] 友好错误消息
+- [x] **实现分层配置** ✅ P1 已完成
+  - [x] with_core_features() - 核心功能（无需 LLM）
+  - [x] with_intelligent_features() - 智能功能（需要 LLM）
+  - [x] with_auto_config() - 零配置自动检测
+  - [x] detect_llm_from_env() - 环境变量检测
+  - [x] 友好错误消息和警告
+  - [x] 完整文档和示例代码
+
+  **Commit**: e5b5f2e "feat(agentmem2.5): Implement layered configuration API"
+  **文件**: crates/agent-mem/src/builder.rs
+  **新增行数**: +270 行
+
+  **新增功能**:
+  - `with_core_features()` - 一键配置核心功能（CRUD + 向量搜索）
+  - `with_intelligent_features()` - 一键配置智能功能（需要 LLM）
+  - `with_auto_config()` - 零配置，自动检测环境
+  - `detect_llm_from_env()` - 检测 4 种 LLM API Key
+
+  **使用示例**:
+  ```rust
+  // 最简单：核心功能，无需 API Key
+  let mem = Memory::builder()
+      .with_core_features()
+      .build()
+      .await?;
+
+  // 完整智能功能
+  let mem = Memory::builder()
+      .with_core_features()
+      .with_llm("openai", "gpt-4")
+      .with_intelligent_features()
+      .build()
+      .await?;
+
+  // 零配置自动检测
+  let mem = Memory::builder()
+      .with_auto_config()  // 自动检测 OPENAI_API_KEY
+      .build()
+      .await?;
+  ```
+
+  **优势**:
+  - 更语义化的 API
+  - 更快的开发体验
+  - 自动最佳实践
+  - 零破坏性变更
 
 - [x] **创建统一启动脚本** ✅ 已完成
   - [x] just dev

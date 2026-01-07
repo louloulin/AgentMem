@@ -191,6 +191,231 @@ impl MemoryBuilder {
         self
     }
 
+    // ✅ P1 Enhancement: 分层配置 API - 更语义化的配置方法
+
+    /// ✅ P1: 仅启用核心功能（无需 LLM）
+    ///
+    /// 这是一个便捷方法，等价于：
+    /// - 配置默认存储（libsql）
+    /// - 配置默认嵌入器（fastembed 本地模型）
+    /// - 禁用智能功能（无需 LLM API Key）
+    ///
+    /// **适用场景**：
+    /// - 开发测试
+    /// - 本地应用
+    /// - 仅需要 CRUD + 向量搜索
+    /// - 不需要事实提取和智能决策
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_core_features()  // ✅ 最简单：核心功能，无需 API Key
+    ///     .build()
+    ///     .await?;
+    ///
+    /// // 立即可用：添加、搜索、更新、删除
+    /// mem.add("I love Rust programming").await?;
+    /// let results = mem.search("programming").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # 核心功能包含
+    ///
+    /// - ✅ **CRUD 操作** (add, get, update, delete)
+    /// - ✅ **向量搜索** (语义搜索，使用 FastEmbed 本地模型)
+    /// - ✅ **批量操作** (batch_add, batch_delete)
+    /// - ✅ **持久化存储** (LibSQL 数据库)
+    /// - ❌ **事实提取** (需要 LLM)
+    /// - ❌ **智能决策** (需要 LLM)
+    /// - ❌ **记忆去重** (需要 LLM)
+    pub fn with_core_features(mut self) -> Self {
+        // 设置默认存储（如果用户没有设置）
+        if self.config.storage_url.is_none() {
+            self.config.storage_url = Some("libsql://./data/agentmem_core.db".to_string());
+            info!("🔧 使用默认核心功能存储: libsql://./data/agentmem_core.db");
+        }
+
+        // 设置默认嵌入器（如果用户没有设置）
+        if self.config.embedder_provider.is_none() {
+            self.config.embedder_provider = Some("fastembed".to_string());
+            self.config.embedder_model = Some("BAAI/bge-small-en-v1.5".to_string());
+            info!("🔧 使用默认核心功能嵌入器: FastEmbed (BAAI/bge-small-en-v1.5)");
+        }
+
+        // 禁用智能功能（核心功能不需要 LLM）
+        self.config.enable_intelligent_features = false;
+
+        info!("✅ 核心功能已配置 - 仅需 CRUD + 向量搜索，无需 LLM API Key");
+        self
+    }
+
+    /// ✅ P1: 启用完整智能功能（需要 LLM API Key）
+    ///
+    /// 这是一个便捷方法，等价于：
+    /// - 配置默认存储（libsql）
+    /// - 配置默认嵌入器（fastembed 本地模型）
+    /// - **启用智能功能**（需要配置 LLM API Key）
+    ///
+    /// **适用场景**：
+    /// - 需要事实提取
+    /// - 需要智能决策（自动 ADD/UPDATE/DELETE）
+    /// - 需要记忆去重和合并
+    /// - 生产环境应用
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_core_features()        // 先配置核心功能
+    ///     .with_llm("openai", "gpt-4") // ✅ 然后启用 LLM
+    ///     .with_intelligent_features() // ✅ 启用智能功能
+    ///     .build()
+    ///     .await?;
+    ///
+    /// // 完整功能：事实提取 + 智能决策
+    /// mem.add("Rust is a systems programming language").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # 智能功能包含
+    ///
+    /// - ✅ **所有核心功能** (CRUD, 向量搜索, 批量操作)
+    /// - ✅ **事实提取** (自动从文本中提取关键事实)
+    /// - ✅ **智能决策** (自动决定 ADD/UPDATE/DELETE/MERGE)
+    /// - ✅ **记忆去重** (检测和合并重复记忆)
+    /// - ✅ **重要性评分** (自动评估记忆重要性)
+    ///
+    /// # 前置条件
+    ///
+    /// 必须先配置 LLM（使用 `.with_llm()`），否则智能功能无法工作：
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mem = Memory::builder()
+    ///     .with_intelligent_features() // ❌ 错误：没有配置 LLM
+    ///     .build()
+    ///     .await?;
+    /// // 结果：智能功能将无法使用，降级到核心模式
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_intelligent_features(mut self) -> Self {
+        // 设置默认存储（如果用户没有设置）
+        if self.config.storage_url.is_none() {
+            self.config.storage_url = Some("libsql://./data/agentmem.db".to_string());
+            info!("🔧 使用默认智能功能存储: libsql://./data/agentmem.db");
+        }
+
+        // 设置默认嵌入器（如果用户没有设置）
+        if self.config.embedder_provider.is_none() {
+            self.config.embedder_provider = Some("fastembed".to_string());
+            self.config.embedder_model = Some("BAAI/bge-small-en-v1.5".to_string());
+            info!("🔧 使用默认智能功能嵌入器: FastEmbed (BAAI/bge-small-en-v1.5)");
+        }
+
+        // 启用智能功能
+        self.config.enable_intelligent_features = true;
+
+        // 检查是否配置了 LLM
+        if self.config.llm_provider.is_none() || self.config.llm_model.is_none() {
+            tracing::warn!(
+                "⚠️  智能功能已启用，但未配置 LLM！请使用 .with_llm() 配置 LLM 提供商。"
+            );
+            tracing::warn!("⚠️  智能功能将降级到核心模式（无事实提取和智能决策）");
+        } else {
+            info!("✅ 智能功能已配置 - 包含事实提取、智能决策、记忆去重");
+        }
+
+        self
+    }
+
+    /// ✅ P1: 自动配置（零配置模式）
+    ///
+    /// 自动检测环境并选择最佳配置：
+    /// - 检测 LLM API Key（环境变量）
+    /// - 如果有 LLM → 启用智能功能
+    /// - 如果无 LLM → 核心功能
+    ///
+    /// **适用场景**：
+    /// - 快速原型
+    /// - 不确定使用哪种模式
+    /// - 希望自动适配环境
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// # use agent_mem::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // 最简单的用法：零配置
+    /// let mem = Memory::builder()
+    ///     .with_auto_config()  // ✅ 自动检测并配置
+    ///     .build()
+    ///     .await?;
+    ///
+    /// // 如果设置了 OPENAI_API_KEY → 智能功能
+    /// // 如果没有设置 API Key → 核心功能
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # 环境变量检测
+    ///
+    /// 按优先级检测以下环境变量：
+    /// - `OPENAI_API_KEY` - OpenAI
+    /// - `ANTHROPIC_API_KEY` - Anthropic Claude
+    /// - `DEEPSEEK_API_KEY` - DeepSeek
+    /// - `HUAWEI_MaaS_API_KEY` - 华为 MaaS
+    pub fn with_auto_config(mut self) -> Self {
+        info!("🔍 自动配置模式：检测环境...");
+
+        // 检测 LLM API Key
+        let llm_detected = detect_llm_from_env();
+
+        if let Some((provider, model)) = llm_detected {
+            // 检测到 LLM，启用智能功能
+            info!("✅ 检测到 LLM: {} ({})", provider, model);
+            self.config.llm_provider = Some(provider);
+            self.config.llm_model = Some(model);
+            self.config.enable_intelligent_features = true;
+
+            // 设置默认存储和嵌入器
+            if self.config.storage_url.is_none() {
+                self.config.storage_url = Some("libsql://./data/agentmem.db".to_string());
+            }
+            if self.config.embedder_provider.is_none() {
+                self.config.embedder_provider = Some("fastembed".to_string());
+                self.config.embedder_model = Some("BAAI/bge-small-en-v1.5".to_string());
+            }
+
+            info!("✅ 自动配置：智能功能模式");
+        } else {
+            // 未检测到 LLM，使用核心功能
+            info!("⚠️  未检测到 LLM API Key，使用核心功能模式");
+            self.config.enable_intelligent_features = false;
+
+            // 设置默认存储和嵌入器
+            if self.config.storage_url.is_none() {
+                self.config.storage_url = Some("libsql://./data/agentmem_core.db".to_string());
+            }
+            if self.config.embedder_provider.is_none() {
+                self.config.embedder_provider = Some("fastembed".to_string());
+                self.config.embedder_model = Some("BAAI/bge-small-en-v1.5".to_string());
+            }
+
+            info!("✅ 自动配置：核心功能模式（无需 LLM API Key）");
+        }
+
+        self
+    }
+
     /// 启用嵌入队列（P1 优化：自动批量处理并发请求）
     ///
     /// 嵌入队列会自动收集并发请求，批量处理嵌入生成，显著减少 Mutex 锁竞争。
@@ -487,3 +712,48 @@ impl Default for MemoryBuilder {
         Self::new()
     }
 }
+
+// ✅ P1 Helper Functions
+
+/// ✅ P1: 从环境变量检测 LLM 配置
+///
+/// 按优先级检测以下环境变量：
+/// 1. `OPENAI_API_KEY` → (openai, gpt-4)
+/// 2. `ANTHROPIC_API_KEY` → (anthropic, claude-3-opus-20240229)
+/// 3. `DEEPSEEK_API_KEY` → (deepseek, deepseek-chat)
+/// 4. `HUAWEI_MAAS_API_KEY` → (huawei_maas, deepseek-v3.2-exp)
+///
+/// # Returns
+///
+/// - `Some((provider, model))` - 如果检测到 API Key
+/// - `None` - 如果未检测到任何 API Key
+fn detect_llm_from_env() -> Option<(String, String)> {
+    // 检测 OpenAI
+    if std::env::var("OPENAI_API_KEY").is_ok() {
+        return Some(("openai".to_string(), "gpt-4".to_string()));
+    }
+
+    // 检测 Anthropic
+    if std::env::var("ANTHROPIC_API_KEY").is_ok() {
+        return Some((
+            "anthropic".to_string(),
+            "claude-3-opus-20240229".to_string(),
+        ));
+    }
+
+    // 检测 DeepSeek
+    if std::env::var("DEEPSEEK_API_KEY").is_ok() {
+        return Some(("deepseek".to_string(), "deepseek-chat".to_string()));
+    }
+
+    // 检测华为 MaaS
+    if std::env::var("HUAWEI_MAAS_API_KEY").is_ok() {
+        return Some((
+            "huawei_maas".to_string(),
+            "deepseek-v3.2-exp".to_string(),
+        ));
+    }
+
+    None
+}
+
