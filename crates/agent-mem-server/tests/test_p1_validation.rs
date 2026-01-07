@@ -14,6 +14,83 @@ mod validation_tests {
     use super::*;
     use std::collections::HashMap;
 
+    // ==================== Hash Optimization Tests ====================
+
+    #[test]
+    fn test_generate_cache_key_consistency() {
+        // Test that same inputs generate same cache key
+        let key1 = agent_mem_server::routes::memory::cache::generate_cache_key(
+            "test query",
+            Some("agent-123"),
+            Some("user-456"),
+            Some(10),
+        );
+
+        let key2 = agent_mem_server::routes::memory::cache::generate_cache_key(
+            "test query",
+            Some("agent-123"),
+            Some("user-456"),
+            Some(10),
+        );
+
+        assert_eq!(key1, key2, "Same inputs should generate same cache key");
+    }
+
+    #[test]
+    fn test_generate_cache_key_uniqueness() {
+        // Test that different inputs generate different cache keys
+        let key1 = agent_mem_server::routes::memory::cache::generate_cache_key(
+            "query one",
+            Some("agent-123"),
+            Some("user-456"),
+            Some(10),
+        );
+
+        let key2 = agent_mem_server::routes::memory::cache::generate_cache_key(
+            "query two",
+            Some("agent-123"),
+            Some("user-456"),
+            Some(10),
+        );
+
+        assert_ne!(key1, key2, "Different queries should generate different cache keys");
+    }
+
+    #[test]
+    fn test_generate_cache_key_performance() {
+        use std::time::Instant;
+
+        // Performance test: should generate keys very quickly (< 1μs per key)
+        let iterations = 10_000;
+        let start = Instant::now();
+
+        for i in 0..iterations {
+            let _ = agent_mem_server::routes::memory::cache::generate_cache_key(
+                &format!("test query {}", i),
+                Some(&format!("agent-{}", i % 100)),
+                Some(&format!("user-{}", i % 100)),
+                Some(10 + i % 90),
+            );
+        }
+
+        let duration = start.elapsed();
+        let avg_time = duration / iterations;
+
+        // XxHash64 should be < 1μs per hash
+        assert!(
+            avg_time.as_micros() < 1,
+            "Hash function too slow: {}μs per hash (expected < 1μs)",
+            avg_time.as_micros()
+        );
+
+        println!(
+            "✅ Hash performance: {} hashes in {:?} ({}μs per hash)",
+            iterations,
+            duration,
+            avg_time.as_micros()
+        );
+    }
+
     // ==================== Add Memory Request Tests ====================
 
     #[test]

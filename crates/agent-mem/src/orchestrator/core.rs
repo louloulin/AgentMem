@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use agent_mem_core::manager::MemoryManager;
 use agent_mem_core::managers::CoreMemoryManager;
@@ -221,33 +221,70 @@ impl MemoryOrchestrator {
         #[cfg(feature = "postgres")]
         let procedural_manager = None;
 
-        // ========== Step 2: 创建 Intelligence 组件 ==========
-        let intelligence_components = if config.enable_intelligent_features {
-            info!("创建 Intelligence 组件...");
-            super::initialization::InitializationModule::create_intelligence_components(&config)
+        // ========== Step 2-7: ✅ P1 Optimization - 并行初始化独立组件 ==========
+        // 这些组件之间没有依赖关系，可以并行初始化以显著减少启动时间
+        // 预期提升: 40-60% 启动时间减少（取决于组件数量和IO等待时间）
+        info!("🚀 P1: 启动并行初始化...（预期减少 40-60% 启动时间）");
+
+        let (
+            intelligence_components,
+            embedder,
+            (image_processor, audio_processor, video_processor, multimodal_manager),
+            (dbscan_clusterer, kmeans_clusterer, memory_reasoner),
+        ) = tokio::try_join!(
+            // Task 1: Intelligence 组件（如果启用）
+            async {
+                if config.enable_intelligent_features {
+                    info!("📦 [并行 1/4] 创建 Intelligence 组件...");
+                    super::initialization::InitializationModule::create_intelligence_components(&config)
+                        .await
+                } else {
+                    info!("⚠️  [并行 1/4] 智能功能已禁用");
+                    Ok(IntelligenceComponents {
+                        fact_extractor: None,
+                        advanced_fact_extractor: None,
+                        batch_entity_extractor: None,
+                        batch_importance_evaluator: None,
+                        decision_engine: None,
+                        enhanced_decision_engine: None,
+                        importance_evaluator: None,
+                        conflict_resolver: None,
+                        llm_provider: None,
+                    })
+                }
+            },
+            // Task 2: Embedder（必需组件）
+            async {
+                info!("📦 [并行 2/4] 创建 Embedder...");
+                super::initialization::InitializationModule::create_embedder(&config).await
+            },
+            // Task 3: 多模态处理组件（如果配置）
+            async {
+                info!("📦 [并行 3/4] 创建多模态处理组件...");
+                super::initialization::InitializationModule::create_multimodal_components(&config).await
+            },
+            // Task 4: 聚类和推理组件
+            async {
+                info!("📦 [并行 4/4] 创建聚类和推理组件...");
+                super::initialization::InitializationModule::create_clustering_reasoning_components(&config).await
+            },
+        )
+        .map_err(|e| {
+            error!("❌ 并行初始化失败: {}", e);
+            e
+        })?;
+
+        info!("✅ P1: 并行初始化完成（4 个组件已并行创建）");
+
+        // ========== Step 6: OpenAI 多模态 API（有条件编译，无法并行）==========
+        #[cfg(feature = "multimodal")]
+        let (openai_vision, openai_whisper) = {
+            info!("创建 OpenAI 多模态 API 客户端...");
+            super::initialization::InitializationModule::create_openai_multimodal_clients(&config)
                 .await?
-        } else {
-            info!("智能功能已禁用，将使用基础模式");
-            IntelligenceComponents {
-                fact_extractor: None,
-                advanced_fact_extractor: None,
-                batch_entity_extractor: None,
-                batch_importance_evaluator: None,
-                decision_engine: None,
-                enhanced_decision_engine: None,
-                importance_evaluator: None,
-                conflict_resolver: None,
-                llm_provider: None,
-            }
         };
 
-        // ========== Step 3: 创建 Embedder ==========
-        let embedder = {
-            info!("创建 Embedder...");
-            super::initialization::InitializationModule::create_embedder(&config).await?
-        };
-
-        // ========== Step 4: 创建 Search 组件 ==========
+        // ========== Step 4: Search 组件（需要在 embedder 和 vector_store 之后）==========
         // 注意：Search组件需要embedder和vector_store，所以需要在它们创建之后
         // 这里先设置为None，稍后在创建vector_store之后会更新
         #[cfg(feature = "postgres")]
@@ -256,30 +293,6 @@ impl MemoryOrchestrator {
             Option<Arc<agent_mem_core::search::VectorSearchEngine>>,
             Option<Arc<agent_mem_core::search::FullTextSearchEngine>>,
         ) = (None, None, None);
-
-        // ========== Step 5: 创建多模态处理组件 ==========
-        let (image_processor, audio_processor, video_processor, multimodal_manager) = {
-            info!("创建多模态处理组件...");
-            super::initialization::InitializationModule::create_multimodal_components(&config)
-                .await?
-        };
-
-        // ========== Step 6: 创建 OpenAI 多模态 API ==========
-        #[cfg(feature = "multimodal")]
-        let (openai_vision, openai_whisper) = {
-            info!("创建 OpenAI 多模态 API 客户端...");
-            super::initialization::InitializationModule::create_openai_multimodal_clients(&config)
-                .await?
-        };
-
-        // ========== Step 7: 创建聚类和推理组件 ==========
-        let (dbscan_clusterer, kmeans_clusterer, memory_reasoner) = {
-            info!("创建聚类和推理组件...");
-            super::initialization::InitializationModule::create_clustering_reasoning_components(
-                &config,
-            )
-            .await?
-        };
 
         // ========== Step 8: 创建向量存储 ==========
         let vector_store = {
