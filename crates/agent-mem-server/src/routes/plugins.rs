@@ -13,7 +13,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, error, info};
 use utoipa::ToSchema;
 
 use crate::error::{ServerError, ServerResult};

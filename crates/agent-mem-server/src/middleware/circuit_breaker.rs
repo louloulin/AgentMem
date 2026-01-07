@@ -4,7 +4,6 @@
 //! This middleware protects the server from cascading failures by temporarily
 //! blocking requests when a service is experiencing high error rates.
 
-use crate::error::ServerError;
 use agent_mem_performance::error_recovery::{
     CircuitBreaker, CircuitBreakerConfig, CircuitBreakerState,
 };
@@ -22,6 +21,7 @@ use tracing::{error, warn};
 /// Circuit breaker manager for different service endpoints
 pub struct CircuitBreakerManager {
     /// Default circuit breaker for general operations
+    #[allow(dead_code)]
     default_breaker: Arc<CircuitBreaker>,
     /// Circuit breakers for specific endpoints
     endpoint_breakers: Arc<tokio::sync::RwLock<std::collections::HashMap<String, Arc<CircuitBreaker>>>>,

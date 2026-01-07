@@ -2,9 +2,8 @@
 //! Task 1.5: 记录使用旧版本路由的请求，便于监控迁移进度
 
 use axum::{
-    body::Body,
     extract::Request,
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
     middleware::Next,
     response::Response,
 };

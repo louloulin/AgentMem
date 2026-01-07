@@ -2,8 +2,6 @@
 //!
 //! 测试多模态处理模块的各种功能
 
-use super::*;
-use std::collections::HashMap;
 
 #[cfg(test)]
 mod multimodal_tests {

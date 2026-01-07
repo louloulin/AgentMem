@@ -2,7 +2,6 @@
 //!
 //! 提供搜索结果的 LRU 缓存功能，支持 TTL 和自动过期
 
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroUsize;
 use std::sync::Arc;

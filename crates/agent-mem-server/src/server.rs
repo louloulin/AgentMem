@@ -21,7 +21,9 @@ use tracing::info;
 pub struct MemoryServer {
     config: ServerConfig,
     memory_manager: Arc<MemoryManager>,
+    #[allow(dead_code)]
     metrics_registry: Arc<MetricsRegistry>,
+    #[allow(dead_code)]
     repositories: Repositories,
     router: Router,
 }
@@ -114,7 +116,7 @@ impl MemoryServer {
             {
                 use tokio::signal::unix::{signal, SignalKind};
                 
-                let mut ctrl_c_stream = tokio::signal::ctrl_c();
+                let ctrl_c_stream = tokio::signal::ctrl_c();
                 let mut terminate_stream = match signal(SignalKind::terminate()) {
                     Ok(stream) => stream,
                     Err(e) => {

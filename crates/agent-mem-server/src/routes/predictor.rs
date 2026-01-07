@@ -9,7 +9,6 @@ use crate::routes::memory::{calculate_access_pattern_score, get_search_stats, Me
 use axum::{extract::Extension, response::Json};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 

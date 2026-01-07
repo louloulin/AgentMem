@@ -10,7 +10,7 @@
 //! - Authentication
 //! - Multi-tenant isolation
 
-use crate::error::{ServerError, ServerResult};
+use crate::error::ServerResult;
 use crate::middleware::auth::AuthUser;
 use axum::{
     extract::{
@@ -68,8 +68,11 @@ pub enum WsMessage {
 /// WebSocket connection info
 #[derive(Debug, Clone)]
 struct ConnectionInfo {
+    #[allow(dead_code)]
     user_id: String,
+    #[allow(dead_code)]
     org_id: String,
+    #[allow(dead_code)]
     connected_at: chrono::DateTime<chrono::Utc>,
 }
 

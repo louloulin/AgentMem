@@ -33,23 +33,15 @@ pub use utils::{
     compute_prefetch_candidates,
 };
 
-use crate::{
-    error::{ServerError, ServerResult},
-    models::{
-        BatchRequest, BatchResponse, BatchSearchRequest, BatchSearchResponse, MemoryRequest,
-        MemoryResponse, SearchRequest, SearchResponse, UpdateMemoryRequest,
-    },
-};
+use crate::error::{ServerError, ServerResult};
 use agent_mem::{AddMemoryOptions, DeleteAllOptions, GetAllOptions, Memory, SearchOptions};
 
 // 内部使用 MemoryItem 用于向后兼容（已废弃，未来将迁移到 Memory V4）
 #[allow(deprecated)]
 use agent_mem_traits::MemoryItem;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
 use tokio::time::timeout;
 use futures::future::{self, join_all};
 
@@ -964,7 +956,7 @@ async fn search_by_libsql_exact(
             info!("✅ LibSQL查询成功: 找到 {} 条记忆", memories.len());
 
             // 🔧 修复: 将 MemoryV4 转换为 MemoryItem 以便访问字段
-            use agent_mem_traits::MemoryV4;
+            
             let memory_items: Vec<_> = memories.into_iter().map(|m| m.to_legacy_item()).collect();
 
             // 🔧 修复: 优先返回精确匹配的商品记忆
@@ -3110,7 +3102,7 @@ pub async fn get_agent_memories(
         .map_err(|e| ServerError::internal_error(format!("Failed to fetch row: {}", e)))?
     {
         // ✅ 修复时间戳：将 i64 秒级时间戳转换为 ISO 8601 字符串
-        use chrono::{DateTime, Utc};
+        use chrono::DateTime;
 
         let created_at_ts: Option<i64> = row.get(6).ok();
         let created_at_str = created_at_ts
@@ -3169,7 +3161,7 @@ pub async fn list_all_memories(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
     use chrono::{DateTime, Utc};
-    use libsql::{params as sql_params, Builder};
+    use libsql::Builder;
 
     // 解析参数
     let page = params

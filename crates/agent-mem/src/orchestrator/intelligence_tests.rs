@@ -2,8 +2,6 @@
 //!
 //! 测试智能处理模块的各种功能
 
-use super::*;
-use agent_mem_intelligence::{ExtractedFact, StructuredFact, ImportanceEvaluation, MemoryAction};
 
 #[cfg(test)]
 mod intelligence_tests {

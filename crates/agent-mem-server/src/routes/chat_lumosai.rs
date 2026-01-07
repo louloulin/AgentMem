@@ -8,16 +8,13 @@ use crate::models::ApiResponse;
 use agent_mem_core::storage::factory::Repositories;
 use axum::{
     extract::{Extension, Path},
-    response::sse::{Event, KeepAlive, Sse},
+    response::sse::{Event, Sse},
     Json,
 };
 use futures::stream::Stream;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 #[cfg(feature = "lumosai")]
 use crate::routes::memory::MemoryManager;

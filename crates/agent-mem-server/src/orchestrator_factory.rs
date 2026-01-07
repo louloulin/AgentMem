@@ -14,7 +14,7 @@ use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;
 use agent_mem_traits::LLMConfig;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// 从 Agent 配置中解析 LLM 配置
 pub fn parse_llm_config(agent: &Agent) -> ServerResult<LLMConfig> {

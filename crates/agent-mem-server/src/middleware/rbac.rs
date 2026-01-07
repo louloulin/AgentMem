@@ -4,12 +4,10 @@ use crate::auth::UserContext;
 use crate::error::{ServerError, ServerResult};
 use crate::rbac::{Action, AuditLogEntry, RbacChecker, Resource};
 use axum::{
-    extract::{Request, State},
-    http::StatusCode,
+    extract::Request,
     middleware::Next,
     response::Response,
 };
-use std::sync::Arc;
 
 /// 权限验证中间件配置
 #[derive(Clone)]

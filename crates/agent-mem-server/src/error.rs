@@ -15,7 +15,6 @@ use axum::{
 };
 use chrono::Utc;
 use std::backtrace::Backtrace;
-use std::fmt;
 use thiserror::Error;
 
 /// Error context for additional information

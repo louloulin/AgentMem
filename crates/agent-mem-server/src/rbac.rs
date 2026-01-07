@@ -8,7 +8,6 @@
 
 use crate::error::{ServerError, ServerResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// 系统角色定义
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

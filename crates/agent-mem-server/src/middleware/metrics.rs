@@ -4,7 +4,6 @@
 
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::{
-    body::Body,
     extract::{Extension, Request},
     middleware::Next,
     response::Response,

@@ -7,13 +7,11 @@ use crate::models::ApiResponse;
 use agent_mem_tools::mcp::{McpServer, ServerInfo};
 use axum::{
     extract::{Extension, Path},
-    http::StatusCode,
-    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 use utoipa::ToSchema;
 
 /// 工具调用请求

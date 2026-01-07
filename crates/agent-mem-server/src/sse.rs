@@ -9,7 +9,7 @@
 //! - Multi-tenant isolation
 //! - Error handling
 
-use crate::error::{ServerError, ServerResult};
+use crate::error::ServerResult;
 use crate::middleware::auth::AuthUser;
 use axum::{
     extract::Extension,

@@ -2,10 +2,6 @@
 //!
 //! 测试检索模块的各种功能
 
-use super::*;
-use crate::types::AddResult;
-use agent_mem_core::types::MemoryType;
-use agent_mem_traits::MemoryItem;
 
 #[cfg(test)]
 mod retrieval_tests {

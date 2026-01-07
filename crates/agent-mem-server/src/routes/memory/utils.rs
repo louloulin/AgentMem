@@ -5,7 +5,10 @@
 //! - 评分计算
 //! - 查询检测
 //! - 数据转换
+//!
+//! 注意：本模块使用 MemoryItem 用于向后兼容，未来版本将迁移到 Memory V4
 
+#[allow(deprecated)]
 use agent_mem_traits::MemoryItem;
 use regex::Regex;
 
@@ -87,8 +90,9 @@ pub fn calculate_3d_score(
 }
 
 /// 计算搜索结果质量评分
-/// 
+///
 /// 基于内容质量、完整性和元数据丰富度评估搜索结果的质量
+#[allow(deprecated)]
 pub fn calculate_quality_score(item: &MemoryItem) -> f64 {
     let mut quality_score = 0.0;
     let mut weight_sum = 0.0;
@@ -229,6 +233,7 @@ pub fn detect_exact_query(query: &str) -> bool {
 }
 
 /// 转换MemoryItem为JSON
+#[allow(deprecated)]
 pub fn convert_memory_to_json(item: MemoryItem) -> serde_json::Value {
     serde_json::json!({
         "id": item.id,
@@ -307,9 +312,10 @@ pub fn calculate_auto_importance(
 }
 
 /// 应用分层排序（基于scope和level）
-/// 
+///
 /// 基于scope字段对搜索结果进行层次排序，优先返回最具体scope的结果
 /// 层次顺序（从最具体到最抽象）：run -> session -> agent -> user -> organization -> global
+#[allow(deprecated)]
 pub fn apply_hierarchical_sorting(mut items: Vec<MemoryItem>) -> Vec<MemoryItem> {
     // Scope层次映射（数字越小越具体，优先级越高）
     let scope_level = |scope: &str| -> usize {
@@ -358,6 +364,7 @@ pub fn apply_hierarchical_sorting(mut items: Vec<MemoryItem>) -> Vec<MemoryItem>
 /// - min_importance: 最小重要性阈值（默认0.0，不过滤）
 /// - max_age_days: 最大年龄（天数，默认不过滤）
 /// - min_access_count: 最小访问次数（默认0，不过滤）
+#[allow(deprecated)]
 pub fn apply_intelligent_filtering(
     items: Vec<MemoryItem>,
     min_importance: Option<f32>,

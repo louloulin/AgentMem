@@ -413,7 +413,7 @@ pub async fn get_memory_growth(
     Extension(repositories): Extension<Arc<Repositories>>,
     Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<MemoryGrowthResponse>> {
-    use chrono::DateTime as ChronoDateTime;
+    
     use libsql::{params, Builder};
 
     // ✅ Connect to database to query historical stats

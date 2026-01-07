@@ -11,7 +11,7 @@ type-complexity-threshold = 250
 
 # Documentation
 # Avoid broken links in documentation
-missing-docs-in-private-items = false
+# missing-docs-in-private-items = false  # 此选项已移除
 
 # Literal representation
 # Threshold for integer literals that trigger the warning
@@ -49,9 +49,9 @@ enum-variant-size-threshold = 200
 # Warn on bit masks with more than this many bits
 verbose-bit-mask-threshold = 1
 
-# Blacklisted names (variable names that should not be used)
+# Disallowed names (variable names that should not be used)
 # Common overly generic names that reduce code clarity
-blacklisted-names = ["foo", "bar", "baz", "quux"]
+disallowed-names = ["foo", "bar", "baz", "quux"]
 
 # Allowed duplicate crates
 # Allow duplicate dependencies on these crates
@@ -65,20 +65,16 @@ disallowed-methods = []
 # Types that should not be used in the codebase
 disallowed-types = []
 
-# Disallowed scripts
-# Scripts that should not be used
-disallowed-scripts = []
-
 # Allowed scripts
 # Scripts that are allowed
-allowed-scripts = []
+# allowed-scripts = []  # 此选项已移除
 
 # Suppress lints from dependencies
-suppress-lint = []
+# suppress-lint = []  # 此选项已移除
 
 # Macro matcher names
 # Avoid certain names in macro matchers
-enforced-import-renames = []
+# enforced-import-renames = []
 
 # Standard macro braces
 # Require braces for standard macros
@@ -92,17 +88,17 @@ enforced-import-renames = [
 
 # Third-party crates to allow
 # Allow certain third-party crates
-allowed-external-crates = []
+# allowed-external-crates = []  # 此选项已移除
 
 # Self named items
 # Allow certain self-named items
 # e.g., #[allow(clippy::items_after_statements)]
-allowed-self-known-items = []
+# allowed-self-known-items = []  # 此选项已移除
 
 # Obsolete paths
 # Paths that are considered obsolete
-# obsolete-paths = []
+# obsolete-paths = []  # 此选项已移除
 
 # Macro matcher builder names
 # Names that should not be used in macro matchers
-# macro-matchers-builder-names = []
+# macro-matchers-builder-names = []  # 此选项已移除

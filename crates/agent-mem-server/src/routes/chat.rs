@@ -16,7 +16,7 @@ use crate::error::{ServerError, ServerResult};
 use crate::middleware::auth::AuthUser;
 use crate::models::ApiResponse;
 use crate::orchestrator_factory::create_orchestrator;
-use agent_mem_core::orchestrator::{AgentOrchestrator, ChatRequest as OrchestratorChatRequest};
+use agent_mem_core::orchestrator::ChatRequest as OrchestratorChatRequest;
 use agent_mem_core::storage::factory::Repositories;
 use axum::{
     extract::{Extension, Path},

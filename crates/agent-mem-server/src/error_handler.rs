@@ -8,7 +8,6 @@
 
 use crate::error::{ErrorContext, ServerError, ServerResult};
 use std::backtrace::Backtrace;
-use std::fmt;
 use tracing::{error, warn};
 
 /// Error handler trait for consistent error handling
