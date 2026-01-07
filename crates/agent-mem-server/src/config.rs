@@ -12,6 +12,14 @@ pub struct ServerConfig {
     pub host: String,
     /// Enable CORS
     pub enable_cors: bool,
+    /// CORS allowed origins (comma-separated, "*" for all)
+    pub cors_allowed_origins: String,
+    /// CORS allowed methods (comma-separated)
+    pub cors_allowed_methods: String,
+    /// CORS allowed headers (comma-separated)
+    pub cors_allowed_headers: String,
+    /// CORS max age in seconds (for preflight cache)
+    pub cors_max_age: u64,
     /// Enable authentication
     pub enable_auth: bool,
     /// JWT secret key
@@ -52,6 +60,16 @@ impl Default for ServerConfig {
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
                 .unwrap_or(true),
+            cors_allowed_origins: env::var("AGENT_MEM_CORS_ALLOWED_ORIGINS")
+                .unwrap_or_else(|_| "*".to_string()),
+            cors_allowed_methods: env::var("AGENT_MEM_CORS_ALLOWED_METHODS")
+                .unwrap_or_else(|_| "GET,POST,PUT,DELETE,OPTIONS".to_string()),
+            cors_allowed_headers: env::var("AGENT_MEM_CORS_ALLOWED_HEADERS")
+                .unwrap_or_else(|_| "content-type,authorization,x-requested-with".to_string()),
+            cors_max_age: env::var("AGENT_MEM_CORS_MAX_AGE")
+                .unwrap_or_else(|_| "3600".to_string())
+                .parse()
+                .unwrap_or(3600),
             enable_auth: env::var("AGENT_MEM_ENABLE_AUTH")
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
@@ -148,6 +166,20 @@ impl ServerConfig {
         if let Ok(cors) = env::var("AGENT_MEM_ENABLE_CORS") {
             if let Ok(c) = cors.parse() {
                 self.enable_cors = c;
+            }
+        }
+        if let Ok(origins) = env::var("AGENT_MEM_CORS_ALLOWED_ORIGINS") {
+            self.cors_allowed_origins = origins;
+        }
+        if let Ok(methods) = env::var("AGENT_MEM_CORS_ALLOWED_METHODS") {
+            self.cors_allowed_methods = methods;
+        }
+        if let Ok(headers) = env::var("AGENT_MEM_CORS_ALLOWED_HEADERS") {
+            self.cors_allowed_headers = headers;
+        }
+        if let Ok(max_age) = env::var("AGENT_MEM_CORS_MAX_AGE") {
+            if let Ok(age) = max_age.parse() {
+                self.cors_max_age = age;
             }
         }
         if let Ok(auth) = env::var("AGENT_MEM_ENABLE_AUTH") {

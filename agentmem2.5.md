@@ -2175,9 +2175,60 @@ criterion_main!(benches);
 
 #### 安全（🟡 中）
 
-- [ ] **添加 CORS**
-  - [ ] 配置允许来源
-  - [ ] 预检请求
+- [x] **添加 CORS** ✅ P2 已完成
+  - [x] 配置允许来源
+  - [x] 预检请求支持
+  - [x] 允许的HTTP方法配置
+  - [x] 允许的请求头配置
+  - [x] 预检缓存时间配置
+
+  **Commit**: 1f637c7 "feat(agentmem2.5): Add configurable CORS support (P2)"
+  **文件**:
+  - crates/agent-mem-server/src/config.rs (+36行)
+  - crates/agent-mem-server/src/routes/mod.rs (+70行)
+  - crates/agent-mem-server/src/server.rs (+1行)
+  - .env.example (+32行)
+
+  **新增配置**:
+  - `cors_allowed_origins`: 允许的来源列表（逗号分隔）
+  - `cors_allowed_methods`: 允许的HTTP方法
+  - `cors_allowed_headers`: 允许的请求头
+  - `cors_max_age`: 预检请求缓存时间（秒）
+
+  **环境变量**:
+  - `AGENT_MEM_CORS_ALLOWED_ORIGINS`: 默认 "*"
+  - `AGENT_MEM_CORS_ALLOWED_METHODS`: 默认 "GET,POST,PUT,DELETE,OPTIONS"
+  - `AGENT_MEM_CORS_ALLOWED_HEADERS`: 默认 "content-type,authorization,x-requested-with"
+  - `AGENT_MEM_CORS_MAX_AGE`: 默认 "3600"
+
+  **核心实现**:
+  - `create_cors_layer()` 函数: 根据配置动态创建 CorsLayer
+  - 支持允许所有来源（"*"）或特定来源列表
+  - 禁用CORS时返回空层
+
+  **配置示例**:
+  ```bash
+  # 开发环境（允许所有）
+  AGENT_MEM_ENABLE_CORS=true
+  CORS_ALLOW_ORIGINS=*
+
+  # 生产环境（特定来源）
+  CORS_ALLOW_ORIGINS=https://myapp.com,https://admin.myapp.com
+  CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
+  CORS_ALLOW_HEADERS=content-type,authorization
+  CORS_MAX_AGE=86400
+  ```
+
+  **设计原则**:
+  - 最佳最小方式: 复用 tower-http CorsLayer
+  - 高内聚: 所有CORS逻辑集中在一个函数
+  - 低耦合: 配置与实现分离
+  - 向后兼容: 默认行为保持不变
+
+  **安全增强**:
+  - 支持限制特定来源
+  - 支持自定义方法、请求头和缓存时间
+  - 开发/生产环境灵活配置
 
 - [ ] **速率限制**
   - [ ] 10 req/s

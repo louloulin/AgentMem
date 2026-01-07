@@ -81,6 +81,7 @@ impl MemoryServer {
 
         // Create router with all routes and middleware
         let router = create_router(
+            config.clone(),
             memory_manager.clone(),
             metrics_registry.clone(),
             repositories.clone(),

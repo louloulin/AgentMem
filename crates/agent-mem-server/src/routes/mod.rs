@@ -23,6 +23,7 @@ pub mod logs; // 🆕 Phase 4.2: 日志聚合功能
 pub mod performance; // 🆕 Phase 4.2: 性能分析功能
 pub mod predictor; // 🆕 Phase 2.3: 记忆预测功能
 
+use crate::config::ServerConfig;
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
 use crate::middleware::{
@@ -43,15 +44,68 @@ use axum::{
     Extension, Router,
 };
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+/// Create CORS layer based on configuration
+fn create_cors_layer(config: &ServerConfig) -> CorsLayer {
+    if !config.enable_cors {
+        return CorsLayer::new();
+    }
+
+    let origins: Vec<&str> = config.cors_allowed_origins
+        .split(',')
+        .map(|s| s.trim())
+        .collect();
+
+    if origins.len() == 1 && origins[0] == "*" {
+        return create_cors_layer(&config);
+    }
+
+    let methods: Vec<http::Method> = config.cors_allowed_methods
+        .split(',')
+        .map(|s| s.trim())
+        .filter_map(|m| match m {
+            "GET" => Some(http::Method::GET),
+            "POST" => Some(http::Method::POST),
+            "PUT" => Some(http::Method::PUT),
+            "DELETE" => Some(http::Method::DELETE),
+            "PATCH" => Some(http::Method::PATCH),
+            "OPTIONS" => Some(http::Method::OPTIONS),
+            "HEAD" => Some(http::Method::HEAD),
+            _ => None,
+        })
+        .collect();
+
+    let headers: Vec<http::HeaderName> = config.cors_allowed_headers
+        .split(',')
+        .map(|s| s.trim())
+        .filter_map(|h| http::HeaderName::from_bytes(h.as_bytes()).ok())
+        .collect();
+
+    let mut cors = CorsLayer::new()
+        .allow_methods(methods)
+        .allow_headers(headers);
+
+    cors = cors.max_age(std::time::Duration::from_secs(config.cors_max_age));
+
+    for origin in origins {
+        cors = cors.allow_origin(origin.parse::<HeaderValue>().unwrap_or(HeaderValue::from_static("*")));
+    }
+
+    cors
+}
 
 /// Create the main router with all routes
 pub async fn create_router(
     memory_manager: Arc<MemoryManager>,
     metrics_registry: Arc<MetricsRegistry>,
     repositories: Repositories,
+    config: ServerConfig,
 ) -> ServerResult<Router<()>> {
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
@@ -353,7 +407,7 @@ pub async fn create_router(
     // Add middleware and shared state (order matters: last added = first executed)
     let app = app
         // Add middleware (these middleware layers execute BEFORE the Extension layers below)
-        .layer(CorsLayer::permissive())
+        .layer(create_cors_layer(&config))
         .layer(TraceLayer::new_for_http())
         .layer(axum_middleware::from_fn(circuit_breaker_middleware)) // ✅ Phase 2.2.5: 熔断器模式
         .layer(axum_middleware::from_fn(quota_middleware))
