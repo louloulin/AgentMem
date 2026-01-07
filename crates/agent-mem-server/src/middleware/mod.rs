@@ -12,7 +12,7 @@ pub mod rbac;
 pub use api_version::api_version_compatibility_middleware;
 pub use audit::{audit_logging_middleware, log_security_event, SecurityEvent};
 pub use auth::{
-    api_key_auth_middleware, default_auth_middleware, extract_auth_user, has_role, is_admin,
+    api_key_auth_middleware, require_auth_middleware, extract_auth_user, has_role, is_admin,
     jwt_auth_middleware, optional_auth_middleware, require_admin, require_role,
     tenant_isolation_middleware, AuthUser,
 };

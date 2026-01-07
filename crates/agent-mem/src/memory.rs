@@ -148,6 +148,162 @@ impl Memory {
         Ok(mem)
     }
 
+    /// 核心功能模式（无需 LLM）
+    ///
+    /// 初始化一个仅提供核心功能的 Memory 实例：
+    /// - CRUD 操作（添加、获取、更新、删除）
+    /// - 向量搜索（使用 FastEmbed 本地模型）
+    /// - 批量操作
+    /// - 内存数据库或 LibSQL
+    ///
+    /// 此模式不需要任何 API Key，适合：
+    /// - 开发测试
+    /// - 本地应用
+    /// - 不需要智能功能的场景
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use agent_mem::Memory;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mem = Memory::new_core().await?;
+    ///
+    ///     // 添加记忆
+    ///     mem.add("I love Rust programming").await?;
+    ///
+    ///     // 向量搜索
+    ///     let results = mem.search("programming").await?;
+    ///     for result in results {
+    ///         println!("{}", result.content);
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn new_core() -> Result<Self> {
+        info!("初始化 Memory (核心功能模式 - 无需 LLM)");
+
+        let mem = Memory::builder()
+            .with_storage("libsql://./data/agentmem_core.db")
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .disable_intelligent_features()
+            .build()
+            .await?;
+
+        info!("✅ 核心功能已启动 - CRUD + 向量搜索可用");
+        Ok(mem)
+    }
+
+    /// 智能功能模式（需要 LLM API Key）
+    ///
+    /// 初始化一个启用智能功能的 Memory 实例：
+    /// - 所有核心功能
+    /// - 事实提取
+    /// - 智能搜索
+    /// - 记忆去重
+    /// - 智能决策
+    ///
+    /// 需要配置以下环境变量之一：
+    /// - `OPENAI_API_KEY` - OpenAI (GPT-4, GPT-3.5)
+    /// - `ZHIPU_API_KEY` - 智谱 AI (GLM-4)
+    /// - `DEEPSEEK_API_KEY` - DeepSeek
+    /// - `ANTHROPIC_API_KEY` - Anthropic (Claude)
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use agent_mem::Memory;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // 确保设置了环境变量: OPENAI_API_KEY=sk-...
+    ///     let mem = Memory::new_intelligent().await?;
+    ///
+    ///     // 智能添加（自动提取事实）
+    ///     mem.add("I had lunch with John at 2pm at the Italian restaurant").await?;
+    ///
+    ///     // 智能搜索（考虑重要性、时间、相关性）
+    ///     let results = mem.search("What did I do today?").await?;
+    ///     for result in results {
+    ///         println!("{}", result.content);
+    ///     }
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # 错误
+    ///
+    /// 如果未配置任何 LLM API Key，将返回错误。
+    pub async fn new_intelligent() -> Result<Self> {
+        info!("初始化 Memory (智能功能模式 - 需要 LLM)");
+
+        // 检查是否有可用的 LLM API Key
+        let has_llm = std::env::var("OPENAI_API_KEY").is_ok()
+            || std::env::var("ZHIPU_API_KEY").is_ok()
+            || std::env::var("DEEPSEEK_API_KEY").is_ok()
+            || std::env::var("ANTHROPIC_API_KEY").is_ok();
+
+        if !has_llm {
+            return Err(AgentMemError::configuration(
+                "智能功能需要 LLM API Key。请设置以下环境变量之一: \
+                 OPENAI_API_KEY, ZHIPU_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY\n\
+                 提示: 使用 Memory::new_core() 可无需 API Key 使用核心功能。"
+            ));
+        }
+
+        let mem = Memory::builder()
+            .with_storage("libsql://./data/agentmem_intelligent.db")
+            .with_embedder("fastembed", "BAAI/bge-small-en-v1.5")
+            .enable_intelligent_features()
+            .build()
+            .await?;
+
+        info!("✅ 智能功能已启动 - 事实提取 + 智能搜索可用");
+        Ok(mem)
+    }
+
+    /// 自动检测模式（推荐）
+    ///
+    /// 自动检测环境并选择合适的模式：
+    /// - 有 LLM API Key → 智能功能模式
+    /// - 无 LLM API Key → 核心功能模式
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use agent_mem::Memory;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mem = Memory::new_auto().await?;
+    ///
+    ///     // 根据配置自动启用/禁用智能功能
+    ///     mem.add("I love Rust").await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn new_auto() -> Result<Self> {
+        info!("初始化 Memory (自动检测模式)");
+
+        // 检查是否有可用的 LLM API Key
+        let has_llm = std::env::var("OPENAI_API_KEY").is_ok()
+            || std::env::var("ZHIPU_API_KEY").is_ok()
+            || std::env::var("DEEPSEEK_API_KEY").is_ok()
+            || std::env::var("ANTHROPIC_API_KEY").is_ok();
+
+        if has_llm {
+            info!("检测到 LLM API Key - 使用智能功能模式");
+            Self::new_intelligent().await
+        } else {
+            info!("未检测到 LLM API Key - 使用核心功能模式");
+            Self::new_core().await
+        }
+    }
+
     /// 使用 Builder 模式初始化
     ///
     /// # 示例

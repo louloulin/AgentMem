@@ -162,11 +162,12 @@ impl BatchProcessor {
             .await
             .map_err(|_| AgentMemError::memory_error("Batch processing response lost"))?;
 
-        // Convert back to original type
+        // Convert back to original type using safe serialization
         match result {
             Ok(data) => {
-                // This is a simplified conversion - in practice you'd need proper serialization
-                Ok(unsafe { std::mem::transmute_copy(&data) })
+                // Use safe bincode deserialization instead of unsafe transmute
+                bincode::deserialize(&data)
+                    .map_err(|e| AgentMemError::memory_error(format!("Deserialization failed: {}", e)))
             }
             Err(e) => Err(e),
         }

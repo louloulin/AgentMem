@@ -26,7 +26,7 @@ pub mod predictor; // 🆕 Phase 2.3: 记忆预测功能
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::rbac::rbac_middleware;
 use crate::middleware::{
-    audit_logging_middleware, circuit_breaker_middleware, default_auth_middleware,
+    audit_logging_middleware, circuit_breaker_middleware, require_auth_middleware,
     metrics_middleware, quota_middleware, CircuitBreakerManager, QuotaManager,
 };
 use crate::rbac::RbacChecker;
@@ -361,7 +361,10 @@ pub async fn create_router(
         .layer(axum_middleware::from_fn(rbac_middleware)) // ✅ RBAC权限检查
         .layer(axum_middleware::from_fn(metrics_middleware))
         // Add default auth middleware (injects default AuthUser when auth is disabled)
-        .layer(axum_middleware::from_fn(default_auth_middleware))
+        .layer(axum_middleware::from_fn_with_state(
+            server_config.clone(),
+            require_auth_middleware,
+        ))
         // Add shared state via Extension (must be after middleware that uses them)
         .layer(Extension(circuit_breaker_manager)) // ✅ Phase 2.2.5: 熔断器管理器
         .layer(Extension(rbac_checker)) // ✅ RBAC检查器

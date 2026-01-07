@@ -180,21 +180,49 @@ pub async fn tenant_isolation_middleware(
     Ok(next.run(request).await)
 }
 
-/// Default authentication middleware (when auth is disabled)
+/// Production-ready authentication middleware
 ///
-/// This middleware injects a default AuthUser for development/testing
-/// when authentication is disabled. In production, use jwt_auth_middleware
-/// or api_key_auth_middleware instead.
-pub async fn default_auth_middleware(mut request: Request, next: Next) -> Response {
-    // Check if AuthUser already exists (from optional_auth_middleware)
+/// SECURITY: This middleware enforces authentication in production.
+/// In development mode (debug builds), it provides a default user for testing.
+/// 
+/// IMPORTANT: Production builds MUST have valid authentication configured.
+pub async fn require_auth_middleware(
+    State(config): State<crate::config::ServerConfig>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    // Check if AuthUser already exists (from JWT/API key middleware)
     if request.extensions().get::<AuthUser>().is_none() {
-        // Inject a default AuthUser for development
-        let default_user = AuthUser {
-            user_id: "default".to_string(),
-            org_id: "default-org".to_string(),
-            roles: vec!["admin".to_string(), "user".to_string()],
-        };
-        request.extensions_mut().insert(default_user);
+        // Development mode: allow default user for testing
+        #[cfg(debug_assertions)]
+        {
+            tracing::warn!(
+                "No authentication found - using default user for DEVELOPMENT mode only"
+            );
+            let default_user = AuthUser {
+                user_id: "dev-user".to_string(),
+                org_id: "dev-org".to_string(),
+                roles: vec!["admin".to_string(), "user".to_string()],
+            };
+            request.extensions_mut().insert(default_user);
+        }
+        
+        // Production mode: reject unauthenticated requests
+        #[cfg(not(debug_assertions))]
+        {
+            tracing::error!("Authentication required in production but not provided");
+            let error_response = serde_json::json!({
+                "error": "Authentication required",
+                "message": "This endpoint requires authentication. Please provide valid credentials.",
+                "code": 401
+            });
+            
+            return Response::builder()
+                .status(401)
+                .header("Content-Type", "application/json")
+                .body(Body::from(serde_json::to_string(&error_response).unwrap()))
+                .unwrap();
+        }
     }
 
     next.run(request).await
