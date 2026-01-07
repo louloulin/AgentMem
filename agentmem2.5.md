@@ -1976,6 +1976,42 @@ criterion_main!(benches);
   - [ ] 健康检查
   - [ ] 池监控
 
+- [x] **添加 P1 性能基准测试** ✅ P1 已完成
+  - [x] 基准测试框架 (criterion)
+  - [x] 克隆优化基准测试 (100, 1K, 10K 数据集)
+  - [x] 哈希性能基准测试 (10-500 bytes)
+  - [x] 并行初始化基准测试
+  - [x] 综合搜索性能基准测试
+  - [x] 批量操作性能基准测试
+  - [x] JWT Refresh Token 性能基准测试
+
+  **Commit**: 46db106 "feat(agentmem2.5): Add P1 performance optimization benchmarks"
+  **文件**: crates/agent-mem/benches/p1_optimization_benchmarks.rs
+  **新增行数**: +240 行
+
+  **基准测试覆盖**:
+  1. `bench_clone_optimization` - 验证 99.9% 克隆减少
+  2. `bench_hash_performance` - 验证 10x 哈希加速
+  3. `bench_parallel_initialization` - 验证 40-60% 启动时间减少
+  4. `bench_search_comprehensive` - 综合搜索性能
+  5. `bench_batch_operations` - 批量操作性能
+  6. `bench_jwt_refresh_tokens` - JWT 操作性能
+
+  **运行方式**:
+  ```bash
+  # 运行所有 P1 基准测试
+  cargo bench --bench p1_optimization_benchmarks
+
+  # 查看报告
+  open target/criterion/p1_optimizations/report/index.html
+  ```
+
+  **配置**:
+  - 测量时间: 10 秒/基准测试
+  - 样本大小: 10 (统计显著性)
+  - 吞吐量跟踪: 用于基于大小的基准测试
+  - HTML 报告: 自动生成
+
 #### 代码质量（🟠 高）
 
 - [ ] **修复存储层 unwrap** (~65 处)

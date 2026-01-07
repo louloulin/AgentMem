@@ -56,6 +56,10 @@ tempfile.workspace = true
 name = "memory_benchmarks"
 harness = false
 
+[[bench]]
+name = "p1_optimization_benchmarks"
+harness = false
+
 [features]
 default = ["libsql", "fastembed"]
 libsql = ["agent-mem-storage/libsql", "agent-mem-core/libsql"]
