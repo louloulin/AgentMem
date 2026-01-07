@@ -21,6 +21,8 @@ mod cache;
 mod stats;
 #[path = "memory/utils.rs"]
 mod utils;
+#[path = "memory/validators.rs"]
+mod validators;
 
 // 重新导出以便向后兼容
 pub use cache::{get_search_cache, generate_cache_key, CachedSearchResult};
@@ -31,6 +33,10 @@ pub use utils::{
     detect_exact_query, convert_memory_to_json, calculate_access_pattern_score,
     calculate_auto_importance, apply_hierarchical_sorting, apply_intelligent_filtering,
     compute_prefetch_candidates,
+};
+pub use validators::{
+    AddMemoryRequest, UpdateMemoryRequest, SearchMemoryRequest,
+    DeleteMemoryRequest, BatchAddMemoriesRequest,
 };
 
 use crate::error::{ServerError, ServerResult};

@@ -1866,13 +1866,19 @@ criterion_main!(benches);
   + Ok(bincode::deserialize(&data)?)
   ```
 
-- [ ] **添加准备语句缓存**
+- [x] **添加准备语句缓存** ✅ 已完成 (2025-01-07)
   ```rust
   // crates/agent-mem-storage/src/backends/libsql_core.rs
-  pub struct LibSQLBackend {
-      cached_statements: Arc<RwLock<HashMap<String, Statement>>>,
+  pub struct LibSqlCoreStore {
+      conn: Arc<Mutex<Connection>>,
+      statement_cache: StatementCache,  // ✅ 已实现
   }
   ```
+  - 实现了 `get_prepared_statement()` 方法
+  - 实现了 `clear_statement_cache()` 方法
+  - 实现了 `cache_size()` 统计方法
+  - 所有查询方法已更新使用缓存
+  - 预期性能提升: 40% 查询延迟减少
 
 #### 代码质量（🔴 高）
 
@@ -1895,11 +1901,17 @@ criterion_main!(benches);
 
 #### 安全性（🟠 高）
 
-- [ ] **实现输入验证层**
-  - [ ] 添加 validator 依赖
-  - [ ] 为所有请求添加验证结构
-  - [ ] 实现 validation middleware
-  - [ ] 添加 payload 大小限制
+- [x] **实现输入验证层** ✅ 已完成 (2025-01-07)
+  - [x] 添加 validator 依赖
+  - [x] 为所有请求添加验证结构
+  - [x] 实现 validation middleware
+  - [x] 添加 payload 大小限制
+  - [x] 创建综合测试 (test_p1_validation.rs)
+  - [x] 创建集成测试 (integration_test_p1.rs)
+  - 文件: crates/agent-mem-server/src/routes/memory/validators.rs
+  - 文件: crates/agent-mem-server/src/middleware/validation.rs
+  - 测试: crates/agent-mem-server/tests/test_p1_validation.rs
+  - 测试: crates/agent-mem-server/tests/integration_test_p1.rs
 
 - [ ] **完善 JWT**
   - [ ] 实现 refresh token
@@ -1957,11 +1969,16 @@ criterion_main!(benches);
   - [ ] with_auto_config()
   - [ ] 友好错误消息
 
-- [ ] **创建统一启动脚本**
-  - [ ] just dev
-  - [ ] just stop
-  - [ ] just logs
-  - [ ] just test
+- [x] **创建统一启动脚本** ✅ 已完成
+  - [x] just dev
+  - [x] just stop
+  - [x] just logs
+  - [x] just test
+  - [x] just start-full
+  - [x] just build
+  - [x] just health
+  - [x] 完整的 justfile 已存在且功能完善
+  - 文件: justfile (包含100+命令)
 
 - [ ] **配置文件模板**
   - [ ] config.core-only.toml
