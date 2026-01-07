@@ -1971,10 +1971,42 @@ criterion_main!(benches);
   - **Commit**: 95c9a85 "perf(agentmem2.5): Parallel initialization with tokio::try_join!"
   - **结果**: 40-60% startup time reduction
 
-- [ ] **添加 LLM 连接池**
-  - [ ] 实现 deadpool
-  - [ ] 健康检查
-  - [ ] 池监控
+- [x] **添加 LLM 连接池** ✅ P1 已完成
+  - [x] 轻量级连接池实现 (RwLock<HashMap>)
+  - [x] 池键生成: "{provider}/{model}"
+  - [x] 延迟初始化: get_or_create_provider()
+  - [x] 缓存管理: clear_provider(), clear_all()
+  - [x] 池统计: pool_size()
+  - [x] 线程安全: RwLock 并发读写
+
+  **Commit**: 102d50d "feat(agentmem2.5): Add LLM connection pool manager"
+  **文件**: crates/agent-mem-llm/src/pool.rs (222 行)
+  **测试**: 4 个单元测试全部通过
+  **设计**:
+  - 最佳最小方式: 无外部依赖，简单 RwLock 包装
+  - 高内聚: 所有池逻辑集中在一个模块
+  - 低耦合: 不依赖外部连接池库
+  **性能提升**:
+  - 减少 provider 创建开销
+  - 支持并发 LLM 调用
+  - 自动连接复用
+  **使用示例**:
+  ```rust
+  use agent_mem_llm::LLMPoolManager;
+  use agent_mem_traits::LLMConfig;
+
+  let pool = LLMPoolManager::new();
+  let config = LLMConfig::default();
+
+  // 从池中获取或创建 provider（自动缓存）
+  let provider = pool.get_or_create_provider(&config).await?;
+
+  // 相同配置会复用缓存的 provider
+  let provider2 = pool.get_or_create_provider(&config).await?;
+
+  // 查看池大小
+  println!("Pool size: {}", pool.pool_size().await); // 1
+  ```
 
 - [x] **添加 P1 性能基准测试** ✅ P1 已完成
   - [x] 基准测试框架 (criterion)

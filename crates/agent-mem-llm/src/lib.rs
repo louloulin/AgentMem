@@ -13,6 +13,7 @@ pub mod cache;
 pub mod client;
 pub mod factory;
 pub mod metrics;
+pub mod pool;
 pub mod prompts;
 pub mod providers;
 pub mod retry;
@@ -21,6 +22,7 @@ pub use cache::{CacheStats, CachedResult, LLMCache};
 pub use client::LLMClient;
 pub use factory::LLMFactory;
 pub use metrics::{LLMMetrics, LLMMonitor, LLMStats};
+pub use pool::LLMPoolManager;
 pub use retry::{ErrorType, RetryConfig, RetryExecutor};
 
 // 重新导出常用类型

@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_response() {
+    async fn test_generate_response() -> Result<()> {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
@@ -339,10 +339,11 @@ mod tests {
         let response = provider.generate(&messages).await?;
         assert!(!response.is_empty());
         assert!(response.contains("您好"));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_generate_with_metadata() {
+    async fn test_generate_with_metadata() -> Result<()> {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
@@ -356,15 +357,17 @@ mod tests {
         assert!(!response.is_empty());
         assert!(metadata.contains_key("model"));
         assert!(metadata.contains_key("usage"));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_health_check() {
+    async fn test_health_check() -> Result<()> {
         let config = LLMConfig::default();
         let provider = LocalTestProvider::new(config).unwrap();
 
         let is_healthy = provider.health_check().await?;
         assert!(is_healthy);
+        Ok(())
     }
 
     #[tokio::test]
