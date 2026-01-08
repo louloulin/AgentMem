@@ -11,7 +11,7 @@ use axum::{
     extract::Request,
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
 use serde_json::json;
@@ -54,11 +54,8 @@ pub fn validation_error_response(error: String) -> Response {
         }
     }));
 
-    Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .header("Content-Type", "application/json")
-        .body(body.into_body().into())
-        .unwrap()
+    // Convert Json to response body
+    Json(body).into_response()
 }
 
 /// Validate add memory request

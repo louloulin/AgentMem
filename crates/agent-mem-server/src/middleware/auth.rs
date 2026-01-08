@@ -5,7 +5,7 @@
 use crate::auth::AuthService;
 use crate::error::{ServerError, ServerResult};
 use agent_mem_core::storage::traits::ApiKeyRepositoryTrait;
-use axum::{extract::Request, http::header, middleware::Next, response::Response};
+use axum::{extract::{Request, State}, http::header, middleware::Next, response::Response};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 

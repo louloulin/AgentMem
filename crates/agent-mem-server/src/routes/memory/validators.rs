@@ -12,7 +12,7 @@
 //! 🏗️ Architecture: Security validation layer at API boundary
 
 use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError, ValidationErrorKind};
+use validator::{Validate, ValidationError};
 use std::collections::HashMap;
 
 /// Maximum payload size in bytes (1MB)
@@ -55,10 +55,9 @@ fn validate_no_html(content: &str) -> Result<(), ValidationError> {
     let content_lower = content.to_lowercase();
     for pattern in &dangerous_patterns {
         if content_lower.contains(pattern) {
-            return Err(ValidationError::new(ValidationErrorKind::Custom(
-                String::from("content_contains_html_or_script"),
-                Some(format!("Content contains potentially dangerous pattern: {}", pattern)),
-            )));
+            let mut error = ValidationError::new("content_contains_html_or_script");
+            error.message = Some(format!("Content contains potentially dangerous pattern: {}", pattern).into());
+            return Err(error);
         }
     }
 
@@ -69,13 +68,12 @@ fn validate_no_html(content: &str) -> Result<(), ValidationError> {
 fn validate_payload_size(payload: &str) -> Result<(), ValidationError> {
     let size = payload.len();
     if size > MAX_PAYLOAD_SIZE {
-        return Err(ValidationError::new(ValidationErrorKind::Custom(
-            String::from("payload_too_large"),
-            Some(format!(
-                "Payload size {} bytes exceeds maximum {} bytes",
-                size, MAX_PAYLOAD_SIZE
-            )),
-        )));
+        let mut error = ValidationError::new("payload_too_large");
+        error.message = Some(format!(
+            "Payload size {} bytes exceeds maximum {} bytes",
+            size, MAX_PAYLOAD_SIZE
+        ).into());
+        return Err(error);
     }
     Ok(())
 }
@@ -83,13 +81,12 @@ fn validate_payload_size(payload: &str) -> Result<(), ValidationError> {
 /// Custom validator: Validate metadata keys (alphanumeric, underscore, hyphen)
 fn validate_metadata_key(key: &str) -> Result<(), ValidationError> {
     if !key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err(ValidationError::new(ValidationErrorKind::Custom(
-            String::from("invalid_metadata_key"),
-            Some(format!(
-                "Metadata key '{}' contains invalid characters (only alphanumeric, underscore, hyphen allowed)",
-                key
-            )),
-        )));
+        let mut error = ValidationError::new("invalid_metadata_key");
+        error.message = Some(format!(
+            "Metadata key '{}' contains invalid characters (only alphanumeric, underscore, hyphen allowed)",
+            key
+        ).into());
+        return Err(error);
     }
     Ok(())
 }
@@ -97,13 +94,12 @@ fn validate_metadata_key(key: &str) -> Result<(), ValidationError> {
 /// Custom validator: Validate tags (alphanumeric, underscore, hyphen)
 fn validate_tag(tag: &str) -> Result<(), ValidationError> {
     if !tag.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err(ValidationError::new(ValidationErrorKind::Custom(
-            String::from("invalid_tag"),
-            Some(format!(
-                "Tag '{}' contains invalid characters (only alphanumeric, underscore, hyphen allowed)",
-                tag
-            )),
-        )));
+        let mut error = ValidationError::new("invalid_tag");
+        error.message = Some(format!(
+            "Tag '{}' contains invalid characters (only alphanumeric, underscore, hyphen allowed)",
+            tag
+        ).into());
+        return Err(error);
     }
     Ok(())
 }

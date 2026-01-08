@@ -43,6 +43,7 @@ use axum::{
     routing::{delete, get, post, put},
     Extension, Router,
 };
+use http::{HeaderName, HeaderValue, Method};
 use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -66,25 +67,25 @@ fn create_cors_layer(config: &ServerConfig) -> CorsLayer {
         return create_cors_layer(&config);
     }
 
-    let methods: Vec<http::Method> = config.cors_allowed_methods
+    let methods: Vec<Method> = config.cors_allowed_methods
         .split(',')
         .map(|s| s.trim())
         .filter_map(|m| match m {
-            "GET" => Some(http::Method::GET),
-            "POST" => Some(http::Method::POST),
-            "PUT" => Some(http::Method::PUT),
-            "DELETE" => Some(http::Method::DELETE),
-            "PATCH" => Some(http::Method::PATCH),
-            "OPTIONS" => Some(http::Method::OPTIONS),
-            "HEAD" => Some(http::Method::HEAD),
+            "GET" => Some(Method::GET),
+            "POST" => Some(Method::POST),
+            "PUT" => Some(Method::PUT),
+            "DELETE" => Some(Method::DELETE),
+            "PATCH" => Some(Method::PATCH),
+            "OPTIONS" => Some(Method::OPTIONS),
+            "HEAD" => Some(Method::HEAD),
             _ => None,
         })
         .collect();
 
-    let headers: Vec<http::HeaderName> = config.cors_allowed_headers
+    let headers: Vec<HeaderName> = config.cors_allowed_headers
         .split(',')
         .map(|s| s.trim())
-        .filter_map(|h| http::HeaderName::from_bytes(h.as_bytes()).ok())
+        .filter_map(|h| HeaderName::from_bytes(h.as_bytes()).ok())
         .collect();
 
     let mut cors = CorsLayer::new()
