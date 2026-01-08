@@ -224,6 +224,46 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // Disabled: requires real Store implementation
+    async fn test_agent_registry_basic() -> anyhow::Result<()> {
+        let registry = AgentRegistry::new();
+
+        // 创建一个 agent with real store
+        // let store = Arc::new(/* create real store */);
+        let agent = CoreAgent::new("test-agent".to_string());
+        // agent.set_store(store);
+        let agent_arc = Arc::new(RwLock::new(agent));
+
+        // 注册 agent
+        // registry.register_core_agent(agent_arc).await?;
+
+        // 验证注册
+        // assert!(registry.has_agent(&MemoryType::Core).await);
+        // assert_eq!(registry.agent_count().await, 1);
+
+        // let types = registry.registered_memory_types().await;
+        // assert_eq!(types.len(), 1);
+        // assert!(types.contains(&MemoryType::Core));
+    }
+
+    #[tokio::test]
+    #[ignore] // Disabled: requires real Store implementation
+    async fn test_agent_registry_multiple_agents() {
+        let registry = AgentRegistry::new();
+
+        // 注册多个 agents
+        // let core_store = Arc::new(/* create real store */);
+        let core_agent = CoreAgent::new("core-agent".to_string());
+        // core_agent.set_store(core_store);
+        // registry
+        //     .register_core_agent(Arc::new(RwLock::new(core_agent)))
+        //     .await
+        //     .unwrap();
+
+        // 验证
+        // assert_eq!(registry.agent_count().await, 1);
+    }
+}
+
     async fn test_agent_registry_basic() {
         let registry = AgentRegistry::new();
 

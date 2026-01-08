@@ -308,7 +308,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_kv_cache_basic() {
+    async fn test_kv_cache_basic() -> anyhow::Result<()> {
         let cache = KvCacheManager::with_defaults();
         
         let prompt_hash = "test_prompt_123";
@@ -356,6 +356,130 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_kv_cache_stats() {
+        let cache = KvCacheManager::with_defaults();
+        
+        let prompt_hash = "test_stats";
+        let keys = vec![vec![1.0, 2.0]];
+        let values = vec![vec![3.0, 4.0]];
+
+        cache.set(prompt_hash.to_string(), keys, values).await?;
+        cache.get(prompt_hash).await; // Hit
+        cache.get("nonexistent").await; // Miss
+
+        let stats = cache.get_stats().await;
+        assert_eq!(stats.entries, 1);
+        assert!(stats.hits > 0);
+        assert!(stats.misses > 0);
+    }
+}
+
+    async fn test_kv_cache_basic() {
+        let cache = KvCacheManager::with_defaults();
+        
+        let prompt_hash = "test_prompt_123";
+        let keys = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
+        let values = vec![vec![7.0, 8.0, 9.0], vec![10.0, 11.0, 12.0]];
+
+        // Store
+        cache.set(prompt_hash.to_string(), keys.clone(), values.clone()).await?;
+
+        // Retrieve
+        let entry = cache.get(prompt_hash).await;
+        assert!(entry.is_some());
+        let entry = entry.unwrap();
+        assert_eq!(entry.cached_keys, keys);
+        assert_eq!(entry.cached_values, values);
+
+        // Inject memory
+        let injected = cache.inject_memory(prompt_hash).await?;
+        assert!(injected.is_some());
+        let (injected_keys, injected_values) = injected.unwrap();
+        assert_eq!(injected_keys, keys);
+        assert_eq!(injected_values, values);
+    }
+
+    #[tokio::test]
+    async fn test_kv_cache_ttl() -> anyhow::Result<()> {
+        let mut config = KvCacheConfig::default();
+        config.ttl_seconds = 1; // 1 second TTL
+        let cache = KvCacheManager::new(config);
+        
+        let prompt_hash = "test_prompt_ttl";
+        let keys = vec![vec![1.0]];
+        let values = vec![vec![2.0]];
+
+        cache.set(prompt_hash.to_string(), keys, values).await?;
+
+        // Should be available immediately
+        assert!(cache.get(prompt_hash).await.is_some());
+
+        // Wait for TTL to expire
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Should be expired
+        assert!(cache.get(prompt_hash).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_kv_cache_stats() {
+        let cache = KvCacheManager::with_defaults();
+        
+        let prompt_hash = "test_stats";
+        let keys = vec![vec![1.0, 2.0]];
+        let values = vec![vec![3.0, 4.0]];
+
+        cache.set(prompt_hash.to_string(), keys, values).await?;
+        cache.get(prompt_hash).await; // Hit
+        cache.get("nonexistent").await; // Miss
+
+        let stats = cache.get_stats().await;
+        assert_eq!(stats.entries, 1);
+        assert!(stats.hits > 0);
+        assert!(stats.misses > 0);
+    }
+}
+
+    async fn test_kv_cache_ttl() {
+        let mut config = KvCacheConfig::default();
+        config.ttl_seconds = 1; // 1 second TTL
+        let cache = KvCacheManager::new(config);
+        
+        let prompt_hash = "test_prompt_ttl";
+        let keys = vec![vec![1.0]];
+        let values = vec![vec![2.0]];
+
+        cache.set(prompt_hash.to_string(), keys, values).await?;
+
+        // Should be available immediately
+        assert!(cache.get(prompt_hash).await.is_some());
+
+        // Wait for TTL to expire
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Should be expired
+        assert!(cache.get(prompt_hash).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_kv_cache_stats() -> anyhow::Result<()> {
+        let cache = KvCacheManager::with_defaults();
+        
+        let prompt_hash = "test_stats";
+        let keys = vec![vec![1.0, 2.0]];
+        let values = vec![vec![3.0, 4.0]];
+
+        cache.set(prompt_hash.to_string(), keys, values).await?;
+        cache.get(prompt_hash).await; // Hit
+        cache.get("nonexistent").await; // Miss
+
+        let stats = cache.get_stats().await;
+        assert_eq!(stats.entries, 1);
+        assert!(stats.hits > 0);
+        assert!(stats.misses > 0);
+    }
+}
+
     async fn test_kv_cache_stats() {
         let cache = KvCacheManager::with_defaults();
         

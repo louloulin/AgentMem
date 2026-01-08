@@ -304,7 +304,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_memory_cache_set_get() {
+    async fn test_memory_cache_set_get() -> anyhow::Result<()> {
         let cache = MemoryCache::new(MemoryCacheConfig::default());
 
         cache
@@ -355,4 +355,58 @@ mod tests {
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.total_sets, 1);
     }
+}
+
+    async fn test_memory_cache_set_get() {
+        let cache = MemoryCache::new(MemoryCacheConfig::default());
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        let value = cache.get(&"key1".to_string()).await?;
+
+        assert_eq!(value, Some(b"value1".to_vec()));
+    }
+
+    #[tokio::test]
+    async fn test_memory_cache_miss() -> anyhow::Result<()> {
+        let cache = MemoryCache::new(MemoryCacheConfig::default());
+
+        let value = cache.get(&"nonexistent".to_string()).await?;
+        assert_eq!(value, None);
+    }
+
+    #[tokio::test]
+    async fn test_memory_cache_delete() {
+        let cache = MemoryCache::new(MemoryCacheConfig::default());
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        let removed = cache.delete(&"key1".to_string()).await?;
+        assert!(removed);
+
+        let value = cache.get(&"key1".to_string()).await?;
+        assert_eq!(value, None);
+    }
+
+    #[tokio::test]
+    async fn test_memory_cache_stats() {
+        let cache = MemoryCache::new(MemoryCacheConfig::default());
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        cache.get(&"key1".to_string()).await?; // hit
+        cache.get(&"key2".to_string()).await?; // miss
+
+        let stats = cache.stats().await?;
+        assert_eq!(stats.hits, 1);
+        assert_eq!(stats.misses, 1);
+        assert_eq!(stats.total_sets, 1);
+    }
+}
 }

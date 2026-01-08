@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_warmer_eager() {
+    async fn test_cache_warmer_eager() -> anyhow::Result<()> {
         let cache = Arc::new(MemoryCache::new(MemoryCacheConfig::default()));
         let loader = Arc::new(MockDataLoader);
         let config = CacheWarmingConfig {
@@ -350,6 +350,7 @@ mod tests {
             max_items: 10,
             batch_size: 5,
             enable_stats: true,
+        Ok(())
         };
 
         let warmer = CacheWarmer::new(cache.clone(), loader, config);

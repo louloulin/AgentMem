@@ -258,20 +258,19 @@ impl MemoryScheduler for DefaultMemoryScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_mem_traits::{
-        AttributeKey, AttributeValue, Content, MemoryBuilder, Metadata,
-    };
+    use agent_mem_core::types::Memory;
+    use agent_mem_traits::{AttributeKey, AttributeValue, MemoryType};
 
     fn create_test_memory(importance: f64, days_ago: f64) -> Memory {
         let created_at = (chrono::Utc::now() - chrono::Duration::days(days_ago as i64)).timestamp();
 
-        MemoryBuilder::new()
-            .content(Content::Text(format!("Test memory from {} days ago", days_ago)))
-            .build()
-            .with_attribute(
-                AttributeKey::system("importance"),
-                AttributeValue::Number(importance as f64),
-            )
+        Memory::new(
+            "test_agent".to_string(),
+            None,
+            MemoryType::Episodic,
+            format!("Test memory from {} days ago", days_ago),
+            importance as f32,
+        )
     }
 
     #[tokio::test]

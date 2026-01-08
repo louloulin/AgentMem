@@ -925,6 +925,79 @@ mod tests {
     use crate::types::Memory;
 
     #[tokio::test]
+    async fn test_graph_memory_basic_operations() -> anyhow::Result<()> {
+        use crate::types::MemoryType;
+        use agent_mem_traits::Vector;
+
+        let engine = GraphMemoryEngine::new();
+
+        // 创建测试记忆（使用V4 API）
+        let memory1 = Memory::new(
+            "test_agent".to_string(),
+            Some("user1".to_string()),
+            MemoryType::Semantic,
+            "Apple is a fruit".to_string(),
+            0.8,
+        );
+
+        let memory2 = Memory::new(
+            "test_agent".to_string(),
+            Some("user1".to_string()),
+            MemoryType::Semantic,
+            "Fruit is healthy".to_string(),
+            0.7,
+        );
+
+        // 添加节点
+        let node1_id = engine.add_node(memory1, NodeType::Entity).await?;
+        let node2_id = engine.add_node(memory2, NodeType::Concept).await?;
+
+        // 添加边
+        let _edge_id = engine
+            .add_edge(node1_id.clone(), node2_id.clone(), RelationType::IsA, 1.0)
+            .await
+            .unwrap();
+
+        // 查找相关节点
+        let related = engine.find_related_nodes(&node1_id, 2, None).await?;
+        assert_eq!(related.len(), 1);
+
+        // 获取统计信息
+        let stats = engine.get_graph_stats().await?;
+        assert_eq!(stats.total_nodes, 2);
+        assert_eq!(stats.total_edges, 1);
+    }
+
+    #[tokio::test]
+    async fn test_graph_memory_mem0_api() {
+        use crate::types::MemoryType;
+
+        let engine = GraphMemoryEngine::new();
+
+        // 测试add方法
+        let mut filters = HashMap::new();
+        filters.insert("agent_id".to_string(), "test_agent".to_string());
+        filters.insert("user_id".to_string(), "user1".to_string());
+
+        let result = engine.add("Apple is a fruit", &filters).await?;
+        assert!(!result.added_entities.is_empty());
+
+        // 测试search方法
+        let relations = engine.search("fruit", &filters, 10).await?;
+        // 可能为空，因为需要先建立关系
+        assert!(relations.len() <= 10);
+
+        // 测试get_all方法
+        let all_relations = engine.get_all(&filters, 10).await?;
+        assert!(all_relations.len() <= 10);
+
+        // 测试delete_all方法
+        engine.delete_all(&filters).await?;
+        let after_delete = engine.get_all(&filters, 10).await?;
+        assert_eq!(after_delete.len(), 0);
+    }
+}
+
     async fn test_graph_memory_basic_operations() {
         use crate::types::MemoryType;
         use agent_mem_traits::Vector;
@@ -969,6 +1042,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_graph_memory_mem0_api() -> anyhow::Result<()> {
+        use crate::types::MemoryType;
+
+        let engine = GraphMemoryEngine::new();
+
+        // 测试add方法
+        let mut filters = HashMap::new();
+        filters.insert("agent_id".to_string(), "test_agent".to_string());
+        filters.insert("user_id".to_string(), "user1".to_string());
+
+        let result = engine.add("Apple is a fruit", &filters).await?;
+        assert!(!result.added_entities.is_empty());
+
+        // 测试search方法
+        let relations = engine.search("fruit", &filters, 10).await?;
+        // 可能为空，因为需要先建立关系
+        assert!(relations.len() <= 10);
+
+        // 测试get_all方法
+        let all_relations = engine.get_all(&filters, 10).await?;
+        assert!(all_relations.len() <= 10);
+
+        // 测试delete_all方法
+        engine.delete_all(&filters).await?;
+        let after_delete = engine.get_all(&filters, 10).await?;
+        assert_eq!(after_delete.len(), 0);
+    }
+}
+
     async fn test_graph_memory_mem0_api() {
         use crate::types::MemoryType;
 

@@ -395,7 +395,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_adaptive_router() {
+    async fn test_adaptive_router() -> anyhow::Result<()> {
         let config = AgentMemConfig::default();
         let router = AdaptiveRouter::new(config);
 
@@ -407,6 +407,7 @@ mod tests {
             fulltext_weight: 0.3,
             filters: None,
             metadata_filters: None,
+        Ok(())
         };
 
         // 决策

@@ -587,10 +587,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_processor() {
+    async fn test_batch_processor() -> anyhow::Result<()> {
         let config = MultimodalOptimizationConfig {
             batch_size: 2,
             ..Default::default()
+        Ok(())
         };
         let cross_modal_config = CrossModalConfig::default();
         let processor = BatchProcessor::new(config, cross_modal_config);

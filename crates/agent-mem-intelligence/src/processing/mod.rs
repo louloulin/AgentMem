@@ -208,6 +208,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_process_memories() -> anyhow::Result<()> {
+        let config = ProcessingConfig::default();
+        let mut processor = MemoryProcessor::new(config);
+
+        let mut memories = vec![
+            create_test_memory("mem1", "First memory", 0.8),
+            create_test_memory("mem2", "Second memory", 0.6),
+            create_test_memory("mem3", "Third memory", 0.9),
+        ];
+
+        let stats = processor.process_memories(&mut memories).await?;
+        assert_eq!(stats.processed_count, 3);
+        // Processing time might be 0 in fast tests, so just check it's valid
+        assert!(stats.processing_time_ms >= 0);
+    }
+
+    #[tokio::test]
+    async fn test_process_single_memory() {
+        let config = ProcessingConfig::default();
+        let mut processor = MemoryProcessor::new(config);
+
+        let mut memory = create_test_memory("mem1", "Test memory", 0.7);
+        let result = processor.process_single_memory(&mut memory).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_config_update() {
+        let mut config = ProcessingConfig::default();
+        let mut processor = MemoryProcessor::new(config.clone());
+
+        config.consolidation_threshold = 0.9;
+        config.importance_decay_rate = 0.8;
+        processor.update_config(config.clone());
+
+        assert_eq!(processor.config().consolidation_threshold, 0.9);
+        assert_eq!(processor.config().importance_decay_rate, 0.8);
+    }
+}
+
     async fn test_process_memories() {
         let config = ProcessingConfig::default();
         let mut processor = MemoryProcessor::new(config);

@@ -586,7 +586,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_core_memory_manager_creation() {
+    async fn test_core_memory_manager_creation() -> anyhow::Result<()> {
         let manager = CoreMemoryManager::new();
         let stats = manager.get_stats().await?;
 
@@ -787,9 +787,1399 @@ mod tests {
         assert_eq!(id, &block_id);
         assert_eq!(*block_type, CoreMemoryBlockType::Persona);
         assert!(usage > &0.0 && usage < &1.0);
+    async fn test_core_memory_manager_creation() {
+        let manager = CoreMemoryManager::new();
+        let stats = manager.get_stats().await?;
+
+        assert_eq!(stats.persona_blocks_count, 0);
+        assert_eq!(stats.human_blocks_count, 0);
+        assert_eq!(stats.total_accesses, 0);
+        assert_eq!(stats.auto_rewrites, 0);
     }
 
     #[tokio::test]
+    async fn test_persona_block_creation_and_retrieval() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let content = "I am a helpful AI assistant with a friendly personality.".to_string();
+        let block_id = manager
+            .create_persona_block(content.clone(), None)
+            .await
+            .unwrap();
+
+        let retrieved_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(retrieved_block.content, content);
+        assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Persona);
+        assert_eq!(retrieved_block.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_human_block_creation_and_retrieval() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "User prefers concise responses and technical details.".to_string();
+        let block_id = manager
+            .create_human_block(content.clone(), None)
+            .await
+            .unwrap();
+
+        let retrieved_block = manager.get_human_block(&block_id).await?.unwrap();
+        assert_eq!(retrieved_block.content, content);
+        assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Human);
+        assert_eq!(retrieved_block.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_update() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content, None)
+            .await
+            .unwrap();
+
+        let new_content = "Updated content with more information".to_string();
+        manager
+            .update_persona_block(&block_id, new_content.clone())
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(updated_block.content, new_content);
+        assert!(updated_block.updated_at > updated_block.created_at);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_append() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content.clone(), None)
+            .await
+            .unwrap();
+
+        let additional_content = "Additional information";
+        manager
+            .append_to_persona_block(&block_id, additional_content)
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(updated_block.content.contains(&initial_content));
+        assert!(updated_block.content.contains(additional_content));
+    }
+
+    #[tokio::test]
+    async fn test_capacity_management() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+    async fn test_persona_block_creation_and_retrieval() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "I am a helpful AI assistant with a friendly personality.".to_string();
+        let block_id = manager
+            .create_persona_block(content.clone(), None)
+            .await
+            .unwrap();
+
+        let retrieved_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(retrieved_block.content, content);
+        assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Persona);
+        assert_eq!(retrieved_block.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_human_block_creation_and_retrieval() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let content = "User prefers concise responses and technical details.".to_string();
+        let block_id = manager
+            .create_human_block(content.clone(), None)
+            .await
+            .unwrap();
+
+        let retrieved_block = manager.get_human_block(&block_id).await?.unwrap();
+        assert_eq!(retrieved_block.content, content);
+        assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Human);
+        assert_eq!(retrieved_block.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_update() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content, None)
+            .await
+            .unwrap();
+
+        let new_content = "Updated content with more information".to_string();
+        manager
+            .update_persona_block(&block_id, new_content.clone())
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(updated_block.content, new_content);
+        assert!(updated_block.updated_at > updated_block.created_at);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_append() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content.clone(), None)
+            .await
+            .unwrap();
+
+        let additional_content = "Additional information";
+        manager
+            .append_to_persona_block(&block_id, additional_content)
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(updated_block.content.contains(&initial_content));
+        assert!(updated_block.content.contains(additional_content));
+    }
+
+    #[tokio::test]
+    async fn test_capacity_management() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_human_block_creation_and_retrieval() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "User prefers concise responses and technical details.".to_string();
+        let block_id = manager
+            .create_human_block(content.clone(), None)
+            .await
+            .unwrap();
+
+        let retrieved_block = manager.get_human_block(&block_id).await?.unwrap();
+        assert_eq!(retrieved_block.content, content);
+        assert_eq!(retrieved_block.block_type, CoreMemoryBlockType::Human);
+        assert_eq!(retrieved_block.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_update() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content, None)
+            .await
+            .unwrap();
+
+        let new_content = "Updated content with more information".to_string();
+        manager
+            .update_persona_block(&block_id, new_content.clone())
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(updated_block.content, new_content);
+        assert!(updated_block.updated_at > updated_block.created_at);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_append() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content.clone(), None)
+            .await
+            .unwrap();
+
+        let additional_content = "Additional information";
+        manager
+            .append_to_persona_block(&block_id, additional_content)
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(updated_block.content.contains(&initial_content));
+        assert!(updated_block.content.contains(additional_content));
+    }
+
+    #[tokio::test]
+    async fn test_capacity_management() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_block_content_update() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content, None)
+            .await
+            .unwrap();
+
+        let new_content = "Updated content with more information".to_string();
+        manager
+            .update_persona_block(&block_id, new_content.clone())
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(updated_block.content, new_content);
+        assert!(updated_block.updated_at > updated_block.created_at);
+    }
+
+    #[tokio::test]
+    async fn test_block_content_append() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content.clone(), None)
+            .await
+            .unwrap();
+
+        let additional_content = "Additional information";
+        manager
+            .append_to_persona_block(&block_id, additional_content)
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(updated_block.content.contains(&initial_content));
+        assert!(updated_block.content.contains(additional_content));
+    }
+
+    #[tokio::test]
+    async fn test_capacity_management() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_block_content_append() {
+        let manager = CoreMemoryManager::new();
+
+        let initial_content = "Initial content".to_string();
+        let block_id = manager
+            .create_persona_block(initial_content.clone(), None)
+            .await
+            .unwrap();
+
+        let additional_content = "Additional information";
+        manager
+            .append_to_persona_block(&block_id, additional_content)
+            .await
+            .unwrap();
+
+        let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(updated_block.content.contains(&initial_content));
+        assert!(updated_block.content.contains(additional_content));
+    }
+
+    #[tokio::test]
+    async fn test_capacity_management() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_capacity_management() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建一个小容量的块
+        let small_capacity = 50;
+        let content = "Short content".to_string();
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert_eq!(block.max_capacity, small_capacity);
+        assert!(block.capacity_usage() < 1.0);
+
+        // 测试容量超限
+        let large_content = "x".repeat(100);
+        let result = manager.update_persona_block(&block_id, large_content).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_auto_rewrite_trigger() -> anyhow::Result<()> {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_auto_rewrite_trigger() {
+        let mut config = CoreMemoryConfig::default();
+        config.enable_auto_rewrite = true;
+        config.auto_rewrite_threshold = 0.8; // 80% 触发重写
+
+        let manager = CoreMemoryManager::with_config(config);
+
+        // 创建一个小容量的块
+        let small_capacity = 100;
+        let content = "x".repeat(85); // 85% 容量使用
+        let block_id = manager
+            .create_persona_block(content, Some(small_capacity))
+            .await
+            .unwrap();
+
+        // 添加更多内容触发重写
+        manager
+            .append_to_persona_block(&block_id, "more content")
+            .await
+            .unwrap();
+
+        let stats = manager.get_stats().await?;
+        assert!(stats.auto_rewrites > 0);
+    }
+
+    #[tokio::test]
+    async fn test_block_deletion() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_block_deletion() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content to be deleted".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        // 确认块存在
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // 删除块
+        manager.delete_persona_block(&block_id).await?;
+
+        // 确认块已删除
+        assert!(manager
+            .get_persona_block(&block_id)
+            .await
+            .unwrap()
+            .is_none());
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.persona_blocks_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_blocks() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_list_blocks() {
+        let manager = CoreMemoryManager::new();
+
+        // 创建多个块
+        manager
+            .create_persona_block("Persona 1".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_persona_block("Persona 2".to_string(), None)
+            .await
+            .unwrap();
+        manager
+            .create_human_block("Human 1".to_string(), None)
+            .await
+            .unwrap();
+
+        let persona_blocks = manager.list_persona_blocks().await?;
+        let human_blocks = manager.list_human_blocks().await?;
+
+        assert_eq!(persona_blocks.len(), 2);
+        assert_eq!(human_blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_status_check() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
+    async fn test_capacity_status_check() {
+        let manager = CoreMemoryManager::new();
+
+        let block_id = manager
+            .create_persona_block("Test content".to_string(), Some(100))
+            .await
+            .unwrap();
+
+        let status = manager.check_capacity_status().await?;
+        assert_eq!(status.len(), 1);
+
+        let (id, block_type, usage) = &status[0];
+        assert_eq!(id, &block_id);
+        assert_eq!(*block_type, CoreMemoryBlockType::Persona);
+        assert!(usage > &0.0 && usage < &1.0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_rewrite() -> anyhow::Result<()> {
+        let manager = CoreMemoryManager::new();
+
+        let content = "Content that will be rewritten manually".to_string();
+        let block_id = manager.create_persona_block(content, None).await?;
+
+        manager.manual_rewrite_block(&block_id).await?;
+
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+}
+
     async fn test_manual_rewrite() {
         let manager = CoreMemoryManager::new();
 

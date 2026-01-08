@@ -1755,7 +1755,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_update_memories() {
+    async fn test_batch_update_memories() -> anyhow::Result<()> {
         let client = AgentMemClient::default();
 
         // First, create some memories to update
@@ -1769,6 +1769,7 @@ mod tests {
                 infer: true,
                 memory_type: Some(MemoryType::Episodic),
                 prompt: None,
+            Ok(())
             },
             AddRequest {
                 messages: Messages::Single("Original content 2".to_string()),
@@ -1810,7 +1811,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_delete_memories() {
+    async fn test_batch_delete_memories() -> anyhow::Result<()> {
         let client = AgentMemClient::default();
 
         // First, create some memories to delete
@@ -1824,6 +1825,7 @@ mod tests {
                 infer: true,
                 memory_type: Some(MemoryType::Episodic),
                 prompt: None,
+            Ok(())
             },
             AddRequest {
                 messages: Messages::Single("Memory to delete 2".to_string()),

@@ -458,6 +458,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_historical_feedback() -> anyhow::Result<()> {
+        let calculator = AdaptiveThresholdCalculator::with_default_config();
+
+        // 记录低分数反馈
+        calculator
+            .record_feedback(QueryType::ShortKeyword, 0.2)
+            .await;
+        calculator
+            .record_feedback(QueryType::ShortKeyword, 0.3)
+            .await;
+
+        let stats = calculator.get_stats().await?;
+        let adjustment = stats.get_adjustment(&QueryType::ShortKeyword);
+
+        // 应该建议降低阈值
+        assert!(adjustment.is_some());
+        assert!(adjustment.unwrap() < 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_with_details() {
+        let calculator = AdaptiveThresholdCalculator::with_default_config();
+        let classifier = QueryClassifier::with_default_config();
+
+        let query = "What is AI?";
+        let features = classifier.extract_features(query);
+        let details = calculator
+            .calculate_with_details(query, &QueryType::Semantic, &features)
+            .await;
+
+        assert!(details.threshold >= 0.0 && details.threshold <= 1.0);
+        assert_eq!(details.base_threshold, 0.5); // Semantic base threshold
+    }
+}
+
     async fn test_historical_feedback() {
         let calculator = AdaptiveThresholdCalculator::with_default_config();
 

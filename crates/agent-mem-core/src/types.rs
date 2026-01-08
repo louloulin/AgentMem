@@ -3138,7 +3138,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_linear() {
+    async fn test_dag_pipeline_linear() -> anyhow::Result<()> {
         // 线性DAG: A -> B -> C
         let dag = DagPipeline::new("test_linear")
             .add_node("A", TestStage::new("A", 10), vec![])
@@ -3152,10 +3152,11 @@ mod tests {
         assert_eq!(results.get("A"), Some(&1));
         assert_eq!(results.get("B"), Some(&1));
         assert_eq!(results.get("C"), Some(&1));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_parallel() {
+    async fn test_dag_pipeline_parallel() -> anyhow::Result<()> {
         // 并行DAG: A, B, C (无依赖)
         let dag = DagPipeline::new("test_parallel")
             .add_node("A", TestStage::new("A", 50), vec![])
@@ -3174,10 +3175,11 @@ mod tests {
             "Parallel execution took {}ms, expected < 200ms",
             elapsed
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_diamond() {
+    async fn test_dag_pipeline_diamond() -> anyhow::Result<()> {
         // 菱形DAG: A -> B,C -> D
         let dag = DagPipeline::new("test_diamond")
             .add_node("A", TestStage::new("A", 10), vec![])
@@ -3197,10 +3199,11 @@ mod tests {
         assert!(ctx.get::<bool>("B_executed").unwrap_or(false));
         assert!(ctx.get::<bool>("C_executed").unwrap_or(false));
         assert!(ctx.get::<bool>("D_executed").unwrap_or(false));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_conditional() {
+    async fn test_dag_pipeline_conditional() -> anyhow::Result<()> {
         // 条件分支: A -> B (if true) or C (if false)
         struct ConditionalStage;
 
@@ -3221,6 +3224,7 @@ mod tests {
                 let _ = context.set("condition_value", input > 5);
                 Ok(StageResult::Continue(input))
             }
+        Ok(())
         }
 
         let dag = DagPipeline::new("test_conditional")
@@ -3247,10 +3251,11 @@ mod tests {
         let results2 = dag.execute(3, &mut ctx2).await?;
         assert!(!results2.contains_key("B"));
         assert!(results2.contains_key("C"));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_cycle_detection() {
+    async fn test_dag_pipeline_cycle_detection() -> anyhow::Result<()> {
         // 创建循环依赖: A -> B -> C -> A
         let dag = DagPipeline::new("test_cycle")
             .add_node("A", TestStage::new("A", 10), vec!["C".to_string()])
@@ -3262,10 +3267,11 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Cycle detected"));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dag_pipeline_max_parallelism() {
+    async fn test_dag_pipeline_max_parallelism() -> anyhow::Result<()> {
         // 测试并行度控制
         let dag = DagPipeline::new("test_parallelism")
             .add_node("A", TestStage::new("A", 100), vec![])
@@ -3286,5 +3292,6 @@ mod tests {
             "Execution took {}ms, expected >= 180ms",
             elapsed
         );
+        Ok(())
     }
 }

@@ -410,6 +410,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fluent_memory() -> anyhow::Result<()> {
+        // 测试FluentMemory的创建和转换
+        // 注意：实际的Memory实例需要数据库连接，这里只测试类型系统
+        // 在实际使用中，可以通过 Memory::new().await?.fluent() 创建
+    }
+
+    #[test]
+    fn test_error_enhancement() {
+        let error = AgentMemError::StorageError("Database connection failed".to_string());
+        let enhanced = ErrorEnhancer::enhance(error, None);
+        assert!(!enhanced.user_message.is_empty());
+        assert!(!enhanced.suggestions.is_empty());
+    }
+}
+
     async fn test_fluent_memory() {
         // 测试FluentMemory的创建和转换
         // 注意：实际的Memory实例需要数据库连接，这里只测试类型系统

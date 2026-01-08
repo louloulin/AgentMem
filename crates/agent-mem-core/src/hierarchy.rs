@@ -1027,7 +1027,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_default_hierarchy_manager() {
+    async fn test_default_hierarchy_manager() -> anyhow::Result<()> {
         use agent_mem_traits::{MemoryType as TraitMemoryType, Session};
         use chrono::Utc;
 
@@ -1056,6 +1056,7 @@ mod tests {
             access_count: 0,
             expires_at: None,
             version: 1,
+        Ok(())
         };
         let memory = Memory::from_legacy_item(&memory_item);
 

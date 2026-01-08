@@ -643,7 +643,7 @@ mod storage_factory_tests {
 
     #[tokio::test]
     #[cfg(feature = "libsql")]
-    async fn test_storage_factory_embedded_creates_tables() {
+    async fn test_storage_factory_embedded_creates_tables() -> anyhow::Result<()> {
         use crate::storage::models::{Organization, User};
         use tempfile::TempDir;
 
@@ -680,6 +680,7 @@ mod storage_factory_tests {
             vector_dimension: 1536,
             enable_wal: true,
             cache_size_kb: 10240,
+        Ok(())
         };
 
         let mode = DeploymentMode::Embedded(config);
@@ -735,6 +736,39 @@ mod storage_factory_tests {
 
     #[tokio::test]
     #[cfg(feature = "libsql")]
+    async fn test_storage_factory_all_repositories_available() -> anyhow::Result<()> {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let mode = DeploymentMode::embedded(temp_dir.path());
+        let repos = StorageFactory::create(mode).await?;
+
+        // Verify key repositories with list() method are available
+        assert!(repos.users.list(1, 0).await.is_ok(), "users.list failed");
+        assert!(
+            repos.organizations.list(1, 0).await.is_ok(),
+            "organizations.list failed"
+        );
+        assert!(repos.agents.list(1, 0).await.is_ok(), "agents.list failed");
+        let tools_result = repos.tools.list(1, 0).await;
+        assert!(
+            tools_result.is_ok(),
+            "tools.list failed: {:?}",
+            tools_result.err()
+        );
+        assert!(
+            repos.api_keys.list(1, 0).await.is_ok(),
+            "api_keys.list failed"
+        );
+        assert!(repos.blocks.list(1, 0).await.is_ok(), "blocks.list failed");
+
+        // Verify all repositories exist (even if they don't have list())
+        let _ = &repos.memories;
+        let _ = &repos.messages;
+        let _ = &repos.associations;
+    }
+}
+
     async fn test_storage_factory_all_repositories_available() {
         use tempfile::TempDir;
 

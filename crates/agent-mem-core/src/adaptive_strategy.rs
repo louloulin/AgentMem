@@ -515,7 +515,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_strategy_recommendation() {
+    async fn test_strategy_recommendation() -> anyhow::Result<()> {
         let config = AdaptiveStrategyConfig::default();
         let mut manager = AdaptiveStrategyManager::new(config);
         let context = ScoringContext::default();
@@ -532,6 +532,7 @@ mod tests {
             | MemoryStrategy::TaskOriented => {
                 // Valid strategy
             }
+        Ok(())
         }
         assert!(recommendation.confidence >= 0.0 && recommendation.confidence <= 1.0);
     }

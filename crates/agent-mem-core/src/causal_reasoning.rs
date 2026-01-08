@@ -509,7 +509,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_causal_reasoning() {
+    async fn test_causal_reasoning() -> anyhow::Result<()> {
         let engine = CausalReasoningEngine::with_defaults();
 
         // 添加节点
@@ -519,6 +519,7 @@ mod tests {
             node_type: CausalNodeType::Action,
             timestamp: Utc::now(),
             properties: HashMap::new(),
+        Ok(())
         };
 
         let node2 = CausalNode {

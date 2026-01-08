@@ -352,7 +352,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_bm25_basic() {
+    async fn test_bm25_basic() -> anyhow::Result<()> {
         let engine = BM25SearchEngine::with_defaults();
 
         // 添加文档
@@ -374,6 +374,7 @@ mod tests {
             query: "quick brown".to_string(),
             limit: 10,
             ..Default::default()
+        Ok(())
         };
 
         let results = engine.search(&query).await?;
@@ -383,13 +384,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_bm25_empty_query() {
+    async fn test_bm25_empty_query() -> anyhow::Result<()> {
         let engine = BM25SearchEngine::with_defaults();
 
         let query = SearchQuery {
             query: "".to_string(),
             limit: 10,
             ..Default::default()
+        Ok(())
         };
 
         let results = engine.search(&query).await?;

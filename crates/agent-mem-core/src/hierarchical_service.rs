@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_hierarchical_memory() {
+    async fn test_add_hierarchical_memory() -> anyhow::Result<()> {
         let config = HierarchicalServiceConfig::default();
         let service = HierarchicalMemoryService::new(config).await?;
 
@@ -431,6 +431,7 @@ mod tests {
                 MemoryScope::User {
                     agent_id: "agent1".to_string(),
                     user_id: "user1".to_string(),
+                Ok(())
                 },
                 MemoryLevel::Operational,
                 ImportanceLevel::Medium,

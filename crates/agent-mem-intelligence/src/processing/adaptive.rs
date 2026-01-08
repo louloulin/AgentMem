@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_memory_archiving() {
+    async fn test_memory_archiving() -> anyhow::Result<()> {
         let manager = AdaptiveMemoryManager::new(100, 30 * 24 * 60 * 60);
         let mut memory = create_test_memory("test", 0.5, 5, 10);
 
@@ -532,12 +532,13 @@ mod tests {
         assert!(archived.is_some());
         if let Some(AttributeValue::Boolean(val)) = archived {
             assert_eq!(*val, true);
+        Ok(())
         }
         assert!(memory.importance().unwrap_or(0.0) < 0.5); // Should be reduced
     }
 
     #[tokio::test]
-    async fn test_memory_compression() {
+    async fn test_memory_compression() -> anyhow::Result<()> {
         let manager = AdaptiveMemoryManager::new(100, 30 * 24 * 60 * 60);
         let mut memory = create_test_memory("test", 0.5, 5, 1);
         memory.content = agent_mem_traits::Content::Text("A".repeat(15000)); // Large content
@@ -551,10 +552,33 @@ mod tests {
         assert!(compressed.is_some());
         if let Some(AttributeValue::Boolean(val)) = compressed {
             assert_eq!(*val, true);
+        Ok(())
         }
     }
 
     #[tokio::test]
+    async fn test_capacity_management() -> anyhow::Result<()> {
+        let mut manager = AdaptiveMemoryManager::new(3, 30 * 24 * 60 * 60); // Max 3 memories
+
+        let mut memories = vec![
+            create_test_memory("1", 0.9, 10, 1), // High importance
+            create_test_memory("2", 0.5, 5, 5),  // Medium importance
+            create_test_memory("3", 0.2, 2, 10), // Low importance
+            create_test_memory("4", 0.1, 1, 15), // Very low importance
+            create_test_memory("5", 0.8, 8, 2),  // High importance
+        ];
+
+        let (archived, deleted) = manager.manage_memories(&mut memories).await?;
+
+        // Should have deleted some memories due to capacity constraints
+        assert!(deleted > 0);
+
+        // Clean up and verify capacity is respected
+        manager.cleanup_deleted_memories(&mut memories);
+        assert!(memories.len() <= 3);
+    }
+}
+
     async fn test_capacity_management() {
         let mut manager = AdaptiveMemoryManager::new(3, 30 * 24 * 60 * 60); // Max 3 memories
 

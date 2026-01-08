@@ -881,7 +881,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_contextual_search() {
+    async fn test_contextual_search() -> anyhow::Result<()> {
         let config = ContextAwareSearchConfig::default();
         let mut engine = ContextAwareSearchEngine::new(config);
 
@@ -896,6 +896,7 @@ mod tests {
             filters: None,
             search_strategy: SearchStrategy::Exact,
             result_preferences: ResultPreferences::default(),
+        Ok(())
         };
 
         let results = engine.search(query, &memories).await?;

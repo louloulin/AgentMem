@@ -472,7 +472,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_decentralized_manager() {
+    async fn test_decentralized_manager() -> anyhow::Result<()> {
         let manager = DecentralizedManager::with_defaults();
 
         // 注册节点
@@ -483,6 +483,7 @@ mod tests {
             status: NodeStatus::Online,
             last_heartbeat: Utc::now(),
             capabilities: vec!["memory".to_string(), "search".to_string()],
+        Ok(())
         };
 
         manager.register_node(node).await?;
@@ -502,7 +503,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decentralized_manager_empty_nodes() {
+    async fn test_decentralized_manager_empty_nodes() -> anyhow::Result<()> {
         let manager = DecentralizedManager::with_defaults();
 
         // 测试没有节点时的同步
@@ -514,6 +515,7 @@ mod tests {
             version: 1,
             timestamp: Utc::now(),
             node_id: manager.config.node_id.clone(),
+        Ok(())
         };
 
         // 应该成功，即使没有其他节点
@@ -567,7 +569,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conflict_resolution() {
+    async fn test_conflict_resolution() -> anyhow::Result<()> {
         let manager = DecentralizedManager::with_defaults();
 
         let conflict = ConflictRecord {
@@ -591,6 +593,7 @@ mod tests {
             resolved_value: None,
             conflict_time: Utc::now(),
             resolved_time: None,
+        Ok(())
         };
 
         let resolved = manager.resolve_conflict(conflict).await?;

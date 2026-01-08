@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_alert_rules() {
+    async fn test_alert_rules() -> anyhow::Result<()> {
         let config = MonitoringConfig::default();
         let monitoring = MonitoringSystem::new(config);
 
@@ -592,6 +592,7 @@ mod tests {
             severity: AlertSeverity::Warning,
             enabled: true,
             labels: HashMap::new(),
+        Ok(())
         };
 
         monitoring.add_alert_rule(rule).await?;

@@ -491,7 +491,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_semantic_hierarchy() {
+    async fn test_semantic_hierarchy() -> anyhow::Result<()> {
         let index = SemanticHierarchyIndex::with_defaults();
 
         // 添加根节点
@@ -511,6 +511,7 @@ mod tests {
             semantic_tags: vec![],
             created_at: Utc::now(),
             properties: HashMap::new(),
+        Ok(())
         };
 
         index.add_node(root).await?;

@@ -462,7 +462,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_context_window_expansion() {
+    async fn test_context_window_expansion() -> anyhow::Result<()> {
         let manager = ContextWindowManager::with_defaults();
         let query = "test query";
         let context = "current context";
@@ -490,6 +490,7 @@ mod tests {
             timestamp: Utc::now(),
             key_information: Vec::new(),
             relevance_score: 0.5,
+        Ok(())
         }];
 
         let context = manager

@@ -77,7 +77,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_system_lifecycle() {
+    async fn test_system_lifecycle() -> anyhow::Result<()> {
         let system_manager = create_test_system_manager().await?;
 
         // 测试系统启动
@@ -173,13 +173,14 @@ mod tests {
         for (component, health) in health_results {
             println!("组件 {} 健康状态: {:?}", component, health.status);
             assert_ne!(health.status, HealthStatus::Unknown);
+        Ok(())
         }
 
         system_manager.stop().await?;
     }
 
     #[tokio::test]
-    async fn test_system_statistics() {
+    async fn test_system_statistics() -> anyhow::Result<()> {
         let system_manager = create_test_system_manager().await?;
         system_manager.start().await?;
 
@@ -187,6 +188,7 @@ mod tests {
         for i in 0..5 {
             let memory = create_test_memory(MemoryType::Core, &format!("测试记忆 {i}"));
             system_manager.store_memory(memory).await?;
+        Ok(())
         }
 
         // 获取系统统计信息
@@ -248,7 +250,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_api_interface() {
+    async fn test_api_interface() -> anyhow::Result<()> {
         let system_manager = Arc::new(create_test_system_manager().await?);
         system_manager.start().await?;
 
@@ -266,6 +268,7 @@ mod tests {
                 user_agent: Some("AgentMem Test".to_string()),
                 ip_address: Some("127.0.0.1".to_string()),
             }),
+        Ok(())
         };
 
         let store_response = api_interface.handle_request(store_request).await
@@ -324,7 +327,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_operations() {
+    async fn test_batch_operations() -> anyhow::Result<()> {
         let system_manager = Arc::new(create_test_system_manager().await?);
         system_manager.start().await?;
 
@@ -334,6 +337,7 @@ mod tests {
         let operations = vec![
             ApiOperation::StoreMemory {
                 memory: create_test_memory(MemoryType::Core, "批量操作记忆1"),
+            Ok(())
             },
             ApiOperation::StoreMemory {
                 memory: create_test_memory(MemoryType::Resource, "批量操作记忆2"),
@@ -359,7 +363,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_concurrent_operations() {
+    async fn test_concurrent_operations() -> anyhow::Result<()> {
         let system_manager = Arc::new(create_test_system_manager().await?);
         system_manager.start().await?;
 
@@ -372,6 +376,7 @@ mod tests {
                 manager.store_memory(memory).await
             });
             handles.push(handle);
+        Ok(())
         }
 
         // 等待所有操作完成
@@ -391,6 +396,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_error_handling() -> anyhow::Result<()> {
+        let system_manager = create_test_system_manager().await?;
+        // 不启动系统，测试错误处理
+
+        // 测试在系统未运行时的操作
+        let memory = create_test_memory(MemoryType::Core, "错误测试记忆");
+        let result = system_manager.store_memory(memory).await;
+        assert!(result.is_err());
+
+        // 测试检索不存在的记忆
+        system_manager.start().await?;
+        let non_existent_id = Uuid::new_v4();
+        let result = system_manager.retrieve_memory(non_existent_id).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+
+        system_manager.stop().await?;
+    }
+}
+
     async fn test_error_handling() {
         let system_manager = create_test_system_manager().await?;
         // 不启动系统，测试错误处理

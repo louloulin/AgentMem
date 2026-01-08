@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_connection() {
+    async fn test_get_connection() -> anyhow::Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
@@ -499,11 +499,64 @@ mod tests {
         let result = manager.health_check().await;
         if let Err(e) = &result {
             eprintln!("Health check failed: {e:?}");
+        Ok(())
         }
         assert!(result.is_ok());
     }
 
     #[tokio::test]
+    async fn test_get_stats() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
+        let stats = manager.get_stats().await;
+        assert!(stats.is_ok());
+
+        let stats = stats.unwrap();
+        assert!(stats.page_size > 0);
+        assert!(stats.size_mb() >= 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_create_libsql_pool() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let conn = create_libsql_pool(db_path_str).await;
+        assert!(conn.is_ok());
+
+        // Test basic query
+        let conn = conn.unwrap();
+        let conn_guard = conn.lock().await;
+        let result = conn_guard
+            .execute(
+                "CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)",
+                (),
+            )
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_multiple_connections() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
+
+        // Get multiple connections
+        let conn1 = manager.get_connection().await;
+        let conn2 = manager.get_connection().await;
+
+        assert!(conn1.is_ok());
+        assert!(conn2.is_ok());
+    }
+}
+
     async fn test_get_stats() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
@@ -540,6 +593,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_multiple_connections() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db_path_str = db_path.to_str().unwrap();
+
+        let manager = LibSqlConnectionManager::new(db_path_str).await?;
+
+        // Get multiple connections
+        let conn1 = manager.get_connection().await;
+        let conn2 = manager.get_connection().await;
+
+        assert!(conn1.is_ok());
+        assert!(conn2.is_ok());
+    }
+}
+
     async fn test_multiple_connections() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");

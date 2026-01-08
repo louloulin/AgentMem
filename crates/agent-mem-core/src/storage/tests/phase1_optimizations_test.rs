@@ -125,7 +125,7 @@ mod tests {
     /// 测试1.2: 批量向量存储队列
     /// 验证批量队列能够批量处理向量存储
     #[tokio::test]
-    async fn test_batch_vector_queue() {
+    async fn test_batch_vector_queue() -> anyhow::Result<()> {
         // 创建mock vector store
         let vector_store = Arc::new(MockVectorStore { add_delay_ms: 10 });
         
@@ -142,6 +142,7 @@ mod tests {
                 metadata: std::collections::HashMap::new(),
             };
             queue.add_vector(vector_data).await?;
+        Ok(())
         }
 
         // 等待队列处理完成

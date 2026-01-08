@@ -881,7 +881,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_find_by_id() {
+    async fn test_find_by_id() -> anyhow::Result<()> {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);
 
@@ -958,12 +958,13 @@ mod tests {
             assert_eq!(text, "Updated content");
         } else {
             panic!("Expected text content");
+        Ok(())
         }
         assert!((updated.importance().unwrap() - 0.9).abs() < 0.01);
     }
 
     #[tokio::test]
-    async fn test_delete() {
+    async fn test_delete() -> anyhow::Result<()> {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);
 
@@ -996,6 +997,105 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_list() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory1 = create_test_memory("mem11");
+        let memory2 = create_test_memory("mem12");
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
+
+        let result = repo.list(10, 0).await;
+        assert!(result.is_ok());
+        let memories = result.unwrap();
+        assert_eq!(memories.len(), 2);
+    }
+}
+
+    async fn test_delete() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory = create_test_memory("mem8");
+        repo.create(&memory).await?;
+
+        let result = repo.delete("mem8").await;
+        assert!(result.is_ok());
+
+        let found = repo.find_by_id("mem8").await?;
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_by_agent_id() -> anyhow::Result<()> {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory1 = create_test_memory("mem9");
+        let memory2 = create_test_memory("mem10");
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
+
+        let result = repo.delete_by_agent_id("agent1").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 2);
+
+        let memories = repo.find_by_agent_id("agent1", 10).await?;
+        assert_eq!(memories.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory1 = create_test_memory("mem11");
+        let memory2 = create_test_memory("mem12");
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
+
+        let result = repo.list(10, 0).await;
+        assert!(result.is_ok());
+        let memories = result.unwrap();
+        assert_eq!(memories.len(), 2);
+    }
+}
+
+    async fn test_delete_by_agent_id() {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory1 = create_test_memory("mem9");
+        let memory2 = create_test_memory("mem10");
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
+
+        let result = repo.delete_by_agent_id("agent1").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 2);
+
+        let memories = repo.find_by_agent_id("agent1", 10).await?;
+        assert_eq!(memories.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list() -> anyhow::Result<()> {
+        let conn = setup_test_db().await;
+        let repo = LibSqlMemoryRepository::new(conn);
+
+        let memory1 = create_test_memory("mem11");
+        let memory2 = create_test_memory("mem12");
+        repo.create(&memory1).await?;
+        repo.create(&memory2).await?;
+
+        let result = repo.list(10, 0).await;
+        assert!(result.is_ok());
+        let memories = result.unwrap();
+        assert_eq!(memories.len(), 2);
+    }
+}
+
     async fn test_list() {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);

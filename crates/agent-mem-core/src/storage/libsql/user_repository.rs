@@ -473,7 +473,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_user_repository_crud() {
+    async fn test_user_repository_crud() -> anyhow::Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
@@ -487,6 +487,7 @@ mod tests {
                 "INSERT INTO organizations (id, name, created_at, updated_at, is_deleted) VALUES (?, ?, ?, ?, ?)",
                 libsql::params![org_id.clone(), "Test Org", chrono::Utc::now().timestamp(), chrono::Utc::now().timestamp(), 0],
             ).await?;
+        Ok(())
         }
 
         let repo = LibSqlUserRepository::new(conn);

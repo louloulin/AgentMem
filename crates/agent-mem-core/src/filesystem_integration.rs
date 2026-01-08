@@ -370,7 +370,7 @@ Python is also a great language.
     }
 
     #[tokio::test]
-    async fn test_convert_to_memories() {
+    async fn test_convert_to_memories() -> anyhow::Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let manager = FilesystemIntegrationManager::with_defaults(temp_dir.path().to_path_buf());
 
@@ -385,6 +385,7 @@ Python is also a great language.
                 metadata: HashMap::new(),
             }],
             metadata: HashMap::new(),
+        Ok(())
         };
 
         let memories = manager.convert_to_memories(&claude_file).await?;

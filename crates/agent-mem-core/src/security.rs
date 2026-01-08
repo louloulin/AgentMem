@@ -650,7 +650,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_user_authentication() {
+    async fn test_user_authentication() -> anyhow::Result<()> {
         let config = SecurityConfig::default();
         let security = SecuritySystem::new(config);
 
@@ -666,6 +666,7 @@ mod tests {
             locked_until: None,
             active: true,
             metadata: HashMap::new(),
+        Ok(())
         };
 
         security.create_user(user).await?;
@@ -678,7 +679,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_permission_checking() {
+    async fn test_permission_checking() -> anyhow::Result<()> {
         let config = SecurityConfig::default();
         let security = SecuritySystem::new(config);
 
@@ -697,6 +698,7 @@ mod tests {
             locked_until: None,
             active: true,
             metadata: HashMap::new(),
+        Ok(())
         };
 
         security.create_user(user).await?;

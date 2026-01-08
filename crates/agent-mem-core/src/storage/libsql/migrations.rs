@@ -728,7 +728,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_run_migrations() {
+    async fn test_run_migrations() -> anyhow::Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let conn = create_libsql_pool(db_path.to_str().unwrap()).await?;
@@ -797,6 +797,7 @@ mod tests {
         while let Some(row) = rows.next().await? {
             let name: String = row.get(0).unwrap();
             index_names.push(name);
+        Ok(())
         }
 
         // Verify composite indexes for memories table

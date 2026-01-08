@@ -579,7 +579,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_schema_evolution() {
+    async fn test_schema_evolution() -> anyhow::Result<()> {
         let engine = SchemaEvolutionEngine::with_defaults();
 
         // 创建Schema
@@ -600,6 +600,7 @@ mod tests {
             updated_at: Utc::now(),
             usage_count: 0,
             confidence: 0.8,
+        Ok(())
         };
 
         engine.create_schema(schema).await?;
@@ -629,7 +630,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_schema_evolution_max_count() {
+    async fn test_schema_evolution_max_count() -> anyhow::Result<()> {
         let engine = SchemaEvolutionEngine::with_defaults();
 
         // 创建最大数量的Schema
@@ -654,6 +655,7 @@ mod tests {
             };
 
             engine.create_schema(schema).await?;
+        Ok(())
         }
 
         // 尝试创建超出限制的Schema

@@ -368,7 +368,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_and_get_history() {
+    async fn test_add_and_get_history() -> anyhow::Result<()> {
         let manager = HistoryManager::new(":memory:").await?;
 
         let entry = HistoryEntry {
@@ -382,6 +382,7 @@ mod tests {
             is_deleted: false,
             actor_id: Some("user_456".to_string()),
             role: Some("user".to_string()),
+        Ok(())
         };
 
         // 添加历史记录
@@ -396,7 +397,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multiple_history_entries() {
+    async fn test_multiple_history_entries() -> anyhow::Result<()> {
         let manager = HistoryManager::new(":memory:").await?;
         let memory_id = "mem_multi_test";
 
@@ -420,6 +421,7 @@ mod tests {
             };
 
             manager.add_history(entry).await?;
+        Ok(())
         }
 
         // 获取历史记录
@@ -432,7 +434,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_history_stats() {
+    async fn test_history_stats() -> anyhow::Result<()> {
         let manager = HistoryManager::new(":memory:").await?;
 
         // 添加不同类型的历史记录
@@ -451,6 +453,7 @@ mod tests {
             };
 
             manager.add_history(entry).await?;
+        Ok(())
         }
 
         // 获取统计
@@ -462,7 +465,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_reset() {
+    async fn test_reset() -> anyhow::Result<()> {
         let manager = HistoryManager::new(":memory:").await?;
 
         // 添加一些记录
@@ -477,6 +480,7 @@ mod tests {
             is_deleted: false,
             actor_id: None,
             role: None,
+        Ok(())
         };
 
         manager.add_history(entry).await?;

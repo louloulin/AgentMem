@@ -230,6 +230,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_create_and_send_message() -> anyhow::Result<()> {
+        let queue = MessageQueue::new();
+        let mut rx = queue.create_queue("agent-1".to_string()).await;
+
+        let message = AgentMessage::new(
+            "agent-1".to_string(),
+            "user-1".to_string(),
+            "Hello".to_string(),
+        );
+
+        assert!(queue.send_message(message.clone()).await.is_ok());
+
+        let received = rx.recv().await?;
+        assert_eq!(received.content, "Hello");
+    }
+
+    #[tokio::test]
+    async fn test_send_to_nonexistent_queue() {
+        let queue = MessageQueue::new();
+
+        let message = AgentMessage::new(
+            "agent-1".to_string(),
+            "user-1".to_string(),
+            "Hello".to_string(),
+        );
+
+        assert!(queue.send_message(message).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_remove_queue() {
+        let queue = MessageQueue::new();
+        let _rx = queue.create_queue("agent-1".to_string()).await;
+
+        assert!(queue.has_queue("agent-1").await);
+
+        queue.remove_queue("agent-1").await;
+
+        assert!(!queue.has_queue("agent-1").await);
+    }
+
+    #[test]
+    fn test_message_accumulator() {
+        let mut accumulator = MessageAccumulator::new(3, std::time::Duration::from_secs(60));
+
+        let msg1 = AgentMessage::new(
+            "agent-1".to_string(),
+            "user-1".to_string(),
+            "Message 1".to_string(),
+        );
+        let msg2 = AgentMessage::new(
+            "agent-1".to_string(),
+            "user-1".to_string(),
+            "Message 2".to_string(),
+        );
+        let msg3 = AgentMessage::new(
+            "agent-1".to_string(),
+            "user-1".to_string(),
+            "Message 3".to_string(),
+        );
+
+        assert!(accumulator.add_message(msg1).is_none());
+        assert!(accumulator.add_message(msg2).is_none());
+
+        let flushed = accumulator.add_message(msg3);
+        assert!(flushed.is_some());
+        assert_eq!(flushed.unwrap().len(), 3);
+        assert_eq!(accumulator.len(), 0);
+    }
+}
+
     async fn test_create_and_send_message() {
         let queue = MessageQueue::new();
         let mut rx = queue.create_queue("agent-1".to_string()).await;

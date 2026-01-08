@@ -370,11 +370,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_multi_level_cache_l1_only() {
+    async fn test_multi_level_cache_l1_only() -> anyhow::Result<()> {
         let config = MultiLevelCacheConfig {
             enable_l1: true,
             enable_l2: false,
             ..Default::default()
+        Ok(())
         };
 
         let cache = MultiLevelCache::new(config);
@@ -389,6 +390,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_multi_level_cache_stats() -> anyhow::Result<()> {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        cache.get(&"key1".to_string()).await?;
+
+        let stats = cache.stats().await?;
+        assert!(stats.total_sets > 0);
+        assert!(stats.hits > 0);
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_delete() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        let deleted = cache.delete(&"key1".to_string()).await?;
+        assert!(deleted);
+
+        let value = cache.get(&"key1".to_string()).await?;
+        assert_eq!(value, None);
+    }
+}
+
     async fn test_multi_level_cache_stats() {
         let config = MultiLevelCacheConfig::default();
         let cache = MultiLevelCache::new(config);
@@ -405,6 +438,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_multi_level_cache_delete() -> anyhow::Result<()> {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        cache
+            .set("key1".to_string(), b"value1".to_vec(), None)
+            .await
+            .unwrap();
+        let deleted = cache.delete(&"key1".to_string()).await?;
+        assert!(deleted);
+
+        let value = cache.get(&"key1".to_string()).await?;
+        assert_eq!(value, None);
+    }
+}
+
     async fn test_multi_level_cache_delete() {
         let config = MultiLevelCacheConfig::default();
         let cache = MultiLevelCache::new(config);

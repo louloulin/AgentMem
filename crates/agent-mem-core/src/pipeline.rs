@@ -1161,10 +1161,11 @@ mod tests {
     use crate::types::{Content, MemoryBuilder, QueryBuilder};
 
     #[tokio::test]
-    async fn test_content_preprocess_stage() {
+    async fn test_content_preprocess_stage() -> anyhow::Result<()> {
         let stage = ContentPreprocessStage {
             min_length: 5,
             max_length: 1000,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new().text("Test content").build();
@@ -1177,10 +1178,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_content_too_short() {
+    async fn test_content_too_short() -> anyhow::Result<()> {
         let stage = ContentPreprocessStage {
             min_length: 100,
             max_length: 1000,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new().text("Short").build();
@@ -1192,7 +1194,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entity_extraction_stage() {
+    async fn test_entity_extraction_stage() -> anyhow::Result<()> {
         let stage = EntityExtractionStage {
             extract_persons: true,
             extract_orgs: true,
@@ -1202,6 +1204,7 @@ mod tests {
             extract_time: false,
             extract_percentage: false,
             extract_ip: false,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new()
@@ -1222,7 +1225,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_entity_extraction_enhanced() {
+    async fn test_entity_extraction_enhanced() -> anyhow::Result<()> {
         let stage = EntityExtractionStage {
             extract_persons: false,
             extract_orgs: false,
@@ -1232,6 +1235,7 @@ mod tests {
             extract_time: true,
             extract_percentage: true,
             extract_ip: true,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new()
@@ -1278,7 +1282,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_query_understanding_stage() {
+    async fn test_query_understanding_stage() -> anyhow::Result<()> {
         let stage = QueryUnderstandingStage;
 
         let query = QueryBuilder::new().text("Test query").limit(10).build();
@@ -1315,6 +1319,7 @@ mod tests {
             constraints: vec![Constraint::Limit(0)],
             preferences: vec![],
             context: crate::types::QueryContext::default(),
+        Ok(())
         };
 
         let mut context2 = PipelineContext::new();
@@ -1374,7 +1379,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_memory_compression_stage() {
+    async fn test_memory_compression_stage() -> anyhow::Result<()> {
         let stage = MemoryCompressionStage {
             enable_content_compression: true,
             enable_attribute_compression: true,
@@ -1382,6 +1387,7 @@ mod tests {
             max_compression_ratio: 3,
             merge_strategy: "highest_importance".to_string(),
             preserve_unique_entities: true,
+        Ok(())
         };
 
         // Create very similar memories (with high overlap)
@@ -1445,7 +1451,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_importance_reassessment_stage() {
+    async fn test_importance_reassessment_stage() -> anyhow::Result<()> {
         let stage = ImportanceReassessmentStage {
             enable_access_freq: true,
             enable_temporal_decay: true,
@@ -1456,6 +1462,7 @@ mod tests {
             relation_boost_weight: 0.25,
             context_relevance_weight: 0.2,
             decay_halflife_days: 30.0,
+        Ok(())
         };
 
         // Create a memory with some access history and relations
@@ -1514,10 +1521,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_query_expansion_stage() {
+    async fn test_query_expansion_stage() -> anyhow::Result<()> {
         let stage = QueryExpansionStage {
             enable_synonym: true,
             enable_relation: true,
+        Ok(())
         };
 
         let query = Query::from_string("搜索产品订单");

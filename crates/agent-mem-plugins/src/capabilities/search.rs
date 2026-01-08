@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_search_by_content() {
+    async fn test_search_by_content() -> anyhow::Result<()> {
         let search = SearchCapability::new();
 
         search
@@ -251,6 +251,7 @@ mod tests {
                 ))
                 .await
                 .unwrap();
+        Ok(())
         }
 
         let results = search.search("test", 5).await?;
@@ -258,6 +259,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_count_and_clear() -> anyhow::Result<()> {
+        let search = SearchCapability::new();
+
+        search
+            .index_memory(create_test_memory("1", "Content 1", "message", "user1"))
+            .await
+            .unwrap();
+        search
+            .index_memory(create_test_memory("2", "Content 2", "message", "user1"))
+            .await
+            .unwrap();
+
+        assert_eq!(search.count().await?, 2);
+
+        search.clear().await?;
+        assert_eq!(search.count().await?, 0);
+    }
+}
+
     async fn test_search_count_and_clear() {
         let search = SearchCapability::new();
 

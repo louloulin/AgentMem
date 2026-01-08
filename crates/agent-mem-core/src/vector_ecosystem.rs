@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_recommend_storage() {
+    async fn test_recommend_storage() -> anyhow::Result<()> {
         let manager = VectorEcosystemManager::new_with_defaults().await;
 
         let criteria = SelectionCriteria::default();
@@ -625,6 +625,7 @@ mod tests {
 
         assert!(!recommendations.is_empty());
         assert!(recommendations[0].score > 0.0);
+        Ok(())
     }
 
     #[tokio::test]

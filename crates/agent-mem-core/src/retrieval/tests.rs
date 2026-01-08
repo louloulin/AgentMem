@@ -57,7 +57,7 @@ async fn test_topic_extractor_creation() {
 }
 
 #[tokio::test]
-async fn test_topic_extraction() {
+async fn test_topic_extraction() -> anyhow::Result<()> {
     let config = TopicExtractorConfig::default();
     let extractor = TopicExtractor::new(config).await?;
 
@@ -124,6 +124,7 @@ async fn test_retrieval_routing() {
         hierarchy_level: 0,
         parent_topic_id: None,
         relevance_score: 0.9,
+    Ok(())
     }];
 
     let result = router.route_retrieval(&request, &topics).await?;
@@ -135,7 +136,7 @@ async fn test_retrieval_routing() {
 }
 
 #[tokio::test]
-async fn test_router_strategy_selection() {
+async fn test_router_strategy_selection() -> anyhow::Result<()> {
     let config = RetrievalRouterConfig::default();
     let router = RetrievalRouter::new(config).await?;
 
@@ -147,6 +148,7 @@ async fn test_router_strategy_selection() {
         context: None,
         enable_topic_extraction: false,
         enable_context_synthesis: false,
+    Ok(())
     };
 
     let result = router.route_retrieval(&request, &[]).await?;
@@ -156,7 +158,7 @@ async fn test_router_strategy_selection() {
 }
 
 #[tokio::test]
-async fn test_router_stats() {
+async fn test_router_stats() -> anyhow::Result<()> {
     let config = RetrievalRouterConfig::default();
     let router = RetrievalRouter::new(config).await?;
 
@@ -199,6 +201,7 @@ async fn test_conflict_detection() {
         enable_conflict_detection: true,
         conflict_detection_threshold: 0.5,
         ..Default::default()
+    Ok(())
     };
     let synthesizer = ContextSynthesizer::new(config).await?;
 
@@ -235,7 +238,7 @@ async fn test_conflict_detection() {
 }
 
 #[tokio::test]
-async fn test_synthesizer_stats() {
+async fn test_synthesizer_stats() -> anyhow::Result<()> {
     let config = ContextSynthesizerConfig::default();
     let synthesizer = ContextSynthesizer::new(config).await?;
 
@@ -275,6 +278,7 @@ async fn test_retrieval_system_caching() {
         enable_caching: true,
         cache_ttl_seconds: 60,
         ..Default::default()
+    Ok(())
     };
     let system = ActiveRetrievalSystem::new(config).await?;
 
@@ -293,7 +297,7 @@ async fn test_retrieval_system_caching() {
 }
 
 #[tokio::test]
-async fn test_retrieval_system_stats() {
+async fn test_retrieval_system_stats() -> anyhow::Result<()> {
     let config = ActiveRetrievalConfig::default();
     let system = ActiveRetrievalSystem::new(config).await?;
 
@@ -310,6 +314,7 @@ async fn test_cache_cleanup() {
         enable_caching: true,
         cache_ttl_seconds: 1, // 1秒过期
         ..Default::default()
+    Ok(())
     };
     let system = ActiveRetrievalSystem::new(config).await?;
 

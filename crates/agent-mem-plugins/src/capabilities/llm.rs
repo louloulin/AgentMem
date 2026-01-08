@@ -137,7 +137,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_llm_call() {
+    async fn test_llm_call() -> anyhow::Result<()> {
         let llm = LlmCapability::new(true);
 
         let request = LlmRequest {
@@ -147,6 +147,7 @@ mod tests {
             temperature: Some(0.7),
             max_tokens: Some(100),
             parameters: std::collections::HashMap::new(),
+        Ok(())
         };
 
         let response = llm.call_llm(request).await?;
@@ -157,7 +158,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_llm_history() {
+    async fn test_llm_history() -> anyhow::Result<()> {
         let llm = LlmCapability::new(true);
 
         let request1 = LlmRequest {
@@ -167,6 +168,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
+        Ok(())
         };
 
         let request2 = LlmRequest {
@@ -188,7 +190,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_llm_mock_responses() {
+    async fn test_llm_mock_responses() -> anyhow::Result<()> {
         let llm = LlmCapability::new(true);
 
         // Test summarize
@@ -199,6 +201,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
+        Ok(())
         };
         let response = llm.call_llm(request).await?;
         assert!(response.text.contains("summary"));
@@ -229,7 +232,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_llm_clear_history() {
+    async fn test_llm_clear_history() -> anyhow::Result<()> {
         let llm = LlmCapability::new(true);
 
         let request = LlmRequest {
@@ -239,6 +242,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
+        Ok(())
         };
 
         llm.call_llm(request).await?;

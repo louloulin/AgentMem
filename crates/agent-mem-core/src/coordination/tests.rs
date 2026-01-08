@@ -252,7 +252,7 @@ async fn test_core_agent_creation() {
 }
 
 #[tokio::test]
-async fn test_agent_task_execution() {
+async fn test_agent_task_execution() -> anyhow::Result<()> {
     let mut agent = EpisodicAgent::new("test_execution".to_string());
     agent.initialize().await?;
 
@@ -291,6 +291,147 @@ async fn test_agent_message_handling() {
 }
 
 #[tokio::test]
+async fn test_agent_statistics() {
+    let mut agent = EpisodicAgent::new("test_stats".to_string());
+    agent.initialize().await?;
+
+    // Get initial stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 0);
+    assert_eq!(stats.successful_tasks, 0);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+
+    // Execute a task to update stats
+    let task = TaskRequest::new(
+        MemoryType::Episodic,
+        "search".to_string(),
+        json!({"user_id": "test_user", "query": "test"}),
+    );
+
+    agent.execute_task(task).await?;
+
+    // Check updated stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 1);
+    assert_eq!(stats.successful_tasks, 1);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+}
+
+async fn test_agent_task_execution() {
+    let mut agent = EpisodicAgent::new("test_execution".to_string());
+    agent.initialize().await?;
+
+    // Create a test task
+    let task = TaskRequest::new(
+        MemoryType::Episodic,
+        "search".to_string(),
+        json!({"user_id": "test_user", "query": "test query"}),
+    );
+
+    // Execute the task
+    let result = agent.execute_task(task).await;
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+    assert!(response.success);
+    assert_eq!(response.executed_by, "test_execution");
+}
+
+#[tokio::test]
+async fn test_agent_message_handling() -> anyhow::Result<()> {
+    let mut agent = EpisodicAgent::new("test_messages".to_string());
+    agent.initialize().await?;
+
+    // Create a test message
+    let message = AgentMessage::new(
+        MessageType::HealthCheck,
+        "meta_manager".to_string(),
+        "test_messages".to_string(),
+        json!({}),
+    );
+
+    // Handle the message
+    let result = agent.handle_message(message).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_agent_statistics() {
+    let mut agent = EpisodicAgent::new("test_stats".to_string());
+    agent.initialize().await?;
+
+    // Get initial stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 0);
+    assert_eq!(stats.successful_tasks, 0);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+
+    // Execute a task to update stats
+    let task = TaskRequest::new(
+        MemoryType::Episodic,
+        "search".to_string(),
+        json!({"user_id": "test_user", "query": "test"}),
+    );
+
+    agent.execute_task(task).await?;
+
+    // Check updated stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 1);
+    assert_eq!(stats.successful_tasks, 1);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+}
+
+async fn test_agent_message_handling() {
+    let mut agent = EpisodicAgent::new("test_messages".to_string());
+    agent.initialize().await?;
+
+    // Create a test message
+    let message = AgentMessage::new(
+        MessageType::HealthCheck,
+        "meta_manager".to_string(),
+        "test_messages".to_string(),
+        json!({}),
+    );
+
+    // Handle the message
+    let result = agent.handle_message(message).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_agent_statistics() -> anyhow::Result<()> {
+    let mut agent = EpisodicAgent::new("test_stats".to_string());
+    agent.initialize().await?;
+
+    // Get initial stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 0);
+    assert_eq!(stats.successful_tasks, 0);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+
+    // Execute a task to update stats
+    let task = TaskRequest::new(
+        MemoryType::Episodic,
+        "search".to_string(),
+        json!({"user_id": "test_user", "query": "test"}),
+    );
+
+    agent.execute_task(task).await?;
+
+    // Check updated stats
+    let stats = agent.get_stats().await;
+    assert_eq!(stats.total_tasks, 1);
+    assert_eq!(stats.successful_tasks, 1);
+    assert_eq!(stats.failed_tasks, 0);
+    assert_eq!(stats.active_tasks, 0);
+}
+
 async fn test_agent_statistics() {
     let mut agent = EpisodicAgent::new("test_stats".to_string());
     agent.initialize().await?;

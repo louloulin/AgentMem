@@ -268,10 +268,11 @@ pub mod tests {
     /// 测试1.2: 批量向量存储队列
     /// 验证批量队列能够批量处理向量存储
     #[tokio::test]
-    async fn test_batch_vector_queue() {
+    async fn test_batch_vector_queue() -> anyhow::Result<()> {
         let vector_store = Arc::new(MockVectorStore {
             vectors: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
             add_delay_ms: 10, // 10ms delay per vector
+        Ok(())
         });
 
         // 创建批量队列

@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_send_message_to_agent() {
+    async fn test_send_message_to_agent() -> anyhow::Result<()> {
         let queue = Arc::new(MessageQueue::new());
         let manager = BackgroundAgentManager::new(Arc::clone(&queue));
 
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_agent_state_transitions() {
+    async fn test_agent_state_transitions() -> anyhow::Result<()> {
         let queue = Arc::new(MessageQueue::new());
         let manager = BackgroundAgentManager::new(Arc::clone(&queue));
 
