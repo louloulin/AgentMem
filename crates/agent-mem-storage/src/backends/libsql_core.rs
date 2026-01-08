@@ -114,7 +114,9 @@ impl CoreMemoryStore for LibSqlCoreStore {
 
     async fn get_value(&self, user_id: &str, key: &str) -> Result<Option<CoreMemoryItem>> {
         let conn = self.conn.lock().await;
-        let stmt = conn.prepare("SELECT * FROM core_memory WHERE user_id = ? AND key = ?").await?
+        let mut stmt = conn.prepare("SELECT * FROM core_memory WHERE user_id = ? AND key = ?")
+            .await
+            .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(params![user_id, key])
@@ -134,9 +136,11 @@ impl CoreMemoryStore for LibSqlCoreStore {
 
     async fn get_all(&self, user_id: &str) -> Result<Vec<CoreMemoryItem>> {
         let conn = self.conn.lock().await;
-        let stmt = conn.prepare(
+        let mut stmt = conn.prepare(
             "SELECT * FROM core_memory WHERE user_id = ? ORDER BY category, key"
-        ).await?
+        )
+        .await
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(params![user_id])
@@ -157,9 +161,11 @@ impl CoreMemoryStore for LibSqlCoreStore {
 
     async fn get_by_category(&self, user_id: &str, category: &str) -> Result<Vec<CoreMemoryItem>> {
         let conn = self.conn.lock().await;
-        let stmt = conn.prepare(
+        let mut stmt = conn.prepare(
             "SELECT * FROM core_memory WHERE user_id = ? AND category = ? ORDER BY key"
-        ).await?
+        )
+        .await
+        .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
 
         let mut rows = stmt
             .query(params![user_id, category])
