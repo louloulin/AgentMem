@@ -247,10 +247,10 @@ impl Memory {
             || std::env::var("ANTHROPIC_API_KEY").is_ok();
 
         if !has_llm {
-            return Err(AgentMemError::configuration(
+            return Err(AgentMemError::ConfigError(
                 "智能功能需要 LLM API Key。请设置以下环境变量之一: \
                  OPENAI_API_KEY, ZHIPU_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY\n\
-                 提示: 使用 Memory::new_core() 可无需 API Key 使用核心功能。"
+                 提示: 使用 Memory::new_core() 可无需 API Key 使用核心功能。".to_string()
             ));
         }
 

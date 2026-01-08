@@ -30,6 +30,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 log = "0.4"
 lru = "0.12"
+parking_lot = "0.12"
 
 # Storage and async
 async-trait.workspace = true

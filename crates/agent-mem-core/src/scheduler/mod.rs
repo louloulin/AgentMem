@@ -111,10 +111,9 @@ impl DefaultMemoryScheduler {
     ///
     /// 从记忆的 metadata 中提取 created_at 字段。
     fn extract_created_at(&self, memory: &Memory) -> Option<i64> {
-        // 从 metadata.timestamp.created_at 获取
-        if let Some(timestamp) = memory.metadata.timestamp.created_at {
-            return Some(timestamp);
-        }
+        // 从 metadata.created_at 获取
+        let timestamp = memory.metadata.created_at.timestamp();
+        return Some(timestamp);
 
         // 尝试从 attributes 获取
         if let Some(value) = memory

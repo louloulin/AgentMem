@@ -39,6 +39,7 @@ pub use memory_store::{
 };
 pub use session::SessionManager;
 pub use scheduler::{MemoryScheduler, ScheduleConfig, ScheduleContext};
+pub use abstractions::Memory;
 pub use storage::{
     EmbeddingVectorStore, GraphResult, GraphStore, HistoryStore, KeyValueStore, LegacyVectorStore,
     VectorStore, VectorStoreStats,

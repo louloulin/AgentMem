@@ -140,10 +140,21 @@ impl BatchProcessor {
     }
 
     /// Submit an item for batch processing
-    pub async fn submit<T>(&self, item: T) -> Result<T::Output>
+    ///
+    /// ⚠️ TEMPORARILY DISABLED: Type erasure and serialization issues
+    /// The current implementation cannot safely deserialize without requiring all Output types to implement Serialize/Deserialize
+    /// TODO: Redesign with a different approach (e.g., type-indexed dispatch or callback-based results)
+    #[allow(dead_code)]
+    pub async fn submit<T>(&self, _item: T) -> Result<T::Output>
     where
         T: BatchItem,
     {
+        Err(AgentMemError::memory_error(
+            "Batch processor submit is temporarily disabled due to type safety issues. \
+             See TODO in batch.rs for redesign approach."
+        ))
+
+        /* Original implementation (commented out due to type safety issues):
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
 
         // Convert to boxed trait object
@@ -171,6 +182,7 @@ impl BatchProcessor {
             }
             Err(e) => Err(e),
         }
+        */
     }
 
     /// Get processing statistics

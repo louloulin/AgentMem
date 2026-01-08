@@ -3,7 +3,7 @@
 //! 这是 AgentMem 的核心对话循环实现，参考 MIRIX 的 AgentWrapper.step() 设计
 //! 集成所有现有模块：MemoryEngine, LLMClient, ToolExecutor, MessageRepository
 
-use crate::{engine::MemoryEngine, hierarchy::MemoryScope, storage::traits::MessageRepositoryTrait, Memory};
+use crate::{engine::MemoryEngine, storage::traits::MessageRepositoryTrait, Memory};
 
 use agent_mem_llm::LLMClient;
 use agent_mem_tools::ToolExecutor;

@@ -33,7 +33,7 @@
 //! - MemOS: A Memory OS for AI System (ACL 2025)
 //! - AgentMem 2.6 发展路线图
 
-use crate::{MemoryV4 as Memory, Result, AgentMemError};
+use crate::{Memory, Result, AgentMemError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

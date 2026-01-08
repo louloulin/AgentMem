@@ -12,7 +12,8 @@
 use agent_mem_core::scheduler::{DefaultMemoryScheduler, ExponentialDecayModel};
 use agent_mem_core::{MemoryEngine, MemoryEngineConfig};
 use agent_mem_traits::{
-    AttributeKey, AttributeValue, Content, MemoryBuilder, MemoryScheduler, ScheduleConfig,
+    AttributeKey, AttributeValue, AttributeSet, Content, Memory, MemoryId, MemoryScheduler,
+    Metadata, RelationGraph, ScheduleConfig,
 };
 
 #[tokio::test]
@@ -131,23 +132,34 @@ async fn test_scheduler_with_time_decay() {
 // Helper Functions
 // ========================================
 
-fn create_test_memory(content: &str, importance: f64, days_ago: f64) -> agent_mem_traits::MemoryV4 {
-    let created_at = (chrono::Utc::now() - chrono::Duration::days(days_ago as i64)).timestamp();
+fn create_test_memory(content: &str, importance: f64, days_ago: f64) -> Memory {
+    let created_at = chrono::Utc::now() - chrono::Duration::days(days_ago as i64);
 
-    MemoryBuilder::new()
-        .content(Content::Text(content.to_string()))
-        .build()
-        .with_attribute(
-            AttributeKey::system("importance"),
-            AttributeValue::Number(importance as f64),
-        )
-        .with_attribute(
-            AttributeKey::system("created_at"),
-            AttributeValue::Number(created_at as f64),
-        )
+    let mut attributes = AttributeSet::new();
+    attributes.set(
+        AttributeKey::system("importance"),
+        AttributeValue::Number(importance),
+    );
+
+    let metadata = Metadata {
+        created_at,
+        updated_at: created_at,
+        accessed_at: created_at,
+        access_count: 0,
+        version: 1,
+        hash: None,
+    };
+
+    Memory {
+        id: MemoryId::new(),
+        content: Content::Text(content.to_string()),
+        attributes,
+        relations: RelationGraph::default(),
+        metadata,
+    }
 }
 
-fn extract_content(memory: &agent_mem_traits::MemoryV4) -> String {
+fn extract_content(memory: &Memory) -> String {
     match &memory.content {
         Content::Text(text) => text.clone(),
         _ => "<non-text content>".to_string(),

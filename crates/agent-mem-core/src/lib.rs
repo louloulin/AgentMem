@@ -74,6 +74,10 @@ pub mod causal_reasoning;
 pub mod semantic_hierarchy;
 /// Phase 5.1: Adaptive learning mechanism - learning strategy optimization, adaptive parameter adjustment, online learning support
 pub mod adaptive_learning;
+/// Adaptive strategy manager for dynamic memory strategy optimization
+pub mod adaptive_strategy;
+/// LLM optimizer for context compression and prompt optimization
+pub mod llm_optimizer;
 /// Phase 5.2: Decentralized architecture - distributed sync mechanism, conflict resolution strategy, network optimization
 pub mod decentralized_architecture;
 /// Phase 5.3: Schema evolution system - schema update mechanism, schema evolution algorithm, schema creation support

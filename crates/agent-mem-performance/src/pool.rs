@@ -94,9 +94,11 @@ impl ObjectPool {
     /// Create a new object pool
     pub fn new(config: PoolConfig) -> Result<Self> {
         let stats = Arc::new(RwLock::new(PoolStats::default()));
+        let pool = Arc::new(SegQueue::new());
 
         let object_pool = Self {
             config,
+            pool,
             stats,
             created_count: AtomicU64::new(0),
             borrowed_count: AtomicUsize::new(0),
