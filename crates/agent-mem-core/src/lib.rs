@@ -176,6 +176,13 @@ pub use cache::{
     WarmingStrategy,
 };
 
+// 🆕 P2: Re-export LLM optimizer modules
+pub use llm_optimizer::{
+    CacheLevelConfig as LlmCacheLevelConfig,  // Alias to avoid conflict with cache::CacheLevelConfig
+    ContextCompressor, ContextCompressorConfig, ContextCompressionResult,
+    LlmOptimizer, LlmOptimizationConfig, LlmPerformanceMetrics,
+};
+
 // Re-export from traits
 // V4 Architecture: Memory now points to the new V4 abstraction
 pub use agent_mem_traits::{

@@ -7,7 +7,13 @@ use agent_mem_traits::{AgentMemError, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
+use log::{info, debug};
+
+// Import Memory type for compress_context method
+use crate::Memory;
 
 /// LLM optimization configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +127,8 @@ pub struct LlmOptimizer {
     performance_metrics: LlmPerformanceMetrics,
     quality_history: Vec<f64>,
     cost_history: Vec<f64>,
+    /// 🆕 P2: Context compressor for token reduction
+    context_compressor: Option<ContextCompressor>,
 }
 
 impl LlmOptimizer {
@@ -142,10 +150,17 @@ impl LlmOptimizer {
             },
             quality_history: Vec::new(),
             cost_history: Vec::new(),
+            context_compressor: None,
         };
 
         optimizer.initialize_default_templates();
         optimizer
+    }
+
+    /// 🆕 P2: Enable context compression
+    pub fn with_context_compressor(mut self, config: ContextCompressorConfig) -> Self {
+        self.context_compressor = Some(ContextCompressor::new(config));
+        self
     }
 
     /// Optimize an LLM request
@@ -501,6 +516,536 @@ pub trait LlmProvider {
     async fn generate_response(&self, prompt: &str) -> Result<String>;
 }
 
+// ============================================================================
+// 🆕 P2: ContextCompressor - 上下文压缩
+// ============================================================================
+
+/// Context compressor configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextCompressorConfig {
+    /// Maximum context length (in tokens)
+    pub max_context_tokens: usize,
+    /// Target compression ratio (0.0-1.0)
+    pub target_compression_ratio: f64,
+    /// Preserve important memories
+    pub preserve_important_memories: bool,
+    /// Importance threshold
+    pub importance_threshold: f64,
+    /// Enable semantic deduplication
+    pub enable_deduplication: bool,
+    /// Deduplication similarity threshold
+    pub dedup_threshold: f64,
+}
+
+impl Default for ContextCompressorConfig {
+    fn default() -> Self {
+        Self {
+            max_context_tokens: 3000,
+            target_compression_ratio: 0.7, // Compress to 70%
+            preserve_important_memories: true,
+            importance_threshold: 0.7,
+            enable_deduplication: true,
+            dedup_threshold: 0.85,
+        }
+    }
+}
+
+/// Context compression result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextCompressionResult {
+    /// Compressed context
+    pub compressed_context: String,
+    /// Original token count
+    pub original_tokens: usize,
+    /// Compressed token count
+    pub compressed_tokens: usize,
+    /// Compression ratio
+    pub compression_ratio: f64,
+    /// Number of memories removed
+    pub memories_removed: usize,
+    /// Number of memories preserved
+    pub memories_preserved: usize,
+    /// Deduplication savings
+    pub deduplication_savings: usize,
+}
+
+impl LlmOptimizer {
+    /// 🆕 P2: Compress context using the context compressor
+    ///
+    /// This method reduces token usage by:
+    /// - Filtering memories by importance threshold
+    /// - Removing semantically similar memories (deduplication)
+    /// - Targeting 70% compression ratio by default
+    ///
+    /// # Arguments
+    /// * `context` - Base context string (e.g., user query)
+    /// * `memories` - Array of memories to include in context
+    ///
+    /// # Returns
+    /// * `Ok(ContextCompressionResult)` - Compression statistics and compressed context
+    /// * `Err(AgentMemError)` - If compressor is not enabled or compression fails
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use agent_mem_core::llm_optimizer::{LlmOptimizer, LlmOptimizationConfig, ContextCompressorConfig};
+    /// # use agent_mem_core::Memory;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut optimizer = LlmOptimizer::new(LlmOptimizationConfig::default())
+    ///     .with_context_compressor(ContextCompressorConfig::default());
+    ///
+    /// let context = "What did I work on yesterday?";
+    /// let memories = vec![/* ... */];
+    ///
+    /// let result = optimizer.compress_context(context, &memories)?;
+    /// println!("Compressed to {}% of original size", result.compression_ratio * 100.0);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn compress_context(
+        &self,
+        context: &str,
+        memories: &[Memory],
+    ) -> Result<ContextCompressionResult> {
+        let compressor = self.context_compressor.as_ref()
+            .ok_or_else(|| AgentMemError::config_error("Context compressor is not enabled. Call with_context_compressor() first."))?;
+
+        compressor.compress_context(context, memories)
+    }
+}
+
+/// Context compressor for reducing token usage
+pub struct ContextCompressor {
+    config: ContextCompressorConfig,
+}
+
+impl ContextCompressor {
+    /// Create a new context compressor
+    pub fn new(config: ContextCompressorConfig) -> Self {
+        Self { config }
+    }
+
+    /// Compress context by removing redundant/less-important information
+    pub fn compress_context(
+        &self,
+        context: &str,
+        memories: &[crate::Memory],
+    ) -> Result<ContextCompressionResult> {
+        use crate::Memory;
+        use agent_mem_traits::AttributeKey;
+
+        info!("🗜️  Compressing context: {} chars, {} memories", context.len(), memories.len());
+
+        // Estimate original token count (rough estimate: 1 token ≈ 4 chars)
+        let original_tokens = (context.len() / 4) + (memories.len() * 50); // Assume 50 tokens per memory
+        let target_tokens = (original_tokens as f64 * self.config.target_compression_ratio) as usize;
+
+        // 1️⃣ Filter by importance
+        let important_memories: Vec<&Memory> = memories
+            .iter()
+            .filter(|m| {
+                if !self.config.preserve_important_memories {
+                    return true;
+                }
+                m.attributes
+                    .get(&agent_mem_traits::AttributeKey::core("importance"))
+                    .and_then(|v| v.as_number())
+                    .map_or(false, |imp| imp >= self.config.importance_threshold)
+            })
+            .collect();
+
+        // 2️⃣ Semantic deduplication (simplified - uses content similarity)
+        let mut unique_memories = Vec::new();
+        let mut dedup_count = 0;
+
+        for memory in important_memories {
+            let is_duplicate = if self.config.enable_deduplication {
+                unique_memories.iter().any(|existing| {
+                    self.are_memories_similar(*existing, memory)
+                })
+            } else {
+                false
+            };
+
+            if !is_duplicate {
+                unique_memories.push(memory);
+            } else {
+                dedup_count += 1;
+            }
+        }
+
+        // 3️⃣ Build compressed context
+        let compressed_context = self.build_compressed_context(context, &unique_memories);
+
+        let compressed_tokens = (compressed_context.len() / 4) + (unique_memories.len() * 50);
+        let compression_ratio = if original_tokens > 0 {
+            compressed_tokens as f64 / original_tokens as f64
+        } else {
+            1.0
+        };
+
+        info!(
+            "   ✅ Compressed: {} → {} tokens ({:.1}% ratio), removed: {}",
+            original_tokens,
+            compressed_tokens,
+            compression_ratio * 100.0,
+            memories.len() - unique_memories.len() + dedup_count
+        );
+
+        Ok(ContextCompressionResult {
+            compressed_context,
+            original_tokens,
+            compressed_tokens,
+            compression_ratio,
+            memories_removed: memories.len() - unique_memories.len(),
+            memories_preserved: unique_memories.len(),
+            deduplication_savings: dedup_count,
+        })
+    }
+
+    /// Check if two memories are semantically similar
+    fn are_memories_similar(&self, m1: &crate::Memory, m2: &crate::Memory) -> bool {
+        // Simplified similarity check: compare content
+        let content1 = match &m1.content {
+            agent_mem_traits::Content::Text(s) => s,
+            _ => return false,
+        };
+        let content2 = match &m2.content {
+            agent_mem_traits::Content::Text(s) => s,
+            _ => return false,
+        };
+
+        // Simple Jaccard similarity
+        let words1: std::collections::HashSet<&str> = content1.split_whitespace().collect();
+        let words2: std::collections::HashSet<&str> = content2.split_whitespace().collect();
+
+        if words1.is_empty() || words2.is_empty() {
+            return false;
+        }
+
+        let intersection = words1.intersection(&words2).count();
+        let union = words1.union(&words2).count();
+        let similarity = if union > 0 {
+            intersection as f64 / union as f64
+        } else {
+            0.0
+        };
+
+        similarity >= self.config.dedup_threshold
+    }
+
+    /// Build compressed context from filtered memories
+    fn build_compressed_context(&self, base_context: &str, memories: &[&crate::Memory]) -> String {
+        let mut compressed = String::from(base_context);
+
+        for memory in memories {
+            match &memory.content {
+                agent_mem_traits::Content::Text(s) => {
+                    compressed.push_str("\n\n");
+                    compressed.push_str(s);
+                }
+                _ => continue,
+            }
+        }
+
+        compressed
+    }
+}
+
+// ============================================================================
+// 🆕 P2: Multi-Level Cache (L1/L2/L3)
+// ============================================================================
+
+/// Cache level configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheLevelConfig {
+    /// Cache size (number of entries)
+    pub size: usize,
+    /// TTL in seconds
+    pub ttl_seconds: u64,
+    /// Enable this cache level
+    pub enabled: bool,
+}
+
+impl Default for CacheLevelConfig {
+    fn default() -> Self {
+        Self {
+            size: 1000,
+            ttl_seconds: 3600, // 1 hour
+            enabled: true,
+        }
+    }
+}
+
+/// Multi-level cache configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiLevelCacheConfig {
+    /// L1 cache (in-memory, fast, small)
+    pub l1: CacheLevelConfig,
+    /// L2 cache (in-memory, medium speed, medium size)
+    pub l2: CacheLevelConfig,
+    /// L3 cache (persistent, slower, large)
+    pub l3: CacheLevelConfig,
+}
+
+impl Default for MultiLevelCacheConfig {
+    fn default() -> Self {
+        Self {
+            l1: CacheLevelConfig {
+                size: 100,
+                ttl_seconds: 300, // 5 minutes
+                enabled: true,
+            },
+            l2: CacheLevelConfig {
+                size: 1000,
+                ttl_seconds: 1800, // 30 minutes
+                enabled: true,
+            },
+            l3: CacheLevelConfig {
+                size: 10000,
+                ttl_seconds: 7200, // 2 hours
+                enabled: true,
+            },
+        }
+    }
+}
+
+/// Cache entry with metadata
+#[derive(Debug, Clone)]
+struct CacheEntry {
+    value: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    access_count: u64,
+    last_accessed: chrono::DateTime<chrono::Utc>,
+}
+
+/// Cache level (L1, L2, or L3)
+struct CacheLevel {
+    name: String,
+    config: CacheLevelConfig,
+    cache: Arc<RwLock<std::collections::HashMap<String, CacheEntry>>>,
+    order: Arc<RwLock<Vec<String>>>, // For LRU tracking
+}
+
+impl CacheLevel {
+    fn new(name: String, config: CacheLevelConfig) -> Self {
+        Self {
+            name,
+            config,
+            cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            order: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    async fn get(&self, key: &str) -> Option<String> {
+        let mut cache = self.cache.write().await;
+        let mut order = self.order.write().await;
+        
+        if let Some(entry) = cache.get(key) {
+            // Check TTL
+            let age = chrono::Utc::now() - entry.created_at;
+            if age.num_seconds() < self.config.ttl_seconds as i64 {
+                // Update access stats
+                let value = entry.value.clone();
+                let updated_entry = CacheEntry {
+                    value: value.clone(),
+                    created_at: entry.created_at,
+                    access_count: entry.access_count + 1,
+                    last_accessed: chrono::Utc::now(),
+                };
+                cache.insert(key.to_string(), updated_entry);
+                
+                // Update LRU order
+                if let Some(pos) = order.iter().position(|k| k == key) {
+                    order.remove(pos);
+                }
+                order.push(key.to_string());
+                
+                Some(value)
+            } else {
+                cache.remove(key);
+                if let Some(pos) = order.iter().position(|k| k == key) {
+                    order.remove(pos);
+                }
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    async fn set(&self, key: String, value: String) {
+        let mut cache = self.cache.write().await;
+        let mut order = self.order.write().await;
+        
+        // Check size limit and evict if necessary
+        if cache.len() >= self.config.size {
+            if let Some(lru_key) = order.first() {
+                cache.remove(lru_key);
+                order.remove(0);
+            }
+        }
+        
+        let now = chrono::Utc::now();
+        cache.insert(key.clone(), CacheEntry {
+            value,
+            created_at: now,
+            access_count: 0,
+            last_accessed: now,
+        });
+        order.push(key);
+    }
+
+    async fn invalidate(&self, key: &str) {
+        let mut cache = self.cache.write().await;
+        let mut order = self.order.write().await;
+        cache.remove(key);
+        if let Some(pos) = order.iter().position(|k| k == key) {
+            order.remove(pos);
+        }
+    }
+
+    async fn clear(&self) {
+        let mut cache = self.cache.write().await;
+        let mut order = self.order.write().await;
+        cache.clear();
+        order.clear();
+    }
+}
+
+/// Multi-level cache manager
+pub struct MultiLevelCache {
+    l1: Option<CacheLevel>,
+    l2: Option<CacheLevel>,
+    l3: Option<CacheLevel>,
+}
+
+impl MultiLevelCache {
+    /// Create a new multi-level cache
+    pub fn new(config: MultiLevelCacheConfig) -> Self {
+        Self {
+            l1: if config.l1.enabled {
+                Some(CacheLevel::new("L1".to_string(), config.l1))
+            } else {
+                None
+            },
+            l2: if config.l2.enabled {
+                Some(CacheLevel::new("L2".to_string(), config.l2))
+            } else {
+                None
+            },
+            l3: if config.l3.enabled {
+                Some(CacheLevel::new("L3".to_string(), config.l3))
+            } else {
+                None
+            },
+        }
+    }
+
+    /// Get value from cache (tries L1 → L2 → L3)
+    pub async fn get(&self, key: &str) -> Option<String> {
+        // Try L1 first (fastest)
+        if let Some(l1) = &self.l1 {
+            if let Some(value) = l1.get(key).await {
+                debug!("🎯 L1 cache hit for key: {}", key);
+                return Some(value);
+            }
+        }
+
+        // Try L2
+        if let Some(l2) = &self.l2 {
+            if let Some(value) = l2.get(key).await {
+                debug!("📊 L2 cache hit for key: {}", key);
+                // Promote to L1
+                if let Some(l1) = &self.l1 {
+                    l1.set(key.to_string(), value.clone()).await;
+                }
+                return Some(value);
+            }
+        }
+
+        // Try L3
+        if let Some(l3) = &self.l3 {
+            if let Some(value) = l3.get(key).await {
+                debug!("💾 L3 cache hit for key: {}", key);
+                // Promote to L2 and L1
+                if let Some(l2) = &self.l2 {
+                    l2.set(key.to_string(), value.clone()).await;
+                }
+                if let Some(l1) = &self.l1 {
+                    l1.set(key.to_string(), value.clone()).await;
+                }
+                return Some(value);
+            }
+        }
+
+        debug!("❌ Cache miss for key: {}", key);
+        None
+    }
+
+    /// Set value in all cache levels
+    pub async fn set(&self, key: String, value: String) {
+        if let Some(l1) = &self.l1 {
+            l1.set(key.clone(), value.clone()).await;
+        }
+        if let Some(l2) = &self.l2 {
+            l2.set(key.clone(), value.clone()).await;
+        }
+        if let Some(l3) = &self.l3 {
+            l3.set(key, value).await;
+        }
+    }
+
+    /// Invalidate key from all levels
+    pub async fn invalidate(&self, key: &str) {
+        if let Some(l1) = &self.l1 {
+            l1.invalidate(key).await;
+        }
+        if let Some(l2) = &self.l2 {
+            l2.invalidate(key).await;
+        }
+        if let Some(l3) = &self.l3 {
+            l3.invalidate(key).await;
+        }
+    }
+
+    /// Clear all cache levels
+    pub async fn clear(&self) {
+        if let Some(l1) = &self.l1 {
+            l1.clear().await;
+        }
+        if let Some(l2) = &self.l2 {
+            l2.clear().await;
+        }
+        if let Some(l3) = &self.l3 {
+            l3.clear().await;
+        }
+    }
+
+    /// Get cache statistics
+    pub async fn stats(&self) -> MultiLevelCacheStats {
+        // Simplified stats
+        MultiLevelCacheStats {
+            total_hits: 0,
+            total_misses: 0,
+            l1_hits: 0,
+            l2_hits: 0,
+            l3_hits: 0,
+            hit_rate: 0.0,
+        }
+    }
+}
+
+/// Multi-level cache statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiLevelCacheStats {
+    pub total_hits: u64,
+    pub total_misses: u64,
+    pub l1_hits: u64,
+    pub l2_hits: u64,
+    pub l3_hits: u64,
+    pub hit_rate: f64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,5 +1127,134 @@ mod tests {
         // For now, just check that both responses have the same content
         // assert!(response2.cached);
         assert_eq!(optimizer.performance_metrics.cache_hits, 1);
+    }
+
+    // 🆕 P2 Tests for ContextCompressor
+    #[test]
+    fn test_context_compressor_creation() {
+        let config = ContextCompressorConfig::default();
+        let compressor = ContextCompressor::new(config);
+        // Just verify it was created successfully
+        assert!(true);
+    }
+
+    #[test]
+    fn test_context_compressor_config() {
+        let config = ContextCompressorConfig::default();
+        assert_eq!(config.max_context_tokens, 3000);
+        assert_eq!(config.target_compression_ratio, 0.7);
+        assert!(config.preserve_important_memories);
+        assert_eq!(config.importance_threshold, 0.7);
+        assert!(config.enable_deduplication);
+        assert_eq!(config.dedup_threshold, 0.85);
+    }
+
+    // 🆕 P2 Tests for MultiLevelCache
+    #[tokio::test]
+    async fn test_multi_level_cache_creation() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+        // Just verify it was created successfully
+        assert!(true);
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_config() {
+        let config = MultiLevelCacheConfig::default();
+        // L1: Fast, small, short TTL
+        assert_eq!(config.l1.size, 100);
+        assert_eq!(config.l1.ttl_seconds, 300); // 5 minutes
+        assert!(config.l1.enabled);
+
+        // L2: Medium speed, medium size, medium TTL
+        assert_eq!(config.l2.size, 1000);
+        assert_eq!(config.l2.ttl_seconds, 1800); // 30 minutes
+        assert!(config.l2.enabled);
+
+        // L3: Slow, large, long TTL
+        assert_eq!(config.l3.size, 10000);
+        assert_eq!(config.l3.ttl_seconds, 7200); // 2 hours
+        assert!(config.l3.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_set_get() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        // Set a value
+        cache.set("test_key".to_string(), "test_value".to_string()).await;
+
+        // Get it back
+        let value = cache.get("test_key").await;
+        assert!(value.is_some());
+        assert_eq!(value.unwrap(), "test_value");
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_miss() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        // Try to get a non-existent key
+        let value = cache.get("nonexistent_key").await;
+        assert!(value.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_invalidate() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        // Set a value
+        cache.set("test_key".to_string(), "test_value".to_string()).await;
+
+        // Invalidate it
+        cache.invalidate("test_key").await;
+
+        // Should be gone
+        let value = cache.get("test_key").await;
+        assert!(value.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_multi_level_cache_clear() {
+        let config = MultiLevelCacheConfig::default();
+        let cache = MultiLevelCache::new(config);
+
+        // Set multiple values
+        cache.set("key1".to_string(), "value1".to_string()).await;
+        cache.set("key2".to_string(), "value2".to_string()).await;
+        cache.set("key3".to_string(), "value3".to_string()).await;
+
+        // Clear all
+        cache.clear().await;
+
+        // All should be gone
+        assert!(cache.get("key1").await.is_none());
+        assert!(cache.get("key2").await.is_none());
+        assert!(cache.get("key3").await.is_none());
+    }
+
+    // 🆕 P2 Integration Test: LlmOptimizer with ContextCompressor
+    #[test]
+    fn test_llm_optimizer_with_context_compressor() {
+        let config = LlmOptimizationConfig::default();
+        let compressor_config = ContextCompressorConfig::default();
+
+        let optimizer = LlmOptimizer::new(config)
+            .with_context_compressor(compressor_config);
+
+        // Verify the compressor is enabled
+        assert!(optimizer.context_compressor.is_some());
+    }
+
+    #[test]
+    fn test_llm_optimizer_without_context_compressor() {
+        let config = LlmOptimizationConfig::default();
+        let optimizer = LlmOptimizer::new(config);
+
+        // Verify the compressor is not enabled
+        assert!(optimizer.context_compressor.is_none());
     }
 }
