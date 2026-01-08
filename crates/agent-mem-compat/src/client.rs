@@ -433,8 +433,7 @@ impl Mem0Client {
             .unwrap_or(self.config.memory.default_search_limit);
 
         // Enhanced search with complex filtering and scoring
-        // ✅ P1 Optimization: Avoid cloning during filtering, collect references first
-        let matching_refs: Vec<&Memory> = self
+        let mut matching_memories: Vec<Memory> = self
             .memories
             .iter()
             .filter(|entry| {
@@ -454,11 +453,8 @@ impl Mem0Client {
                 // Enhanced text matching with scoring
                 self.calculate_search_score(&request.query, memory) > 0.0
             })
-            .map(|entry| entry.value())
+            .map(|entry| entry.value().clone())
             .collect();
-
-        // ✅ P1 Optimization: Clone only after filtering (much smaller number of items)
-        let mut matching_memories: Vec<Memory> = matching_refs.into_iter().cloned().collect();
 
         // Apply enhanced sorting if specified in filters
         if let Some(ref filter) = request.filters {
@@ -817,7 +813,7 @@ impl Mem0Client {
         let limit = filters.as_ref().and_then(|f| f.limit).unwrap_or(1000); // Default large limit for get_all
 
         // ✅ P1 Optimization: Filter with references first, then clone
-        let filtered_refs: Vec<&Memory> = self
+        let mut memories: Vec<Memory> = self
             .memories
             .iter()
             .filter(|entry| {
@@ -853,11 +849,8 @@ impl Mem0Client {
 
                 true
             })
-            .map(|entry| entry.value())
+            .map(|entry| entry.value().clone())
             .collect();
-
-        // ✅ P1 Optimization: Clone only after filtering and apply limit BEFORE sorting
-        let mut memories: Vec<Memory> = filtered_refs.into_iter().cloned().collect();
 
         // Sort by creation time (newest first) and limit
         memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -1041,11 +1034,8 @@ impl Mem0Client {
 
                 true
             })
-            .map(|entry| entry.value())
+            .map(|entry| entry.value().clone())
             .collect();
-
-        // ✅ P1 Optimization: Clone only filtered candidates (usually much smaller)
-        let mut candidate_memories: Vec<Memory> = candidate_refs.into_iter().cloned().collect();
 
         // Step 2: Calculate semantic similarity scores
         for memory in &mut candidate_memories {
