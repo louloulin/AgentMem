@@ -12,7 +12,7 @@ use crate::{
     },
     storage::conversion::v4_to_legacy,
 };
-use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory, Result as AgentMemResult};
+use agent_mem_traits::{MemoryItem as LegacyMemory, MemoryV4 as Memory, Result as AgentMemResult, MemoryScheduler};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -95,6 +95,10 @@ pub struct MemoryEngine {
     /// Optional enhanced hybrid search engine (EnhancedHybridSearchEngineV2)
     /// Used when enable_enhanced_search is true
     enhanced_search_engine: Option<Arc<EnhancedHybridSearchEngineV2>>,
+
+    /// Optional memory scheduler for intelligent memory selection
+    /// If provided, search_with_scheduler() will use this for smart memory ranking
+    scheduler: Option<Arc<dyn MemoryScheduler>>,
 }
 
 impl MemoryEngine {
@@ -111,6 +115,7 @@ impl MemoryEngine {
             conflict_resolver,
             memory_repository: None,
             enhanced_search_engine: None,
+            scheduler: None,
         }
     }
 
@@ -156,7 +161,32 @@ impl MemoryEngine {
             conflict_resolver,
             memory_repository: Some(memory_repository),
             enhanced_search_engine,
+            scheduler: None,
         }
+    }
+
+    /// Set memory scheduler for intelligent memory selection
+    ///
+    /// This enables search_with_scheduler() to use smart memory ranking
+    /// based on relevance, importance, and recency.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use agent_mem_core::scheduler::{DefaultMemoryScheduler, ExponentialDecayModel};
+    /// use agent_mem_traits::ScheduleConfig;
+    ///
+    /// let scheduler = DefaultMemoryScheduler::new(
+    ///     ScheduleConfig::balanced(),
+    ///     ExponentialDecayModel::default()
+    /// );
+    ///
+    /// let engine = MemoryEngine::new(config)
+    ///     .with_scheduler(Arc::new(scheduler));
+    /// ```
+    pub fn with_scheduler(mut self, scheduler: Arc<dyn MemoryScheduler>) -> Self {
+        self.scheduler = Some(scheduler);
+        self
     }
 
     /// Add memory with full processing
@@ -684,6 +714,79 @@ impl MemoryEngine {
 
         info!("Returning {} search results", results.len());
         Ok(results)
+    }
+
+    /// Search memories with intelligent scheduling
+    ///
+    /// This method uses the memory scheduler (if available) to perform smart memory ranking
+    /// based on relevance, importance, and recency. If no scheduler is configured,
+    /// it falls back to the standard search_memories() method.
+    ///
+    /// # Arguments
+    ///
+    /// - `query`: Search query string
+    /// - `scope`: Optional memory scope filter
+    /// - `limit`: Maximum number of memories to return
+    ///
+    /// # Returns
+    ///
+    /// Sorted and filtered memories based on the scheduler's ranking
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let results = engine
+    ///     .search_with_scheduler("What did I work on?", None, 10)
+    ///     .await?;
+    /// ```
+    pub async fn search_with_scheduler(
+        &self,
+        query: &str,
+        scope: Option<MemoryScope>,
+        limit: usize,
+    ) -> crate::CoreResult<Vec<Memory>> {
+        info!(
+            "Searching with scheduler: query='{}', scope={:?}, limit={}",
+            query, scope, limit
+        );
+
+        // If no scheduler is configured, fall back to standard search
+        let scheduler = match &self.scheduler {
+            Some(s) => s,
+            None => {
+                info!("No scheduler configured, using standard search");
+                return self.search_memories(query, scope, Some(limit)).await;
+            }
+        };
+
+        // Fetch more candidates (3x) to give the scheduler more options
+        let candidates_count = limit * 3;
+        info!(
+            "Fetching {} candidates for scheduler (target: {})",
+            candidates_count, limit
+        );
+
+        let candidates = self
+            .search_memories(query, scope.clone(), Some(candidates_count))
+            .await?;
+
+        info!("Fetched {} candidates, applying scheduler", candidates.len());
+
+        // Use scheduler to select top-k memories
+        let selected = scheduler
+            .select_memories(query, candidates, limit)
+            .await
+            .map_err(|e| {
+                crate::CoreError::Storage(format!("Memory scheduler failed: {}", e))
+            })?;
+
+        info!(
+            "Scheduler selected {} memories (from {} candidates)",
+            selected.len(),
+            candidates_count
+        );
+
+        Ok(selected)
     }
 
     /// Check if a memory matches the given scope

@@ -86,6 +86,7 @@ pub mod prompt;
 pub mod query;
 /// Active retrieval system with topic extraction, intelligent routing, and context synthesis
 pub mod retrieval;
+pub mod scheduler;
 pub mod search;
 pub mod security;
 /// Simplified Memory API (Mem0-style)
@@ -144,6 +145,9 @@ pub use retrieval::{
     RoutingResult, SynthesisResult, TopicCategory, TopicExtractor, TopicExtractorConfig,
     TopicHierarchy,
 };
+
+// Re-export scheduler modules
+pub use scheduler::{DefaultMemoryScheduler, ExponentialDecayModel};
 
 // Re-export integration modules
 pub use integration::{

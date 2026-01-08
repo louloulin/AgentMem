@@ -14,6 +14,7 @@ pub mod memory;
 pub mod memory_store;
 pub mod session;
 pub mod storage;
+pub mod scheduler;
 pub mod types;
 
 // Re-export main traits
@@ -37,6 +38,7 @@ pub use memory_store::{
     SemanticMemoryStore, SemanticQuery, WorkingMemoryItem, WorkingMemoryStore,
 };
 pub use session::SessionManager;
+pub use scheduler::{MemoryScheduler, ScheduleConfig, ScheduleContext};
 pub use storage::{
     EmbeddingVectorStore, GraphResult, GraphStore, HistoryStore, KeyValueStore, LegacyVectorStore,
     VectorStore, VectorStoreStats,
