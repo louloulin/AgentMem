@@ -1,78 +1,23 @@
 //! LibSQL implementation of CoreMemoryStore
 //!
-//! 🎯 P1 Task: Prepared statement caching for database optimization
-//! 📅 Updated: 2025-01-07
-//! 🏗️ Optimization: Cache prepared statements to reduce query latency by ~40%
+//! Note: Statement caching removed due to libsql::Statement not implementing Clone
 
 use agent_mem_traits::{AgentMemError, CoreMemoryItem, CoreMemoryStore, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use libsql::{params, Connection, Row, Statement};
-use std::collections::HashMap;
+use libsql::{params, Connection, Row};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 
-/// 🆕 P1: Prepared statement cache
-/// Stores prepared statements keyed by SQL query string
-type StatementCache = Arc<RwLock<HashMap<String, Statement>>>;
-
-/// LibSQL implementation of CoreMemoryStore with prepared statement caching
+/// LibSQL implementation of CoreMemoryStore
 pub struct LibSqlCoreStore {
     conn: Arc<Mutex<Connection>>,
-    /// 🆕 P1: Prepared statement cache for query optimization
-    statement_cache: StatementCache,
 }
 
 impl LibSqlCoreStore {
-    /// Create a new LibSQL core memory store with statement caching
+    /// Create a new LibSQL core memory store
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { 
-            conn,
-            statement_cache: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    /// 🆕 P1: Get or create a prepared statement with caching
-    /// This reduces query preparation overhead by reusing statements
-    async fn get_prepared_statement(&self, sql: &str) -> Result<Statement> {
-        // Check cache first
-        {
-            let cache = self.statement_cache.read().await;
-            if let Some(stmt) = cache.get(sql) {
-                tracing::debug!("✅ Statement cache hit: {}", sql);
-                return Ok(stmt.clone());
-            }
-        }
-
-        // Not in cache, prepare and cache it
-        tracing::debug!("⚡ Preparing and caching statement: {}", sql);
-        let conn = self.conn.lock().await;
-        let stmt = conn
-            .prepare(sql)
-            .await
-            .map_err(|e| AgentMemError::storage_error(format!("Failed to prepare statement: {e}")))?;
-
-        // Cache the statement
-        {
-            let mut cache = self.statement_cache.write().await;
-            cache.insert(sql.to_string(), stmt.clone());
-        }
-
-        Ok(stmt)
-    }
-
-    /// 🆕 P1: Clear the statement cache
-    /// Useful for testing or when the database schema changes
-    pub async fn clear_statement_cache(&self) {
-        let mut cache = self.statement_cache.write().await;
-        cache.clear();
-        tracing::info!("✅ Statement cache cleared");
-    }
-
-    /// 🆕 P1: Get cache statistics
-    pub async fn cache_size(&self) -> usize {
-        let cache = self.statement_cache.read().await;
-        cache.len()
+        Self { conn }
     }
 }
 
@@ -168,10 +113,8 @@ impl CoreMemoryStore for LibSqlCoreStore {
     }
 
     async fn get_value(&self, user_id: &str, key: &str) -> Result<Option<CoreMemoryItem>> {
-        // 🆕 P1: Use cached prepared statement
-        let stmt = self
-            .get_prepared_statement("SELECT * FROM core_memory WHERE user_id = ? AND key = ?")
-            .await?;
+        let conn = self.conn.lock().await;
+        let stmt = conn.prepare("SELECT * FROM core_memory WHERE user_id = ? AND key = ?").await?
 
         let mut rows = stmt
             .query(params![user_id, key])
@@ -190,12 +133,10 @@ impl CoreMemoryStore for LibSqlCoreStore {
     }
 
     async fn get_all(&self, user_id: &str) -> Result<Vec<CoreMemoryItem>> {
-        // 🆕 P1: Use cached prepared statement
-        let stmt = self
-            .get_prepared_statement(
-                "SELECT * FROM core_memory WHERE user_id = ? ORDER BY category, key"
-            )
-            .await?;
+        let conn = self.conn.lock().await;
+        let stmt = conn.prepare(
+            "SELECT * FROM core_memory WHERE user_id = ? ORDER BY category, key"
+        ).await?
 
         let mut rows = stmt
             .query(params![user_id])
@@ -215,12 +156,10 @@ impl CoreMemoryStore for LibSqlCoreStore {
     }
 
     async fn get_by_category(&self, user_id: &str, category: &str) -> Result<Vec<CoreMemoryItem>> {
-        // 🆕 P1: Use cached prepared statement
-        let stmt = self
-            .get_prepared_statement(
-                "SELECT * FROM core_memory WHERE user_id = ? AND category = ? ORDER BY key"
-            )
-            .await?;
+        let conn = self.conn.lock().await;
+        let stmt = conn.prepare(
+            "SELECT * FROM core_memory WHERE user_id = ? AND category = ? ORDER BY key"
+        ).await?
 
         let mut rows = stmt
             .query(params![user_id, category])
