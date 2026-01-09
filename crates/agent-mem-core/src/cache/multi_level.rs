@@ -375,7 +375,6 @@ mod tests {
             enable_l1: true,
             enable_l2: false,
             ..Default::default()
-        Ok(())
         };
 
         let cache = MultiLevelCache::new(config);
@@ -452,20 +451,4 @@ mod tests {
         let value = cache.get(&"key1".to_string()).await?;
         assert_eq!(value, None);
     }
-}
 
-    async fn test_multi_level_cache_delete() {
-        let config = MultiLevelCacheConfig::default();
-        let cache = MultiLevelCache::new(config);
-
-        cache
-            .set("key1".to_string(), b"value1".to_vec(), None)
-            .await
-            .unwrap();
-        let deleted = cache.delete(&"key1".to_string()).await?;
-        assert!(deleted);
-
-        let value = cache.get(&"key1".to_string()).await?;
-        assert_eq!(value, None);
-    }
-}

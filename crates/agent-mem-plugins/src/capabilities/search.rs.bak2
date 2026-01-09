@@ -276,6 +276,7 @@ mod tests {
         search.clear().await?;
         assert_eq!(search.count().await?, 0);
     }
+}
 
     async fn test_search_count_and_clear() {
         let search = SearchCapability::new();

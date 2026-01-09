@@ -431,10 +431,11 @@ impl MemoryOrchestrator {
         })
     }
 
-    // ========== 存储方法委托 ==========
+    // ========== 存储方法委托（内部方法） ==========
 
-    /// 添加记忆（快速模式）
-    pub async fn add_memory_fast(
+    /// 添加记忆（快速模式）- 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_memory_fast(
         &self,
         content: String,
         agent_id: String,
@@ -453,8 +454,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 添加记忆（简单模式）
-    pub async fn add_memory(
+    /// 添加记忆（简单模式）- 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_memory(
         &self,
         content: String,
         agent_id: String,
@@ -473,8 +475,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 添加记忆 v2（支持 infer 参数）
-    pub async fn add_memory_v2(
+    /// 添加记忆 v2（支持 infer 参数）- 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_memory_v2(
         &self,
         content: String,
         agent_id: String,
@@ -518,10 +521,11 @@ impl MemoryOrchestrator {
         super::storage::StorageModule::get_memory(self, memory_id).await
     }
 
-    // ========== 检索方法委托 ==========
+    // ========== 检索方法委托（内部方法） ==========
 
-    /// 搜索记忆
-    pub async fn search_memories(
+    /// 搜索记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn search_memories(
         &self,
         query: String,
         agent_id: String,
@@ -540,9 +544,10 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 混合搜索记忆
+    /// 混合搜索记忆 - 内部方法
     #[cfg(feature = "postgres")]
-    pub async fn search_memories_hybrid(
+    #[allow(dead_code)]
+    pub(crate) async fn search_memories_hybrid(
         &self,
         query: String,
         user_id: String,
@@ -556,9 +561,10 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 混合搜索记忆（非 postgres 版本）
+    /// 混合搜索记忆（非 postgres 版本） - 内部方法
     #[cfg(not(feature = "postgres"))]
-    pub async fn search_memories_hybrid(
+    #[allow(dead_code)]
+    pub(crate) async fn search_memories_hybrid(
         &self,
         query: String,
         user_id: String,
@@ -572,8 +578,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 上下文感知重排序
-    pub async fn context_aware_rerank(
+    /// 上下文感知重排序 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn context_aware_rerank(
         &self,
         memories: Vec<MemoryItem>,
         query: &str,
@@ -583,10 +590,11 @@ impl MemoryOrchestrator {
             .await
     }
 
-    // ========== 批量操作方法委托 ==========
+    // ========== 批量操作方法委托（内部方法） ==========
 
-    /// 批量添加记忆
-    pub async fn add_memories_batch(
+    /// 批量添加记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_memories_batch(
         &self,
         items: Vec<(
             String,
@@ -599,8 +607,9 @@ impl MemoryOrchestrator {
         super::batch::BatchModule::add_memories_batch(self, items).await
     }
 
-    /// 批量添加记忆（优化版）
-    pub async fn add_memory_batch_optimized(
+    /// 批量添加记忆（优化版） - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_memory_batch_optimized(
         &self,
         contents: Vec<String>,
         agent_id: String,
@@ -613,10 +622,11 @@ impl MemoryOrchestrator {
         .await
     }
 
-    // ========== 多模态方法委托 ==========
+    // ========== 多模态方法委托（内部方法） ==========
 
-    /// 添加图像记忆
-    pub async fn add_image_memory(
+    /// 添加图像记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_image_memory(
         &self,
         image_data: Vec<u8>,
         user_id: String,
@@ -629,8 +639,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 添加音频记忆
-    pub async fn add_audio_memory(
+    /// 添加音频记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_audio_memory(
         &self,
         audio_data: Vec<u8>,
         user_id: String,
@@ -643,8 +654,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 添加视频记忆
-    pub async fn add_video_memory(
+    /// 添加视频记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn add_video_memory(
         &self,
         video_data: Vec<u8>,
         user_id: String,
@@ -657,10 +669,11 @@ impl MemoryOrchestrator {
         .await
     }
 
-    // ========== 工具方法委托 ==========
+    // ========== 工具方法委托（内部方法） ==========
 
-    /// 生成查询嵌入向量
-    pub async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
+    /// 生成查询嵌入向量 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn generate_query_embedding(&self, query: &str) -> Result<Vec<f32>> {
         if let Some(embedder) = &self.embedder {
             super::utils::UtilsModule::generate_query_embedding(query, embedder.as_ref()).await
         } else {
@@ -670,8 +683,9 @@ impl MemoryOrchestrator {
         }
     }
 
-    /// 获取统计信息
-    pub async fn get_stats(&self, user_id: Option<String>) -> Result<MemoryStats> {
+    /// 获取统计信息 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn get_stats(&self, user_id: Option<String>) -> Result<MemoryStats> {
         let total_memories = 0;
         let memories_by_type: HashMap<String, usize> = HashMap::new();
         let total_importance = 0.0;
@@ -703,8 +717,9 @@ impl MemoryOrchestrator {
         })
     }
 
-    /// 获取所有记忆
-    pub async fn get_all_memories(
+    /// 获取所有记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn get_all_memories(
         &self,
         agent_id: String,
         user_id: Option<String>,
@@ -733,8 +748,9 @@ impl MemoryOrchestrator {
         Ok(all_memories)
     }
 
-    /// 获取所有记忆 v2
-    pub async fn get_all_memories_v2(
+    /// 获取所有记忆 v2 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn get_all_memories_v2(
         &self,
         agent_id: String,
         user_id: Option<String>,
@@ -748,8 +764,9 @@ impl MemoryOrchestrator {
         Ok(memories)
     }
 
-    /// 删除所有记忆
-    pub async fn delete_all_memories(
+    /// 删除所有记忆 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn delete_all_memories(
         &self,
         agent_id: String,
         user_id: Option<String>,
@@ -815,8 +832,9 @@ impl MemoryOrchestrator {
         Ok(())
     }
 
-    /// 缓存搜索
-    pub async fn cached_search(
+    /// 缓存搜索 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn cached_search(
         &self,
         query: String,
         user_id: String,
@@ -829,8 +847,9 @@ impl MemoryOrchestrator {
             .await
     }
 
-    /// 获取性能统计
-    pub async fn get_performance_stats(&self) -> Result<crate::memory::PerformanceStats> {
+    /// 获取性能统计 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn get_performance_stats(&self) -> Result<crate::memory::PerformanceStats> {
         // 实现性能统计逻辑
         
         let cache_hit_rate = 0.0;
@@ -864,12 +883,654 @@ impl MemoryOrchestrator {
         })
     }
 
-    /// 获取历史记录
-    pub async fn get_history(&self, memory_id: &str) -> Result<Vec<crate::history::HistoryEntry>> {
+    /// 获取历史记录 - 内部方法
+    #[allow(dead_code)]
+    pub(crate) async fn get_history(&self, memory_id: &str) -> Result<Vec<crate::history::HistoryEntry>> {
         if let Some(history_manager) = &self.history_manager {
             history_manager.get_history(memory_id).await
         } else {
             Ok(Vec::new())
         }
+    }
+
+    // ========== ✅ 新 API - 统一的记忆管理 ==========
+
+    /// 添加记忆（统一入口，自动使用智能处理）
+    ///
+    /// 这是推荐的添加记忆方法，会自动使用智能添加：
+    /// - 事实提取
+    /// - 重要性评估
+    /// - 冲突检测
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let id = orchestrator.add("Hello, world!").await?;
+    /// ```
+    pub async fn add(&self, content: &str) -> Result<String> {
+        // 使用智能添加（如果可用），否则使用快速添加
+        if self.config.enable_intelligent_features {
+            // 调用智能添加的内部实现
+            super::intelligence::IntelligenceModule::add_memory_intelligent(
+                self,
+                content.to_string(),
+                "default".to_string(),
+                Some("default".to_string()),
+                None,
+                None,
+            )
+            .await
+            .map(|_| uuid::Uuid::new_v4().to_string())
+        } else {
+            // 降级到快速添加
+            self.add_memory_fast(
+                content.to_string(),
+                "default".to_string(),
+                Some("default".to_string()),
+                None,
+                None,
+            )
+            .await
+        }
+    }
+
+    /// 批量添加记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let ids = orchestrator.add_batch(vec
+!["Memory 1", "Memory 2"]).await?;
+    /// ```
+    pub async fn add_batch(&self, contents: Vec<String>) -> Result<Vec<String>> {
+        if contents.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 准备批量数据
+        let items: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<agent_mem_core::types::MemoryType>,
+            Option<std::collections::HashMap<String, serde_json::Value>>,
+        )> = contents
+            .into_iter()
+            .map(|content| {
+                (
+                    content,
+                    "default".to_string(),
+                    Some("default".to_string()),
+                    None,
+                    None,
+                )
+            })
+            .collect();
+
+        // 使用现有的批量添加方法
+        self.add_memories_batch(items).await
+    }
+
+    /// 添加图片记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let id = orchestrator.add_image(image_data, Some("A beautiful sunset")).await?;
+    /// ```
+    pub async fn add_image(
+        &self,
+        image: Vec<u8>,
+        caption: Option<&str>,
+    ) -> Result<String> {
+        let mut metadata = std::collections::HashMap::new();
+        if let Some(caption_text) = caption {
+            metadata.insert("caption".to_string(), caption_text.to_string());
+        }
+
+        self.add_image_memory(
+            image,
+            "default".to_string(),
+            "default".to_string(),
+            if metadata.is_empty() { None } else { Some(metadata) },
+        )
+        .await
+        .map(|r| r.memory_id)
+    }
+
+    /// 添加音频记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let id = orchestrator.add_audio(audio_data, Some("Transcript text")).await?;
+    /// ```
+    pub async fn add_audio(
+        &self,
+        audio: Vec<u8>,
+        transcript: Option<&str>,
+    ) -> Result<String> {
+        let mut metadata = std::collections::HashMap::new();
+        if let Some(transcript_text) = transcript {
+            metadata.insert("transcript".to_string(), transcript_text.to_string());
+        }
+
+        self.add_audio_memory(
+            audio,
+            "default".to_string(),
+            "default".to_string(),
+            if metadata.is_empty() { None } else { Some(metadata) },
+        )
+        .await
+        .map(|r| r.memory_id)
+    }
+
+    /// 添加视频记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let id = orchestrator.add_video(video_data, Some("Video description")).await?;
+    /// ```
+    pub async fn add_video(
+        &self,
+        video: Vec<u8>,
+        description: Option<&str>,
+    ) -> Result<String> {
+        let mut metadata = std::collections::HashMap::new();
+        if let Some(desc) = description {
+            metadata.insert("description".to_string(), desc.to_string());
+        }
+
+        self.add_video_memory(
+            video,
+            "default".to_string(),
+            "default".to_string(),
+            if metadata.is_empty() { None } else { Some(metadata) },
+        )
+        .await
+        .map(|r| r.memory_id)
+    }
+
+    // ========== ✅ 新 API - 统一的查询 ==========
+
+    /// 获取单个记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let memory = orchestrator.get("memory-id").await?;
+    /// ```
+    pub async fn get(&self, id: &str) -> Result<MemoryItem> {
+        self.get_memory(id).await
+    }
+
+    /// 获取所有记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let memories = orchestrator.get_all().await?;
+    /// ```
+    pub async fn get_all(&self) -> Result<Vec<MemoryItem>> {
+        self.get_all_memories_v2("default".to_string(), Some("default".to_string()), None, None)
+            .await
+    }
+
+    // ========== ✅ 新 API - 统一的更新 ==========
+
+    /// 更新记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// orchestrator.update("memory-id", "new content").await?;
+    /// ```
+    pub async fn update(&self, id: &str, content: &str) -> Result<()> {
+        let mut data = std::collections::HashMap::new();
+        data.insert("content".to_string(), serde_json::json!(content));
+        self.update_memory(id, data).await?;
+        Ok(())
+    }
+
+    // ========== ✅ 新 API - 统一的删除 ==========
+
+    /// 删除单个记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// orchestrator.delete("memory-id").await?;
+    /// ```
+    pub async fn delete(&self, id: &str) -> Result<()> {
+        self.delete_memory(id).await
+    }
+
+    /// 删除所有记忆
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// orchestrator.delete_all().await?;
+    /// ```
+    pub async fn delete_all(&self) -> Result<()> {
+        self.delete_all_memories("default".to_string(), Some("default".to_string()), None)
+            .await?;
+        Ok(())
+    }
+
+    // ========== ✅ 新 API - 统一的搜索 ==========
+
+    /// 搜索记忆（使用默认配置）
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let results = orchestrator.search("query").await?;
+    /// ```
+    pub async fn search(&self, query: &str) -> Result<Vec<MemoryItem>> {
+        self.search_with_options(query, 10, true, true, None, None)
+            .await
+    }
+
+    /// 搜索记忆（带选项）
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let results = orchestrator
+    ///     .search_with_options("query", 20, true, false, Some(0.7), None)
+    ///     .await?;
+    /// ```
+    pub async fn search_with_options(
+        &self,
+        query: &str,
+        limit: usize,
+        enable_hybrid: bool,
+        enable_rerank: bool,
+        threshold: Option<f32>,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<MemoryItem>> {
+        let user_id = "default".to_string();
+
+        // 执行搜索
+        let mut results = if enable_hybrid {
+            #[cfg(feature = "postgres")]
+            {
+                self.search_memories_hybrid(
+                    query.to_string(),
+                    user_id,
+                    limit,
+                    threshold,
+                    None,
+                )
+                .await?
+            }
+
+            #[cfg(not(feature = "postgres"))]
+            {
+                self.search_memories(
+                    query.to_string(),
+                    "default".to_string(),
+                    Some(user_id),
+                    limit,
+                    None,
+                )
+                .await?
+            }
+        } else {
+            self.search_memories(
+                query.to_string(),
+                "default".to_string(),
+                Some(user_id),
+                limit,
+                None,
+            )
+            .await?
+        };
+
+        // 应用重排序
+        if enable_rerank {
+            results = self
+                .context_aware_rerank(results, query, &user_id)
+                .await?;
+        }
+
+        // TODO: 应用时间范围过滤
+        // if let Some((start, end)) = time_range { ... }
+
+        Ok(results)
+    }
+
+    // ========== ✅ 新 API - 统一的统计 ==========
+
+    /// 获取统计信息
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let stats = orchestrator.stats().await?;
+    /// ```
+    pub async fn stats(&self) -> Result<MemoryStats> {
+        self.get_stats(None).await
+    }
+
+    /// 获取性能统计
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let perf = orchestrator.performance_stats().await?;
+    /// ```
+    pub async fn performance_stats(&self) -> Result<crate::memory::PerformanceStats> {
+        self.get_performance_stats().await
+    }
+
+    /// 获取历史记录
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let history = orchestrator.history("memory-id").await?;
+    /// ```
+    pub async fn history(&self, memory_id: &str) -> Result<Vec<crate::history::HistoryEntry>> {
+        self.get_history(memory_id).await
+    }
+
+    // ========== ✅ Builder 模式支持 ==========
+
+    /// 创建搜索构建器
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let results = orchestrator
+    ///     .search_builder("query")
+    ///     .limit(20)
+    ///     .with_rerank(true)
+    ///     .with_threshold(0.7)
+    ///     .execute()
+    ///     .await?;
+    /// ```
+    pub fn search_builder<'a>(&'a self, query: &'a str) -> SearchBuilder<'a> {
+        SearchBuilder::new(self, query)
+    }
+
+    /// 创建批量操作构建器
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// let ids = orchestrator
+    ///     .batch_add()
+    ///     .add("Memory 1")
+    ///     .add("Memory 2")
+    ///     .batch_size(50)
+    ///     .execute()
+    ///     .await?;
+    /// ```
+    pub fn batch_add<'a>(&'a self) -> BatchBuilder<'a> {
+        BatchBuilder::new(self)
+    }
+}
+
+// ========== ✅ SearchBuilder ==========
+
+/// 搜索构建器 - 使用 Builder 模式提供灵活的搜索配置
+///
+/// # 示例
+///
+/// ```rust
+/// let results = orchestrator
+///     .search_builder("query")
+///     .limit(20)
+///     .with_rerank(true)
+///     .with_threshold(0.7)
+///     .execute()
+///     .await?;
+/// ```
+pub struct SearchBuilder<'a> {
+    orchestrator: &'a MemoryOrchestrator,
+    query: String,
+    limit: usize,
+    enable_hybrid: bool,
+    enable_rerank: bool,
+    threshold: Option<f32>,
+    time_range: Option<(i64, i64)>,
+    filters: std::collections::HashMap<String, String>,
+}
+
+impl<'a> SearchBuilder<'a> {
+    fn new(orchestrator: &'a MemoryOrchestrator, query: &str) -> Self {
+        Self {
+            orchestrator,
+            query: query.to_string(),
+            limit: 10,
+            enable_hybrid: true,
+            enable_rerank: true,
+            threshold: None,
+            time_range: None,
+            filters: std::collections::HashMap::new(),
+        }
+    }
+
+    /// 设置返回结果数量
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.limit = limit;
+        self
+    }
+
+    /// 启用/禁用混合搜索
+    pub fn with_hybrid(mut self, enable: bool) -> Self {
+        self.enable_hybrid = enable;
+        self
+    }
+
+    /// 启用/禁用重排序
+    pub fn with_rerank(mut self, enable: bool) -> Self {
+        self.enable_rerank = enable;
+        self
+    }
+
+    /// 设置相似度阈值
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.threshold = Some(threshold);
+        self
+    }
+
+    /// 设置时间范围
+    pub fn with_time_range(mut self, start: i64, end: i64) -> Self {
+        self.time_range = Some((start, end));
+        self
+    }
+
+    /// 添加自定义过滤器
+    pub fn with_filter(mut self, key: String, value: String) -> Self {
+        self.filters.insert(key, value);
+        self
+    }
+
+    /// 执行搜索
+    pub async fn execute(self) -> Result<Vec<MemoryItem>> {
+        let user_id = "default".to_string();
+
+        // 执行搜索
+        let mut results = if self.enable_hybrid {
+            #[cfg(feature = "postgres")]
+            {
+                self.orchestrator
+                    .search_memories_hybrid(
+                        self.query.clone(),
+                        user_id,
+                        self.limit,
+                        self.threshold,
+                        if self.filters.is_empty() { None } else { Some(self.filters) },
+                    )
+                    .await?
+            }
+
+            #[cfg(not(feature = "postgres"))]
+            {
+                self.orchestrator
+                    .search_memories(
+                        self.query.clone(),
+                        "default".to_string(),
+                        Some(user_id),
+                        self.limit,
+                        None,
+                    )
+                    .await?
+            }
+        } else {
+            self.orchestrator
+                .search_memories(
+                    self.query.clone(),
+                    "default".to_string(),
+                    Some(user_id),
+                    self.limit,
+                    None,
+                )
+                .await?
+        };
+
+        // 应用重排序
+        if self.enable_rerank {
+            results = self
+                .orchestrator
+                .context_aware_rerank(results, &self.query, &user_id)
+                .await?;
+        }
+
+        // TODO: 应用时间范围过滤
+        // if let Some((start, end)) = self.time_range { ... }
+
+        // TODO: 应用自定义过滤器
+        // if !self.filters.is_empty() { ... }
+
+        Ok(results)
+    }
+}
+
+// 实现 Future，允许直接 await
+impl<'a> std::future::IntoFuture for SearchBuilder<'a> {
+    type Output = Result<Vec<MemoryItem>>;
+    type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + 'a>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.execute())
+    }
+}
+
+// ========== ✅ BatchBuilder ==========
+
+/// 批量操作构建器 - 使用 Builder 模式提供灵活的批量操作
+///
+/// # 示例
+///
+/// ```rust
+/// let ids = orchestrator
+///     .batch_add()
+///     .add("Memory 1")
+///     .add("Memory 2")
+///     .batch_size(50)
+///     .execute()
+///     .await?;
+/// ```
+pub struct BatchBuilder<'a> {
+    orchestrator: &'a MemoryOrchestrator,
+    contents: Vec<String>,
+    agent_id: String,
+    user_id: Option<String>,
+    memory_type: Option<agent_mem_core::types::MemoryType>,
+    batch_size: usize,
+}
+
+impl<'a> BatchBuilder<'a> {
+    fn new(orchestrator: &'a MemoryOrchestrator) -> Self {
+        Self {
+            orchestrator,
+            contents: Vec::new(),
+            agent_id: "default".to_string(),
+            user_id: Some("default".to_string()),
+            memory_type: None,
+            batch_size: 100,
+        }
+    }
+
+    /// 添加单个内容
+    pub fn add(mut self, content: &str) -> Self {
+        self.contents.push(content.to_string());
+        self
+    }
+
+    /// 添加多个内容
+    pub fn add_all(mut self, contents: Vec<String>) -> Self {
+        self.contents.extend(contents);
+        self
+    }
+
+    /// 设置 agent_id
+    pub fn with_agent_id(mut self, agent_id: String) -> Self {
+        self.agent_id = agent_id;
+        self
+    }
+
+    /// 设置 user_id
+    pub fn with_user_id(mut self, user_id: String) -> Self {
+        self.user_id = Some(user_id);
+        self
+    }
+
+    /// 设置 memory_type
+    pub fn with_memory_type(mut self, memory_type: agent_mem_core::types::MemoryType) -> Self {
+        self.memory_type = Some(memory_type);
+        self
+    }
+
+    /// 设置批量大小
+    pub fn batch_size(mut self, size: usize) -> Self {
+        self.batch_size = size;
+        self
+    }
+
+    /// 执行批量添加
+    pub async fn execute(self) -> Result<Vec<String>> {
+        if self.contents.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 准备批量数据
+        let items: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<agent_mem_core::types::MemoryType>,
+            Option<std::collections::HashMap<String, serde_json::Value>>,
+        )> = self
+            .contents
+            .into_iter()
+            .map(|content| {
+                (
+                    content,
+                    self.agent_id.clone(),
+                    self.user_id.clone(),
+                    self.memory_type,
+                    None,
+                )
+            })
+            .collect();
+
+        // 使用内部批量添加方法
+        self.orchestrator.add_memories_batch(items).await
+    }
+}
+
+// 实现 Future，允许直接 await
+impl<'a> std::future::IntoFuture for BatchBuilder<'a> {
+    type Output = Result<Vec<String>>;
+    type IntoFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Self::Output> + 'a>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.execute())
     }
 }
