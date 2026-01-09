@@ -511,5 +511,4 @@ mod tests {
         let value = engine.get_parameter("vector_weight").await;
         assert_eq!(value, Some(0.8));
     }
-}
 

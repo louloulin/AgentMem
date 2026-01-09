@@ -370,4 +370,3 @@ mod tests {
         assert_eq!(flushed.unwrap().len(), 3);
         assert_eq!(accumulator.len(), 0);
     }
-}

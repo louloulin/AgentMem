@@ -999,9 +999,18 @@ mod tests {
 
         manager.manual_rewrite_block(&block_id).await?;
 
+        let stats = manager.get_stats().await?;
+        assert_eq!(stats.auto_rewrites, 1);
+
+        let block = manager.get_persona_block(&block_id).await?.unwrap();
+        assert!(block
+            .content
+            .contains("[Auto-rewritten to manage capacity]"));
+    }
+
+    #[tokio::test]
     async fn test_persona_block_creation_and_retrieval() {
         let manager = CoreMemoryManager::new();
-
         let content = "I am a helpful AI assistant with a friendly personality.".to_string();
         let block_id = manager
             .create_persona_block(content.clone(), None)
@@ -1566,23 +1575,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_manual_rewrite() {
-        let manager = CoreMemoryManager::new();
-
-        let content = "Content that will be rewritten manually".to_string();
-        let block_id = manager.create_persona_block(content, None).await?;
-
-        manager.manual_rewrite_block(&block_id).await?;
-
-        let stats = manager.get_stats().await?;
-        assert_eq!(stats.auto_rewrites, 1);
-
-        let block = manager.get_persona_block(&block_id).await?.unwrap();
-        assert!(block
-            .content
-            .contains("[Auto-rewritten to manage capacity]"));
-    }
-}
 
     async fn test_block_content_append() {
         let manager = CoreMemoryManager::new();
@@ -1724,21 +1716,3 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_manual_rewrite() {
-        let manager = CoreMemoryManager::new();
-
-        let content = "Content that will be rewritten manually".to_string();
-        let block_id = manager.create_persona_block(content, None).await?;
-
-        manager.manual_rewrite_block(&block_id).await?;
-
-        let stats = manager.get_stats().await?;
-        assert_eq!(stats.auto_rewrites, 1);
-
-        let block = manager.get_persona_block(&block_id).await?.unwrap();
-        assert!(block
-            .content
-            .contains("[Auto-rewritten to manage capacity]"));
-    }
-
-}

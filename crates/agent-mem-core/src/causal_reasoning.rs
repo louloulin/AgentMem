@@ -519,7 +519,7 @@ mod tests {
             node_type: CausalNodeType::Action,
             timestamp: Utc::now(),
             properties: HashMap::new(),
-        Ok(())
+        }
         };
 
         let node2 = CausalNode {

@@ -1,0 +1,9 @@
+[package]
+name = "eventbus-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent-mem-event-bus = { path = "../../crates/agent-mem-event-bus" }
+agent-mem-performance = { path = "../../crates/agent-mem-performance" }
+tokio = { version = "1", features = ["full"] }

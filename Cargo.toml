@@ -30,6 +30,10 @@ members = [
     "crates/agent-mem-deployment",
     "crates/agent-mem-plugin-sdk",  # Plugin SDK
     "crates/agent-mem-plugins",     # Plugin Manager
+    "crates/agent-mem-event-bus",   # Event bus for pub/sub messaging
+    "crates/agent-mem-working-memory", # Working memory service
+    "crates/agent-mem-forgetting",  # Forgetting mechanism with Ebbinghaus curve
+    "crates/agent-mem-metacognition", # Metacognition and auto-consolidation
     # "crates/agent-mem-lumosai",  # Temporarily disabled - missing lumosai_core dependency
     # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
@@ -161,6 +165,7 @@ members = [
     "examples/demo-performance-comparison", # 性能对比测试（对标MIRIX）
     "examples/enhanced-hybrid-search-demo", # 增强混合搜索演示
     "examples/product-search-demo",        # 商品搜索演示
+    "examples/working-memory-demo",        # Working memory service demo
     # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 

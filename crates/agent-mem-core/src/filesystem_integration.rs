@@ -385,7 +385,7 @@ Python is also a great language.
                 metadata: HashMap::new(),
             }],
             metadata: HashMap::new(),
-        Ok(())
+        }
         };
 
         let memories = manager.convert_to_memories(&claude_file).await?;

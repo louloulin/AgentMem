@@ -511,7 +511,7 @@ mod tests {
             semantic_tags: vec![],
             created_at: Utc::now(),
             properties: HashMap::new(),
-        Ok(())
+        }
         };
 
         index.add_node(root).await?;
@@ -554,5 +554,4 @@ mod tests {
         let results = index.search_by_meaning(&query, 10).await?;
         assert!(!results.is_empty());
     }
-}
 

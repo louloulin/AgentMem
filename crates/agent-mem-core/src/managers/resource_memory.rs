@@ -685,8 +685,8 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().to_path_buf(),
             ..Default::default()
-        Ok(())
         };
+    }
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
         let stats = manager.get_stats().await?;
@@ -1303,4 +1303,3 @@ mod tests {
             .unwrap();
         assert_eq!(metadata.file_size, 0);
     }
-}

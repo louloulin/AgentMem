@@ -273,4 +273,3 @@ mod tests {
         let stats = manager.get_performance_stats().await;
         assert_eq!(stats.cache_stats.total_requests, 0);
     }
-}
