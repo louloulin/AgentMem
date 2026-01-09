@@ -385,10 +385,10 @@ Python is also a great language.
                 metadata: HashMap::new(),
             }],
             metadata: HashMap::new(),
-        }
         };
 
         let memories = manager.convert_to_memories(&claude_file).await?;
         assert_eq!(memories.len(), 1);
+        Ok(())
     }
 }

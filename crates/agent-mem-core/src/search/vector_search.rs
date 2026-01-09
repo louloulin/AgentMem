@@ -613,7 +613,6 @@ mod tests {
             url: None,
             index_name: None,
             collection_name: None,
-        Ok(())
         };
         let vector_store = Arc::new(MemoryVectorStore::new(config).await?);
         let engine = VectorSearchEngine::new(vector_store.clone(), 128);
@@ -664,7 +663,6 @@ mod tests {
         let config = VectorStoreConfig {
             dimension: Some(128),
             ..Default::default()
-        Ok(())
         };
         let vector_store = Arc::new(MemoryVectorStore::new(config).await?);
         let engine = VectorSearchEngine::new(vector_store, 128);

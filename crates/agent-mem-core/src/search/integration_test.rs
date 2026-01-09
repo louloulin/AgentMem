@@ -151,7 +151,6 @@ mod tests {
         let config = EnhancedHybridConfig {
             enable_adaptive_threshold: true,
             ..Default::default()
-        Ok(())
         };
         let engine = EnhancedHybridSearchEngineV2::new(config)
             .with_vector_searcher(Arc::new(MockVectorSearcher));
@@ -171,7 +170,6 @@ mod tests {
         let config = EnhancedHybridConfig {
             enable_metrics: true,
             ..Default::default()
-        Ok(())
         };
         let engine = EnhancedHybridSearchEngineV2::new(config)
             .with_vector_searcher(Arc::new(MockVectorSearcher));
@@ -191,7 +189,6 @@ mod tests {
         let config = EnhancedHybridConfig {
             enable_parallel: true,
             ..Default::default()
-        Ok(())
         };
         let engine = EnhancedHybridSearchEngineV2::new(config)
             .with_vector_searcher(Arc::new(MockVectorSearcher))

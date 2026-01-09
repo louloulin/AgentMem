@@ -477,7 +477,6 @@ mod tests {
             throughput: 100.0,
             user_satisfaction: 0.9,
             timestamp: Utc::now(),
-        Ok(())
         };
 
         engine.record_performance(metrics).await?;

@@ -483,7 +483,6 @@ mod tests {
             status: NodeStatus::Online,
             last_heartbeat: Utc::now(),
             capabilities: vec!["memory".to_string(), "search".to_string()],
-        Ok(())
         };
 
         manager.register_node(node).await?;
@@ -515,7 +514,6 @@ mod tests {
             version: 1,
             timestamp: Utc::now(),
             node_id: manager.config.node_id.clone(),
-        Ok(())
         };
 
         // 应该成功，即使没有其他节点
@@ -593,7 +591,6 @@ mod tests {
             resolved_value: None,
             conflict_time: Utc::now(),
             resolved_time: None,
-        Ok(())
         };
 
         let resolved = manager.resolve_conflict(conflict).await?;

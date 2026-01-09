@@ -370,7 +370,6 @@ mod tests {
             query: "quick brown".to_string(),
             limit: 10,
             ..Default::default()
-        Ok(())
         };
 
         let results = engine.search(&query).await?;
@@ -403,7 +402,6 @@ mod tests {
             query: "hello world".to_string(),
             limit: 10,
             ..Default::default()
-        Ok(())
         };
 
         let results = engine.search(&query).await?;

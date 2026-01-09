@@ -666,7 +666,6 @@ mod tests {
             locked_until: None,
             active: true,
             metadata: HashMap::new(),
-        Ok(())
         };
 
         security.create_user(user).await?;
@@ -698,7 +697,6 @@ mod tests {
             locked_until: None,
             active: true,
             metadata: HashMap::new(),
-        Ok(())
         };
 
         security.create_user(user).await?;

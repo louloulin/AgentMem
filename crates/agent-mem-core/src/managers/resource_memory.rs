@@ -686,13 +686,13 @@ mod tests {
             storage_root: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-    }
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
         let stats = manager.get_stats().await?;
 
         assert_eq!(stats.total_resources, 0);
         assert_eq!(stats.total_storage_size, 0);
+        Ok(())
     }
 
     #[tokio::test]
@@ -711,7 +711,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -757,7 +756,6 @@ mod tests {
             storage_root: temp_dir.path().join("storage"),
             enable_deduplication: true,
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -785,6 +783,7 @@ mod tests {
         let stats = manager.get_stats().await?;
         assert_eq!(stats.total_resources, 1);
         assert_eq!(stats.deduplication_savings, test_content.len() as u64);
+        Ok(())
     }
 
     #[tokio::test]
@@ -793,7 +792,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -874,7 +872,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -939,7 +936,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1013,7 +1009,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1053,7 +1048,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1091,7 +1085,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1167,7 +1160,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1192,7 +1184,6 @@ mod tests {
         let config = ResourceStorageConfig {
             storage_root: temp_dir.path().join("storage"),
             ..Default::default()
-        Ok(())
         };
 
         let manager = ResourceMemoryManager::with_config(config).unwrap();
@@ -1303,3 +1294,4 @@ mod tests {
             .unwrap();
         assert_eq!(metadata.file_size, 0);
     }
+}

@@ -1165,6 +1165,7 @@ mod tests {
         let stage = ContentPreprocessStage {
             min_length: 5,
             max_length: 1000,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new().text("Test content").build();
@@ -1181,6 +1182,7 @@ mod tests {
         let stage = ContentPreprocessStage {
             min_length: 100,
             max_length: 1000,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new().text("Short").build();
@@ -1202,6 +1204,7 @@ mod tests {
             extract_time: false,
             extract_percentage: false,
             extract_ip: false,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new()
@@ -1232,6 +1235,7 @@ mod tests {
             extract_time: true,
             extract_percentage: true,
             extract_ip: true,
+        Ok(())
         };
 
         let memory = MemoryBuilder::new()
@@ -1315,6 +1319,7 @@ mod tests {
             constraints: vec![Constraint::Limit(0)],
             preferences: vec![],
             context: crate::types::QueryContext::default(),
+        Ok(())
         };
 
         let mut context2 = PipelineContext::new();
@@ -1382,6 +1387,7 @@ mod tests {
             max_compression_ratio: 3,
             merge_strategy: "highest_importance".to_string(),
             preserve_unique_entities: true,
+        Ok(())
         };
 
         // Create very similar memories (with high overlap)
@@ -1456,6 +1462,7 @@ mod tests {
             relation_boost_weight: 0.25,
             context_relevance_weight: 0.2,
             decay_halflife_days: 30.0,
+        Ok(())
         };
 
         // Create a memory with some access history and relations
@@ -1518,6 +1525,7 @@ mod tests {
         let stage = QueryExpansionStage {
             enable_synonym: true,
             enable_relation: true,
+        Ok(())
         };
 
         let query = Query::from_string("搜索产品订单");

@@ -216,6 +216,8 @@ impl Default for AgentRegistry {
     }
 }
 
+#[cfg(test)]
+mod tests {
 
 #[cfg(test)]
 mod tests {

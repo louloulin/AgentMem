@@ -407,7 +407,6 @@ mod tests {
             fulltext_weight: 0.3,
             filters: None,
             metadata_filters: None,
-        Ok(())
         };
 
         // 决策

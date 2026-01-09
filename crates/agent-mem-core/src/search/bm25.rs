@@ -374,7 +374,6 @@ mod tests {
             query: "quick brown".to_string(),
             limit: 10,
             ..Default::default()
-        Ok(())
         };
 
         let results = engine.search(&query).await?;
@@ -391,7 +390,6 @@ mod tests {
             query: "".to_string(),
             limit: 10,
             ..Default::default()
-        Ok(())
         };
 
         let results = engine.search(&query).await?;

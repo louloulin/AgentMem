@@ -680,6 +680,7 @@ mod storage_factory_tests {
             vector_dimension: 1536,
             enable_wal: true,
             cache_size_kb: 10240,
+        Ok(())
         };
 
         let mode = DeploymentMode::Embedded(config);
@@ -799,3 +800,4 @@ mod storage_factory_tests {
         let _ = &repos.messages;
         let _ = &repos.associations;
     }
+}

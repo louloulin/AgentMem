@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_calculate_with_details() {
+    async fn test_calculate_with_details() -> anyhow::Result<()> {
         let calculator = AdaptiveThresholdCalculator::with_default_config();
         let classifier = QueryClassifier::with_default_config();
 
@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_calculate_with_details() {
+    async fn test_calculate_with_details() -> anyhow::Result<()> {
         let calculator = AdaptiveThresholdCalculator::with_default_config();
         let classifier = QueryClassifier::with_default_config();
 
@@ -525,5 +525,5 @@ mod tests {
 
         assert!(details.threshold >= 0.0 && details.threshold <= 1.0);
         assert_eq!(details.base_threshold, 0.5); // Semantic base threshold
+        Ok(())
     }
-}

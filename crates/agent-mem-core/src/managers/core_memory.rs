@@ -1715,4 +1715,3 @@ mod tests {
         assert!(usage > &0.0 && usage < &1.0);
     }
 
-    #[tokio::test]

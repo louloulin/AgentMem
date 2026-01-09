@@ -201,7 +201,6 @@ async fn test_conflict_detection() {
         enable_conflict_detection: true,
         conflict_detection_threshold: 0.5,
         ..Default::default()
-    Ok(())
     };
     let synthesizer = ContextSynthesizer::new(config).await?;
 
@@ -278,7 +277,6 @@ async fn test_retrieval_system_caching() {
         enable_caching: true,
         cache_ttl_seconds: 60,
         ..Default::default()
-    Ok(())
     };
     let system = ActiveRetrievalSystem::new(config).await?;
 
@@ -314,7 +312,6 @@ async fn test_cache_cleanup() {
         enable_caching: true,
         cache_ttl_seconds: 1, // 1秒过期
         ..Default::default()
-    Ok(())
     };
     let system = ActiveRetrievalSystem::new(config).await?;
 

@@ -600,7 +600,6 @@ mod tests {
             updated_at: Utc::now(),
             usage_count: 0,
             confidence: 0.8,
-        Ok(())
         };
 
         engine.create_schema(schema).await?;
