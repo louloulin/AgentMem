@@ -168,7 +168,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        Ok(())
+
         let request2 = LlmRequest {
             model: "gpt-3.5-turbo".to_string(),
             prompt: "Test 2".to_string(),
@@ -200,7 +200,7 @@ mod tests {
             max_tokens: None,
             parameters: std::collections::HashMap::new(),
         };
-        Ok(())
+
         let response = llm.call_llm(request).await?;
 
         // Test translate
@@ -238,8 +238,9 @@ mod tests {
             system: None,
             temperature: None,
             max_tokens: None,
-            parameters: std::collections::HashMap::new(),$
-        };$
+            parameters: std::collections::HashMap::new(),
+        };
+
         Ok(())
 
         llm.call_llm(request).await?;
