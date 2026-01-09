@@ -369,3 +369,4 @@ mod tests {
         assert!(stats.misses > 0);
     }
 }
+}

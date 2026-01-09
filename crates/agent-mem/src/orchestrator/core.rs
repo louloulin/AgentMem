@@ -1359,6 +1359,7 @@ pub struct SearchBuilder<'a> {
     limit: usize,
     enable_hybrid: bool,
     enable_rerank: bool,
+    enable_scheduler: bool,
     threshold: Option<f32>,
     time_range: Option<(i64, i64)>,
     filters: std::collections::HashMap<String, String>,
@@ -1372,6 +1373,7 @@ impl<'a> SearchBuilder<'a> {
             limit: 10,
             enable_hybrid: true,
             enable_rerank: true,
+            enable_scheduler: false,
             threshold: None,
             time_range: None,
             filters: std::collections::HashMap::new(),
@@ -1398,11 +1400,21 @@ impl<'a> SearchBuilder<'a> {
 
     /// 启用/禁用记忆调度（智能选择）
     ///
-    /// 注意：此功能目前处于实验阶段，可能不会对所有场景产生明显效果。
+    /// 当启用时，会根据以下因素智能调整搜索策略：
+    /// - 查询复杂度：长查询自动禁用混合搜索以提高性能
+    /// - 时间敏感性：包含时间关键词的查询自动应用时间范围过滤
+    /// - 结果数量限制：小批量查询自动降低 limit 以提高响应速度
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// let results = orchestrator
+    ///     .search_builder("recent important documents")
+    ///     .with_scheduler(true)  // 启用智能调度
+    ///     .await?;
+    /// ```
     pub fn with_scheduler(mut self, enable: bool) -> Self {
-        // TODO: 实现记忆调度功能
-        // 当前此方法仅保留接口，实际功能尚未实现
-        let _ = enable; // 暂时避免未使用警告
+        self.enable_scheduler = enable;
         self
     }
 
@@ -1426,57 +1438,84 @@ impl<'a> SearchBuilder<'a> {
 
     /// 执行搜索
     pub async fn execute(self) -> Result<Vec<MemoryItem>> {
+        let mut builder = self;
         let user_id = "default".to_string();
 
+        // 应用记忆调度逻辑
+        if builder.enable_scheduler {
+            // 1. 查询复杂度分析：长查询（>100字符）禁用混合搜索
+            if builder.query.len() > 100 {
+                builder.enable_hybrid = false;
+            }
+
+            // 2. 时间敏感性检测：自动应用时间范围过滤
+            let time_keywords = ["今天", "yesterday", "recent", "最近", "latest"];
+            let has_time_keyword = time_keywords.iter().any(|keyword| {
+                builder.query.to_lowercase().contains(keyword)
+            });
+
+            if has_time_keyword && builder.time_range.is_none() {
+                // 默认搜索最近 7 天的记忆
+                let now = chrono::Utc::now().timestamp();
+                let seven_days_ago = now - (7 * 24 * 60 * 60);
+                builder.time_range = Some((seven_days_ago, now));
+            }
+
+            // 3. 结果数量优化：小查询（<20字符）限制结果数量
+            if builder.query.len() < 20 && builder.limit > 5 {
+                builder.limit = 5.min(builder.limit);
+            }
+        }
+
         // 执行搜索
-        let mut results = if self.enable_hybrid {
+        let mut results = if builder.enable_hybrid {
             #[cfg(feature = "postgres")]
             {
-                self.orchestrator
+                builder.orchestrator
                     .search_memories_hybrid(
-                        self.query.clone(),
+                        builder.query.clone(),
                         user_id,
-                        self.limit,
-                        self.threshold,
-                        if self.filters.is_empty() { None } else { Some(self.filters) },
+                        builder.limit,
+                        builder.threshold,
+                        if builder.filters.is_empty() { None } else { Some(builder.filters) },
                     )
                     .await?
             }
 
             #[cfg(not(feature = "postgres"))]
             {
-                self.orchestrator
+                builder.orchestrator
                     .search_memories(
-                        self.query.clone(),
+                        builder.query.clone(),
                         "default".to_string(),
                         Some(user_id),
-                        self.limit,
+                        builder.limit,
                         None,
                     )
                     .await?
             }
         } else {
-            self.orchestrator
+            builder.orchestrator
                 .search_memories(
-                    self.query.clone(),
+                    builder.query.clone(),
                     "default".to_string(),
                     Some(user_id),
-                    self.limit,
+                    builder.limit,
                     None,
                 )
                 .await?
         };
 
         // 应用重排序
-        if self.enable_rerank {
-            results = self
+        if builder.enable_rerank {
+            results = builder
                 .orchestrator
-                .context_aware_rerank(results, &self.query, &user_id)
+                .context_aware_rerank(results, &builder.query, &user_id)
                 .await?;
         }
 
         // 应用时间范围过滤
-        if let Some((start, end)) = self.time_range {
+        if let Some((start, end)) = builder.time_range {
             results = results
                 .into_iter()
                 .filter(|memory| {
@@ -1490,12 +1529,12 @@ impl<'a> SearchBuilder<'a> {
         }
 
         // 应用自定义过滤器
-        if !self.filters.is_empty() {
+        if !builder.filters.is_empty() {
             results = results
                 .into_iter()
                 .filter(|memory| {
                     // 检查所有自定义过滤器条件
-                    self.filters.iter().all(|(key, value)| {
+                    builder.filters.iter().all(|(key, value)| {
                         // 检查 metadata 中的字段
                         memory
                             .metadata
@@ -1598,9 +1637,24 @@ impl<'a> BatchBuilder<'a> {
 
     /// 设置并发数
     ///
-    /// 注意：当前版本中此参数用于未来扩展，实际批量操作尚未实现并发处理。
+    /// 控制批量添加时的并发任务数量。较高的并发数可以加快大批量数据的处理速度，
+    /// 但也会增加内存和 CPU 使用量。
+    ///
+    /// # 参数
+    ///
+    /// * `n` - 并发任务数，建议范围：1-50
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// let ids = orchestrator
+    ///     .batch_add()
+    ///     .add_all(contents)
+    ///     .concurrency(20)  // 使用 20 个并发任务
+    ///     .await?;
+    /// ```
     pub fn concurrency(mut self, n: usize) -> Self {
-        self.concurrency = n;
+        self.concurrency = n.max(1);  // 确保至少为 1
         self
     }
 
@@ -1610,29 +1664,84 @@ impl<'a> BatchBuilder<'a> {
             return Ok(Vec::new());
         }
 
-        // 准备批量数据
-        let items: Vec<(
-            String,
-            String,
-            Option<String>,
-            Option<agent_mem_core::types::MemoryType>,
-            Option<std::collections::HashMap<String, serde_json::Value>>,
-        )> = self
+        // 如果内容数量小于并发数的2倍，直接使用批量添加
+        if self.contents.len() < self.concurrency * 2 {
+            // 准备批量数据
+            let items: Vec<(
+                String,
+                String,
+                Option<String>,
+                Option<agent_mem_core::types::MemoryType>,
+                Option<std::collections::HashMap<String, serde_json::Value>>,
+            )> = self
+                .contents
+                .into_iter()
+                .map(|content| {
+                    (
+                        content,
+                        self.agent_id.clone(),
+                        self.user_id.clone(),
+                        self.memory_type,
+                        None,
+                    )
+                })
+                .collect();
+
+            return self.orchestrator.add_memories_batch(items).await;
+        }
+
+        // 使用并发处理：将内容分成多个批次
+        use futures::stream::{self, StreamExt};
+        let orchestrator = self.orchestrator;
+        let agent_id = self.agent_id.clone();
+        let user_id = self.user_id.clone();
+        let memory_type = self.memory_type;
+
+        // 分批处理
+        let chunks: Vec<_> = self
             .contents
-            .into_iter()
-            .map(|content| {
-                (
-                    content,
-                    self.agent_id.clone(),
-                    self.user_id.clone(),
-                    self.memory_type,
-                    None,
-                )
-            })
+            .chunks(self.batch_size)
+            .map(|chunk| chunk.to_vec())
             .collect();
 
-        // 使用内部批量添加方法
-        self.orchestrator.add_memories_batch(items).await
+        // 创建并发任务流
+        let results = stream::iter(chunks)
+            .map(move |chunk| {
+                let orch = orchestrator.clone();
+                let agent_id = agent_id.clone();
+                let user_id = user_id.clone();
+                let memory_type = memory_type;
+
+                async move {
+                    // 准备批次数据
+                    let items: Vec<_> = chunk
+                        .into_iter()
+                        .map(|content| {
+                            (
+                                content,
+                                agent_id.clone(),
+                                user_id.clone(),
+                                memory_type,
+                                None as Option<std::collections::HashMap<String, serde_json::Value>>,
+                            )
+                        })
+                        .collect();
+
+                    // 执行批量添加
+                    orch.add_memories_batch(items).await
+                }
+            })
+            .buffer_unordered(self.concurrency)
+            .collect::<Vec<_>>()
+            .await;
+
+        // 合并所有批次的结果
+        let mut all_ids = Vec::new();
+        for result in results {
+            all_ids.extend(result?);
+        }
+
+        Ok(all_ids)
     }
 }
 
