@@ -69,7 +69,7 @@ build-server:
 # 构建 MCP Stdio 服务器
 build-mcp:
     @echo "🔨 构建 MCP Stdio 服务器..."
-    cargo build --package mcp-stdio-server --release
+    cargo build --package mcp-stdio-server --bin agentmem-mcp-client --release
 
 # 构建前端 UI
 build-ui:
@@ -153,13 +153,13 @@ audit:
 
 # 等待服务就绪（智能健康检查）
 _wait-healthy url max_attempts="30":
-    @env SHELLOPTS= /bin/bash -lc 'set +u; i=1; while [ $i -le {{max_attempts}} ]; do \
+    @bash -c 'set +u; i=1; while [ $$i -le {{max_attempts}} ]; do \
         if curl -s {{url}} > /dev/null 2>&1; then \
-            echo "✅ 服务已就绪 (尝试 $i/{{max_attempts}})"; \
+            echo "✅ 服务已就绪 (尝试 $$i/{{max_attempts}})"; \
             exit 0; \
         fi; \
-        echo "⏳ 等待服务启动... ($i/{{max_attempts}})"; \
-        i=$((i + 1)); \
+        echo "⏳ 等待服务启动... ($$i/{{max_attempts}})"; \
+        i=$$((i + 1)); \
         sleep 1; \
     done; \
     echo "❌ 服务启动超时"; \
@@ -215,8 +215,8 @@ start-server-bg:
     export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
     export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
     nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
-    PID=$! && echo $PID > backend.pid && \
-    echo "📝 后端 PID: $PID" && \
+    PID=$$! && echo $$PID > backend.pid && \
+    echo "📝 后端 PID: $$PID" && \
     echo "📝 日志文件: backend.log"'
     @just _wait-healthy "http://localhost:8080/health"
     @echo "✅ 后端服务已启动"
@@ -240,7 +240,8 @@ start-server-plugins:
     export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
     nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
     PID=$$! && echo $$PID > backend.pid && \
-    echo "📝 后端 PID: $$PID"'
+    echo "📝 后端 PID: $$PID" && \
+    echo "📝 日志文件: backend.log"'
     @just _wait-healthy "http://localhost:8080/health"
     @echo "✅ 后端服务已启动（插件支持）"
     @echo "   • 插件API: http://localhost:8080/api/v1/plugins"
@@ -260,16 +261,17 @@ start-server-lumosai:
     export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/debug:$$DYLD_LIBRARY_PATH" && \
     export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
     nohup ./target/debug/agent-mem-server > backend.log 2>&1 & \
-    echo $$! > backend.pid && \
-    echo "📝 后端 PID: $$(cat backend.pid)"'
+    PID=$$! && echo $$PID > backend.pid && \
+    echo "📝 后端 PID: $$PID" && \
+    echo "📝 日志文件: backend.log"'
     @just _wait-healthy "http://localhost:8080/health"
     @echo "✅ 后端服务已启动（LumosAI 已启用）"
 
 # 启动 MCP Stdio 服务器
 start-mcp:
     @echo "🚀 启动 MCP Stdio 服务器..."
-    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agentmem-mcp-server"; exit 1; fi'
-    @./target/release/agentmem-mcp-server
+    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-client" ]; then echo "❌ 二进制文件不存在: ./target/release/agentmem-mcp-client"; exit 1; fi'
+    @./target/release/agentmem-mcp-client
 
 # 启动前端 UI（前台运行）
 start-ui:
@@ -283,14 +285,15 @@ start-ui-bg:
     @echo "🚀 启动前端 UI（后台运行）..."
     @bash -c 'if lsof -i :3001 > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用"; exit 1; fi'
     @just _stop-frontend
-    @bash -c 'cd agentmem-ui && \
+    @bash -c 'ROOT_DIR=$(pwd) && \
+    cd agentmem-ui && \
     if [ ! -d "node_modules" ]; then \
         echo "📦 安装前端依赖..."; \
         npm install; \
     fi && \
-    nohup npm run dev > ../frontend.log 2>&1 & \
-    PID=$! && echo $PID > ../frontend.pid && \
-    echo "📝 前端 PID: $PID" && \
+    nohup npm run dev > "$${ROOT_DIR}/frontend.log" 2>&1 & \
+    PID=$$! && echo $$PID > "$${ROOT_DIR}/frontend.pid" && \
+    echo "📝 前端 PID: $$PID" && \
     echo "📝 日志文件: frontend.log"'
     @just _wait-healthy "http://localhost:3001"
     @echo "✅ 前端服务已启动"
@@ -354,7 +357,7 @@ stop:
     @echo "🛑 停止所有服务..."
     @just _stop-backend
     @just _stop-frontend
-    @bash -c 'pkill -f "agentmem-mcp-server" 2>/dev/null && echo "🛑 停止 MCP 服务器" || true'
+    @bash -c 'pkill -f "agentmem-mcp-client" 2>/dev/null && echo "🛑 停止 MCP 服务器" || true'
     @bash -c 'rm -f backend.pid frontend.pid 2>/dev/null && echo "🧹 清理 PID 文件" || true'
     @echo "✅ 所有服务已停止"
 
@@ -396,7 +399,7 @@ db-restore:
 # 验证 MCP 工具功能
 mcp-verify:
     @echo "🔍 验证 MCP 工具功能..."
-    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-server" ]; then \
+    @bash -c 'if [ ! -f "./target/release/agentmem-mcp-client" ]; then \
         echo "❌ MCP 服务器未编译，正在编译..."; \
         just build-mcp; \
     fi'
@@ -406,9 +409,9 @@ mcp-verify:
 # 测试 MCP Chat 功能并验证 Working Memory
 mcp-test-chat:
     @echo "💬 测试 MCP Chat 功能..."
-    @echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | ./target/release/agentmem-mcp-server 2>/dev/null | head -1
+    @echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | ./target/release/agentmem-mcp-client 2>/dev/null | head -1
     @echo ""
-    @echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"agentmem_chat","arguments":{"message":"你好，请介绍一下AgentMem","user_id":"test-user","session_id":"test-session-001","use_memory":true}}}' | ./target/release/agentmem-mcp-server 2>/dev/null | tail -1
+    @echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"agentmem_chat","arguments":{"message":"你好，请介绍一下AgentMem","user_id":"test-user","session_id":"test-session-001","use_memory":true}}}' | ./target/release/agentmem-mcp-client 2>/dev/null | tail -1
 
 # 配置 Claude Desktop
 mcp-setup-claude:
@@ -572,8 +575,11 @@ verify: build-release test
 dev:
     @echo "🔧 开发模式..."
     @echo "⚠️  注意: 此命令将在前台运行，按 Ctrl+C 停止"
-    @just watch &
-    @just start-ui
+    @echo "💡 提示: 使用 'just watch' 和 'just start-ui' 分别启动"
+    @bash -c 'echo "启动文件监听..." && cargo watch -x build & \
+    WATCH_PID=$$! && \
+    echo "启动前端UI..." && \
+    just start-ui || (kill $$WATCH_PID 2>/dev/null; exit 1)'
 
 # 清理并重新构建
 rebuild: clean build-release
