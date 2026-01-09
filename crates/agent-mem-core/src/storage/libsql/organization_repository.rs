@@ -321,8 +321,8 @@ mod tests {
         let deleted = repo.find_by_id(&created.id).await?;
         assert!(deleted.is_none());
     }
-}
 
+    #[tokio::test]
     async fn test_organization_crud() {
         let (_temp_dir, conn) = setup_test_db().await;
         let repo = LibSqlOrganizationRepository::new(conn);

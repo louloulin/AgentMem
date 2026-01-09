@@ -327,7 +327,6 @@ mod tests {
             effectiveness: 0.9,
             timestamp: Utc::now(),
             user_id: Some("user1".to_string()),
-        Ok(())
         };
 
         // Create
@@ -375,7 +374,6 @@ mod tests {
             effectiveness: 0.8,
             timestamp: Utc::now() - chrono::Duration::days(30),
             user_id: None,
-        Ok(())
         };
 
         // Create new record

@@ -573,8 +573,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_find_by_id() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -693,8 +693,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_find_by_agent_id() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -798,8 +798,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_update() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -887,8 +887,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_delete() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -958,8 +958,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_link_to_agent() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -1014,8 +1014,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_unlink_from_agent() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);
@@ -1055,8 +1055,8 @@ mod tests {
         let result = repo.link_to_agent("nonexistent", "agent1").await;
         assert!(result.is_err());
     }
-}
 
+    #[tokio::test]
     async fn test_list() {
         let conn = setup_test_db().await;
         let repo = LibSqlBlockRepository::new(conn);

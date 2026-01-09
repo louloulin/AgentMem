@@ -1011,8 +1011,8 @@ mod tests {
         let memories = result.unwrap();
         assert_eq!(memories.len(), 2);
     }
-}
 
+    #[tokio::test]
     async fn test_delete() {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);
@@ -1060,8 +1060,8 @@ mod tests {
         let memories = result.unwrap();
         assert_eq!(memories.len(), 2);
     }
-}
 
+    #[tokio::test]
     async fn test_delete_by_agent_id() {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);
@@ -1094,8 +1094,8 @@ mod tests {
         let memories = result.unwrap();
         assert_eq!(memories.len(), 2);
     }
-}
 
+    #[tokio::test]
     async fn test_list() {
         let conn = setup_test_db().await;
         let repo = LibSqlMemoryRepository::new(conn);

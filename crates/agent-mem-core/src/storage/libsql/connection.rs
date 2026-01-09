@@ -555,8 +555,8 @@ mod tests {
         assert!(conn1.is_ok());
         assert!(conn2.is_ok());
     }
-}
 
+    #[tokio::test]
     async fn test_get_stats() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
@@ -594,22 +594,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_connections() -> anyhow::Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test.db");
-        let db_path_str = db_path.to_str().unwrap();
-
-        let manager = LibSqlConnectionManager::new(db_path_str).await?;
-
-        // Get multiple connections
-        let conn1 = manager.get_connection().await;
-        let conn2 = manager.get_connection().await;
-
-        assert!(conn1.is_ok());
-        assert!(conn2.is_ok());
-    }
-}
-
-    async fn test_multiple_connections() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_str().unwrap();
