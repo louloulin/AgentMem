@@ -432,6 +432,7 @@ mod tests {
                     agent_id: "agent1".to_string(),
                     user_id: "user1".to_string(),
                 },
+                },
                 MemoryLevel::Operational,
                 ImportanceLevel::Medium,
                 HashMap::new(),

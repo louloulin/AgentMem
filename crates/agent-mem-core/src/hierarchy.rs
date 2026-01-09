@@ -1056,7 +1056,7 @@ mod tests {
             access_count: 0,
             expires_at: None,
             version: 1,
-        Ok(())
+        };
         };
         let memory = Memory::from_legacy_item(&memory_item);
 

@@ -934,6 +934,66 @@ impl MemoryOrchestrator {
         }
     }
 
+    /// 添加记忆（带自定义选项）
+    ///
+    /// 当需要指定 agent_id、user_id 或 memory_type 时使用此方法。
+    ///
+    /// # 参数
+    ///
+    /// - `content`: 记忆内容
+    /// - `agent_id`: 代理 ID
+    /// - `user_id`: 用户 ID（可选）
+    /// - `memory_type`: 记忆类型（可选）
+    /// - `metadata`: 额外的元数据（可选）
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use agent_mem::MemoryOrchestrator;
+    /// use std::collections::HashMap;
+    ///
+    /// let id = orchestrator.add_with_options(
+    ///     "Hello",
+    ///     "agent1",
+    ///     Some("user1"),
+    ///     None,
+    ///     None,
+    /// ).await?;
+    /// ```
+    pub async fn add_with_options(
+        &self,
+        content: &str,
+        agent_id: &str,
+        user_id: Option<&str>,
+        memory_type: Option<agent_mem_core::types::MemoryType>,
+        metadata: Option<std::collections::HashMap<String, serde_json::Value>>,
+    ) -> Result<String> {
+        // 使用智能添加（如果可用），否则使用快速添加
+        if self.config.enable_intelligent_features {
+            // 调用智能添加的内部实现
+            super::intelligence::IntelligenceModule::add_memory_intelligent(
+                self,
+                content.to_string(),
+                agent_id.to_string(),
+                user_id.map(|u| u.to_string()),
+                memory_type,
+                metadata,
+            )
+            .await
+            .map(|_| uuid::Uuid::new_v4().to_string())
+        } else {
+            // 降级到快速添加
+            self.add_memory_fast(
+                content.to_string(),
+                agent_id.to_string(),
+                user_id.map(|u| u.to_string()),
+                memory_type,
+                metadata,
+            )
+            .await
+        }
+    }
+
     /// 批量添加记忆
     ///
     /// # 示例
@@ -1332,6 +1392,16 @@ impl<'a> SearchBuilder<'a> {
         self
     }
 
+    /// 启用/禁用记忆调度（智能选择）
+    ///
+    /// 注意：此功能目前处于实验阶段，可能不会对所有场景产生明显效果。
+    pub fn with_scheduler(mut self, enable: bool) -> Self {
+        // TODO: 实现记忆调度功能
+        // 当前此方法仅保留接口，实际功能尚未实现
+        let _ = enable; // 暂时避免未使用警告
+        self
+    }
+
     /// 设置相似度阈值
     pub fn with_threshold(mut self, threshold: f32) -> Self {
         self.threshold = Some(threshold);
@@ -1401,11 +1471,38 @@ impl<'a> SearchBuilder<'a> {
                 .await?;
         }
 
-        // TODO: 应用时间范围过滤
-        // if let Some((start, end)) = self.time_range { ... }
+        // 应用时间范围过滤
+        if let Some((start, end)) = self.time_range {
+            results = results
+                .into_iter()
+                .filter(|memory| {
+                    if let Some(timestamp) = memory.metadata.timestamp {
+                        timestamp >= start && timestamp <= end
+                    } else {
+                        false
+                    }
+                })
+                .collect();
+        }
 
-        // TODO: 应用自定义过滤器
-        // if !self.filters.is_empty() { ... }
+        // 应用自定义过滤器
+        if !self.filters.is_empty() {
+            results = results
+                .into_iter()
+                .filter(|memory| {
+                    // 检查所有自定义过滤器条件
+                    self.filters.iter().all(|(key, value)| {
+                        // 检查 metadata 中的字段
+                        memory
+                            .metadata
+                            .additional
+                            .get(key)
+                            .map(|v| v == value)
+                            .unwrap_or(false)
+                    })
+                })
+                .collect();
+        }
 
         Ok(results)
     }

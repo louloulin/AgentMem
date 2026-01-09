@@ -560,7 +560,6 @@ mod tests {
 
         assert_eq!(score1.composite, score2.composite, "缓存分数应该相同");
     }
-}
 
     async fn test_recency_decay() {
         let scorer = MultiDimensionalScorer::with_defaults();
