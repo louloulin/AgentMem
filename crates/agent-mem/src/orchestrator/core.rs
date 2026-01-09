@@ -502,8 +502,9 @@ impl MemoryOrchestrator {
         .await
     }
 
-    /// 更新记忆
-    pub async fn update_memory(
+    /// 更新记忆（内部方法）
+    #[allow(dead_code)]
+    pub(crate) async fn update_memory(
         &self,
         memory_id: &str,
         data: HashMap<String, serde_json::Value>,
@@ -511,13 +512,15 @@ impl MemoryOrchestrator {
         super::storage::StorageModule::update_memory(self, memory_id, data).await
     }
 
-    /// 删除记忆
-    pub async fn delete_memory(&self, memory_id: &str) -> Result<()> {
+    /// 删除记忆（内部方法）
+    #[allow(dead_code)]
+    pub(crate) async fn delete_memory(&self, memory_id: &str) -> Result<()> {
         super::storage::StorageModule::delete_memory(self, memory_id).await
     }
 
-    /// 获取记忆
-    pub async fn get_memory(&self, memory_id: &str) -> Result<MemoryItem> {
+    /// 获取记忆（内部方法）
+    #[allow(dead_code)]
+    pub(crate) async fn get_memory(&self, memory_id: &str) -> Result<MemoryItem> {
         super::storage::StorageModule::get_memory(self, memory_id).await
     }
 
@@ -791,8 +794,9 @@ impl MemoryOrchestrator {
         Ok(deleted_count)
     }
 
-    /// 重置
-    pub async fn reset(&self) -> Result<()> {
+    /// 重置（内部方法）
+    #[allow(dead_code)]
+    pub(crate) async fn reset(&self) -> Result<()> {
         info!("重置 MemoryOrchestrator");
 
         // 1. 删除所有记忆（通过 MemoryManager）
@@ -1540,6 +1544,7 @@ pub struct BatchBuilder<'a> {
     user_id: Option<String>,
     memory_type: Option<agent_mem_core::types::MemoryType>,
     batch_size: usize,
+    concurrency: usize,
 }
 
 impl<'a> BatchBuilder<'a> {
@@ -1551,6 +1556,7 @@ impl<'a> BatchBuilder<'a> {
             user_id: Some("default".to_string()),
             memory_type: None,
             batch_size: 100,
+            concurrency: 10,
         }
     }
 
@@ -1587,6 +1593,14 @@ impl<'a> BatchBuilder<'a> {
     /// 设置批量大小
     pub fn batch_size(mut self, size: usize) -> Self {
         self.batch_size = size;
+        self
+    }
+
+    /// 设置并发数
+    ///
+    /// 注意：当前版本中此参数用于未来扩展，实际批量操作尚未实现并发处理。
+    pub fn concurrency(mut self, n: usize) -> Self {
+        self.concurrency = n;
         self
     }
 
