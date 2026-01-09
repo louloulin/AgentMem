@@ -421,7 +421,7 @@ mod tests {
     }
 }
 
-    async fn test_multi_level_cache_stats() {
+    async fn test_multi_level_cache_stats() -> anyhow::Result<()> {
         let config = MultiLevelCacheConfig::default();
         let cache = MultiLevelCache::new(config);
 
@@ -434,6 +434,7 @@ mod tests {
         let stats = cache.stats().await?;
         assert!(stats.total_sets > 0);
         assert!(stats.hits > 0);
+        Ok(())
     }
 
     #[tokio::test]

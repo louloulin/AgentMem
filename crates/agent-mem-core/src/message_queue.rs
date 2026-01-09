@@ -301,7 +301,7 @@ mod tests {
     }
 }
 
-    async fn test_create_and_send_message() {
+    async fn test_create_and_send_message() -> anyhow::Result<()> {
         let queue = MessageQueue::new();
         let mut rx = queue.create_queue("agent-1".to_string()).await;
 
@@ -313,8 +313,9 @@ mod tests {
 
         assert!(queue.send_message(message.clone()).await.is_ok());
 
-        let received = rx.recv().await?;
+        let received = rx.recv().await.ok_or_else(|| anyhow::anyhow!("Failed to receive message"))?;
         assert_eq!(received.content, "Hello");
+        Ok(())
     }
 
     #[tokio::test]

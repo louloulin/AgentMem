@@ -532,9 +532,9 @@ mod tests {
             | MemoryStrategy::TaskOriented => {
                 // Valid strategy
             }
-        Ok(())
         }
         assert!(recommendation.confidence >= 0.0 && recommendation.confidence <= 1.0);
+        Ok(())
     }
 
     #[tokio::test]

@@ -3224,7 +3224,6 @@ mod tests {
                 let _ = context.set("condition_value", input > 5);
                 Ok(StageResult::Continue(input))
             }
-        Ok(())
         }
 
         let dag = DagPipeline::new("test_conditional")

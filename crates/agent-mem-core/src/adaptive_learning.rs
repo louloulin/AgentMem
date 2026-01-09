@@ -500,7 +500,7 @@ mod tests {
 }
 
 
-    async fn test_parameter_adjustment() {
+    async fn test_parameter_adjustment() -> anyhow::Result<()> {
         let engine = AdaptiveLearningEngine::with_defaults();
 
         // 设置参数
@@ -509,5 +509,6 @@ mod tests {
         // 获取参数
         let value = engine.get_parameter("vector_weight").await;
         assert_eq!(value, Some(0.8));
+        Ok(())
     }
 

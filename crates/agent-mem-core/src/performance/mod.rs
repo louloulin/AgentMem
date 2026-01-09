@@ -254,7 +254,7 @@ mod tests {
     }
 }
 
-    async fn test_performance_manager_start_stop() {
+    async fn test_performance_manager_start_stop() -> anyhow::Result<()> {
         let config = PerformanceConfig::default();
         let manager = PerformanceManager::new(config);
 
@@ -263,6 +263,7 @@ mod tests {
 
         manager.stop().await?;
         assert!(!*manager.running.read().await);
+        Ok(())
     }
 
     #[tokio::test]

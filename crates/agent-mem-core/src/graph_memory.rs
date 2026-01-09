@@ -998,7 +998,7 @@ mod tests {
     }
 }
 
-    async fn test_graph_memory_basic_operations() {
+    async fn test_graph_memory_basic_operations() -> anyhow::Result<()> {
         use crate::types::MemoryType;
         use agent_mem_traits::Vector;
 
@@ -1039,6 +1039,7 @@ mod tests {
         let stats = engine.get_graph_stats().await?;
         assert_eq!(stats.total_nodes, 2);
         assert_eq!(stats.total_edges, 1);
+        Ok(())
     }
 
     #[tokio::test]
@@ -1068,32 +1069,5 @@ mod tests {
         engine.delete_all(&filters).await?;
         let after_delete = engine.get_all(&filters, 10).await?;
         assert_eq!(after_delete.len(), 0);
-    }
-
-    async fn test_graph_memory_mem0_api() {
-        use crate::types::MemoryType;
-
-        let engine = GraphMemoryEngine::new();
-
-        // 测试add方法
-        let mut filters = HashMap::new();
-        filters.insert("agent_id".to_string(), "test_agent".to_string());
-        filters.insert("user_id".to_string(), "user1".to_string());
-
-        let result = engine.add("Apple is a fruit", &filters).await?;
-        assert!(!result.added_entities.is_empty());
-
-        // 测试search方法
-        let relations = engine.search("fruit", &filters, 10).await?;
-        // 可能为空，因为需要先建立关系
-        assert!(relations.len() <= 10);
-
-        // 测试get_all方法
-        let all_relations = engine.get_all(&filters, 10).await?;
-        assert!(all_relations.len() <= 10);
-
-        // 测试delete_all方法
-        engine.delete_all(&filters).await?;
-        let after_delete = engine.get_all(&filters, 10).await?;
-        assert_eq!(after_delete.len(), 0);
+        Ok(())
     }

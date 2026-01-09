@@ -469,12 +469,13 @@ mod tests {
             .record_feedback(QueryType::ShortKeyword, 0.3)
             .await;
 
-        let stats = calculator.get_stats().await?;
+        let stats = calculator.get_stats().await.ok_or_else(|| anyhow::anyhow!("Failed to get stats"))?;
         let adjustment = stats.get_adjustment(&QueryType::ShortKeyword);
 
         // 应该建议降低阈值
         assert!(adjustment.is_some());
         assert!(adjustment.unwrap() < 0.0);
+        Ok(())
     }
 
     #[tokio::test]
@@ -493,7 +494,7 @@ mod tests {
     }
 }
 
-    async fn test_historical_feedback() {
+    async fn test_historical_feedback() -> anyhow::Result<()> {
         let calculator = AdaptiveThresholdCalculator::with_default_config();
 
         // 记录低分数反馈
@@ -504,12 +505,13 @@ mod tests {
             .record_feedback(QueryType::ShortKeyword, 0.3)
             .await;
 
-        let stats = calculator.get_stats().await?;
+        let stats = calculator.get_stats().await.ok_or_else(|| anyhow::anyhow!("Failed to get stats"))?;
         let adjustment = stats.get_adjustment(&QueryType::ShortKeyword);
 
         // 应该建议降低阈值
         assert!(adjustment.is_some());
         assert!(adjustment.unwrap() < 0.0);
+        Ok(())
     }
 
     #[tokio::test]

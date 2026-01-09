@@ -1414,7 +1414,7 @@ mod tests {
     }
 }
 
-    async fn test_block_content_update() {
+    async fn test_block_content_update() -> anyhow::Result<()> {
         let manager = CoreMemoryManager::new();
 
         let initial_content = "Initial content".to_string();
@@ -1432,6 +1432,7 @@ mod tests {
         let updated_block = manager.get_persona_block(&block_id).await?.unwrap();
         assert_eq!(updated_block.content, new_content);
         assert!(updated_block.updated_at > updated_block.created_at);
+        Ok(())
     }
 
     #[tokio::test]

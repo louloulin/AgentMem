@@ -577,9 +577,9 @@ mod tests {
         manager.cleanup_deleted_memories(&mut memories);
         assert!(memories.len() <= 3);
     }
-}
 
-    async fn test_capacity_management() {
+    #[tokio::test]
+    async fn test_capacity_management_duplicate() -> anyhow::Result<()> {
         let mut manager = AdaptiveMemoryManager::new(3, 30 * 24 * 60 * 60); // Max 3 memories
 
         let mut memories = vec![
@@ -598,5 +598,6 @@ mod tests {
         // Clean up and verify capacity is respected
         manager.cleanup_deleted_memories(&mut memories);
         assert!(memories.len() <= 3);
+        Ok(())
     }
 }

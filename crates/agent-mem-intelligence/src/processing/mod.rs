@@ -246,9 +246,9 @@ mod tests {
         assert_eq!(processor.config().consolidation_threshold, 0.9);
         assert_eq!(processor.config().importance_decay_rate, 0.8);
     }
-}
 
-    async fn test_process_memories() {
+    #[tokio::test]
+    async fn test_process_memories() -> anyhow::Result<()> {
         let config = ProcessingConfig::default();
         let mut processor = MemoryProcessor::new(config);
 
@@ -262,6 +262,7 @@ mod tests {
         assert_eq!(stats.processed_count, 3);
         // Processing time might be 0 in fast tests, so just check it's valid
         assert!(stats.processing_time_ms >= 0);
+        Ok(())
     }
 
     #[tokio::test]

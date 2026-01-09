@@ -765,37 +765,6 @@ mod storage_factory_tests {
         let _ = &repos.memories;
         let _ = &repos.messages;
         let _ = &repos.associations;
+        Ok(())
     }
 }
-
-    async fn test_storage_factory_all_repositories_available() {
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().unwrap();
-        let mode = DeploymentMode::embedded(temp_dir.path());
-        let repos = StorageFactory::create(mode).await?;
-
-        // Verify key repositories with list() method are available
-        assert!(repos.users.list(1, 0).await.is_ok(), "users.list failed");
-        assert!(
-            repos.organizations.list(1, 0).await.is_ok(),
-            "organizations.list failed"
-        );
-        assert!(repos.agents.list(1, 0).await.is_ok(), "agents.list failed");
-        let tools_result = repos.tools.list(1, 0).await;
-        assert!(
-            tools_result.is_ok(),
-            "tools.list failed: {:?}",
-            tools_result.err()
-        );
-        assert!(
-            repos.api_keys.list(1, 0).await.is_ok(),
-            "api_keys.list failed"
-        );
-        assert!(repos.blocks.list(1, 0).await.is_ok(), "blocks.list failed");
-
-        // Verify all repositories exist (even if they don't have list())
-        let _ = &repos.memories;
-        let _ = &repos.messages;
-        let _ = &repos.associations;
-    }
