@@ -171,6 +171,8 @@ async fn test_semantic_agent_insert_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task).await.unwrap();
@@ -247,6 +249,8 @@ async fn test_semantic_agent_search_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task).await.unwrap();
@@ -292,6 +296,8 @@ async fn test_semantic_agent_update_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     agent.execute_task(task_insert).await.unwrap();
@@ -321,6 +327,8 @@ async fn test_semantic_agent_update_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task_update).await.unwrap();
@@ -373,6 +381,8 @@ async fn test_semantic_agent_delete_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     agent.execute_task(task_insert).await.unwrap();
@@ -395,6 +405,8 @@ async fn test_semantic_agent_delete_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task_delete).await.unwrap();
@@ -442,6 +454,8 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     agent.execute_task(task_main).await.unwrap();
@@ -472,6 +486,8 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     agent.execute_task(task_related).await.unwrap();
@@ -491,6 +507,8 @@ async fn test_semantic_agent_query_relationships_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task_query).await.unwrap();
@@ -540,6 +558,8 @@ async fn test_semantic_agent_graph_traversal_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     agent.execute_task(task_start).await.unwrap();
@@ -560,6 +580,8 @@ async fn test_semantic_agent_graph_traversal_with_real_store() {
         priority: 1,
         timeout: None,
         retry_count: 0,
+        resource_id: None,
+        category_path: None,
     };
 
     let response = agent.execute_task(task_traverse).await.unwrap();
