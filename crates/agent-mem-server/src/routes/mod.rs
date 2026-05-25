@@ -14,6 +14,7 @@ pub mod logs; // 🆕 Phase 4.2: 日志聚合功能
 pub mod mcp;
 pub mod memory; // ✅ 统一API实现：基于agent-mem Memory API
 pub mod messages;
+pub mod alerts;
 pub mod metrics;
 pub mod organizations;
 pub mod performance; // 🆕 Phase 4.2: 性能分析功能
@@ -191,6 +192,9 @@ pub async fn create_router(
         .route("/api/v1/file-centric/proactive/stats", get(file_centric::get_scheduler_stats_canonical))
         // ========== Health & Monitoring (3) ==========
         .route("/health", get(health::health_check))
+        .route("/api/v1/alerts", get(alerts::get_alerts))
+        .route("/api/v1/alerts/config", get(alerts::get_alert_config))
+        .route("/api/v1/alerts/config", put(alerts::update_alert_config))
         .route("/metrics", get(metrics::get_metrics))
         // ========== Stats & Analytics (3) ==========
         .route("/api/v1/stats", get(stats::get_dashboard_stats))

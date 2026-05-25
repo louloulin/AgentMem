@@ -1814,3 +1814,76 @@ async fn get_stats(&self) -> Result<agent_mem_traits::VectorStoreStats> {
 - [ ] 混合搜索
 - [ ] 缓存策略
 - [ ] 性能基准
+
+---
+
+## 三十六、v8.24 监控告警系统API实现 (2026-05-25)
+
+**日期**: 2026-05-25
+**版本**: v8.24 (监控告警系统API实现完成)
+
+### ✅ 本次实现的功能
+
+#### 1. Alert API路由 (`alerts.rs`)
+- **GET /api/v1/alerts** - 获取当前触发的告警列表
+  - 返回告警级别统计 (critical/error/warning)
+  - 告警包含: level, message, metric, current_value, threshold, timestamp
+  
+- **GET /api/v1/alerts/config** - 获取告警配置
+  - error_rate_threshold (默认 5%)
+  - error_count_threshold (默认 100)
+  - latency_threshold_ms (默认 1000ms)
+  - memory_operations_error_rate_threshold (默认 10%)
+
+- **PUT /api/v1/alerts/config** - 更新告警配置
+
+#### 2. 核心逻辑 (已有 telemetry.rs)
+- `MetricsCollector` - 请求/内存操作指标收集
+- `AlertManager` - 告警检查逻辑
+- `Alert` / `AlertLevel` - 告警数据结构
+
+### 📊 测试结果
+
+| 测试项 | 状态 |
+|--------|------|
+| 告警测试 (12个) | ✅ 全部通过 |
+| 编译 (release) | ✅ 通过 |
+| Linker警告 | ⚠️ sqlite3重复符号 (不影响运行) |
+
+### 🔧 新增/修改的文件
+
+| 文件 | 修改内容 |
+|------|---------|
+| `crates/agent-mem-server/src/routes/alerts.rs` | 🆕 新增 Alert API路由 |
+| `crates/agent-mem-server/src/routes/mod.rs` | 注册 alerts 模块和路由 |
+
+### 📝 Git提交建议
+
+```bash
+git add crates/agent-mem-server/src/routes/alerts.rs crates/agent-mem-server/src/routes/mod.rs
+git commit -m "v8.24: Add alerts API routes for monitoring system
+
+- GET /api/v1/alerts - get triggered alerts with level stats
+- GET /api/v1/alerts/config - get alert thresholds
+- PUT /api/v1/alerts/config - update alert thresholds
+- Integrate with existing MetricsCollector and AlertManager"
+```
+
+### 🎉 v8.2 服务端完善 - 全部完成
+
+| 功能 | 状态 |
+|------|------|
+| Telemetry指标收集 | ✅ 已实现 (telemetry.rs) |
+| Chat流式响应 (SSE) | ✅ 已实现 (chat.rs) |
+| SSE多租户隔离 | ✅ 已实现 (v8.23) |
+| WebSocket多租户隔离 | ✅ 已实现 (v8.23) |
+| 监控告警系统 | ✅ 已实现 (v8.24) |
+| OpenAPI文档 | ✅ 已实现 (utoipa) |
+
+### 📝 后续工作 (v8.3存储后端)
+
+- [ ] LanceDB完整集成
+- [ ] Postgres向量优化
+- [ ] 混合搜索
+- [ ] 缓存策略
+- [ ] 性能基准
