@@ -2126,3 +2126,42 @@ v8.3 存储后端工作已全部完成！所有核心功能已实现并编译通
 - **Grafana**: 需要 Prometheus 数据源配置文件
 - **Jaeger/Zipkin**: 需要 OTLP 端点配置
 - **Prometheus**: 可直接抓取 `/metrics` 端点
+
+---
+
+## 四十二、v8.30 SDK完善 (2026-05-25)
+
+**日期**: 2026-05-25
+**版本**: v8.30 (SDK完善)
+
+### ✅ 已实现的SDK
+
+#### 1. Python SDK (`agent-mem-python`)
+- **PyO3 绑定** - 使用 maturin 构建
+- **Memory 类** - add, search, get_all, delete, clear
+- **使用指南** - PYTHON_USAGE_GUIDE.md
+
+#### 2. TypeScript SDK (`agentmem-ui/src/lib/api-client.ts`)
+- **类型安全 API** - Agent, Memory, Organization 等类型
+- **自动重试** - 指数退避
+- **客户端缓存** - TTL 缓存
+- **请求去重**
+
+### 📊 编译状态
+
+| 检查项 | 状态 |
+|--------|------|
+| `cargo build --release -p agent-mem-python` | ✅ 通过 |
+| Python API 客户端 | ✅ |
+
+### 📝 v8.5 进度
+
+- [x] Python SDK ✅ (已有完整绑定)
+- [x] TypeScript SDK ✅ (api-client.ts)
+- [ ] 文档网站 (外部)
+- [ ] Playground (外部)
+
+### ⚠️ 外部依赖说明
+
+- **文档网站**: 建议使用 Docusaurus 或 Mintlify
+- **Playground**: 可使用 Next.js 页面实现
