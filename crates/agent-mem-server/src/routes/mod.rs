@@ -195,7 +195,7 @@ pub async fn create_router(
         .route("/api/v1/alerts", get(alerts::get_alerts))
         .route("/api/v1/alerts/config", get(alerts::get_alert_config))
         .route("/api/v1/alerts/config", put(alerts::update_alert_config))
-        .route("/metrics", get(metrics::get_metrics))
+        .route("/metrics", get(metrics::get_prometheus_metrics))
         // ========== Stats & Analytics (3) ==========
         .route("/api/v1/stats", get(stats::get_dashboard_stats))
         .route("/api/v1/logs/stats", get(logs::get_log_stats))

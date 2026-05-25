@@ -2080,3 +2080,49 @@ git commit -m "v8.24: Add alerts API routes for monitoring system
 ### 🎉 v8.3 存储后端 - 完成
 
 v8.3 存储后端工作已全部完成！所有核心功能已实现并编译通过。
+
+---
+
+## 四十一、v8.29 可观测性完善 (2026-05-25)
+
+**日期**: 2026-05-25
+**版本**: v8.29 (可观测性完善)
+
+### ✅ 已实现的可观测性功能
+
+#### 1. 核心可观测性模块 (`agent-mem-observability`)
+- **Tracing** - OpenTelemetry 分布式追踪
+- **Metrics** - Prometheus 指标收集
+- **Logging** - 结构化日志
+- **Health** - 健康检查
+
+#### 2. API 端点
+| 端点 | 功能 | 状态 |
+|------|------|------|
+| `/health` | 健康检查 | ✅ |
+| `/metrics` | Prometheus格式指标 | ✅ |
+| `/api/v1/stats` | 仪表板统计 | ✅ |
+| `/api/v1/logs/stats` | 日志统计 | ✅ |
+| `/api/v1/logs/query` | 日志查询 | ✅ |
+| `/api/v1/alerts` | 告警列表 | ✅ |
+| `/api/v1/performance` | 性能分析 | ✅ |
+
+### 📊 编译状态
+
+| 检查项 | 状态 |
+|--------|------|
+| `cargo build --release -p agent-mem-server` | ✅ 通过 |
+
+### 📝 v8.4 进度
+
+- [x] 指标收集 ✅ (Prometheus + telemetry.rs)
+- [x] 日志聚合 ✅ (logs.rs)
+- [x] 告警规则 ✅ (alerts.rs)
+- [ ] Grafana仪表板 (外部配置)
+- [ ] 分布式追踪 (需外部Jaeger)
+
+### ⚠️ 外部依赖说明
+
+- **Grafana**: 需要 Prometheus 数据源配置文件
+- **Jaeger/Zipkin**: 需要 OTLP 端点配置
+- **Prometheus**: 可直接抓取 `/metrics` 端点
