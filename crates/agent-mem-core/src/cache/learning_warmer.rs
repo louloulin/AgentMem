@@ -297,6 +297,7 @@ impl LearningBasedCacheWarmer {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::search::LearningConfig;

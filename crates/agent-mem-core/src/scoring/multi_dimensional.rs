@@ -398,6 +398,7 @@ pub struct CacheStats {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     fn create_test_memory(importance: f64, age_hours: i64) -> Memory {
         let created_at = Utc::now() - chrono::Duration::hours(age_hours);

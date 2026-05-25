@@ -366,6 +366,7 @@ impl Cache for MultiLevelCache {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 
@@ -418,6 +419,7 @@ mod tests {
 
         let value = cache.get(&"key1".to_string()).await?;
         assert_eq!(value, None);
+        Ok(())
     }
 }
 
@@ -451,5 +453,6 @@ mod tests {
 
         let value = cache.get(&"key1".to_string()).await?;
         assert_eq!(value, None);
+        Ok(())
     }
 

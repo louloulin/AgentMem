@@ -915,6 +915,7 @@ impl HierarchyManager for DefaultHierarchyManager {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use agent_mem_traits::MemoryItem;

@@ -214,6 +214,7 @@ impl RepositoryFactory {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use agent_mem_config::{DatabaseBackend, DatabaseConfig};
@@ -654,6 +655,7 @@ mod storage_factory_tests {
 
         let result = repos.users.create(&user).await;
         assert!(result.is_ok(), "Failed to create user: {:?}", result.err());
+        Ok(())
     }
 
     #[tokio::test]

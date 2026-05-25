@@ -3,6 +3,7 @@
 //! 测试整个混合检索系统的集成
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use crate::search::{
         EnhancedHybridSearchEngineV2,

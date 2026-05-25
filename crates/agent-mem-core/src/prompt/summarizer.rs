@@ -170,6 +170,7 @@ impl Default for MemorySummarizer {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

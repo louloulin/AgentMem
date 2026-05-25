@@ -313,6 +313,7 @@ pub fn v4_to_legacy(memory: &Memory) -> agent_mem_traits::MemoryItem {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

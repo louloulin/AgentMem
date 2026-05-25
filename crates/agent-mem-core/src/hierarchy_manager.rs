@@ -486,6 +486,7 @@ impl HierarchyManager {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::hierarchical_service::HierarchicalServiceConfig;

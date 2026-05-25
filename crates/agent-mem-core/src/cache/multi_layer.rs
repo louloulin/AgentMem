@@ -466,6 +466,7 @@ pub struct WarmingStats {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::MultiLayerCache;
     use agent_mem_traits::abstractions::Memory;

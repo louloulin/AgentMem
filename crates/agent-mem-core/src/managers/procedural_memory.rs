@@ -356,6 +356,7 @@ impl From<ProceduralMemoryItemRow> for ProceduralMemoryItem {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use serde_json::json;

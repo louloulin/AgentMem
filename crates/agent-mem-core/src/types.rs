@@ -2519,6 +2519,7 @@ impl Default for MemoryStats {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

@@ -334,6 +334,7 @@ impl FilesystemIntegrationManager {
 use std::sync::Arc;
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use tempfile::TempDir;

@@ -233,6 +233,7 @@ pub fn cosine_similarity_exact(vec1: &[f32], vec2: &[f32]) -> f32 {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use serde_json::json;

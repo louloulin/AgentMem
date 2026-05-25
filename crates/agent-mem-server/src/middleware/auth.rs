@@ -9,9 +9,10 @@ use axum::{
     extract::{Request, State},
     http::header,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
+    Json,
 };
-use hyper::body::Body;
+use axum::body::Body;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
@@ -224,8 +225,8 @@ pub async fn require_auth_middleware(
             });
 
             return Response::builder()
-                .status(401)
-                .header("Content-Type", "application/json")
+                .status(axum::http::StatusCode::UNAUTHORIZED)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
                 .body(Body::from(serde_json::to_string(&error_response).unwrap()))
                 .unwrap();
         }

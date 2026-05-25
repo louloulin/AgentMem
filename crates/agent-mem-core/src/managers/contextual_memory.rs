@@ -1077,6 +1077,7 @@ impl ContextualMemoryManager {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use std::collections::HashMap;

@@ -258,13 +258,12 @@ pub struct HistoryEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MemvidConfig, MemvidStore};
+    use crate::{MemvidConfig, store::MemvidStore};
     use agent_mem_traits::{AttributeSet, Content, MetadataV4};
 
     #[tokio::test]
     async fn test_time_travel() {
-        let config = MemvidConfig::new("test_timeline.mv2");
-        let store = Arc::new(MemvidStore::create(config).await.unwrap());
+        let store = Arc::new(MemvidStore::create(MemvidConfig::new("test_timeline.mv2")).await.unwrap());
         let tt = TimeTravel::new(store.clone());
 
         let memory = Memory {

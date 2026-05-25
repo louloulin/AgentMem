@@ -387,6 +387,7 @@ mod tests {
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].memory_id, "mem_test_123");
         assert_eq!(history[0].event, "ADD");
+        Ok(())
     }
 
     #[tokio::test]
@@ -413,8 +414,7 @@ mod tests {
                 role: Some("user".to_string()),
             };
 
-            manager.add_history(entry).await?;
-            Ok(())
+            manager.add_history(entry).await?
         }
 
         // 获取历史记录
@@ -424,6 +424,7 @@ mod tests {
         // 验证顺序（最新的在前）
         assert_eq!(history[0].event, "DELETE");
         assert_eq!(history[3].event, "ADD");
+        Ok(())
     }
 
     #[tokio::test]
@@ -454,6 +455,7 @@ mod tests {
         assert_eq!(stats.add_count, 2);
         assert_eq!(stats.update_count, 1);
         assert_eq!(stats.delete_count, 1);
+        Ok(())
     }
 
     #[tokio::test]
@@ -483,5 +485,6 @@ mod tests {
         // 验证已清空
         let all = manager.get_all_history(None).await?;
         assert_eq!(all.len(), 0);
+        Ok(())
     }
 }

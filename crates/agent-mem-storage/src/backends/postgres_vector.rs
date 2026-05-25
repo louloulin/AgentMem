@@ -539,10 +539,23 @@ impl VectorStore for PostgresVectorStore {
     async fn get_stats(&self) -> Result<VectorStoreStats> {
         let count = self.count_vectors().await?;
 
+        // Calculate approximate index size using pg_relation_size for the vector table
+        // This includes both table and index sizes
+        let index_size = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COALESCE(pg_relation_size($1::regclass), 0)::bigint 
+            + COALESCE(pg_indexes_size($1::regclass), 0)::bigint
+            "#
+        )
+        .bind(&self.config.table_name)
+        .fetch_one(self.pool.as_ref())
+        .await
+        .unwrap_or(0);
+
         Ok(VectorStoreStats {
             total_vectors: count,
             dimension: self.config.dimension,
-            index_size: 0, // TODO: 实现索引大小计算
+            index_size: index_size as usize,
         })
     }
 

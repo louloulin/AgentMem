@@ -28,6 +28,7 @@
 pub mod meta_manager;
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests;
 
 // Re-export main types

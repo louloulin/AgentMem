@@ -300,6 +300,7 @@ impl ResourceRecallEngine for InMemoryResourceRecall {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

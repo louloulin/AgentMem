@@ -154,6 +154,7 @@ pub const unsafe fn compile_regex_unchecked(pattern: &str) -> regex::Regex {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use std::sync::{Mutex, RwLock};

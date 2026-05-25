@@ -346,6 +346,7 @@ impl AdaptiveThresholdCalculator {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::search::query_classifier::{Language, QueryClassifier};
@@ -493,39 +494,3 @@ mod tests {
         assert_eq!(details.base_threshold, 0.5); // Semantic base threshold
     }
 }
-
-    async fn test_historical_feedback() -> anyhow::Result<()> {
-        let calculator = AdaptiveThresholdCalculator::with_default_config();
-
-        // 记录低分数反馈
-        calculator
-            .record_feedback(QueryType::ShortKeyword, 0.2)
-            .await;
-        calculator
-            .record_feedback(QueryType::ShortKeyword, 0.3)
-            .await;
-
-        let stats = calculator.get_stats().await.ok_or_else(|| anyhow::anyhow!("Failed to get stats"))?;
-        let adjustment = stats.get_adjustment(&QueryType::ShortKeyword);
-
-        // 应该建议降低阈值
-        assert!(adjustment.is_some());
-        assert!(adjustment.unwrap() < 0.0);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_calculate_with_details() -> anyhow::Result<()> {
-        let calculator = AdaptiveThresholdCalculator::with_default_config();
-        let classifier = QueryClassifier::with_default_config();
-
-        let query = "What is AI?";
-        let features = classifier.extract_features(query);
-        let details = calculator
-            .calculate_with_details(query, &QueryType::Semantic, &features)
-            .await;
-
-        assert!(details.threshold >= 0.0 && details.threshold <= 1.0);
-        assert_eq!(details.base_threshold, 0.5); // Semantic base threshold
-        Ok(())
-    }

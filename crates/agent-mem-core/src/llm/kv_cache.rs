@@ -304,6 +304,7 @@ impl KvCacheManager {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
 
     async fn test_kv_cache_basic() -> anyhow::Result<()> {

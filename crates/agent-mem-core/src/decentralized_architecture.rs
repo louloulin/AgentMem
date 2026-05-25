@@ -468,6 +468,7 @@ impl DecentralizedManager {
 use std::collections::VecDeque;
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

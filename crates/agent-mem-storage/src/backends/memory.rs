@@ -217,13 +217,13 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    async fn create_test_store() -> anyhow::Result<MemoryVectorStore> {
+    async fn create_test_store() -> MemoryVectorStore {
         let config = VectorStoreConfig {
             provider: "memory".to_string(),
             dimension: Some(3),
             ..Default::default()
         };
-        Ok(MemoryVectorStore::new(config).await?)
+        MemoryVectorStore::new(config).await.unwrap()
     }
 
     fn create_test_vector(id: &str, vector: Vec<f32>) -> VectorData {
@@ -235,25 +235,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_and_get_vectors() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_add_and_get_vectors() {
+        let store = create_test_store().await;
 
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        let ids = store.add_vectors(vectors).await?;
+        let ids = store.add_vectors(vectors).await.unwrap();
         assert_eq!(ids.len(), 2);
 
-        let vector = store.get_vector("1").await?;
+        let vector = store.get_vector("1").await.unwrap();
         assert!(vector.is_some());
         assert_eq!(vector.unwrap().vector, vec![1.0, 0.0, 0.0]);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_search_vectors() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_search_vectors() {
+        let store = create_test_store().await;
 
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
@@ -261,7 +262,7 @@ mod tests {
             create_test_vector("3", vec![0.0, 0.0, 1.0]),
         ];
 
-        store.add_vectors(vectors).await?;
+        store.add_vectors(vectors).await.unwrap();
 
         // 搜索与第一个向量相似的向量
         let results = store
@@ -274,67 +275,71 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_delete_vectors() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_delete_vectors() {
+        let store = create_test_store().await;
 
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await?;
-        assert_eq!(store.count_vectors().await?, 2);
+        store.add_vectors(vectors).await.unwrap();
+        assert_eq!(store.count_vectors().await.unwrap(), 2);
 
-        store.delete_vectors(vec!["1".to_string()]).await?;
-        assert_eq!(store.count_vectors().await?, 1);
+        store.delete_vectors(vec!["1".to_string()]).await.unwrap();
+        assert_eq!(store.count_vectors().await.unwrap(), 1);
 
-        let vector = store.get_vector("1").await?;
+        let vector = store.get_vector("1").await.unwrap();
         assert!(vector.is_none());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_update_vectors() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_update_vectors() {
+        let store = create_test_store().await;
 
         let vectors = vec![create_test_vector("1", vec![1.0, 0.0, 0.0])];
-        store.add_vectors(vectors).await?;
+        store.add_vectors(vectors).await.unwrap();
 
         let updated_vectors = vec![create_test_vector("1", vec![0.0, 1.0, 0.0])];
-        store.update_vectors(updated_vectors).await?;
+        store.update_vectors(updated_vectors).await.unwrap();
 
-        let vector = store.get_vector("1").await?.unwrap();
+        let vector = store.get_vector("1").await.unwrap().unwrap();
         assert_eq!(vector.vector, vec![0.0, 1.0, 0.0]);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_clear() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_clear() {
+        let store = create_test_store().await;
 
         let vectors = vec![
             create_test_vector("1", vec![1.0, 0.0, 0.0]),
             create_test_vector("2", vec![0.0, 1.0, 0.0]),
         ];
 
-        store.add_vectors(vectors).await?;
-        assert_eq!(store.count_vectors().await?, 2);
+        store.add_vectors(vectors).await.unwrap();
+        assert_eq!(store.count_vectors().await.unwrap(), 2);
 
-        store.clear().await?;
-        assert_eq!(store.count_vectors().await?, 0);
+        store.clear().await.unwrap();
+        assert_eq!(store.count_vectors().await.unwrap(), 0);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_dimension_validation() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_dimension_validation() {
+        let store = create_test_store().await;
 
         // 尝试添加错误维度的向量
         let vectors = vec![create_test_vector("1", vec![1.0, 0.0])]; // 2维而不是3维
         let result = store.add_vectors(vectors).await;
         assert!(result.is_err());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_cosine_similarity() -> anyhow::Result<()> {
-        let store = create_test_store().await?;
+    async fn test_cosine_similarity() {
+        let store = create_test_store().await;
 
         // 测试余弦相似度计算
         let sim = store.cosine_similarity(&[1.0, 0.0, 0.0], &[1.0, 0.0, 0.0]);
@@ -344,6 +349,6 @@ mod tests {
         assert_eq!(sim, 0.0);
 
         let sim = store.cosine_similarity(&[1.0, 0.0, 0.0], &[-1.0, 0.0, 0.0]);
-        assert_eq!(sim, -1.0);
+        assert_eq!(sim, -1.0);        Ok(())
     }
 }

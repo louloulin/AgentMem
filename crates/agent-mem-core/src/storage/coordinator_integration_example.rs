@@ -4,8 +4,8 @@
 //!
 //! 这个文件仅作为示例，展示集成方式，不参与实际编译
 
-use agent_mem_core::storage::coordinator::{CacheConfig, UnifiedStorageCoordinator};
-use agent_mem_core::storage::factory::Repositories;
+use crate::storage::coordinator::{CacheConfig, UnifiedStorageCoordinator};
+use crate::storage::factory::Repositories;
 use agent_mem_traits::{MemoryV4 as Memory, VectorStore};
 use std::sync::Arc;
 

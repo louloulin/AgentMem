@@ -855,6 +855,30 @@ impl MemvidStore {
     }
 
     // ========================================================================
+    // Direct API: 直接调用内部实现
+    // ========================================================================
+
+    /// 添加单个记忆
+    pub async fn add(&self, memory: &Memory) -> Result<()> {
+        self.inner.add(memory).await
+    }
+
+    /// 获取单个记忆
+    pub async fn get(&self, id: &MemoryId) -> Result<Option<Memory>> {
+        self.inner.get(id).await
+    }
+
+    /// 搜索记忆
+    pub async fn search(&self, query: &str, top_k: usize) -> Result<Vec<SearchHit>> {
+        self.inner.search(query, top_k).await
+    }
+
+    /// 获取记忆数量
+    pub async fn count(&self) -> Result<usize> {
+        self.inner.count().await
+    }
+
+    // ========================================================================
     // 辅助方法：类型转换和适配
     // ========================================================================
 

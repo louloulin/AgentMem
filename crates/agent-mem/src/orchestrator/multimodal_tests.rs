@@ -315,8 +315,8 @@ mod edge_case_tests {
     /// 测试并发限制
     #[tokio::test]
     async fn test_concurrent_limit() {
-        let max_concurrent = 10;
-        let request_count = 15;
+        let max_concurrent: usize = 10;
+        let request_count: usize = 15;
         let rejected = request_count.saturating_sub(max_concurrent);
 
         assert_eq!(rejected, 5);

@@ -358,6 +358,7 @@ impl EnhancedSearchV4 {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

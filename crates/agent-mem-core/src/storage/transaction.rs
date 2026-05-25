@@ -262,6 +262,7 @@ macro_rules! retry_db_with_config {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

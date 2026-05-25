@@ -3,6 +3,7 @@
 //! 测试主动检索系统和自动压缩机制的集成
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use crate::orchestrator::memory_integration::{MemoryIntegrator, MemoryIntegratorConfig};
     use crate::engine::MemoryEngine;

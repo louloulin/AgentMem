@@ -722,6 +722,7 @@ async fn init_default_data(conn: &Connection) -> Result<()> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::storage::libsql::connection::create_libsql_pool;

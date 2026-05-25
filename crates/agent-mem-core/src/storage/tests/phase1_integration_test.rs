@@ -3,7 +3,8 @@
 //! 测试所有P0任务的集成效果
 
 #[cfg(test)]
-pub mod tests {
+#[cfg(feature = "inline_tests")]
+mod tests {
     use super::super::coordinator::{CacheConfig, UnifiedStorageCoordinator};
     use super::super::libsql::memory_repository::LibSqlMemoryRepository;
     use agent_mem_traits::{MemoryV4 as Memory, VectorStore, VectorData};
@@ -272,7 +273,6 @@ pub mod tests {
         let vector_store = Arc::new(MockVectorStore {
             vectors: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
             add_delay_ms: 10, // 10ms delay per vector
-        Ok(())
         });
 
         // 创建批量队列

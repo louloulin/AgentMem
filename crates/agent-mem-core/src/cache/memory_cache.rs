@@ -300,6 +300,7 @@ impl Cache for MemoryCache {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

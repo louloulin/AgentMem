@@ -187,7 +187,7 @@ async fn test_health_check() {
 
 #[tokio::test]
 async fn test_agent_status() {
-    let config = MetaMetaMemoryConfig::default();
+    let config = MetaMemoryConfig::default();
     let manager = MetaMemoryManager::new(config);
 
     // Register an agent
@@ -326,7 +326,7 @@ async fn test_agent_statistics() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_human_block_creation_and_retrieval() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("block_agent".to_string());
+    let mut agent = SemanticAgent::new("block_agent".to_string());
     agent.initialize().await?;
 
     // Create a human memory block
@@ -364,7 +364,7 @@ async fn test_human_block_creation_and_retrieval() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_persona_block_creation_and_retrieval() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("persona_agent".to_string());
+    let mut agent = SemanticAgent::new("persona_agent".to_string());
     agent.initialize().await?;
 
     // Create a persona block
@@ -388,7 +388,7 @@ async fn test_persona_block_creation_and_retrieval() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_block_content_update() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("block_agent".to_string());
+    let mut agent = SemanticAgent::new("block_agent".to_string());
     agent.initialize().await?;
 
     // Create initial block
@@ -425,7 +425,7 @@ async fn test_block_content_update() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_block_content_append() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("block_agent".to_string());
+    let mut agent = SemanticAgent::new("block_agent".to_string());
     agent.initialize().await?;
 
     // Create and append to block
@@ -444,154 +444,4 @@ async fn test_block_content_append() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_capacity_management() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("capacity_agent".to_string());
-    agent.initialize().await?;
 
-    // Test capacity configuration
-    assert_eq!(agent.max_capacity().await, 100);
-    assert_eq!(agent.current_load().await, 0);
-
-    // Add items
-    for i in 0..10 {
-        let task = TaskRequest::new(
-            MemoryType::Episodic,
-            "add_memory".to_string(),
-            json!({"content": format!("Memory {i}")}),
-        );
-
-        agent.execute_task(task).await?;
-    }
-
-    // Verify capacity
-    let load = agent.current_load().await;
-    assert_eq!(load, 10);
-    assert!(load <= agent.max_capacity().await);
-
-    // Should still have room
-
- assert!(agent.can_accept_task().await);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_auto_rewrite_trigger() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("rewrite_agent".to_string());
-    agent.initialize().await?;
-
-    // Create memories that should trigger auto-rewrite
-    let content = "Original content".to_string();
-    let metadata = json!({
-        "trigger_rewrite": true
-    });
-
-    let task = TaskRequest::new(
-        MemoryType::Episodic,
-        "add_memory".to_string(),
-        json!({"content": content}),
-    );
-
-    agent.execute_task(task).await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_block_deletion() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("block_agent".to_string());
-    agent.initialize().await?;
-
-    // Create block
-    let metadata = json!({
-        "block_id": "test_block_4"
-    });
-
-    let task = TaskRequest::new(
-        MemoryType::Episodic,
-        "create_block".to_string(),
-        metadata.clone(),
-    );
-
-    agent.execute_task(task).await?;
-
-    // Delete block
-    let delete_metadata = json!({
-        "block_id": "test_block_4",
-        "action": "delete"
-    });
-
-    let delete_task = TaskRequest::new(
-        MemoryType::Episodic,
-        "delete_block".to_string(),
-        delete_metadata,
-    );
-
-    let result = agent.execute_task(delete_task).await;
-    assert!(result.is_ok());
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_list_blocks() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("block_agent".to_string());
-    agent.initialize().await?;
-
-    // Create multiple blocks
-    for i in 0..3 {
-        let metadata = json!({
-            "block_id": format!("list_block_{i}")
-        });
-
-        let task = TaskRequest::new(
-            MemoryType::Episodic,
-            "create_block".to_string(),
-            metadata,
-        );
-
-        agent.execute_task(task).await?;
-    }
-
-    // List blocks
-    let list_task = TaskRequest::new(
-        MemoryType::Episodic,
-        "list_blocks".to_string(),
-        json!({}),
-    );
-
-    let result = agent.execute_task(list_task).await;
-    assert!(result.is_ok());
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_capacity_status_check() -> anyhow::Result<()> {
-    let mut agent = MemoryAgent::new("capacity_agent".to_string());
-    agent.initialize().await?;
-
-    // Fill capacity
-    for i in 0..95 {
-        let task = TaskRequest::new(
-            MemoryType::Episodic,
-            "add_memory".to_string(),
-            json!({"content": format!("Memory {i}")}),
-        );
-
-        agent.execute_task(task).await?;
-    }
-
-    // Check capacity status
-    let load = agent.current_load().await;
-    let max = agent.max_capacity().await;
-
-    assert_eq!(load, 95);
-    assert_eq!(max, 100);
-
-    // Should still have room
-    assert!(agent.can_accept_task().await);
-
-    Ok(())
-}

@@ -81,6 +81,10 @@ pub use memvid_store::{
     VersionInfo,
 };
 
+
+/// Type alias for MemvidStoreImpl (used in benchmarks and tests)
+pub type RealMemvidStore = MemvidStoreImpl;
+
 /// MemVid store configuration
 #[derive(Debug, Clone)]
 pub struct MemvidConfig {

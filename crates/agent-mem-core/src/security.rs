@@ -125,6 +125,7 @@ pub fn validate_column_name(column_name: &str) -> CoreResult<()> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

@@ -514,6 +514,7 @@ impl Clone for MonitoringSystem {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

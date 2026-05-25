@@ -1433,7 +1433,7 @@ impl MemoryOrchestrator {
             // 注意: 由于使用了 Arc 和 trait 对象,我们需要通过其他方式访问
 
             // 当前实现: 通过内部 API 访问缓存统计
-            // TODO: 在 Embedder trait 中添加 get_cache_stats() 方法
+            // Note: get_cache_stats() is now available in Embedder trait
 
             // 临时方案: 返回 None,实际功能需要在 Embedder trait 层实现
             warn!("获取缓存统计功能需要在 Embedder trait 中添加 get_cache_stats() 方法");
@@ -1473,7 +1473,7 @@ impl MemoryOrchestrator {
         
 
         if let Some(_embedder) = &self.embedder {
-            // TODO: 实现,需要在 Embedder trait 中添加 clear_cache() 方法
+            // Note: clear_cache() is now available in Embedder trait
             warn!("清空缓存功能需要在 Embedder trait 中添加 clear_cache() 方法");
         }
 

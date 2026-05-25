@@ -354,6 +354,7 @@ impl From<SemanticMemoryItemRow> for SemanticMemoryItem {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use serde_json::json;

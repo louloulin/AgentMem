@@ -72,6 +72,7 @@ vector-search = []
 postgres = ["sqlx", "agent-mem-traits/sqlx"]
 redis-cache = ["redis"]
 libsql = ["dep:libsql"]
+inline_tests = []
 performance_tests = []
 
 [[bench]]

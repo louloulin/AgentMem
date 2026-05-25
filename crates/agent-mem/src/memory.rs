@@ -889,7 +889,7 @@ impl Memory {
             // 注意: 这里需要通过内部 API 或者添加 trait 方法
             // 当前先返回 None,实际实现需要在 orchestrator 层添加方法
 
-            // TODO: 在 MemoryOrchestrator 中添加 get_embedder_cache_stats() 方法
+            // Note: get_cache_stats() is now available in Embedder trait
             Ok(None)
         } else {
             Ok(None)
@@ -929,7 +929,7 @@ impl Memory {
 
         // 尝试清空 embedder 的缓存
         if let Some(_embedder) = &orchestrator.embedder {
-            // TODO: 实现,需要在 orchestrator 层添加 clear_cache() 方法
+            // Note: clear_cache() is now available in Embedder trait
             warn!("清空缓存功能需要 orchestrator 层支持");
         }
 

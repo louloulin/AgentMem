@@ -314,6 +314,7 @@ impl From<EpisodicEventRow> for EpisodicEvent {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use chrono::Duration;

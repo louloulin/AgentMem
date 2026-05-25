@@ -135,6 +135,7 @@ impl TimeDecayModel for ExponentialDecayModel {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

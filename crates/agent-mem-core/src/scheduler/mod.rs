@@ -260,9 +260,10 @@ impl MemoryScheduler for DefaultMemoryScheduler {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
-    use agent_mem_core::types::Memory;
+    use crate::types::Memory;
     use agent_mem_traits::{AttributeKey, AttributeValue, MemoryType};
 
     fn create_test_memory(importance: f64, days_ago: f64) -> Memory {

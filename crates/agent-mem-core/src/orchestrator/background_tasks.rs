@@ -186,6 +186,7 @@ async fn run_memory_extraction(
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use tokio::time::{sleep, Duration as TokioDuration};

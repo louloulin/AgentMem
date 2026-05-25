@@ -530,11 +530,10 @@ mod tests {
         // 检查 archived 属性
         let archived = memory.attributes.get(&AttributeKey::system("archived"));
         assert!(archived.is_some());
-        if let Some(AttributeValue::Boolean(val)) = archived {
-            assert_eq!(*val, true);
-            Ok(())
-        }
-        assert!(memory.importance().unwrap_or(0.0) < 0.5); // Should be reduced
+        let is_archived = matches!(archived, Some(AttributeValue::Boolean(true)));
+        assert!(is_archived, "Expected archived to be true");
+        assert!(memory.importance().unwrap_or(0.0) < 0.5);
+        Ok(()) // Should be reduced
     }
 
     #[tokio::test]
@@ -550,10 +549,9 @@ mod tests {
         // 检查 compressed 属性
         let compressed = memory.attributes.get(&AttributeKey::system("compressed"));
         assert!(compressed.is_some());
-        if let Some(AttributeValue::Boolean(val)) = compressed {
-            assert_eq!(*val, true);
-            Ok(())
-        }
+        let is_compressed = matches!(compressed, Some(AttributeValue::Boolean(true)));
+        assert!(is_compressed, "Expected compressed to be true");
+        Ok(())
     }
 
     #[tokio::test]
@@ -576,6 +574,7 @@ mod tests {
         // Clean up and verify capacity is respected
         manager.cleanup_deleted_memories(&mut memories);
         assert!(memories.len() <= 3);
+        Ok(())
     }
 
     #[tokio::test]

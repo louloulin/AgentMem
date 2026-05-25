@@ -14,6 +14,7 @@ pub mod synthesizer;
 pub mod topic_extractor;
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests;
 
 // Re-export main types

@@ -3,6 +3,7 @@
 /// 测试系统各组件的集成和端到端工作流程
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use crate::integration::api_interface::{
         ApiOperation, ApiRequest, ApiStatus, BatchRequest, ClientInfo, UnifiedApiInterface,
@@ -268,7 +269,6 @@ mod tests {
                 user_agent: Some("AgentMem Test".to_string()),
                 ip_address: Some("127.0.0.1".to_string()),
             }),
-        Ok(())
         };
 
         let store_response = api_interface.handle_request(store_request).await

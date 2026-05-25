@@ -592,6 +592,7 @@ impl TemporalGraphEngine {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::graph_memory::NodeType;

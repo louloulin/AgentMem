@@ -600,6 +600,7 @@ impl SearchEngine for VectorSearchEngine {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use agent_mem_storage::backends::MemoryVectorStore;

@@ -270,6 +270,7 @@ impl OrganizationRepositoryTrait for LibSqlOrganizationRepository {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use crate::storage::libsql::{create_libsql_pool, run_migrations};

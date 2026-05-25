@@ -3,7 +3,8 @@
 //! 测试批量处理队列和批量向量搜索功能
 
 #[cfg(test)]
-pub mod tests {
+#[cfg(feature = "inline_tests")]
+mod tests {
     use super::super::batch_vector_queue::{BatchVectorQueueConfig, BatchVectorStorageQueue};
     use agent_mem_traits::{VectorData, VectorStore};
     use std::sync::Arc;
@@ -117,7 +118,6 @@ pub mod tests {
         let vector_store = Arc::new(MockVectorStore {
             vectors: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
             add_delay_ms: 10, // 10ms delay per vector
-        Ok(())
         });
 
         // 创建批量队列

@@ -9,6 +9,7 @@
 //! 6. 消除N+1查询
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::super::coordinator::{CacheConfig, UnifiedStorageCoordinator};
     use super::super::libsql::memory_repository::LibSqlMemoryRepository;

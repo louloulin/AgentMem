@@ -296,7 +296,7 @@ impl SearchQuery {
 }
 
 /// 搜索过滤条件
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SearchFilters {
     /// 用户 ID 过滤
     pub user_id: Option<String>,
@@ -349,6 +349,7 @@ pub struct SearchStats {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

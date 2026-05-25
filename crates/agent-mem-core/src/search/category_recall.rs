@@ -410,6 +410,7 @@ impl CategoryRecallEngine for InMemoryCategoryRecall {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

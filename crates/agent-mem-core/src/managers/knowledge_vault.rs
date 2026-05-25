@@ -1044,6 +1044,7 @@ impl KnowledgeVaultManager {
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
 

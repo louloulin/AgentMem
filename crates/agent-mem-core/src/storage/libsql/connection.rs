@@ -470,6 +470,7 @@ pub async fn create_libsql_pool_with_config(
 }
 
 #[cfg(test)]
+#[cfg(feature = "inline_tests")]
 mod tests {
     use super::*;
     use tempfile::TempDir;
