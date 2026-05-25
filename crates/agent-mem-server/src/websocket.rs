@@ -37,12 +37,14 @@ pub enum WsMessage {
         message_id: String,
         agent_id: String,
         user_id: String,
+        org_id: String,
         content: String,
         timestamp: String,
     },
     /// Agent status update
     AgentUpdate {
         agent_id: String,
+        org_id: String,
         status: String,
         timestamp: String,
     },
@@ -50,6 +52,7 @@ pub enum WsMessage {
     MemoryUpdate {
         memory_id: String,
         agent_id: String,
+        org_id: String,
         operation: String, // "created", "updated", "deleted"
         timestamp: String,
     },
@@ -76,13 +79,15 @@ struct ConnectionInfo {
     connected_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// WebSocket connection manager
+/// WebSocket connection manager with multi-tenant isolation
 #[derive(Clone)]
 pub struct WebSocketManager {
     /// Active connections
     connections: Arc<RwLock<HashMap<String, ConnectionInfo>>>,
-    /// Broadcast channel for messages
+    /// Broadcast channel for messages (global, backwards compatible)
     broadcast_tx: broadcast::Sender<WsMessage>,
+    /// Per-organization broadcast channels for tenant isolation
+    org_channels: Arc<RwLock<HashMap<String, broadcast::Sender<WsMessage>>>>,
 }
 
 impl WebSocketManager {
@@ -93,10 +98,34 @@ impl WebSocketManager {
         Self {
             connections: Arc::new(RwLock::new(HashMap::new())),
             broadcast_tx,
+            org_channels: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// Get the broadcast sender
+    /// Get or create a broadcast channel for a specific organization
+    async fn get_org_channel(&self, org_id: &str) -> broadcast::Sender<WsMessage> {
+        let mut channels = self.org_channels.write().await;
+        if let Some(tx) = channels.get(org_id) {
+            return tx.clone();
+        }
+        let (tx, _) = broadcast::channel(1000);
+        channels.insert(org_id.to_string(), tx.clone());
+        tx
+    }
+
+    /// Subscribe to organization-specific channel
+    pub async fn subscribe_to_org(&self, org_id: &str) -> broadcast::Receiver<WsMessage> {
+        self.get_org_channel(org_id).await.subscribe()
+    }
+
+    /// Broadcast to organization-specific channel
+    pub async fn broadcast_to_org(&self, org_id: String, message: WsMessage) -> ServerResult<()> {
+        let tx = self.get_org_channel(&org_id).await;
+        let _ = tx.send(message);
+        Ok(())
+    }
+
+    /// Get the broadcast sender (global)
     pub fn broadcast_sender(&self) -> broadcast::Sender<WsMessage> {
         self.broadcast_tx.clone()
     }
@@ -127,9 +156,8 @@ impl WebSocketManager {
         self.connections.read().await.len()
     }
 
-    /// Broadcast a message to all connections
+    /// Broadcast a message to all connections (global, backwards compatible)
     pub fn broadcast(&self, message: WsMessage) -> ServerResult<()> {
-        // Ignore errors when there are no receivers (e.g., during testing)
         let _ = self.broadcast_tx.send(message);
         Ok(())
     }
@@ -152,13 +180,14 @@ pub async fn websocket_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, auth_user, manager))
 }
 
-/// Handle WebSocket connection
+/// Handle WebSocket connection with multi-tenant isolation
 async fn handle_socket(socket: WebSocket, auth_user: AuthUser, manager: Arc<WebSocketManager>) {
     let connection_id = Uuid::new_v4().to_string();
+    let org_id = auth_user.org_id.clone();
 
     info!(
         "New WebSocket connection: {} (user: {}, org: {})",
-        connection_id, auth_user.user_id, auth_user.org_id
+        connection_id, auth_user.user_id, org_id
     );
 
     // Register connection
@@ -166,7 +195,7 @@ async fn handle_socket(socket: WebSocket, auth_user: AuthUser, manager: Arc<WebS
         .register_connection(
             connection_id.clone(),
             auth_user.user_id.clone(),
-            auth_user.org_id.clone(),
+            org_id.clone(),
         )
         .await;
 
@@ -174,8 +203,8 @@ async fn handle_socket(socket: WebSocket, auth_user: AuthUser, manager: Arc<WebS
     let (sender, mut receiver) = socket.split();
     let sender = Arc::new(tokio::sync::Mutex::new(sender));
 
-    // Subscribe to broadcast channel
-    let mut broadcast_rx = manager.broadcast_sender().subscribe();
+    // Subscribe to organization-specific broadcast channel
+    let mut broadcast_rx = manager.subscribe_to_org(&org_id).await;
 
     // Spawn heartbeat task
     let heartbeat_connection_id = connection_id.clone();
@@ -209,15 +238,12 @@ async fn handle_socket(socket: WebSocket, auth_user: AuthUser, manager: Arc<WebS
         }
     });
 
-    // Spawn broadcast receiver task
+    // Spawn broadcast receiver task for this organization
     let broadcast_connection_id = connection_id.clone();
-    let _broadcast_org_id = auth_user.org_id.clone();
     let broadcast_sender = sender.clone();
     let broadcast_task = tokio::spawn(async move {
         while let Ok(message) = broadcast_rx.recv().await {
-            // TODO: Filter messages by organization for multi-tenant isolation
-            // For now, broadcast to all connections
-
+            // Serialize and send message to this connection
             let json = match serde_json::to_string(&message) {
                 Ok(j) => j,
                 Err(e) => {
@@ -317,11 +343,28 @@ mod tests {
             message_id: "msg1".to_string(),
             agent_id: "agent1".to_string(),
             user_id: "user1".to_string(),
+            org_id: "org1".to_string(),
             content: "Hello".to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
 
         // Should not error even with no subscribers
         assert!(manager.broadcast(message).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_org_broadcast() {
+        let manager = WebSocketManager::new();
+
+        let message = WsMessage::Message {
+            message_id: "msg1".to_string(),
+            agent_id: "agent1".to_string(),
+            user_id: "user1".to_string(),
+            org_id: "org1".to_string(),
+            content: "Hello".to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+
+        assert!(manager.broadcast_to_org("org1".to_string(), message).await.is_ok());
     }
 }
