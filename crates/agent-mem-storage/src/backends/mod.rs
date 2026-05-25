@@ -24,6 +24,7 @@ pub mod postgres_working;
 pub mod lancedb_store;
 pub mod hybrid_store;
 pub mod cached_store;
+pub mod benchmark;
 #[cfg(feature = "libsql")]
 pub mod libsql_fts5;
 pub mod libsql_store;
@@ -85,6 +86,7 @@ pub use faiss::FaissStore;
 pub use lancedb::LanceDBStore;
 pub use hybrid_store::{HybridVectorStore, HybridSearchResult, RrfCombiner, SearchMethod};
 pub use cached_store::{CachedVectorStore, SearchResultCache};
+pub use benchmark::{VectorStoreBenchmark, BenchmarkResult, generate_random_vectors};
 pub use memory::MemoryVectorStore;
 pub use milvus::MilvusStore;
 pub use mongodb::MongoDBStore;
