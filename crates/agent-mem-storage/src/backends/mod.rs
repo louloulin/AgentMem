@@ -22,6 +22,8 @@ pub mod postgres_working;
 // 嵌入式存储
 #[cfg(feature = "lancedb")]
 pub mod lancedb_store;
+pub mod hybrid_store;
+pub mod cached_store;
 #[cfg(feature = "libsql")]
 pub mod libsql_fts5;
 pub mod libsql_store;
@@ -81,6 +83,8 @@ pub use chroma::ChromaStore;
 pub use elasticsearch::ElasticsearchStore;
 pub use faiss::FaissStore;
 pub use lancedb::LanceDBStore;
+pub use hybrid_store::{HybridVectorStore, HybridSearchResult, RrfCombiner, SearchMethod};
+pub use cached_store::{CachedVectorStore, SearchResultCache};
 pub use memory::MemoryVectorStore;
 pub use milvus::MilvusStore;
 pub use mongodb::MongoDBStore;
