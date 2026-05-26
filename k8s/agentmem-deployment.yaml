@@ -1,0 +1,194 @@
+# AgentMem Kubernetes Deployment Configuration
+# Version: 1.0
+# Date: 2026-05-26
+
+---
+# AgentMem Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentmem-server
+  namespace: agentmem
+  labels:
+    app: agentmem
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agentmem
+  template:
+    metadata:
+      labels:
+        app: agentmem
+        tier: backend
+    spec:
+      containers:
+        - name: agentmem
+          image: agentmem/server:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agentmem-secrets
+                  key: database-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: agentmem-secrets
+                  key: jwt-secret
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agentmem-secrets
+                  key: openai-api-key
+            - name: RUST_LOG
+              value: "info"
+            - name: SERVER_PORT
+              value: "8080"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: agentmem-data
+              mountPath: /data
+      volumes:
+        - name: agentmem-data
+          persistentVolumeClaim:
+            claimName: agentmem-pvc
+
+---
+# AgentMem Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentmem-service
+  namespace: agentmem
+spec:
+  selector:
+    app: agentmem
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      name: http
+  type: ClusterIP
+
+---
+# AgentMem HPA (Horizontal Pod Autoscaler)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agentmem-hpa
+  namespace: agentmem
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agentmem-server
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# Persistent Volume Claim for data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: agentmem-pvc
+  namespace: agentmem
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+# Redis Deployment (optional cache)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentmem-redis
+  namespace: agentmem
+  labels:
+    app: agentmem-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agentmem-redis
+  template:
+    metadata:
+      labels:
+        app: agentmem-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentmem-redis
+  namespace: agentmem
+spec:
+  selector:
+    app: agentmem-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentmem
+  labels:
+    name: agentmem

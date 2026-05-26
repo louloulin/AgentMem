@@ -1,0 +1,88 @@
+# AgentMem ConfigMap and Secrets
+# Version: 1.0
+# Date: 2026-05-26
+
+---
+# ConfigMap for AgentMem configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentmem-config
+  namespace: agentmem
+data:
+  RUST_LOG: "info"
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "8080"
+  ENABLE_CORS: "true"
+  ENABLE_AUTH: "true"
+  ENABLE_METRICS: "true"
+  ENABLE_DOCS: "false"
+  LOG_LEVEL: "info"
+  # Database settings
+  DATABASE_BACKEND: "libsql"
+  DATABASE_URL: "/data/agentmem.db"
+  # Cache settings
+  CACHE_ENABLED: "true"
+  CACHE_TTL_SECONDS: "300"
+  CACHE_MAX_ENTRIES: "10000"
+  # Performance settings
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "1000"
+  MAX_BODY_SIZE: "10485760"
+  REQUEST_TIMEOUT: "60"
+
+---
+# Secret for sensitive data
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agentmem-secrets
+  namespace: agentmem
+type: Opaque
+stringData:
+  # IMPORTANT: Replace these with actual values in production
+  database-url: "libsql:///data/agentmem.db"
+  jwt-secret: "CHANGE-THIS-TO-A-SECURE-SECRET-32-CHARS"
+  openai-api-key: "sk-REPLACE-WITH-YOUR-KEY"
+  # Optional: for external services
+  # anthropic-api-key: "sk-ant-..."
+  # postgres-password: "your-postgres-password"
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agentmem-ingress
+  namespace: agentmem
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  rules:
+    - host: agentmem.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agentmem-service
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - agentmem.example.com
+      secretName: agentmem-tls-secret
+
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agentmem-pdb
+  namespace: agentmem
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: agentmem
