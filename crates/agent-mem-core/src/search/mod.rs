@@ -36,6 +36,8 @@ pub mod query_classifier;
 pub mod query_optimizer;
 pub mod ranker;
 pub mod reranker;
+/// v9.5: Search analytics panel
+pub mod search_analytics;
 pub mod vector_search;
 /// Week 11-13: Enhanced search with category/resource awareness
 pub mod category_recall;
@@ -347,6 +349,12 @@ pub struct SearchStats {
     /// 最终结果数
     pub final_results_count: usize,
 }
+
+// v9.5: Search analytics exports
+pub use search_analytics::{
+    AnalyticsReport, PerformanceMetrics, QueryPatternStats, QualityMetrics,
+    ResultDistribution, SearchAnalytics, SearchAnalyticsConfig, SearchEvent, SearchEventType,
+};
 
 #[cfg(test)]
 #[cfg(feature = "inline_tests")]

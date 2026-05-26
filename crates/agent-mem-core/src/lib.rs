@@ -258,3 +258,18 @@ pub enum CoreError {
 
 /// Core result type
 pub type CoreResult<T> = Result<T, CoreError>;
+/// v9.6: Multimodal memory storage (image, audio, video)
+pub mod multimodal_storage;
+// v9.6: Multimodal storage exports
+pub use multimodal_storage::{
+    ImageVectorizer, ImageVectorizerConfig, InMemoryMultimodalStorage, MockImageVectorizer,
+    MultimodalError, MultimodalMemory, MultimodalMetadata, MultimodalSearchResult,
+    MultimodalStats, MultimodalStorage, MultimodalStorageBackend, MultimodalStorageConfig,
+    MultimodalType,
+};
+
+// Re-export search analytics from search module
+pub use search::{
+    AnalyticsReport, PerformanceMetrics, QueryPatternStats, QualityMetrics,
+    ResultDistribution, SearchAnalytics, SearchAnalyticsConfig, SearchEvent, SearchEventType,
+};

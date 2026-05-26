@@ -38,6 +38,7 @@ interface GraphNode {
   label: string;
   type: string;
   importance: number;
+  decayScore: number; // NEW: Memory health status (0-1)
   x: number;
   y: number;
   vx: number;  // velocity x
@@ -139,11 +140,17 @@ export default function GraphPage() {
     // Create nodes with initial random positions - spread out more
     const canvasWidth = 1200;
     const canvasHeight = 800;
+    // Helper to get decay score from memory metadata
+    const getDecayScore = (mem: any): number => {
+      return mem.metadata?.decay_score ?? mem.metadata?.health ?? 0.85;
+    };
+    
     const graphNodes: GraphNode[] = filteredMemories.map((memory) => ({
       id: memory.id,
       label: memory.content.substring(0, 20) + '...', // Shorter labels
       type: memory.memory_type,
       importance: memory.importance,
+      decayScore: getDecayScore(memory), // Memory health status
       x: canvasWidth / 2 + (Math.random() - 0.5) * 400, // Wider initial spread
       y: canvasHeight / 2 + (Math.random() - 0.5) * 400,
       vx: 0,
@@ -351,6 +358,7 @@ export default function GraphPage() {
       const isHovered = hoveredNode?.id === node.id;
       const isFiltered = searchQuery && !filteredNodes.includes(node);
       const isImportant = node.importance > 0.5;
+      const isHealthy = node.decayScore > 0.5; // NEW: Health status
 
       // Node circle
       ctx.beginPath();
@@ -366,6 +374,28 @@ export default function GraphPage() {
       ctx.fillStyle = colors[node.type] || '#6b7280';
       ctx.globalAlpha = isFiltered ? 0.2 : 1;
       ctx.fill();
+
+      // Decay-based ring (outer glow for unhealthy nodes)
+      if (!isHealthy && !isFiltered) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius + 3, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#ef4444'; // Red ring for low health
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6;
+        ctx.stroke();
+        ctx.globalAlpha = isFiltered ? 0.2 : 1;
+      }
+      
+      // Importance ring (medium health indicator)
+      if (isHealthy && isImportant && !isFiltered) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius + 3, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#10b981'; // Green ring for high importance + healthy
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = isFiltered ? 0.2 : 1;
+      }
 
       // Glow effect for selected/hovered nodes
       if (isSelected || isHovered) {
@@ -782,6 +812,30 @@ export default function GraphPage() {
                       </div>
                     </div>
                   </div>
+                  {/* Memory Health / Decay */}
+                  <div>
+                    <label className="text-sm font-medium text-slate-400">Memory Health</label>
+                    <div className="mt-2 space-y-2">
+                      {/* Health Status Badge */}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${selectedNode.decayScore > 0.5 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="text-sm text-slate-300">
+                          {selectedNode.decayScore > 0.7 ? 'Healthy' : selectedNode.decayScore > 0.4 ? 'Aging' : 'Critical'}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          ({Math.round(selectedNode.decayScore * 100)}%)
+                        </span>
+                      </div>
+                      {/* Health Progress Bar */}
+                      <div className="w-full bg-slate-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${selectedNode.decayScore > 0.7 ? 'bg-green-500' : selectedNode.decayScore > 0.4 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          style={{ width: `${selectedNode.decayScore * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div>
                     <label className="text-sm font-medium text-slate-400">Connections</label>
                     <p className="text-sm text-slate-300 mt-1">

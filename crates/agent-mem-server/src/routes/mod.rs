@@ -24,6 +24,7 @@ pub mod stats;
 pub mod tools;
 pub mod users;
 pub mod webhook; // 🆕 Webhook事件订阅支持
+pub mod multimodal;
 pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait // 🆕 Phase 2.3: 记忆预测功能
 
 use crate::config::ServerConfig;
@@ -151,6 +152,19 @@ pub async fn create_router(
     let webhook_state = Arc::new(crate::routes::webhook::WebhookState::new());
     info!("Webhook state initialized");
 
+    // 🆕 Initialize multimodal state
+    use agent_mem_core::multimodal_storage::{MultimodalStorage, MultimodalStorageConfig, MockImageVectorizer, InMemoryMultimodalStorage};
+    let in_memory = InMemoryMultimodalStorage::new();
+    let vectorizer = MockImageVectorizer::new(512);
+    let multimodal_storage = MultimodalStorage::new(
+        Arc::new(in_memory),
+        Arc::new(vectorizer),
+        MultimodalStorageConfig::default(),
+    );
+    let multimodal_state = multimodal::MultimodalState {
+        storage: Arc::new(multimodal_storage),
+    };
+    
     let mut app = Router::new()
         // ========== 核心 Memory 路由 (6) ==========
         .route(
@@ -199,7 +213,13 @@ pub async fn create_router(
         // ========== Stats & Analytics (3) ==========
         .route("/api/v1/stats", get(stats::get_dashboard_stats))
         .route("/api/v1/logs/stats", get(logs::get_log_stats))
-        .route("/api/v1/performance", get(performance::get_performance_analysis));
+        .route("/api/v1/performance", get(performance::get_performance_analysis))
+        // ========== Multimodal (4) ==========
+        .route("/api/v1/multimodal/upload", post(multimodal::upload_image))
+        .route("/api/v1/multimodal/search", post(multimodal::search_similar))
+        .route("/api/v1/multimodal/stats", get(multimodal::get_stats))
+        .route("/api/v1/multimodal/health", get(multimodal::health_check))
+        .with_state(multimodal_state);
 
     // Add all routes (now database-agnostic via Repository Traits)
     app = app

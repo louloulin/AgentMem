@@ -25,6 +25,10 @@ thiserror.workspace = true
 async-trait.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+
+# 加密依赖
+aes-gcm = "0.10"
+base64 = "0.22"
 tracing.workspace = true
 
 # 向量存储依赖

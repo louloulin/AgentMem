@@ -4,15 +4,16 @@
  * Features:
  * - Table view with pagination
  * - Advanced filtering and search
- * - Toast notifications
- * - Skeleton loading states
- * - Supabase-style modern UI
+ * - Importance score display (new)
+ * - Decay status visualization (new)
+ * - Time range selector (new)
+ * - Search analytics panel (new)
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Brain, Search, Trash2, Filter, Plus, RefreshCw, Eye } from 'lucide-react';
+import { Brain, Search, Trash2, Filter, Plus, RefreshCw, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient, Memory, Agent } from '@/lib/api-client';
 
+// Import new components
+import { ImportanceBadge } from '@/components/ui/importance-badge';
+import { ImportanceLevel } from '@/components/ui/importance-badge';
+import { DecayProgress } from '@/components/ui/decay-progress';
+import { DecayStatusBadge } from '@/components/ui/decay-progress';
+import { TimeRangeSelector, TimeRange, timeRangeToTimestamp } from '@/components/ui/time-range-selector';
+import { SearchAnalyticsPanel } from '@/components/charts/search-analytics-panel';
+
 // Pagination component
 interface PaginationProps {
   currentPage: number;
@@ -66,6 +75,7 @@ function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) 
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 0}
         >
+          <ChevronLeft className="w-4 h-4 mr-1" />
           Previous
         </Button>
         <Button
@@ -75,6 +85,7 @@ function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) 
           disabled={currentPage >= totalPages - 1}
         >
           Next
+          <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
     </div>
@@ -91,10 +102,12 @@ export default function MemoriesPageEnhanced() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedImportance, setSelectedImportance] = useState<string>('all');
+  const [timeRange, setTimeRange] = useState<TimeRange>('all');
   
-  // Pagination state (✅ Backend pagination)
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
-  const [itemsPerPage] = useState(20);  // ✅ 与后端默认值一致
+  const [itemsPerPage] = useState(20);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   
@@ -108,18 +121,20 @@ export default function MemoriesPageEnhanced() {
   });
   const [submitting, setSubmitting] = useState(false);
   
-  // ✅ Load data when page, agent, or type changes
+  // Show analytics panel
+  const [showAnalytics, setShowAnalytics] = useState(true);
+  
+  // Load data when page, agent, or type changes
   useEffect(() => {
     loadData();
-  }, [currentPage, selectedAgentId, selectedType]);
+  }, [currentPage, selectedAgentId, selectedType, selectedImportance, timeRange]);
   
   const loadData = async () => {
     try {
       setLoading(true);
       
-      console.log('🔍 [Memories] Loading data with page:', currentPage, 'type:', selectedType);
+      const timestamp = timeRangeToTimestamp(timeRange);
       
-      // ✅ 并行加载agents和memories，支持agent和type过滤
       const [agentsData, memoriesResponse] = await Promise.all([
         apiClient.getAgents(),
         apiClient.getAllMemories(
@@ -130,34 +145,40 @@ export default function MemoriesPageEnhanced() {
         ),
       ]);
       
-      console.log('📦 [Memories] Received:', {
-        agents: agentsData?.length,
-        memories: memoriesResponse?.memories?.length,
-        pagination: memoriesResponse?.pagination
-      });
-      
       setAgents(agentsData || []);
-      setMemories(memoriesResponse?.memories || []);
       
-      // ✅ 设置分页信息
+      // Filter by importance and time if needed
+      let filteredMemories = memoriesResponse?.memories || [];
+      
+      if (selectedImportance !== 'all') {
+        const [min, max] = selectedImportance === 'high' 
+          ? [0.7, 1.0]
+          : selectedImportance === 'medium'
+          ? [0.4, 0.7]
+          : [0.0, 0.4];
+        filteredMemories = filteredMemories.filter((m: any) => {
+          const score = m.importance_score || m.metadata?.importance || 0;
+          return score >= min && score < max;
+        });
+      }
+      
+      if (timestamp) {
+        filteredMemories = filteredMemories.filter((m: any) => {
+          const createdAt = new Date(m.created_at).getTime();
+          return createdAt >= timestamp;
+        });
+      }
+      
+      setMemories(filteredMemories);
+      
       if (memoriesResponse?.pagination) {
         setTotalPages(memoriesResponse.pagination.total_pages);
         setTotalCount(memoriesResponse.pagination.total);
       }
-      
-      toast({
-        title: "Data loaded",
-        description: `Loaded ${agentsData?.length || 0} agents and ${memoriesResponse?.memories?.length || 0} memories`,
-      });
     } catch (err) {
-      console.error('❌ [Memories] Load error:', err);
+      console.error('Load error:', err);
       setAgents([]);
       setMemories([]);
-      toast({
-        title: "Failed to load data",
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -165,193 +186,127 @@ export default function MemoriesPageEnhanced() {
   
   const handleAgentChange = async (agentId: string) => {
     setSelectedAgentId(agentId);
-    setCurrentPage(0);  // ✅ Reset to page 0
-    
-    try {
-      setLoading(true);
-      // ✅ 使用后端分页API（包含type过滤）
-      const memoriesResponse = await apiClient.getAllMemories(
-        0, 
-        itemsPerPage, 
-        agentId === 'all' ? undefined : agentId,
-        selectedType !== 'all' ? selectedType : undefined
-      );
-      setMemories(memoriesResponse?.memories || []);
-      
-      // ✅ 更新分页信息
-      if (memoriesResponse?.pagination) {
-        setTotalPages(memoriesResponse.pagination.total_pages);
-        setTotalCount(memoriesResponse.pagination.total);
-      }
-      
-      toast({
-        title: "Memories loaded",
-        description: `Found ${memoriesResponse?.memories?.length || 0} memories`,
-      });
-    } catch (err) {
-      setMemories([]);
-      toast({
-        title: "Failed to load memories",
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setCurrentPage(0);
+  };
+  
+  const handleTypeChange = async (type: string) => {
+    setSelectedType(type);
+    setCurrentPage(0);
   };
   
   const handleAddMemory = async () => {
-    if (!newMemory.content.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Memory content cannot be empty",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!newMemory.content.trim()) return;
     
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      
-      // Convert '__none__' to empty string for global memory
-      const agentId = newMemory.agent_id === '__none__' ? '' : newMemory.agent_id;
-      
       await apiClient.createMemory({
-        agent_id: agentId,
         content: newMemory.content,
-        memory_type: newMemory.memory_type,
+        memory_type: newMemory.memory_type as any,
+        agent_id: newMemory.agent_id || '',
         importance: newMemory.importance,
       });
       
       toast({
-        title: "Memory Added",
-        description: "Memory has been created successfully",
+        title: 'Memory added',
+        description: 'Your memory has been saved successfully.',
       });
       
-      // Close dialog and reset form
       setAddDialogOpen(false);
-      setNewMemory({
-        agent_id: '__none__',
-        content: '',
-        memory_type: 'Semantic',
-        importance: 0.8,
-      });
-      
-      // Reload current view
-      await loadData();
+      setNewMemory({ agent_id: '', content: '', memory_type: 'Semantic', importance: 0.8 });
+      loadData();
     } catch (err) {
       toast({
-        title: "Failed to add memory",
+        title: 'Failed to add memory',
         description: err instanceof Error ? err.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setSubmitting(false);
     }
   };
   
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setCurrentPage(0);  // 🔧 Fix: Reset to page 0
-      const data = await apiClient.searchMemories(
-        searchQuery,
-        selectedAgentId !== 'all' ? selectedAgentId : undefined
-      );
-      setMemories(data || []);
-      
-      toast({
-        title: "Search completed",
-        description: `Found ${data?.length || 0} results`,
-      });
-    } catch (err) {
-      setMemories([]);
-      toast({
-        title: "Search failed",
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   const handleDeleteMemory = async (memoryId: string) => {
     try {
       await apiClient.deleteMemory(memoryId);
-      setMemories((prev) => (prev || []).filter((m) => m.id !== memoryId));
-      
       toast({
-        title: "Memory deleted",
-        description: "Memory has been successfully deleted",
+        title: 'Memory deleted',
+        description: 'The memory has been removed.',
       });
+      loadData();
     } catch (err) {
       toast({
-        title: "Failed to delete memory",
+        title: 'Failed to delete memory',
         description: err instanceof Error ? err.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
   
-  // ✅ 后端已经处理了过滤和分页，直接显示
-  const displayMemories = memories || [];
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+  // Get importance score from memory
+  const getImportanceScore = (memory: Memory): number => {
+    const anyMem = memory as any;
+    return anyMem.importance_score || anyMem.metadata?.importance || 0.5;
   };
   
+  // Get decay score from memory
+  const getDecayScore = (memory: Memory): number => {
+    const anyMem = memory as any;
+    return anyMem.metadata?.decay_score ?? anyMem.metadata?.health ?? 1.0;
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-8 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Brain className="w-8 h-8" />
-            Memories
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            View and manage agent memories
-          </p>
+        <div className="flex items-center gap-3">
+          <Brain className="w-8 h-8 text-blue-500" />
+          <h1 className="text-2xl font-bold">Memory Management</h1>
         </div>
         <div className="flex gap-2">
-          <Button onClick={loadData} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button 
-            size="sm"
-            onClick={() => setAddDialogOpen(true)}
+          <Button
+            variant="outline"
+            onClick={() => setShowAnalytics(!showAnalytics)}
           >
+            <Eye className="w-4 h-4 mr-2" />
+            {showAnalytics ? 'Hide' : 'Show'} Analytics
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Memory
+          </Button>
+          <Button variant="outline" onClick={loadData}>
+            <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
       </div>
       
-      {/* Filters */}
+      {/* Search Analytics Panel */}
+      {showAnalytics && (
+        <SearchAnalyticsPanel />
+      )}
+      
+      {/* Filters Card */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Agent Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Agent
-              </label>
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Agent</Label>
               <Select value={selectedAgentId} onValueChange={handleAgentChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select agent" />
+                  <SelectValue placeholder="All Agents" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Agents</SelectItem>
-                  {(agents || []).map((agent) => (
+                  {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name || agent.id}
+                      {agent.name || `Agent ${agent.id.slice(0, 8)}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -359,154 +314,137 @@ export default function MemoriesPageEnhanced() {
             </div>
             
             {/* Type Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Memory Type
-              </label>
-              <Select 
-                value={selectedType} 
-                onValueChange={(value) => {
-                  setSelectedType(value);
-                  setCurrentPage(0); // ✅ Reset to page 0
-                }}
-              >
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Type</Label>
+              <Select value={selectedType} onValueChange={handleTypeChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="episodic">Episodic</SelectItem>
-                  <SelectItem value="semantic">Semantic</SelectItem>
-                  <SelectItem value="procedural">Procedural</SelectItem>
-                  <SelectItem value="working">Working</SelectItem>
+                  <SelectItem value="Episodic">Episodic</SelectItem>
+                  <SelectItem value="Semantic">Semantic</SelectItem>
+                  <SelectItem value="Procedural">Procedural</SelectItem>
+                  <SelectItem value="Working">Working</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
-            {/* Search */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Search
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Search memories..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                />
-                <Button onClick={handleSearch} size="sm">
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
+            {/* Importance Filter (NEW) */}
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Importance</Label>
+              <Select value={selectedImportance} onValueChange={setSelectedImportance}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="high">High (0.7+)</SelectItem>
+                  <SelectItem value="medium">Medium (0.4-0.7)</SelectItem>
+                  <SelectItem value="low">Low (0-0.4)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Time Range Filter (NEW) */}
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Time Range</Label>
+              <TimeRangeSelector
+                value={timeRange}
+                onChange={setTimeRange}
+                size="sm"
+                showLabel={false}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* Table */}
+      {/* Memories Table Card */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">
-            {totalCount > 0 ? `${totalCount} Total Memories` : `${displayMemories.length} Memories`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            // Loading skeleton
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
+            <div className="p-8 space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : displayMemories.length === 0 ? (
-            // Empty state
-            <div className="text-center py-12">
-              <Brain className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No memories found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Select an agent or adjust your filters
-              </p>
+          ) : memories.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No memories found</p>
+              <p className="text-sm">Try adjusting your filters or add a new memory</p>
             </div>
           ) : (
             <>
-              {/* Table */}
-              <div className="rounded-md border">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Content</TableHead>
+                      <TableHead className="w-[300px]">Content</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Agent</TableHead>
-                      <TableHead>Relevance</TableHead>
+                      <TableHead>Importance</TableHead>
+                      <TableHead>Health</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {displayMemories.map((memory) => {
-                      // 🔧 获取相关性分数（从score字段）
-                      const relevanceScore = (memory as any).score || 0;
-                      const relevancePercent = (relevanceScore * 100).toFixed(0);
-                      const relevanceColor = relevanceScore >= 0.8 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : relevanceScore >= 0.5 
-                        ? 'text-blue-600 dark:text-blue-400' 
-                        : 'text-gray-600 dark:text-gray-400';
-                      
+                    {memories.map((memory) => {
+                      const anyMem = memory as any;
                       return (
-                      <TableRow key={memory.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <TableCell className="font-medium">
-                          <div className="max-w-md truncate" title={memory.content}>
-                            {memory.content}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-                            {memory.memory_type || 'Unknown'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {(agents || []).find((a) => a.id === memory.agent_id)?.name || 'Unknown'}
-                        </TableCell>
-                        <TableCell>
-                          {relevanceScore > 0 ? (
-                            <span className={`text-sm font-semibold ${relevanceColor}`}>
-                              {relevancePercent}%
+                        <TableRow key={memory.id}>
+                          <TableCell>
+                            <div className="max-w-[280px]">
+                              <p className="truncate text-sm">
+                                {anyMem.content?.substring(0, 80) || 'N/A'}
+                                {(anyMem.content?.length || 0) > 80 ? '...' : ''}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              {anyMem.memory_type || 'Unknown'}
                             </span>
-                          ) : (
-                            <span className="text-sm text-gray-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-600 dark:text-gray-400">
-                          {formatDate(memory.created_at)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link href={`/admin/memories/${memory.id}`}>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {anyMem.agent_id ? anyMem.agent_id.slice(0, 8) + '...' : 'Global'}
+                            </span>
+                          </TableCell>
+                          {/* Importance Column (NEW) */}
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <ImportanceBadge score={getImportanceScore(memory)} size="sm" />
+                              <ImportanceLevel score={getImportanceScore(memory)} size="sm" />
+                            </div>
+                          </TableCell>
+                          {/* Health/Decay Column (NEW) */}
+                          <TableCell>
+                            <div className="w-[100px]">
+                              <DecayProgress decayScore={getDecayScore(memory)} size="sm" />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-500">
+                              {anyMem.created_at 
+                                ? new Date(anyMem.created_at).toLocaleDateString()
+                                : 'N/A'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
-                                title="View details"
+                                onClick={() => handleDeleteMemory(memory.id)}
                               >
-                                <Eye className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteMemory(memory.id)}
-                              className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                              title="Delete memory"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
                   </TableBody>
@@ -522,7 +460,7 @@ export default function MemoriesPageEnhanced() {
                     onPageChange={setCurrentPage}
                   />
                   <div className="text-center text-sm text-gray-500 mt-2">
-                    Showing {displayMemories.length} of {totalCount} memories
+                    Showing {memories.length} of {totalCount} memories
                   </div>
                 </div>
               )}
@@ -537,12 +475,11 @@ export default function MemoriesPageEnhanced() {
           <DialogHeader>
             <DialogTitle>Add New Memory</DialogTitle>
             <DialogDescription>
-              Create a new memory for an agent. This memory will be used in future conversations.
+              Create a new memory for an agent.
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
-            {/* Agent Selection */}
             <div className="grid gap-2">
               <Label htmlFor="agent">Agent (Optional)</Label>
               <Select
@@ -550,10 +487,10 @@ export default function MemoriesPageEnhanced() {
                 onValueChange={(value) => setNewMemory({ ...newMemory, agent_id: value })}
               >
                 <SelectTrigger id="agent">
-                  <SelectValue placeholder="Select an agent or leave empty" />
+                  <SelectValue placeholder="Select an agent" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">No Agent (Global Memory)</SelectItem>
+                  <SelectItem value="__none__">No Agent (Global)</SelectItem>
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name || `Agent ${agent.id.slice(0, 8)}`}
@@ -563,7 +500,6 @@ export default function MemoriesPageEnhanced() {
               </Select>
             </div>
             
-            {/* Memory Type */}
             <div className="grid gap-2">
               <Label htmlFor="type">Memory Type</Label>
               <Select
@@ -574,15 +510,14 @@ export default function MemoriesPageEnhanced() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Episodic">Episodic (事件记忆)</SelectItem>
-                  <SelectItem value="Semantic">Semantic (语义记忆)</SelectItem>
-                  <SelectItem value="Procedural">Procedural (程序记忆)</SelectItem>
-                  <SelectItem value="Working">Working (工作记忆)</SelectItem>
+                  <SelectItem value="Episodic">Episodic</SelectItem>
+                  <SelectItem value="Semantic">Semantic</SelectItem>
+                  <SelectItem value="Procedural">Procedural</SelectItem>
+                  <SelectItem value="Working">Working</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
-            {/* Importance */}
             <div className="grid gap-2">
               <Label htmlFor="importance">
                 Importance: {newMemory.importance.toFixed(2)}
@@ -599,19 +534,15 @@ export default function MemoriesPageEnhanced() {
               />
             </div>
             
-            {/* Content */}
             <div className="grid gap-2">
-              <Label htmlFor="content">Memory Content *</Label>
+              <Label htmlFor="content">Content *</Label>
               <Textarea
                 id="content"
-                placeholder="Enter the memory content..."
+                placeholder="Enter memory content..."
                 value={newMemory.content}
                 onChange={(e) => setNewMemory({ ...newMemory, content: e.target.value })}
                 className="min-h-[150px]"
               />
-              <p className="text-sm text-gray-500">
-                {newMemory.content.length} characters
-              </p>
             </div>
           </div>
           
@@ -637,4 +568,3 @@ export default function MemoriesPageEnhanced() {
     </div>
   );
 }
-

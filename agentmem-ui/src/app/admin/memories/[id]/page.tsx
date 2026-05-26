@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { apiClient, Memory } from '@/lib/api-client';
+import { ImportanceBadge, ImportanceLevel } from '@/components/ui/importance-badge';
+import { DecayProgress, DecayStatusBadge } from '@/components/ui/decay-progress';
 
 export default function MemoryDetailPage() {
   const params = useParams();
@@ -86,6 +88,12 @@ export default function MemoryDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete memory');
     }
+  };
+  
+  // Get decay score from memory metadata
+  const getDecayScore = (mem: Memory): number => {
+    const anyMem = mem as any;
+    return anyMem.metadata?.decay_score ?? anyMem.metadata?.health ?? 0.85;
   };
 
   if (loading) {
@@ -257,17 +265,10 @@ export default function MemoryDetailPage() {
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Importance
                 </label>
-                <div className="mt-1">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${memory.importance * 100}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {(memory.importance * 100).toFixed(0)}%
-                    </span>
+                <div className="mt-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <ImportanceBadge score={memory.importance || 0.5} size="md" />
+                    <ImportanceLevel score={memory.importance || 0.5} size="sm" />
                   </div>
                 </div>
               </div>

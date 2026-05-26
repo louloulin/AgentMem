@@ -16,8 +16,10 @@ pub mod graph;
 pub mod optimizations;
 pub mod performance;
 pub mod security;
+pub mod crypto;
 pub mod distributed_cache;
 pub mod memory_manager;
+pub mod advanced_search;
 pub mod utils;
 pub mod vector;
 pub mod vector_factory; // Vector store factory (vector_factory.rs)
