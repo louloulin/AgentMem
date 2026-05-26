@@ -531,3 +531,67 @@ k8s/
               │  Redis Cache   │
               └───────────────┘
 ```
+
+---
+
+## 四、v9.4 记忆管理增强 (2026-05-26)
+
+**日期**: 2026-05-26
+**版本**: v9.4 (记忆管理增强)
+
+### ✅ 已实现的功能
+
+#### 1. 重要性评分 (`memory_manager.rs`)
+- **ImportanceConfig** - 重要性配置
+  - `base_importance` - 基础重要性
+  - `access_boost` - 访问提升
+  - `access_boost_decay` - 访问衰减
+
+- **ImportanceCalculator** - 重要性计算器
+  - `calculate()` - 计算重要性因素
+  - 考虑：基础、时间衰减、访问、内容长度
+
+#### 2. 记忆衰减
+- **DecayConfig** - 衰减配置
+  - `decay_rate_per_day` - 每天衰减率 (默认 5%)
+  - `min_decay_threshold` - 最小阈值
+
+- **DecayCalculator** - 衰减计算器
+  - `calculate()` - 计算衰减后的重要性
+  - `should_delete()` - 判断是否应删除
+
+#### 3. 记忆整合
+- **ConsolidationConfig** - 整合配置
+  - `max_memories` - 最大记忆数
+  - `min_importance_threshold` - 最小重要性阈值
+
+- **MemoryPriorityQueue** - 优先级队列
+  - `push()` - 按重要性插入
+  - `top()` - 获取最重要记忆
+  - `below_threshold()` - 获取低于阈值记忆
+
+#### 4. 统计
+- **MemoryManagerStats** - 记忆管理统计
+  - `memories_processed` - 已处理记忆
+  - `importance_updates` - 重要性更新
+  - `decayed_memories` - 已衰减记忆
+
+### 📊 编译状态
+
+| 检查项 | 状态 |
+|--------|------|
+| `cargo build --release -p agent-mem-storage` | ✅ |
+| `cargo build --release -p agent-mem-server` | ✅ |
+
+### 🔧 新增的文件
+
+| 文件 | 功能 |
+|------|------|
+| `memory_manager.rs` | 记忆管理模块 |
+
+### 📝 v9.4 进度
+
+- [x] 重要性自动评分 ✅
+- [x] 记忆衰减机制 ✅
+- [x] 记忆整合 ✅
+- [x] 优先级队列 ✅
