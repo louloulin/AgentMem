@@ -92,7 +92,7 @@ pub struct ListOrganizationsQuery {
 )]
 pub async fn create_organization(
     Extension(repositories): Extension<Arc<Repositories>>,
-    Extension(auth_user): Extension<AuthUser>,
+    Extension(_auth_user): Extension<AuthUser>,
     Json(request): Json<CreateOrganizationRequest>,
 ) -> ServerResult<impl IntoResponse> {
     // Validate request

@@ -15,7 +15,7 @@
 use crate::error::{ServerError, ServerResult};
 use crate::middleware::AuthUser;
 use axum::{
-    extract::{Extension, Path, State},
+    extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -522,13 +522,13 @@ impl WebhookState {
         id: &str,
         user_id: &str,
     ) -> ServerResult<Option<WebhookSubscriptionResponse>> {
-        Ok(self.webhooks.get(id).map(|w| {
+        Ok(self.webhooks.get(id).and_then(|w| {
             if w.user_id == user_id {
                 Some(w.clone())
             } else {
                 None
             }
-        }).flatten())
+        }))
     }
 
     /// Update webhook

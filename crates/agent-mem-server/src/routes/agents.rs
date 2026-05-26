@@ -420,7 +420,7 @@ pub async fn list_agents(
     let repo = repositories.agents.clone();
 
     // Validate pagination parameters
-    let limit = query.limit.unwrap_or(50).min(100); // Max 100 items per page
+    let _limit = query.limit.unwrap_or(50).min(100); // Max 100 items per page
     let _offset = query.offset.unwrap_or(0).max(0); // Ensure non-negative
 
     let agents = repo
@@ -668,7 +668,7 @@ pub async fn update_agent_state(
     }
 
     // Validate state
-    let valid_states = vec!["idle", "thinking", "executing", "waiting", "error"];
+    let valid_states = ["idle", "thinking", "executing", "waiting", "error"];
     if !valid_states.contains(&req.state.as_str()) {
         return Err(ServerError::bad_request(format!(
             "Invalid state: {}. Valid states are: {}",

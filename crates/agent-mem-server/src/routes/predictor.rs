@@ -113,8 +113,8 @@ fn enhance_prediction_with_search_stats(
     )
 )]
 pub async fn predict_memories(
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
-    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Json(request): Json<PredictionRequest>,
 ) -> ServerResult<Json<models::ApiResponse<MemoryPredictionResponse>>> {
     info!(
@@ -147,7 +147,7 @@ pub async fn predict_memories(
     // 根据是否有过滤条件构建不同的查询
     let mut rows = if let Some(agent_id) = &request.agent_id {
         let query = "SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?";
-        let mut stmt = conn.prepare(query).await.map_err(|e| {
+        let stmt = conn.prepare(query).await.map_err(|e| {
             crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
         })?;
         stmt.query(params![agent_id.clone(), (limit * 2) as i64])
@@ -157,7 +157,7 @@ pub async fn predict_memories(
             })?
     } else if let Some(user_id) = &request.user_id {
         let query = "SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND user_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?";
-        let mut stmt = conn.prepare(query).await.map_err(|e| {
+        let stmt = conn.prepare(query).await.map_err(|e| {
             crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
         })?;
         stmt.query(params![user_id.clone(), (limit * 2) as i64])
@@ -167,7 +167,7 @@ pub async fn predict_memories(
             })?
     } else {
         let query = "SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?";
-        let mut stmt = conn.prepare(query).await.map_err(|e| {
+        let stmt = conn.prepare(query).await.map_err(|e| {
             crate::error::ServerError::internal_error(format!("Failed to prepare query: {}", e))
         })?;
         stmt.query(params![(limit * 2) as i64]).await.map_err(|e| {

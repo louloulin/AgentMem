@@ -188,14 +188,13 @@ impl QuotaManager {
                     )));
                 }
             }
-            "api_key" => {
-                if usage.total_api_keys >= limits.max_api_keys {
+            "api_key"
+                if usage.total_api_keys >= limits.max_api_keys => {
                     return Err(ServerError::quota_exceeded(format!(
                         "API key quota exceeded: {} / {}",
                         usage.total_api_keys, limits.max_api_keys
                     )));
                 }
-            }
             _ => {}
         }
 

@@ -268,7 +268,7 @@ pub async fn list_tools(
     let repo = repositories.tools.clone();
 
     // Validate pagination parameters
-    let limit = query.limit.unwrap_or(50).min(100);
+    let _limit = query.limit.unwrap_or(50).min(100);
     let _offset = query.offset.unwrap_or(0).max(0);
 
     let tools = if let Some(tags_str) = query.tags {

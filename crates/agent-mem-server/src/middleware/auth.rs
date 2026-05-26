@@ -2,6 +2,7 @@
 //!
 //! This module provides middleware for JWT and API Key authentication.
 
+use axum::body::Body;
 use crate::auth::AuthService;
 use crate::error::{ServerError, ServerResult};
 use agent_mem_core::storage::traits::ApiKeyRepositoryTrait;
@@ -9,10 +10,8 @@ use axum::{
     extract::{Request, State},
     http::header,
     middleware::Next,
-    response::{IntoResponse, Response},
-    Json,
+    response::Response,
 };
-use axum::body::Body;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
@@ -194,7 +193,7 @@ pub async fn tenant_isolation_middleware(
 ///
 /// IMPORTANT: Production builds MUST have valid authentication configured.
 pub async fn require_auth_middleware(
-    State(config): State<crate::config::ServerConfig>,
+    State(_config): State<crate::config::ServerConfig>,
     mut request: Request,
     next: Next,
 ) -> Response {

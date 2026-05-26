@@ -8,14 +8,12 @@
 //! 🏗️ Architecture: Security validation at API boundary
 
 use axum::{
-    extract::Request,
     http::StatusCode,
-    middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use serde_json::json;
-use tracing::{error, warn};
+use tracing::warn;
 
 use crate::routes::memory::{
     AddMemoryRequest, BatchAddMemoriesRequest, DeleteMemoryRequest, SearchMemoryRequest,

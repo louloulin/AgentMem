@@ -4,7 +4,6 @@ use crate::error::ServerResult;
 use crate::telemetry::{AlertConfig, AlertLevel, AlertManager, MetricsCollector};
 use axum::{
     extract::Extension,
-    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};

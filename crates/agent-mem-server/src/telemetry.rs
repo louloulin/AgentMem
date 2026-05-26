@@ -6,7 +6,6 @@ use crate::{
 };
 use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
-use std::time::Instant;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Setup telemetry and logging
@@ -43,6 +42,7 @@ pub struct MetricsCollector {
     inner: Arc<RwLock<MetricsInner>>,
 }
 
+#[derive(Default)]
 struct MetricsInner {
     request_count: u64,
     error_count: u64,
@@ -52,18 +52,6 @@ struct MetricsInner {
     operation_durations: HashMap<String, u64>,
 }
 
-impl Default for MetricsInner {
-    fn default() -> Self {
-        Self {
-            request_count: 0,
-            error_count: 0,
-            total_duration_ms: 0,
-            memory_operations: 0,
-            memory_errors: 0,
-            operation_durations: HashMap::new(),
-        }
-    }
-}
 
 impl MetricsCollector {
     /// Create a new metrics collector
@@ -316,7 +304,7 @@ impl AlertManager {
 
         // Check error count
         if let Some(&error_count) = metrics.get("requests.errors") {
-            if error_count as f64 > self.config.error_count_threshold as f64 {
+            if error_count > self.config.error_count_threshold as f64 {
                 alerts.push(Alert::new(
                     AlertLevel::Warning,
                     &format!("Error count {} exceeds threshold {}", 

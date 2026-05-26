@@ -338,7 +338,7 @@ impl MemoryManager {
                      created_at, last_accessed, access_count, metadata, hash, scope \
                      FROM memories WHERE id = ? AND is_deleted = 0 LIMIT 1";
 
-        let mut stmt = conn
+        let stmt = conn
             .prepare(query)
             .await
             .map_err(|e| format!("Failed to prepare query: {}", e))?;
@@ -374,7 +374,7 @@ impl MemoryManager {
                 if let Ok(update_db) = Builder::new_local(&db_path_clone).build().await {
                     if let Ok(update_conn) = update_db.connect() {
                         let update_query = "UPDATE memories SET access_count = ?, last_accessed = ?, importance = ?, updated_at = ? WHERE id = ?";
-                        if let Ok(mut update_stmt) = update_conn.prepare(update_query).await {
+                        if let Ok(update_stmt) = update_conn.prepare(update_query).await {
                             let _ = update_stmt
                                 .execute(params![
                                     new_access_count,
@@ -463,7 +463,7 @@ impl MemoryManager {
     pub async fn search_memories(
         &self,
         query: String,
-        agent_id: Option<String>,
+        _agent_id: Option<String>,
         user_id: Option<String>,
         limit: Option<usize>,
         _memory_type: Option<agent_mem_traits::MemoryType>,
@@ -566,7 +566,7 @@ impl MemoryManager {
     /// 将MemoryItem转换为SearchResult，调用Reranker，再转换回来
     async fn apply_reranking(
         &self,
-        query: &str,
+        _query: &str,
         search_query: &agent_mem_core::search::SearchQuery,
         raw_results: Vec<MemoryItem>,
         final_limit: usize,
@@ -805,7 +805,7 @@ pub async fn get_memory(
     )
 )]
 pub async fn update_memory(
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Path(id): Path<String>,
     Json(request): Json<crate::models::UpdateMemoryRequest>,
@@ -1066,7 +1066,7 @@ async fn search_by_libsql_exact(
 
 /// 🆕 Phase 2.3: 智能预取（简化版） - 基于访问模式和搜索历史预取
 async fn prefetch_for_query(
-    repositories: Arc<agent_mem_core::storage::factory::Repositories>,
+    _repositories: Arc<agent_mem_core::storage::factory::Repositories>,
     memory_manager: Arc<MemoryManager>,
     request: &crate::models::SearchRequest,
 ) -> ServerResult<usize> {
@@ -1088,7 +1088,7 @@ async fn prefetch_for_query(
 
     // 根据过滤条件构建查询
     let mut rows = if let Some(agent_id) = &request.agent_id {
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -1096,7 +1096,7 @@ async fn prefetch_for_query(
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?
     } else if let Some(user_id) = &request.user_id {
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND user_id = ? ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -1104,7 +1104,7 @@ async fn prefetch_for_query(
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?
     } else {
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT id, access_count, last_accessed FROM memories WHERE is_deleted = 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?")
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -1723,12 +1723,12 @@ pub async fn search_memories(
     // 转换为JSON，同时应用阈值过滤（使用原始relevance分数进行阈值过滤）
     let json_results: Vec<serde_json::Value> = filtered_results
         .into_iter()
-        .filter(|(item, _, _, _, relevance, _)| {
+        .filter(|(_item, _, _, _, relevance, _)| {
             // 使用原始的relevance分数进行阈值过滤
             *relevance >= min_score_threshold as f64
         })
         .map(
-            |(item, final_score, recency, importance, relevance, quality)| {
+            |(item, final_score, recency, _importance, relevance, quality)| {
                 serde_json::json!({
                     "id": item.id,
                     "agent_id": item.agent_id,
@@ -1867,7 +1867,7 @@ pub(crate) async fn cleanup_memories(
                  AND (access_count IS NULL OR access_count <= ?)
                  LIMIT 1000";
 
-    let mut stmt = conn
+    let stmt = conn
         .prepare(query)
         .await
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
@@ -1930,8 +1930,8 @@ pub(crate) async fn cleanup_memories(
     )
 )]
 pub async fn warmup_cache(
-    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
     let limit = params
@@ -1958,7 +1958,7 @@ pub async fn warmup_cache(
             .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
         // 🆕 Phase 2.3: 增强查询 - 获取访问模式和评分信息
-        let mut stmt = conn
+        let stmt = conn
             .prepare(
                 "SELECT id, access_count, last_accessed FROM memories 
                  WHERE is_deleted = 0 
@@ -2372,7 +2372,7 @@ pub async fn get_search_statistics(
     )
 )]
 pub async fn batch_update_memories(
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     Json(request): Json<serde_json::Value>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
@@ -2533,7 +2533,7 @@ pub async fn deduplicate_memories(
                  AND hash IS NOT NULL 
                  AND hash != ''";
 
-    let mut stmt = conn
+    let stmt = conn
         .prepare(query)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -2560,7 +2560,7 @@ pub async fn deduplicate_memories(
 
         hash_groups
             .entry(hash)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((id, importance, agent_id, user_id));
     }
 
@@ -2579,7 +2579,7 @@ pub async fn deduplicate_memories(
             let duplicates: Vec<String> = sorted[1..]
                 .iter()
                 .filter(|(_, imp, _, _)| {
-                    (keep_importance - imp).abs() >= min_importance_diff as f64
+                    (keep_importance - imp).abs() >= min_importance_diff
                 })
                 .map(|(id, _, _, _)| id.clone())
                 .collect();
@@ -2677,7 +2677,7 @@ pub async fn import_memories(
     // 遍历导入的记忆
     for (index, memory_json) in memories_array.iter().enumerate() {
         // 解析记忆数据
-        let id = memory_json
+        let _id = memory_json
             .get("id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
@@ -2791,7 +2791,7 @@ pub async fn import_memories(
     )
 )]
 pub async fn export_memories(
-    Extension(repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
+    Extension(_repositories): Extension<Arc<agent_mem_core::storage::factory::Repositories>>,
     axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
     info!("📤 开始导出记忆");
@@ -2844,7 +2844,7 @@ pub async fn export_memories(
     query.push_str(" ORDER BY created_at DESC LIMIT ?");
 
     // 执行查询（简化处理，使用固定参数）
-    let mut stmt = conn
+    let stmt = conn
         .prepare(&query)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -3019,7 +3019,7 @@ pub async fn batch_update_importance(
         .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
     let query = "SELECT id, importance, access_count, last_accessed FROM memories WHERE is_deleted = 0 AND (access_count > 0 OR last_accessed IS NOT NULL) LIMIT ?";
-    let mut stmt = conn
+    let stmt = conn
         .prepare(query)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -3030,7 +3030,7 @@ pub async fn batch_update_importance(
         .map_err(|e| ServerError::internal_error(format!("Failed to execute query: {}", e)))?;
 
     let mut update_count = 0;
-    let now = chrono::Utc::now().timestamp();
+    let _now = chrono::Utc::now().timestamp();
 
     while let Some(row) = rows
         .next()
@@ -3237,7 +3237,7 @@ pub async fn performance_benchmark(
     )
 )]
 pub async fn get_agent_memories(
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Path(agent_id): Path<String>,
 ) -> ServerResult<Json<crate::models::ApiResponse<Vec<serde_json::Value>>>> {
     info!("Getting all memories for agent_id: {}", agent_id);
@@ -3263,7 +3263,7 @@ pub async fn get_agent_memories(
                  created_at, last_accessed, access_count, metadata, hash \
                  FROM memories WHERE agent_id = ? AND is_deleted = 0 LIMIT 100";
 
-    let mut stmt = conn
+    let stmt = conn
         .prepare(query)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -3336,7 +3336,7 @@ pub async fn get_agent_memories(
     tag = "memory"
 )]
 pub async fn list_all_memories(
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> ServerResult<Json<crate::models::ApiResponse<serde_json::Value>>> {
     use chrono::{DateTime, Utc};
@@ -3387,7 +3387,7 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(&query)
                 .await
                 .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
@@ -3402,7 +3402,7 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND agent_id = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(&query)
                 .await
                 .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
@@ -3417,7 +3417,7 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(&query)
                 .await
                 .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
@@ -3432,7 +3432,7 @@ pub async fn list_all_memories(
                  FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ? ORDER BY {} {} LIMIT ? OFFSET ?",
                 sort_by, order
             );
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(&query)
                 .await
                 .map_err(|e| ServerError::internal_error(format!("Failed to prepare: {}", e)))?;
@@ -3488,7 +3488,7 @@ pub async fn list_all_memories(
     let total_count = match (agent_id, memory_type) {
         (None, None) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0";
-            let mut stmt = conn.prepare(query).await.map_err(|e| {
+            let stmt = conn.prepare(query).await.map_err(|e| {
                 ServerError::internal_error(format!("Failed to prepare count: {}", e))
             })?;
             if let Some(count_row) = stmt
@@ -3504,7 +3504,7 @@ pub async fn list_all_memories(
         }
         (Some(aid), None) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ?";
-            let mut stmt = conn.prepare(query).await.map_err(|e| {
+            let stmt = conn.prepare(query).await.map_err(|e| {
                 ServerError::internal_error(format!("Failed to prepare count: {}", e))
             })?;
             if let Some(count_row) = stmt
@@ -3520,7 +3520,7 @@ pub async fn list_all_memories(
         }
         (None, Some(mt)) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND memory_type = ?";
-            let mut stmt = conn.prepare(query).await.map_err(|e| {
+            let stmt = conn.prepare(query).await.map_err(|e| {
                 ServerError::internal_error(format!("Failed to prepare count: {}", e))
             })?;
             if let Some(count_row) = stmt
@@ -3536,7 +3536,7 @@ pub async fn list_all_memories(
         }
         (Some(aid), Some(mt)) => {
             let query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND agent_id = ? AND memory_type = ?";
-            let mut stmt = conn.prepare(query).await.map_err(|e| {
+            let stmt = conn.prepare(query).await.map_err(|e| {
                 ServerError::internal_error(format!("Failed to prepare count: {}", e))
             })?;
             if let Some(count_row) = stmt
@@ -3565,7 +3565,7 @@ pub async fn list_all_memories(
                 "page": page,
                 "limit": limit,
                 "total": total_count,
-                "total_pages": (total_count as usize + limit - 1) / limit,
+                "total_pages": (total_count as usize).div_ceil(limit),
             }
         }),
         success: true,

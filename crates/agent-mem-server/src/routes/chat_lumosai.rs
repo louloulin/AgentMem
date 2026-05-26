@@ -507,7 +507,7 @@ pub async fn send_chat_message_lumosai_stream(
                 "chunk_type": "error",
                 "content": "LumosAI integration not enabled. Compile with --features lumosai"
             }))
-            .map_err(|e| axum::Error::new(e))
+            .map_err(axum::Error::new)
     });
 
     Ok(Sse::new(error_stream).keep_alive(KeepAlive::default()))

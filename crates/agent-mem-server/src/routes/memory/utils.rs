@@ -264,7 +264,7 @@ pub fn calculate_access_pattern_score(access_count: i64, last_accessed_ts: Optio
     let count_score = (access_count.min(100) as f64 / 100.0).min(1.0);
 
     let recency_score = if let Some(ts) = last_accessed_ts {
-        let last_accessed = chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(|| Utc::now());
+        let last_accessed = chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(Utc::now);
         let hours_ago = (Utc::now() - last_accessed).num_hours() as f64;
         (-0.1 * hours_ago.max(0.0)).exp()
     } else {
@@ -309,11 +309,11 @@ pub fn calculate_auto_importance(
     };
 
     // 计算新的importance（限制在[0.0, 1.0]范围内）
-    let new_importance = (base_importance + access_bonus + recency_bonus as f32)
-        .max(0.0)
-        .min(1.0);
+    
 
-    new_importance
+    (base_importance + access_bonus + recency_bonus as f32)
+        .max(0.0)
+        .min(1.0)
 }
 
 /// 应用分层排序（基于scope和level）

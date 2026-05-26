@@ -50,7 +50,7 @@ use axum::{
 use http::{HeaderName, HeaderValue, Method};
 use std::sync::Arc;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::CorsLayer,
     trace::TraceLayer,
 };
 use utoipa::OpenApi;
@@ -69,7 +69,7 @@ fn create_cors_layer(config: &ServerConfig) -> CorsLayer {
         .collect();
 
     if origins.len() == 1 && origins[0] == "*" {
-        return create_cors_layer(&config);
+        return create_cors_layer(config);
     }
 
     let methods: Vec<Method> = config

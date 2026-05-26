@@ -350,7 +350,7 @@ pub async fn get_dashboard_stats(
             activity_type: "message_sent".to_string(),
             agent_id: Some(msg.agent_id.clone()),
             user_id: Some(msg.user_id.clone()),
-            description: format!("Message sent in conversation"),
+            description: "Message sent in conversation".to_string(),
             timestamp: msg.created_at,
         });
     }
@@ -410,8 +410,8 @@ pub async fn get_dashboard_stats(
     )
 )]
 pub async fn get_memory_growth(
-    Extension(repositories): Extension<Arc<Repositories>>,
-    Extension(memory_manager): Extension<Arc<MemoryManager>>,
+    Extension(_repositories): Extension<Arc<Repositories>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<MemoryGrowthResponse>> {
     use libsql::{params, Builder};
 
@@ -441,7 +441,7 @@ pub async fn get_memory_growth(
 
     // Try to query, but don't fail if table doesn't exist
     match conn.prepare(query).await {
-        Ok(mut stmt) => {
+        Ok(stmt) => {
             if let Ok(mut rows) = stmt.query(params![thirty_days_ago]).await {
                 while let Ok(Some(row)) = rows.next().await {
                     let date: String = row.get(0).unwrap_or_default();
@@ -474,7 +474,7 @@ pub async fn get_memory_growth(
     if data_points.is_empty() {
         // Get current count from memories table
         let count_query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0";
-        let mut count_stmt = conn
+        let count_stmt = conn
             .prepare(count_query)
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to prepare count: {}", e)))?;
@@ -586,7 +586,7 @@ pub async fn get_agent_activity_stats(
                             FROM memories 
                             WHERE agent_id = ? AND is_deleted = 0";
 
-        let mut stmt = conn.prepare(memory_query).await.map_err(|e| {
+        let stmt = conn.prepare(memory_query).await.map_err(|e| {
             ServerError::internal_error(format!("Failed to prepare memory query: {}", e))
         })?;
 
@@ -668,7 +668,7 @@ pub async fn get_agent_activity_stats(
     )
 )]
 pub async fn get_memory_quality_stats(
-    Extension(repositories): Extension<Arc<Repositories>>,
+    Extension(_repositories): Extension<Arc<Repositories>>,
 ) -> ServerResult<Json<MemoryQualityStats>> {
     use libsql::{params, Builder};
 
@@ -688,7 +688,7 @@ pub async fn get_memory_quality_stats(
                        FROM memories 
                        WHERE is_deleted = 0";
 
-    let mut stmt = conn.prepare(basic_query).await.map_err(|e| {
+    let stmt = conn.prepare(basic_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare basic query: {}", e))
     })?;
 
@@ -713,7 +713,7 @@ pub async fn get_memory_quality_stats(
                               FROM memories 
                               WHERE is_deleted = 0 AND importance > 0.7";
 
-    let mut stmt2 = conn.prepare(high_quality_query).await.map_err(|e| {
+    let stmt2 = conn.prepare(high_quality_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare quality query: {}", e))
     })?;
 
@@ -743,7 +743,7 @@ pub async fn get_memory_quality_stats(
     ];
 
     for (range, query) in dist_queries {
-        let mut stmt3 = conn.prepare(query).await.map_err(|e| {
+        let stmt3 = conn.prepare(query).await.map_err(|e| {
             ServerError::internal_error(format!("Failed to prepare dist query: {}", e))
         })?;
 
@@ -768,7 +768,7 @@ pub async fn get_memory_quality_stats(
                       GROUP BY memory_type
                       ORDER BY COUNT(*) DESC";
 
-    let mut stmt4 = conn
+    let stmt4 = conn
         .prepare(type_query)
         .await
         .map_err(|e| ServerError::internal_error(format!("Failed to prepare type query: {}", e)))?;
@@ -1181,7 +1181,7 @@ pub async fn get_index_performance_stats(
             .connect()
             .map_err(|e| ServerError::internal_error(format!("Failed to connect: {}", e)))?;
 
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT COUNT(*) FROM memories WHERE is_deleted = 0")
             .await
             .map_err(|e| ServerError::internal_error(format!("Failed to prepare query: {}", e)))?;
@@ -1417,7 +1417,7 @@ pub async fn get_memory_usage_stats(
                        FROM memories 
                        WHERE is_deleted = 0";
 
-    let mut stmt = conn.prepare(basic_query).await.map_err(|e| {
+    let stmt = conn.prepare(basic_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare basic query: {}", e))
     })?;
 
@@ -1448,7 +1448,7 @@ pub async fn get_memory_usage_stats(
     ];
 
     for (range, query) in frequency_queries {
-        let mut stmt2 = conn.prepare(query).await.map_err(|e| {
+        let stmt2 = conn.prepare(query).await.map_err(|e| {
             ServerError::internal_error(format!("Failed to prepare frequency query: {}", e))
         })?;
 
@@ -1480,7 +1480,7 @@ pub async fn get_memory_usage_stats(
     ];
 
     for (range, query) in recency_queries {
-        let mut stmt3 = conn.prepare(&query).await.map_err(|e| {
+        let stmt3 = conn.prepare(&query).await.map_err(|e| {
             ServerError::internal_error(format!("Failed to prepare recency query: {}", e))
         })?;
 
@@ -1498,7 +1498,7 @@ pub async fn get_memory_usage_stats(
 
     // 查询最近访问的记忆数（24小时内）
     let recently_accessed_query = format!("SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND last_accessed IS NOT NULL AND last_accessed >= {}", one_day_ago);
-    let mut stmt4 = conn.prepare(&recently_accessed_query).await.map_err(|e| {
+    let stmt4 = conn.prepare(&recently_accessed_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare recently accessed query: {}", e))
     })?;
 
@@ -1520,7 +1520,7 @@ pub async fn get_memory_usage_stats(
 
     // 查询从未访问的记忆数
     let never_accessed_query = "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND (access_count IS NULL OR access_count = 0)";
-    let mut stmt5 = conn.prepare(never_accessed_query).await.map_err(|e| {
+    let stmt5 = conn.prepare(never_accessed_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare never accessed query: {}", e))
     })?;
 
@@ -1543,7 +1543,7 @@ pub async fn get_memory_usage_stats(
     // 查询高访问记忆数（访问次数 > 10）
     let high_access_query =
         "SELECT COUNT(*) FROM memories WHERE is_deleted = 0 AND access_count > 10";
-    let mut stmt6 = conn.prepare(high_access_query).await.map_err(|e| {
+    let stmt6 = conn.prepare(high_access_query).await.map_err(|e| {
         ServerError::internal_error(format!("Failed to prepare high access query: {}", e))
     })?;
 
