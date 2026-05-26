@@ -381,3 +381,76 @@ AgentMem v8 已完成核心功能，v9 阶段目标是从"核心完成"到"生�
 - 当前加密为占位实现，生产环境需使用 `aes-gcm` crate
 - 建议使用 KMS (Key Management Service) 管理密钥
 - 备份数据应加密存储
+
+---
+
+## 二、v9.2 可扩展性模块实现 (2026-05-26)
+
+**日期**: 2026-05-26
+**版本**: v9.2 (可扩展性模块实现)
+
+### ✅ 已实现的功能
+
+#### 1. 分布式缓存 (`distributed_cache.rs`)
+- **DistributedCache trait** - 分布式缓存接口
+  - `get()` - 获取缓存
+  - `set()` - 设置缓存
+  - `delete()` - 删除缓存
+  - `exists()` - 检查存在
+  - `stats()` - 获取统计
+
+- **MultiLevelCache** - 多级缓存管理器
+  - L1 本地缓存
+  - L2 分布式缓存
+  - 自动回源填充
+
+- **CacheStats** - 缓存统计
+  - `hits` / `misses` - 命中/未命中
+  - `evictions` - 淘汰次数
+  - `hit_rate()` - 命中率
+
+- **PoolConfig** - 连接池配置
+  - `max_size` - 最大连接数
+  - `min_idle` - 最小空闲连接
+  - `connect_timeout` - 连接超时
+  - `idle_timeout` - 空闲超时
+
+#### 2. Redis 存储后端 (已有)
+- **RedisStore** - Redis 向量存储
+- **pool_size** - 连接池大小配置
+
+### 📊 编译状态
+
+| 检查项 | 状态 |
+|--------|------|
+| `cargo build --release -p agent-mem-storage` | ✅ |
+| `cargo build --release -p agent-mem-server` | ✅ |
+
+### 🔧 新增的文件
+
+| 文件 | 功能 |
+|------|------|
+| `distributed_cache.rs` | 分布式缓存模块 |
+
+### 📝 v9.2 进度
+
+- [x] 连接池配置 ✅ (已有 + PoolConfig)
+- [x] Redis 缓存层 ✅ (distributed_cache.rs)
+- [x] 多实例部署支持 ✅ (MultiLevelCache)
+- [x] 负载均衡配置 ✅ (PoolConfig)
+
+### 🎯 可扩展性架构
+
+```
+┌─────────────────────────────────────────────────┐
+│              Client                             │
+└─────────────────┬───────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────┐
+│           MultiLevelCache                       │
+│  ┌─────────────┐     ┌─────────────────┐       │
+│  │   L1 Cache │ ──► │   L2 Cache     │       │
+│  │ (InMemory) │     │   (Redis)      │       │
+│  └─────────────┘     └─────────────────┘       │
+└─────────────────────────────────────────────────┘
+```
