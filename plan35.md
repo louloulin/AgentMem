@@ -301,3 +301,83 @@ AgentMem v8 已完成核心功能，v9 阶段目标是从"核心完成"到"生�
 **日期**: 2026-05-26  
 **版本**: v9.0  
 **状态**: 计划制定中
+
+---
+
+## 一、v9.1 数据安全模块实现 (2026-05-26)
+
+**日期**: 2026-05-26
+**版本**: v9.1 (数据安全模块实现)
+
+### ✅ 已实现的功能
+
+#### 1. 加密模块 (`security.rs`)
+- **Encryption** - 加密工具
+  - `generate_key()` - 生成加密密钥
+  - `encrypt()` - 数据加密
+  - `decrypt()` - 数据解密
+
+- **EncryptionConfig** - 加密配置
+  - `enabled` - 启用加密
+  - `key` - 加密密钥
+  - `algorithm` - 加密算法 (AES-256-GCM, ChaCha20Poly1305)
+
+#### 2. 备份模块
+- **BackupManager** - 备份管理器
+  - `create_backup()` - 创建备份
+  - `list_backups()` - 列出备份
+  - `restore_backup()` - 恢复备份
+  - `cleanup_old_backups()` - 清理旧备份
+
+- **BackupConfig** - 备份配置
+  - `enabled` - 启用自动备份
+  - `backup_dir` - 备份目录
+  - `max_backups` - 最大备份数
+  - `interval_seconds` - 备份间隔
+
+#### 3. 导出模块
+- **DataExporter** - 数据导出器
+  - `export_json()` - JSON 导出
+  - `export_csv()` - CSV 导出
+  - `export_to_file()` - 导出到文件
+
+- **ExportConfig** - 导出配置
+  - `export_dir` - 导出目录
+  - `default_format` - 默认格式
+  - `include_metadata` - 包含元数据
+
+#### 4. 保留策略
+- **RetentionManager** - 保留策略管理器
+  - `should_delete()` - 判断是否应删除
+  - `filter_memories()` - 按策略过滤记忆
+
+- **RetentionPolicy** - 保留策略
+  - `max_age_days` - 最大保留天数
+  - `min_importance` - 最小重要性
+  - `auto_cleanup` - 自动清理
+
+### 📊 编译状态
+
+| 检查项 | 状态 |
+|--------|------|
+| `cargo build --release -p agent-mem-storage` | ✅ |
+| `cargo build --release -p agent-mem-server` | ✅ |
+
+### 🔧 新增的文件
+
+| 文件 | 功能 |
+|------|------|
+| `security.rs` | 数据安全模块 |
+
+### 📝 v9.1 进度
+
+- [x] 数据加密存储 (框架) ✅
+- [x] 备份恢复机制 ✅
+- [x] 数据导出功能 ✅
+- [x] 数据保留策略 ✅
+
+### ⚠️ 生产使用注意
+
+- 当前加密为占位实现，生产环境需使用 `aes-gcm` crate
+- 建议使用 KMS (Key Management Service) 管理密钥
+- 备份数据应加密存储

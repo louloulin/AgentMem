@@ -15,6 +15,7 @@ pub mod factory; // Memory store factory (factory/mod.rs)
 pub mod graph;
 pub mod optimizations;
 pub mod performance;
+pub mod security;
 pub mod utils;
 pub mod vector;
 pub mod vector_factory; // Vector store factory (vector_factory.rs)
