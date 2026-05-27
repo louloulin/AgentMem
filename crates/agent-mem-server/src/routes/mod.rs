@@ -20,6 +20,7 @@ pub mod organizations;
 pub mod performance; // 🆕 Phase 4.2: 性能分析功能
 pub mod plugins; // 🆕 Plugin management API
 pub mod predictor;
+pub mod search_analytics;
 pub mod stats;
 pub mod tools;
 pub mod users;
@@ -152,8 +153,10 @@ pub async fn create_router(
     let webhook_state = Arc::new(crate::routes::webhook::WebhookState::new());
     info!("Webhook state initialized");
 
-    // 🆕 Initialize multimodal state
+    // 🆕 Initialize multimodal & search analytics state
     use agent_mem_core::multimodal_storage::{MultimodalStorage, MultimodalStorageConfig, MockImageVectorizer, InMemoryMultimodalStorage};
+    use agent_mem_core::search::search_analytics::{SearchAnalytics, SearchAnalyticsConfig};
+    
     let in_memory = InMemoryMultimodalStorage::new();
     let vectorizer = MockImageVectorizer::new(512);
     let multimodal_storage = MultimodalStorage::new(
@@ -161,7 +164,8 @@ pub async fn create_router(
         Arc::new(vectorizer),
         MultimodalStorageConfig::default(),
     );
-    let multimodal_state = multimodal::MultimodalState {
+    
+    let combined_state = multimodal::MultimodalState {
         storage: Arc::new(multimodal_storage),
     };
     
@@ -219,10 +223,15 @@ pub async fn create_router(
         .route("/api/v1/multimodal/search", post(multimodal::search_similar))
         .route("/api/v1/multimodal/stats", get(multimodal::get_stats))
         .route("/api/v1/multimodal/health", get(multimodal::health_check))
-        .with_state(multimodal_state);
+        .with_state(combined_state);
+
+    // TODO: Add search analytics routes after fixing type issues
+    // let search_analytics_router = search_analytics::create_search_analytics_router(...);
+    // app = app.merge(search_analytics_router);
+    // Note: Search analytics routes will be added in a separate PR due to type complexity
 
     // Add all routes (now database-agnostic via Repository Traits)
-    app = app
+    let app = app
         // User management routes
         .route("/api/v1/users", get(users::get_users_list))
         .route("/api/v1/users/register", post(users::register_user))
@@ -271,7 +280,21 @@ pub async fn create_router(
         .route("/api/v1/webhooks", post(webhook::create_webhook).get(webhook::list_webhooks))
         .route("/api/v1/webhooks/:id", get(webhook::get_webhook).put(webhook::update_webhook).delete(webhook::delete_webhook))
         .route("/api/v1/webhooks/stats", get(webhook::get_webhook_stats))
-        .route("/api/v1/webhooks/:id/test", post(webhook::test_webhook));
+        .route("/api/v1/webhooks/:id/test", post(webhook::test_webhook))
+        // ========== MCP Server Routes 🆕 ==========
+        .route("/api/v1/mcp/info", get(mcp::get_server_info))
+        .route("/api/v1/mcp/tools", get(mcp::list_tools))
+        .route("/api/v1/mcp/tools/call", post(mcp::call_tool))
+        .route("/api/v1/mcp/tools/:tool_name", get(mcp::get_tool))
+        .route("/api/v1/mcp/health", get(mcp::health_check))
+        // MCP Prompts
+        .route("/api/v1/mcp/prompts", get(mcp::list_prompts))
+        .route("/api/v1/mcp/prompts/:name", get(mcp::get_prompt))
+        // MCP Resources
+        .route("/api/v1/mcp/resources", get(mcp::list_resources))
+        .route("/api/v1/mcp/resources/*uri", get(mcp::read_resource))
+        .route("/api/v1/mcp/resources/*uri/subscribe", post(mcp::subscribe_resource))
+        .route("/api/v1/mcp/subscriptions/:id", delete(mcp::unsubscribe_resource));
 
     // Graph visualization routes (PostgreSQL only)
     #[cfg(feature = "postgres")]
@@ -417,6 +440,18 @@ pub async fn create_router(
         logs::get_log_stats,
         logs::query_logs,
         logs::get_trace,
+        // MCP Server routes 🆕
+        mcp::get_server_info,
+        mcp::list_tools,
+        mcp::call_tool,
+        mcp::get_tool,
+        mcp::health_check,
+        mcp::list_prompts,
+        mcp::get_prompt,
+        mcp::list_resources,
+        mcp::read_resource,
+        mcp::subscribe_resource,
+        mcp::unsubscribe_resource,
     ),
     components(
         schemas(

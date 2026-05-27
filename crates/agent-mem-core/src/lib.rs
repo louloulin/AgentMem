@@ -107,6 +107,12 @@ pub mod tenant;
 pub mod types;
 /// Vector storage ecosystem with capability detection and auto-selection
 pub mod vector_ecosystem;
+/// Event sourcing module for memory audit trails and state reconstruction
+pub mod event_sourcing;
+/// Optimistic locking module for concurrent memory operations
+pub mod optimistic_lock;
+/// Performance benchmarking module for EventStore and OptimisticLock
+pub mod benchmarks;
 
 // Re-export core types
 pub use agent_state::{AgentState, AgentStateMachine};
@@ -272,4 +278,15 @@ pub use multimodal_storage::{
 pub use search::{
     AnalyticsReport, PerformanceMetrics, QueryPatternStats, QualityMetrics,
     ResultDistribution, SearchAnalytics, SearchAnalyticsConfig, SearchEvent, SearchEventType,
+};
+
+// Re-export optimistic locking module
+pub use optimistic_lock::{
+    AtomicUpdateResult, LockManagerConfig, LockManagerStats, LockStats, LockResult,
+    OptimisticLockError, OptimisticLockManager, VersionComparison, VersionInfo, VersionedMemory,
+};
+
+// Re-export benchmarks module
+pub use benchmarks::{
+    run_all_benchmarks, run_quick_benchmark, BenchmarkConfig, BenchmarkResult, BenchmarkSuiteResult,
 };
