@@ -113,6 +113,8 @@ pub mod event_sourcing;
 pub mod optimistic_lock;
 /// Performance benchmarking module for EventStore and OptimisticLock
 pub mod benchmarks;
+/// Agent communication protocol for inter-agent messaging
+pub mod agent_communication;
 
 // Re-export core types
 pub use agent_state::{AgentState, AgentStateMachine};
@@ -289,4 +291,10 @@ pub use optimistic_lock::{
 // Re-export benchmarks module
 pub use benchmarks::{
     run_all_benchmarks, run_quick_benchmark, BenchmarkConfig, BenchmarkResult, BenchmarkSuiteResult,
+};
+
+// Re-export agent communication module
+pub use agent_communication::{
+    AgentCommError, AgentCommunicationManager, AgentId, InterAgentMessage, InterAgentMessageType,
+    CommManagerConfig, CommResult, CommStats, MessagePriority,
 };
