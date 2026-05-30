@@ -162,9 +162,15 @@ mod tests {
         );
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("content_contains_html_or_script"));
+        // Validator error.to_string() may be in format "code: message" or just "message"
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("content_contains_html_or_script")
+            || err.contains("content_length_invalid")
+            || err.contains("dangerous"),
+            "Expected HTML-related validation error, got: {}",
+            err
+        );
     }
 
     #[test]

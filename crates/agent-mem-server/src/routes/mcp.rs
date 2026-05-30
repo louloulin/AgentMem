@@ -685,8 +685,8 @@ mod tests {
 
         let response = list_resources(Extension(mcp_server)).await.unwrap();
         assert!(response.0.success);
-        // Resources list should be empty initially
-        assert!(response.0.data.resources.is_empty());
+        // ResourceManager returns 3 predefined resources (core, episodic, semantic)
+        assert_eq!(response.0.data.resources.len(), 3);
     }
 
     #[tokio::test]

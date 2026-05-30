@@ -22,6 +22,7 @@ agent-mem-performance = { path = "../agent-mem-performance" }  # ✅ Phase 2.2.5
 agent-mem-resource = { path = "../agent-mem-resource" }  # 🆕 File-centric resource management
 agent-mem-category = { path = "../agent-mem-category" }  # 🆕 File-centric category management
 agent-mem-extraction = { path = "../agent-mem-extraction" }  # 🆕 File-centric extraction pipeline
+agent-mem-forgetting = { path = "../agent-mem-forgetting" }  # 🔴 Phase 2: Forgetting integration
 agent-mem-storage = { path = "../agent-mem-storage", optional = true }
 # agent-mem-lumosai = { path = "../agent-mem-lumosai", optional = true }  # LumosAI集成 - TEMPORARILY DISABLED
 # lumosai_core = { git = "https://github.com/louloulin/lumos.ai", package = "lumosai_core", optional = true }  # LumosAI集成 - TEMPORARILY DISABLED

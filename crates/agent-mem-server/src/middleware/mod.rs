@@ -7,6 +7,7 @@ pub mod circuit_breaker; // ✅ Phase 2.2.5: 熔断器模式
 pub mod metrics;
 pub mod quota;
 pub mod rbac;
+pub mod scope_middleware; // 🔴 Phase 3: Scope Middleware
 pub mod validation; // ✅ P1 Task: Input validation layer
 
 // Re-export commonly used middleware functions
@@ -23,6 +24,10 @@ pub use quota::{quota_middleware, QuotaLimits, QuotaManager, UsageStats};
 pub use rbac::{
     admin_only, check_agent_permission, check_memory_permission, check_user_permission,
     no_read_only, rbac_middleware, RbacConfig,
+};
+pub use scope_middleware::{
+    check_scope_access, extract_scope_from_request, extract_target_scope_from_params,
+    scope_enforcement_middleware, validate_access, ScopeExt, ScopeMiddlewareState,
 };
 pub use validation::{
     validate_add_memory_request, validate_batch_add_request, validate_delete_request,

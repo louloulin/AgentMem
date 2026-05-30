@@ -13,7 +13,7 @@ use agent_mem_core::multimodal_storage::{
     MultimodalStorageBackend, MultimodalType,
 };
 use axum::{
-    extract::{Extension, Query, State},
+    extract::{Extension, Query},
     response::Json,
     routing::{get, post},
     Router,
@@ -125,7 +125,7 @@ pub struct HealthResponse {
     )
 )]
 pub async fn upload_image(
-    State(state): State<MultimodalState>,
+    Extension(state): Extension<Arc<MultimodalState>>,
     Extension(user_id): Extension<String>,
     params: Query<UploadRequest>,
 ) -> ServerResult<Json<UploadResponse>> {
@@ -177,7 +177,7 @@ pub async fn upload_image(
     )
 )]
 pub async fn search_similar(
-    State(state): State<MultimodalState>,
+    Extension(state): Extension<Arc<MultimodalState>>,
     Extension(user_id): Extension<String>,
     params: Json<SearchRequest>,
 ) -> ServerResult<Json<SearchResponse>> {
@@ -238,7 +238,7 @@ pub async fn search_similar(
     )
 )]
 pub async fn get_stats(
-    State(state): State<MultimodalState>,
+    Extension(state): Extension<Arc<MultimodalState>>,
 ) -> ServerResult<Json<MultimodalStats>> {
     let stats = state.storage.get_stats().await;
     
@@ -263,7 +263,7 @@ pub async fn get_stats(
     )
 )]
 pub async fn health_check(
-    State(state): State<MultimodalState>,
+    Extension(state): Extension<Arc<MultimodalState>>,
 ) -> ServerResult<Json<HealthResponse>> {
     let stats = state.storage.get_stats().await;
     
@@ -282,11 +282,13 @@ pub async fn health_check(
 }
 
 /// Create the multimodal router
+/// Note: MultimodalState is now passed via Extension layer, not with_state
+/// This function is kept for backwards compatibility but is no longer used
 pub fn create_multimodal_router(state: MultimodalState) -> Router {
     Router::new()
         .route("/upload", post(upload_image))
         .route("/search", post(search_similar))
         .route("/stats", get(get_stats))
         .route("/health", get(health_check))
-        .with_state(state)
+        // State is passed via Extension layer instead
 }

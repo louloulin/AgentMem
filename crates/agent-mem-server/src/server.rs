@@ -10,12 +10,16 @@ use crate::{
 };
 use agent_mem_config::{DatabaseBackend, DatabaseConfig};
 use agent_mem_core::storage::factory::{Repositories, RepositoryFactory};
+use agent_mem_forgetting::ForgettingConfig;
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::Router;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::info;
+
+/// 🔴 Phase 2: Forgetting state
+use crate::background_tasks::ForgettingState;
 
 /// Main memory server
 pub struct MemoryServer {
@@ -26,6 +30,9 @@ pub struct MemoryServer {
     #[allow(dead_code)]
     repositories: Repositories,
     router: Router,
+    /// 🔴 Phase 2: Forgetting scheduler state
+    #[allow(dead_code)]
+    forgetting_state: ForgettingState,
 }
 
 impl MemoryServer {
@@ -81,12 +88,23 @@ impl MemoryServer {
         let metrics_registry = Arc::new(MetricsRegistry::new());
         info!("Metrics registry initialized");
 
+        // 🔴 Phase 2: Initialize Forgetting state
+        let forgetting_config = ForgettingConfig::default()
+            .with_check_interval(86400) // Check daily
+            .with_threshold(0.1)
+            .with_strength(7.0); // 7 days default strength
+        let forgetting_state = ForgettingState::new(forgetting_config);
+        forgetting_state.init().await
+            .map_err(|e| ServerError::server_error(format!("Failed to initialize forgetting scheduler: {e}")))?;
+        info!("Forgetting scheduler initialized (check interval: 24h, threshold: 0.1)");
+
         // Create router with all routes and middleware
         let router = create_router(
             memory_manager.clone(),
             metrics_registry.clone(),
             repositories.clone(),
             config.clone(),
+            forgetting_state.clone(),
         )
         .await?;
 
@@ -98,6 +116,7 @@ impl MemoryServer {
             metrics_registry,
             repositories,
             router,
+            forgetting_state,
         })
     }
 

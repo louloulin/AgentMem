@@ -4,6 +4,7 @@
 pub mod agents;
 pub mod chat;
 pub mod chat_lumosai; // LumosAI集成
+pub mod core_memory; // 🔴 Phase 1: Core Memory API - AgentMem v2.0
 pub mod docs;
 pub mod file_centric;
 // Graph routes require PostgreSQL-specific managers (temporarily disabled for LibSQL)
@@ -27,6 +28,7 @@ pub mod users;
 pub mod webhook; // 🆕 Webhook事件订阅支持
 pub mod multimodal;
 pub mod working_memory; // ✅ Working Memory API：基于 WorkingMemoryStore trait // 🆕 Phase 2.3: 记忆预测功能
+pub mod consolidation; // 🔴 Phase 4: Consolidation API - 记忆整合 (摘要/清理)
 
 use crate::config::ServerConfig;
 use crate::error::{ServerError, ServerResult};
@@ -42,6 +44,7 @@ use crate::routes::memory::MemoryManager;
 use crate::routes::file_centric::FileCentricState;
 use crate::sse::SseManager;
 use crate::websocket::WebSocketManager;
+use agent_mem_core::managers::CoreMemoryManager;
 use agent_mem_core::storage::factory::Repositories;
 use agent_mem_observability::metrics::MetricsRegistry;
 use axum::{
@@ -140,6 +143,7 @@ pub async fn create_router(
     metrics_registry: Arc<MetricsRegistry>,
     repositories: Repositories,
     config: ServerConfig,
+    forgetting_state: crate::background_tasks::ForgettingState,
 ) -> ServerResult<Router<()>> {
     // Create WebSocket and SSE managers
     let ws_manager = Arc::new(WebSocketManager::new());
@@ -194,7 +198,22 @@ pub async fn create_router(
         storage: Arc::new(multimodal_storage),
     };
     info!("Multimodal state initialized");
-    
+
+    // 🔴 Phase 1: Initialize CoreMemory state (before Router creation)
+    info!("Initializing CoreMemory state...");
+    let core_memory_manager = agent_mem_core::managers::CoreMemoryManager::new();
+    let core_memory_state = Arc::new(core_memory::CoreMemoryState::new(core_memory_manager));
+    info!("CoreMemory state initialized");
+
+    // 🔴 Phase 4: Initialize Consolidation state
+    info!("Initializing Consolidation state...");
+    let consolidation_state = Arc::new(consolidation::ConsolidationState::new(1000)); // 1000 chars default
+    info!("Consolidation state initialized (max_chars=1000)");
+
+    // Note: All routes use Extension layers for state extraction
+    // State types: CoreMemoryState, MultimodalState, MemoryManager, etc.
+    // All are added as Extension layers to the main Router
+
     let mut app = Router::new()
         // ========== 核心 Memory 路由 (6) ==========
         .route(
@@ -244,12 +263,34 @@ pub async fn create_router(
         .route("/api/v1/stats", get(stats::get_dashboard_stats))
         .route("/api/v1/logs/stats", get(logs::get_log_stats))
         .route("/api/v1/performance", get(performance::get_performance_analysis))
-        // ========== Multimodal (4) ==========
+        // ========== 🔴 Phase 1: Core Memory 路由 ==========
+        .route("/api/v1/core-memory/persona", post(core_memory::create_persona_block).get(core_memory::list_persona_blocks))
+        .route("/api/v1/core-memory/persona/:block_id", get(core_memory::get_persona_block))
+        .route("/api/v1/core-memory/persona/:block_id", put(core_memory::update_persona_block))
+        .route("/api/v1/core-memory/persona/:block_id", delete(core_memory::delete_persona_block))
+        .route("/api/v1/core-memory/persona/:block_id/append", post(core_memory::append_to_persona_block))
+        .route("/api/v1/core-memory/human", post(core_memory::create_human_block).get(core_memory::list_human_blocks))
+        .route("/api/v1/core-memory/human/:block_id", get(core_memory::get_human_block))
+        .route("/api/v1/core-memory/human/:block_id", put(core_memory::update_human_block))
+        .route("/api/v1/core-memory/human/:block_id", delete(core_memory::delete_human_block))
+        .route("/api/v1/core-memory/human/:block_id/append", post(core_memory::append_to_human_block))
+        .route("/api/v1/core-memory/capacity", get(core_memory::get_capacity))
+        .route("/api/v1/core-memory/stats", get(core_memory::get_stats))
+        .route("/api/v1/core-memory/rewrite/:block_id", post(core_memory::rewrite_block))
+        // ========== Multimodal 路由 ==========
         .route("/api/v1/multimodal/upload", post(multimodal::upload_image))
         .route("/api/v1/multimodal/search", post(multimodal::search_similar))
         .route("/api/v1/multimodal/stats", get(multimodal::get_stats))
         .route("/api/v1/multimodal/health", get(multimodal::health_check))
-        .with_state(combined_state);
+        // ========== 🔴 Phase 2: Forgetting 路由 ==========
+        .route("/api/v1/memories/health", get(crate::background_tasks::get_memory_health))
+        .route("/api/v1/memories/cleanup", post(crate::background_tasks::trigger_cleanup))
+        .route("/api/v1/memories/forgetting/stats", get(crate::background_tasks::get_forgetting_stats))
+        .route("/api/v1/memories/protection", post(crate::background_tasks::set_memory_protection))
+        // ========== 🔴 Phase 4: Consolidation 路由 ==========
+        .route("/api/v1/memories/consolidate", post(consolidation::consolidate_memories).get(consolidation::get_summarizable_memories))
+        .route("/api/v1/memories/consolidate/summarizable", get(consolidation::get_summarizable_memories))
+        .route("/api/v1/memories/consolidate/:memory_id", post(consolidation::consolidate_single_memory));
 
     // TODO: Add search analytics routes after fixing type issues
     // let search_analytics_router = search_analytics::create_search_analytics_router(...);
@@ -344,9 +385,7 @@ pub async fn create_router(
         .route("/api/v1/sse", get(crate::sse::sse_handler))
         .route("/api/v1/sse/llm", get(crate::sse::sse_stream_llm_response))
         // Add OpenAPI documentation
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Add state for plugin routes
-        .with_state(memory_manager.clone());
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
 
     // Create circuit breaker manager
     let circuit_breaker_manager = Arc::new(CircuitBreakerManager::new());
@@ -356,6 +395,15 @@ pub async fn create_router(
     let app = build_router_with_layers(app, config, circuit_breaker_manager, rbac_checker,
         sse_manager, ws_manager, mcp_server, metrics_registry, memory_manager,
         file_centric_state, webhook_state, repositories).await?;
+
+    // Add CoreMemory state as the last Extension layer
+    let app = app.layer(Extension(core_memory_state));
+
+    // 🔴 Phase 2: Add Forgetting state as Extension layer
+    let app = app.layer(Extension(Arc::new(forgetting_state)));
+
+    // 🔴 Phase 4: Add Consolidation state as Extension layer
+    let app = app.layer(Extension(consolidation_state));
 
     Ok(app)
 }
@@ -448,6 +496,7 @@ async fn build_router_with_layers(
     app = app.layer(Extension(Arc::new(QuotaManager::new())));
     info!("Layer 11/11: quota_manager");
 
+    // Note: core_memory_state will be added in create_router where it's in scope
     info!("All Extension layers added. Router build complete!");
     Ok(app)
 }
@@ -512,6 +561,22 @@ async fn build_router_with_layers(
         working_memory::add_working_memory,
         working_memory::get_working_memory,
         working_memory::cleanup_expired,  // Only cleanup endpoint remains
+        // 🔴 Phase 1: Core Memory API endpoints
+        core_memory::create_persona_block,
+        core_memory::get_persona_block,
+        core_memory::update_persona_block,
+        core_memory::append_to_persona_block,
+        core_memory::list_persona_blocks,
+        core_memory::delete_persona_block,
+        core_memory::create_human_block,
+        core_memory::get_human_block,
+        core_memory::update_human_block,
+        core_memory::append_to_human_block,
+        core_memory::list_human_blocks,
+        core_memory::delete_human_block,
+        core_memory::get_capacity,
+        core_memory::get_stats,
+        core_memory::rewrite_block,
         // ========== Webhook routes 🆕 ==========
         webhook::create_webhook,
         webhook::list_webhooks,
@@ -638,12 +703,23 @@ async fn build_router_with_layers(
             webhook::WebhookEventType,
             webhook::WebhookDeliveryStatus,
             working_memory::CleanupResponse,
+        // 🔴 Phase 1: Core Memory schemas
+        core_memory::CreatePersonaRequest,
+        core_memory::CreateHumanRequest,
+        core_memory::UpdateBlockRequest,
+        core_memory::AppendContentRequest,
+        core_memory::CoreMemoryBlockResponse,
+        core_memory::CapacityInfo,
+        core_memory::CapacityResponse,
+        core_memory::CoreMemoryStatsResponse,
+        core_memory::RewriteResponse,
             // Note: graph schemas are only available with postgres feature
         )
     ),
     tags(
         (name = "memory", description = "Memory management operations"),
         (name = "batch", description = "Batch operations"),
+        (name = "core-memory", description = "🔴 Core Memory API - Persona/Human blocks for agent context"),
         (name = "users", description = "User management operations"),
         (name = "organizations", description = "Organization management operations"),
         (name = "agents", description = "Agent management operations"),

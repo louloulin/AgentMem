@@ -5,6 +5,7 @@
 //! multi-tenancy, and comprehensive monitoring.
 
 pub mod auth;
+pub mod background_tasks; // 🔴 Phase 2: Forgetting background tasks
 pub mod config;
 pub mod error;
 pub mod error_handler; // ✅ Phase 0.1: 统一错误处理模块
@@ -17,6 +18,9 @@ pub mod server;
 pub mod sse;
 pub mod telemetry;
 pub mod websocket;
+
+// Re-export middleware for external use
+pub use middleware::scope_middleware::{ScopeMiddlewareState, ScopeExt, extract_scope_from_request, check_scope_access, validate_access};
 
 pub use config::ServerConfig;
 pub use error::{ServerError, ServerResult};

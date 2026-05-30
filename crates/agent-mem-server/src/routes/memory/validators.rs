@@ -103,7 +103,7 @@ fn validate_metadata_key(key: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// Custom validator: Validate tags (alphanumeric, underscore, hyphen)
+/// Custom validator: Validate tag (alphanumeric, underscore, hyphen)
 fn validate_tag(tag: &str) -> Result<(), ValidationError> {
     if !tag
         .chars()
@@ -122,11 +122,27 @@ fn validate_tag(tag: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
+/// Custom validator: Validate add memory content (length + HTML check)
+fn validate_add_memory_content(content: &str) -> Result<(), ValidationError> {
+    // Check length
+    if content.is_empty() || content.len() > MAX_CONTENT_LENGTH {
+        let mut error = ValidationError::new("content_length_invalid");
+        error.message = Some(format!(
+            "Content length must be between 1 and {} characters",
+            MAX_CONTENT_LENGTH
+        ).into());
+        return Err(error);
+    }
+
+    // Check for dangerous HTML patterns
+    validate_no_html(content)
+}
+
 /// Request validator for adding a memory
 #[derive(Debug, Clone, Validate, Deserialize, Serialize)]
 pub struct AddMemoryRequest {
     /// Memory content
-    #[validate(length(min = 1, max = 50000))]
+    #[validate(custom(function = "validate_add_memory_content"))]
     pub content: String,
 
     /// Optional metadata
@@ -236,7 +252,7 @@ pub struct UpdateMemoryRequest {
     pub id: String,
 
     /// New content
-    #[validate(length(min = 1, max = 50000))]
+    #[validate(custom(function = "validate_add_memory_content"))]
     pub content: String,
 
     /// Optional metadata

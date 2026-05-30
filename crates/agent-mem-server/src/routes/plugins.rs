@@ -7,7 +7,7 @@ use agent_mem::plugins::sdk::{Capability, PluginConfig, PluginMetadata, PluginTy
 #[cfg(feature = "plugins")]
 use agent_mem::plugins::{PluginStatus, RegisteredPlugin};
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path},
     http::StatusCode,
     Json,
 };
@@ -120,7 +120,7 @@ pub enum PluginStatusDto {
     )
 )]
 pub async fn list_plugins(
-    State(memory_manager): State<Arc<MemoryManager>>,
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<Vec<PluginResponse>>> {
     info!("Listing all registered plugins");
 
@@ -174,7 +174,7 @@ pub async fn list_plugins(
     )
 )]
 pub async fn register_plugin(
-    State(memory_manager): State<Arc<MemoryManager>>,
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Json(request): Json<RegisterPluginRequest>,
 ) -> ServerResult<(StatusCode, Json<PluginResponse>)> {
     info!("Registering plugin: {}", request.id);
@@ -260,7 +260,7 @@ pub async fn register_plugin(
     )
 )]
 pub async fn get_plugin(
-    State(memory_manager): State<Arc<MemoryManager>>,
+    Extension(memory_manager): Extension<Arc<MemoryManager>>,
     Path(id): Path<String>,
 ) -> ServerResult<Json<PluginResponse>> {
     debug!("Getting plugin: {}", id);
@@ -350,14 +350,14 @@ fn convert_capability_from_dto(dto: &CapabilityDto) -> Capability {
 // Placeholder functions for when plugins feature is not enabled
 #[cfg(not(feature = "plugins"))]
 pub async fn list_plugins(
-    State(_memory_manager): State<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
 ) -> ServerResult<Json<Vec<PluginResponse>>> {
     Err(ServerError::server_error("Plugins feature is not enabled"))
 }
 
 #[cfg(not(feature = "plugins"))]
 pub async fn register_plugin(
-    State(_memory_manager): State<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Json(_request): Json<RegisterPluginRequest>,
 ) -> ServerResult<(StatusCode, Json<PluginResponse>)> {
     Err(ServerError::server_error("Plugins feature is not enabled"))
@@ -365,7 +365,7 @@ pub async fn register_plugin(
 
 #[cfg(not(feature = "plugins"))]
 pub async fn get_plugin(
-    State(_memory_manager): State<Arc<MemoryManager>>,
+    Extension(_memory_manager): Extension<Arc<MemoryManager>>,
     Path(_id): Path<String>,
 ) -> ServerResult<Json<PluginResponse>> {
     Err(ServerError::server_error("Plugins feature is not enabled"))
