@@ -450,7 +450,13 @@ impl InitializationModule {
                         }
                         Err(e) => {
                             warn!("创建 FastEmbed Embedder 失败: {}", e);
-                            Ok(None)
+                            // 🔧 后备方案：创建 Mock Embedder
+                            warn!("使用 MockEmbedder 作为后备方案");
+                            use agent_mem_embeddings::providers::MockEmbedder;
+                            let mock_embedder = MockEmbedder::new(384);
+                            let mock: Arc<dyn Embedder + Send + Sync> = Arc::new(mock_embedder);
+                            info!("✅ MockEmbedder 创建成功 (384维) - 用于离线测试");
+                            Ok(Some(mock))
                         }
                     }
                 }

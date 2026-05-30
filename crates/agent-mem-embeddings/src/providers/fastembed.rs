@@ -66,9 +66,10 @@ impl FastEmbedProvider {
     /// # }
     /// ```
     pub async fn new(config: EmbeddingConfig) -> Result<Self> {
-        // 默认使用 CPU 核心数作为模型池大小
-        // 这样可以充分利用多核 CPU，避免 Mutex 锁竞争
-        let pool_size = num_cpus::get().max(1); // 至少1个实例
+        // 使用较小的固定池大小以减少内存和栈使用
+        // 14个实例在并行初始化时可能导致 stack overflow
+        // 改为使用 2 个实例，足以支持并发请求
+        let pool_size = 2;
         Self::new_with_pool_size(config, pool_size).await
     }
 

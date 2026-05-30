@@ -10,8 +10,10 @@ use colored::*;
 use std::env;
 
 mod config;
+pub mod commands;
 
 use config::CliConfig;
+use commands::mcp::McpCommand;
 
 /// AgentMem CLI - Enterprise-grade memory management for AI agents
 #[derive(Parser)]
@@ -75,17 +77,28 @@ enum Commands {
 
     /// Health check
     Status,
+
+    /// MCP (Model Context Protocol) server mode
+    #[command(name = "mcp")]
+    Mcp {
+        /// MCP subcommand
+        #[command(subcommand)]
+        subcommand: commands::mcp::McpSubcommand,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info");
-    }
-    env_logger::init();
-
     let cli = Cli::parse();
+
+    // Skip env_logger init for MCP commands (they use tracing_subscriber)
+    let is_mcp = matches!(cli.command, Commands::Mcp { .. });
+    if !is_mcp {
+        if env::var("RUST_LOG").is_err() {
+            env::set_var("RUST_LOG", "info");
+        }
+        env_logger::init();
+    }
 
     // Load configuration
     let config = CliConfig::load(cli.config.as_deref())?;
@@ -93,8 +106,8 @@ async fn main() -> Result<()> {
     // Merge CLI args with config
     let merged_config = config.merge_with_cli(&cli)?;
 
-    // Validate API key
-    if merged_config.api_key.is_none() {
+    // Validate API key (skip for MCP commands)
+    if merged_config.api_key.is_none() && !matches!(cli.command, Commands::Mcp { .. }) {
         eprintln!("{}", "Error: API key is required. Set AGENTMEM_API_KEY environment variable or use --api-key flag.".red());
         eprintln!(
             "Get your API key at: {}",
@@ -134,6 +147,13 @@ async fn main() -> Result<()> {
             println!("✅ CLI is ready to use!");
             println!("Note: Add your API key to connect to AgentMem service");
             Ok(())
+        }
+        Commands::Mcp { subcommand } => {
+            // MCP commands run without requiring API key validation
+            // Skip the API key check for MCP mode
+            async move {
+                McpCommand::execute(subcommand).await
+            }.await
         }
     };
 

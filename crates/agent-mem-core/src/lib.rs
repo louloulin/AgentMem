@@ -26,6 +26,8 @@ pub mod config;
 /// Environment-based configuration
 pub mod config_env;
 pub mod conflict;
+/// Advanced conflict resolution with multiple strategies
+pub mod conflict_resolver;
 pub mod context;
 /// Phase 2.3: Context understanding enhancement (window expansion, multi-turn, compression)
 pub mod context_enhancement;
@@ -94,6 +96,8 @@ pub mod retrieval;
 pub mod scheduler;
 pub mod search;
 pub mod security;
+/// Monitoring and telemetry system
+pub mod monitoring;
 /// Input validation for API endpoints
 pub mod validation;
 /// Simplified Memory API (Mem0-style)
@@ -115,6 +119,14 @@ pub mod optimistic_lock;
 pub mod benchmarks;
 /// Agent communication protocol for inter-agent messaging
 pub mod agent_communication;
+/// ABAC (Attribute-Based Access Control) Engine
+pub mod abac_engine;
+/// Data lineage tracking for GDPR compliance
+pub mod lineage;
+/// Privacy-preserving technologies (differential privacy, masking)
+pub mod privacy_preserving;
+/// Predictive health monitoring
+pub mod predictive_monitoring;
 
 // Re-export core types
 pub use agent_state::{AgentState, AgentStateMachine};
@@ -297,4 +309,46 @@ pub use benchmarks::{
 pub use agent_communication::{
     AgentCommError, AgentCommunicationManager, AgentId, InterAgentMessage, InterAgentMessageType,
     CommManagerConfig, CommResult, CommStats, MessagePriority,
+};
+
+// Re-export conflict resolver module (as noted in plan41.md)
+pub use conflict_resolver::{
+    ConflictDetection, ConflictResolver, ConflictResolverConfig,
+    ConflictType,
+};
+
+// Re-export ABAC engine module
+pub use abac_engine::{
+    AbacConfig, AbacEngine, AbacPolicy, AbacPolicy as Policy, AccessDecision, AccessRequest,
+    AccessResponse, ActionAttributes, ActionType, EnvironmentAttributes, Obligation,
+    ObligationType, PolicyCondition, PolicyCondition as Condition, PolicyEffect, PolicyTarget,
+    SubjectAttributes, ResourceAttributes, ResourceType as AbacResourceType, AgentType, AuditEntry as AbacAuditEntry,
+    DelegationEntry, DelegatedPermission, AttributeCategory, AttributeMatcher, ConditionOperation,
+    ConditionValue,
+};
+
+// Re-export lineage tracking module
+pub use lineage::{
+    CascadeDeletion, GdprDeletionReport, GdprDeletionRequest, ImpactAnalysis, ImpactEntry,
+    ImpactStats, ImpactType, LineageConfig, LineageDirection, LineageEdge, LineageGraph,
+    LineageNode, LineageQuery, LineageStats, LineageTracker, LineageTrackerStats,
+    MemoryType as LineageMemoryType, Transformation, TransformationType,
+    DeletionStatus as LineageDeletionStatus,
+};
+
+// Re-export privacy-preserving module
+pub use privacy_preserving::{
+    AnonymizationRequest, AnonymizationResult, AnonymizationStats, AnonymityGroup,
+    DataMasking, DifferentialPrivacy, KAnonymity, MaskingRequest,
+    MaskingResult, MaskingStrategy, NoiseType, PrivacyAuditEntry, PrivacyConfig,
+    PrivacyMetadata, PrivacyOperation, PrivateQueryResult, SecureAggregation,
+    SecureAggregationRequest, SecureAggregationResult, AggregationType as SecureAggType,
+    TenantKey, TenantKeyManager, KeyRotationRecord,
+};
+
+// Re-export predictive monitoring module
+pub use predictive_monitoring::{
+    Anomaly, AnomalyMethod, AnomalySeverity, AnomalyType, CapacityForecast, ConfidenceInterval as PredCI,
+    ForecastPoint, HealthPrediction, HealthTrend, PredictiveConfig, PredictiveMonitor,
+    SelfHealingRecommendation, HealingAction, RiskLevel, StatisticalSummary, TrendDirection,
 };

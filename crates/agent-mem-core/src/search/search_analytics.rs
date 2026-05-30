@@ -3,6 +3,7 @@
 // 提供搜索统计和性能分析功能，用于监控和优化搜索质量
 
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -65,6 +66,10 @@ pub struct SearchEvent {
     pub cache_hit: bool,
     /// 时间戳
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// 第一相关结果的位置 (用于MRR计算，0表示无相关结果)
+    pub first_relevant_position: Option<u32>,
+    /// 各结果的相关性得分列表 (用于NDCG计算)
+    pub relevance_scores: Option<Vec<f32>>,
 }
 
 /// 性能指标
@@ -121,6 +126,14 @@ pub struct QualityMetrics {
     pub max_result_score: f64,
     /// 结果得分标准差
     pub score_std_dev: f64,
+    /// Mean Reciprocal Rank (MRR) - 检索质量指标
+    pub mean_reciprocal_rank: f64,
+    /// Normalized Discounted Cumulative Gain (NDCG) - 排名质量指标
+    pub ndcg: f64,
+    /// MRR计算样本数
+    pub mrr_sample_count: u64,
+    /// NDCG计算样本数
+    pub ndcg_sample_count: u64,
 }
 
 /// 搜索分析面板
@@ -248,13 +261,40 @@ impl SearchAnalytics {
         // 更新质量指标
         {
             let mut quality = self.quality_metrics.write().await;
-            let total_score = quality.avg_result_score * (perf::change_time_total_searches(&self.performance).await - 1) as f64 
+            let total_score = quality.avg_result_score * (perf::change_time_total_searches(&self.performance).await - 1) as f64
                 + event.avg_score as f64;
             let searches = perf::change_time_total_searches(&self.performance).await;
             quality.avg_result_score = total_score / searches as f64;
-            
+
             if event.max_score > quality.max_result_score as f32 {
                 quality.max_result_score = event.max_score as f64;
+            }
+
+            // 更新MRR (Mean Reciprocal Rank)
+            if let Some(first_relevant_pos) = event.first_relevant_position {
+                if first_relevant_pos > 0 {
+                    quality.mrr_sample_count += 1;
+                    let reciprocal_rank = 1.0 / first_relevant_pos as f64;
+                    quality.mean_reciprocal_rank =
+                        (quality.mean_reciprocal_rank * (quality.mrr_sample_count - 1) as f64 + reciprocal_rank)
+                        / quality.mrr_sample_count as f64;
+                }
+            }
+
+            // 更新NDCG (Normalized Discounted Cumulative Gain)
+            if let Some(ref relevance_scores) = event.relevance_scores {
+                if !relevance_scores.is_empty() {
+                    quality.ndcg_sample_count += 1;
+                    let dcg = Self::calculate_dcg(relevance_scores);
+                    // 计算理想DCG - 将相关性得分降序排列
+                    let mut ideal_relevance: Vec<f32> = relevance_scores.iter().cloned().collect();
+                    ideal_relevance.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+                    let idcg = Self::calculate_dcg(&ideal_relevance);
+                    let ndcg = if idcg > 0.0 { dcg / idcg } else { 0.0 };
+                    quality.ndcg =
+                        (quality.ndcg * (quality.ndcg_sample_count - 1) as f64 + ndcg)
+                        / quality.ndcg_sample_count as f64;
+                }
             }
         }
 
@@ -328,6 +368,22 @@ impl SearchAnalytics {
         *self.quality_metrics.write().await = QualityMetrics::default();
         *self.hourly_stats.write().await = HashMap::new();
     }
+
+    /// 计算DCG (Discounted Cumulative Gain)
+    /// 使用标准DCG公式: DCG = sum(rel_i / log2(i+1), i从1到结果数)
+    fn calculate_dcg(relevance_scores: &[f32]) -> f64 {
+        relevance_scores
+            .iter()
+            .enumerate()
+            .map(|(i, &rel)| {
+                if rel > 0.0 {
+                    rel as f64 / (i as f64 + 2.0).log2()
+                } else {
+                    0.0
+                }
+            })
+            .sum()
+    }
 }
 
 // 辅助函数
@@ -374,6 +430,25 @@ mod tests {
             max_score: 0.85,
             cache_hit: false,
             timestamp: chrono::Utc::now(),
+            first_relevant_position: None,
+            relevance_scores: None,
+        }
+    }
+
+    fn create_test_event_with_relevance(query: &str, result_count: usize, first_relevant: Option<u32>, relevance: Vec<f32>) -> SearchEvent {
+        SearchEvent {
+            id: uuid::Uuid::new_v4().to_string(),
+            event_type: SearchEventType::Search,
+            query: query.to_string(),
+            query_length: query.split_whitespace().count(),
+            result_count,
+            response_time_ms: 100,
+            avg_score: 0.7,
+            max_score: relevance.iter().cloned().fold(0.0, f32::max),
+            cache_hit: false,
+            timestamp: chrono::Utc::now(),
+            first_relevant_position: first_relevant,
+            relevance_scores: Some(relevance),
         }
     }
 
@@ -424,11 +499,71 @@ mod tests {
     #[tokio::test]
     async fn test_reset() {
         let analytics = SearchAnalytics::default();
-        
+
         analytics.record_search(create_test_event("test", 5, 100)).await;
         analytics.reset().await;
-        
+
         let perf = analytics.get_performance().await;
         assert_eq!(perf.total_searches, 0);
+    }
+
+    #[tokio::test]
+    async fn test_mrr_calculation() {
+        let analytics = SearchAnalytics::default();
+
+        // 第一条查询：相关结果在位置1，RR = 1/1 = 1
+        analytics.record_search(create_test_event_with_relevance("query1", 5, Some(1), vec![1.0, 0.8, 0.6, 0.4, 0.2])).await;
+
+        let quality = analytics.get_quality_metrics().await;
+        assert!((quality.mean_reciprocal_rank - 1.0).abs() < 0.001);
+        assert_eq!(quality.mrr_sample_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_mrr_multiple_queries() {
+        let analytics = SearchAnalytics::default();
+
+        // 查询1：相关结果在位置1，RR = 1/1 = 1
+        analytics.record_search(create_test_event_with_relevance("query1", 5, Some(1), vec![1.0, 0.8, 0.6, 0.4, 0.2])).await;
+        // 查询2：相关结果在位置2，RR = 1/2 = 0.5
+        analytics.record_search(create_test_event_with_relevance("query2", 5, Some(2), vec![0.8, 1.0, 0.6, 0.4, 0.2])).await;
+
+        let quality = analytics.get_quality_metrics().await;
+        // MRR = (1 + 0.5) / 2 = 0.75
+        assert!((quality.mean_reciprocal_rank - 0.75).abs() < 0.001);
+        assert_eq!(quality.mrr_sample_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_ndcg_calculation() {
+        let analytics = SearchAnalytics::default();
+
+        // 记录一个搜索事件，计算NDCG
+        analytics.record_search(create_test_event_with_relevance("test", 5, Some(2), vec![1.0, 0.8, 0.6, 0.4, 0.2])).await;
+
+        let quality = analytics.get_quality_metrics().await;
+        assert!(quality.ndcg > 0.0);
+        assert!(quality.ndcg <= 1.0);
+        assert_eq!(quality.ndcg_sample_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_ndcg_perfect_ranking() {
+        let analytics = SearchAnalytics::default();
+
+        // 完美排序的NDCG应该接近1.0
+        analytics.record_search(create_test_event_with_relevance("test", 3, Some(1), vec![1.0, 0.8, 0.6])).await;
+
+        let quality = analytics.get_quality_metrics().await;
+        // NDCG应该接近1.0（因为已经按降序排列）
+        assert!(quality.ndcg > 0.9);
+    }
+
+    #[tokio::test]
+    async fn test_dcg_calculation() {
+        // DCG = 1/log2(2) + 0.8/log2(3) + 0.6/log2(4)
+        // DCG = 1 + 0.5 + 0.3 = 1.8
+        let dcg = SearchAnalytics::calculate_dcg(&vec![1.0, 0.8, 0.6]);
+        assert!(dcg > 1.7 && dcg < 1.9);
     }
 }

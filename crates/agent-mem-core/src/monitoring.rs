@@ -593,7 +593,6 @@ mod tests {
             severity: AlertSeverity::Warning,
             enabled: true,
             labels: HashMap::new(),
-        Ok(())
         };
 
         monitoring.add_alert_rule(rule).await?;

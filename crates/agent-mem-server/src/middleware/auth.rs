@@ -193,10 +193,22 @@ pub async fn tenant_isolation_middleware(
 ///
 /// IMPORTANT: Production builds MUST have valid authentication configured.
 pub async fn require_auth_middleware(
-    State(_config): State<crate::config::ServerConfig>,
+    State(config): State<crate::config::ServerConfig>,
     mut request: Request,
     next: Next,
 ) -> Response {
+    // Check if auth is disabled via config
+    if !config.enable_auth {
+        tracing::info!("Auth disabled via config - using default user");
+        let default_user = AuthUser {
+            user_id: "dev-user".to_string(),
+            org_id: "dev-org".to_string(),
+            roles: vec!["admin".to_string(), "user".to_string()],
+        };
+        request.extensions_mut().insert(default_user);
+        return next.run(request).await;
+    }
+
     // Check if AuthUser already exists (from JWT/API key middleware)
     if request.extensions().get::<AuthUser>().is_none() {
         // Development mode: allow default user for testing

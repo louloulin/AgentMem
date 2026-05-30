@@ -43,6 +43,8 @@ libsql = { version = "0.9", optional = true }
 # This prevents lancedb from enabling CPU-specific optimizations that cause linking errors
 lancedb = { version = "0.22.2", optional = true, default-features = false }
 arrow = { version = "56", optional = true }
+arrow-array = { version = "56", optional = true }  # Required for LanceDB vector operations
+arrow-schema = { version = "56", optional = true }  # Required for schema definitions
 
 # FAISS 向量搜索 (可选，需要系统级安装)
 # faiss = { version = "0.12", optional = true }  # 需要系统级 FAISS 安装
@@ -86,7 +88,7 @@ libsql = ["dep:libsql"]
 azure-ai-search = [] # Azure AI Search 企业级搜索
 chroma = []
 faiss = [] # 本地高性能向量搜索 (使用内存实现)
-lancedb = ["dep:lancedb", "dep:arrow", "dep:futures"] # LanceDB 向量数据库
+lancedb = ["dep:lancedb", "dep:arrow", "dep:arrow-array", "dep:arrow-schema", "dep:futures"] # LanceDB 向量数据库
 mongodb = ["dep:mongodb", "dep:bson", "dep:futures"] # MongoDB 文档存储
 qdrant = ["dep:qdrant-client"] # Qdrant 向量数据库
 pinecone = [] # 使用HTTP实现

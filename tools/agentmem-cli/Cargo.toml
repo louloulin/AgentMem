@@ -25,6 +25,10 @@ anyhow = "1.0"
 thiserror = "1.0"
 async-trait = "0.1"
 
+# AgentMem core and MCP
+agent-mem-core = { path = "../../crates/agent-mem-core" }
+agent-mem-tools = { path = "../../crates/agent-mem-tools" }
+
 # HTTP client
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
 
@@ -48,6 +52,8 @@ toml = "0.8"
 # Logging
 env_logger = "0.10"
 log = "0.4"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # Template engine
 handlebars = "4.5"

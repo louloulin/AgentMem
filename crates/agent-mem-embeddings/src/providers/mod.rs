@@ -3,6 +3,7 @@
 pub mod cohere;
 pub mod huggingface;
 pub mod local;
+pub mod mock;
 pub mod openai;
 
 #[cfg(feature = "fastembed")]
@@ -19,6 +20,7 @@ mod local_test;
 pub use cohere::CohereEmbedder;
 pub use huggingface::HuggingFaceEmbedder;
 pub use local::LocalEmbedder;
+pub use mock::MockEmbedder;
 pub use openai::OpenAIEmbedder;
 
 #[cfg(feature = "fastembed")]

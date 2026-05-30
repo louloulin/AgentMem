@@ -19,6 +19,7 @@ pub enum EmbedderEnum {
     Local(LocalEmbedder),
     #[cfg(feature = "cohere")]
     Cohere(CohereEmbedder),
+    Mock(crate::providers::MockEmbedder),
 }
 
 #[async_trait]
@@ -34,6 +35,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::Local(embedder) => embedder.embed(text).await,
             #[cfg(feature = "cohere")]
             EmbedderEnum::Cohere(embedder) => embedder.embed(text).await,
+            EmbedderEnum::Mock(embedder) => embedder.embed(text).await,
         }
     }
 
@@ -48,6 +50,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::Local(embedder) => embedder.embed_batch(texts).await,
             #[cfg(feature = "cohere")]
             EmbedderEnum::Cohere(embedder) => embedder.embed_batch(texts).await,
+            EmbedderEnum::Mock(embedder) => embedder.embed_batch(texts).await,
         }
     }
 
@@ -62,6 +65,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::Local(embedder) => embedder.dimension(),
             #[cfg(feature = "cohere")]
             EmbedderEnum::Cohere(embedder) => embedder.dimension(),
+            EmbedderEnum::Mock(embedder) => embedder.dimension(),
         }
     }
 
@@ -76,6 +80,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::Local(embedder) => embedder.provider_name(),
             #[cfg(feature = "cohere")]
             EmbedderEnum::Cohere(embedder) => embedder.provider_name(),
+            EmbedderEnum::Mock(embedder) => embedder.provider_name(),
         }
     }
 
@@ -88,6 +93,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::HuggingFace(embedder) => embedder.model_name(),
             #[cfg(feature = "local")]
             EmbedderEnum::Local(embedder) => embedder.model_name(),
+            EmbedderEnum::Mock(embedder) => embedder.model_name(),
         }
     }
 
@@ -102,6 +108,7 @@ impl Embedder for EmbedderEnum {
             EmbedderEnum::Local(embedder) => embedder.health_check().await,
             #[cfg(feature = "cohere")]
             EmbedderEnum::Cohere(embedder) => embedder.health_check().await,
+            EmbedderEnum::Mock(embedder) => embedder.health_check().await,
         }
     }
 }
@@ -181,6 +188,11 @@ impl EmbeddingFactory {
                         "Cohere feature not enabled",
                     ));
                 }
+            }
+            "mock" => {
+                use crate::providers::MockEmbedder;
+                let embedder = MockEmbedder::from_config(config);
+                EmbedderEnum::Mock(embedder)
             }
             _ => return Err(AgentMemError::unsupported_provider(&config.provider)),
         };
@@ -575,11 +587,48 @@ impl RealEmbeddingFactory {
                                 "Fallback embedder creation also failed: {}",
                                 fallback_err
                             );
-                            Err(e) // 返回原始错误
+
+                            // 最后尝试 MockEmbedder 作为最终 fallback
+                            tracing::info!("Attempting fallback to MockEmbedder (offline mode)");
+                            let mock_config = EmbeddingConfig {
+                                provider: "mock".to_string(),
+                                model: "mock-384d".to_string(),
+                                dimension: config.dimension,
+                                ..Default::default()
+                            };
+
+                            match EmbeddingFactory::create_embedder(&mock_config).await {
+                                Ok(embedder) => {
+                                    tracing::info!("Successfully created MockEmbedder as final fallback");
+                                    Ok(embedder)
+                                }
+                                Err(mock_err) => {
+                                    tracing::error!("MockEmbedder fallback also failed: {}", mock_err);
+                                    Err(e) // 返回原始错误
+                                }
+                            }
                         }
                     }
                 } else {
-                    Err(e)
+                    // 如果 OpenAI 也失败了，尝试 Mock
+                    tracing::info!("OpenAI embedder failed, attempting MockEmbedder");
+                    let mock_config = EmbeddingConfig {
+                        provider: "mock".to_string(),
+                        model: "mock-384d".to_string(),
+                        dimension: config.dimension,
+                        ..Default::default()
+                    };
+
+                    match EmbeddingFactory::create_embedder(&mock_config).await {
+                        Ok(embedder) => {
+                            tracing::info!("Successfully created MockEmbedder");
+                            Ok(embedder)
+                        }
+                        Err(mock_err) => {
+                            tracing::error!("MockEmbedder fallback also failed: {}", mock_err);
+                            Err(e) // 返回原始错误
+                        }
+                    }
                 }
             }
         }

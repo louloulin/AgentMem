@@ -5,7 +5,6 @@ resolver = "2"
 # These can be fixed later without impacting production readiness
 exclude = [
     "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
-    "examples/batch-embedding-optimization-demo",  # 独立示例，不需要workspace集成
     "crates/agent-mem-plugin-sdk/examples/hello_plugin",  # Plugin example - standalone
     "crates/agent-mem-plugin-sdk/examples/memory_processor",  # Plugin example - standalone
     "crates/agent-mem-plugin-sdk/examples/code_analyzer",  # Plugin example - standalone
@@ -31,7 +30,6 @@ members = [
     "crates/agent-mem-client",
     "crates/agent-mem-performance",
     "crates/agent-mem-distributed",
-    "crates/agent-mem-compat",
     "crates/agent-mem-deployment",
     "crates/agent-mem-plugin-sdk",  # Plugin SDK
     "crates/agent-mem-plugins",     # Plugin Manager
@@ -108,12 +106,10 @@ members = [
     "examples/phase6-optimization-demo",
     # "examples/server-demo",  # Temporarily disabled - depends on agent-mem-server
     "examples/client-demo",
-    "examples/mem0-compat-demo",
     # "examples/client-server-integration-test",  # Temporarily disabled - depends on agent-mem-server
     "examples/comprehensive-verification",  # 综合功能验证
     "examples/intelligent-reasoning-demo",
     "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
-    "examples/graph-memory-demo",
     # "examples/test-intelligent-integration",  # ⚠️ 已移至 exclude（使用废弃的 trait API）
     "examples/test-cache",
     "examples/simple-memory-demo",
@@ -128,24 +124,12 @@ members = [
     "examples/storage-migration-demo",
     "examples/embedded-mode-demo",
     "examples/embedded-persistent-demo",
-    "examples/advanced-search-demo",
-    "examples/context-aware-demo",
-    "examples/personalization-demo",
-    "examples/enterprise-security-demo",
     "examples/intelligent-compression-demo",
     "examples/multi-agent-collaboration-demo",
-    "examples/enterprise-monitoring-demo",
-    "examples/storage-optimization-demo",
-    "examples/compute-optimization-demo",
-    "examples/cloud-integration-demo",
-    "examples/procedural-memory-demo",
     "examples/deepseek-test",
     "examples/multimodal-demo",
     "examples/intelligence-demo",
-    "examples/mem5-demo",
-    "examples/enhanced-messages-demo",
     "examples/production-telemetry-demo",
-    "examples/real-implementation-demo",
     "examples/llm-provider-demo",
     # "examples/api-server-demo",  # Temporarily disabled - depends on agent-mem-server
     "examples/multi-tenant-demo",

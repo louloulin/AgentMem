@@ -70,8 +70,26 @@ fn create_cors_layer(config: &ServerConfig) -> CorsLayer {
         .map(|s| s.trim())
         .collect();
 
+    // If wildcard, allow all origins
     if origins.len() == 1 && origins[0] == "*" {
-        return create_cors_layer(config);
+        return CorsLayer::new()
+            .allow_origin(tower_http::cors::Any)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::PATCH,
+                Method::OPTIONS,
+                Method::HEAD,
+            ])
+            .allow_headers([
+                HeaderName::from_static("content-type"),
+                HeaderName::from_static("authorization"),
+                HeaderName::from_static("x-requested-with"),
+                HeaderName::from_static("accept"),
+            ])
+            .max_age(std::time::Duration::from_secs(config.cors_max_age));
     }
 
     let methods: Vec<Method> = config
@@ -104,11 +122,13 @@ fn create_cors_layer(config: &ServerConfig) -> CorsLayer {
     cors = cors.max_age(std::time::Duration::from_secs(config.cors_max_age));
 
     for origin in origins {
-        cors = cors.allow_origin(
-            origin
-                .parse::<HeaderValue>()
-                .unwrap_or(HeaderValue::from_static("*")),
-        );
+        if !origin.is_empty() {
+            cors = cors.allow_origin(
+                origin
+                    .parse::<HeaderValue>()
+                    .unwrap_or(HeaderValue::from_static("*")),
+            );
+        }
     }
 
     cors
@@ -138,6 +158,7 @@ pub async fn create_router(
     let mcp_server = Arc::new(McpServer::new(mcp_config, tool_executor));
 
     // Initialize MCP server
+    info!("Initializing MCP server...");
     mcp_server
         .initialize()
         .await
@@ -146,17 +167,20 @@ pub async fn create_router(
     info!("MCP server initialized successfully");
 
     // 🆕 Initialize file-centric state with resource and category managers
+    info!("Initializing file-centric state...");
     let file_centric_state = Arc::new(FileCentricState::new());
     info!("File-centric state initialized");
 
     // 🆕 Initialize webhook state
+    info!("Initializing webhook state...");
     let webhook_state = Arc::new(crate::routes::webhook::WebhookState::new());
     info!("Webhook state initialized");
 
     // 🆕 Initialize multimodal & search analytics state
+    info!("Initializing multimodal storage...");
     use agent_mem_core::multimodal_storage::{MultimodalStorage, MultimodalStorageConfig, MockImageVectorizer, InMemoryMultimodalStorage};
     use agent_mem_core::search::search_analytics::{SearchAnalytics, SearchAnalyticsConfig};
-    
+
     let in_memory = InMemoryMultimodalStorage::new();
     let vectorizer = MockImageVectorizer::new(512);
     let multimodal_storage = MultimodalStorage::new(
@@ -164,10 +188,12 @@ pub async fn create_router(
         Arc::new(vectorizer),
         MultimodalStorageConfig::default(),
     );
-    
+    info!("Multimodal storage initialized");
+
     let combined_state = multimodal::MultimodalState {
         storage: Arc::new(multimodal_storage),
     };
+    info!("Multimodal state initialized");
     
     let mut app = Router::new()
         // ========== 核心 Memory 路由 (6) ==========
@@ -290,10 +316,10 @@ pub async fn create_router(
         // MCP Prompts
         .route("/api/v1/mcp/prompts", get(mcp::list_prompts))
         .route("/api/v1/mcp/prompts/:name", get(mcp::get_prompt))
-        // MCP Resources
+        // MCP Resources - subscribe must come before wildcard to avoid conflict
+        .route("/api/v1/mcp/resources/subscribe", post(mcp::subscribe_resource))
         .route("/api/v1/mcp/resources", get(mcp::list_resources))
         .route("/api/v1/mcp/resources/*uri", get(mcp::read_resource))
-        .route("/api/v1/mcp/resources/*uri/subscribe", post(mcp::subscribe_resource))
         .route("/api/v1/mcp/subscriptions/:id", delete(mcp::unsubscribe_resource));
 
     // Graph visualization routes (PostgreSQL only)
@@ -326,33 +352,103 @@ pub async fn create_router(
     let circuit_breaker_manager = Arc::new(CircuitBreakerManager::new());
 
     // Add middleware and shared state (order matters: last added = first executed)
-    let app = app
-        // Add middleware (these middleware layers execute BEFORE the Extension layers below)
-        .layer(create_cors_layer(&config))
-        .layer(TraceLayer::new_for_http())
-        .layer(axum_middleware::from_fn(circuit_breaker_middleware)) // ✅ Phase 2.2.5: 熔断器模式
-        .layer(axum_middleware::from_fn(quota_middleware))
-        .layer(axum_middleware::from_fn(audit_logging_middleware))
-        .layer(axum_middleware::from_fn(rbac_middleware)) // ✅ RBAC权限检查
-        .layer(axum_middleware::from_fn(metrics_middleware))
-        // Add default auth middleware (injects default AuthUser when auth is disabled)
-        .layer(axum_middleware::from_fn_with_state(
-            config.clone(),
-            require_auth_middleware,
-        ))
-        // Add shared state via Extension (must be after middleware that uses them)
-        .layer(Extension(circuit_breaker_manager)) // ✅ Phase 2.2.5: 熔断器管理器
-        .layer(Extension(rbac_checker)) // ✅ RBAC检查器
-        .layer(Extension(sse_manager))
-        .layer(Extension(ws_manager))
-        .layer(Extension(mcp_server)) // 🆕 Add MCP server extension
-        .layer(Extension(metrics_registry))
-        .layer(Extension(memory_manager))
-        .layer(Extension(file_centric_state)) // 🆕 File-centric resource/category managers
-        .layer(Extension(webhook_state)) // 🆕 Webhook state
-        .layer(Extension(Arc::new(repositories)))
-        .layer(Extension(Arc::new(QuotaManager::new()))); // ✅ API限流管理器
+    // Add middleware and Extension layers in separate function to avoid stack overflow
+    let app = build_router_with_layers(app, config, circuit_breaker_manager, rbac_checker,
+        sse_manager, ws_manager, mcp_server, metrics_registry, memory_manager,
+        file_centric_state, webhook_state, repositories).await?;
 
+    Ok(app)
+}
+
+// Separate function to build router with layers (avoids stack overflow)
+async fn build_router_with_layers(
+    mut app: Router,
+    config: ServerConfig,
+    circuit_breaker_manager: Arc<CircuitBreakerManager>,
+    rbac_checker: Arc<RbacChecker>,
+    sse_manager: Arc<SseManager>,
+    ws_manager: Arc<WebSocketManager>,
+    mcp_server: Arc<agent_mem_tools::mcp::McpServer>,
+    metrics_registry: Arc<MetricsRegistry>,
+    memory_manager: Arc<MemoryManager>,
+    file_centric_state: Arc<FileCentricState>,
+    webhook_state: Arc<crate::routes::webhook::WebhookState>,
+    repositories: Repositories,
+) -> ServerResult<Router> {
+    info!("Building router with layers...");
+
+    // Add middleware
+    info!("Adding CORS layer...");
+    app = app.layer(create_cors_layer(&config));
+    info!("CORS layer added");
+
+    info!("Adding TraceLayer...");
+    app = app.layer(TraceLayer::new_for_http());
+    info!("TraceLayer added");
+
+    info!("Adding circuit breaker middleware...");
+    app = app.layer(axum_middleware::from_fn(circuit_breaker_middleware));
+    info!("Circuit breaker middleware added");
+
+    info!("Adding quota middleware...");
+    app = app.layer(axum_middleware::from_fn(quota_middleware));
+    info!("Quota middleware added");
+
+    info!("Adding audit logging middleware...");
+    app = app.layer(axum_middleware::from_fn(audit_logging_middleware));
+    info!("Audit logging middleware added");
+
+    info!("Adding RBAC middleware...");
+    app = app.layer(axum_middleware::from_fn(rbac_middleware));
+    info!("RBAC middleware added");
+
+    info!("Adding metrics middleware...");
+    app = app.layer(axum_middleware::from_fn(metrics_middleware));
+    info!("Metrics middleware added");
+
+    info!("Adding auth middleware...");
+    app = app.layer(axum_middleware::from_fn_with_state(
+        config.clone(),
+        require_auth_middleware,
+    ));
+    info!("Auth middleware added");
+
+    // Add Extension layers one at a time
+    info!("Adding Extension layers...");
+    app = app.layer(Extension(circuit_breaker_manager));
+    info!("Layer 1/11: circuit_breaker_manager");
+
+    app = app.layer(Extension(rbac_checker));
+    info!("Layer 2/11: rbac_checker");
+
+    app = app.layer(Extension(sse_manager));
+    info!("Layer 3/11: sse_manager");
+
+    app = app.layer(Extension(ws_manager));
+    info!("Layer 4/11: ws_manager");
+
+    app = app.layer(Extension(mcp_server));
+    info!("Layer 5/11: mcp_server");
+
+    app = app.layer(Extension(metrics_registry));
+    info!("Layer 6/11: metrics_registry");
+
+    app = app.layer(Extension(memory_manager));
+    info!("Layer 7/11: memory_manager");
+
+    app = app.layer(Extension(file_centric_state));
+    info!("Layer 8/11: file_centric_state");
+
+    app = app.layer(Extension(webhook_state));
+    info!("Layer 9/11: webhook_state");
+
+    app = app.layer(Extension(Arc::new(repositories)));
+    info!("Layer 10/11: repositories");
+
+    app = app.layer(Extension(Arc::new(QuotaManager::new())));
+    info!("Layer 11/11: quota_manager");
+
+    info!("All Extension layers added. Router build complete!");
     Ok(app)
 }
 

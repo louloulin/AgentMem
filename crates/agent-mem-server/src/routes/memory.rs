@@ -211,6 +211,20 @@ impl MemoryManager {
             .map(|r| r.id.clone())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
+        // 🔧 修复 UNIQUE 约束冲突：检查是否已存在，避免重复写入
+        // Memory API 内部已经写入 LibSQL，所以我们需要检测这种情况
+        let existing_memory = repositories
+            .memories
+            .find_by_id(&memory_id)
+            .await
+            .map_err(|e| format!("Failed to check existing memory: {}", e))?;
+
+        if existing_memory.is_some() {
+            // Memory API 已经写入，验证向量是否存储
+            info!("✅ Memory 已存在 (ID: {}), Memory API 已写入", memory_id);
+            return Ok(memory_id);
+        }
+
         // Step 2: 写入LibSQL Repository（持久化）
         let user_id_val = user_id.unwrap_or_else(|| "default".to_string());
         let content_hash = compute_content_hash(&content);

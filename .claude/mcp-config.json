@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agentmem": {
+      "type": "stdio",
+      "command": "cargo",
+      "args": ["run", "-p", "agent-mem-server", "--"],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "description": "AgentMem Memory Server - Enterprise-grade AI Agent memory management"
+    }
+  }
+}

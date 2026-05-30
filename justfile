@@ -153,17 +153,7 @@ audit:
 
 # 等待服务就绪（智能健康检查）
 _wait-healthy url max_attempts="30":
-    @bash -c 'set +u; i=1; while [ $$i -le {{max_attempts}} ]; do \
-        if curl -s {{url}} > /dev/null 2>&1; then \
-            echo "✅ 服务已就绪 (尝试 $$i/{{max_attempts}})"; \
-            exit 0; \
-        fi; \
-        echo "⏳ 等待服务启动... ($$i/{{max_attempts}})"; \
-        i=$$((i + 1)); \
-        sleep 1; \
-    done; \
-    echo "❌ 服务启动超时"; \
-    exit 1'
+    @bash -c 'i=1; while [ $i -le {{max_attempts}} ]; do if curl -s {{url}} > /dev/null 2>&1; then echo "✅ 服务已就绪 (尝试 $i/{{max_attempts}})"; exit 0; fi; echo "⏳ 等待服务启动... ($i/{{max_attempts}})"; i=$((i + 1)); sleep 1; done; echo "❌ 服务启动超时"; exit 1'
 
 # 停止现有服务进程
 _stop-backend:
@@ -186,11 +176,17 @@ _stop-frontend:
 # 服务启动
 # ============================================================================
 
+# 💡 启动模式说明:
+# - start-server: 前台运行，方便调试
+# - start-server-bg: 后台运行，正式使用
+# - start-local / start-local-bg: 使用 MockEmbedder，适合中国网络环境
+# - start-server-plugins: 带插件支持
+
 # 启动 HTTP API 服务器（前台运行，无认证模式）
 start-server:
     @echo "🚀 启动 HTTP API 服务器（前台运行）..."
     @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
-    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用（服务器已在运行）"; exit 1; fi'
     @just _stop-backend
     @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
@@ -205,13 +201,14 @@ start-server:
 start-server-bg:
     @echo "🚀 启动 HTTP API 服务器（后台运行）..."
     @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
-    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用（服务器已在运行）"; exit 1; fi'
     @just _stop-backend
     @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
     export AGENT_MEM_ENABLE_AUTH="false" && \
     export EMBEDDER_PROVIDER="fastembed" && \
     export EMBEDDER_MODEL="BAAI/bge-small-en-v1.5" && \
+    export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}" && \
     export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
     export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
     nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
@@ -229,7 +226,7 @@ start-server-plugins:
     @echo "🚀 启动 HTTP API 服务器（插件支持，后台运行）..."
     @echo "1️⃣  编译带插件的服务器..."
     @cargo build --release --bin agent-mem-server --features agent-mem/plugins
-    @bash -c 'if lsof -i :8080 > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用（服务器已在运行）"; exit 1; fi'
     @just _stop-backend
     @bash -c 'export ENABLE_AUTH="false" && \
     export SERVER_ENABLE_AUTH="false" && \
@@ -276,14 +273,14 @@ start-mcp:
 # 启动前端 UI（前台运行）
 start-ui:
     @echo "🚀 启动前端 UI（前台运行）..."
-    @bash -c 'if lsof -i :3001 > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用"; exit 1; fi'
+    @bash -c 'if lsof -i :3001 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用（前端已在运行）"; exit 1; fi'
     @just _stop-frontend
     @cd agentmem-ui && npm run dev
 
 # 启动前端 UI（后台运行）
 start-ui-bg:
     @echo "🚀 启动前端 UI（后台运行）..."
-    @bash -c 'if lsof -i :3001 > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用"; exit 1; fi'
+    @bash -c 'if lsof -i :3001 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 3001 已被占用（前端已在运行）"; exit 1; fi'
     @just _stop-frontend
     @bash -c 'ROOT_DIR=$(pwd) && \
     cd agentmem-ui && \
@@ -291,9 +288,9 @@ start-ui-bg:
         echo "📦 安装前端依赖..."; \
         npm install; \
     fi && \
-    nohup npm run dev > "$${ROOT_DIR}/frontend.log" 2>&1 & \
-    PID=$$! && echo $$PID > "$${ROOT_DIR}/frontend.pid" && \
-    echo "📝 前端 PID: $$PID" && \
+    nohup npm run dev > "$ROOT_DIR/frontend.log" 2>&1 & \
+    PID=$! && echo $PID > "$ROOT_DIR/frontend.pid" && \
+    echo "📝 前端 PID: $PID" && \
     echo "📝 日志文件: frontend.log"'
     @just _wait-healthy "http://localhost:3001"
     @echo "✅ 前端服务已启动"
@@ -702,6 +699,64 @@ env:
     echo "EMBEDDER_MODEL: ${EMBEDDER_MODEL:-未设置}"; \
     echo "DYLD_LIBRARY_PATH: ${DYLD_LIBRARY_PATH:-未设置}"; \
     echo "ORT_DYLIB_PATH: ${ORT_DYLIB_PATH:-未设置}"'
+
+# ============================================================================
+# 本地/离线启动 (中国网络环境)
+# ============================================================================
+
+# 启动服务器（使用 MockEmbedder，适合离线/中国网络）
+start-local:
+    @echo "🚀 启动 HTTP API 服务器（本地模式）..."
+    @echo "📌 使用 MockEmbedder，无需网络下载模型"
+    @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用（服务器已在运行）"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="mock" && \
+    export EMBEDDER_MODEL="mock-384d" && \
+    export HF_ENDPOINT="https://hf-mirror.com" && \
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    ./target/release/agent-mem-server'
+
+# 启动服务器后台运行（本地模式）
+start-local-bg:
+    @echo "🚀 启动 HTTP API 服务器（本地模式，后台运行）..."
+    @echo "📌 使用 MockEmbedder，无需网络下载模型"
+    @bash -c 'if [ ! -f "./target/release/agent-mem-server" ]; then echo "❌ 二进制文件不存在: ./target/release/agent-mem-server"; exit 1; fi'
+    @bash -c 'if lsof -i :8080 -s TCP:LISTEN > /dev/null 2>&1; then echo "⚠️  端口 8080 已被占用（服务器已在运行）"; exit 1; fi'
+    @just _stop-backend
+    @bash -c 'export ENABLE_AUTH="false" && \
+    export SERVER_ENABLE_AUTH="false" && \
+    export AGENT_MEM_ENABLE_AUTH="false" && \
+    export EMBEDDER_PROVIDER="mock" && \
+    export EMBEDDER_MODEL="mock-384d" && \
+    export HF_ENDPOINT="https://hf-mirror.com" && \
+    export DYLD_LIBRARY_PATH="$(pwd)/lib:$(pwd)/target/release:$$DYLD_LIBRARY_PATH" && \
+    export ORT_DYLIB_PATH="$(pwd)/lib/libonnxruntime.1.22.0.dylib" && \
+    nohup ./target/release/agent-mem-server > backend.log 2>&1 & \
+    PID=$$! && echo $$PID > backend.pid && \
+    echo "📝 后端 PID: $$PID" && \
+    echo "📝 日志文件: backend.log"'
+    @just _wait-healthy "http://localhost:8080/health"
+    @echo "✅ 后端服务已启动（本地模式）"
+    @echo "   • API: http://localhost:8080"
+    @echo "   • 健康检查: http://localhost:8080/health"
+    @echo "   • Embedder: MockEmbedder (离线模式)"
+
+# 下载 FastEmbed 模型（预先下载，避免运行时下载）
+download-models:
+    @echo "📥 下载嵌入模型..."
+    @echo "⚠️  这可能需要几分钟时间..."
+    @bash -c 'export HF_ENDPOINT="https://hf-mirror.com" && \
+    mkdir -p ~/.cache/huggingface/models && \
+    echo "正在下载 BAAI/bge-small-en-v1.5 模型..." && \
+    cargo run --example download_model 2>/dev/null || \
+    python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-small-en-v1.5', cache_dir='~/.cache/huggingface/models')" 2>/dev/null || \
+    echo "💡 请手动下载模型或使用 start-local 模式"'
+    @echo "✅ 模型下载完成（如果成功）"
 
 # ============================================================================
 # 演示相关（按照 x.md 演示计划）
