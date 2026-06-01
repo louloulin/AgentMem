@@ -292,3 +292,50 @@ config.save_to_file("config.json").await.unwrap();
 let from_file = UnifiedConfig::from_file("config.json").await.unwrap();
 ```
 
+
+---
+
+## Phase 3 完成: 配置管理
+
+### 已实现功能
+
+| 功能 | 状态 |
+|------|------|
+| ConfigManager | ✅ |
+| YAML 配置加载 | ✅ |
+| JSON 配置加载 | ✅ |
+| 环境变量覆盖 | ✅ |
+| 配置验证 | ✅ |
+| 自动文件格式检测 | ✅ |
+
+### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| AGENTMEM_WORKING_CAPACITY | 工作记忆容量 |
+| AGENTMEM_CORE_CAPACITY | 核心记忆容量 |
+| AGENTMEM_PROMOTE_ACCESS_THRESHOLD | 晋升访问阈值 |
+| AGENTMEM_ARCHIVE_MAX_ITEMS | 归档最大项数 |
+| AGENTMEM_REVIEW_TRIGGER_THRESHOLD | 复习触发阈值 |
+
+### API
+
+```rust
+use agent_mem_cognitive::ConfigManager;
+
+// 从文件加载
+let manager = ConfigManager::from_yaml_file("config.yaml").await.unwrap();
+
+// 从字符串加载
+let manager = ConfigManager::from_json(json).unwrap();
+
+// 环境变量自动覆盖
+let manager = ConfigManager::from_yaml(yaml).unwrap();
+
+// 保存到文件
+manager.save_to_file("config.yaml").await.unwrap();
+
+// 验证
+manager.validate().unwrap();
+```
+

@@ -11,7 +11,8 @@
 //! - Unified memory manager (统一记忆管理)
 //! - Async support (异步支持)
 //! - Error handling (错误处理)
-//! - Storage backend (持久化存储) 🆕
+//! - Storage backend (持久化存储)
+//! - Configuration management (配置管理) 🆕
 
 mod episodic;
 mod semantic;
@@ -32,6 +33,7 @@ mod unified;     // 🆕 统一记忆管理
 mod error;       // 🆕 错误处理
 mod async_unified; // 🆕 异步支持
 mod storage;     // 🆕 持久化存储
+mod config;      // 🆕 配置管理
 
 pub use types::*;
 pub use episodic::*;
@@ -56,3 +58,4 @@ pub use storage::{
     StorageManager, InMemoryStorageManager, FileStorageManager,
     StoredMemory
 };
+pub use config::{ConfigManager, ConfigValidationError};
