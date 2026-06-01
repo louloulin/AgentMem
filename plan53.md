@@ -1,7 +1,7 @@
 # AgentMem 生产级别改造计划 v4.0
 
 **日期**: 2026-06-01
-**版本**: v4.0 (Phase 1 持久化存储完成)
+**版本**: v4.1 (Phase 1-2 完成)
 **目标**: 将 agent-mem-cognitive 提升到生产级别
 
 ---
@@ -9,7 +9,7 @@
 ## 一、测试状态
 
 ```
-agent-mem-cognitive: 42 passed ✅ (+2 storage tests)
+agent-mem-cognitive: 43 passed ✅ (+2 storage tests)
 ```
 
 ---
@@ -17,7 +17,7 @@ agent-mem-cognitive: 42 passed ✅ (+2 storage tests)
 ## 二、实现进度
 
 ```
-已完成: 8/15 (53%) ✅ (+1 Phase 1)
+已完成: 9/15 (60%) ✅ (+1 Phase 1)
 待实现: 7/15 (47%)
 ```
 
