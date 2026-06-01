@@ -64,3 +64,6 @@ pub use storage::{
 pub use config::{ConfigManager, ConfigValidationError};
 pub use metrics::{MemoryMetrics, MetricsCollector, OperationTimer};
 pub use lru::{LruCache, LruTier};
+mod integration;
+mod resilience;
+pub use resilience::{CircuitBreaker, RateLimiter, CircuitState};
