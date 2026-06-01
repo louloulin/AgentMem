@@ -1,23 +1,16 @@
 //! AgentMem Cognitive Memory Module
 //! 
-//! Implements the 8 types of cognitive memories for AgentMem:
-//! - Episodic: Event-based memories with temporal context
-//! - Semantic: Factual knowledge and concepts
-//! - Procedural: Skills and how-to knowledge
-//! - Working: Short-term active processing
-//! - Core: Persistent identity and preferences
-//! - Resource: Multimedia and external resources
-//! - Knowledge: Structured knowledge graphs
-//! - Contextual: Environment-aware information
+//! Implements the 8 types of cognitive memories for AgentMem with production-ready features.
 //! 
-//! Also includes:
-//! - Forgetting curve (Ebbinghaus)
-//! - Memory consolidation and fusion
+//! Features:
+//! - 8 types of cognitive memories (Episodic, Semantic, Procedural, Working, Core, Resource, Knowledge, Contextual)
 //! - Memory hierarchy (层级记忆管理)
 //! - Smart tiering (智能分层器)
 //! - Archive memory manager (归档记忆管理)
 //! - Intelligent review trigger (智能复习触发)
 //! - Unified memory manager (统一记忆管理)
+//! - Async support (异步支持)
+//! - Error handling (错误处理)
 
 mod episodic;
 mod semantic;
@@ -35,6 +28,8 @@ mod tiering;     // 🆕 智能分层器
 mod archive;     // 🆕 归档记忆管理
 mod review;      // 🆕 智能复习触发
 mod unified;     // 🆕 统一记忆管理
+mod error;       // 🆕 错误处理
+mod async_unified; // 🆕 异步支持
 
 pub use types::*;
 pub use episodic::*;
@@ -51,4 +46,6 @@ pub use hierarchy::{MemoryTier, TieredMemoryItem, MemoryHierarchy, MemoryHierarc
 pub use tiering::{SmartTiering, TieringConfig};
 pub use archive::{ArchiveMemoryManager, ArchiveConfig, ArchiveStats, ArchivedItem};
 pub use review::{ReviewTriggerManager, ReviewConfig, ReviewStats, ReviewTrigger, ReviewPriority};
-pub use unified::{UnifiedMemoryManager, UnifiedConfig, UnifiedStats, SearchResult};  // 🆕 统一管理导出
+pub use unified::{UnifiedMemoryManager, UnifiedConfig, UnifiedStats, SearchResult};
+pub use error::{MemoryError, Result};
+pub use async_unified::{AsyncUnifiedMemoryManager, AsyncUnifiedConfig, AsyncUnifiedStats, AsyncSearchResult};

@@ -124,16 +124,29 @@ impl MemoryHierarchy {
     pub fn stats(&self) -> MemoryHierarchyStats {
         MemoryHierarchyStats {
             working_count: self.working.len(),
+            working_capacity: self.working_capacity,
             core_count: self.core.len(),
+            core_capacity: self.core_capacity,
             archive_count: self.archive.len(),
         }
+    }
+    
+    /// Get capacity limits
+    pub fn working_capacity(&self) -> usize {
+        self.working_capacity
+    }
+    
+    pub fn core_capacity(&self) -> usize {
+        self.core_capacity
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryHierarchyStats {
     pub working_count: usize,
+    pub working_capacity: usize,
     pub core_count: usize,
+    pub core_capacity: usize,
     pub archive_count: usize,
 }
 
