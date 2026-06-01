@@ -36,6 +36,7 @@ mod async_unified;
 mod storage;
 mod config;
 mod metrics;
+mod lru;
 
 pub use types::*;
 pub use episodic::*;
@@ -62,3 +63,4 @@ pub use storage::{
 };
 pub use config::{ConfigManager, ConfigValidationError};
 pub use metrics::{MemoryMetrics, MetricsCollector, OperationTimer};
+pub use lru::{LruCache, LruTier};

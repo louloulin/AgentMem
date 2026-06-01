@@ -375,3 +375,33 @@ let metrics = collector.snapshot();
 println!("Total operations: {}", metrics.total_operations);
 ```
 
+
+---
+
+## Phase 5 完成: LRU 缓存
+
+### 已实现功能
+
+| 功能 | 状态 |
+|------|------|
+| LruCache | ✅ |
+| LruTier | ✅ |
+| 自动淘汰 | ✅ |
+| 访问顺序追踪 | ✅ |
+
+### API
+
+```rust
+use agent_mem_cognitive::{LruCache, LruTier};
+
+// 创建 LRU 缓存
+let mut cache = LruCache::new(100);
+
+// 插入/获取
+cache.put("key1", "value1");
+assert_eq!(cache.get(&"key1"), Some(&"value1"));
+
+// 自动淘汰最久未使用的
+cache.put("key2", "value2");
+```
+
