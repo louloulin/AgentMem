@@ -1,0 +1,32 @@
+[package]
+name = "agent-mem-types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core type definitions for AgentMem - extracted from types.rs for better modularity"
+
+[dependencies]
+# Async runtime
+async-trait.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+# Regex for content validation
+regex = "1.10"
+
+[features]
+default = []

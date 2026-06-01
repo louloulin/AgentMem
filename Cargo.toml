@@ -4,46 +4,34 @@ resolver = "2"
 # Temporarily exclude examples with compilation errors (non-core functionality)
 # These can be fixed later without impacting production readiness
 exclude = [
-    "examples/test-intelligent-integration",  # ⚠️ 使用已废弃的 trait API，需要重写
-    "crates/agent-mem-plugin-sdk/examples/hello_plugin",  # Plugin example - standalone
-    "crates/agent-mem-plugin-sdk/examples/memory_processor",  # Plugin example - standalone
-    "crates/agent-mem-plugin-sdk/examples/code_analyzer",  # Plugin example - standalone
 ]
 
 members = [
     # 核心Crates (逐步添加)
     "crates/agent-mem-traits",
+    "crates/agent-mem-types",
+    "crates/agent-mem-engine",
+    "crates/agent-mem-search",
+    "crates/agent-mem-cognitive",
     "crates/agent-mem-utils",
     "crates/agent-mem-config",
     "crates/agent-mem-core",
     "crates/agent-mem",  # 新增：统一 API
-    "crates/agent-mem-resource",  # ✨ 新增：Resource 资源抽象层
-    "crates/agent-mem-category",  # ✨ 新增：Category 类别层级系统
-    "crates/agent-mem-extraction", # ✨ 新增：Extraction 提取管道框架
-    "crates/agent-mem-proactive", # ✨ 新增：Proactive 主动代理
     "crates/agent-mem-llm",
     "crates/agent-mem-storage",
-    "crates/agent-mem-embeddings",
-    "crates/agent-mem-intelligence",
-    "crates/agent-mem-memvid",  # ✨ 新增：MemVid 存储后端
     "crates/agent-mem-server",  # ✅ Re-enabled for justfile build support
     "crates/agent-mem-client",
     "crates/agent-mem-performance",
-    "crates/agent-mem-distributed",
-    "crates/agent-mem-deployment",
-    "crates/agent-mem-plugin-sdk",  # Plugin SDK
-    "crates/agent-mem-plugins",     # Plugin Manager
     "crates/agent-mem-event-bus",   # Event bus for pub/sub messaging
     "crates/agent-mem-working-memory", # Working memory service
     "crates/agent-mem-forgetting",  # Forgetting mechanism with Ebbinghaus curve
-    "crates/agent-mem-metacognition", # Metacognition and auto-consolidation
     # "crates/agent-mem-lumosai",  # Temporarily disabled - missing lumosai_core dependency
-    # "crates/agent-mem-embeddings",
     # "crates/agent-mem-session",
-    # "crates/agent-mem-intelligence",
 
     # 多语言绑定
     "crates/agent-mem-python",  # ✅ FIXED: Upgraded pyo3-asyncio 0.21, Arc<RwLock<>> pattern
+    "crates/agent-mem-plugin-sdk",  # Plugin SDK
+    "crates/agent-mem-plugins",  # Plugin Manager
     # "bindings/agent-mem-node",
     # "bindings/agent-mem-c",
 
@@ -59,103 +47,27 @@ members = [
     # "tools/agent-mem-bench",
 
     # 示例
-    "examples/agent-from-env-demo",
-    "examples/production-memory-demo",
-    "examples/env-config-demo",
-    "examples/importance-scoring-demo",
-    "examples/vector-search-demo",
-    "examples/llm-memory-analysis-demo",
-    "examples/error-handling-demo",
     "examples/mcp-stdio-server",
-    "examples/langgraph-integration-demo",
-    "examples/user-management-demo",
-    "examples/migration-demo",
-    "examples/performance-demo",
-    "examples/performance-optimization-demo",
-    "examples/agent-lifecycle-demo",
-    "examples/database-schema-demo",
-    "examples/entity-relation-extraction-demo",
-    "examples/system-metrics-demo",
-    "examples/onnx-embedding-demo",
-    "examples/mcp-resources-demo",
-    "examples/mcp-prompts-demo",
-    "examples/mcp-transport-demo",
-    "examples/mcp-tool-discovery-demo",
-    "examples/mcp-auth-demo",
-    "examples/mcp-sampling-demo",
-    "examples/mcp-logging-demo",
-    "examples/multimodal-ai-demo",
-    "examples/advanced-reasoning-demo",
-    "examples/single-binary-demo",
-    "examples/observability-demo",
-    "examples/fastembed-demo",
-    "examples/mem0-api-demo",
     "examples/quickstart-zero-config",  # P1: 零配置快速开始示例
     "examples/quickstart-simple-mode",  # P1: 简单模式示例
-    "examples/test-fastembed",  # 测试 FastEmbed 初始化
     "examples/p0-real-verification",  # P0 真实验证
 
     # 示例
-    "examples/demo",
-    "examples/simple-demo",
     "examples/comprehensive-test",
-    "examples/phase1-integration-demo",
-    "examples/phase3-demo",
-    "examples/phase4-demo",  # ✅ FIXED: Updated LLM factory API
-    "examples/phase5-production-demo",
-    "examples/phase6-optimization-demo",
-    # "examples/server-demo",  # Temporarily disabled - depends on agent-mem-server
-    "examples/client-demo",
     # "examples/client-server-integration-test",  # Temporarily disabled - depends on agent-mem-server
     "examples/comprehensive-verification",  # 综合功能验证
-    "examples/intelligent-reasoning-demo",
-    "examples/intelligent-memory-demo",  # ✅ FIXED: Updated to use Memory API
-    # "examples/test-intelligent-integration",  # ⚠️ 已移至 exclude（使用废弃的 trait API）
     "examples/test-cache",
-    "examples/simple-memory-demo",
     "examples/simple-api-test",
     # "examples/real-agentmem-test",  # 暂时禁用：使用旧 API
-    # "examples/local-embedding-demo",  # 暂时禁用：依赖 candle-core 有编译问题
-    # "examples/storage-backend-demo",  # 暂时禁用：需要修复
-    "examples/litellm-demo",
-    "examples/embedding-demo",
-    "examples/vector-store-demo",
-    "examples/multimodal-real-demo",
-    "examples/storage-migration-demo",
-    "examples/embedded-mode-demo",
-    "examples/embedded-persistent-demo",
-    "examples/intelligent-compression-demo",
-    "examples/multi-agent-collaboration-demo",
     "examples/deepseek-test",
-    "examples/multimodal-demo",
-    "examples/intelligence-demo",
-    "examples/production-telemetry-demo",
-    "examples/llm-provider-demo",
-    # "examples/api-server-demo",  # Temporarily disabled - depends on agent-mem-server
-    "examples/multi-tenant-demo",
-    "examples/cloud-native-demo",
     "examples/performance-benchmark",
-    # "examples/intelligent-memory-demo",  # Temporarily excluded - MemoryManager import error, API changes
     "crates/agent-mem-tools",
-    "crates/agent-mem-observability", "examples/system-prompt-demo", "examples/chat-demo",
     # "examples/basic-usage",
     # "examples/advanced-features",
     # "examples/migration-from-agentmen",
     # "examples/mem0-compatibility",
 
 # 新的真实演示示例（2025-10-24）
-    "examples/demo-memory-api",           # Memory API基础演示
-    "examples/demo-multimodal",           # 多模态处理演示
-    "examples/demo-intelligent-chat",     # 智能对话演示
-    "examples/demo-performance-benchmark", # 性能基准测试工具
-    "examples/demo-codebase-memory",      # 代码库记忆与搜索演示（需FastEmbed）
-    "examples/demo-performance-simple",    # 简化性能测试（无Embedder依赖）
-    "examples/demo-memory-viewer",        # 记忆可视化工具（对标MIRIX）
-    "examples/demo-performance-comparison", # 性能对比测试（对标MIRIX）
-    "examples/enhanced-hybrid-search-demo", # 增强混合搜索演示
-    "examples/product-search-demo",        # 商品搜索演示
-    "examples/working-memory-demo",        # Working memory service demo
-    # "examples/hybrid-search-server-demo",  # Temporarily disabled - server dependency
 ]
 
 # Workspace package configuration

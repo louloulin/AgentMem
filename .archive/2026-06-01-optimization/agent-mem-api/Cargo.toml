@@ -1,0 +1,12 @@
+[package]
+name = "agent-mem-api"
+version.workspace = true
+edition.workspace = true
+description = "AgentMem REST API routes - extracted from routes/memory.rs"
+
+[dependencies]
+agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem = { path = "../agent-mem" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

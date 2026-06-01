@@ -12,14 +12,21 @@ categories.workspace = true
 description = "Core memory management for AgentMem memory platform"
 
 [dependencies]
+# Core dependencies
 agent-mem-traits = { path = "../agent-mem-traits" }
 agent-mem-utils = { path = "../agent-mem-utils" }
 agent-mem-config = { path = "../agent-mem-config" }
-agent-mem-resource = { path = "../agent-mem-resource", optional = true }
-agent-mem-extraction = { path = "../agent-mem-extraction", optional = true }
+agent-mem-storage = { path = "../agent-mem-storage" }
+agent-mem-types = { path = "../agent-mem-types" }
+
+# Optional modular crates (extracted from this crate)
+agent-mem-engine = { path = "../agent-mem-engine", optional = true }
+agent-mem-search = { path = "../agent-mem-search", optional = true }
+agent-mem-cognitive = { path = "../agent-mem-cognitive", optional = true }
+
+# Optional integrations
 agent-mem-llm = { path = "../agent-mem-llm" }
 agent-mem-tools = { path = "../agent-mem-tools" }
-agent-mem-storage = { path = "../agent-mem-storage" }
 
 # Core dependencies
 serde.workspace = true
@@ -32,7 +39,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 log = "0.4"
 lru = "0.12"
-parking_lot = "0.12"
+parking_lot.workspace = true
 lazy_static = "1.4"
 
 # Storage and async
@@ -42,11 +49,11 @@ futures = "0.3"
 sha2 = "0.10"
 aes-gcm = "0.10"
 rand = "0.8"
-rand_distr = "0.4"  # For Beta distribution in Thompson Sampling
+rand_distr = "0.4"
 regex = "1.10"
 bincode = "1.3"
-md5 = "0.7"  # For content hashing in deduplication
-toml = "0.8"  # For config file parsing
+md5 = "0.7"
+toml = "0.8"
 validator = { version = "0.18", features = ["derive"] }
 
 # Database dependencies
@@ -67,23 +74,27 @@ name = "phase2_demo"
 path = "examples/phase2_demo.rs"
 
 [features]
-default = ["libsql"]
+# Default: LibSQL + modular crates (all enabled)
+default = ["libsql", "engine", "search", "cognitive"]
+
+# Modular features (extracted from this crate)
+engine = ["dep:agent-mem-engine"]
+search = ["dep:agent-mem-search"]
+cognitive = ["dep:agent-mem-cognitive"]
+
+# Database features
 persistence = ["postgres", "redis-cache"]
 vector-search = []
 postgres = ["sqlx", "agent-mem-traits/sqlx"]
 redis-cache = ["redis"]
 libsql = ["dep:libsql"]
+
+# Optional integrations
+
+# Testing and development
 inline_tests = []
 performance_tests = []
 
 [[bench]]
 name = "memory_operations"
-harness = false
-
-[[bench]]
-name = "graph_reasoning"
-harness = false
-
-[[bench]]
-name = "adaptive_search_benchmark"
 harness = false

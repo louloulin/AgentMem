@@ -1,0 +1,34 @@
+[package]
+name = "agent-mem-engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core engine for AgentMem - lightweight wrapper crate"
+
+[dependencies]
+# Core dependencies (minimal to avoid cycle)
+agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem-types = { path = "../agent-mem-types" }
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+default = []

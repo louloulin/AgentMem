@@ -1,0 +1,38 @@
+[package]
+name = "agent-mem-cognitive"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Cognitive memory module for AgentMem - 8 types of cognitive memories"
+
+[dependencies]
+# Core dependencies (minimal to avoid cycle)
+agent-mem-traits = { path = "../agent-mem-traits" }
+agent-mem-types = { path = "../agent-mem-types" }
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+uuid.workspace = true
+
+# Concurrency
+parking_lot.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+default = []
