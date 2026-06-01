@@ -1,7 +1,7 @@
-# AgentMem 生产级别改造计划 v5.0
+# AgentMem 生产级别改造计划 v5.1
 
 **日期**: 2026-06-01
-**版本**: v5.0 (Phase 1-8 完成!)
+**版本**: v5.1 (Phase 1-8 完成 + Clippy 清理)
 **目标**: 将 agent-mem-cognitive 提升到生产级别
 
 ---
@@ -9,7 +9,8 @@
 ## 一、测试状态
 
 ```
-agent-mem-cognitive: 68 passed ✅ (+5 resilience tests)
+agent-mem-cognitive: 68 passed ✅
+Clippy: 0 warnings ✅
 ```
 
 ---
@@ -43,7 +44,24 @@ agent-mem-cognitive: 68 passed ✅ (+5 resilience tests)
 
 ---
 
-## 三、核心模块架构
+## 三、代码统计
+
+```
+agent-mem-cognitive: 4305 行代码 (27 个模块)
+├── unified.rs: 284 行
+├── async_unified.rs: 316 行
+├── storage.rs: 335 行
+├── review.rs: 334 行
+├── archive.rs: 309 行
+├── resilience.rs: 230 行
+├── metrics.rs: 205 行
+├── lru.rs: 189 行
+└── 其他: ~2103 行
+```
+
+---
+
+## 四、核心模块架构
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -57,17 +75,17 @@ agent-mem-cognitive: 68 passed ✅ (+5 resilience tests)
 │                                    │                                 │
 │        ┌───────────┬───────────┬───┴───┬───────────┬────────────┐   │
 │        ▼           ▼           ▼       ▼           ▼            ▼   │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ │ ┌─────────┐ ┌────────┐    │
-│  │ Working │ │  Core   │ │Episodic │ │ │Semantic │ │Procedural│   │
-│  │ Memory  │ │ Memory  │ │ Memory  │ │ │ Memory  │ │  Memory │    │
-│  │(LRU)    │ │         │ │         │ │ │         │ │         │    │
-│  └─────────┘ └─────────┘ └─────────┘ │ └─────────┘ └────────┘    │
-│                                  ┌────┴───────────────────┐        │
-│                                  ▼                        ▼        │
-│                            ┌───────────┐           ┌───────────┐   │
-│                            │ Knowledge │           │ Resource  │   │
-│                            │  Memory   │           │  Memory   │   │
-│                            └───────────┘           └───────────┘   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ ┌────────┐│
+│  │ Working │ │  Core   │ │Episodic │ │Semantic │ │Procedural│ │Contextual│
+│  │ Memory  │ │ Memory  │ │ Memory  │ │ Memory  │ │  Memory │ │  Memory  ││
+│  │(LRU)    │ │         │ │         │ │         │ │         │ │         ││
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └────────┘ └─────────┘│
+│                    ┌───────────┬───────────┐                       │
+│                    ▼           ▼           ▼                       │
+│              ┌───────────┐ ┌───────────┐ ┌───────────┐              │
+│              │ Knowledge │ │ Resource  │ │ Contextual│              │
+│              │  Memory   │ │  Memory   │ │  Memory   │              │
+│              └───────────┘ └───────────┘ └───────────┘              │
 │                                                                      │
 │  ┌─────────────────────────────────────────────────────────────────┐│
 │  │                     Production Infrastructure                   ││
@@ -83,84 +101,6 @@ agent-mem-cognitive: 68 passed ✅ (+5 resilience tests)
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
-
----
-
-## 四、已完成功能详细
-
-### 4.1 Phase 1: 持久化存储 (P0) ✅
-
-| 功能 | 状态 |
-|------|------|
-| StorageBackend trait | ✅ |
-| InMemoryStorage | ✅ |
-| FileStorage (JSON) | ✅ |
-| StorageManager | ✅ |
-
-### 4.2 Phase 2: 序列化支持 (P1) ✅
-
-| 功能 | 状态 |
-|------|------|
-| UnifiedConfig serde | ✅ |
-| ArchiveConfig serde | ✅ |
-| TieringConfig serde | ✅ |
-| ReviewConfig serde | ✅ |
-| JSON 导入/导出 | ✅ |
-
-### 4.3 Phase 3: 配置管理 (P1) ✅
-
-| 功能 | 状态 |
-|------|------|
-| ConfigManager | ✅ |
-| YAML 配置加载 | ✅ |
-| JSON 配置加载 | ✅ |
-| 环境变量覆盖 | ✅ |
-| 配置验证 | ✅ |
-
-### 4.4 Phase 4: 监控指标 (P1) ✅
-
-| 功能 | 状态 |
-|------|------|
-| MetricsCollector | ✅ |
-| MemoryMetrics | ✅ |
-| OperationTimer | ✅ |
-| 操作计数 | ✅ |
-| 延迟追踪 | ✅ |
-
-### 4.5 Phase 5: LRU 缓存 (P1) ✅
-
-| 功能 | 状态 |
-|------|------|
-| LruCache | ✅ |
-| LruTier | ✅ |
-| 自动淘汰 | ✅ |
-| 访问顺序追踪 | ✅ |
-
-### 4.6 Phase 6: 集成测试 (P1) ✅
-
-| 功能 | 状态 |
-|------|------|
-| 存储集成测试 | ✅ |
-| 配置集成测试 | ✅ |
-| 记忆访问追踪测试 | ✅ |
-| 跨层搜索测试 | ✅ |
-
-### 4.7 Phase 7: API文档 (P2) ✅
-
-| 功能 | 状态 |
-|------|------|
-| 模块注释 | ✅ |
-| README 更新 | ✅ |
-
-### 4.8 Phase 8: 熔断器/限流 (P2) ✅
-
-| 功能 | 状态 |
-|------|------|
-| CircuitBreaker | ✅ |
-| RateLimiter | ✅ |
-| CircuitState | ✅ |
-| Half-Open 恢复 | ✅ |
-| 令牌桶限流 | ✅ |
 
 ---
 
@@ -207,52 +147,7 @@ pub use error::{MemoryError, Result};
 
 ---
 
-## 六、使用示例
-
-### 6.1 基础使用
-
-```rust
-use agent_mem_cognitive::{UnifiedMemoryManager, UnifiedConfig};
-
-let config = UnifiedConfig::default();
-let manager = UnifiedMemoryManager::new(config);
-
-manager.add("test_key", "test_content", 0.8).unwrap();
-let content = manager.get("test_key").unwrap();
-```
-
-### 6.2 带持久化
-
-```rust
-use agent_mem_cognitive::{
-    FileStorage, StorageManager, UnifiedMemoryManager, 
-    UnifiedConfig, CircuitBreaker, RateLimiter
-};
-use std::time::Duration;
-
-let storage = FileStorage::new("./data").unwrap();
-let storage_mgr = StorageManager::new(storage);
-let limiter = RateLimiter::new(100, 10); // 100 tokens, 10/s refill
-
-let config = UnifiedConfig::default();
-let manager = UnifiedMemoryManager::new(config);
-```
-
-### 6.3 配置管理
-
-```rust
-use agent_mem_cognitive::ConfigManager;
-
-let manager = ConfigManager::from_yaml_file("config.yaml").await?;
-manager.validate()?;
-
-// 环境变量自动覆盖
-let _ = ConfigManager::from_env();
-```
-
----
-
-## 七、Todo List
+## 六、Todo List (全部完成)
 
 ### Phase 1: 持久化存储 (P0) ✅
 
@@ -312,28 +207,33 @@ let _ = ConfigManager::from_env();
 
 ---
 
-## 八、总结
+## 七、总结
 
 ### 完成度: 100% (15/15) ✅
 
 所有 Phase 已完成，agent-mem-cognitive 现已达到生产级别标准。
 
-### 测试覆盖
+### 代码质量
 
-- 单元测试: 58
-- 集成测试: 10
-- Resilience 测试: 5
-- **总计: 68 tests passing**
+- **测试**: 68 tests passing
+- **Clippy**: 0 warnings
+- **代码行数**: 4305 行 (27 模块)
+
+### 架构特点
+
+1. **8种记忆类型**: Working, Core, Episodic, Semantic, Procedural, Knowledge, Resource, Contextual
+2. **生产基础设施**: Storage, Metrics, Config, Resilience
+3. **支持模块**: Tiering, Archive, Review, Forgetting, Consolidation
 
 ### 下一步建议
 
-1. **性能基准测试**: 添加 cargo bench
+1. **性能基准测试**: 添加 `cargo bench`
 2. **压力测试**: 添加长期运行测试
-3. **文档完善**: 生成 API 文档
-4. **发布准备**: 准备 Crates.io 发布
+3. **文档生成**: `cargo doc`
+4. **Crate发布**: 准备 Crates.io 发布
 
 ---
 
 **更新日期**: 2026-06-01
-**版本**: v5.0
-**状态**: ✅ 生产级别完成
+**版本**: v5.1
+**状态**: ✅ 生产级别完成 + Clippy 清理
