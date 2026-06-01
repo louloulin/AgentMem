@@ -2,17 +2,13 @@
 //! 
 //! Tests the integration between all components
 
-use crate::{ConfigManager, UnifiedMemoryManager, InMemoryStorage, StorageManager, StoredMemory};
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::MemoryTier;
-    use crate::TieredMemoryItem;
+    use crate::{UnifiedMemoryManager, UnifiedConfig, InMemoryStorage, StorageManager, StoredMemory, ConfigManager, MemoryTier, TieredMemoryItem};
 
     #[tokio::test]
     async fn test_config_and_manager_integration() {
-        let config = crate::UnifiedConfig::default();
+        let config = UnifiedConfig::default();
         let manager = UnifiedMemoryManager::new(config);
         
         manager.add("id1".into(), "Hello world".into(), 0.8);
@@ -58,7 +54,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_memory_search_across_tiers() {
-        let config = crate::UnifiedConfig::default();
+        let config = UnifiedConfig::default();
         let manager = UnifiedMemoryManager::new(config);
         
         manager.add("rust1".into(), "Rust programming".into(), 0.9);
@@ -71,7 +67,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_memory_access_tracking() {
-        let config = crate::UnifiedConfig::default();
+        let config = UnifiedConfig::default();
         let manager = UnifiedMemoryManager::new(config);
         
         manager.add("test1".into(), "Test content".into(), 0.5);
