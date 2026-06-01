@@ -11,6 +11,7 @@
 //! - Unified memory manager (统一记忆管理)
 //! - Async support (异步支持)
 //! - Error handling (错误处理)
+//! - Storage backend (持久化存储) 🆕
 
 mod episodic;
 mod semantic;
@@ -30,6 +31,7 @@ mod review;      // 🆕 智能复习触发
 mod unified;     // 🆕 统一记忆管理
 mod error;       // 🆕 错误处理
 mod async_unified; // 🆕 异步支持
+mod storage;     // 🆕 持久化存储
 
 pub use types::*;
 pub use episodic::*;
@@ -49,3 +51,8 @@ pub use review::{ReviewTriggerManager, ReviewConfig, ReviewStats, ReviewTrigger,
 pub use unified::{UnifiedMemoryManager, UnifiedConfig, UnifiedStats, SearchResult};
 pub use error::{MemoryError, Result};
 pub use async_unified::{AsyncUnifiedMemoryManager, AsyncUnifiedConfig, AsyncUnifiedStats, AsyncSearchResult};
+pub use storage::{
+    StorageBackend, InMemoryStorage, FileStorage, 
+    StorageManager, InMemoryStorageManager, FileStorageManager,
+    StoredMemory
+};

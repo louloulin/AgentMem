@@ -68,6 +68,11 @@ impl MemoryError {
         Self::StorageError { message: msg.into() }
     }
     
+    /// Create a serialization error
+    pub fn serialization(msg: impl Into<String>) -> Self {
+        Self::SerializationError { message: msg.into() }
+    }
+    
     /// Create a capacity exceeded error
     pub fn capacity_exceeded(tier: impl Into<String>, current: usize, max: usize) -> Self {
         Self::CapacityExceeded {
