@@ -78,8 +78,10 @@ impl CognitiveMemoryItem {
 
 /// Memory consolidation status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum ConsolidationStatus {
     /// Not yet consolidated
+    #[default]
     Fresh,
     /// Currently being consolidated
     Consolidating,
@@ -91,11 +93,6 @@ pub enum ConsolidationStatus {
     Forgotten,
 }
 
-impl Default for ConsolidationStatus {
-    fn default() -> Self {
-        Self::Fresh
-    }
-}
 
 /// Memory importance weighting for different cognitive types
 #[derive(Debug, Clone)]

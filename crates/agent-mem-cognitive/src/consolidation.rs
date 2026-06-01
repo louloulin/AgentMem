@@ -6,7 +6,6 @@
 //! - Important memory prioritization
 
 use super::{CognitiveMemoryItem, ConsolidationStatus};
-use chrono::Utc;
 
 /// Memory consolidation engine
 #[derive(Debug, Clone)]

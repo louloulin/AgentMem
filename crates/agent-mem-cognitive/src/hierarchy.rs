@@ -78,23 +78,21 @@ impl MemoryHierarchy {
     pub fn add(&mut self, item: TieredMemoryItem) {
         match item.tier {
             MemoryTier::Working => {
-                if self.working.len() >= self.working_capacity {
-                    if !self.working.is_empty() {
+                if self.working.len() >= self.working_capacity
+                    && !self.working.is_empty() {
                         let mut evicted = self.working.remove(0);
                         evicted.tier = MemoryTier::Archive;
                         self.archive.push(evicted);
                     }
-                }
                 self.working.push(item);
             }
             MemoryTier::Core => {
-                if self.core.len() >= self.core_capacity {
-                    if !self.core.is_empty() {
+                if self.core.len() >= self.core_capacity
+                    && !self.core.is_empty() {
                         let mut evicted = self.core.remove(0);
                         evicted.tier = MemoryTier::Archive;
                         self.archive.push(evicted);
                     }
-                }
                 self.core.push(item);
             }
             MemoryTier::Archive => {

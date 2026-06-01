@@ -98,7 +98,7 @@ impl ArchivedItem {
         // 时间衰减 (越新分数越高)
         let now = chrono::Utc::now().timestamp();
         let days_old = (now - self.archived_at) / 86400;
-        let recency = ((30 - days_old as i64).max(0) as f32 / 30.0) * 0.2;
+        let recency = ((30 - days_old).max(0) as f32 / 30.0) * 0.2;
         score += recency;
         
         // 重要性加权
@@ -171,7 +171,7 @@ impl ArchiveMemoryManager {
         let mut all: Vec<_> = items.values().cloned().collect();
         
         // 按归档时间排序
-        all.sort_by(|a, b| b.archived_at.cmp(&a.archived_at));
+        all.sort_by_key(|b| std::cmp::Reverse(b.archived_at));
         
         all.into_iter().take(limit).collect()
     }
@@ -225,7 +225,7 @@ impl ArchiveMemoryManager {
         
         // 收集所有项并排序
         let mut all: Vec<_> = items.iter().collect();
-        all.sort_by(|a, b| b.1.archived_at.cmp(&a.1.archived_at));
+        all.sort_by_key(|b| std::cmp::Reverse(b.1.archived_at));
         
         // 保留最近的
         let to_keep: Vec<_> = all.into_iter().take(retain).map(|(k, _)| k.clone()).collect();

@@ -41,7 +41,7 @@ impl Default for ReviewConfig {
 #[derive(Debug, Clone)]
 pub struct ReviewItem {
     pub id: String,
-    pub content: String,
+    #[allow(dead_code)] pub content: String,
     pub created_at: DateTime<Utc>,
     pub decay_status: DecayStatus,
     pub stability: f32,
