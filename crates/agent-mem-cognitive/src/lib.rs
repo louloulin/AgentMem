@@ -13,6 +13,7 @@
 //! Also includes:
 //! - Forgetting curve (Ebbinghaus)
 //! - Memory consolidation and fusion
+//! - Memory hierarchy (层级记忆管理)
 
 mod episodic;
 mod semantic;
@@ -25,6 +26,7 @@ mod contextual;
 mod types;
 mod forgetting;
 mod consolidation;
+mod hierarchy;  // 🆕 层级记忆管理
 
 pub use types::*;
 pub use episodic::*;
@@ -37,3 +39,4 @@ pub use knowledge::*;
 pub use contextual::*;
 pub use forgetting::{ForgettingCurve, DecayStatus};
 pub use consolidation::{ConsolidationEngine, MemoryFusion};
+pub use hierarchy::{MemoryTier, TieredMemoryItem, MemoryHierarchy, MemoryHierarchyStats};

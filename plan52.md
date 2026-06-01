@@ -1221,3 +1221,93 @@ Query ──▶ Embedder ──▶ Vector ──▶
 
 ---
 
+
+---
+
+## 十八、MemoryHierarchy 实现完成 (v2.4)
+
+### ✅ 已实现功能
+
+| 功能 | 模块 | 状态 | 测试 |
+|------|------|------|------|
+| **MemoryHierarchy trait** | hierarchy.rs | ✅ 完成 | 2 tests |
+| **MemoryTier 枚举** | hierarchy.rs | ✅ 完成 | - |
+| **TieredMemoryItem** | hierarchy.rs | ✅ 完成 | 2 tests |
+| **容量管理** | hierarchy.rs | ✅ 完成 | 1 test |
+
+### 📝 新增代码
+
+```rust
+// crates/agent-mem-cognitive/src/hierarchy.rs
+
+pub enum MemoryTier {
+    Working,  // 工作记忆 ~100条
+    Core,     // 核心记忆 ~1000条
+    Archive,  // 归档记忆 无限制
+}
+
+pub struct TieredMemoryItem {
+    pub id: String,
+    pub content: String,
+    pub tier: MemoryTier,
+    pub importance: f32,
+    pub access_count: u32,
+}
+
+pub struct MemoryHierarchy {
+    working: Vec<TieredMemoryItem>,
+    core: Vec<TieredMemoryItem>,
+    archive: Vec<TieredMemoryItem>,
+    working_capacity: usize,
+    core_capacity: usize,
+}
+
+impl MemoryHierarchy {
+    pub fn add(&mut self, item: TieredMemoryItem)      // 添加记忆
+    pub fn access(&mut self, id: &str) -> Option<&mut TieredMemoryItem>  // 访问记忆
+    pub fn get_tier(&self, tier: MemoryTier) -> &[TieredMemoryItem]  // 获取层级
+    pub fn stats(&self) -> MemoryHierarchyStats  // 统计
+}
+```
+
+### 📈 功能完成度更新
+
+```
+已完成: 11/15 (73%)
+
+🆕 新增:
+├── MemoryHierarchy trait: ✅
+├── MemoryTier 枚举: ✅
+├── TieredMemoryItem: ✅
+└── 容量管理: ✅
+
+待实现: 4/15 (27%)
+├── 智能分层器: ☐
+├── ArchiveMemoryManager: ☐
+├── 智能复习触发: ☐
+└── API简化: ☐
+```
+
+### ✅ 测试结果
+
+```
+agent-mem-cognitive: 25 passed ✅ (+2 new tests)
+agent-mem-engine:     4 passed ✅
+agent-mem-search:    15 passed ✅
+agent-mem-types:      2 passed ✅
+
+总计: 47 tests, 0 failed ✅
+```
+
+### 🔄 下一步
+
+1. 继续实现智能分层器 (基于重要性自动分层)
+2. 实现 ArchiveMemoryManager
+3. 实现智能复习触发
+
+---
+
+**更新日期**: 2026-06-01 12:30
+**版本**: v2.4
+**状态**: MemoryHierarchy ✅ 已实现
+
