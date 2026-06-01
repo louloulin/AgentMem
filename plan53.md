@@ -339,3 +339,39 @@ manager.save_to_file("config.yaml").await.unwrap();
 manager.validate().unwrap();
 ```
 
+
+---
+
+## Phase 4 完成: 监控指标
+
+### 已实现功能
+
+| 功能 | 状态 |
+|------|------|
+| MetricsCollector | ✅ |
+| MemoryMetrics | ✅ |
+| OperationTimer | ✅ |
+| 操作计数 | ✅ |
+| 延迟追踪 | ✅ |
+| 系统状态集成 | ✅ |
+
+### API
+
+```rust
+use agent_mem_cognitive::{MetricsCollector, OperationTimer, MemoryMetrics};
+
+// 使用 MetricsCollector
+let collector = MetricsCollector::new();
+
+// 记录操作
+{
+    let timer = OperationTimer::new();
+    // do operation
+    collector.record_add(timer.elapsed_us());
+}
+
+// 获取指标
+let metrics = collector.snapshot();
+println!("Total operations: {}", metrics.total_operations);
+```
+

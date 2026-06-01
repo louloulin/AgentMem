@@ -12,7 +12,8 @@
 //! - Async support (异步支持)
 //! - Error handling (错误处理)
 //! - Storage backend (持久化存储)
-//! - Configuration management (配置管理) 🆕
+//! - Configuration management (配置管理)
+//! - Metrics (监控指标)
 
 mod episodic;
 mod semantic;
@@ -25,15 +26,16 @@ mod contextual;
 mod types;
 mod forgetting;
 mod consolidation;
-mod hierarchy;  // 🆕 层级记忆管理
-mod tiering;     // 🆕 智能分层器
-mod archive;     // 🆕 归档记忆管理
-mod review;      // 🆕 智能复习触发
-mod unified;     // 🆕 统一记忆管理
-mod error;       // 🆕 错误处理
-mod async_unified; // 🆕 异步支持
-mod storage;     // 🆕 持久化存储
-mod config;      // 🆕 配置管理
+mod hierarchy;
+mod tiering;
+mod archive;
+mod review;
+mod unified;
+mod error;
+mod async_unified;
+mod storage;
+mod config;
+mod metrics;
 
 pub use types::*;
 pub use episodic::*;
@@ -59,3 +61,4 @@ pub use storage::{
     StoredMemory
 };
 pub use config::{ConfigManager, ConfigValidationError};
+pub use metrics::{MemoryMetrics, MetricsCollector, OperationTimer};
