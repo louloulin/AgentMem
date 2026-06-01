@@ -74,6 +74,28 @@ pub use agent_mem_core::{
     SemanticAgent, WorkingAgent,
 };
 
+// 🆕 Memory Hierarchy - 层级记忆系统
+pub use agent_mem_cognitive::{
+    // 基础组件
+    MemoryTier, TieredMemoryItem, MemoryHierarchy, MemoryHierarchyStats,
+    // 智能分层
+    SmartTiering, TieringConfig,
+    // 归档管理
+    ArchiveMemoryManager, ArchiveConfig, ArchiveStats, ArchivedItem,
+    // 复习触发
+    ReviewTriggerManager, ReviewConfig, ReviewStats, ReviewTrigger, ReviewPriority,
+    // 统一入口
+    UnifiedMemoryManager, UnifiedConfig, UnifiedStats, SearchResult,
+    // 8种记忆类型
+    CognitiveMemory, CognitiveMemoryItem, CognitiveMemoryType,
+    EpisodicMemory, SemanticMemory, ProceduralMemory, WorkingMemory, CoreMemory,
+    ResourceMemory, KnowledgeGraph, ContextualMemory,
+    // 遗忘曲线
+    ForgettingCurve, DecayStatus,
+    // 记忆融合
+    ConsolidationEngine, MemoryFusion,
+};
+
 #[cfg(feature = "plugins")]
 pub use agent_mem_plugins as plugins;
 

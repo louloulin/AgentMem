@@ -16,6 +16,9 @@ agent-mem-storage = { path = "../agent-mem-storage" }
 agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-utils = { path = "../agent-mem-utils" }
 
+# Memory hierarchy (from agent-mem-cognitive)
+agent-mem-cognitive = { path = "../agent-mem-cognitive" }
+
 # Optional dependencies
 agent-mem-plugins = { path = "../agent-mem-plugins", optional = true }
 agent-mem-forgetting = { path = "../agent-mem-forgetting", optional = true }
