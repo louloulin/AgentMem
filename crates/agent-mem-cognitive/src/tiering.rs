@@ -10,7 +10,7 @@
 use crate::hierarchy::{MemoryTier, TieredMemoryItem, MemoryHierarchy};
 
 /// 智能分层器配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TieringConfig {
     /// 晋升阈值: 访问次数
     pub promote_access_threshold: u32,

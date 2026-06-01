@@ -260,3 +260,35 @@ let ids = manager.list_memories().await.unwrap();
 **版本**: v4.0
 **状态**: Phase 1 持久化存储已完成
 
+
+---
+
+## Phase 2 完成: 序列化支持
+
+### 已实现功能
+
+| 功能 | 状态 |
+|------|------|
+| UnifiedConfig serde | ✅ |
+| ArchiveConfig serde | ✅ |
+| TieringConfig serde | ✅ |
+| ReviewConfig serde | ✅ |
+| ReviewTrigger serde | ✅ |
+| ReviewPriority serde | ✅ |
+| JSON 导入/导出 | ✅ |
+
+### API
+
+```rust
+// 序列化配置
+let config = UnifiedConfig::default();
+let json = config.to_json().unwrap();
+
+// 反序列化配置
+let loaded = UnifiedConfig::from_json(&json).unwrap();
+
+// 文件操作
+config.save_to_file("config.json").await.unwrap();
+let from_file = UnifiedConfig::from_file("config.json").await.unwrap();
+```
+

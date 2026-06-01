@@ -13,10 +13,11 @@ use crate::tiering::{SmartTiering, TieringConfig};
 use crate::archive::{ArchiveMemoryManager, ArchiveConfig};
 use crate::review::{ReviewTriggerManager, ReviewConfig, ReviewTrigger};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
 
 /// 统一配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedConfig {
     pub hierarchy: HierarchyConfig,
     pub tiering: TieringConfig,
@@ -24,7 +25,7 @@ pub struct UnifiedConfig {
     pub review: ReviewConfig,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HierarchyConfig {
     pub working_capacity: usize,
     pub core_capacity: usize,
@@ -41,6 +42,32 @@ impl Default for UnifiedConfig {
             archive: ArchiveConfig::default(),
             review: ReviewConfig::default(),
         }
+    }
+}
+
+impl UnifiedConfig {
+    /// 从 JSON 字符串加载配置
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+    
+    /// 序列化为 JSON 字符串
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+    
+    /// 从文件加载配置
+    pub async fn from_file(path: &std::path::Path) -> std::io::Result<Self> {
+        let content = tokio::fs::read_to_string(path).await?;
+        serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+    
+    /// 保存配置到文件
+    pub async fn save_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
+        let json = self.to_json()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        tokio::fs::write(path, json).await
     }
 }
 
@@ -187,7 +214,7 @@ impl UnifiedMemoryManager {
 }
 
 /// 搜索结果
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     pub id: String,
     pub content: String,
@@ -196,7 +223,7 @@ pub struct SearchResult {
 }
 
 /// 统一统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedStats {
     pub working_count: usize,
     pub core_count: usize,
@@ -213,7 +240,7 @@ mod tests {
     fn test_add_and_access() {
         let manager = UnifiedMemoryManager::with_defaults();
         
-        manager.add("test1".to_string(), "Hello world".to_string(), 0.8);
+        manager.add("test1".into(), "Hello world".into(), 0.8);
         
         let result = manager.access("test1");
         assert!(result.is_some());
@@ -224,8 +251,8 @@ mod tests {
     fn test_search() {
         let manager = UnifiedMemoryManager::with_defaults();
         
-        manager.add("test1".to_string(), "Rust programming".to_string(), 0.8);
-        manager.add("test2".to_string(), "Python programming".to_string(), 0.7);
+        manager.add("test1".into(), "Rust programming".into(), 0.8);
+        manager.add("test2".into(), "Python programming".into(), 0.7);
         
         let results = manager.search("Rust", 10);
         assert!(!results.is_empty());
@@ -236,9 +263,22 @@ mod tests {
     fn test_stats() {
         let manager = UnifiedMemoryManager::with_defaults();
         
-        manager.add("test1".to_string(), "Hello".to_string(), 0.8);
+        manager.add("test1".into(), "Hello".into(), 0.8);
         
         let stats = manager.stats();
         assert_eq!(stats.working_count, 1);
+    }
+    
+    #[test]
+    fn test_config_serde() {
+        let config = UnifiedConfig::default();
+        
+        // Serialize to JSON
+        let json = config.to_json().unwrap();
+        assert!(json.contains("working_capacity"));
+        
+        // Deserialize from JSON
+        let loaded = UnifiedConfig::from_json(&json).unwrap();
+        assert_eq!(loaded.hierarchy.working_capacity, config.hierarchy.working_capacity);
     }
 }

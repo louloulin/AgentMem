@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// 归档记忆配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchiveConfig {
     /// 最大归档数量 (0 = 无限制)
     pub max_items: usize,
@@ -42,7 +42,7 @@ pub struct ArchiveMemoryManager {
 }
 
 /// 归档记忆项
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchivedItem {
     pub id: String,
     pub content: String,
@@ -242,7 +242,7 @@ impl ArchiveMemoryManager {
 }
 
 /// 归档统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchiveStats {
     pub total_items: usize,
     pub avg_importance: f32,

@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// 复习触发器配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReviewConfig {
     /// 触发阈值: 记忆保留率低于此值时触发复习
     pub trigger_threshold: f32,
@@ -38,7 +38,7 @@ impl Default for ReviewConfig {
 }
 
 /// 复习项
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReviewItem {
     pub id: String,
     #[allow(dead_code)] pub content: String,
@@ -52,7 +52,7 @@ pub struct ReviewItem {
 }
 
 /// 复习优先级
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum ReviewPriority {
     Critical = 4,  // 即将遗忘
     High = 3,      // 重要但稳定
@@ -61,7 +61,7 @@ pub enum ReviewPriority {
 }
 
 /// 复习触发事件
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReviewTrigger {
     pub id: String,
     pub priority: ReviewPriority,
@@ -288,7 +288,7 @@ impl ReviewTriggerManager {
 }
 
 /// 复习统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReviewStats {
     pub total_tracked: usize,
     pub pending_reviews: usize,
