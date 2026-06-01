@@ -2,7 +2,7 @@
 //! 
 //! Semantic memories store facts, concepts, and general knowledge.
 
-use agent_mem_types::{MemoryType, Metadata};
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

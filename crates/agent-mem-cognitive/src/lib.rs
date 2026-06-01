@@ -17,6 +17,7 @@
 //! - Smart tiering (智能分层器)
 //! - Archive memory manager (归档记忆管理)
 //! - Intelligent review trigger (智能复习触发)
+//! - Unified memory manager (统一记忆管理)
 
 mod episodic;
 mod semantic;
@@ -33,6 +34,7 @@ mod hierarchy;  // 🆕 层级记忆管理
 mod tiering;     // 🆕 智能分层器
 mod archive;     // 🆕 归档记忆管理
 mod review;      // 🆕 智能复习触发
+mod unified;     // 🆕 统一记忆管理
 
 pub use types::*;
 pub use episodic::*;
@@ -46,6 +48,7 @@ pub use contextual::*;
 pub use forgetting::{ForgettingCurve, DecayStatus};
 pub use consolidation::{ConsolidationEngine, MemoryFusion};
 pub use hierarchy::{MemoryTier, TieredMemoryItem, MemoryHierarchy, MemoryHierarchyStats};
-pub use tiering::{SmartTiering, TieringConfig};  // 🆕 智能分层器导出
-pub use archive::{ArchiveMemoryManager, ArchiveConfig, ArchiveStats, ArchivedItem};  // 🆕 归档管理导出
-pub use review::{ReviewTriggerManager, ReviewConfig, ReviewStats, ReviewTrigger, ReviewPriority};  // 🆕 复习触发导出
+pub use tiering::{SmartTiering, TieringConfig};
+pub use archive::{ArchiveMemoryManager, ArchiveConfig, ArchiveStats, ArchivedItem};
+pub use review::{ReviewTriggerManager, ReviewConfig, ReviewStats, ReviewTrigger, ReviewPriority};
+pub use unified::{UnifiedMemoryManager, UnifiedConfig, UnifiedStats, SearchResult};  // 🆕 统一管理导出

@@ -2,7 +2,7 @@
 //! 
 //! Knowledge memories store structured knowledge graphs and domain expertise.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use serde::{Deserialize, Serialize};
 
 /// Knowledge graph edge

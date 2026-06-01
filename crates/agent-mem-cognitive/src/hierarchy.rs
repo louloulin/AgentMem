@@ -75,7 +75,7 @@ impl MemoryHierarchy {
         Self::new(100, 1000)
     }
     
-    pub fn add(&mut self, mut item: TieredMemoryItem) {
+    pub fn add(&mut self, item: TieredMemoryItem) {
         match item.tier {
             MemoryTier::Working => {
                 if self.working.len() >= self.working_capacity {

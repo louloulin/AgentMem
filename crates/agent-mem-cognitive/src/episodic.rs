@@ -2,8 +2,8 @@
 //! 
 //! Episodic memories store specific events and experiences with temporal context.
 
-use super::{CognitiveMemoryItem, ConsolidationStatus};
-use agent_mem_types::{MemoryType, Metadata};
+
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

@@ -1508,3 +1508,82 @@ agent-mem-types:      2 passed ✅
 **版本**: v2.6
 **状态**: ✅ 所有计划功能已实现
 
+
+---
+
+## 二十二、UnifiedMemoryManager 统一记忆管理器 (v2.7)
+
+### ✅ 已实现功能
+
+| 功能 | 模块 | 状态 | 测试 |
+|------|------|------|------|
+| **UnifiedConfig** | unified.rs | ✅ 完成 | - |
+| **UnifiedMemoryManager** | unified.rs | ✅ 完成 | 3 tests |
+| **add()** | unified.rs | ✅ 完成 | 1 test |
+| **access()** | unified.rs | ✅ 完成 | 1 test |
+| **search()** | unified.rs | ✅ 完成 | 1 test |
+| **review()** | unified.rs | ✅ 完成 | - |
+| **get_pending_reviews()** | unified.rs | ✅ 完成 | - |
+| **rebalance()** | unified.rs | ✅ 完成 | - |
+| **stats()** | unified.rs | ✅ 完成 | 1 test |
+
+### 📝 核心代码
+
+```rust
+// 统一入口
+let manager = UnifiedMemoryManager::with_defaults();
+
+// 添加记忆
+manager.add("id".to_string(), "content".to_string(), 0.8);
+
+// 访问记忆
+if let Some(content) = manager.access("id") {
+    println!("{}", content);
+}
+
+// 搜索
+let results = manager.search("query", 10);
+
+// 复习
+manager.review("id");
+
+// 获取待复习项
+let pending = manager.get_pending_reviews(5);
+
+// 重新平衡
+manager.rebalance();
+
+// 统计
+let stats = manager.stats();
+```
+
+### 📈 功能完成度更新
+
+```
+✅ 所有计划功能 + 扩展功能已实现!
+
+核心模块:
+├── MemoryHierarchy: ✅ 层级管理
+├── SmartTiering: ✅ 智能分层
+├── ArchiveMemoryManager: ✅ 归档管理
+├── ReviewTriggerManager: ✅ 复习触发
+└── UnifiedMemoryManager: ✅ 统一入口 (新)
+```
+
+### ✅ 测试结果
+
+```
+agent-mem-cognitive: 37 passed ✅ (+3 new tests)
+agent-mem-engine:     4 passed ✅
+agent-mem-search:    15 passed ✅
+agent-mem-types:      2 passed ✅
+
+总计: 59 tests, 0 failed ✅
+```
+
+---
+
+**更新日期**: 2026-06-01 15:00
+**版本**: v2.7
+**状态**: ✅ 所有功能 + 统一入口完成
+
