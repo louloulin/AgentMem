@@ -42,7 +42,7 @@ chrono = { version = "0.4", features = ["serde"] }
 url = "2.5"
 
 # Configuration
-config = "0.14"
+config = "0.15"
 toml = "0.8"
 
 # Logging
