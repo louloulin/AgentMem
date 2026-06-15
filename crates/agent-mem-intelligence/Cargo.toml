@@ -50,7 +50,7 @@ imageproc = { version = "0.23", optional = true }
 rusttype = { version = "0.9", optional = true }
 
 # OCR 和文本识别
-tesseract = { version = "0.13", optional = true }
+tesseract = { version = "0.15", optional = true }
 
 # 音频处理
 hound = { version = "3.5", optional = true }
