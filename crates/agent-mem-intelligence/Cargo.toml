@@ -36,7 +36,7 @@ lru = "0.12"
 sha2 = "0.10"
 
 # 数学和统计计算
-nalgebra = { version = "0.32", optional = true }
+nalgebra = { version = "0.34", optional = true }
 ndarray = { version = "0.15", optional = true }
 
 # 机器学习算法（可选）
