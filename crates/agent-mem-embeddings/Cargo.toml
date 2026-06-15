@@ -28,7 +28,7 @@ chrono.workspace = true
 tracing.workspace = true
 
 # HTTP客户端（用于API调用）
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # 本地嵌入模型依赖（可选）
 candle-core = { version = "0.6", optional = true }

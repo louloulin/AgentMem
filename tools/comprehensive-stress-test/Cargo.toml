@@ -50,7 +50,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # HTTP client (for API testing)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # Metrics
 prometheus = "0.13"

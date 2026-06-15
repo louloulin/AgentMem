@@ -44,7 +44,7 @@ linfa = { version = "0.7", optional = true }
 linfa-clustering = { version = "0.7", optional = true }
 
 # 多模态处理依赖
-reqwest = { version = "0.11", features = ["json", "multipart"], optional = true }
+reqwest = { version = "0.13", features = ["json", "multipart"], optional = true }
 image = { version = "0.24", optional = true }
 imageproc = { version = "0.23", optional = true }
 rusttype = { version = "0.9", optional = true }

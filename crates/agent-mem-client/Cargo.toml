@@ -18,7 +18,7 @@ agent-mem-config = { path = "../agent-mem-config" }
 agent-mem-performance = { path = "../agent-mem-performance" }
 
 # HTTP client
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", features = ["json", "rustls-tls"] }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
